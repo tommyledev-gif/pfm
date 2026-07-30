@@ -1,0 +1,9 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# GitNexus local index (already self-ignored via .gitnexus/.gitignore, listed for clarity)
+.gitnexus/
+
+# Spec Kit local scratch
+.specify/memory/*.local.md
