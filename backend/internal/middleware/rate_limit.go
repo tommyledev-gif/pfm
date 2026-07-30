@@ -1,0 +1,50 @@
+package middleware
+
+import (
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
+	"go.uber.org/zap"
+
+	"github.com/example/pfm/backend/internal/common"
+	"github.com/example/pfm/backend/internal/response"
+)
+
+// InviteRateLimiter enforces spec.md S-USR-07 (20 invites/hour/admin). Must
+// run after JWTAuth so common.LocalsUserID is already populated.
+func InviteRateLimiter(logger *zap.Logger) fiber.Handler {
+	return limiter.New(limiter.Config{
+		Max:        common.InviteRateLimit,
+		Expiration: common.InviteRateLimitWindow,
+		KeyGenerator: func(c *fiber.Ctx) string {
+			userID, _ := c.Locals(common.LocalsUserID).(string)
+			return userID
+		},
+		LimitReached: func(c *fiber.Ctx) error {
+			return response.Error(c, logger, common.ErrRateLimited)
+		},
+	})
+}
+
+// LoginRateLimiter enforces spec.md S-SEC-07 (10 attempts/15min/IP).
+//
+// Deliberate simplification: this counts every request to /auth/login from
+// an IP within the window, not only failed ones. spec.md's own Edge Case
+// text hedges this as "counts failed attempts only (assumption)" — true
+// failed-only counting needs a custom post-response hook (increment after
+// the handler determines the outcome), which Fiber's stock limiter doesn't
+// do. Counting all attempts is strictly safer (a legitimate user retrying
+// after a typo consumes the same budget as an attacker), just not literally
+// what the hedge in spec.md guessed. Flagged here rather than silently
+// assumed either way.
+func LoginRateLimiter(logger *zap.Logger) fiber.Handler {
+	return limiter.New(limiter.Config{
+		Max:        common.LoginRateLimit,
+		Expiration: common.LoginRateLimitWindow,
+		KeyGenerator: func(c *fiber.Ctx) string {
+			return c.IP()
+		},
+		LimitReached: func(c *fiber.Ctx) error {
+			return response.Error(c, logger, common.ErrRateLimited)
+		},
+	})
+}

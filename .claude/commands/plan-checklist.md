@@ -7,10 +7,13 @@
 
 ## DIAGRAM / SEQUENCE
 
-- [ ] Diagrams stay at **actor-level** — no SQL statements, no method parameter lists, no field-level detail inside arrows.
+- [ ] Diagrams use the **standard four-tier lifeline**: `Actor → Frontend → Backend → DB` (for backend-only flows with no UI in scope, drop `Frontend` and use `Actor → Backend → DB`). Never collapse the whole request path into a single "Backend does everything" box — that's not a sequence diagram, it's a note with extra steps.
+- [ ] No SQL statements, no method parameter lists, no struct/field-level detail inside arrows or notes — describe *what* each tier does in plain language ("Backend checks the email isn't already registered"), not *how* ("UserRepository.findByEmail() then bcrypt.Compare()").
 - [ ] Every arrow/action has a **clear actor** (who triggers) and a **clear outcome** (what results) — no ambiguous "calls X" with no result.
 - [ ] Actors named consistently with SRS §2 domain language — `User` not `UserAccount`, `BusinessUnit` not `BU`.
-- [ ] No more than one level of system internals shown — e.g., show "AuthService validates credentials", not "AuthService calls UserRepository.findByEmail() → compares BCrypt hash → updates lastLogin".
+- [ ] No more than one level of system internals shown per tier — e.g., the Backend tier shows "validates credentials", not "calls UserRepository.findByEmail() → compares BCrypt hash → updates lastLogin". The four-tier lifeline itself (Frontend/Backend/DB) is the intended level of detail — it is not a violation of this rule.
+- [ ] **One diagram per user story** — happy path first, every alternate/failure path in the **same diagram** using real `alt / else / end` blocks. Never split one story's flows across multiple diagrams, and never fake alt branches with `Note over X: alt: ...` text — that renders as disconnected notes, not actual control flow.
+- [ ] Diagram text avoids characters that break common Mermaid parsers inside arrow/note labels — no `{}`, no `;`, no raw `<`/`>`. Use plain comma-separated prose instead of literal JSON-like payload shapes.
 
 ---
 

@@ -1,0 +1,85 @@
+package main
+
+import (
+	"context"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"go.uber.org/zap"
+
+	"github.com/example/pfm/backend/internal/common"
+	"github.com/example/pfm/backend/internal/config"
+	"github.com/example/pfm/backend/internal/handler"
+	"github.com/example/pfm/backend/internal/repository"
+	"github.com/example/pfm/backend/internal/repository/sqlc"
+	"github.com/example/pfm/backend/internal/response"
+	"github.com/example/pfm/backend/internal/service"
+)
+
+func main() {
+	logger, err := newLogger()
+	if err != nil {
+		panic(err)
+	}
+	defer logger.Sync() //nolint:errcheck // best-effort flush on shutdown
+
+	cfg, err := config.Load()
+	if err != nil {
+		logger.Fatal("failed to load config", zap.Error(err))
+	}
+
+	pool, err := pgxpool.New(context.Background(), cfg.DatabaseURL)
+	if err != nil {
+		logger.Fatal("failed to connect to database", zap.Error(err))
+	}
+	defer pool.Close()
+
+	queries := sqlc.New(pool)
+	userRepo := repository.NewUserRepository(queries)
+	revokedRepo := repository.NewRevokedTokenRepository(queries)
+
+	tokenService := service.NewTokenService(cfg.JWTSecret)
+	emailSender := service.NewLogEmailSender(logger)
+	userService := service.NewUserService(userRepo, emailSender, logger)
+	authService := service.NewAuthService(userRepo, revokedRepo, tokenService, logger)
+
+	userHandler := handler.NewUserHandler(userService, logger)
+	authHandler := handler.NewAuthHandler(authService, logger)
+
+	app := fiber.New(fiber.Config{
+		ErrorHandler: func(c *fiber.Ctx, err error) error {
+			return response.Error(c, logger, err)
+		},
+	})
+	registerRoutes(app, userHandler, authHandler, tokenService, logger)
+
+	go func() {
+		if err := app.Listen(":" + cfg.Port); err != nil {
+			logger.Fatal("server stopped unexpectedly", zap.Error(err))
+		}
+	}()
+	logger.Info("server started", zap.String("port", cfg.Port))
+
+	waitForShutdown(app, logger)
+}
+
+func waitForShutdown(app *fiber.App, logger *zap.Logger) {
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	<-quit
+
+	logger.Info("shutting down server")
+	if err := app.ShutdownWithTimeout(common.ShutdownTimeout); err != nil {
+		logger.Error("error during shutdown", zap.Error(err))
+	}
+}
+
+func newLogger() (*zap.Logger, error) {
+	if os.Getenv("APP_ENV") == "production" {
+		return zap.NewProduction()
+	}
+	return zap.NewDevelopment()
+}
