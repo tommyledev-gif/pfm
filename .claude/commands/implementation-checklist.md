@@ -1,6 +1,6 @@
 # MUST NOT VIOLATE — Implementation Coding (src code)
 
-> Scope: Backend — every file under `internal/` or `cmd/` (Go) and `app/` or `src/` (Python) — handlers, services, repositories, schemas/DTOs, middleware. Frontend — every file under `lib/` (Flutter) — screens, widgets, blocs/providers, repositories, models.
+> Scope: Backend — every file under `internal/` or `cmd/` (Go) and `app/` or `src/` (Python) — handlers, services, repositories, schemas/DTOs, middleware. Frontend (Mobile) — every file under `mobile/lib/` (Flutter) — screens, widgets, blocs/providers, repositories, models. Frontend (Web) — every file under `frontend/src/` (Next.js/React) — pages, components, hooks, stores, middleware.
 > Violation = PR blocked. No exception without explicit tech-lead sign-off.
 
 ---
@@ -158,6 +158,24 @@
 - [ ] Navigation logic is centralized (named routes or a router package) — no hardcoded `Navigator.push(MaterialPageRoute(...))` duplicated across the app for the same destination.
 - [ ] `BuildContext` never stored/used across an `async` gap without a `context.mounted` check.
 - [ ] Null-safety respected fully — no `!` (bang operator) used to silence a nullability the code hasn't actually verified.
+
+---
+
+## REACT (WEB) — ARCHITECTURE
+
+- [ ] `frontend/` is a second client, not a mobile replacement — no feature removed or degraded in `mobile/` to justify a web-only shortcut.
+- [ ] Server state (API data) lives in TanStack Query only — never copied into `useState` or a Zustand store as a cache.
+- [ ] Client/global state (session, UI prefs) lives in Zustand, one store per concern — no single catch-all store.
+- [ ] Components check for an existing reusable piece before adding a new one, in order: `components/ui/` (shadcn) → `components/shared/` → the feature's own `components/`. A component used by ≥2 features is promoted to `components/shared/`, never duplicated.
+- [ ] No file (page or component) exceeds 300 lines — split into `components/shared/` (reusable) or a private sub-component in the same file/folder (not reusable) before it does.
+- [ ] Component body follows the fixed order: imports → types → module constants/config → global/shared state (Zustand) → `useState` → TanStack Query hooks → derived values → `useEffect` → handlers → early returns (loading/empty/error) → JSX return.
+- [ ] Every data-fetching component/page renders a skeleton (shadcn `Skeleton`) while loading — no blank screen, no bare spinner standing in for a list/detail view.
+- [ ] `middleware.ts` gates every protected route group by checking session-cookie presence only — it never decodes/trusts the JWT (that's the backend's job).
+- [ ] Browser code never calls the Go backend origin directly and never holds the JWT — all requests go through the Next.js BFF proxy route (`app/api/proxy/[...path]/route.ts`), axios instance points at `/api/proxy`.
+- [ ] No raw `fetch`/`axios` call inside a component — always through a feature's `api/` hook (TanStack Query `useQuery`/`useMutation`).
+- [ ] No `any` in TypeScript — API response shapes are explicit types/interfaces, mirrored from `api-spec/openapi.yaml` where one exists.
+- [ ] Money values formatted via the shared `formatCurrency` utility only — never `amount / 100` inline in JSX.
+- [ ] No magic numbers/strings in components (timeouts, page sizes, route paths) — extracted to `lib/constants.ts`.
 
 ---
 

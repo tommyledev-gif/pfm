@@ -1,7 +1,19 @@
 # PFM – Tech Stack
 
-> Last updated: 2026-07-30  
+> Last updated: 2026-07-31  
 > Scope: Mobile App + Go Backend + Python AI Service
+
+## Implementation Status
+
+| Component | Status |
+|---|---|
+| Backend (Go) | **In progress** — Phase 0 (F-01 User Management, F-02 Auth) implemented in `backend/` |
+| Mobile (Flutter) | **Not started** — `mobile/` does not exist yet |
+| AI Service (Python) | **Not started** — `ai-service/` does not exist yet |
+| Infra (Docker Compose) | **Not started** — `infra/` does not exist yet |
+| API spec (`openapi.yaml`) | **Not started** — `api-spec/` does not exist yet; backend handlers are hand-written, not codegen'd |
+
+Everything below describes the **target** stack. Rows already implemented in `backend/` are marked ✅; everything else is planned only.
 
 ---
 
@@ -22,7 +34,7 @@ Backend handles all business logic + data ownership; AI service handles LLM call
 
 ---
 
-## 1. Mobile App (Flutter)
+## 1. Mobile App (Flutter) — *planned, not started*
 
 | Layer | Library | Version | Notes |
 |-------|---------|---------|-------|
@@ -43,28 +55,28 @@ Backend handles all business logic + data ownership; AI service handles LLM call
 
 ## 2. Backend — Go
 
-| Layer | Library | Notes |
-|-------|---------|-------|
-| Web framework | Fiber v2 | Express-like, high performance |
-| DB driver | pgx/v5 | Native PostgreSQL driver, used by sqlc |
-| Query layer | **sqlc** | Type-safe Go code generated from raw SQL — do NOT use GORM |
-| Database | PostgreSQL 16 | Relational, supports aggregation/reporting, pgvector extension |
-| Migrations | golang-migrate | SQL file-based, idempotent |
-| Auth | golang-jwt/jwt v5 | Access token (15m) + refresh token (7d) |
-| Validation | go-playground/validator v10 | Struct-tag validation, OWASP input safety |
-| Logging | Zap (uber-go/zap) | Structured JSON logging — never log sensitive fields |
-| API spec generation | **oapi-codegen** | API-first: write openapi.yaml → generate server boilerplate |
-| Rate limiting | Fiber built-in limiter | Applied on auth endpoints from day 1 |
-| Password hashing | bcrypt | Cost = 12 |
-| Secure token | crypto/rand | For invite tokens — NOT UUID |
+| Layer | Library | Notes | Status |
+|-------|---------|-------|--------|
+| Web framework | Fiber v2.52.5 | Express-like, high performance | ✅ implemented |
+| DB driver | pgx/v5 (v5.6.0) | Native PostgreSQL driver, used by sqlc | ✅ implemented |
+| Query layer | **sqlc** | Type-safe Go code generated from raw SQL — do NOT use GORM | ✅ implemented (`sqlc.yaml`, generates into `internal/repository/sqlc`) |
+| Database | PostgreSQL | Relational, supports aggregation/reporting | ✅ implemented (version/pgvector not verifiable — no infra/docker-compose yet) |
+| Migrations | Numbered `.sql` files, applied manually | `db/migrations/001_init.sql`, `002_seed_admin.sql`, `003_revoked_tokens.sql` | ⚠️ **planned tool not wired**: `golang-migrate` is not a dependency (not in `go.sum`) and no Makefile/script runs it yet — files exist but nothing automates applying them |
+| Auth | golang-jwt/jwt v5 (v5.2.1) | Access token (15m) + refresh token (7d) | ✅ implemented |
+| Validation | go-playground/validator v10 (v10.22.0) | Struct-tag validation, OWASP input safety | ✅ implemented |
+| Logging | Zap (uber-go/zap v1.27.0) | Structured JSON logging — never log sensitive fields | ✅ implemented |
+| API spec generation | oapi-codegen | API-first: write openapi.yaml → generate server boilerplate | ❌ **not started** — no `api-spec/openapi.yaml`, no oapi-codegen dependency anywhere; handlers in `internal/handler/` are hand-written Go, not generated |
+| Rate limiting | Fiber built-in limiter (`fiber/v2/middleware/limiter`) | Applied on auth endpoints from day 1 | ✅ implemented |
+| Password hashing | bcrypt | Cost = 12 | ✅ implemented |
+| Secure token | crypto/rand | For invite tokens — NOT UUID (32 bytes → 64 hex chars) | ✅ implemented |
 
 **Why sqlc over GORM:** GORM hides N+1 queries, has zero-value gotchas, and loses type safety on complex aggregations. Expense tracker needs GROUP BY, SUM, date range — raw SQL is the right tool.
 
-**Why oapi-codegen over Swaggo:** API-first means the spec is the source of truth. Write `openapi.yaml` → generate Go server interfaces → generate Dart client. Swaggo generates docs *after* the code, inverting the dependency.
+**Why oapi-codegen over Swaggo (planned, not yet acted on):** API-first means the spec is the source of truth. Write `openapi.yaml` → generate Go server interfaces → generate Dart client. Swaggo generates docs *after* the code, inverting the dependency. **Current reality:** neither is wired up — handlers are hand-written and there is no `openapi.yaml` yet, so this decision hasn't been executed.
 
 ---
 
-## 3. AI Service — Python
+## 3. AI Service — Python — *planned, not started*
 
 | Layer | Library | Notes |
 |-------|---------|-------|
@@ -96,7 +108,7 @@ Backend handles all business logic + data ownership; AI service handles LLM call
 
 ---
 
-## 5. Infra / Dev Tooling
+## 5. Infra / Dev Tooling — *planned, not started*
 
 | Tool | Purpose |
 |------|---------|
@@ -118,7 +130,7 @@ pfm/
 ├── backend/             # Go service
 │   ├── cmd/
 │   ├── internal/
-│   │   ├── handler/     # HTTP layer (generated + manual)
+│   │   ├── handler/     # HTTP layer (hand-written; codegen from openapi.yaml not yet adopted)
 │   │   ├── service/     # Business logic
 │   │   ├── repository/  # sqlc generated + wrappers
 │   │   ├── model/       # Domain structs

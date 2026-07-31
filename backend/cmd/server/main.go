@@ -7,6 +7,7 @@ import (
 	"syscall"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
@@ -42,7 +43,7 @@ func main() {
 	revokedRepo := repository.NewRevokedTokenRepository(queries)
 
 	tokenService := service.NewTokenService(cfg.JWTSecret)
-	emailSender := service.NewLogEmailSender(logger)
+	emailSender := newEmailSender(cfg, logger)
 	userService := service.NewUserService(userRepo, emailSender, logger)
 	authService := service.NewAuthService(userRepo, revokedRepo, tokenService, logger)
 
@@ -54,6 +55,11 @@ func main() {
 			return response.Error(c, logger, err)
 		},
 	})
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: cfg.CORSAllowedOrigins,
+		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
+		AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+	}))
 	registerRoutes(app, userHandler, authHandler, tokenService, logger)
 
 	go func() {
@@ -82,4 +88,24 @@ func newLogger() (*zap.Logger, error) {
 		return zap.NewProduction()
 	}
 	return zap.NewDevelopment()
+}
+
+// newEmailSender picks SMTP once SMTP_HOST is set, otherwise falls back to
+// the log-only placeholder — SMTP delivery is not required to run the API
+// locally (see config.Config.SMTPHost doc comment).
+func newEmailSender(cfg *config.Config, logger *zap.Logger) service.EmailSender {
+	if cfg.SMTPHost == "" {
+		logger.Warn("SMTP_HOST not set — activation emails will only be logged, not sent")
+		return service.NewLogEmailSender(logger)
+	}
+	logger.Info("SMTP email sender configured", zap.String("host", cfg.SMTPHost), zap.String("port", cfg.SMTPPort))
+	return service.NewSMTPEmailSender(service.SMTPConfig{
+		Host:       cfg.SMTPHost,
+		Port:       cfg.SMTPPort,
+		Username:   cfg.SMTPUsername,
+		Password:   cfg.SMTPPassword,
+		FromEmail:  cfg.SMTPFromEmail,
+		FromName:   cfg.SMTPFromName,
+		AppBaseURL: cfg.AppBaseURL,
+	})
 }

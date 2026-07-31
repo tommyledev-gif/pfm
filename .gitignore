@@ -7,3 +7,25 @@ Thumbs.db
 
 # Spec Kit local scratch
 .specify/memory/*.local.md
+
+# Local secrets — copy .env.example to .env and fill in your own values
+.env
+
+# Go
+backend/tmp/
+backend/*.exe
+
+# Per-machine local CA trust (e.g. antivirus/corporate TLS-inspection root
+# certs needed to reach smtp.gmail.com through interception) — never commit,
+# never shared across developers. See backend/Dockerfile.
+backend/certs/local-dev-ca/*.crt
+
+# Flutter / Dart
+# pubspec.lock is intentionally NOT ignored — this is an app, not a
+# published package, so the lockfile is committed for reproducible builds.
+mobile/.dart_tool/
+mobile/.flutter-plugin-registrant/
+mobile/build/
+mobile/.pub-cache/
+mobile/.packages
+

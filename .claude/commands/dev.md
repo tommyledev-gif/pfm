@@ -214,6 +214,226 @@ Text('${amount / 100} VND')
 
 ---
 
+## React — Web (Next.js + Tailwind + shadcn/ui + TanStack Query + Zustand + Axios)
+
+`frontend/` is a second client for the **same features** as `mobile/` (F-01..F-11) — a web surface, not a replacement. Never remove or edit `mobile/` to make room for it.
+
+### File Structure
+
+```
+frontend/
+├── middleware.ts                # route protection — see Middleware below
+├── src/
+│   ├── app/
+│   │   ├── (auth)/
+│   │   │   └── login/page.tsx
+│   │   ├── (app)/                # protected — matched by middleware
+│   │   │   └── {feature}/page.tsx
+│   │   ├── api/
+│   │   │   └── proxy/[...path]/route.ts  # BFF proxy to Go backend
+│   │   ├── layout.tsx
+│   │   └── globals.css
+│   ├── features/
+│   │   └── {feature}/
+│   │       ├── api/              # axios calls + TanStack Query hooks
+│   │       ├── components/       # feature-only components
+│   │       ├── store/            # Zustand slice, only if feature needs client state
+│   │       └── types.ts          # TS types/interfaces for this feature
+│   ├── components/
+│   │   ui/                     # shadcn/ui generated components — never hand-edit generation, only extend
+│   │   shared/                  # cross-feature reusable components (skeletons, empty states, etc.)
+│   ├── lib/
+│   │   ├── axios.ts              # single axios instance + interceptors
+│   │   ├── query-client.ts       # TanStack QueryClient singleton
+│   │   ├── constants.ts          # app-wide constants/config — no magic values
+│   │   └── currency.ts           # money formatter (mirrors Flutter's CurrencyFormatter)
+│   └── stores/                   # global Zustand stores (auth/session, ui prefs)
+└── public/
+```
+
+### Component Priority — Reuse Before Creating
+
+Before writing a new component, check `components/ui/` (shadcn primitives) then `components/shared/` (cross-feature) then the current feature's own `components/` folder, in that order. Only create a new component when none of the three cover the need. A component used by ≥2 features belongs in `components/shared/`, never duplicated per-feature.
+
+### File Size
+
+Same rule as everywhere else in this repo: **no file > 300 lines**. A page or component file that grows past 300 lines must be split — pull sections into `components/shared/` (if reusable elsewhere) or a private sub-component in the same feature folder (if not). Prefer many small focused files over one large page component.
+
+### Component File Ordering (strict)
+
+Every component file follows this order — no exceptions. This governs *declaration order*, and it doubles as the hook-call order inside the component body:
+
+```tsx
+// 1. Imports
+import { useState, useEffect } from "react";
+
+// 2. Types/interfaces for this file
+interface FooPageProps {
+  walletId: string;
+}
+
+// 3. Module-level constants / config (never inline magic numbers/strings)
+const POLL_INTERVAL_MS = 30_000;
+
+// 4. Component declaration
+export function FooPage({ walletId }: FooPageProps) {
+  // 5. Global/shared state read first — Zustand stores, context
+  const userId = useAuthStore((s) => s.userId);
+
+  // 6. Local state — useState
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  // 7. Server state — TanStack Query hooks
+  const { data, isLoading } = useWalletQuery(walletId);
+
+  // 8. Derived values (computed from state/props — no side effects)
+  const isEmpty = !isLoading && data?.items.length === 0;
+
+  // 9. Effects — useEffect, last, only for real side effects (subscriptions, DOM, sync with non-React systems)
+  useEffect(() => {
+    document.title = `Wallet — ${data?.name ?? ""}`;
+  }, [data?.name]);
+
+  // 10. Event handlers / callbacks
+  function handleCreate() {
+    setIsDialogOpen(true);
+  }
+
+  // 11. Loading / empty / error early returns
+  if (isLoading) return <FooSkeleton />;
+
+  // 12. Return JSX
+  return <div>...</div>;
+}
+
+// 13. Private sub-components used only in this file go below the main export
+function FooSkeleton() {
+  return <Skeleton className="h-24 w-full" />;
+}
+```
+
+Rationale for the ordering: global config/values before any hook, `useState` before `useEffect`, so a reader always finds "what does this depend on" before "what does this do."
+
+### State Management
+
+- **Server state** (anything from the API) → TanStack Query only. Never mirror server data into `useState` or Zustand.
+- **Client/global state** (auth session, UI prefs, wizard steps) → Zustand. One store per concern — never one giant `useAppStore` holding unrelated state.
+- Mutations invalidate the relevant query key on success — never manually patch cached query data unless doing optimistic updates, and never poll on a timer to "refresh."
+
+```tsx
+// Correct pattern for mutation
+const queryClient = useQueryClient();
+const { mutate: createTransaction } = useMutation({
+  mutationFn: (req: CreateTransactionRequest) => transactionsApi.create(req),
+  onSuccess: (_, req) => {
+    queryClient.invalidateQueries({ queryKey: ["wallets", req.walletId] });
+  },
+});
+```
+
+### Skeleton Loading (required)
+
+Every page/component that reads a TanStack Query with a network round-trip **must** render a skeleton (shadcn `Skeleton`) while `isLoading`/`isPending` is true — never a blank screen, never a bare spinner-only state for list/detail views. Put the skeleton next to the component it stands in for (`FooCardSkeleton` beside `FooCard`) so its shape stays in sync.
+
+### Middleware (required)
+
+Every protected route group goes through `middleware.ts` at the project root — never rely on a client-side redirect alone (it flashes protected content before redirecting). Session is an httpOnly cookie set by the login route handler; middleware only checks for its presence, it never decodes or trusts the JWT itself (that's the Go backend's job on every request).
+
+```ts
+import { NextRequest, NextResponse } from "next/server";
+
+export const config = {
+  matcher: ["/app", "/app/:path*", "/login"],
+};
+
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const hasSessionCookie = request.cookies.has("PFM_SESSION");
+  const isProtectedRoute = pathname === "/app" || pathname.startsWith("/app/");
+
+  if (isProtectedRoute && !hasSessionCookie) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  if (pathname === "/login" && hasSessionCookie) {
+    return NextResponse.redirect(new URL("/app", request.url));
+  }
+
+  return NextResponse.next();
+}
+```
+
+### API Proxy (BFF route handler)
+
+Browser code never calls the Go backend directly and never sees the JWT. All calls go through the Next.js server via a catch-all proxy route, which forwards to `API_PROXY_TARGET` and re-signs cookies for the current protocol:
+
+```ts
+import { NextRequest, NextResponse } from "next/server";
+
+const HOP_BY_HOP_HEADERS = new Set([
+  "connection", "host", "content-length", "transfer-encoding",
+  "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "upgrade",
+]);
+
+function backendBaseUrl(): string {
+  return process.env.API_PROXY_TARGET ?? "http://localhost:8090";
+}
+
+async function proxy(request: NextRequest, path: string[]): Promise<NextResponse> {
+  const targetUrl = `${backendBaseUrl()}/api/v1/${path.join("/")}${request.nextUrl.search}`;
+  const hasBody = !["GET", "HEAD"].includes(request.method);
+
+  const backendResponse = await fetch(targetUrl, {
+    method: request.method,
+    headers: request.headers,
+    body: hasBody ? await request.arrayBuffer() : undefined,
+    redirect: "manual",
+  });
+
+  return new NextResponse(backendResponse.body, {
+    status: backendResponse.status,
+    statusText: backendResponse.statusText,
+    headers: backendResponse.headers,
+  });
+}
+
+type RouteParams = { params: Promise<{ path: string[] }> };
+
+async function handle(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
+  const { path } = await params;
+  return proxy(request, path ?? []);
+}
+
+export { handle as GET, handle as POST, handle as PUT, handle as PATCH, handle as DELETE };
+```
+
+The axios instance (`lib/axios.ts`) points at `/api/proxy`, never at the Go backend's origin directly — this keeps the JWT server-side and lets `middleware.ts` gate access with a plain cookie check.
+
+### React/Next.js Conventions
+
+- `"use client"` only on components that actually need interactivity/hooks — pages default to Server Components unless they read Zustand/TanStack Query directly.
+- No `any` — every prop, API response, and store shape has an explicit TS type/interface, sourced from `api-spec/openapi.yaml` where one exists.
+- `const` by default; `let` only if reassigned.
+- No inline Tailwind magic values (`w-[137px]`) for anything that repeats — extract to `lib/constants.ts` or the Tailwind theme config.
+- No direct `fetch`/`axios` calls inside components — always through a feature's `api/` hook.
+- Named exports for components; default export only for `page.tsx`/`layout.tsx` (Next.js requirement).
+
+### Money Display
+
+Same rule as Flutter — always format via the shared utility, never inline:
+
+```tsx
+// Use this
+<span>{formatCurrency(amount, "VND")}</span>
+
+// Never this
+<span>{amount / 100} VND</span>
+```
+
+---
+
 ## Python — AI Service (FastAPI + Groq)
 
 ### File Structure
@@ -272,18 +492,18 @@ async def categorize_transaction(
 
 ## Shared Cross-Stack Rules
 
-| Rule | Go | Flutter | Python |
-|------|-----|---------|--------|
-| Max file size | 300 lines | 300 lines | 300 lines |
-| Money type | int64 (cents) | int (cents) | int (cents) |
-| Error on unknown fields | strict binding | — | Pydantic `model_config = ConfigDict(extra='forbid')` |
-| Null vs empty | explicit nullable | null-safe Dart | Optional[T] explicit |
-| Log sensitive fields | never | never | never |
-| Timezone | UTC stored, local displayed | — | UTC only |
+| Rule | Go | Flutter | React (Web) | Python |
+|------|-----|---------|-------------|--------|
+| Max file size | 300 lines | 300 lines | 300 lines | 300 lines |
+| Money type | int64 (cents) | int (cents) | number (cents) | int (cents) |
+| Error on unknown fields | strict binding | — | TS type narrows API response, no `any` | Pydantic `model_config = ConfigDict(extra='forbid')` |
+| Null vs empty | explicit nullable | null-safe Dart | `T \| null` explicit, no `undefined` for API data | Optional[T] explicit |
+| Log sensitive fields | never | never | never (no token/password in console.*) | never |
+| Timezone | UTC stored, local displayed | — | UTC stored, local displayed | UTC only |
 
 ## Project Context
 
-Stack: Flutter (Riverpod 2.x codegen, go_router, drift, dio/retrofit, flutter_secure_storage, envied) | Go 1.22+ (Fiber v2, sqlc, pgx/v5, golang-jwt v5, go-playground/validator v10, golang-migrate, Zap) | Python 3.12+ (FastAPI, Pydantic v2, Groq SDK, httpx)  
+Stack: Flutter (Riverpod 2.x codegen, go_router, drift, dio/retrofit, flutter_secure_storage, envied) | React Web (Next.js App Router, Tailwind, shadcn/ui, TanStack Query, Zustand, Axios) | Go 1.22+ (Fiber v2, sqlc, pgx/v5, golang-jwt v5, go-playground/validator v10, golang-migrate, Zap) | Python 3.12+ (FastAPI, Pydantic v2, Groq SDK, httpx)  
 DB: PostgreSQL 16, integer cents for money, UUID v4 IDs, soft delete via deleted_at, UTC timestamps  
 Auth: JWT access (15m) + refresh (7d), invite-only flow, roles: admin | member  
-Infra: Docker Compose, openapi.yaml as single source of truth, oapi-codegen for Go server, openapi-generator for Dart client
+Infra: Docker Compose (postgres, backend, mobile-web, frontend-web), openapi.yaml as single source of truth, oapi-codegen for Go server, openapi-generator for Dart client

@@ -124,29 +124,159 @@ This SDS describes the design of the PFM product as a whole, independent of a sp
 
 This section describes the core business concepts of the PFM domain and their relationships, independent of technical implementation.
 
+Domain objects are grouped by delivery phase, per the [Feature-level Release table in the SRS](SRS.md#feature-level-release-overview) and the [MVP Features table in CLAUDE.md](CLAUDE.md#mvp-features):
+
+| Phase | Domain Objects |
+| --- | --- |
+| **Phase 0** (current scope — see [docs/features.md](docs/features.md)) | User |
+| **MVP** | Wallet, Category, Budget, Transaction, Notification |
+| **Release 1** | FinancialGoal |
+| **Release 2** | InvestmentPortfolio, Asset, Holding |
+
 ## 1. Domain Objects {#1-domain-objects}
 
 ### 1. User {#1-user}
 
+Represents an account holder. Created via admin invite — no self-registration (see [docs/features.md](docs/features.md) Feature-01). Owns essentially every other domain object: each Wallet, user-defined Category, Budget, Transaction, Notification, FinancialGoal, and InvestmentPortfolio belongs to exactly one User.
+
+Key attributes: `id`, `email`, `full_name`, `password_hash`, `status` (pending/active/disabled), `role` (admin/member), `invited_by`, `invite_token`, `invite_expires_at`, `activated_at`.
+
 ### 2. Wallet {#2-wallet}
+
+A source or destination of money (cash, bank account, e-wallet). All Transactions are recorded against a Wallet, and its `balance` is updated atomically with every Transaction insert (same DB transaction — CLAUDE.md).
+
+Key attributes: `id`, `user_id`, `name`, `type`, `balance` (BIGINT, integer cents), `currency`, `is_default`.
 
 ### 3. Category {#3-category}
 
+Classifies Transactions for budgeting and reporting (e.g. Food, Salary). May be **system-defined** (`user_id IS NULL`, shared across all Users) or **user-defined** (`user_id` set, private to that User).
+
+Key attributes: `id`, `user_id` (nullable), `name`, `icon`, `type` (income/expense).
+
 ### 4. Budget {#4-budget}
+
+A spending limit a User sets for a Category within a period (e.g. monthly). The System tracks actual spend — computed from Transactions in that Category — against `amount_limit`.
+
+Key attributes: `id`, `user_id`, `category_id`, `amount_limit` (BIGINT), `period`, `start_date`.
+
+> **Open question:** SRS (Feature-05, BF-01 step 5) frames a Budget as scoped to *both* a Wallet and a Category ("Budget B1 for Category C2 associated with Wallet W1"), but the CLAUDE.md schema ties Budget only to `user_id` + `category_id` (no `wallet_id`). This CDM follows the CLAUDE.md schema as the implementation source of truth; flag for BA clarification if wallet-scoped budgets are actually required.
 
 ### 5. Transaction {#5-transaction}
 
-### 6. FinancialGoal {#6-financialgoal}
+A single income or expense event. Always belongs to exactly one Wallet and one Category, and to the User who owns that Wallet.
 
-### 7. InvestmentPortfolio {#7-investmentportfolio}
+Key attributes: `id`, `user_id`, `wallet_id`, `category_id`, `amount` (BIGINT), `type` (income/expense), `note`, `occurred_at`.
 
-### 8. Asset {#8-asset}
+### 6. FinancialGoal {#6-financialgoal} *(Release 1)*
 
-### 9. Holding {#9-holding}
+A savings target a User defines (e.g. emergency fund, travel). Tracks progress toward a target amount by a target time frame, based on recorded Transactions/allocations (SRS FR-05, BF-06).
+
+### 7. InvestmentPortfolio {#7-investmentportfolio} *(Release 2)*
+
+A single portfolio per User ("Investment Index" — SRS Feature-09) that aggregates all of that User's Holdings for a high-level performance view.
+
+### 8. Asset {#8-asset} *(Release 2)*
+
+A reference definition of something investable (e.g. a stock ticker, a fund). Exists independently of any User or Portfolio — shared reference data, analogous to a system Category.
+
+### 9. Holding {#9-holding} *(Release 2)*
+
+A position of a specific Asset held inside a User's InvestmentPortfolio, with an amount and current value (SRS FR-06).
 
 ### 10. Notification {#10-notification}
 
+A system-generated message to a User (e.g. budget limit reached). Read-only from the User's perspective except for `is_read` toggling (Feature-10).
+
+Key attributes: `id`, `user_id`, `type`, `title`, `body`, `is_read`, `created_at`.
+
 ## 2. Domain Object Relationships {#2-domain-object-relationships}
+
+**Conceptual Data Model (CDM)** — composition (`*--`, filled diamond) marks a part with no meaning or lifecycle outside its whole; aggregation (`o--`, hollow diamond) marks a part that can exist independently of the whole; a plain association (`-->`) marks a reference/classification link with no ownership semantics.
+
+```mermaid
+classDiagram
+    class User {
+      +UUID id
+      +string email
+      +string status
+      +string role
+    }
+    class Wallet {
+      +UUID id
+      +string name
+      +BIGINT balance
+      +string currency
+    }
+    class Category {
+      +UUID id
+      +UUID user_id
+      +string name
+      +string type
+    }
+    class Budget {
+      +UUID id
+      +BIGINT amount_limit
+      +string period
+    }
+    class Transaction {
+      +UUID id
+      +BIGINT amount
+      +string type
+      +TIMESTAMPTZ occurred_at
+    }
+    class Notification {
+      +UUID id
+      +string type
+      +bool is_read
+    }
+    class FinancialGoal {
+      +BIGINT target_amount
+      +date target_date
+    }
+    class InvestmentPortfolio
+    class Asset {
+      +string name
+    }
+    class Holding {
+      +BIGINT amount
+      +BIGINT current_value
+    }
+
+    User "1" *-- "0..*" Wallet : owns
+    User "1" *-- "0..*" Transaction : records
+    User "1" *-- "0..*" Notification : receives
+    User "1" *-- "0..*" Budget : sets
+    User "0..1" o-- "0..*" Category : defines (user-defined only)
+    User "1" *-- "0..*" FinancialGoal : sets
+    User "1" *-- "0..1" InvestmentPortfolio : owns
+
+    Wallet "1" *-- "0..*" Transaction : holds history of
+
+    Transaction "0..*" --> "1" Category : classified by
+    Budget "0..*" --> "1" Category : limits spending on
+
+    InvestmentPortfolio "1" *-- "0..*" Holding : contains
+    Holding "0..*" --> "1" Asset : references
+```
+
+**Relationship summary**
+
+| # | From | Relationship | To | Cardinality | Type | Rationale |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | User | owns | Wallet | 1 : 0..* | Composition | A Wallet has no meaning without its owning User; `wallets.user_id` is mandatory |
+| 2 | User | records | Transaction | 1 : 0..* | Composition | Every Transaction belongs to exactly one User |
+| 3 | User | receives | Notification | 1 : 0..* | Composition | Notifications are generated for and owned by one User |
+| 4 | User | sets | Budget | 1 : 0..* | Composition | Budgets are per-User spending limits |
+| 5 | User | defines | Category | 0..1 : 0..* | Aggregation | System Categories exist with `user_id = NULL` — independent of any User |
+| 6 | User | sets | FinancialGoal | 1 : 0..* | Composition | Goal has no meaning outside its owning User (Release 1) |
+| 7 | User | owns | InvestmentPortfolio | 1 : 0..1 | Composition | Exactly one Portfolio per User, per SDS Feature-09 (Release 2) |
+| 8 | Wallet | holds history of | Transaction | 1 : 0..* | Composition | Transaction requires a Wallet (`wallet_id` mandatory); balance update and insert are atomic |
+| 9 | Category | classifies | Transaction | 1 : 0..* | Association | Category is reusable reference data, not owned by any single Transaction |
+| 10 | Category | limits | Budget | 1 : 0..* | Association | Budget references a Category to track against |
+| 11 | InvestmentPortfolio | contains | Holding | 1 : 0..* | Composition | A Holding has no meaning outside its Portfolio (Release 2) |
+| 12 | Asset | referenced by | Holding | 1 : 0..* | Association | Asset is shared reference data across all Portfolios (Release 2) |
+
+Note: derived figures such as Wallet `balance` or Budget "spent so far" are **computed from Transactions**, not separate stored relationships — they are covered by rows 8–9 above, not modeled as their own line.
 
 # 3. UI Design {#3-ui-design}
 
