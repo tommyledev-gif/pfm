@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/example/pfm/backend/internal/model"
 	"github.com/example/pfm/backend/internal/repository"
@@ -31,9 +32,24 @@ type RevokedTokenRepo interface {
 	IsRevoked(ctx context.Context, tokenJTI string) (bool, error)
 }
 
+// WalletRepo is the repository contract WalletService depends on (F-03).
+// *repository.WalletRepository satisfies this structurally; tests substitute
+// an in-memory fake, same convention as UserRepo.
+type WalletRepo interface {
+	BeginTx(ctx context.Context) (pgx.Tx, error)
+	CreateWallet(ctx context.Context, tx pgx.Tx, arg repository.CreateWalletParams) (*model.Wallet, error)
+	CountWalletsByUser(ctx context.Context, userID uuid.UUID) (int64, error)
+	ClearDefaultWallet(ctx context.Context, tx pgx.Tx, userID uuid.UUID) error
+	ListWalletsByUser(ctx context.Context, userID uuid.UUID) ([]*model.Wallet, error)
+	GetWalletByID(ctx context.Context, id uuid.UUID) (*model.Wallet, error)
+	UpdateWallet(ctx context.Context, arg repository.UpdateWalletParams) (*model.Wallet, error)
+	SetDefaultWallet(ctx context.Context, tx pgx.Tx, id, userID uuid.UUID) (*model.Wallet, error)
+}
+
 // Compile-time checks that the real repositories satisfy these interfaces —
 // catches a signature drift here instead of at runtime.
 var (
 	_ UserRepo         = (*repository.UserRepository)(nil)
 	_ RevokedTokenRepo = (*repository.RevokedTokenRepository)(nil)
+	_ WalletRepo       = (*repository.WalletRepository)(nil)
 )

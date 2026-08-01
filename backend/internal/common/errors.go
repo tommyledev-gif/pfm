@@ -23,6 +23,12 @@ const (
 	// to keep the API's error shape ({error_code, message}) consistent even
 	// on 401s rather than sending an empty error_code.
 	ErrCodeUnauthenticated = "UNAUTHENTICATED"
+	// ErrCodeWalletAccessDenied and ErrCodeWalletNotFound (F-03 Wallet
+	// Management) are deliberately distinct — a wallet owned by someone else
+	// is a 403, not a 404, since wallet IDs are unguessable UUIDv4s with no
+	// meaningful enumeration risk (specs/wallet-management/spec.md S-WAL-16).
+	ErrCodeWalletAccessDenied = "WALLET_ACCESS_DENIED"
+	ErrCodeWalletNotFound     = "WALLET_NOT_FOUND"
 )
 
 // AppError is the single sentinel-error shape services return for known
@@ -56,6 +62,8 @@ var (
 	ErrAccountDisabled    = &AppError{Code: ErrCodeAccountDisabled, Status: http.StatusUnauthorized, Message: "this account has been disabled"}
 	ErrPasswordMismatch   = &AppError{Code: ErrCodePasswordMismatch, Status: http.StatusBadRequest, Message: "password and confirmation do not match"}
 	ErrUnauthenticated    = &AppError{Code: ErrCodeUnauthenticated, Status: http.StatusUnauthorized, Message: "authentication required"}
+	ErrWalletAccessDenied = &AppError{Code: ErrCodeWalletAccessDenied, Status: http.StatusForbidden, Message: "you do not have access to this wallet"}
+	ErrWalletNotFound     = &AppError{Code: ErrCodeWalletNotFound, Status: http.StatusNotFound, Message: "wallet not found"}
 )
 
 // NewInvalidInputError builds a 400 INVALID_INPUT error with a field-specific message.

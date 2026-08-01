@@ -20,6 +20,7 @@ export const ROUTES = {
   activate: "/activate",
   app: "/app",
   users: "/app/users",
+  wallets: "/app/wallets",
 } as const;
 
 export const USER_ROLES = ["admin", "member"] as const;
@@ -27,3 +28,16 @@ export type UserRole = (typeof USER_ROLES)[number];
 
 export const USER_STATUSES = ["pending", "active", "disabled"] as const;
 export type UserStatus = (typeof USER_STATUSES)[number];
+
+// Mirrors backend/internal/common/constants.go's WalletNameMaxLength.
+export const WALLET_NAME_MAX_LENGTH = 100;
+
+// Mirrors model.WalletType (backend/internal/model/wallet.go).
+export const WALLET_TYPES = ["cash", "bank", "e_wallet", "other"] as const;
+export type WalletType = (typeof WALLET_TYPES)[number];
+
+// MVP currency allow-list — mirrors the 004_wallets.sql CHECK constraint.
+// specs/wallet-management/spec.md Open Question #1 flags this as an
+// explicit assumption, not a confirmed decision.
+export const WALLET_CURRENCIES = ["VND", "USD"] as const;
+export type WalletCurrency = (typeof WALLET_CURRENCIES)[number];

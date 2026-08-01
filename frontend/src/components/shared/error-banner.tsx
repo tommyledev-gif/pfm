@@ -1,10 +1,14 @@
 interface ErrorBannerProps {
   message: string;
+  testId?: string;
 }
 
-export function ErrorBanner({ message }: ErrorBannerProps) {
+export function ErrorBanner({ message, testId }: ErrorBannerProps) {
   return (
-    <div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+    <div
+      data-testid={testId}
+      className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+    >
       {message}
     </div>
   );

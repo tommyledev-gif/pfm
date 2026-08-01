@@ -11,6 +11,8 @@ Mobile app quản lý chi tiêu cá nhân. Flutter + Go + Python AI service.
 
 Infra: Docker Compose. Không deploy App Store/Play Store — chỉ build .apk/.ipa để test.
 
+> **Frontend priority:** implementation currently focuses on `frontend/` (web) first; `mobile/` (Flutter) is paused until explicitly requested.
+
 ## Tech Stack
 
 **Mobile:** Flutter (Dart) · Riverpod 2.x codegen · go_router · drift (SQLite offline) · dio + retrofit · fl_chart · flutter_form_builder · flutter_secure_storage · envied

@@ -33,3 +33,17 @@ type RevokedToken struct {
 	ExpiresAt time.Time
 	RevokedAt time.Time
 }
+
+// Wallet mirrors the wallets table exactly (004_wallets.sql).
+type Wallet struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	Name      string
+	Type      string
+	Balance   int64
+	Currency  string
+	IsDefault bool
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt *time.Time
+}

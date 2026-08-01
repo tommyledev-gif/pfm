@@ -1,0 +1,229 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"sync"
+	"testing"
+
+	"github.com/google/uuid"
+	"go.uber.org/zap"
+
+	"github.com/example/pfm/backend/internal/common"
+	"github.com/example/pfm/backend/internal/dto"
+)
+
+func newTestWalletService(t *testing.T) (*WalletService, *fakeWalletRepo) {
+	t.Helper()
+	repo := newFakeWalletRepo()
+	return NewWalletService(repo, zap.NewNop()), repo
+}
+
+// S-WAL-01: a user's very first wallet is always forced to be the default,
+// even when is_default isn't requested.
+func TestWalletService_CreateWallet_FirstWalletForcedDefault(t *testing.T) {
+	svc, _ := newTestWalletService(t)
+	userID := uuid.New()
+
+	wallet, err := svc.CreateWallet(context.Background(), userID, dto.CreateWalletRequest{
+		Name: "Main Wallet",
+		Type: "cash",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !wallet.IsDefault {
+		t.Fatalf("expected first wallet to be forced default")
+	}
+	if wallet.Currency != common.WalletDefaultCurrency {
+		t.Fatalf("expected default currency %s, got %s", common.WalletDefaultCurrency, wallet.Currency)
+	}
+}
+
+// S-WAL-02/S-WAL-03: a second wallet only becomes default when requested,
+// and doing so atomically clears the previous default.
+func TestWalletService_CreateWallet_SecondWalletDefaultSwap(t *testing.T) {
+	svc, _ := newTestWalletService(t)
+	userID := uuid.New()
+
+	first, err := svc.CreateWallet(context.Background(), userID, dto.CreateWalletRequest{Name: "Cash", Type: "cash"})
+	if err != nil {
+		t.Fatalf("unexpected error creating first wallet: %v", err)
+	}
+
+	t.Run("second wallet without is_default leaves first default untouched", func(t *testing.T) {
+		second, err := svc.CreateWallet(context.Background(), userID, dto.CreateWalletRequest{Name: "Bank", Type: "bank"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if second.IsDefault {
+			t.Fatalf("expected second wallet not to be default")
+		}
+		refreshedFirst, err := svc.GetWallet(context.Background(), userID, first.ID)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !refreshedFirst.IsDefault {
+			t.Fatalf("expected first wallet to remain default")
+		}
+	})
+
+	t.Run("third wallet requesting is_default swaps the default atomically", func(t *testing.T) {
+		third, err := svc.CreateWallet(context.Background(), userID, dto.CreateWalletRequest{Name: "E-Wallet", Type: "e_wallet", IsDefault: true})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !third.IsDefault {
+			t.Fatalf("expected third wallet to become default")
+		}
+		refreshedFirst, err := svc.GetWallet(context.Background(), userID, first.ID)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if refreshedFirst.IsDefault {
+			t.Fatalf("expected first wallet to no longer be default")
+		}
+	})
+}
+
+// S-WAL-10: two concurrent requests both creating a user's first wallet —
+// exactly one ends up default, the other is still created successfully.
+//
+// Each create's own response reflects is_default at the instant it was
+// written, which can go stale immediately afterward if a concurrent request
+// then clears it and takes over as default (identical to what a real
+// `INSERT ... RETURNING *` would report under the same interleaving) — so
+// this asserts the settled state via a fresh read after both finish, not
+// each goroutine's own possibly-stale creation-time snapshot.
+func TestWalletService_CreateWallet_ConcurrentFirstWalletRace(t *testing.T) {
+	svc, repo := newTestWalletService(t)
+	userID := uuid.New()
+
+	var wg sync.WaitGroup
+	errs := make([]error, 2)
+	start := make(chan struct{})
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			<-start
+			_, errs[idx] = svc.CreateWallet(context.Background(), userID, dto.CreateWalletRequest{Name: "Race Wallet", Type: "cash"})
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+
+	for idx, err := range errs {
+		if err != nil {
+			t.Fatalf("expected both concurrent creates to succeed, goroutine %d failed: %v", idx, err)
+		}
+	}
+
+	settled, err := svc.ListWallets(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("unexpected error listing wallets: %v", err)
+	}
+	defaultCount := 0
+	for _, w := range settled {
+		if w.IsDefault {
+			defaultCount++
+		}
+	}
+	if defaultCount != 1 {
+		t.Fatalf("expected exactly 1 wallet to end up default in the settled state, got %d", defaultCount)
+	}
+
+	count, err := repo.CountWalletsByUser(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if count != 2 {
+		t.Fatalf("expected 2 wallets to exist, got %d", count)
+	}
+}
+
+// S-WAL-16 vs S-WAL-17: ownership vs. existence must return distinct codes.
+func TestWalletService_GetWallet_OwnershipVsExistence(t *testing.T) {
+	svc, _ := newTestWalletService(t)
+	ownerID := uuid.New()
+	otherID := uuid.New()
+
+	wallet, err := svc.CreateWallet(context.Background(), ownerID, dto.CreateWalletRequest{Name: "Cash", Type: "cash"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	t.Run("wallet owned by someone else returns 403 WALLET_ACCESS_DENIED", func(t *testing.T) {
+		_, err := svc.GetWallet(context.Background(), otherID, wallet.ID)
+		var appErr *common.AppError
+		if !errors.As(err, &appErr) || appErr.Code != common.ErrCodeWalletAccessDenied {
+			t.Fatalf("expected WALLET_ACCESS_DENIED, got %v", err)
+		}
+	})
+
+	t.Run("wallet that does not exist returns 404 WALLET_NOT_FOUND", func(t *testing.T) {
+		_, err := svc.GetWallet(context.Background(), ownerID, uuid.New())
+		var appErr *common.AppError
+		if !errors.As(err, &appErr) || appErr.Code != common.ErrCodeWalletNotFound {
+			t.Fatalf("expected WALLET_NOT_FOUND, got %v", err)
+		}
+	})
+}
+
+// S-WAL-24: an empty PATCH body is a client mistake, not a no-op success.
+func TestWalletService_UpdateWallet_EmptyBodyRejected(t *testing.T) {
+	svc, _ := newTestWalletService(t)
+	userID := uuid.New()
+
+	wallet, err := svc.CreateWallet(context.Background(), userID, dto.CreateWalletRequest{Name: "Cash", Type: "cash"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	_, err = svc.UpdateWallet(context.Background(), userID, wallet.ID, dto.UpdateWalletRequest{})
+	var appErr *common.AppError
+	if !errors.As(err, &appErr) || appErr.Code != common.ErrCodeInvalidInput {
+		t.Fatalf("expected INVALID_INPUT, got %v", err)
+	}
+}
+
+// S-WAL-25 / S-WAL-26: set-default swaps atomically, and calling it again on
+// an already-default wallet is an idempotent no-op.
+func TestWalletService_SetDefaultWallet_SwapThenIdempotentNoOp(t *testing.T) {
+	svc, _ := newTestWalletService(t)
+	userID := uuid.New()
+
+	first, err := svc.CreateWallet(context.Background(), userID, dto.CreateWalletRequest{Name: "Cash", Type: "cash"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	second, err := svc.CreateWallet(context.Background(), userID, dto.CreateWalletRequest{Name: "Bank", Type: "bank"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	updated, err := svc.SetDefaultWallet(context.Background(), userID, second.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !updated.IsDefault {
+		t.Fatalf("expected second wallet to become default")
+	}
+
+	refreshedFirst, err := svc.GetWallet(context.Background(), userID, first.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if refreshedFirst.IsDefault {
+		t.Fatalf("expected first wallet to no longer be default")
+	}
+
+	// Calling set-default again on the now-default wallet is a no-op.
+	again, err := svc.SetDefaultWallet(context.Background(), userID, second.ID)
+	if err != nil {
+		t.Fatalf("unexpected error on idempotent re-call: %v", err)
+	}
+	if !again.IsDefault {
+		t.Fatalf("expected wallet to remain default")
+	}
+}

@@ -41,14 +41,17 @@ func main() {
 	queries := sqlc.New(pool)
 	userRepo := repository.NewUserRepository(queries)
 	revokedRepo := repository.NewRevokedTokenRepository(queries)
+	walletRepo := repository.NewWalletRepository(queries, pool)
 
 	tokenService := service.NewTokenService(cfg.JWTSecret)
 	emailSender := newEmailSender(cfg, logger)
 	userService := service.NewUserService(userRepo, emailSender, logger)
 	authService := service.NewAuthService(userRepo, revokedRepo, tokenService, logger)
+	walletService := service.NewWalletService(walletRepo, logger)
 
 	userHandler := handler.NewUserHandler(userService, logger)
 	authHandler := handler.NewAuthHandler(authService, logger)
+	walletHandler := handler.NewWalletHandler(walletService, logger)
 
 	app := fiber.New(fiber.Config{
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
@@ -60,7 +63,7 @@ func main() {
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 		AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 	}))
-	registerRoutes(app, userHandler, authHandler, tokenService, logger)
+	registerRoutes(app, userHandler, authHandler, walletHandler, tokenService, logger)
 
 	go func() {
 		if err := app.Listen(":" + cfg.Port); err != nil {

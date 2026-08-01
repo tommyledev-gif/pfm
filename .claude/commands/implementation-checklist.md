@@ -2,6 +2,8 @@
 
 > Scope: Backend — every file under `internal/` or `cmd/` (Go) and `app/` or `src/` (Python) — handlers, services, repositories, schemas/DTOs, middleware. Frontend (Mobile) — every file under `mobile/lib/` (Flutter) — screens, widgets, blocs/providers, repositories, models. Frontend (Web) — every file under `frontend/src/` (Next.js/React) — pages, components, hooks, stores, middleware.
 > Violation = PR blocked. No exception without explicit tech-lead sign-off.
+>
+> **Frontend priority:** implementation currently focuses on `frontend/` (web) first; `mobile/` (Flutter) is paused until explicitly requested.
 
 ---
 

@@ -52,3 +52,16 @@ const (
 	LocalsUserID = "userID"
 	LocalsRole   = "role"
 )
+
+// Wallets (F-03). Name length mirrored by frontend/src/lib/constants.ts so
+// the two never drift, same convention as MinPasswordLength above. The
+// type/currency enums themselves live only in the dto validator `oneof` tags
+// and the 004_wallets.sql CHECK constraints — go-playground/validator tags
+// are compile-time string literals and cannot reference a shared Go slice,
+// so a separate constant here would just be dead weight, not a real
+// single source of truth (see model.WalletType for the canonical Go-side
+// enum type used elsewhere in code).
+const (
+	WalletNameMaxLength   = 100
+	WalletDefaultCurrency = "VND"
+)
