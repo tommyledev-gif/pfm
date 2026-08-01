@@ -13,6 +13,7 @@ export function WalletTableSkeleton() {
           <TableHead>Currency</TableHead>
           <TableHead>Balance</TableHead>
           <TableHead>Default</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -32,6 +33,10 @@ export function WalletTableSkeleton() {
             </TableCell>
             <TableCell>
               <Skeleton className="h-4 w-16" />
+            </TableCell>
+            <TableCell className="flex justify-end gap-2">
+              <Skeleton className="h-8 w-12" />
+              <Skeleton className="h-8 w-12" />
             </TableCell>
           </TableRow>
         ))}

@@ -1,7 +1,9 @@
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { EditWalletDialog } from "@/features/wallets/components/edit-wallet-dialog";
 import { ROUTES } from "@/lib/constants";
 import { formatCurrency } from "@/lib/currency";
 import type { Wallet } from "@/features/wallets/types";
@@ -28,6 +30,7 @@ export function WalletTable({ wallets }: WalletTableProps) {
           <TableHead>Currency</TableHead>
           <TableHead>Balance</TableHead>
           <TableHead>Default</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -47,6 +50,12 @@ export function WalletTable({ wallets }: WalletTableProps) {
                   Default
                 </Badge>
               )}
+            </TableCell>
+            <TableCell className="flex justify-end gap-2">
+              <Button asChild variant="ghost" size="sm" data-testid="btn-view-wallet">
+                <Link href={`${ROUTES.wallets}/${wallet.id}`}>View</Link>
+              </Button>
+              <EditWalletDialog wallet={wallet} />
             </TableCell>
           </TableRow>
         ))}
