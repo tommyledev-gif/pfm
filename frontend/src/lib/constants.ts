@@ -21,6 +21,7 @@ export const ROUTES = {
   app: "/app",
   users: "/app/users",
   wallets: "/app/wallets",
+  categories: "/app/categories",
 } as const;
 
 export const USER_ROLES = ["admin", "member"] as const;
@@ -41,3 +42,11 @@ export type WalletType = (typeof WALLET_TYPES)[number];
 // explicit assumption, not a confirmed decision.
 export const WALLET_CURRENCIES = ["VND", "USD"] as const;
 export type WalletCurrency = (typeof WALLET_CURRENCIES)[number];
+
+// Mirrors backend/internal/common/constants.go's CategoryNameMaxLength/CategoryIconMaxLength.
+export const CATEGORY_NAME_MAX_LENGTH = 50;
+export const CATEGORY_ICON_MAX_LENGTH = 32;
+
+// Mirrors model.CategoryType (backend/internal/model/category.go).
+export const CATEGORY_TYPES = ["income", "expense"] as const;
+export type CategoryType = (typeof CATEGORY_TYPES)[number];

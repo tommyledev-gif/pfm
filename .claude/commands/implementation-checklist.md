@@ -88,10 +88,12 @@
 ### Go
 - [ ] Request structs use validation tags (e.g. `validator` package `binding:"required,email"`) — no manual `if x == ""` duplicating what tags already cover.
 - [ ] Validation errors collected and returned as a **single** structured response — not field-by-field separate responses.
+- [ ] Independent business-rule checks (e.g. duplicate name+type, multiple field-level conflicts that don't depend on each other's outcome) are collected and returned together in **one** error response — never thrown one at a time, forcing the caller to fix-and-resubmit repeatedly just to discover the next failure top-down. Only genuinely sequential/gating checks — auth → existence → ownership → a state-dependent rule, where a later check literally cannot run until an earlier one has passed — are allowed to short-circuit in order; those are not "collectible" and must not be forced together.
 
 ### Python
 - [ ] Request schemas validated via Pydantic models (FastAPI) or serializers (DRF) — no manual dict-key checks duplicating schema validation.
 - [ ] Validation errors returned as a **single** structured response body, not raised one at a time.
+- [ ] Independent business-rule checks are aggregated into that same single raised exception/response — never one-at-a-time round trips. Sequential short-circuiting is reserved for genuinely gating checks only (see the Go rule above for the auth → existence → ownership → state-dependent-rule distinction).
 
 ### Flutter
 - [ ] Form/input validation on the client is a UX aid only — backend validation is the source of truth; no feature ships that trusts client-side validation alone.

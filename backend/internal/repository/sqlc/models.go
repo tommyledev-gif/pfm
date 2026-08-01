@@ -47,3 +47,16 @@ type Wallet struct {
 	UpdatedAt time.Time
 	DeletedAt *time.Time
 }
+
+// Category mirrors the categories table exactly (005_categories.sql).
+// UserID is nullable: NULL means system-defined, shared across every user.
+// No UpdatedAt column exists for this table (CLAUDE.md Core DB Schema).
+type Category struct {
+	ID        uuid.UUID
+	UserID    *uuid.UUID
+	Name      string
+	Icon      *string
+	Type      string
+	CreatedAt time.Time
+	DeletedAt *time.Time
+}

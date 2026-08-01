@@ -24,6 +24,7 @@
 - [ ] No generic `/updateStatus` endpoint — each business action gets its own semantically named endpoint.
 - [ ] RESTful resource naming follows context: `/employee` for system-level, `/project/{id}/employee` for project-scoped.
 - [ ] No endpoint planned without a corresponding service method — 1-to-1 traceability.
+- [ ] Plan states which failure checks per endpoint are **independent** (collectible into a single error response — e.g. duplicate name+type, multiple field-level conflicts) vs. **sequential/gating** (auth → existence → ownership → a state-dependent rule, where each step's outcome is required before the next can even run). Independent checks must be designed to return together in one response; only gating checks may short-circuit. No plan should force a client to fix-and-resubmit one discoverable error at a time when the checks didn't actually depend on each other.
 
 ---
 

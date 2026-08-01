@@ -29,6 +29,18 @@ const (
 	// meaningful enumeration risk (specs/wallet-management/spec.md S-WAL-16).
 	ErrCodeWalletAccessDenied = "WALLET_ACCESS_DENIED"
 	ErrCodeWalletNotFound     = "WALLET_NOT_FOUND"
+	// ErrCodeCategoryAccessDenied/ErrCodeCategoryNotFound (F-04 Category
+	// Management) follow the same 403-vs-404 split as Wallet's equivalents —
+	// unguessable UUIDv4 IDs, so "belongs to someone else" (or is a
+	// never-writable system category) is a 403, not a 404
+	// (specs/category-management/spec.md S-CAT-16/S-CAT-20).
+	ErrCodeCategoryAccessDenied  = "CATEGORY_ACCESS_DENIED"
+	ErrCodeCategoryNotFound      = "CATEGORY_NOT_FOUND"
+	ErrCodeCategoryAlreadyExists = "CATEGORY_ALREADY_EXISTS"
+	// ErrCodeCategoryInUse is reserved for the active-Budget delete guard
+	// (spec.md S-CAT-27) — not yet wired up, blocked on F-05 Budget
+	// Management's migration (plan.md Finding #4 / CAT-T14).
+	ErrCodeCategoryInUse = "CATEGORY_IN_USE"
 )
 
 // AppError is the single sentinel-error shape services return for known
@@ -64,6 +76,8 @@ var (
 	ErrUnauthenticated    = &AppError{Code: ErrCodeUnauthenticated, Status: http.StatusUnauthorized, Message: "authentication required"}
 	ErrWalletAccessDenied = &AppError{Code: ErrCodeWalletAccessDenied, Status: http.StatusForbidden, Message: "you do not have access to this wallet"}
 	ErrWalletNotFound     = &AppError{Code: ErrCodeWalletNotFound, Status: http.StatusNotFound, Message: "wallet not found"}
+	ErrCategoryAccessDenied = &AppError{Code: ErrCodeCategoryAccessDenied, Status: http.StatusForbidden, Message: "you do not have access to this category"}
+	ErrCategoryNotFound     = &AppError{Code: ErrCodeCategoryNotFound, Status: http.StatusNotFound, Message: "category not found"}
 )
 
 // NewInvalidInputError builds a 400 INVALID_INPUT error with a field-specific message.
@@ -83,4 +97,10 @@ func NewInvalidInputErrorWithDetails(message string, details interface{}) *AppEr
 // codes (S-USR-13 vs S-USR-14).
 func NewWeakPasswordError(message string) *AppError {
 	return &AppError{Code: ErrCodeWeakPassword, Status: http.StatusBadRequest, Message: message}
+}
+
+// NewCategoryAlreadyExistsError builds a 409 CATEGORY_ALREADY_EXISTS error
+// with a name/type-specific message (spec.md S-CAT-04/S-CAT-05/S-CAT-22).
+func NewCategoryAlreadyExistsError(message string) *AppError {
+	return &AppError{Code: ErrCodeCategoryAlreadyExists, Status: http.StatusConflict, Message: message}
 }

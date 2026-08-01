@@ -65,3 +65,11 @@ const (
 	WalletNameMaxLength   = 100
 	WalletDefaultCurrency = "VND"
 )
+
+// Categories (F-04). CategoryIconMaxLength is an explicit assumption
+// (specs/category-management/plan.md Finding #12) — spec.md left icon
+// validation as "a reasonable max length" without committing to a number.
+const (
+	CategoryNameMaxLength = 50
+	CategoryIconMaxLength = 32
+)

@@ -46,10 +46,25 @@ type WalletRepo interface {
 	SetDefaultWallet(ctx context.Context, tx pgx.Tx, id, userID uuid.UUID) (*model.Wallet, error)
 }
 
+// CategoryRepo is the repository contract CategoryService depends on (F-04).
+// *repository.CategoryRepository satisfies this structurally; tests
+// substitute an in-memory fake, same convention as WalletRepo. No BeginTx
+// method exists here — unlike WalletRepo, no operation in this feature needs
+// a caller-managed transaction (plan.md Constitution Notes).
+type CategoryRepo interface {
+	CreateCategory(ctx context.Context, arg repository.CreateCategoryParams) (*model.Category, error)
+	NameTypeExists(ctx context.Context, userID uuid.UUID, name, categoryType string, excludeID *uuid.UUID) (bool, error)
+	ListCategoriesForUser(ctx context.Context, userID uuid.UUID, categoryType *string) ([]*model.Category, error)
+	GetCategoryByID(ctx context.Context, id uuid.UUID) (*model.Category, error)
+	UpdateCategory(ctx context.Context, arg repository.UpdateCategoryParams) (*model.Category, error)
+	SoftDeleteCategory(ctx context.Context, id, userID uuid.UUID) (*model.Category, error)
+}
+
 // Compile-time checks that the real repositories satisfy these interfaces —
 // catches a signature drift here instead of at runtime.
 var (
 	_ UserRepo         = (*repository.UserRepository)(nil)
 	_ RevokedTokenRepo = (*repository.RevokedTokenRepository)(nil)
 	_ WalletRepo       = (*repository.WalletRepository)(nil)
+	_ CategoryRepo     = (*repository.CategoryRepository)(nil)
 )
