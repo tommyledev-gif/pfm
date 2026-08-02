@@ -21,9 +21,11 @@ const (
 // cents); Spent/Remaining/Status are always computed at read time by
 // BudgetService (never persisted) — see spec.md US-02 Edge Cases #1.
 //
-// Spent is currently always 0 (BudgetService.computeStatus is a stub —
-// specs/budget-management/plan.md Finding #1 / BUD-T17): the `transactions`
-// table F-06 would aggregate from does not exist yet.
+// Spent is computed from a real SUM(transactions.amount) ... GROUP BY
+// category_id, currency aggregate (BudgetService.computeStatus, wired up by
+// specs/transaction-management/plan.md Finding #3 / BUD-T17) for List/Get —
+// except immediately after Create, where spec.md US-01 step 6 mandates
+// spent=0 regardless of any pre-existing Transactions in the Category.
 type BudgetLimit struct {
 	Currency    string
 	AmountLimit int64

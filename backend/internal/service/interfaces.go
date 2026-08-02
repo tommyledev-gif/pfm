@@ -35,6 +35,10 @@ type RevokedTokenRepo interface {
 // WalletRepo is the repository contract WalletService depends on (F-03).
 // *repository.WalletRepository satisfies this structurally; tests substitute
 // an in-memory fake, same convention as UserRepo.
+// WalletRepo interface. HasTransactionForWallet was added by
+// specs/transaction-management/plan.md Finding #2 / WAL-T14 — backs the
+// previously-deferred 409 CURRENCY_LOCKED check in UpdateWallet now that the
+// transactions table exists.
 type WalletRepo interface {
 	BeginTx(ctx context.Context) (pgx.Tx, error)
 	CreateWallet(ctx context.Context, tx pgx.Tx, arg repository.CreateWalletParams) (*model.Wallet, error)
@@ -44,6 +48,7 @@ type WalletRepo interface {
 	GetWalletByID(ctx context.Context, id uuid.UUID) (*model.Wallet, error)
 	UpdateWallet(ctx context.Context, arg repository.UpdateWalletParams) (*model.Wallet, error)
 	SetDefaultWallet(ctx context.Context, tx pgx.Tx, id, userID uuid.UUID) (*model.Wallet, error)
+	HasTransactionForWallet(ctx context.Context, walletID uuid.UUID) (bool, error)
 }
 
 // CategoryRepo is the repository contract CategoryService depends on (F-04).
@@ -69,6 +74,10 @@ type CategoryRepo interface {
 // BudgetRepo is the repository contract BudgetService depends on (F-05).
 // *repository.BudgetRepository satisfies this structurally; tests
 // substitute an in-memory fake, same convention as WalletRepo/CategoryRepo.
+// SpentByUserCurrentPeriod was added by
+// specs/transaction-management/plan.md Finding #3 / BUD-T17 — backs the
+// previously-stubbed real spend computation now that the transactions table
+// exists.
 type BudgetRepo interface {
 	BeginTx(ctx context.Context) (pgx.Tx, error)
 	LockCategoryForBudgetCheck(ctx context.Context, tx pgx.Tx, categoryID uuid.UUID) (*model.Category, error)
@@ -78,6 +87,22 @@ type BudgetRepo interface {
 	ListBudgetsByUser(ctx context.Context, userID uuid.UUID) ([]*model.Budget, error)
 	GetBudgetByID(ctx context.Context, id uuid.UUID) (*model.Budget, error)
 	SoftDeleteBudget(ctx context.Context, id, userID uuid.UUID) (*model.Budget, error)
+	SpentByUserCurrentPeriod(ctx context.Context, userID uuid.UUID) (map[uuid.UUID]map[string]int64, error)
+}
+
+// TransactionRepo is the repository contract TransactionService depends on
+// (F-06). *repository.TransactionRepository satisfies this structurally;
+// tests substitute an in-memory fake, same convention as WalletRepo/
+// CategoryRepo/BudgetRepo.
+type TransactionRepo interface {
+	BeginTx(ctx context.Context) (pgx.Tx, error)
+	CreateTransaction(ctx context.Context, tx pgx.Tx, arg repository.CreateTransactionParams) (*model.Transaction, error)
+	DecrementWalletBalanceIfSufficient(ctx context.Context, tx pgx.Tx, walletID uuid.UUID, amount int64) (*model.Wallet, error)
+	AdjustWalletBalance(ctx context.Context, tx pgx.Tx, walletID uuid.UUID, delta int64) (*model.Wallet, error)
+	ListTransactionsByUser(ctx context.Context, userID uuid.UUID, filter repository.ListTransactionsFilter) ([]*model.Transaction, error)
+	GetTransactionByID(ctx context.Context, id uuid.UUID) (*model.Transaction, error)
+	UpdateTransaction(ctx context.Context, tx pgx.Tx, arg repository.UpdateTransactionParams) (*model.Transaction, error)
+	SoftDeleteTransaction(ctx context.Context, tx pgx.Tx, id, userID uuid.UUID) (*model.Transaction, error)
 }
 
 // Compile-time checks that the real repositories satisfy these interfaces —
@@ -88,4 +113,5 @@ var (
 	_ WalletRepo       = (*repository.WalletRepository)(nil)
 	_ CategoryRepo     = (*repository.CategoryRepository)(nil)
 	_ BudgetRepo       = (*repository.BudgetRepository)(nil)
+	_ TransactionRepo  = (*repository.TransactionRepository)(nil)
 )

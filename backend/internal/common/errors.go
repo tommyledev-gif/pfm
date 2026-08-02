@@ -54,6 +54,29 @@ const (
 	// expense-type" business rule (spec.md S-BUD-03). 422, not 400 — the
 	// request is well-formed, the referenced Category simply isn't eligible.
 	ErrCodeInvalidCategoryType = "INVALID_CATEGORY_TYPE"
+	// ErrCodeTransactionAccessDenied/ErrCodeTransactionNotFound (F-06
+	// Transaction Management) follow the same 403-vs-404 split as Wallet/
+	// Category/Budget's equivalents — unguessable UUIDv4 IDs
+	// (specs/transaction-management/spec.md S-TRX-32/S-TRX-33).
+	ErrCodeTransactionAccessDenied = "TRANSACTION_ACCESS_DENIED"
+	ErrCodeTransactionNotFound     = "TRANSACTION_NOT_FOUND"
+	// ErrCodeInsufficientBalance backs the insufficient-balance floor on
+	// expense Transaction creation only — never Update/Delete
+	// (specs/transaction-management/spec.md Context #3, S-TRX-09/S-TRX-18).
+	// 409, grouped with the other "conflict with current resource state"
+	// codes (BUDGET_ALREADY_EXISTS, CATEGORY_IN_USE, CURRENCY_LOCKED).
+	ErrCodeInsufficientBalance = "INSUFFICIENT_BALANCE"
+	// ErrCodeCategoryTypeMismatch backs the "Transaction type must match its
+	// Category's type" business rule (spec.md S-TRX-14/S-TRX-40). 422, same
+	// reasoning as ErrCodeInvalidCategoryType — the request is well-formed,
+	// the referenced Category simply isn't eligible for this Transaction's type.
+	ErrCodeCategoryTypeMismatch = "CATEGORY_TYPE_MISMATCH"
+	// ErrCodeCurrencyLocked backs F-03's long-deferred 409 CURRENCY_LOCKED
+	// check (specs/wallet-management/spec.md S-WAL-21) — wired up by
+	// specs/transaction-management/plan.md Finding #2 / WAL-T14 now that the
+	// transactions table exists. Was previously only described in a
+	// wallet_service.go comment, never actually defined.
+	ErrCodeCurrencyLocked = "CURRENCY_LOCKED"
 )
 
 // AppError is the single sentinel-error shape services return for known
@@ -77,25 +100,30 @@ func (e *AppError) Error() string {
 // message varies per call site (e.g. field-specific validation failures) are
 // built with NewValidationError/NewWeakPasswordError instead.
 var (
-	ErrEmailAlreadyExists   = &AppError{Code: ErrCodeEmailAlreadyExists, Status: http.StatusConflict, Message: "an account with this email already exists"}
-	ErrForbidden            = &AppError{Code: ErrCodeForbidden, Status: http.StatusForbidden, Message: "you do not have permission to perform this action"}
-	ErrNotFound             = &AppError{Code: ErrCodeNotFound, Status: http.StatusNotFound, Message: "resource not found"}
-	ErrTokenExpired         = &AppError{Code: ErrCodeTokenExpired, Status: http.StatusGone, Message: "this invite link has expired"}
-	ErrRateLimited          = &AppError{Code: ErrCodeRateLimited, Status: http.StatusTooManyRequests, Message: "too many requests, please try again later"}
-	ErrInvalidCredentials   = &AppError{Code: ErrCodeInvalidCredentials, Status: http.StatusUnauthorized, Message: "invalid email or password"}
-	ErrAccountNotActive     = &AppError{Code: ErrCodeAccountNotActivated, Status: http.StatusUnauthorized, Message: "this account has not been activated yet"}
-	ErrAccountDisabled      = &AppError{Code: ErrCodeAccountDisabled, Status: http.StatusUnauthorized, Message: "this account has been disabled"}
-	ErrPasswordMismatch     = &AppError{Code: ErrCodePasswordMismatch, Status: http.StatusBadRequest, Message: "password and confirmation do not match"}
-	ErrUnauthenticated      = &AppError{Code: ErrCodeUnauthenticated, Status: http.StatusUnauthorized, Message: "authentication required"}
-	ErrWalletAccessDenied   = &AppError{Code: ErrCodeWalletAccessDenied, Status: http.StatusForbidden, Message: "you do not have access to this wallet"}
-	ErrWalletNotFound       = &AppError{Code: ErrCodeWalletNotFound, Status: http.StatusNotFound, Message: "wallet not found"}
-	ErrCategoryAccessDenied = &AppError{Code: ErrCodeCategoryAccessDenied, Status: http.StatusForbidden, Message: "you do not have access to this category"}
-	ErrCategoryNotFound     = &AppError{Code: ErrCodeCategoryNotFound, Status: http.StatusNotFound, Message: "category not found"}
-	ErrCategoryInUse        = &AppError{Code: ErrCodeCategoryInUse, Status: http.StatusConflict, Message: "an active budget references this category"}
-	ErrBudgetAccessDenied   = &AppError{Code: ErrCodeBudgetAccessDenied, Status: http.StatusForbidden, Message: "you do not have access to this budget"}
-	ErrBudgetNotFound       = &AppError{Code: ErrCodeBudgetNotFound, Status: http.StatusNotFound, Message: "budget not found"}
-	ErrBudgetAlreadyExists  = &AppError{Code: ErrCodeBudgetAlreadyExists, Status: http.StatusConflict, Message: "an active budget already exists for this category"}
-	ErrInvalidCategoryType  = &AppError{Code: ErrCodeInvalidCategoryType, Status: http.StatusUnprocessableEntity, Message: "budgets can only be set on expense categories"}
+	ErrEmailAlreadyExists      = &AppError{Code: ErrCodeEmailAlreadyExists, Status: http.StatusConflict, Message: "an account with this email already exists"}
+	ErrForbidden               = &AppError{Code: ErrCodeForbidden, Status: http.StatusForbidden, Message: "you do not have permission to perform this action"}
+	ErrNotFound                = &AppError{Code: ErrCodeNotFound, Status: http.StatusNotFound, Message: "resource not found"}
+	ErrTokenExpired            = &AppError{Code: ErrCodeTokenExpired, Status: http.StatusGone, Message: "this invite link has expired"}
+	ErrRateLimited             = &AppError{Code: ErrCodeRateLimited, Status: http.StatusTooManyRequests, Message: "too many requests, please try again later"}
+	ErrInvalidCredentials      = &AppError{Code: ErrCodeInvalidCredentials, Status: http.StatusUnauthorized, Message: "invalid email or password"}
+	ErrAccountNotActive        = &AppError{Code: ErrCodeAccountNotActivated, Status: http.StatusUnauthorized, Message: "this account has not been activated yet"}
+	ErrAccountDisabled         = &AppError{Code: ErrCodeAccountDisabled, Status: http.StatusUnauthorized, Message: "this account has been disabled"}
+	ErrPasswordMismatch        = &AppError{Code: ErrCodePasswordMismatch, Status: http.StatusBadRequest, Message: "password and confirmation do not match"}
+	ErrUnauthenticated         = &AppError{Code: ErrCodeUnauthenticated, Status: http.StatusUnauthorized, Message: "authentication required"}
+	ErrWalletAccessDenied      = &AppError{Code: ErrCodeWalletAccessDenied, Status: http.StatusForbidden, Message: "you do not have access to this wallet"}
+	ErrWalletNotFound          = &AppError{Code: ErrCodeWalletNotFound, Status: http.StatusNotFound, Message: "wallet not found"}
+	ErrCategoryAccessDenied    = &AppError{Code: ErrCodeCategoryAccessDenied, Status: http.StatusForbidden, Message: "you do not have access to this category"}
+	ErrCategoryNotFound        = &AppError{Code: ErrCodeCategoryNotFound, Status: http.StatusNotFound, Message: "category not found"}
+	ErrCategoryInUse           = &AppError{Code: ErrCodeCategoryInUse, Status: http.StatusConflict, Message: "an active budget references this category"}
+	ErrBudgetAccessDenied      = &AppError{Code: ErrCodeBudgetAccessDenied, Status: http.StatusForbidden, Message: "you do not have access to this budget"}
+	ErrBudgetNotFound          = &AppError{Code: ErrCodeBudgetNotFound, Status: http.StatusNotFound, Message: "budget not found"}
+	ErrBudgetAlreadyExists     = &AppError{Code: ErrCodeBudgetAlreadyExists, Status: http.StatusConflict, Message: "an active budget already exists for this category"}
+	ErrInvalidCategoryType     = &AppError{Code: ErrCodeInvalidCategoryType, Status: http.StatusUnprocessableEntity, Message: "budgets can only be set on expense categories"}
+	ErrTransactionAccessDenied = &AppError{Code: ErrCodeTransactionAccessDenied, Status: http.StatusForbidden, Message: "you do not have access to this transaction"}
+	ErrTransactionNotFound     = &AppError{Code: ErrCodeTransactionNotFound, Status: http.StatusNotFound, Message: "transaction not found"}
+	ErrInsufficientBalance     = &AppError{Code: ErrCodeInsufficientBalance, Status: http.StatusConflict, Message: "insufficient balance"}
+	ErrCategoryTypeMismatch    = &AppError{Code: ErrCodeCategoryTypeMismatch, Status: http.StatusUnprocessableEntity, Message: "transaction type must match the category's type"}
+	ErrCurrencyLocked          = &AppError{Code: ErrCodeCurrencyLocked, Status: http.StatusConflict, Message: "currency cannot be changed once the wallet has transactions"}
 )
 
 // NewInvalidInputError builds a 400 INVALID_INPUT error with a field-specific message.

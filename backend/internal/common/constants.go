@@ -88,6 +88,14 @@ const (
 	DateOnlyLayout = "2006-01-02"
 )
 
+// Transactions (F-06). TransactionNoteMaxLength is an explicit assumption
+// (specs/transaction-management/spec.md Domain Fields / Open Questions #4) —
+// no source document commits to a number; mirrors CategoryIconMaxLength's
+// precedent of a plan-owned constant for an assumed limit.
+const (
+	TransactionNoteMaxLength = 500
+)
+
 // SupportedCurrencies is the same {VND, USD} allow-list as Wallet's currency
 // (WalletDefaultCurrency above), but expressed as a real Go-side lookup — not
 // just a struct-tag oneof — because `limits` map-KEY validation cannot be

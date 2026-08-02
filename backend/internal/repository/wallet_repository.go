@@ -106,21 +106,26 @@ func (r *WalletRepository) GetWalletByID(ctx context.Context, id uuid.UUID) (*mo
 }
 
 type UpdateWalletParams struct {
-	ID     uuid.UUID
-	UserID uuid.UUID
-	Name   *string
-	Type   *string
+	ID       uuid.UUID
+	UserID   uuid.UUID
+	Name     *string
+	Type     *string
+	Currency *string
 }
 
 // UpdateWallet is a single-row UPDATE ... RETURNING * — no transaction
 // needed (plan.md Constitution Notes: "Transactional atomicity — Update: N/A").
-// Returns pgx.ErrNoRows if id/user_id don't match a non-deleted row.
+// Returns pgx.ErrNoRows if id/user_id don't match a non-deleted row. Currency
+// is only ever passed non-nil once WalletService has confirmed the 409
+// CURRENCY_LOCKED check passes (specs/transaction-management/plan.md
+// Finding #2 / WAL-T14).
 func (r *WalletRepository) UpdateWallet(ctx context.Context, arg UpdateWalletParams) (*model.Wallet, error) {
 	row, err := r.q.UpdateWallet(ctx, sqlc.UpdateWalletParams{
-		ID:     arg.ID,
-		UserID: arg.UserID,
-		Name:   arg.Name,
-		Type:   arg.Type,
+		ID:       arg.ID,
+		UserID:   arg.UserID,
+		Name:     arg.Name,
+		Type:     arg.Type,
+		Currency: arg.Currency,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("repository.UpdateWallet: %w", err)
@@ -137,6 +142,19 @@ func (r *WalletRepository) SetDefaultWallet(ctx context.Context, tx pgx.Tx, id, 
 		return nil, fmt.Errorf("repository.SetDefaultWallet: %w", err)
 	}
 	return toWalletModel(row), nil
+}
+
+// HasTransactionForWallet backs the 409 CURRENCY_LOCKED check in
+// WalletService.UpdateWallet (specs/transaction-management/plan.md Finding
+// #2 / WAL-T14) — queries the transactions table directly (a deliberate,
+// narrow cross-repository exception, same precedent as F-05's
+// HasActiveBudgetForCategory querying budgets from CategoryRepository).
+func (r *WalletRepository) HasTransactionForWallet(ctx context.Context, walletID uuid.UUID) (bool, error) {
+	exists, err := r.q.ExistsTransactionForWallet(ctx, walletID)
+	if err != nil {
+		return false, fmt.Errorf("repository.HasTransactionForWallet: %w", err)
+	}
+	return exists, nil
 }
 
 func toWalletModel(row sqlc.Wallet) *model.Wallet {

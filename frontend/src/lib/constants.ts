@@ -23,6 +23,7 @@ export const ROUTES = {
   wallets: "/app/wallets",
   categories: "/app/categories",
   budgets: "/app/budgets",
+  transactions: "/app/transactions",
 } as const;
 
 export const USER_ROLES = ["admin", "member"] as const;
@@ -56,3 +57,10 @@ export type CategoryType = (typeof CATEGORY_TYPES)[number];
 // — "monthly" is the only accepted value in MVP.
 export const BUDGET_PERIODS = ["monthly"] as const;
 export type BudgetPeriod = (typeof BUDGET_PERIODS)[number];
+
+// Mirrors model.TransactionType (backend/internal/model/transaction.go).
+export const TRANSACTION_TYPES = ["income", "expense"] as const;
+export type TransactionType = (typeof TRANSACTION_TYPES)[number];
+
+// Mirrors common.TransactionNoteMaxLength (backend/internal/common/constants.go).
+export const TRANSACTION_NOTE_MAX_LENGTH = 500;

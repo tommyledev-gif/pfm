@@ -187,6 +187,67 @@ func TestWalletService_UpdateWallet_EmptyBodyRejected(t *testing.T) {
 	}
 }
 
+// S-WAL-21: a currency change is rejected once the wallet has ≥1 Transaction
+// (specs/transaction-management/plan.md Finding #2 / WAL-T14 — closes the
+// deferral this test used to be blocked on).
+func TestWalletService_UpdateWallet_CurrencyLockedOnceTransactionExists(t *testing.T) {
+	svc, repo := newTestWalletService(t)
+	userID := uuid.New()
+
+	wallet, err := svc.CreateWallet(context.Background(), userID, dto.CreateWalletRequest{Name: "Cash", Type: "cash", Currency: "VND"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	repo.seedTransactionForWallet(wallet.ID)
+
+	newCurrency := "USD"
+	_, err = svc.UpdateWallet(context.Background(), userID, wallet.ID, dto.UpdateWalletRequest{Currency: &newCurrency})
+	var appErr *common.AppError
+	if !errors.As(err, &appErr) || appErr.Code != common.ErrCodeCurrencyLocked {
+		t.Fatalf("expected CURRENCY_LOCKED, got %v", err)
+	}
+}
+
+// A wallet with zero Transactions can still freely change currency — the
+// lock only activates once real financial history exists against it.
+func TestWalletService_UpdateWallet_CurrencyChangeAllowedWithoutTransactions(t *testing.T) {
+	svc, _ := newTestWalletService(t)
+	userID := uuid.New()
+
+	wallet, err := svc.CreateWallet(context.Background(), userID, dto.CreateWalletRequest{Name: "Cash", Type: "cash", Currency: "VND"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	newCurrency := "USD"
+	updated, err := svc.UpdateWallet(context.Background(), userID, wallet.ID, dto.UpdateWalletRequest{Currency: &newCurrency})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if updated.Currency != "USD" {
+		t.Fatalf("expected currency updated to USD, got %s", updated.Currency)
+	}
+}
+
+// Submitting the same currency the wallet already has is not treated as a
+// "change" and never triggers the lock check, even with Transactions present.
+func TestWalletService_UpdateWallet_SameCurrencyNeverLocked(t *testing.T) {
+	svc, repo := newTestWalletService(t)
+	userID := uuid.New()
+
+	wallet, err := svc.CreateWallet(context.Background(), userID, dto.CreateWalletRequest{Name: "Cash", Type: "cash", Currency: "VND"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	repo.seedTransactionForWallet(wallet.ID)
+
+	sameCurrency := "VND"
+	_, err = svc.UpdateWallet(context.Background(), userID, wallet.ID, dto.UpdateWalletRequest{Currency: &sameCurrency})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 // S-WAL-25 / S-WAL-26: set-default swaps atomically, and calling it again on
 // an already-default wallet is an idempotent no-op.
 func TestWalletService_SetDefaultWallet_SwapThenIdempotentNoOp(t *testing.T) {

@@ -68,10 +68,32 @@ func (t *fakeTx) Conn() *pgx.Conn {
 type fakeWalletRepo struct {
 	mu      sync.Mutex
 	wallets map[uuid.UUID]*model.Wallet
+	// transactionWallets backs HasTransactionForWallet (WAL-T14) — a set of
+	// wallet IDs a test has staged as "has at least one non-deleted
+	// Transaction", via seedTransactionForWallet.
+	transactionWallets map[uuid.UUID]bool
 }
 
 func newFakeWalletRepo() *fakeWalletRepo {
-	return &fakeWalletRepo{wallets: make(map[uuid.UUID]*model.Wallet)}
+	return &fakeWalletRepo{
+		wallets:            make(map[uuid.UUID]*model.Wallet),
+		transactionWallets: make(map[uuid.UUID]bool),
+	}
+}
+
+// seedTransactionForWallet stages HasTransactionForWallet's result for a
+// wallet ID — tests exercising the 409 CURRENCY_LOCKED path call this before
+// UpdateWallet.
+func (f *fakeWalletRepo) seedTransactionForWallet(walletID uuid.UUID) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.transactionWallets[walletID] = true
+}
+
+func (f *fakeWalletRepo) HasTransactionForWallet(_ context.Context, walletID uuid.UUID) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.transactionWallets[walletID], nil
 }
 
 func (f *fakeWalletRepo) BeginTx(context.Context) (pgx.Tx, error) {
@@ -182,6 +204,9 @@ func (f *fakeWalletRepo) UpdateWallet(_ context.Context, arg repository.UpdateWa
 	}
 	if arg.Type != nil {
 		w.Type = model.WalletType(*arg.Type)
+	}
+	if arg.Currency != nil {
+		w.Currency = *arg.Currency
 	}
 	w.UpdatedAt = time.Now().UTC()
 	cp := *w

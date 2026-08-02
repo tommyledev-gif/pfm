@@ -22,6 +22,10 @@ type fakeBudgetRepo struct {
 	mu         sync.Mutex
 	budgets    map[uuid.UUID]*model.Budget
 	categories map[uuid.UUID]*model.Category
+	// spent backs SpentByUserCurrentPeriod (BUD-T17) — nil until a test
+	// calls seedSpend, in which case ListBudgets/GetBudget/UpdateBudget see
+	// 0 for every currency, matching a real caller with no Transactions yet.
+	spent map[uuid.UUID]map[string]int64
 }
 
 func newFakeBudgetRepo() *fakeBudgetRepo {
@@ -155,4 +159,34 @@ func (f *fakeBudgetRepo) SoftDeleteBudget(_ context.Context, id, userID uuid.UUI
 	b.DeletedAt = &now
 	cp := *b
 	return &cp, nil
+}
+
+// SpentByUserCurrentPeriod backs BUD-T17's real spend computation — the fake
+// returns whatever seedSpend has staged, keyed by category ID then currency,
+// same convention as seedCategory. Defaults to an empty map (0 spent
+// everywhere) when nothing has been staged.
+func (f *fakeBudgetRepo) SpentByUserCurrentPeriod(_ context.Context, _ uuid.UUID) (map[uuid.UUID]map[string]int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if f.spent == nil {
+		return map[uuid.UUID]map[string]int64{}, nil
+	}
+	return f.spent, nil
+}
+
+// seedSpend stages the SpentByUserCurrentPeriod result a test wants —
+// BudgetService tests that need a non-zero spent figure call this before
+// exercising ListBudgets/GetBudget/UpdateBudget.
+func (f *fakeBudgetRepo) seedSpend(categoryID uuid.UUID, currency string, amount int64) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if f.spent == nil {
+		f.spent = make(map[uuid.UUID]map[string]int64)
+	}
+	if f.spent[categoryID] == nil {
+		f.spent[categoryID] = make(map[string]int64)
+	}
+	f.spent[categoryID][currency] = amount
 }

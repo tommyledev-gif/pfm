@@ -1,0 +1,287 @@
+package sqlc
+
+import (
+	"context"
+	"time"
+
+	"github.com/google/uuid"
+)
+
+const createTransaction = `-- name: CreateTransaction :one
+INSERT INTO transactions (user_id, wallet_id, category_id, amount, type, note, occurred_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, created_at, updated_at, deleted_at
+`
+
+type CreateTransactionParams struct {
+	UserID     uuid.UUID
+	WalletID   uuid.UUID
+	CategoryID uuid.UUID
+	Amount     int64
+	Type       string
+	Note       *string
+	OccurredAt time.Time
+}
+
+func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionParams) (Transaction, error) {
+	row := q.db.QueryRow(ctx, createTransaction,
+		arg.UserID, arg.WalletID, arg.CategoryID, arg.Amount, arg.Type, arg.Note, arg.OccurredAt,
+	)
+	var i Transaction
+	err := row.Scan(
+		&i.ID, &i.UserID, &i.WalletID, &i.CategoryID, &i.Amount, &i.Type,
+		&i.Note, &i.OccurredAt, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
+	)
+	return i, err
+}
+
+const getTransactionByID = `-- name: GetTransactionByID :one
+SELECT
+    t.id, t.user_id, t.wallet_id, t.category_id, t.amount, t.type, t.note,
+    t.occurred_at, t.created_at, t.updated_at, t.deleted_at,
+    w.name AS wallet_name, c.name AS category_name
+FROM transactions t
+JOIN wallets w ON w.id = t.wallet_id
+JOIN categories c ON c.id = t.category_id
+WHERE t.id = $1
+  AND t.deleted_at IS NULL
+LIMIT 1
+`
+
+type GetTransactionByIDRow struct {
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	WalletID     uuid.UUID
+	CategoryID   uuid.UUID
+	Amount       int64
+	Type         string
+	Note         *string
+	OccurredAt   time.Time
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	DeletedAt    *time.Time
+	WalletName   string
+	CategoryName string
+}
+
+// GetTransactionByID is deliberately NOT scoped by user_id, same precedent as
+// GetWalletByID/GetCategoryByID/GetBudgetByID — the service layer decides 403
+// vs. 404. The categories join is a plain JOIN, never filtered on
+// categories.deleted_at (specs/transaction-management/plan.md Finding #6) —
+// a soft-deleted category's row still exists and its name must still resolve.
+func (q *Queries) GetTransactionByID(ctx context.Context, id uuid.UUID) (GetTransactionByIDRow, error) {
+	row := q.db.QueryRow(ctx, getTransactionByID, id)
+	var i GetTransactionByIDRow
+	err := row.Scan(
+		&i.ID, &i.UserID, &i.WalletID, &i.CategoryID, &i.Amount, &i.Type,
+		&i.Note, &i.OccurredAt, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
+		&i.WalletName, &i.CategoryName,
+	)
+	return i, err
+}
+
+const listTransactionsByUser = `-- name: ListTransactionsByUser :many
+SELECT
+    t.id, t.user_id, t.wallet_id, t.category_id, t.amount, t.type, t.note,
+    t.occurred_at, t.created_at, t.updated_at, t.deleted_at,
+    w.name AS wallet_name, c.name AS category_name
+FROM transactions t
+JOIN wallets w ON w.id = t.wallet_id
+JOIN categories c ON c.id = t.category_id
+WHERE t.user_id = $1
+  AND t.deleted_at IS NULL
+  AND ($3::uuid IS NULL OR t.wallet_id = $3)
+  AND ($4::uuid IS NULL OR t.category_id = $4)
+  AND ($5::text IS NULL OR t.type = $5)
+  AND ($6::timestamptz IS NULL OR t.occurred_at >= $6)
+  AND ($7::timestamptz IS NULL OR t.occurred_at <= $7)
+  AND (
+    $8::timestamptz IS NULL
+    OR t.occurred_at < $8
+    OR (t.occurred_at = $8 AND t.id < $9)
+  )
+ORDER BY t.occurred_at DESC, t.id DESC
+LIMIT $2
+`
+
+type ListTransactionsByUserParams struct {
+	UserID           uuid.UUID
+	Limit            int32
+	WalletID         *uuid.UUID
+	CategoryID       *uuid.UUID
+	Type             *string
+	FromTs           *time.Time
+	ToTs             *time.Time
+	CursorOccurredAt *time.Time
+	CursorID         *uuid.UUID
+}
+
+type ListTransactionsByUserRow struct {
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	WalletID     uuid.UUID
+	CategoryID   uuid.UUID
+	Amount       int64
+	Type         string
+	Note         *string
+	OccurredAt   time.Time
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	DeletedAt    *time.Time
+	WalletName   string
+	CategoryName string
+}
+
+// ListTransactionsByUser is cursor-paginated on occurred_at, not created_at
+// (specs/transaction-management/spec.md Edge Cases US-02 #1) — deliberately
+// different from ListUsers' created_at-keyed cursor.
+func (q *Queries) ListTransactionsByUser(ctx context.Context, arg ListTransactionsByUserParams) ([]ListTransactionsByUserRow, error) {
+	rows, err := q.db.Query(ctx, listTransactionsByUser,
+		arg.UserID, arg.Limit, arg.WalletID, arg.CategoryID, arg.Type,
+		arg.FromTs, arg.ToTs, arg.CursorOccurredAt, arg.CursorID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []ListTransactionsByUserRow
+	for rows.Next() {
+		var i ListTransactionsByUserRow
+		if err := rows.Scan(
+			&i.ID, &i.UserID, &i.WalletID, &i.CategoryID, &i.Amount, &i.Type,
+			&i.Note, &i.OccurredAt, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
+			&i.WalletName, &i.CategoryName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateTransaction = `-- name: UpdateTransaction :one
+UPDATE transactions
+SET
+    amount      = COALESCE($3, amount),
+    category_id = COALESCE($4, category_id),
+    occurred_at = COALESCE($5, occurred_at),
+    note        = COALESCE($6, note),
+    updated_at  = NOW()
+WHERE id = $1
+  AND user_id = $2
+  AND deleted_at IS NULL
+RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, created_at, updated_at, deleted_at
+`
+
+type UpdateTransactionParams struct {
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	Amount     *int64
+	CategoryID *uuid.UUID
+	OccurredAt *time.Time
+	Note       *string
+}
+
+func (q *Queries) UpdateTransaction(ctx context.Context, arg UpdateTransactionParams) (Transaction, error) {
+	row := q.db.QueryRow(ctx, updateTransaction,
+		arg.ID, arg.UserID, arg.Amount, arg.CategoryID, arg.OccurredAt, arg.Note,
+	)
+	var i Transaction
+	err := row.Scan(
+		&i.ID, &i.UserID, &i.WalletID, &i.CategoryID, &i.Amount, &i.Type,
+		&i.Note, &i.OccurredAt, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
+	)
+	return i, err
+}
+
+const softDeleteTransaction = `-- name: SoftDeleteTransaction :one
+UPDATE transactions
+SET deleted_at = NOW()
+WHERE id = $1
+  AND user_id = $2
+  AND deleted_at IS NULL
+RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, created_at, updated_at, deleted_at
+`
+
+type SoftDeleteTransactionParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) SoftDeleteTransaction(ctx context.Context, arg SoftDeleteTransactionParams) (Transaction, error) {
+	row := q.db.QueryRow(ctx, softDeleteTransaction, arg.ID, arg.UserID)
+	var i Transaction
+	err := row.Scan(
+		&i.ID, &i.UserID, &i.WalletID, &i.CategoryID, &i.Amount, &i.Type,
+		&i.Note, &i.OccurredAt, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
+	)
+	return i, err
+}
+
+const existsTransactionForWallet = `-- name: ExistsTransactionForWallet :one
+SELECT EXISTS (
+    SELECT 1 FROM transactions
+    WHERE wallet_id = $1
+      AND deleted_at IS NULL
+) AS "exists"
+`
+
+// ExistsTransactionForWallet backs F-03's 409 CURRENCY_LOCKED check
+// (WAL-T14) — called from WalletRepository via the shared *Queries struct
+// (cross-repository query exception).
+func (q *Queries) ExistsTransactionForWallet(ctx context.Context, walletID uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, existsTransactionForWallet, walletID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const sumExpenseByUserCurrentPeriod = `-- name: SumExpenseByUserCurrentPeriod :many
+SELECT
+    t.category_id,
+    w.currency,
+    SUM(t.amount)::bigint AS spent
+FROM transactions t
+JOIN wallets w ON w.id = t.wallet_id
+WHERE t.user_id = $1
+  AND t.type = 'expense'
+  AND t.deleted_at IS NULL
+  AND t.occurred_at >= date_trunc('month', NOW())
+  AND t.occurred_at < date_trunc('month', NOW()) + INTERVAL '1 month'
+GROUP BY t.category_id, w.currency
+`
+
+type SumExpenseByUserCurrentPeriodRow struct {
+	CategoryID uuid.UUID
+	Currency   string
+	Spent      int64
+}
+
+// SumExpenseByUserCurrentPeriod backs F-05's real spend computation
+// (BUD-T17) — called from BudgetRepository via the shared *Queries struct
+// (cross-repository query exception). One aggregate query per request, never
+// N+1 (specs/budget-management/spec.md US-02 Edge Cases #1).
+func (q *Queries) SumExpenseByUserCurrentPeriod(ctx context.Context, userID uuid.UUID) ([]SumExpenseByUserCurrentPeriodRow, error) {
+	rows, err := q.db.Query(ctx, sumExpenseByUserCurrentPeriod, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []SumExpenseByUserCurrentPeriodRow
+	for rows.Next() {
+		var i SumExpenseByUserCurrentPeriodRow
+		if err := rows.Scan(&i.CategoryID, &i.Currency, &i.Spent); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

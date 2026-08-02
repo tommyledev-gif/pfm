@@ -14,7 +14,7 @@ import (
 // (/api/v1). Auth/rate-limit middleware ordering matters: JWTAuth must run
 // before RequireRole (role comes from the token) and before
 // InviteRateLimiter (keyed by the caller's user ID from that same token).
-func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, tokens *service.TokenService, logger *zap.Logger) {
+func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, tokens *service.TokenService, logger *zap.Logger) {
 	v1 := app.Group("/api/v1")
 
 	auth := v1.Group("/auth")
@@ -53,4 +53,14 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	budgets.Get("/:id", budgetHandler.GetBudget)
 	budgets.Patch("/:id", budgetHandler.UpdateBudget)
 	budgets.Delete("/:id", budgetHandler.DeleteBudget)
+
+	// F-06 Transaction Management — no RequireRole gate: every active user
+	// manages only their own transactions (plan.md Security & Actor
+	// Resolution).
+	transactions := v1.Group("/transactions", middleware.JWTAuth(tokens, logger))
+	transactions.Post("/", transactionHandler.CreateTransaction)
+	transactions.Get("/", transactionHandler.ListTransactions)
+	transactions.Get("/:id", transactionHandler.GetTransaction)
+	transactions.Patch("/:id", transactionHandler.UpdateTransaction)
+	transactions.Delete("/:id", transactionHandler.DeleteTransaction)
 }

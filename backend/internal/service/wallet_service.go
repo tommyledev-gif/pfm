@@ -125,27 +125,41 @@ func (s *WalletService) getOwnedWallet(ctx context.Context, userID, walletID uui
 }
 
 // UpdateWallet implements US-04. Currency-lock (S-WAL-21, 409
-// CURRENCY_LOCKED) is intentionally unimplemented — the transactions table
-// doesn't exist yet (F-06 unbuilt; see plan.md Finding #3 / WAL-T14).
-// currency isn't a request field either, by the same deferral.
+// CURRENCY_LOCKED) is now wired up (specs/transaction-management/plan.md
+// Finding #2 / WAL-T14, closing the deferral this comment used to describe)
+// — a currency change is rejected once any non-deleted Transaction
+// references the wallet. A currency value equal to the wallet's current one
+// is not treated as a "change" and never triggers the check.
 func (s *WalletService) UpdateWallet(ctx context.Context, userID, walletID uuid.UUID, req dto.UpdateWalletRequest) (*model.Wallet, error) {
 	if !req.HasUpdates() {
-		return nil, common.NewInvalidInputError("at least one of name or type must be provided")
+		return nil, common.NewInvalidInputError("at least one of name, type, or currency must be provided")
 	}
-	if _, err := s.getOwnedWallet(ctx, userID, walletID); err != nil {
+	wallet, err := s.getOwnedWallet(ctx, userID, walletID)
+	if err != nil {
 		return nil, err
 	}
 
-	wallet, err := s.repo.UpdateWallet(ctx, repository.UpdateWalletParams{
-		ID:     walletID,
-		UserID: userID,
-		Name:   req.Name,
-		Type:   req.Type,
+	if req.Currency != nil && *req.Currency != wallet.Currency {
+		hasTransaction, err := s.repo.HasTransactionForWallet(ctx, walletID)
+		if err != nil {
+			return nil, fmt.Errorf("service.UpdateWallet: %w", err)
+		}
+		if hasTransaction {
+			return nil, common.ErrCurrencyLocked
+		}
+	}
+
+	updated, err := s.repo.UpdateWallet(ctx, repository.UpdateWalletParams{
+		ID:       walletID,
+		UserID:   userID,
+		Name:     req.Name,
+		Type:     req.Type,
+		Currency: req.Currency,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("service.UpdateWallet: %w", err)
 	}
-	return wallet, nil
+	return updated, nil
 }
 
 // SetDefaultWallet implements US-05. Calling this on an already-default

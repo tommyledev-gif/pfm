@@ -61,7 +61,12 @@ func (s *BudgetService) CreateBudget(ctx context.Context, userID uuid.UUID, req 
 	if err != nil {
 		return nil, err
 	}
-	s.computeStatus(budget)
+	// spec.md US-01 step 6: Create's response always shows spent=0/status=
+	// "within" regardless of any pre-existing Transactions already in this
+	// Category this period — a brand-new Budget has nothing tracked against
+	// it yet from the caller's perspective. Passing a nil map is exactly
+	// "0 spent for every currency" (a nil map read returns the zero value).
+	s.computeStatus(budget, nil)
 	return budget, nil
 }
 
@@ -114,14 +119,20 @@ func (s *BudgetService) createBudgetTx(ctx context.Context, userID, categoryID u
 }
 
 // ListBudgets implements US-02 — strictly scoped to the caller (CLAUDE.md
-// user isolation rule).
+// user isolation rule). Spend is fetched via a single aggregate query across
+// every one of the caller's Budgets, never N+1 per Budget/currency
+// (specs/budget-management/spec.md US-02 Edge Cases #1) — closes BUD-T17.
 func (s *BudgetService) ListBudgets(ctx context.Context, userID uuid.UUID) ([]*model.Budget, error) {
 	budgets, err := s.repo.ListBudgetsByUser(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("service.ListBudgets: %w", err)
 	}
+	spentByCategory, err := s.repo.SpentByUserCurrentPeriod(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("service.ListBudgets: %w", err)
+	}
 	for _, budget := range budgets {
-		s.computeStatus(budget)
+		s.computeStatus(budget, spentByCategory[budget.CategoryID])
 	}
 	return budgets, nil
 }
@@ -133,7 +144,11 @@ func (s *BudgetService) GetBudget(ctx context.Context, userID, budgetID uuid.UUI
 	if err != nil {
 		return nil, err
 	}
-	s.computeStatus(budget)
+	spentByCategory, err := s.repo.SpentByUserCurrentPeriod(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("service.GetBudget: %w", err)
+	}
+	s.computeStatus(budget, spentByCategory[budget.CategoryID])
 	return budget, nil
 }
 
@@ -178,7 +193,13 @@ func (s *BudgetService) UpdateBudget(ctx context.Context, userID, budgetID uuid.
 	if err != nil {
 		return nil, err
 	}
-	s.computeStatus(budget)
+	// spec.md US-04 step 6 wants real recomputed spent against the *new*
+	// limits (S-BUD-33) — unlike Create, this is never a bare spent=0.
+	spentByCategory, err := s.repo.SpentByUserCurrentPeriod(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("service.UpdateBudget: %w", err)
+	}
+	s.computeStatus(budget, spentByCategory[budget.CategoryID])
 	return budget, nil
 }
 
@@ -222,18 +243,21 @@ func (s *BudgetService) DeleteBudget(ctx context.Context, userID, budgetID uuid.
 }
 
 // computeStatus fills in each currency entry's Spent/Remaining/Status and
-// the Budget's overall status.
-//
-// STUBBED (specs/budget-management/plan.md Finding #1 / BUD-T17): Spent is
-// always 0 because the `transactions` table (F-06) doesn't exist yet — this
-// method is the single seam where the real
-// `SUM(transactions.amount) ... GROUP BY category_id, currency` aggregate
-// will be wired in later, with no change needed at any call site.
-func (s *BudgetService) computeStatus(budget *model.Budget) {
+// the Budget's overall status from spentByCurrency — this Budget's
+// category's real per-currency expense total for the current period,
+// already aggregated by a single SUM(transactions.amount) ... GROUP BY
+// category_id, currency query per request (BudgetRepo.SpentByUserCurrentPeriod,
+// specs/transaction-management/plan.md Finding #3 / BUD-T17 — closes the
+// stub this method used to be). spentByCurrency may be nil (CreateBudget's
+// call, spec.md US-01 step 6: a freshly created Budget always reports
+// spent=0 regardless of any pre-existing Transactions in that Category this
+// period) — a nil map read returns the zero value, so this needs no special
+// case here.
+func (s *BudgetService) computeStatus(budget *model.Budget, spentByCurrency map[string]int64) {
 	overall := model.BudgetStatusWithin
 	for i := range budget.Limits {
 		limit := &budget.Limits[i]
-		limit.Spent = 0
+		limit.Spent = spentByCurrency[limit.Currency]
 		limit.Remaining = limit.AmountLimit - limit.Spent
 		limit.Status = model.BudgetStatusWithin
 		if limit.Spent > limit.AmountLimit {

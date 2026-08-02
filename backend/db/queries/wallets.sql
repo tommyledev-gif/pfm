@@ -34,10 +34,15 @@ WHERE id = $1
 LIMIT 1;
 
 -- name: UpdateWallet :one
+-- currency is only ever a real change once WalletService has confirmed the
+-- 409 CURRENCY_LOCKED check passes (specs/transaction-management/plan.md
+-- Finding #2 / WAL-T14) — this query itself applies the COALESCE
+-- unconditionally, trusting that gate.
 UPDATE wallets
 SET
     name       = COALESCE(sqlc.narg('name'), name),
     type       = COALESCE(sqlc.narg('type'), type),
+    currency   = COALESCE(sqlc.narg('currency'), currency),
     updated_at = NOW()
 WHERE id = $1
   AND user_id = $2
@@ -49,5 +54,34 @@ UPDATE wallets
 SET is_default = true, updated_at = NOW()
 WHERE id = $1
   AND user_id = $2
+  AND deleted_at IS NULL
+RETURNING *;
+
+-- name: DecrementWalletBalanceIfSufficient :one
+-- Backs the insufficient-balance floor for expense Transaction creation
+-- (specs/transaction-management/spec.md Context #4, S-TRX-09/S-TRX-18) — the
+-- WHERE balance >= $2 clause IS the concurrency guard: zero rows returned
+-- (pgx.ErrNoRows) is the authoritative INSUFFICIENT_BALANCE signal, closing
+-- the race between two concurrent expense requests without a separate
+-- SELECT ... FOR UPDATE lock. Only ever called from POST /transactions — see
+-- AdjustWalletBalance below for the unconditional, floor-free variant used by
+-- Update/Delete.
+UPDATE wallets
+SET balance = balance - $2, updated_at = NOW()
+WHERE id = $1
+  AND deleted_at IS NULL
+  AND balance >= $2
+RETURNING *;
+
+-- name: AdjustWalletBalance :one
+-- Unconditional signed-delta balance adjustment — no floor check, deliberately
+-- (specs/transaction-management/spec.md Context #3): used for income Transaction
+-- creation (positive delta) and for every Update/Delete balance reconciliation
+-- (positive or negative delta), where the resulting balance is allowed to land
+-- at zero or below. Never used for expense Transaction creation — that goes
+-- through DecrementWalletBalanceIfSufficient instead.
+UPDATE wallets
+SET balance = balance + $2, updated_at = NOW()
+WHERE id = $1
   AND deleted_at IS NULL
 RETURNING *;

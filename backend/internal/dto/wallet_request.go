@@ -17,19 +17,24 @@ type CreateWalletRequest struct {
 }
 
 // UpdateWalletRequest is the body of PATCH /wallets/{id}. Deliberately has no
-// balance or currency field at the type level (spec.md: "balance and
-// currency are never accepted by this endpoint") — decoded via DecodeStrict
-// so an unrecognized field like "balance" is rejected with 400, not silently
-// ignored (plan.md Finding #4).
+// balance field at the type level (spec.md: "balance is never accepted by
+// this endpoint") — decoded via DecodeStrict so an unrecognized field like
+// "balance" is rejected with 400, not silently ignored (plan.md Finding #4).
+// Currency WAS excluded too, pending F-06's transactions table
+// (wallet-management/plan.md Finding #3 / WAL-T14) — now added, since that
+// table exists; WalletService.UpdateWallet gates any real currency change
+// behind the 409 CURRENCY_LOCKED check (specs/transaction-management/plan.md
+// Finding #2).
 type UpdateWalletRequest struct {
-	Name *string `json:"name" validate:"omitempty,max=100"`
-	Type *string `json:"type" validate:"omitempty,oneof=cash bank e_wallet other"`
+	Name     *string `json:"name" validate:"omitempty,max=100"`
+	Type     *string `json:"type" validate:"omitempty,oneof=cash bank e_wallet other"`
+	Currency *string `json:"currency" validate:"omitempty,oneof=VND USD"`
 }
 
 // HasUpdates reports whether at least one field was supplied — an empty
 // body is a client mistake (400), not a no-op 200 (spec.md S-WAL-24).
 func (r UpdateWalletRequest) HasUpdates() bool {
-	return r.Name != nil || r.Type != nil
+	return r.Name != nil || r.Type != nil || r.Currency != nil
 }
 
 // DecodeStrict decodes raw JSON into v, rejecting any field not present on

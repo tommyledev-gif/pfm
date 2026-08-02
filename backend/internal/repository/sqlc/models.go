@@ -82,3 +82,18 @@ type BudgetLimit struct {
 	Currency    string
 	AmountLimit int64
 }
+
+// Transaction mirrors the transactions table exactly (008_transactions.sql).
+type Transaction struct {
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	WalletID   uuid.UUID
+	CategoryID uuid.UUID
+	Amount     int64
+	Type       string
+	Note       *string
+	OccurredAt time.Time
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	DeletedAt  *time.Time
+}

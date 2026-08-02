@@ -41,6 +41,19 @@
 
 ---
 
+## DATABASE MIGRATIONS — LOCAL/DOCKER DEPLOYMENT
+
+> This project has no migration runner (`golang-migrate` is not wired up — `docs/tech_stacks.md`). Every `backend/db/migrations/NNN_*.sql` file is applied only because the root `docker-compose.yml` mounts it into the `postgres` service's `/docker-entrypoint-initdb.d/`. A migration file that exists on disk but isn't mounted there **does not exist in any running database**, and every query against its table will fail with `relation "..." does not exist` (SQLSTATE 42P01) — this is not a transient error, it will happen every single time until fixed.
+
+- [ ] Every new `backend/db/migrations/NNN_*.sql` file has a matching new line added to `docker-compose.yml`'s `postgres.volumes` list, in the same numeric order as the migration filename (mirror the existing `01_init.sql`, `02_revoked_tokens.sql`, ... pattern) — added in the **same commit/PR** as the migration file, never as a follow-up.
+- [ ] `infra/postgres/init/seed_dev_admin.sh` (or any other non-SQL init script) stays mounted with the **highest** number — renumber it, don't insert a migration after it.
+- [ ] `/docker-entrypoint-initdb.d/*` scripts run **only on first init of an empty Postgres volume** (Postgres image behavior) — adding a new mount line and restarting the stack does **not** retroactively apply it to an already-initialized dev volume (`pfm_pgdata`). Any dev/staging environment that was already running before the new migration must have it applied manually:
+  `cat backend/db/migrations/NNN_*.sql | docker exec -i <postgres_container> psql -U $POSTGRES_USER -d $POSTGRES_DB`
+- [ ] Before calling a new feature done, verify its table actually exists in the environment you tested against: `docker exec <postgres_container> psql -U $POSTGRES_USER -d $POSTGRES_DB -c "\dt"`.
+- [ ] Before calling a new feature done, check the backend container's logs for `relation "..." does not exist` (or any other unhandled-error entries) for the new endpoint(s): `docker logs <backend_container> --tail 200`. A clean build/test pass does **not** prove the migration was ever applied anywhere — `go build`/`go test` never touch a real Postgres instance in this project's test setup (in-memory fakes only, per `internal/service/fake_*_repo_test.go`).
+
+---
+
 ## SECURITY
 
 - [ ] Passwords always hashed before persistence — `bcrypt` (Go: `golang.org/x/crypto/bcrypt`; Python: `passlib`/`bcrypt`) — no plain-text comparison, no plain-text storage.

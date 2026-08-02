@@ -111,6 +111,7 @@ UPDATE wallets
 SET
     name       = COALESCE($3, name),
     type       = COALESCE($4, type),
+    currency   = COALESCE($5, currency),
     updated_at = NOW()
 WHERE id = $1
   AND user_id = $2
@@ -119,14 +120,15 @@ RETURNING id, user_id, name, type, balance, currency, is_default, created_at, up
 `
 
 type UpdateWalletParams struct {
-	ID     uuid.UUID
-	UserID uuid.UUID
-	Name   *string
-	Type   *string
+	ID       uuid.UUID
+	UserID   uuid.UUID
+	Name     *string
+	Type     *string
+	Currency *string
 }
 
 func (q *Queries) UpdateWallet(ctx context.Context, arg UpdateWalletParams) (Wallet, error) {
-	row := q.db.QueryRow(ctx, updateWallet, arg.ID, arg.UserID, arg.Name, arg.Type)
+	row := q.db.QueryRow(ctx, updateWallet, arg.ID, arg.UserID, arg.Name, arg.Type, arg.Currency)
 	var i Wallet
 	err := row.Scan(
 		&i.ID, &i.UserID, &i.Name, &i.Type, &i.Balance, &i.Currency,
@@ -146,6 +148,60 @@ RETURNING id, user_id, name, type, balance, currency, is_default, created_at, up
 
 func (q *Queries) SetDefaultWallet(ctx context.Context, id uuid.UUID, userID uuid.UUID) (Wallet, error) {
 	row := q.db.QueryRow(ctx, setDefaultWallet, id, userID)
+	var i Wallet
+	err := row.Scan(
+		&i.ID, &i.UserID, &i.Name, &i.Type, &i.Balance, &i.Currency,
+		&i.IsDefault, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
+	)
+	return i, err
+}
+
+const decrementWalletBalanceIfSufficient = `-- name: DecrementWalletBalanceIfSufficient :one
+UPDATE wallets
+SET balance = balance - $2, updated_at = NOW()
+WHERE id = $1
+  AND deleted_at IS NULL
+  AND balance >= $2
+RETURNING id, user_id, name, type, balance, currency, is_default, created_at, updated_at, deleted_at
+`
+
+type DecrementWalletBalanceIfSufficientParams struct {
+	ID     uuid.UUID
+	Amount int64
+}
+
+// DecrementWalletBalanceIfSufficient returns pgx.ErrNoRows when the WHERE
+// clause matched zero rows — that's the authoritative INSUFFICIENT_BALANCE
+// signal (specs/transaction-management/spec.md Context #4), not an error
+// condition to log as unexpected.
+func (q *Queries) DecrementWalletBalanceIfSufficient(ctx context.Context, arg DecrementWalletBalanceIfSufficientParams) (Wallet, error) {
+	row := q.db.QueryRow(ctx, decrementWalletBalanceIfSufficient, arg.ID, arg.Amount)
+	var i Wallet
+	err := row.Scan(
+		&i.ID, &i.UserID, &i.Name, &i.Type, &i.Balance, &i.Currency,
+		&i.IsDefault, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
+	)
+	return i, err
+}
+
+const adjustWalletBalance = `-- name: AdjustWalletBalance :one
+UPDATE wallets
+SET balance = balance + $2, updated_at = NOW()
+WHERE id = $1
+  AND deleted_at IS NULL
+RETURNING id, user_id, name, type, balance, currency, is_default, created_at, updated_at, deleted_at
+`
+
+type AdjustWalletBalanceParams struct {
+	ID    uuid.UUID
+	Delta int64
+}
+
+// AdjustWalletBalance is unconditional — no floor check (spec.md Context #3).
+// Delta may be positive or negative; the resulting balance may land at zero
+// or below.
+func (q *Queries) AdjustWalletBalance(ctx context.Context, arg AdjustWalletBalanceParams) (Wallet, error) {
+	row := q.db.QueryRow(ctx, adjustWalletBalance, arg.ID, arg.Delta)
 	var i Wallet
 	err := row.Scan(
 		&i.ID, &i.UserID, &i.Name, &i.Type, &i.Balance, &i.Currency,
