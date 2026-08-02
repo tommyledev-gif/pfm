@@ -190,6 +190,25 @@ func TestCategoryService_UpdateCategory_RenameCollision(t *testing.T) {
 	}
 }
 
+// S-CAT-27 (F-04, resolved by specs/budget-management/plan.md Finding #2):
+// delete is blocked while an active Budget references the category.
+func TestCategoryService_DeleteCategory_BlockedByActiveBudget(t *testing.T) {
+	svc, repo := newTestCategoryService(t)
+	userID := uuid.New()
+
+	category, err := svc.CreateCategory(context.Background(), userID, dto.CreateCategoryRequest{Name: "Groceries", Type: "expense"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	repo.setActiveBudget(category.ID, true)
+
+	_, err = svc.DeleteCategory(context.Background(), userID, category.ID)
+	var appErr *common.AppError
+	if !errors.As(err, &appErr) || appErr.Code != common.ErrCodeCategoryInUse {
+		t.Fatalf("expected CATEGORY_IN_USE, got %v", err)
+	}
+}
+
 // S-CAT-26/S-CAT-31: delete succeeds once, then the same category is a 404
 // on a second call — deletion is not idempotent.
 func TestCategoryService_DeleteCategory_NotIdempotent(t *testing.T) {

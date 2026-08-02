@@ -60,3 +60,25 @@ type Category struct {
 	CreatedAt time.Time
 	DeletedAt *time.Time
 }
+
+// Budget mirrors the budgets table exactly (007_budgets.sql). Per-currency
+// limits live in the separate BudgetLimit rows, not on this struct.
+type Budget struct {
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	CategoryID uuid.UUID
+	Period     string
+	StartDate  time.Time
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	DeletedAt  *time.Time
+}
+
+// BudgetLimit mirrors the budget_limits table exactly (007_budgets.sql).
+// Composite PK (budget_id, currency) — at most one row per currency per
+// Budget.
+type BudgetLimit struct {
+	BudgetID    uuid.UUID
+	Currency    string
+	AmountLimit int64
+}

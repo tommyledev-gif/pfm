@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/example/pfm/backend/internal/model"
 	"github.com/example/pfm/backend/internal/repository/sqlc"
@@ -13,15 +14,23 @@ import (
 // CategoryRepository wraps the sqlc-generated category queries and returns
 // domain models, never sqlc's raw row structs. No business rules live here —
 // duplicate-checking, system-category guarding, and visibility splits are
-// all decided by CategoryService. Unlike WalletRepository, no write here
-// needs a caller-managed pgx.Tx: every operation is a single-statement
-// INSERT/UPDATE (plan.md Constitution Notes: "Transactional atomicity: N/A").
+// all decided by CategoryService. Create/List/Get/Update stay single-
+// statement, no transaction needed — only Delete now needs one, to close the
+// create-vs-delete race with Budget creation (specs/budget-management/plan.md
+// Finding #2 / BUD-T15).
 type CategoryRepository struct {
-	q *sqlc.Queries
+	q    *sqlc.Queries
+	pool Beginner
 }
 
-func NewCategoryRepository(q *sqlc.Queries) *CategoryRepository {
-	return &CategoryRepository{q: q}
+func NewCategoryRepository(q *sqlc.Queries, pool Beginner) *CategoryRepository {
+	return &CategoryRepository{q: q, pool: pool}
+}
+
+// BeginTx starts a transaction the caller (CategoryService.DeleteCategory)
+// commits or rolls back — see specs/budget-management/plan.md BUD-T16.
+func (r *CategoryRepository) BeginTx(ctx context.Context) (pgx.Tx, error) {
+	return r.pool.Begin(ctx)
 }
 
 type CreateCategoryParams struct {
@@ -112,14 +121,42 @@ func (r *CategoryRepository) UpdateCategory(ctx context.Context, arg UpdateCateg
 }
 
 // SoftDeleteCategory is scoped by id + user_id, same visibility guarantee as
-// UpdateCategory. Returns pgx.ErrNoRows if id/user_id don't match a
-// non-deleted row (ownership must already be checked by the caller).
-func (r *CategoryRepository) SoftDeleteCategory(ctx context.Context, id, userID uuid.UUID) (*model.Category, error) {
-	row, err := r.q.SoftDeleteCategory(ctx, id, userID)
+// UpdateCategory. Runs inside the caller's transaction (BUD-T16) so the lock
+// + active-Budget check + this write are all atomic. Returns pgx.ErrNoRows
+// if id/user_id don't match a non-deleted row (ownership must already be
+// checked by the caller).
+func (r *CategoryRepository) SoftDeleteCategory(ctx context.Context, tx pgx.Tx, id, userID uuid.UUID) (*model.Category, error) {
+	row, err := r.q.WithTx(tx).SoftDeleteCategory(ctx, id, userID)
 	if err != nil {
 		return nil, fmt.Errorf("repository.SoftDeleteCategory: %w", err)
 	}
 	return toCategoryModel(row), nil
+}
+
+// LockCategoryByID takes a row lock on the category, inside the caller's
+// transaction — closes the create-vs-delete race with BudgetService.
+// CreateBudget (specs/budget-management/spec.md S-CAT-32, plan.md
+// Finding #2/#3). Returns pgx.ErrNoRows only if the id has never existed;
+// a soft-deleted category is returned (not an error), same convention as
+// GetCategoryByID's sibling queries.
+func (r *CategoryRepository) LockCategoryByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*model.Category, error) {
+	row, err := r.q.WithTx(tx).LockCategoryByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("repository.LockCategoryByID: %w", err)
+	}
+	return toCategoryModel(row), nil
+}
+
+// HasActiveBudgetForCategory backs the 409 CATEGORY_IN_USE delete guard
+// (spec.md S-CAT-27) — queries the budgets table directly (a deliberate,
+// narrow exception documented in specs/budget-management/plan.md Security &
+// Actor Resolution), inside the caller's transaction.
+func (r *CategoryRepository) HasActiveBudgetForCategory(ctx context.Context, tx pgx.Tx, categoryID uuid.UUID) (bool, error) {
+	exists, err := r.q.WithTx(tx).ExistsActiveBudgetForCategory(ctx, categoryID)
+	if err != nil {
+		return false, fmt.Errorf("repository.HasActiveBudgetForCategory: %w", err)
+	}
+	return exists, nil
 }
 
 func toCategoryModel(row sqlc.Category) *model.Category {

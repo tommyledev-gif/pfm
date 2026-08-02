@@ -140,3 +140,19 @@ func (q *Queries) SoftDeleteCategory(ctx context.Context, id uuid.UUID, userID u
 	err := row.Scan(&i.ID, &i.UserID, &i.Name, &i.Icon, &i.Type, &i.CreatedAt, &i.DeletedAt)
 	return i, err
 }
+
+const lockCategoryByID = `-- name: LockCategoryByID :one
+SELECT id, user_id, name, icon, type, created_at, deleted_at FROM categories
+WHERE id = $1
+LIMIT 1
+FOR UPDATE
+`
+
+// LockCategoryByID is shared by BudgetRepository and CategoryRepository —
+// see db/queries/categories.sql for why this one query serves both.
+func (q *Queries) LockCategoryByID(ctx context.Context, id uuid.UUID) (Category, error) {
+	row := q.db.QueryRow(ctx, lockCategoryByID, id)
+	var i Category
+	err := row.Scan(&i.ID, &i.UserID, &i.Name, &i.Icon, &i.Type, &i.CreatedAt, &i.DeletedAt)
+	return i, err
+}

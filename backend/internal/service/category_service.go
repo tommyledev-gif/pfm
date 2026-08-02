@@ -167,22 +167,55 @@ func (s *CategoryService) UpdateCategory(ctx context.Context, userID, categoryID
 	return updated, nil
 }
 
-// DeleteCategory implements US-05. The active-Budget existence check
-// (spec.md S-CAT-27, 409 CATEGORY_IN_USE) is intentionally not implemented
-// here — the budgets table doesn't exist yet (plan.md Finding #4 / CAT-T14).
-// Deletion is unconditional once ownership is confirmed.
+// DeleteCategory implements US-05. Runs inside one transaction: lock the
+// category row, verify ownership, check for an active Budget referencing it
+// (409 CATEGORY_IN_USE, spec.md S-CAT-27 — now wired up per
+// specs/budget-management/plan.md Finding #2 / BUD-T16, since the budgets
+// table exists), then soft-delete. The row lock closes the create-vs-delete
+// race with BudgetService.CreateBudget (spec.md S-BUD-14 / this package's
+// own S-CAT-32) — the two transactions serialize on the same category row.
 func (s *CategoryService) DeleteCategory(ctx context.Context, userID, categoryID uuid.UUID) (*model.Category, error) {
-	if _, err := s.getOwnedCategory(ctx, userID, categoryID); err != nil {
-		return nil, err
+	tx, err := s.repo.BeginTx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("service.DeleteCategory: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // no-op once committed
+
+	category, err := s.repo.LockCategoryByID(ctx, tx, categoryID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, common.ErrCategoryNotFound
+		}
+		return nil, fmt.Errorf("service.DeleteCategory: %w", err)
+	}
+	// LockCategoryByID is not filtered by deleted_at (unlike GetCategoryByID)
+	// so the lock also covers an already-deleted row — treat that the same
+	// as never-existed (spec.md S-CAT-31).
+	if category.DeletedAt != nil {
+		return nil, common.ErrCategoryNotFound
+	}
+	if category.IsSystem() || *category.UserID != userID {
+		return nil, common.ErrCategoryAccessDenied
 	}
 
-	deleted, err := s.repo.SoftDeleteCategory(ctx, categoryID, userID)
+	hasActiveBudget, err := s.repo.HasActiveBudgetForCategory(ctx, tx, categoryID)
+	if err != nil {
+		return nil, fmt.Errorf("service.DeleteCategory: %w", err)
+	}
+	if hasActiveBudget {
+		return nil, common.ErrCategoryInUse
+	}
+
+	deleted, err := s.repo.SoftDeleteCategory(ctx, tx, categoryID, userID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			// Lost a race to a concurrent delete of the same category
-			// between the ownership check above and this write.
+			// between the lock above and this write.
 			return nil, common.ErrCategoryNotFound
 		}
+		return nil, fmt.Errorf("service.DeleteCategory: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("service.DeleteCategory: %w", err)
 	}
 	return deleted, nil

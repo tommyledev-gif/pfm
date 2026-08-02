@@ -61,7 +61,7 @@ Software Requirement Specification (SRS)
     - [US-04: Update a Category](#us-04-update-a-category)
     - [US-05: Delete a Category](#us-05-delete-a-category)
   - [Feature-05: Budget Management](#feature-05-budget-management)
-    - [US-01: Create a Budget for a Wallet (MVP)](#us-01-create-a-budget-for-a-wallet-mvp)
+    - [US-01: Create a Budget for a Category (MVP)](#us-01-create-a-budget-for-a-category-mvp)
     - [US-02: View a list of Budgets (MVP)](#us-02-view-a-list-of-budgets-mvp)
     - [US-03: View a Budget (MVP)](#us-03-view-a-budget-mvp)
     - [US-04: Update a Budget](#us-04-update-a-budget)
@@ -293,7 +293,7 @@ This flow describes the typical end-to-end interaction of a User with the PFM sy
 2. The User **logs into the System**.  
 3. The User **creates a Wallet W1** (e.g. *Cash Wallet*).  
 4. The User **creates a Category C1** (e.g. *Salary*), C2 (e.g. *Food*).  
-5. The User **defines a Budget B1** for Category **C2** associated with Wallet **W1**.  
+5. The User **defines a Budget B1** for Category **C2**, tracked across all of the User's Wallets.  
 6. The User **records an income Transaction T1** into wallet **W1** under **C1**.  
 7. The User **records an expense Transaction T2 from Wallet W1** under Category **C2**.  
 8. The User **views the current status of Wallet W1.**  
@@ -323,7 +323,7 @@ This flow describes how Users manage Transaction Categories.
 
 This flow describes how Users plan and monitor Budgets.
 
-1. The User **views the list of Budgets associated with a Wallet**.  
+1. The User **views the list of Budgets** (each tracked per Category, across all Wallets).  
 2. The User **views detailed Budget status and remaining amount**.  
 3. The User **updates a Budget** if needed.  
 4. The User **deletes a Budget** when it is no longer required.
@@ -455,10 +455,10 @@ The User Stories of this feature are described below.
 
 ## Feature-05: Budget Management {#feature-05-budget-management}
 
-Allows Users to plan and monitor spending by defining Budgets for specific Categories and Wallets.  
+Allows Users to plan and monitor spending by defining Budgets for specific Categories, tracked across all of the User's Wallets.  
 The User Stories of this feature are described below.
 
-### US-01: Create a Budget for a Wallet (MVP) {#us-01-create-a-budget-for-a-wallet-mvp}
+### US-01: Create a Budget for a Category (MVP) {#us-01-create-a-budget-for-a-category-mvp}
 
 ### US-02: View a list of Budgets (MVP) {#us-02-view-a-list-of-budgets-mvp}
 

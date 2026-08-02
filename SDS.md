@@ -48,7 +48,7 @@ Software Design Specification (SDS)
   - [4. Feature-04: Category Management](#4-feature-04-category-management)
     - [1. US-04-01: Create a Category](#1-us-04-01-create-a-category)
   - [5. Feature-05: Budget Management](#5-feature-05-budget-management)
-    - [1. US-05-01: Create a Budget for a Wallet](#1-us-05-01-create-a-budget-for-a-wallet)
+    - [1. US-05-01: Create a Budget for a Category](#1-us-05-01-create-a-budget-for-a-category)
   - [6. Feature-06: Transaction Management](#6-feature-06-transaction-management)
     - [1. US-06-01: Create a Transaction for a Wallet](#1-us-06-01-create-a-transaction-for-a-wallet)
   - [7. Feature-07: Financial Reporting](#7-feature-07-financial-reporting)
@@ -155,11 +155,11 @@ Key attributes: `id`, `user_id` (nullable), `name`, `icon`, `type` (income/expen
 
 ### 4. Budget {#4-budget}
 
-A spending limit a User sets for a Category within a period (e.g. monthly). The System tracks actual spend — computed from Transactions in that Category — against `amount_limit`.
+A spending limit a User sets for a Category within a period (e.g. monthly), tracked across **all** of the User's Wallets for that Category (not scoped to a single Wallet — see resolution below). The System tracks actual spend — computed from Transactions in that Category — against the Budget's per-currency limits.
 
-Key attributes: `id`, `user_id`, `category_id`, `amount_limit` (BIGINT), `period`, `start_date`.
+Key attributes: `id`, `user_id`, `category_id`, `limits` (a non-empty set of `(currency, amount_limit)` pairs, at most one entry per currency, each `amount_limit` a BIGINT), `period`, `start_date`.
 
-> **Open question:** SRS (Feature-05, BF-01 step 5) frames a Budget as scoped to *both* a Wallet and a Category ("Budget B1 for Category C2 associated with Wallet W1"), but the CLAUDE.md schema ties Budget only to `user_id` + `category_id` (no `wallet_id`). This CDM follows the CLAUDE.md schema as the implementation source of truth; flag for BA clarification if wallet-scoped budgets are actually required.
+> **Resolved** (was previously an open question): SRS (Feature-05, BF-01 step 5) originally framed a Budget as scoped to *both* a Wallet and a Category. BA clarification (see `specs/budget-management/spec.md`) settled this as **Category-only, aggregated across all Wallets** — the better product model for a personal-finance budgeting feature, not just the path of least schema change. `SRS.md` BF-01/BF-04 wording has been updated to match. A direct consequence of dropping the Wallet scope is that a Category's Transactions can span Wallets of different currencies, so a Budget can no longer hold one blended `amount_limit` — it instead holds independent per-currency limits, each tracked (spent/remaining/status) separately; a currency with real spend but no corresponding limit entry is simply not tracked by that Budget. See `specs/budget-management/spec.md` for full detail.
 
 ### 5. Transaction {#5-transaction}
 
@@ -215,7 +215,7 @@ classDiagram
     }
     class Budget {
       +UUID id
-      +BIGINT amount_limit
+      +Map~currency,BIGINT~ limits
       +string period
     }
     class Transaction {
@@ -405,7 +405,7 @@ These scenarios represent the Scenarios (+1 View) of the “4+1 Views” Model.
 | S-SEC-01 | Feature-02: System Security | **US-02-01 Login** | ✔ | Required before protected actions |
 | S-WAL-01 | Feature-03: Wallet Management | **US-03-01 Create a Wallet** | ✔ | Core financial container |
 | S-CAT-01 | Feature-04: Category Management | **US-04-01 Create a Category** | ✔ | Used by transactions |
-| S-BUD-01 | Feature-05: Budget Management | **US-05-01 Create a Budget for a Wallet** | ✔ | Spending control |
+| S-BUD-01 | Feature-05: Budget Management | **US-05-01 Create a Budget for a Category** | ✔ | Spending control |
 | S-TRX-01 | Feature-06: Transaction Management | **US-06-01 Create a Transaction for a Wallet** | ✔ | Primary core scenario |
 | S-RPT-01 | Feature-07: Financial Reporting | **US-07-01 View the Summary Report** | ✔ | Insight & feedback loop |
 | S-NOT-01 | Feature-10: Notification Handling | **US-10-01 View the list of Notifications** | ✔ | User awareness |
@@ -451,7 +451,7 @@ This chapter provides build-ready design details per Feature and User Story, ali
 
 ## 5. Feature-05: Budget Management {#5-feature-05-budget-management}
 
-### 1. US-05-01: Create a Budget for a Wallet {#1-us-05-01-create-a-budget-for-a-wallet}
+### 1. US-05-01: Create a Budget for a Category {#1-us-05-01-create-a-budget-for-a-category}
 
 ## 6. Feature-06: Transaction Management {#6-feature-06-transaction-management}
 

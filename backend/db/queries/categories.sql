@@ -56,3 +56,16 @@ WHERE id = $1
   AND user_id = $2
   AND deleted_at IS NULL
 RETURNING *;
+
+-- name: LockCategoryByID :one
+-- Row lock (specs/budget-management/plan.md Finding #2/#3): takes a
+-- SELECT ... FOR UPDATE on the category row inside the caller's transaction.
+-- Used by BOTH BudgetRepository (create-time category validation) and
+-- CategoryRepository (delete-time active-Budget check) so the two
+-- operations serialize on the same row instead of racing (spec.md
+-- S-BUD-14 / S-CAT-32). Deliberately not scoped by user_id or deleted_at —
+-- the caller decides existence/visibility/type after inspecting the row.
+SELECT * FROM categories
+WHERE id = $1
+LIMIT 1
+FOR UPDATE;

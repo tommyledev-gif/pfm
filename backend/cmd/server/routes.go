@@ -14,7 +14,7 @@ import (
 // (/api/v1). Auth/rate-limit middleware ordering matters: JWTAuth must run
 // before RequireRole (role comes from the token) and before
 // InviteRateLimiter (keyed by the caller's user ID from that same token).
-func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, tokens *service.TokenService, logger *zap.Logger) {
+func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, tokens *service.TokenService, logger *zap.Logger) {
 	v1 := app.Group("/api/v1")
 
 	auth := v1.Group("/auth")
@@ -44,4 +44,13 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	categories.Get("/:id", categoryHandler.GetCategory)
 	categories.Patch("/:id", categoryHandler.UpdateCategory)
 	categories.Delete("/:id", categoryHandler.DeleteCategory)
+
+	// F-05 Budget Management — no RequireRole gate: every active user
+	// manages only their own budgets (plan.md Security & Actor Resolution).
+	budgets := v1.Group("/budgets", middleware.JWTAuth(tokens, logger))
+	budgets.Post("/", budgetHandler.CreateBudget)
+	budgets.Get("/", budgetHandler.ListBudgets)
+	budgets.Get("/:id", budgetHandler.GetBudget)
+	budgets.Patch("/:id", budgetHandler.UpdateBudget)
+	budgets.Delete("/:id", budgetHandler.DeleteBudget)
 }

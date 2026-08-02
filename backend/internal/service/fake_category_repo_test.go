@@ -15,16 +15,57 @@ import (
 )
 
 // fakeCategoryRepo is an in-memory stand-in for CategoryRepo, used instead of
-// a real Postgres per Go Test Conventions — same approach as
-// fakeWalletRepo. No pgx.Tx involved: unlike wallets, no operation in this
-// feature needs a caller-managed transaction (plan.md Constitution Notes).
+// a real Postgres per Go Test Conventions — same approach as fakeWalletRepo.
+// BeginTx/LockCategoryByID/HasActiveBudgetForCategory were added by
+// specs/budget-management/plan.md Finding #2 / BUD-T15 — DeleteCategory now
+// runs inside a transaction to close the create-vs-delete race with Budget
+// creation and to back the 409 CATEGORY_IN_USE check; the fake reuses
+// fakeTx (defined in fake_wallet_repo_test.go, same package) since it's a
+// no-op stand-in regardless of which feature's service opened it.
 type fakeCategoryRepo struct {
-	mu         sync.Mutex
-	categories map[uuid.UUID]*model.Category
+	mu             sync.Mutex
+	categories     map[uuid.UUID]*model.Category
+	activeBudgeted map[uuid.UUID]bool // categoryID -> has an active Budget (test-only setter below)
 }
 
 func newFakeCategoryRepo() *fakeCategoryRepo {
-	return &fakeCategoryRepo{categories: make(map[uuid.UUID]*model.Category)}
+	return &fakeCategoryRepo{
+		categories:     make(map[uuid.UUID]*model.Category),
+		activeBudgeted: make(map[uuid.UUID]bool),
+	}
+}
+
+func (f *fakeCategoryRepo) BeginTx(context.Context) (pgx.Tx, error) {
+	return &fakeTx{}, nil
+}
+
+// setActiveBudget is a test helper simulating "an active Budget references
+// this category" for HasActiveBudgetForCategory (spec.md S-CAT-27 tests).
+func (f *fakeCategoryRepo) setActiveBudget(categoryID uuid.UUID, active bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.activeBudgeted[categoryID] = active
+}
+
+func (f *fakeCategoryRepo) HasActiveBudgetForCategory(_ context.Context, _ pgx.Tx, categoryID uuid.UUID) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.activeBudgeted[categoryID], nil
+}
+
+// LockCategoryByID mirrors GetCategoryByID but is NOT filtered by
+// deleted_at — a soft-deleted category is returned (not pgx.ErrNoRows), same
+// contract as the real query (see db/queries/categories.sql).
+func (f *fakeCategoryRepo) LockCategoryByID(_ context.Context, _ pgx.Tx, id uuid.UUID) (*model.Category, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	c, ok := f.categories[id]
+	if !ok {
+		return nil, pgx.ErrNoRows
+	}
+	cp := *c
+	return &cp, nil
 }
 
 // seedSystemCategory is a test helper — inserts a category with user_id NULL
@@ -146,7 +187,7 @@ func (f *fakeCategoryRepo) UpdateCategory(_ context.Context, arg repository.Upda
 	return &cp, nil
 }
 
-func (f *fakeCategoryRepo) SoftDeleteCategory(_ context.Context, id, userID uuid.UUID) (*model.Category, error) {
+func (f *fakeCategoryRepo) SoftDeleteCategory(_ context.Context, _ pgx.Tx, id, userID uuid.UUID) (*model.Category, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 

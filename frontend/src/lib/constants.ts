@@ -22,6 +22,7 @@ export const ROUTES = {
   users: "/app/users",
   wallets: "/app/wallets",
   categories: "/app/categories",
+  budgets: "/app/budgets",
 } as const;
 
 export const USER_ROLES = ["admin", "member"] as const;
@@ -50,3 +51,8 @@ export const CATEGORY_ICON_MAX_LENGTH = 32;
 // Mirrors model.CategoryType (backend/internal/model/category.go).
 export const CATEGORY_TYPES = ["income", "expense"] as const;
 export type CategoryType = (typeof CATEGORY_TYPES)[number];
+
+// Mirrors common.BudgetPeriodMonthly (backend/internal/common/constants.go)
+// — "monthly" is the only accepted value in MVP.
+export const BUDGET_PERIODS = ["monthly"] as const;
+export type BudgetPeriod = (typeof BUDGET_PERIODS)[number];

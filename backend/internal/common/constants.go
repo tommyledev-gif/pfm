@@ -4,10 +4,10 @@ import "time"
 
 // Invite (F-01 US-01)
 const (
-	InviteTokenBytes       = 32 // crypto/rand byte length -> 64 hex chars
-	InviteTokenTTL         = 72 * time.Hour
-	InviteRateLimit        = 20
-	InviteRateLimitWindow  = 1 * time.Hour
+	InviteTokenBytes      = 32 // crypto/rand byte length -> 64 hex chars
+	InviteTokenTTL        = 72 * time.Hour
+	InviteRateLimit       = 20
+	InviteRateLimitWindow = 1 * time.Hour
 )
 
 // Activation (F-01 US-02)
@@ -73,3 +73,28 @@ const (
 	CategoryNameMaxLength = 50
 	CategoryIconMaxLength = 32
 )
+
+// Budgets (F-05).
+const (
+	// BudgetPeriodMonthly is the only accepted `period` value in MVP
+	// (specs/budget-management/spec.md Business invariants).
+	BudgetPeriodMonthly = "monthly"
+	// DateOnlyLayout is the Go reference-time layout for a plain DATE value
+	// (start_date, no time-of-day component). Shared so budget_service.go's
+	// parse and budget_response.go's format never drift apart. The
+	// validator/v10 struct tag on dto.CreateBudgetRequest.StartDate
+	// necessarily repeats this as a literal (struct tags can't reference a
+	// Go const) — keep the two in sync by hand if this ever changes.
+	DateOnlyLayout = "2006-01-02"
+)
+
+// SupportedCurrencies is the same {VND, USD} allow-list as Wallet's currency
+// (WalletDefaultCurrency above), but expressed as a real Go-side lookup — not
+// just a struct-tag oneof — because `limits` map-KEY validation cannot be
+// expressed as a validator/v10 struct tag (specs/budget-management/plan.md
+// Finding #5). This supersedes the earlier "a Go-side list is dead weight"
+// reasoning for Wallet/Category, which only ever needed a struct-tag oneof.
+var SupportedCurrencies = map[string]bool{
+	"VND": true,
+	"USD": true,
+}

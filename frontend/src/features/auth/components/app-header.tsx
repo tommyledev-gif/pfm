@@ -34,6 +34,9 @@ export function AppHeader() {
           <Link href={ROUTES.categories} className="text-muted-foreground hover:text-foreground">
             Categories
           </Link>
+          <Link href={ROUTES.budgets} className="text-muted-foreground hover:text-foreground">
+            Budgets
+          </Link>
         </nav>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           {userEmail && <span>{userEmail}</span>}
