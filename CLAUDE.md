@@ -51,6 +51,12 @@ pfm/
 │ └── db/
 │ ├── migrations/ # .sql numbered files
 │ └── queries/ # .sql source → sqlc generates Go
+├── frontend/src/
+│   ├── app/app/{feature}/     # Next.js route pages
+│   └── features/{feature}/
+│       ├── api/               # TanStack Query hooks (use-*-query.ts, use-*-mutation.ts)
+│       ├── components/        # table, skeleton, dialogs
+│       └── types.ts
 ├── ai-service/app/
 │ ├── routers/ # FastAPI route handlers
 │ ├── services/ # LLM orchestration
@@ -128,11 +134,18 @@ Error shape: `{ error_code: string, message: string, details?: object }`
 Money trong API: integer cents  
 Full spec: `api-spec/openapi.yaml`
 
-## Agents
+## Slash Commands (Workflow)
 
-- `/ba` — BA agent: viết spec, user story, edge cases, open questions
-- `/qc` — QC agent: viết test cases, coverage analysis, security scenarios  
-- `/dev` — Dev agent: implement theo spec, đúng stack, đúng convention
+/cook-state ← chạy đầu session mới, hoặc sau mỗi feature xong → tạo/update CURRENT_STATE.md
+/cook-ba ← BA: tìm feature tiếp theo, viết spec.md
+/cook-plan ← Architect: viết plan.md từ spec vừa tạo
+/cook-implementation ← Dev: implement theo spec + plan
+/cook-qc ← QC: viết test_cases.md từ spec + plan + code
+/renew-features ← refresh docs/features.md + roadmap (có hỏi clarification)
+/renew-docs ← sync docs/architecture.md + docs/tech_stacks.md theo code thực tế
+
+
+Skill definitions: `.claude/skills/agents/{ba,plan,dev,qc}.md`
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
