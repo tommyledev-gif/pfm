@@ -45,6 +45,7 @@ func main() {
 	categoryRepo := repository.NewCategoryRepository(queries, pool)
 	budgetRepo := repository.NewBudgetRepository(queries, pool)
 	transactionRepo := repository.NewTransactionRepository(queries, pool)
+	reportRepo := repository.NewReportRepository(queries)
 
 	tokenService := service.NewTokenService(cfg.JWTSecret)
 	emailSender := newEmailSender(cfg, logger)
@@ -54,6 +55,7 @@ func main() {
 	categoryService := service.NewCategoryService(categoryRepo, logger)
 	budgetService := service.NewBudgetService(budgetRepo, logger)
 	transactionService := service.NewTransactionService(transactionRepo, walletRepo, categoryRepo, logger)
+	reportService := service.NewReportService(reportRepo, walletRepo, categoryRepo, logger)
 
 	userHandler := handler.NewUserHandler(userService, logger)
 	authHandler := handler.NewAuthHandler(authService, logger)
@@ -61,6 +63,7 @@ func main() {
 	categoryHandler := handler.NewCategoryHandler(categoryService, logger)
 	budgetHandler := handler.NewBudgetHandler(budgetService, logger)
 	transactionHandler := handler.NewTransactionHandler(transactionService, logger)
+	reportHandler := handler.NewReportHandler(reportService, logger)
 
 	app := fiber.New(fiber.Config{
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
@@ -72,7 +75,7 @@ func main() {
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 		AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 	}))
-	registerRoutes(app, userHandler, authHandler, walletHandler, categoryHandler, budgetHandler, transactionHandler, tokenService, logger)
+	registerRoutes(app, userHandler, authHandler, walletHandler, categoryHandler, budgetHandler, transactionHandler, reportHandler, tokenService, logger)
 
 	go func() {
 		if err := app.Listen(":" + cfg.Port); err != nil {

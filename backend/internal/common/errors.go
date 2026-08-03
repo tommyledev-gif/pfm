@@ -121,7 +121,7 @@ var (
 	ErrInvalidCategoryType     = &AppError{Code: ErrCodeInvalidCategoryType, Status: http.StatusUnprocessableEntity, Message: "budgets can only be set on expense categories"}
 	ErrTransactionAccessDenied = &AppError{Code: ErrCodeTransactionAccessDenied, Status: http.StatusForbidden, Message: "you do not have access to this transaction"}
 	ErrTransactionNotFound     = &AppError{Code: ErrCodeTransactionNotFound, Status: http.StatusNotFound, Message: "transaction not found"}
-	ErrInsufficientBalance     = &AppError{Code: ErrCodeInsufficientBalance, Status: http.StatusConflict, Message: "insufficient balance"}
+	ErrInsufficientBalance     = &AppError{Code: ErrCodeInsufficientBalance, Status: http.StatusConflict, Message: "Insufficient balance"}
 	ErrCategoryTypeMismatch    = &AppError{Code: ErrCodeCategoryTypeMismatch, Status: http.StatusUnprocessableEntity, Message: "transaction type must match the category's type"}
 	ErrCurrencyLocked          = &AppError{Code: ErrCodeCurrencyLocked, Status: http.StatusConflict, Message: "currency cannot be changed once the wallet has transactions"}
 )

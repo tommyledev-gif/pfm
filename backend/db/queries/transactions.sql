@@ -83,6 +83,57 @@ SELECT EXISTS (
       AND deleted_at IS NULL
 ) AS exists;
 
+-- name: SumReportTotalsByUser :many
+-- Backs F-07's per-currency totals aggregate (specs/financial-reporting/plan.md
+-- RPT-T1) — one query per request, grouped by (type, currency), over an
+-- arbitrary caller-supplied window (from_ts/to_ts always resolved by
+-- ReportService before this runs — plan.md Finding #6), unlike
+-- SumExpenseByUserCurrentPeriod's hardcoded current-month/expense-only scope.
+-- Every filter beyond the window is an optional sqlc.narg — a NULL narg
+-- leaves that AND clause a no-op (same convention as ListTransactionsByUser).
+-- Ordered by currency for a deterministic response (plan.md Finding #9).
+SELECT
+    t.type,
+    w.currency,
+    SUM(t.amount)::bigint AS total
+FROM transactions t
+JOIN wallets w ON w.id = t.wallet_id
+WHERE t.user_id = $1
+  AND t.deleted_at IS NULL
+  AND t.occurred_at >= sqlc.arg('from_ts')
+  AND t.occurred_at <= sqlc.arg('to_ts')
+  AND (sqlc.narg('wallet_id')::uuid IS NULL OR t.wallet_id = sqlc.narg('wallet_id'))
+  AND (sqlc.narg('category_id')::uuid IS NULL OR t.category_id = sqlc.narg('category_id'))
+  AND (sqlc.narg('type')::text IS NULL OR t.type = sqlc.narg('type'))
+GROUP BY t.type, w.currency
+ORDER BY w.currency ASC;
+
+-- name: SumReportByCategoryForUser :many
+-- Backs F-07's by_category aggregate (specs/financial-reporting/plan.md
+-- RPT-T1) — grouped by (category_id, category_name, type, currency), ordered
+-- amount DESC (spec.md Response Shape). The categories join is a plain JOIN,
+-- never filtered on categories.deleted_at (spec.md S-RPT-10) — same precedent
+-- as GetTransactionByID, so a historical Transaction's category name still
+-- resolves even after that Category is soft-deleted.
+SELECT
+    t.category_id,
+    c.name AS category_name,
+    t.type,
+    w.currency,
+    SUM(t.amount)::bigint AS amount
+FROM transactions t
+JOIN wallets w ON w.id = t.wallet_id
+JOIN categories c ON c.id = t.category_id
+WHERE t.user_id = $1
+  AND t.deleted_at IS NULL
+  AND t.occurred_at >= sqlc.arg('from_ts')
+  AND t.occurred_at <= sqlc.arg('to_ts')
+  AND (sqlc.narg('wallet_id')::uuid IS NULL OR t.wallet_id = sqlc.narg('wallet_id'))
+  AND (sqlc.narg('category_id')::uuid IS NULL OR t.category_id = sqlc.narg('category_id'))
+  AND (sqlc.narg('type')::text IS NULL OR t.type = sqlc.narg('type'))
+GROUP BY t.category_id, c.name, t.type, w.currency
+ORDER BY amount DESC;
+
 -- name: SumExpenseByUserCurrentPeriod :many
 -- Backs F-05's real spend computation (BUD-T17) — one aggregate query per
 -- request, never N+1 (specs/budget-management/spec.md US-02 Edge Cases #1).

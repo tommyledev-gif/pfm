@@ -105,6 +105,18 @@ type TransactionRepo interface {
 	SoftDeleteTransaction(ctx context.Context, tx pgx.Tx, id, userID uuid.UUID) (*model.Transaction, error)
 }
 
+// ReportRepo is the repository contract ReportService depends on (F-07).
+// *repository.ReportRepository satisfies this structurally; tests substitute
+// an in-memory fake, same convention as WalletRepo/CategoryRepo/BudgetRepo/
+// TransactionRepo. Both methods run queries declared in transactions.sql
+// (cross-repository query exception, specs/financial-reporting/plan.md
+// Security & Actor Resolution — the same exception F-05's
+// SpentByUserCurrentPeriod already uses).
+type ReportRepo interface {
+	SumTotals(ctx context.Context, userID uuid.UUID, filter repository.ReportFilter) ([]model.ReportTypeAmount, error)
+	SumByCategory(ctx context.Context, userID uuid.UUID, filter repository.ReportFilter) ([]model.ReportCategoryEntry, error)
+}
+
 // Compile-time checks that the real repositories satisfy these interfaces —
 // catches a signature drift here instead of at runtime.
 var (
@@ -114,4 +126,5 @@ var (
 	_ CategoryRepo     = (*repository.CategoryRepository)(nil)
 	_ BudgetRepo       = (*repository.BudgetRepository)(nil)
 	_ TransactionRepo  = (*repository.TransactionRepository)(nil)
+	_ ReportRepo       = (*repository.ReportRepository)(nil)
 )

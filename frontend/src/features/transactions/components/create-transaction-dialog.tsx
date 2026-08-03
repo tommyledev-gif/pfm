@@ -21,6 +21,7 @@ import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useCreateTransactionMutation } from "@/features/transactions/api/use-create-transaction-mutation";
 import { TRANSACTION_NOTE_MAX_LENGTH, TRANSACTION_TYPES, type TransactionType } from "@/lib/constants";
 import { toCents } from "@/lib/currency";
+import { getErrorMessage } from "@/lib/axios";
 
 export function CreateTransactionDialog() {
   const [isOpen, setIsOpen] = useState(false);
@@ -88,7 +89,10 @@ export function CreateTransactionDialog() {
         </DialogHeader>
 
         {error && (
-          <ErrorBanner testId="banner-transaction-error" message="Could not record the transaction. Check the fields and try again." />
+          <ErrorBanner
+            testId="banner-transaction-error"
+            message={getErrorMessage(error, "Could not record the transaction. Check the fields and try again.")}
+          />
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">

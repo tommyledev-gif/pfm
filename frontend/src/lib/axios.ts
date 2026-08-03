@@ -25,3 +25,15 @@ export function unwrap<T>(envelope: ApiEnvelope<T>): T {
   }
   return envelope.data;
 }
+
+// Extracts the backend's actual error message (e.g. "insufficient balance")
+// from a failed mutation's error — axios rejects on any non-2xx status
+// before `unwrap` ever runs, so the envelope lives on error.response.data.
+// Falls back to a generic message only when the response isn't the expected
+// shape (network failure, non-API error).
+export function getErrorMessage(error: unknown, fallback: string): string {
+  if (axios.isAxiosError<ApiEnvelope<unknown>>(error)) {
+    return error.response?.data?.message ?? fallback;
+  }
+  return fallback;
+}

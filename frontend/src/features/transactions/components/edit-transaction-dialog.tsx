@@ -21,6 +21,7 @@ import { useUpdateTransactionMutation } from "@/features/transactions/api/use-up
 import type { Transaction } from "@/features/transactions/types";
 import { TRANSACTION_NOTE_MAX_LENGTH } from "@/lib/constants";
 import { toCents, toMajorUnits } from "@/lib/currency";
+import { getErrorMessage } from "@/lib/axios";
 
 interface EditTransactionDialogProps {
   transaction: Transaction;
@@ -86,7 +87,9 @@ export function EditTransactionDialog({ transaction }: EditTransactionDialogProp
           </DialogDescription>
         </DialogHeader>
 
-        {error && <ErrorBanner message="Could not update the transaction. Check the fields and try again." />}
+        {error && (
+          <ErrorBanner message={getErrorMessage(error, "Could not update the transaction. Check the fields and try again.")} />
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
