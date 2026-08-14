@@ -88,6 +88,11 @@ type BudgetRepo interface {
 	GetBudgetByID(ctx context.Context, id uuid.UUID) (*model.Budget, error)
 	SoftDeleteBudget(ctx context.Context, id, userID uuid.UUID) (*model.Budget, error)
 	SpentByUserCurrentPeriod(ctx context.Context, userID uuid.UUID) (map[uuid.UUID]map[string]int64, error)
+	// ListDistinctUserIDsWithActiveBudgets was added by
+	// specs/notification-handling/plan.md Finding #1 — backs
+	// NotificationService.EvaluateBudgets, which loops this list and reuses
+	// this repo's own per-user methods above rather than a new global query.
+	ListDistinctUserIDsWithActiveBudgets(ctx context.Context) ([]uuid.UUID, error)
 }
 
 // TransactionRepo is the repository contract TransactionService depends on
@@ -117,6 +122,18 @@ type ReportRepo interface {
 	SumByCategory(ctx context.Context, userID uuid.UUID, filter repository.ReportFilter) ([]model.ReportCategoryEntry, error)
 }
 
+// NotificationRepo is the repository contract NotificationService depends on
+// (F-10). *repository.NotificationRepository satisfies this structurally;
+// tests substitute an in-memory fake, same convention as WalletRepo/
+// CategoryRepo/BudgetRepo/TransactionRepo/ReportRepo.
+type NotificationRepo interface {
+	CreateBudgetExceededNotification(ctx context.Context, arg repository.CreateBudgetExceededNotificationParams) (bool, error)
+	ListNotificationsByUser(ctx context.Context, userID uuid.UUID, filter repository.ListNotificationsFilter) ([]*model.Notification, error)
+	CountNotifications(ctx context.Context, userID uuid.UUID, isRead *bool) (int64, error)
+	GetNotificationByID(ctx context.Context, id uuid.UUID) (*model.Notification, error)
+	MarkNotificationRead(ctx context.Context, id, userID uuid.UUID) (*model.Notification, error)
+}
+
 // Compile-time checks that the real repositories satisfy these interfaces —
 // catches a signature drift here instead of at runtime.
 var (
@@ -127,4 +144,5 @@ var (
 	_ BudgetRepo       = (*repository.BudgetRepository)(nil)
 	_ TransactionRepo  = (*repository.TransactionRepository)(nil)
 	_ ReportRepo       = (*repository.ReportRepository)(nil)
+	_ NotificationRepo = (*repository.NotificationRepository)(nil)
 )

@@ -225,6 +225,18 @@ func (r *BudgetRepository) SpentByUserCurrentPeriod(ctx context.Context, userID 
 	return spent, nil
 }
 
+// ListDistinctUserIDsWithActiveBudgets backs F-10's background job
+// (specs/notification-handling/plan.md Finding #1) — the job loops this
+// list, calling ListBudgetsByUser/SpentByUserCurrentPeriod per user, rather
+// than a single global aggregate query.
+func (r *BudgetRepository) ListDistinctUserIDsWithActiveBudgets(ctx context.Context) ([]uuid.UUID, error) {
+	userIDs, err := r.q.ListDistinctUserIDsWithActiveBudgets(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("repository.ListDistinctUserIDsWithActiveBudgets: %w", err)
+	}
+	return userIDs, nil
+}
+
 func (r *BudgetRepository) limitsByBudgetID(ctx context.Context, budgetIDs []uuid.UUID) (map[uuid.UUID][]model.BudgetLimit, error) {
 	result := make(map[uuid.UUID][]model.BudgetLimit)
 	if len(budgetIDs) == 0 {

@@ -96,6 +96,13 @@ const (
 	TransactionNoteMaxLength = 500
 )
 
+// Notifications (F-10). NotificationJobInterval is an explicit assumption
+// (specs/notification-handling/spec.md Open Questions #2) — no SRS/SDS
+// source states a cadence; 5 minutes balances alert staleness against load.
+const (
+	NotificationJobInterval = 5 * time.Minute
+)
+
 // SupportedCurrencies is the same {VND, USD} allow-list as Wallet's currency
 // (WalletDefaultCurrency above), but expressed as a real Go-side lookup — not
 // just a struct-tag oneof — because `limits` map-KEY validation cannot be

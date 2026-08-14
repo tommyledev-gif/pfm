@@ -1,0 +1,1 @@
+ Stop-Process -Id (Get-NetTCPConnection -LocalPort 8080,8081,8082 -ErrorAction SilentlyContinue).OwningProcess -Force -ErrorAction SilentlyContinue; net stop winnat; net start winnat

@@ -67,3 +67,12 @@ WHERE id = $1
   AND user_id = $2
   AND deleted_at IS NULL
 RETURNING *;
+
+-- name: ListDistinctUserIDsWithActiveBudgets :many
+-- Backs F-10's background job (specs/notification-handling/plan.md Finding
+-- #1) — the job loops this list, calling ListBudgetsByUser/
+-- SpentByUserCurrentPeriod per user, rather than a single global aggregate
+-- query. Only this feature's own table (budgets) is touched, so this is not
+-- a cross-repository query exception.
+SELECT DISTINCT user_id FROM budgets
+WHERE deleted_at IS NULL;

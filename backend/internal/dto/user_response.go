@@ -56,6 +56,6 @@ type PaginationResponse struct {
 }
 
 type ListUsersResponse struct {
-	Data       []UserResponse      `json:"data"`
+	Data       []UserResponse     `json:"data"`
 	Pagination PaginationResponse `json:"pagination"`
 }

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -46,6 +47,7 @@ func main() {
 	budgetRepo := repository.NewBudgetRepository(queries, pool)
 	transactionRepo := repository.NewTransactionRepository(queries, pool)
 	reportRepo := repository.NewReportRepository(queries)
+	notificationRepo := repository.NewNotificationRepository(queries)
 
 	tokenService := service.NewTokenService(cfg.JWTSecret)
 	emailSender := newEmailSender(cfg, logger)
@@ -56,6 +58,7 @@ func main() {
 	budgetService := service.NewBudgetService(budgetRepo, logger)
 	transactionService := service.NewTransactionService(transactionRepo, walletRepo, categoryRepo, logger)
 	reportService := service.NewReportService(reportRepo, walletRepo, categoryRepo, logger)
+	notificationService := service.NewNotificationService(notificationRepo, budgetRepo, logger)
 
 	userHandler := handler.NewUserHandler(userService, logger)
 	authHandler := handler.NewAuthHandler(authService, logger)
@@ -64,6 +67,7 @@ func main() {
 	budgetHandler := handler.NewBudgetHandler(budgetService, logger)
 	transactionHandler := handler.NewTransactionHandler(transactionService, logger)
 	reportHandler := handler.NewReportHandler(reportService, logger)
+	notificationHandler := handler.NewNotificationHandler(notificationService, logger)
 
 	app := fiber.New(fiber.Config{
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
@@ -75,7 +79,7 @@ func main() {
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 		AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 	}))
-	registerRoutes(app, userHandler, authHandler, walletHandler, categoryHandler, budgetHandler, transactionHandler, reportHandler, tokenService, logger)
+	registerRoutes(app, userHandler, authHandler, walletHandler, categoryHandler, budgetHandler, transactionHandler, reportHandler, notificationHandler, tokenService, logger)
 
 	go func() {
 		if err := app.Listen(":" + cfg.Port); err != nil {
@@ -84,15 +88,42 @@ func main() {
 	}()
 	logger.Info("server started", zap.String("port", cfg.Port))
 
-	waitForShutdown(app, logger)
+	// F-10's budget-crossing evaluation job — the first periodic background
+	// process in this codebase (specs/notification-handling/plan.md Finding
+	// #2). schedulerCtx is cancelled in waitForShutdown so the ticker
+	// goroutine never outlives the process on SIGTERM/SIGINT.
+	schedulerCtx, stopScheduler := context.WithCancel(context.Background())
+	go runNotificationScheduler(schedulerCtx, notificationService, logger)
+
+	waitForShutdown(app, stopScheduler, logger)
 }
 
-func waitForShutdown(app *fiber.App, logger *zap.Logger) {
+// runNotificationScheduler runs NotificationService.EvaluateBudgets on a
+// fixed interval until ctx is cancelled. A ticker, not a one-shot timer
+// loop, so a slow evaluation never causes ticks to pile up.
+func runNotificationScheduler(ctx context.Context, notificationService *service.NotificationService, logger *zap.Logger) {
+	ticker := time.NewTicker(common.NotificationJobInterval)
+	defer ticker.Stop()
+
+	logger.Info("notification scheduler started", zap.Duration("interval", common.NotificationJobInterval))
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Info("notification scheduler stopped")
+			return
+		case <-ticker.C:
+			notificationService.EvaluateBudgets(ctx)
+		}
+	}
+}
+
+func waitForShutdown(app *fiber.App, stopScheduler context.CancelFunc, logger *zap.Logger) {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	<-quit
 
 	logger.Info("shutting down server")
+	stopScheduler()
 	if err := app.ShutdownWithTimeout(common.ShutdownTimeout); err != nil {
 		logger.Error("error during shutdown", zap.Error(err))
 	}

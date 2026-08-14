@@ -203,3 +203,33 @@ func (q *Queries) SoftDeleteBudget(ctx context.Context, arg SoftDeleteBudgetPara
 	err := row.Scan(&i.ID, &i.UserID, &i.CategoryID, &i.Period, &i.StartDate, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt)
 	return i, err
 }
+
+const listDistinctUserIDsWithActiveBudgets = `-- name: ListDistinctUserIDsWithActiveBudgets :many
+SELECT DISTINCT user_id FROM budgets
+WHERE deleted_at IS NULL
+`
+
+// ListDistinctUserIDsWithActiveBudgets backs F-10's background job
+// (specs/notification-handling/plan.md Finding #1) — the job loops this
+// list, calling ListBudgetsByUser/SpentByUserCurrentPeriod per user, rather
+// than a single global aggregate query.
+func (q *Queries) ListDistinctUserIDsWithActiveBudgets(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listDistinctUserIDsWithActiveBudgets)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []uuid.UUID
+	for rows.Next() {
+		var userID uuid.UUID
+		if err := rows.Scan(&userID); err != nil {
+			return nil, err
+		}
+		items = append(items, userID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

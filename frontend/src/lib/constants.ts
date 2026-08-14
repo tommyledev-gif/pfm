@@ -25,6 +25,7 @@ export const ROUTES = {
   budgets: "/app/budgets",
   transactions: "/app/transactions",
   reports: "/app/reports",
+  notifications: "/app/notifications",
 } as const;
 
 export const USER_ROLES = ["admin", "member"] as const;

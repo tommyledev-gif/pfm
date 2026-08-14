@@ -175,6 +175,23 @@ func (f *fakeBudgetRepo) SpentByUserCurrentPeriod(_ context.Context, _ uuid.UUID
 	return f.spent, nil
 }
 
+// ListDistinctUserIDsWithActiveBudgets backs NotificationService's
+// EvaluateBudgets job (specs/notification-handling/plan.md Finding #1).
+func (f *fakeBudgetRepo) ListDistinctUserIDsWithActiveBudgets(_ context.Context) ([]uuid.UUID, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	seen := make(map[uuid.UUID]bool)
+	var userIDs []uuid.UUID
+	for _, b := range f.budgets {
+		if b.DeletedAt == nil && !seen[b.UserID] {
+			seen[b.UserID] = true
+			userIDs = append(userIDs, b.UserID)
+		}
+	}
+	return userIDs, nil
+}
+
 // seedSpend stages the SpentByUserCurrentPeriod result a test wants —
 // BudgetService tests that need a non-zero spent figure call this before
 // exercising ListBudgets/GetBudget/UpdateBudget.

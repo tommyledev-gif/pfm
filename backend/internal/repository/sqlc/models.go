@@ -97,3 +97,22 @@ type Transaction struct {
 	UpdatedAt  time.Time
 	DeletedAt  *time.Time
 }
+
+// Notification mirrors the notifications table exactly (009_notifications.sql).
+// RelatedBudgetID/Currency/PeriodStart are only non-nil for
+// type = "budget_exceeded" (enforced by a CHECK constraint at the DB level,
+// specs/notification-handling/plan.md Finding #3) — no other notification
+// type exists in MVP. No DeletedAt: this table has no delete story
+// (specs/notification-handling/spec.md Out of Scope).
+type Notification struct {
+	ID              uuid.UUID
+	UserID          uuid.UUID
+	Type            string
+	Title           string
+	Body            string
+	IsRead          bool
+	RelatedBudgetID *uuid.UUID
+	Currency        *string
+	PeriodStart     *time.Time
+	CreatedAt       time.Time
+}

@@ -14,7 +14,7 @@ import (
 // (/api/v1). Auth/rate-limit middleware ordering matters: JWTAuth must run
 // before RequireRole (role comes from the token) and before
 // InviteRateLimiter (keyed by the caller's user ID from that same token).
-func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, reportHandler *handler.ReportHandler, tokens *service.TokenService, logger *zap.Logger) {
+func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, tokens *service.TokenService, logger *zap.Logger) {
 	v1 := app.Group("/api/v1")
 
 	auth := v1.Group("/auth")
@@ -69,4 +69,13 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	// endpoint covers spec.md US-01 through US-05 (Context decision #1).
 	reports := v1.Group("/reports", middleware.JWTAuth(tokens, logger))
 	reports.Get("/summary", reportHandler.GetSummary)
+
+	// F-10 Notification Handling — no RequireRole gate: every active user
+	// sees only their own notifications (plan.md Security & Actor
+	// Resolution). Notification creation has no HTTP endpoint at all — it is
+	// produced by a background job (main.go's ticker), never a client request.
+	notifications := v1.Group("/notifications", middleware.JWTAuth(tokens, logger))
+	notifications.Get("/", notificationHandler.ListNotifications)
+	notifications.Get("/:id", notificationHandler.GetNotification)
+	notifications.Post("/:id/read", notificationHandler.MarkNotificationRead)
 }

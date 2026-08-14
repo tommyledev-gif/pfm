@@ -43,6 +43,9 @@ export function AppHeader() {
           <Link href={ROUTES.reports} className="text-muted-foreground hover:text-foreground">
             Reports
           </Link>
+          <Link href={ROUTES.notifications} className="text-muted-foreground hover:text-foreground">
+            Notifications
+          </Link>
         </nav>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           {userEmail && <span>{userEmail}</span>}
