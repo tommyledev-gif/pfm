@@ -1,6 +1,6 @@
 # PFM — Current Project State
 
-_Last updated: 2026-08-13_
+_Last updated: 2026-08-16_
 _Command: /cook-state_
 
 > ⚡ Load file này đầu tiên khi bắt đầu session mới.
@@ -10,37 +10,39 @@ _Command: /cook-state_
 
 ## TL;DR — Project Health
 
-- **Phase:** MVP (F-01 → F-07 done backend+web, F-10 remaining)
-- **Overall completion:** ~88% của MVP scope (7/8 MVP features có backend, 7/8 có web frontend, 2/8 có mobile)
-- **Last feature shipped:** Financial Reporting (backend + web frontend)
-- **Currently in progress:** nothing checked out — repo clean except untracked `clear-port.md` (personal dev script, not project code)
-- **Next up:** F-10 Notification Handling — chưa có spec.md, chưa có migration nào
+- **Phase:** MVP done (backend+web full F-01→F-07, F-10); AI Chat (Feature-12 US-01) done backend+web+mobile; Mobile screen build-out (Home/Transactions/Insights/AI Chat/Notifications/Profile + login) done this session
+- **Overall completion:** MVP 100% backend+web. Mobile: went from scaffold-only to a working screen set this session, matched against `mobile/design_handoff_pfm_app/` design spec (excludes dedicated Wallets/Categories/Household-Members/Security screens — out of design-handoff scope, Profile has inert entry-point rows for these)
+- **Last feature shipped:** Mobile screen build-out (this session) — Home, Transactions, Insights (Spending + Budgets), AI Chat, Notifications, Profile, login form
+- **Currently in progress:** nothing checked out
+- **Next up:** manual verification on-device (`npx expo start`, per `mobile/AGENTS.md` — not verified in this session, no emulator/device available); QC coverage gap (FEAT-QC); Financial Goal (F-08) or Data Overview Dashboard (F-11)
 - **Blockers:** none
 
 ---
 
 ## What's Actually Working (Code + DB + UI)
 
-> Backend = Go handler+service+repository tồn tại. Web = frontend/src/features tồn tại. Mobile = mobile/lib/features tồn tại.
+> Backend = Go handler+service+repository tồn tại. Web = frontend/src/features tồn tại. Mobile = mobile/src/features tồn tại.
 
 | Feature | Backend | Web (frontend/) | Mobile |
 |---|---|---|---|
-| F-01 User Management (invite/activate/list) | ✅ | ✅ (`features/users`) | ✅ (`features/admin`) |
-| F-02 System Security (JWT auth, login/logout) | ✅ | ✅ (`features/auth`) | ✅ (`features/auth`) |
-| F-03 Wallet Management | ✅ | ✅ (`features/wallets`) | ❌ |
-| F-04 Category Management | ✅ | ✅ (`features/categories`) | ❌ |
-| F-05 Budget Management | ✅ (per-currency `budget_limits` child table) | ✅ (`features/budgets`) | ❌ |
-| F-06 Transaction Management | ✅ (atomic wallet-balance update) | ✅ (`features/transactions`) | ❌ |
-| F-07 Financial Reporting (summary) | ✅ (`report_handler/service/repository`, aggregate queries reuse `transactions.sql`) | ✅ (`features/reports`: filters, totals cards, category breakdown table) | ❌ |
+| F-01 User Management (invite/activate/list) | ✅ | ✅ (`features/users`) | ❌ (no mobile screen — not in design-handoff scope) |
+| F-02 System Security (JWT auth, login/logout) | ✅ | ✅ (`features/auth`) | ✅ login form + mutation (`features/auth`), no `/auth/refresh` on any client |
+| F-03 Wallet Management | ✅ | ✅ (`features/wallets`) | 🔶 read-only (Home hero/wallet cards, Profile net worth) |
+| F-04 Category Management | ✅ | ✅ (`features/categories`) | 🔶 read-only (Transactions/Insights/AI Chat, colors derived client-side) |
+| F-05 Budget Management | ✅ (per-currency `budget_limits` child table) | ✅ (`features/budgets`) | ✅ read + create (Insights → Budgets tab, "+ New budget" modal) |
+| F-06 Transaction Management | ✅ (atomic wallet-balance update) | ✅ (`features/transactions`) | ✅ read + create (Home recent list, Transactions screen w/ filters+infinite scroll, AI Chat confirm) |
+| F-07 Financial Reporting (summary) | ✅ (`report_handler/service/repository`, aggregate queries reuse `transactions.sql`) | ✅ (`features/reports`) | ✅ (Insights → Spending tab: stat cards + clickable SVG donut chart + legend) |
+| F-10 Notification Handling | ✅ (background scheduler) | ✅ (`features/notifications`) | ✅ (bell → full-screen Notifications overlay, day-grouped, unread toggle) |
+| Feature-12 AI Chat (US-01 create-via-chat) | ✅ | ✅ (`features/ai-chat`) | ✅ (raised nav button → AI Chat screen, transaction-card confirm reuses `POST /transactions`) |
 
-Mobile chỉ implement Phase 0 (F-01/F-02) — đúng với ghi chú trong CLAUDE.md rằng `mobile/` đang paused, việc build tiếp mobile cho F-03→F-07 cần được yêu cầu rõ ràng.
+**2026-08-16: `mobile/` was deleted and rebuilt from scratch as React Native (Expo)**, replacing the previous Flutter app (which had shipped F-01/F-02 mobile screens — those are gone, not carried over). Later the same session, the full screen set above was built against `mobile/design_handoff_pfm_app/`. Not built: dedicated mobile screens for Wallets/Categories/Household-Members/Security CRUD — the design handoff maps these as Profile entry-point rows only (currently inert, no screens behind them).
 
 ---
 
 ## Partial / In Progress
 
-- 🔶 **QC coverage** — `specs/wallet-management/`, `specs/category-management/`, `specs/budget-management/`, `specs/transaction-management/`, `specs/financial-reporting/` đều có `spec.md` + `plan.md` nhưng **chưa có `test_cases.md`** (chỉ `user-management` và `security` có). Backend có unit test files (`*_service_test.go`) cho tất cả, nhưng chưa chạy `/cook-qc` chính thức cho 5 feature này.
-- 🔶 **docs/features.md** — chỉ cover Phase 0 (US-01→US-05), chưa list F-03→F-11. Cần `/renew-features` để đồng bộ với state thực tế.
+- 🔶 **QC coverage** — `specs/wallet-management/`, `specs/category-management/`, `specs/budget-management/`, `specs/transaction-management/`, `specs/financial-reporting/`, `specs/notification-handling/` đều có `spec.md` + `plan.md` nhưng **chưa có `test_cases.md`** (chỉ `user-management` và `security` có). Backend có unit test files (`*_service_test.go`) cho tất cả, nhưng chưa chạy `/cook-qc` chính thức cho các feature này.
+- 🔶 **Mobile on-device verification** — screens were type-checked (`tsc --noEmit`), linted (`expo lint`), and smoke-built (`expo export --platform web`, 868 modules, no bundler errors) but **not visually verified in Expo Go/an emulator** — no device/emulator available in this session. Run `npx expo start` and check against `mobile/design_handoff_pfm_app/PFM App.dc.html` before treating pixel-fidelity as confirmed.
 
 ---
 
@@ -48,8 +50,7 @@ Mobile chỉ implement Phase 0 (F-01/F-02) — đúng với ghi chú trong CLAUD
 
 > Có spec.md/plan.md nhưng backend chưa có handler/service tương ứng.
 
-- Không có — tất cả 7 spec hiện tại (user-management, security, wallet, category, budget, transaction, financial-reporting) đều đã có code.
-- F-10 (Notification) **chưa có spec.md** — cần chạy `/cook-ba` trước.
+- Không có — tất cả 8 spec hiện tại (user-management, security, wallet, category, budget, transaction, financial-reporting, notification-handling) đều đã có code, plus `ai-chat-assistant` (Feature-12 US-01).
 
 ---
 
@@ -68,8 +69,10 @@ Mobile chỉ implement Phase 0 (F-01/F-02) — đúng với ghi chú trong CLAUD
 | Transaction balance floor | Enforced only via conditional `DecrementWalletBalanceIfSufficient` query at Create — **no CHECK constraint** on wallets/transactions | Update/Delete must allow negative balance per spec (S-TRX-38, S-TRX-50) |
 | Category dedup | `(user_id, lower(name), type)` unique index with `NULLS NOT DISTINCT` (PG15+) | Blocks dup system categories too; cross-scope (user vs system) collision is service-level only |
 | Report aggregates | No new `reports` table/migration — `ReportRepository` reuses queries owned by `transactions.sql`, mirroring `BudgetRepository.SpentByUserCurrentPeriod` | Cross-repository query reuse is an accepted exception, not a violation of "repository owns its table" |
-| Frontend priority | `frontend/` (Next.js web) built first; `mobile/` (Flutter) paused | Explicit instruction in CLAUDE.md |
-| Mobile state | Riverpod code-gen (`.g.dart`) | Established in F-01/F-02 mobile code |
+| Frontend priority | `frontend/` (Next.js web) feature-complete-first; `mobile/` builds only on explicit request | Explicit instruction in CLAUDE.md — this session is that explicit request |
+| Mobile framework | React Native (Expo SDK 54, pinned — see `mobile/AGENTS.md`) | Replaced Flutter 2026-08-16, user-directed |
+| Mobile state | TanStack Query (server state) + Zustand (client/global state) | Same pairing as `frontend/` — one mental model across clients |
+| Mobile design source | `mobile/design_handoff_pfm_app/PFM App.dc.html` + `README.md` (dark "Noctis" theme) | High-fidelity handoff — treat as spec, recreate with RN components, not by copying the file's markup |
 
 ---
 
@@ -91,10 +94,12 @@ Mobile chỉ implement Phase 0 (F-01/F-02) — đúng với ghi chú trong CLAUD
 - Route pages under `app/app/{feature}/page.tsx` and `app/app/{feature}/[id]/page.tsx`
 - API calls proxy through `app/api/proxy/[...path]/route.ts` (BFF pattern) — dio/axios talk to Go backend via this proxy, not directly
 
-### Mobile (paused, F-01/F-02 only)
-- `features/{feature}/domain` → `data` → `presentation/{pages,providers,widgets}`
-- Riverpod `@riverpod` + code-gen (`.g.dart`)
-- `core/api/dio_client.dart` — shared dio client, `session_events.dart` handles force-logout on 401
+### Mobile (`mobile/`, React Native + Expo)
+- `app/` — Expo Router file-based routes, thin, compose from `src/features`
+- `src/features/{feature}/{api,components}` + `types.ts` — TanStack Query hooks (`use-*-query.ts`/`use-*-mutation.ts`), same convention as `frontend/`
+- `src/lib/axios.ts` — direct-to-backend client (no BFF), JWT interceptor, force-logout on 401
+- `src/components/{ui,shared}` — reusable primitives (theme tokens, buttons, cards, icon circles, bottom nav)
+- `src/stores/` — Zustand, global state only (session), never server data
 
 ### SQL
 - All money columns: `BIGINT NOT NULL` (+ `CHECK (amount > 0)` where relevant)
@@ -117,8 +122,11 @@ Mobile chỉ implement Phase 0 (F-01/F-02) — đúng với ghi chú trong CLAUD
 | 006 | seed_categories | 10 default system categories (income+expense) |
 | 007 | budgets | `budgets` + `budget_limits` (per-currency child table) |
 | 008 | transactions | `transactions` table, no balance-floor constraint (by design) |
+| 009 | notifications | `notifications` table + dedup columns (`related_budget_id`/`currency`/`period_start`) |
+| 010 | transactions_idempotency_key | additive `idempotency_key` column + partial unique index on `transactions` |
+| 011 | chat_messages | `chat_messages` table (Feature-12 AI Chat) |
 
-No migration 009 — F-07 Financial Reporting added zero schema, only new aggregate queries in `transactions.sql`.
+F-07 Financial Reporting added zero schema (no migration) — only new aggregate queries in `transactions.sql`.
 
 ---
 
@@ -152,19 +160,22 @@ No migration 009 — F-07 Financial Reporting added zero schema, only new aggreg
 | PATCH | /api/v1/transactions/:id | Yes | any | TransactionHandler.UpdateTransaction |
 | DELETE | /api/v1/transactions/:id | Yes | any | TransactionHandler.DeleteTransaction |
 | GET | /api/v1/reports/summary | Yes | any | ReportHandler.GetSummary |
+| GET | /api/v1/notifications/ | Yes | any | NotificationHandler.ListNotifications |
+| GET | /api/v1/notifications/:id | Yes | any | NotificationHandler.GetNotification |
+| POST | /api/v1/notifications/:id/read | Yes | any | NotificationHandler.MarkNotificationRead |
+| POST | /api/v1/ai/chat | Yes (+ AIChatRateLimiter) | any | ChatHandler.Chat |
 
-Wallets/categories/budgets/transactions/reports groups have **no `RequireRole` gate** — every active user manages/views only their own data (`user_id` scoping in service layer), only `/admin/*` requires `role=admin`.
+Wallets/categories/budgets/transactions/reports/notifications/ai groups have **no `RequireRole` gate** — every active user manages/views only their own data (`user_id` scoping in service layer), only `/admin/*` requires `role=admin`. There is no notification-creation endpoint — notifications are produced only by a background scheduler (`main.go`).
 
 ---
 
 ## Active TODOs / Known Issues
 
-- [ ] `/auth/refresh` endpoint chưa implement — hiện tại 401 = force re-login (không phải bug, là quyết định MVP)
-- [ ] `test_cases.md` thiếu cho wallet/category/budget/transaction/financial-reporting-management — chạy `/cook-qc` cho từng feature
-- [ ] `docs/features.md` chỉ cover Phase 0 — chạy `/renew-features` để sync F-03→F-11
-- [ ] F-10 Notification Handling: chưa có spec.md, chưa có `notifications` table migration — cần `/cook-ba`
-- [ ] `ai-service/` (Python FastAPI) directory chưa tồn tại — AI Service chưa bắt đầu
-- [ ] Mobile F-03→F-07 (wallet/category/budget/transaction/reports) chưa build — paused theo CLAUDE.md, cần yêu cầu rõ ràng để resume
+- [ ] `/auth/refresh` endpoint chưa implement — hiện tại 401 = force re-login (không phải bug, là quyết định MVP); worse UX impact on mobile than web
+- [ ] `test_cases.md` thiếu cho wallet/category/budget/transaction/financial-reporting/notification-handling — chạy `/cook-qc` cho từng feature
+- [ ] Mobile: screens not yet verified on-device/emulator (`npx expo start`) — only type-checked/linted/web-exported this session, no emulator available
+- [ ] Mobile: no offline/local-DB layer — TanStack Query cache is the only client persistence
+- [ ] Mobile: no dedicated Wallets/Categories/Household-Members/Security screens — Profile rows for these are inert (design-handoff scope only)
 - [ ] Root có untracked `clear-port.md` (personal PowerShell helper để free port 8080/8081/8082, không phải project code — không cần commit)
 
 ---
@@ -174,10 +185,10 @@ Wallets/categories/budgets/transactions/reports groups have **no `RequireRole` g
 - Local dev: Docker Compose (`docker-compose.yml`, root)
 - DB: PostgreSQL 16-alpine, port `${POSTGRES_PORT}` (5432 in `.env.example`)
 - Backend: Go Fiber, port `${BACKEND_PORT}` (8090 in `.env.example`)
-- Mobile (Flutter web build): served via nginx, port `${FRONTEND_PORT}` (8081) — labeled `frontend` service in compose but is the Flutter build, don't confuse with `web`
 - Web (Next.js, `frontend/`): port `${WEB_FRONTEND_PORT}` (8082) — labeled `web` service in compose, BFF-proxies `/api/proxy/*` → `http://backend:8080`
-- AI Service: not started, no `ai-service/` directory yet
-- Migrations mounted directly as `docker-entrypoint-initdb.d/*` scripts on the postgres service (no golang-migrate runner wired into compose yet — new migration files need a corresponding compose mount line)
+- Mobile (`mobile/`, React Native/Expo): **not** a compose service — dev flow is `npx expo start` (Metro bundler + Expo Go/simulator), calls the backend directly (no BFF), no local port to configure beyond `EXPO_PUBLIC_API_BASE_URL`
+- AI Service (`ai-service/`, Python FastAPI): containerized, internal-only (no host port), reachable at `http://ai-service:8000` from the backend via `AI_SERVICE_URL`
+- Migrations mounted directly as `docker-entrypoint-initdb.d/*` scripts on the postgres service (no golang-migrate runner wired into compose yet — new migration files need a corresponding compose mount line; a migration added after the dev volume was first initialized needs a manual `psql <` apply, hit live with `009_notifications.sql`)
 
 ---
 
@@ -187,7 +198,7 @@ Wallets/categories/budgets/transactions/reports groups have **no `RequireRole` g
 |------|--------------|
 | Add new backend feature | `backend/cmd/server/routes.go`, `backend/internal/service/interfaces.go`, closest existing handler + service + repository (`report_*` is most recent — good template for read-only aggregate features; `transaction_*` for full CRUD) |
 | Add new web feature | Closest existing `frontend/src/features/{feature}` (`reports` for read-only aggregate UI; `transactions` or `budgets` for full CRUD: query+mutation hooks, table+skeleton, create/edit/delete dialogs) |
-| Add new mobile feature | `mobile/lib/features/admin/` (only fully-built non-auth example) — but confirm resuming mobile work is actually wanted first (it's paused) |
+| Add new mobile feature | Closest existing `mobile/src/features/{feature}` once one exists, else mirror `frontend/src/features/{feature}` type names/shapes 1:1 (CLAUDE.md: keep DTOs hand-synced across backend/frontend/mobile) |
 | Fix a bug | Relevant `*_service_test.go` / `fake_*_repo_test.go` in `backend/internal/service/` |
 | Update DB schema | Latest migration file (`008_transactions.sql`) + corresponding `docker-compose.yml` mount + `backend/db/queries/*.sql` |
 | BA/spec new feature (F-10) | `docs/features.md`, closest existing `specs/{feature}/spec.md` (`financial-reporting` is most recent/thorough template) |

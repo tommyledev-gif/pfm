@@ -1,20 +1,33 @@
 import { StyleSheet, Text, View } from "react-native";
+import { StatusBar } from "expo-status-bar";
+import { SparkleIcon } from "@/components/ui/Icon";
+import { LoginForm } from "@/features/auth/components/LoginForm";
+import { colors, spacing, typography } from "@/lib/theme";
 
-// Placeholder only — the real login form + mutation
-// (src/features/auth/api, src/features/auth/components) is not implemented
-// in this pass. This screen exists so the (auth)/(app) route split and the
-// Stack.Protected guard in app/_layout.tsx are demonstrably wired end to end.
 export default function LoginScreen() {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>PFM</Text>
-      <Text style={styles.subtitle}>Login screen — coming soon</Text>
+      <StatusBar style="light" />
+      <View style={styles.header}>
+        <SparkleIcon size={28} />
+        <Text style={styles.title}>PFM</Text>
+        <Text style={styles.subtitle}>Log in to manage your money</Text>
+      </View>
+      <LoginForm />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8 },
-  title: { fontSize: 28, fontWeight: "700" },
-  subtitle: { fontSize: 14, color: "#666" },
+  container: {
+    flex: 1,
+    backgroundColor: colors.bgApp,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.xxl,
+    gap: spacing.xxl,
+  },
+  header: { alignItems: "center", gap: spacing.xs },
+  title: { ...typography.hero, color: colors.textPrimary },
+  subtitle: { ...typography.label, color: colors.textSecondary },
 });

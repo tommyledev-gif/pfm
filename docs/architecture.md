@@ -5,7 +5,7 @@ _Updated by: /renew-docs_
 
 > Source of truth: generated from the actual codebase (`docker-compose.yml`, `backend/go.mod`, `backend/cmd/server/routes.go`, `backend/db/migrations/`, `mobile/package.json`, `frontend/package.json`), not from initial design intent. This file replaces the previous `docs/architecture_design.md`, which had drifted from actual code.
 >
-> **2026-08-16: `mobile/` was rebuilt from scratch as React Native (Expo), replacing the previous Flutter app** (deleted by the user). This is a project-scaffold pass only — Expo Router, TanStack Query, Zustand, Axios, and secure-store are wired and the app boots, but no feature screens exist yet.
+> **2026-08-16: `mobile/` was rebuilt from scratch as React Native (Expo), replacing the previous Flutter app** (deleted by the user). Same-day, later in this session, the full screen set was implemented against `mobile/design_handoff_pfm_app/` (Home, Transactions, Insights, AI Chat, Notifications, Profile) — see §3, no longer scaffold-only.
 
 ---
 
@@ -128,11 +128,22 @@ No `pgvector` extension is enabled anywhere in the actual migrations (unlike the
 
 ---
 
-## 3. Mobile Architecture (React Native + Expo, `mobile/` — project scaffold only)
+## 3. Mobile Architecture (React Native + Expo, `mobile/`)
 
 **Expo SDK:** `^54.0.0` · **React Native:** `0.81.5` · **React:** `19.1.0` · **TypeScript:** `~5.9.2` (from `mobile/package.json`).
 
-`mobile/` was deleted and rebuilt from scratch on 2026-08-16 as React Native (Expo), replacing the previous Flutter app. This pass is **setup only** — no feature screens (auth, wallets, etc.) exist; the app boots to a placeholder "Login screen — coming soon" / "Welcome to PFM" screen depending on session state.
+`mobile/` was deleted and rebuilt from scratch on 2026-08-16 as React Native (Expo), replacing the previous Flutter app. The initial pass that day was setup-only; later the same session the full screen set was built against the high-fidelity design handoff at `mobile/design_handoff_pfm_app/` (`PFM App.dc.html` + `README.md`, a dark "Noctis"-themed prototype — treated as a visual/behavioral spec, not copied as markup):
+
+- **Home** (`app/(app)/index.tsx`) — hero balance card (sum of wallets sharing the default wallet's currency), horizontal wallet cards, recent transactions
+- **Transactions** (`app/(app)/transactions.tsx`) — filter chips (All/Income/Expense), cursor-paginated infinite list
+- **Insights** (`app/(app)/insights.tsx`) — Spending sub-tab (stat cards + clickable SVG donut chart + legend, `src/components/shared/DonutChart.tsx`) and Budgets sub-tab (stacked Budget-vs-Actual bars + a "+ New budget" modal, `src/features/budgets/`)
+- **AI Chat** (`app/(app)/ai-chat.tsx`) — chat thread against `POST /ai/chat`, renders a `TransactionActionCard` for parsed transactions, confirms via the existing `POST /transactions` (reusing its `idempotency_key`)
+- **Notifications** (`app/(app)/notifications.tsx`) — full-screen overlay from the Home bell, day-grouped, unread-only toggle
+- **Profile** (`app/(app)/profile.tsx`) — stat cards + settings entry-point rows (Wallets/Categories/Household Members/Security/Help are inert rows, no screens behind them yet — the design handoff maps them as entry points only) + logout
+
+Auth (`app/(auth)/login.tsx` + `src/features/auth/`) was also completed as a prerequisite — the screens above need a real session. There is no `GET /users/me` endpoint and the JWT's `AccessClaims` carry only `user_id`/`role` (`backend/internal/service/token_service.go`) — Profile's name/email come from the email typed at login, persisted client-side (`src/stores/session-store.ts`), not re-verified server-side.
+
+A `BottomNav` (`src/components/shared/BottomNav.tsx`) is a floating, blurred (`expo-blur`) pill overlaid in `app/(app)/_layout.tsx` — not expo-router's native tab bar, since the design's raised center button (always opens AI Chat) and floating shape don't map onto a standard tab bar. `react-native-svg` was added for the donut chart and the hand-drawn icon set (`src/components/ui/Icon.tsx` — no icon font/library, matching the design handoff's own "minimal inline SVG" approach).
 
 ⚠️ **Deliberately pinned to SDK 54, not the latest (57)** — went through two rounds of trial and error the same day: scaffolded on SDK 57 → real-device testing via the Play Store's Expo Go failed with `Project is incompatible with this version of Expo Go` → downgraded to SDK 56, same failure → **confirmed directly from the tester's own installed Expo Go app** (its Profile tab reported client version `54.0.8`, "supported SDK 54") that the Play Store build was several SDKs behind the newly-released SDK 57, not just one. Downgraded to SDK 54, verified working. Expo's own changelogs corroborate this: SDK 56's changelog states *"Expo Go for SDK 56 is not available on the Apple App Store or Google Play Store. We do not have a timeline for when they will be."* — the lesson generalized in `mobile/AGENTS.md`: **don't infer the safe SDK from changelogs alone; have someone check Expo Go's own Profile/Settings tab on a real device and match that number exactly.**
 
@@ -187,12 +198,14 @@ mobile/
 | `@tanstack/react-query` | `^5.101.4` | Server state |
 | `zustand` | `^5.0.15` | Global client state (session) |
 | `axios` | `^1.19.0` | HTTP client |
+| `react-native-svg` | latest SDK-54-compatible | Donut chart segments + the hand-drawn icon set (added this session, no icon font/library) |
+| `expo-blur` | latest SDK-54-compatible | `BlurView` behind the floating bottom-nav pill (added this session) |
 
 **Dev dependencies:** `typescript ~5.9.2`, `eslint ^9.0.0` + `eslint-config-expo ~10.0.0` (via `npx expo lint`). Note `expo-router`'s own package version (`~6.0.24`) doesn't track the Expo SDK number 1:1 — don't assume version-number parity between the two when cross-referencing Expo's docs.
 
 ⚠️ `expo-status-bar` must **not** be listed in `app.json`'s `plugins` array on this SDK — its config-plugin resolution throws `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING` if present (see `mobile/AGENTS.md`).
 
-**Not yet a dependency:** any form library (`react-hook-form` planned once a real form screen exists), any charting library (planned once Dashboard/Reports mobile work starts) — neither is needed by anything built so far.
+**Not yet a dependency:** any form library — the login form and the "New budget" modal are both plain `useState`, small enough not to need `react-hook-form` yet. The donut chart is hand-built on `react-native-svg` rather than a charting library (`src/components/shared/DonutChart.tsx` — stacked `<Circle>` arcs via `strokeDasharray`/`strokeDashoffset`).
 
 ### Auth-gating pattern (`app/_layout.tsx`)
 
@@ -261,7 +274,7 @@ The Go Backend re-validates every Wallet/Category ID the AI Service returns for 
 
 ## 6. Data Flow
 
-### Auth flow (mobile, `src/lib/axios.ts` / `src/stores/session-store.ts`) — not yet exercised end to end, no login screen exists
+### Auth flow (mobile, `src/lib/axios.ts` / `src/stores/session-store.ts`)
 
 ```
 Client → POST /api/v1/auth/login (LoginRateLimiter) → Backend validates → JWT access+refresh

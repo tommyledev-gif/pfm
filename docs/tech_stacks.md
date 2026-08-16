@@ -13,7 +13,7 @@ _Updated by: /renew-docs_
 |---|---|
 | Backend (Go) | **Done for MVP** — F-01, F-02, F-03, F-04, F-05, F-06, F-07, F-10 all implemented in `backend/`, plus Feature-12 AI Chat (US-01 only) |
 | Web frontend (Next.js, `frontend/`) | **Done for MVP** — `features/{auth,users,wallets,categories,budgets,transactions,reports,notifications,ai-chat}` all exist |
-| Mobile (React Native/Expo, `mobile/`) | **Project scaffold only, rebuilt 2026-08-16** — deleted and recreated as React Native (Expo), replacing Flutter. Expo Router, TanStack Query, Zustand, Axios, secure-store wired; app boots to a placeholder screen; no feature screens implemented yet |
+| Mobile (React Native/Expo, `mobile/`) | **Screens built 2026-08-16** — rebuilt from Flutter to React Native (Expo) earlier the same day, then the full screen set (Home, Transactions, Insights, AI Chat, Notifications, Profile) was implemented against `mobile/design_handoff_pfm_app/`, plus a real login form. Wallets/Categories/Household Members/Security/Help on Profile are entry-point rows only (design handoff scope), no screens behind them yet |
 | AI Service (Python) | **Implemented** — `ai-service/`, Feature-12 US-01 only (create-transaction-via-chat); Groq primary / Anthropic fallback via tool/function calling |
 | Infra (Docker Compose) | `postgres`, `backend`, `ai-service`, `web` (Next.js). `mobile/` is deliberately **not** containerized — Expo's dev flow is `npx expo start`, not a docker service; the old Flutter-web-build `frontend` service was removed |
 | API spec (`api-spec/openapi.yaml`) | **Not started** — no `api-spec/` directory; `docs/open-ai.md` is a hand-drafted, aspirational OpenAPI 3.1 sketch, not a generated/enforced contract, and it is already ahead of actual code in places (documents `/auth/refresh`, though `CreateTransactionRequest.idempotency_key` is now real) |
@@ -33,9 +33,9 @@ _Updated by: /renew-docs_
 
 ---
 
-## 1. Mobile App (React Native + Expo, `mobile/`) — project scaffold only, rebuilt 2026-08-16
+## 1. Mobile App (React Native + Expo, `mobile/`) — rebuilt 2026-08-16, screens built same session
 
-`mobile/` was deleted (Flutter) and rebuilt from scratch as React Native + Expo. This is a setup pass — no feature screens exist; see `docs/architecture.md` §3 for the full rationale and structure.
+`mobile/` was deleted (Flutter) and rebuilt from scratch as React Native + Expo, then had its full screen set built against the design handoff. See `docs/architecture.md` §3 for the full rationale and structure.
 
 ⚠️ **Pinned to SDK 54, not the latest (57)** — two rounds of trial and error the same day: 57 → real-device Expo Go failure → 56 → same failure → confirmed via the tester's own Expo Go app (Profile tab: client `54.0.8`, "supported SDK 54") that the Play Store build was several SDKs behind, not just one. Downgrading `expo` alone isn't enough — use `npx expo install --fix` to realign every dependent package, and if that hits an `ERESOLVE` peer conflict, `rm -rf node_modules package-lock.json && npm install` first. Full story in `mobile/AGENTS.md`; don't bump the SDK again without having someone check Expo Go's own Profile tab on a real device first.
 
@@ -51,11 +51,15 @@ _Updated by: /renew-docs_
 | Server state | `@tanstack/react-query` | `^5.101.4` | same choice as `frontend/` — one state-management mental model across both clients |
 | Client/global state | `zustand` | `^5.0.15` | same choice as `frontend/`; used for the session store only so far |
 | HTTP client | `axios` | `^1.19.0` | calls the Go backend directly (no BFF — mobile has no server tier to hide the JWT behind) |
-| Secure storage | `expo-secure-store` | `~15.0.8` | JWT access + refresh token storage |
+| Secure storage | `expo-secure-store` | `~15.0.8` | JWT access + refresh token storage, plus the login email (see below) |
+| SVG / icons + chart | `react-native-svg` | latest SDK-54-compatible | Added this session: hand-drawn icon set (`src/components/ui/Icon.tsx`) + the Insights donut chart, no icon font/charting library |
+| Blur | `expo-blur` | latest SDK-54-compatible | Added this session: `BlurView` behind the floating bottom-nav pill |
 
 **Dev dependencies:** `typescript ~5.9.2`, `eslint ^9.0.0` + `eslint-config-expo ~10.0.0` (installed via `npx expo lint`). ⚠️ `expo-status-bar` must not be listed in `app.json`'s `plugins` array on this SDK — breaks with `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING` if present.
 
-**Not yet installed:** any form library (`react-hook-form` planned once a real form screen exists), any charting library (planned once Dashboard/Reports mobile work starts), any offline/local-DB layer (the old Flutter stack listed `drift` as intended but never adopted it — this scaffold doesn't repeat that "planned but unused" pattern; TanStack Query's cache is the only client persistence for now).
+**Not yet installed:** any form library — the login form and "New budget" modal are plain `useState`, small enough not to need `react-hook-form`. No offline/local-DB layer (the old Flutter stack listed `drift` as intended but never adopted it; TanStack Query's cache is still the only client persistence).
+
+**No `GET /users/me` endpoint exists** — the JWT's `AccessClaims` carry only `user_id`/`role`, no name/email (`backend/internal/service/token_service.go`). Profile's displayed name/email come from the email typed at login, persisted via `expo-secure-store` alongside the tokens (`src/stores/session-store.ts`) — not re-verified against the server on each load.
 
 ---
 
