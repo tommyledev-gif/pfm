@@ -3,7 +3,9 @@
 _Last updated: 2026-08-16_
 _Updated by: /renew-docs_
 
-> Source of truth: generated from the actual codebase (`docker-compose.yml`, `backend/go.mod`, `backend/cmd/server/routes.go`, `backend/db/migrations/`, `mobile/pubspec.yaml`, `frontend/package.json`), not from initial design intent. This file replaces the previous `docs/architecture_design.md`, which had drifted from actual code (e.g. it still described oapi-codegen/Retrofit-DTO-generation and a `/categorize`+`/insights` AI Service as already-decided, none of which exist in code).
+> Source of truth: generated from the actual codebase (`docker-compose.yml`, `backend/go.mod`, `backend/cmd/server/routes.go`, `backend/db/migrations/`, `mobile/package.json`, `frontend/package.json`), not from initial design intent. This file replaces the previous `docs/architecture_design.md`, which had drifted from actual code.
+>
+> **2026-08-16: `mobile/` was rebuilt from scratch as React Native (Expo), replacing the previous Flutter app** (deleted by the user). This is a project-scaffold pass only — Expo Router, TanStack Query, Zustand, Axios, and secure-store are wired and the app boots, but no feature screens exist yet.
 
 ---
 
@@ -12,14 +14,15 @@ _Updated by: /renew-docs_
 ```
 [Next.js Web (frontend/)] ──┐
                              │ HTTPS REST /api/v1 (BFF proxy: app/api/proxy/[...path])
-[Flutter Web (mobile/)]  ────┤
+[React Native App (mobile/, Expo)] ──┤  ← calls the backend directly, no BFF (see §3)
                              ▼
                     [Go + Fiber Backend :8080]
                              │
                              ▼
                     [PostgreSQL 16-alpine]
 
-Python AI Service: not started — no `ai-service/` directory exists yet.
+Python AI Service (ai-service/): scaffolded, Groq-primary/Anthropic-fallback,
+reachable from the backend over the internal Docker network — see §5.
 ```
 
 **Active services** (from `docker-compose.yml`):
@@ -28,10 +31,10 @@ Python AI Service: not started — no `ai-service/` directory exists yet.
 |---|---|---|---|
 | `postgres` | `postgres:16-alpine` | `5432` → `${POSTGRES_PORT}` | Primary DB; migrations mounted directly as `docker-entrypoint-initdb.d/*` scripts (no `golang-migrate` runner wired in) |
 | `backend` | built from `./backend/Dockerfile` | `8080` → `${BACKEND_PORT}` | Go Fiber API |
-| `frontend` | built from `./mobile/Dockerfile` | `80` → `${FRONTEND_PORT}` | **Flutter web build** — labeled `frontend` in compose but is the mobile/Flutter output, not the Next.js app |
+| `ai-service` | built from `./ai-service/Dockerfile` | internal only, no host port | Python FastAPI AI Service |
 | `web` | built from `./frontend/Dockerfile` | `3000` → `${WEB_FRONTEND_PORT}` | Next.js app (`frontend/`) — BFF-proxies to `backend:8080` via `API_PROXY_TARGET` |
 
-No `ai-service`, `redis`, or `nginx` entries exist in `docker-compose.yml` today.
+**`mobile/` is intentionally not a compose service** — the old Flutter-web-build `frontend` service was removed when `mobile/` was rebuilt as React Native/Expo. Expo's dev flow (`npx expo start`) doesn't fit the "serve a static build via a container" pattern the Flutter setup used; `npx expo export --platform web` could produce a static bundle for a future containerized preview if ever needed. No `redis` or `nginx` entries exist either.
 
 ---
 
@@ -97,6 +100,7 @@ There is no `dto`-generation step and no `api-spec/openapi.yaml` — every handl
 | GET | `/api/v1/notifications/` | Yes | any | `NotificationHandler.ListNotifications` |
 | GET | `/api/v1/notifications/:id` | Yes | any | `NotificationHandler.GetNotification` |
 | POST | `/api/v1/notifications/:id/read` | Yes | any | `NotificationHandler.MarkNotificationRead` |
+| POST | `/api/v1/ai/chat` | Yes (+ `AIChatRateLimiter`) | any | `ChatHandler.Chat` |
 
 Every group except `/admin/*` requires only `JWTAuth`, no `RequireRole` gate — ownership is enforced in the service layer (`user_id` scoping), per-route comments in `routes.go` reference the `plan.md` findings that justified this. There is no notification-creation endpoint — Notifications are produced only by a background scheduler (§5).
 
@@ -113,62 +117,102 @@ Every group except `/admin/*` requires only `JWTAuth`, no `RequireRole` gate —
 | 007 | `budgets` | `budgets` + `budget_limits` (per-currency child table) |
 | 008 | `transactions` | `transactions` table, no balance-floor CHECK constraint (by design) |
 | 009 | `notifications` | `notifications` table + `related_budget_id`/`currency`/`period_start` dedup columns |
+| 010 | `transactions_idempotency_key` | additive `idempotency_key` column + partial unique index on `transactions` |
+| 011 | `chat_messages` | `chat_messages` table (Feature-12 AI Chat) |
 
 No `pgvector` extension is enabled anywhere in the actual migrations (unlike the superseded `architecture_design.md`, which described it as already enabled).
 
-**Key tables:** `users`, `revoked_tokens`, `wallets`, `categories`, `budgets` + `budget_limits`, `transactions`, `notifications`.
+**Key tables:** `users`, `revoked_tokens`, `wallets`, `categories`, `budgets` + `budget_limits`, `transactions`, `notifications`, `chat_messages`.
 
-**Pending, specced but not yet migrated** (per `specs/ai-chat-assistant/spec.md`): an additive `idempotency_key` column on `transactions`, and a new `chat_messages` table — not yet in `backend/db/migrations/`.
+⚠️ **Operational gotcha, hit live in this session:** `docker-entrypoint-initdb.d/*` scripts only run once, on a genuinely empty Postgres volume. A long-running dev volume that predates a migration file being added will silently never pick it up — `009_notifications.sql` had to be applied by hand (`psql < 009_notifications.sql`) against an already-initialized volume from 2026-08-02. This is the concrete failure mode behind the "no automated apply-on-boot" gap already noted in §8's Decisions table — not hypothetical.
 
 ---
 
-## 3. Mobile Architecture (Flutter, `mobile/` — Phase 0 only)
+## 3. Mobile Architecture (React Native + Expo, `mobile/` — project scaffold only)
 
-**Dart SDK constraint:** `>=3.9.0 <4.0.0` (`mobile/pubspec.yaml`) — no separate "Flutter version" pin beyond the SDK constraint.
+**Expo SDK:** `^54.0.0` · **React Native:** `0.81.5` · **React:** `19.1.0` · **TypeScript:** `~5.9.2` (from `mobile/package.json`).
 
-Per `CLAUDE.md`, `mobile/` is **paused** after Phase 0 (F-01 User Management, F-02 System Security) — F-03 through F-07/F-10 have no mobile implementation, deliberately.
+`mobile/` was deleted and rebuilt from scratch on 2026-08-16 as React Native (Expo), replacing the previous Flutter app. This pass is **setup only** — no feature screens (auth, wallets, etc.) exist; the app boots to a placeholder "Login screen — coming soon" / "Welcome to PFM" screen depending on session state.
 
-### Feature structure (from `mobile/lib/`)
+⚠️ **Deliberately pinned to SDK 54, not the latest (57)** — went through two rounds of trial and error the same day: scaffolded on SDK 57 → real-device testing via the Play Store's Expo Go failed with `Project is incompatible with this version of Expo Go` → downgraded to SDK 56, same failure → **confirmed directly from the tester's own installed Expo Go app** (its Profile tab reported client version `54.0.8`, "supported SDK 54") that the Play Store build was several SDKs behind the newly-released SDK 57, not just one. Downgraded to SDK 54, verified working. Expo's own changelogs corroborate this: SDK 56's changelog states *"Expo Go for SDK 56 is not available on the Apple App Store or Google Play Store. We do not have a timeline for when they will be."* — the lesson generalized in `mobile/AGENTS.md`: **don't infer the safe SDK from changelogs alone; have someone check Expo Go's own Profile/Settings tab on a real device and match that number exactly.**
+
+### Structure (from `mobile/`)
 
 ```
-lib/
-├── core/
-│   ├── api/          — dio_client.dart, session_events.dart (force-logout on 401), auth_api.dart/.g.dart (Retrofit), admin_api.dart/.g.dart, api_endpoints.dart, api_providers.dart/.g.dart
-│   ├── common/        — api_exception.dart, app_constants.dart, jwt_decoder.dart
-│   ├── env/           — env.dart
-│   ├── router/        — app_router.dart/.g.dart (go_router), route_paths.dart
-│   ├── storage/        — secure_storage_service.dart
-│   └── theme/          — app_theme.dart
-└── features/
-    ├── auth/{data,domain,presentation/pages,presentation/providers}
-    ├── admin/{data,domain,presentation/pages,presentation/providers,presentation/widgets}
-    └── home/presentation/pages
+mobile/
+├── app/                          — Expo Router file-based routes (thin — compose from src/features)
+│   ├── _layout.tsx               — Root layout: SafeAreaProvider, QueryClientProvider, session
+│   │                                hydration, Stack.Protected auth-gated route split
+│   ├── (auth)/
+│   │   ├── _layout.tsx
+│   │   └── login.tsx             — placeholder screen, no form/mutation yet
+│   └── (app)/
+│       ├── _layout.tsx
+│       └── index.tsx             — placeholder home screen
+└── src/
+    ├── features/
+    │   └── auth/                 — only scaffolded feature (mirrors the old Flutter Phase-0 precedent)
+    │       ├── api/               (empty — TanStack Query hooks land here)
+    │       ├── components/        (empty — screen components land here)
+    │       └── types.ts           — LoginRequest/LoginResponse, mirrors backend dto shape
+    ├── components/{ui,shared}/   — empty, ready for reusable primitives as features are added
+    ├── lib/
+    │   ├── axios.ts               — direct-to-backend client (no BFF — see below), JWT interceptor, 401 handling
+    │   ├── query-client.ts        — TanStack QueryClient singleton
+    │   ├── secure-storage.ts      — expo-secure-store wrapper
+    │   ├── constants.ts           — mirrors backend/internal/common/constants.go
+    │   └── currency.ts            — ported verbatim from frontend/src/lib/currency.ts
+    └── stores/
+        └── session-store.ts       — global Zustand store (accessToken/refreshToken/isHydrated)
 ```
 
-Only `auth` and `admin` exist as full feature modules — no `wallets`/`categories`/`budgets`/`transactions`/`reports`/`notifications` directories under `mobile/lib/features/`.
+### Why this stack (deliberate departure from the old Flutter choices)
 
-### Key dependencies (from `pubspec.yaml`)
+- **TanStack Query + Zustand, not Riverpod** — matches `frontend/`'s exact state-management pairing, so there is one state-management mental model across both clients instead of two (Riverpod was Flutter-only).
+- **Expo Router, not go_router** — file-based routing, directly analogous to `frontend/`'s Next.js App Router; auth gating uses the current SDK's declarative `Stack.Protected guard={...}` (see `mobile/app/_layout.tsx`), not a manual redirect-on-navigate check.
+- **No BFF/proxy layer, unlike `frontend/`.** The web client hides the JWT behind a same-origin Next.js proxy (`app/api/proxy/[...path]`) so the browser never holds it. A mobile app has no equivalent server tier — `lib/axios.ts` calls the Go backend directly over HTTPS, with the JWT read from `expo-secure-store` via the interceptor. This mirrors the old Flutter app's `dio_client.dart` pattern, not the web client's BFF pattern.
+- **No offline/local-DB layer yet** (no SQLite/`drift`-equivalent). The old Flutter stack listed `drift` in its intended tech stack but never actually adopted it (per this doc's prior finding); this scaffold doesn't repeat that "planned but unused" gap — TanStack Query's own cache is the only client-side persistence for now.
+
+### Key dependencies (from `mobile/package.json`)
 
 | Package | Version | Purpose |
 |---|---|---|
-| `flutter_riverpod` | `^3.0.0` | State management |
-| `riverpod_annotation` | `^4.0.0` | Riverpod codegen annotations |
-| `go_router` | `^14.6.2` | Navigation |
-| `dio` | `^5.7.0` | HTTP client |
-| `retrofit` | `^4.9.2` | Type-safe API client codegen on top of `dio` |
-| `json_annotation` | `^4.9.0` | JSON (de)serialization codegen |
-| `flutter_secure_storage` | `^9.2.2` | JWT storage |
-| `cupertino_icons` | `^1.0.8` | Icon set |
+| `expo` | `^54.0.0` | Framework/SDK |
+| `expo-router` | `~6.0.24` | File-based routing, `Stack.Protected` auth gating (present and working at this version too — verified, not assumed) |
+| `expo-secure-store` | `~15.0.8` | JWT storage |
+| `expo-constants` / `expo-linking` | `~18.0.13` / `~8.0.12` | Router runtime deps |
+| `react-native-safe-area-context` | `~5.6.0` | Safe-area insets |
+| `react-native-screens` | `~4.16.0` | Native screen containers (React Navigation dep) |
+| `react-native-web` / `react-dom` | `^0.21.2` / `19.1.0` | Enables `expo start --web` browser preview |
+| `@tanstack/react-query` | `^5.101.4` | Server state |
+| `zustand` | `^5.0.15` | Global client state (session) |
+| `axios` | `^1.19.0` | HTTP client |
 
-**Code-gen tools (dev dependencies):** `build_runner ^2.4.13`, `riverpod_generator ^4.0.0`, `retrofit_generator ^10.2.8`, `json_serializable ^6.9.0`, `flutter_lints ^5.0.0`.
+**Dev dependencies:** `typescript ~5.9.2`, `eslint ^9.0.0` + `eslint-config-expo ~10.0.0` (via `npx expo lint`). Note `expo-router`'s own package version (`~6.0.24`) doesn't track the Expo SDK number 1:1 — don't assume version-number parity between the two when cross-referencing Expo's docs.
 
-**Not present despite earlier planning docs:** `drift`, `fl_chart`, `flutter_form_builder`, `envied` — none are dependencies today; CLAUDE.md's tech-stack list for `mobile/` describes an intended, not-yet-adopted stack for these.
+⚠️ `expo-status-bar` must **not** be listed in `app.json`'s `plugins` array on this SDK — its config-plugin resolution throws `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING` if present (see `mobile/AGENTS.md`).
+
+**Not yet a dependency:** any form library (`react-hook-form` planned once a real form screen exists), any charting library (planned once Dashboard/Reports mobile work starts) — neither is needed by anything built so far.
+
+### Auth-gating pattern (`app/_layout.tsx`)
+
+```tsx
+<Stack screenOptions={{ headerShown: false }}>
+  <Stack.Protected guard={hasSession}>
+    <Stack.Screen name="(app)" />
+  </Stack.Protected>
+  <Stack.Protected guard={!hasSession}>
+    <Stack.Screen name="(auth)" />
+  </Stack.Protected>
+</Stack>
+```
+`hasSession` reads `useSessionStore`, hydrated once from `expo-secure-store` on app start; an `isHydrated` flag gates rendering the `Stack` at all, so a signed-in user's session never flashes the login screen while the async secure-store read is in flight.
 
 ---
 
 ## 4. Web Frontend Architecture (Next.js, `frontend/`)
 
-Per `CLAUDE.md`, `frontend/` (this Next.js app) is the **currently prioritized** client — built out through F-01, F-02 (`features/auth`, `features/users`), F-03–F-07 (`wallets`, `categories`, `budgets`, `transactions`, `reports`), while `mobile/` stays paused.
+Per `CLAUDE.md`, `frontend/` (this Next.js app) is the **currently prioritized** client — built out through F-01, F-02 (`features/auth`, `features/users`), F-03–F-07 (`wallets`, `categories`, `budgets`, `transactions`, `reports`), Feature-12 AI Chat (`features/ai-chat`), while `mobile/` (React Native/Expo, §3) has only a project scaffold.
 
 ```
 frontend/src/
@@ -178,37 +222,53 @@ frontend/src/
 │   │   └── proxy/[...path]/route.ts                — BFF proxy: forwards to API_PROXY_TARGET (http://backend:8080)
 │   └── app/{feature}/                              — route pages
 └── features/
-    ├── auth/, users/, wallets/, categories/, budgets/, transactions/, reports/
-    └── notifications/
+    ├── auth/, users/, wallets/, categories/, budgets/, transactions/, reports/, notifications/
+    └── ai-chat/
         └── each: api/ (TanStack Query hooks), components/, types.ts
 ```
 
-`frontend/src/features/notifications/` already exists — the Next.js web UI for F-10 has shipped, alongside the backend.
+`frontend/src/features/notifications/` and `frontend/src/features/ai-chat/` already exist — the Next.js web UI for F-10 and Feature-12 (US-01 only) have both shipped, alongside their backend counterparts.
 
 ---
 
 ## 5. AI Service Architecture
 
-**Status: NOT_STARTED** — no `ai_service/`, `ai-service/`, or `python_service/` directory exists anywhere in the repository.
+**Status: implemented** (Feature-12, US-01 "Create a Transaction via Chat" only) — `ai-service/app/` exists, containerized (`docker-compose.yml`'s `ai-service` entry, internal-only, no host port), reachable from the Go Backend at `http://ai-service:8000/extract` (`AI_SERVICE_URL`).
 
-Planned (per `CLAUDE.md` and `specs/ai-chat-assistant/spec.md`, not yet built):
-- Python 3.12+ / FastAPI
-- Groq SDK (primary, free tier) + Anthropic SDK (fallback)
-- One internal extraction endpoint reachable from the Go Backend over the internal Docker network (no such network path exists in `docker-compose.yml` today — adding the service will also require a new `docker-compose.yml` entry)
-- No `pgvector`/RAG usage is designed yet for any specced feature
+```
+ai-service/app/
+├── main.py                    — FastAPI app, GET /health, mounts extract_router; configures structured JSON logging
+├── core/
+│   ├── config.py              — pydantic-settings: GROQ_API_KEY, ANTHROPIC_API_KEY, groq_model, temperature=0, max_tokens
+│   ├── groq_client.py         — Groq + Anthropic client singletons
+│   └── logging.py             — JSON log formatter (required for `extra={...}` fields to actually appear in output)
+├── routers/extract_router.py  — POST /extract
+├── services/
+│   ├── extract_service.py     — Groq primary, Anthropic fallback on exception
+│   └── prompt_builder.py      — system prompt assembly (pure function, no I/O)
+└── schemas/extract_schema.py  — Pydantic v2: ExtractRequest, ExtractResponse, ProposedTransaction, WalletContext, CategoryContext
+```
+
+**Key implementation decisions, found necessary via live testing against the real Groq API (not decided up front):**
+- **Tool/function calling, not prose-described `response_format: json_object`.** A prose "return this exact JSON shape" instruction was observed to not reliably hold — Groq returned different field names (`amount`/`type`/`date`) than the ones asked for (`amount_vnd`/`tx_type`/`occurred_at`). The tool schema is `ExtractResponse.model_json_schema()` itself (single source of truth), passed to both Groq's `tools`/`tool_choice` and Anthropic's `tools`/`tool_choice` params.
+- **`temperature=0`.** The default (~0.7–1.0) was observed to return a different — and often wrong — Category for the identical input across repeated calls; this is a classification task, not creative generation.
+- **Categories are grouped by type (expense vs. income) in the prompt**, not a flat list — a flat list was observed to sometimes let the model match an expense message to an income Category with a similar "vibe" (e.g. "Bonus" for a lunch expense).
+- No `pgvector`/RAG usage — not designed for this feature.
+
+The Go Backend re-validates every Wallet/Category ID the AI Service returns for caller ownership before use (`ChatService.resolveActions`) — the AI Service is untrusted input for authorization, per `specs/ai-chat-assistant/spec.md`.
 
 ---
 
 ## 6. Data Flow
 
-### Auth flow (mobile, `dio_client.dart` / `session_events.dart`)
+### Auth flow (mobile, `src/lib/axios.ts` / `src/stores/session-store.ts`) — not yet exercised end to end, no login screen exists
 
 ```
 Client → POST /api/v1/auth/login (LoginRateLimiter) → Backend validates → JWT access+refresh
-                                                                       → mobile: stored via flutter_secure_storage
-Client → subsequent requests → Authorization: Bearer {access_token}
-Backend → 401 → mobile's dio interceptor clears storage → session_events fires
-                                                          → router redirects to /login
+                                                                       → mobile: stored via expo-secure-store
+Client → subsequent requests → Authorization: Bearer {access_token} (attached by an axios request interceptor)
+Backend → 401 → axios response interceptor clears the session store
+                                                          → (TODO once a login screen exists: redirect to (auth))
 ```
 
 There is no `/auth/refresh` endpoint — a 401 forces a full re-login (explicit MVP decision, not a bug).
@@ -249,7 +309,7 @@ Backend → validate input (handler) → verify Wallet/Category ownership + type
 - **Password hashing:** bcrypt (`golang.org/x/crypto`).
 - **Invite tokens:** `crypto/rand` 32-byte hex, not UUID (`backend/internal/service/invite_token.go`).
 - **Redaction:** `backend/internal/common/redact.go` exists for keeping sensitive fields out of logs, per CLAUDE.md's "don't log sensitive data" rule.
-- **AI Chat (planned, per `specs/ai-chat-assistant/spec.md`):** the (not-yet-built) AI Service is treated as untrusted input for authorization — any Wallet/Category ID it returns must be re-validated for ownership by the Go Backend before use.
+- **AI Chat (implemented, per `specs/ai-chat-assistant/spec.md`):** the AI Service is treated as untrusted input for authorization — every Wallet/Category ID it returns is re-validated for ownership by `ChatService.resolveActions` before use; a mismatch is silently dropped, never surfaced or trusted.
 
 ---
 
@@ -263,8 +323,9 @@ Backend → validate input (handler) → verify Wallet/Category ownership + type
 | Migrations | Numbered `.sql` files mounted directly into `docker-entrypoint-initdb.d/*` | Simple for MVP | No automated apply-on-boot for an existing DB volume; adding a migration requires a matching compose mount line (`golang-migrate` is planned but not wired in) |
 | Budget scope | Category-only, aggregated across all Wallets, per-currency limits in child table `budget_limits` | Resolved in `specs/budget-management/spec.md`; sqlc doesn't type-gen JSONB well | An extra child table instead of one blended limit column |
 | Notification delivery | In-app only, background ticker in `main.go` | No SRS/SDS basis for push/email in MVP | No real-time channel (WebSocket/SSE) |
-| Frontend priority | `frontend/` (Next.js) built first; `mobile/` (Flutter) paused after Phase 0 | Explicit `CLAUDE.md` instruction | Feature parity gap between web and mobile is intentional, not a bug |
-| AI Service | Not started; Groq primary / Anthropic fallback when built | Budget-conscious (`docs/features.md` §6) | Feature-12 (AI Chat) blocked on this scaffold existing first |
+| Frontend priority | `frontend/` (Next.js) built first; `mobile/` has a project scaffold only (React Native/Expo, rebuilt 2026-08-16, no feature screens yet) | Explicit `CLAUDE.md` instruction | Feature parity gap between web and mobile is intentional, not a bug |
+| Mobile framework | React Native (Expo) | User-directed change 2026-08-16, replacing Flutter — no further rationale recorded | Zero code reuse from the old Flutter app; TanStack Query/Zustand pairing does reuse the web client's mental model |
+| AI Service | Implemented (Feature-12 US-01 only); Groq primary / Anthropic fallback via tool/function calling | Budget-conscious (`docs/features.md` §6); prose-described JSON schemas proved unreliable in live testing | Only the create-transaction-via-chat slice exists — edit/query/advice intents are unspecced |
 
 ---
 
@@ -280,4 +341,4 @@ Backend → validate input (handler) → verify Wallet/Category ownership + type
 | S-TRX-* | Transaction Management | `specs/transaction-management/spec.md` |
 | S-RPT-* (or equivalent) | Financial Reporting | `specs/financial-reporting/spec.md` |
 | S-NOT-* | Notification Handling | `specs/notification-handling/spec.md` |
-| S-AI-* | AI Chat — Create Transaction (Release 1) | `specs/ai-chat-assistant/spec.md` — specced, **not yet coded**; `ai-service/` scaffold does not exist |
+| S-AI-* | AI Chat — Create Transaction (Release 1) | `specs/ai-chat-assistant/spec.md` — implemented (backend + web); mobile has no chat screen yet (§3) |

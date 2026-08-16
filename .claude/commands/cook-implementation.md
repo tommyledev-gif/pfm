@@ -13,7 +13,7 @@ Before writing any code, use gitnexus to read the ONE closest existing complete 
 
 - Go: handler + service + repository + dto files for the nearest entity
 - Next.js: `api/` hooks + `components/` for one existing feature
-- Mobile: `providers/` + `pages/` + `data/` for one existing feature (only if mobile scope active)
+- Mobile (React Native/Expo): `api/` + `components/` for one existing feature under `mobile/src/features/` (only if mobile scope active — as of 2026-08-16 `mobile/` has only a project scaffold, no feature yet exists to use as reference; `mobile/src/features/auth/` shows the folder shape but has no implemented API/components yet)
 - Migration: read the latest `.sql` migration as format reference
 
 ## Step 3 — Implement

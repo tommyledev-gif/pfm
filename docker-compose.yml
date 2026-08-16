@@ -68,19 +68,12 @@ services:
     networks:
       - pfm_network
 
-  # Flutter web build (mobile/) — kept as-is; not to be confused with `web` below.
-  frontend:
-    build:
-      context: ./mobile
-      dockerfile: Dockerfile
-      args:
-        API_BASE_URL: ${API_BASE_URL}
-    ports:
-      - "${FRONTEND_PORT}:80"
-    depends_on:
-      - backend
-    networks:
-      - pfm_network
+  # mobile/ (React Native + Expo) is intentionally NOT containerized. Expo's
+  # dev flow is `npx expo start` (Metro bundler + Expo Go / a simulator), not
+  # a Docker-served build — unlike the old Flutter setup, there is no static
+  # web bundle to serve via nginx at this stage. If a containerized web
+  # preview is ever needed, `npx expo export --platform web` produces a
+  # static bundle that could be added back as a service then.
 
   # Next.js web app (frontend/) — second client for the same features, BFF-proxies to backend.
   web:

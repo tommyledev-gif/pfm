@@ -3,7 +3,7 @@
 _Last updated: 2026-08-16_
 _Updated by: /renew-docs_
 
-> Versions extracted from actual config files (`backend/go.mod`, `mobile/pubspec.yaml`, `frontend/package.json`, `docker-compose.yml`), not from memory or prior planning docs.
+> Versions extracted from actual config files (`backend/go.mod`, `mobile/package.json`, `frontend/package.json`, `docker-compose.yml`), not from memory or prior planning docs.
 
 ---
 
@@ -11,12 +11,12 @@ _Updated by: /renew-docs_
 
 | Component | Status |
 |---|---|
-| Backend (Go) | **Done for MVP** — F-01, F-02, F-03, F-04, F-05, F-06, F-07, F-10 all implemented in `backend/` |
-| Web frontend (Next.js, `frontend/`) | **Done for MVP** — `features/{auth,users,wallets,categories,budgets,transactions,reports,notifications}` all exist |
-| Mobile (Flutter, `mobile/`) | **Phase 0 only, paused** — `features/{auth,admin,home}` exist; F-03→F-07/F-10 mobile UI intentionally not built (`CLAUDE.md`) |
-| AI Service (Python) | **Not started** — no `ai-service/` directory; blocks `specs/ai-chat-assistant/spec.md` |
-| Infra (Docker Compose) | **Done** — `docker-compose.yml` at repo root: `postgres`, `backend`, `frontend` (Flutter web build), `web` (Next.js) |
-| API spec (`api-spec/openapi.yaml`) | **Not started** — no `api-spec/` directory; `docs/open-ai.md` is a hand-drafted, aspirational OpenAPI 3.1 sketch, not a generated/enforced contract, and it is already ahead of actual code in places (documents `/auth/refresh` and a `CreateTransactionRequest.idempotency_key`, neither implemented) |
+| Backend (Go) | **Done for MVP** — F-01, F-02, F-03, F-04, F-05, F-06, F-07, F-10 all implemented in `backend/`, plus Feature-12 AI Chat (US-01 only) |
+| Web frontend (Next.js, `frontend/`) | **Done for MVP** — `features/{auth,users,wallets,categories,budgets,transactions,reports,notifications,ai-chat}` all exist |
+| Mobile (React Native/Expo, `mobile/`) | **Project scaffold only, rebuilt 2026-08-16** — deleted and recreated as React Native (Expo), replacing Flutter. Expo Router, TanStack Query, Zustand, Axios, secure-store wired; app boots to a placeholder screen; no feature screens implemented yet |
+| AI Service (Python) | **Implemented** — `ai-service/`, Feature-12 US-01 only (create-transaction-via-chat); Groq primary / Anthropic fallback via tool/function calling |
+| Infra (Docker Compose) | `postgres`, `backend`, `ai-service`, `web` (Next.js). `mobile/` is deliberately **not** containerized — Expo's dev flow is `npx expo start`, not a docker service; the old Flutter-web-build `frontend` service was removed |
+| API spec (`api-spec/openapi.yaml`) | **Not started** — no `api-spec/` directory; `docs/open-ai.md` is a hand-drafted, aspirational OpenAPI 3.1 sketch, not a generated/enforced contract, and it is already ahead of actual code in places (documents `/auth/refresh`, though `CreateTransactionRequest.idempotency_key` is now real) |
 
 ---
 
@@ -25,37 +25,37 @@ _Updated by: /renew-docs_
 ```
 [Next.js Web (frontend/)] ─┐
                             ├─▶ [Go + Fiber Backend :8080] ──▶ [PostgreSQL 16-alpine]
-[Flutter Web (mobile/)]  ───┘
-
-Python AI Service: not started, no internal REST path wired yet.
+[React Native (mobile/, Expo)] ─┘   (mobile calls the backend directly — no BFF, unlike frontend/)
+                                            │
+                                            ▼
+                                 [Python AI Service :8000] (internal only, Groq primary / Anthropic fallback)
 ```
 
 ---
 
-## 1. Mobile App (Flutter) — Phase 0 implemented (`auth`, `admin`), rest paused
+## 1. Mobile App (React Native + Expo, `mobile/`) — project scaffold only, rebuilt 2026-08-16
+
+`mobile/` was deleted (Flutter) and rebuilt from scratch as React Native + Expo. This is a setup pass — no feature screens exist; see `docs/architecture.md` §3 for the full rationale and structure.
+
+⚠️ **Pinned to SDK 54, not the latest (57)** — two rounds of trial and error the same day: 57 → real-device Expo Go failure → 56 → same failure → confirmed via the tester's own Expo Go app (Profile tab: client `54.0.8`, "supported SDK 54") that the Play Store build was several SDKs behind, not just one. Downgrading `expo` alone isn't enough — use `npx expo install --fix` to realign every dependent package, and if that hits an `ERESOLVE` peer conflict, `rm -rf node_modules package-lock.json && npm install` first. Full story in `mobile/AGENTS.md`; don't bump the SDK again without having someone check Expo Go's own Profile tab on a real device first.
 
 | Layer | Package | Version | Notes |
 |---|---|---|---|
-| SDK constraint | Dart | `>=3.9.0 <4.0.0` | `pubspec.yaml` `environment.sdk` — no separate Flutter version pin present |
-| State management | `flutter_riverpod` | `^3.0.0` | + `riverpod_annotation ^4.0.0` for codegen |
-| Routing | `go_router` | `^14.6.2` | |
-| Networking | `dio` | `^5.7.0` | |
-| API client codegen | `retrofit` | `^4.9.2` | Type-safe client generated over `dio` — **is** in use (contradicts earlier planning docs that called this "not started") |
-| JSON codegen | `json_annotation` | `^4.9.0` | |
-| Secure storage | `flutter_secure_storage` | `^9.2.2` | JWT access + refresh token storage |
-| Icons | `cupertino_icons` | `^1.0.8` | |
+| Framework | `expo` | `^54.0.0` | `mobile/package.json` |
+| Runtime | `react-native` | `0.81.5` | |
+| UI library | `react` | `19.1.0` | |
+| Language | `typescript` | `~5.9.2` | strict mode, `@/*` path alias to `src/*` (Metro/Expo CLI supports `tsconfig` paths natively — no `babel-plugin-module-resolver` needed) |
+| Routing | `expo-router` | `~6.0.24` | file-based, `Stack.Protected guard={...}` for auth gating — verified present and working at this version too, not assumed from newer-SDK docs |
+| Navigation deps | `react-native-safe-area-context` / `react-native-screens` | `~5.6.0` / `~4.16.0` | required by `expo-router` |
+| Web preview | `react-native-web` / `react-dom` | `^0.21.2` / `19.1.0` | enables `npx expo start --web` |
+| Server state | `@tanstack/react-query` | `^5.101.4` | same choice as `frontend/` — one state-management mental model across both clients |
+| Client/global state | `zustand` | `^5.0.15` | same choice as `frontend/`; used for the session store only so far |
+| HTTP client | `axios` | `^1.19.0` | calls the Go backend directly (no BFF — mobile has no server tier to hide the JWT behind) |
+| Secure storage | `expo-secure-store` | `~15.0.8` | JWT access + refresh token storage |
 
-**Code-gen tools (dev dependencies):**
+**Dev dependencies:** `typescript ~5.9.2`, `eslint ^9.0.0` + `eslint-config-expo ~10.0.0` (installed via `npx expo lint`). ⚠️ `expo-status-bar` must not be listed in `app.json`'s `plugins` array on this SDK — breaks with `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING` if present.
 
-| Tool | Version |
-|---|---|
-| `build_runner` | `^2.4.13` |
-| `riverpod_generator` | `^4.0.0` |
-| `retrofit_generator` | `^10.2.8` |
-| `json_serializable` | `^6.9.0` |
-| `flutter_lints` | `^5.0.0` |
-
-**Not actually a dependency today** (present in `CLAUDE.md`'s intended mobile stack, absent from `pubspec.yaml`): `drift`, `flutter_form_builder`, `fl_chart`, `envied`. These are aspirational for when mobile work resumes on F-03+, not currently installed.
+**Not yet installed:** any form library (`react-hook-form` planned once a real form screen exists), any charting library (planned once Dashboard/Reports mobile work starts), any offline/local-DB layer (the old Flutter stack listed `drift` as intended but never adopted it — this scaffold doesn't repeat that "planned but unused" pattern; TanStack Query's cache is the only client persistence for now).
 
 ---
 
@@ -80,16 +80,24 @@ Python AI Service: not started, no internal REST path wired yet.
 
 ---
 
-## 3. AI Service — Python — not started
+## 3. AI Service — Python (`ai-service/`) — implemented (Feature-12 US-01 only)
 
-No `ai-service/`, `ai_service/`, or `python_service/` directory exists in the repository. `specs/ai-chat-assistant/spec.md` (Release 1, "Create Transaction via Chat") specifies its minimal required shape once built:
+Per `specs/ai-chat-assistant/spec.md` (Release 1, "Create Transaction via Chat" only — no edit/query/advice intents).
 
-| Layer | Planned choice | Notes |
-|---|---|---|
-| Framework | FastAPI | Per `CLAUDE.md` |
-| LLM (primary) | Groq SDK | Free tier — explicit budget constraint noted in `docs/features.md` §6 |
-| LLM (fallback) | Anthropic SDK | For cases Groq's free tier can't handle |
-| Internal transport | REST over the Docker network | Requires a new `docker-compose.yml` service entry — none exists today |
+| Layer | Package | Version | Notes |
+|---|---|---|---|
+| Framework | `fastapi` | `0.141.1` | `ai-service/requirements.txt` |
+| ASGI server | `uvicorn` | `0.52.3` | |
+| Validation | `pydantic` | `2.13.4` | `model_json_schema()` doubles as the tool/function-calling schema passed to both LLM providers — single source of truth, see below |
+| Settings | `pydantic-settings` | `2.15.0` | |
+| LLM (primary) | `groq` | `1.6.0` | Free tier — budget constraint noted in `docs/features.md` §6 |
+| LLM (fallback) | `anthropic` | `0.122.0` | Only invoked on a Groq exception/timeout |
+| HTTP client | `httpx` | `0.28.1` | |
+| Internal transport | REST over the Docker network | — | `docker-compose.yml`'s `ai-service` entry, internal-only, no host port; reached at `http://ai-service:8000/extract` via `AI_SERVICE_URL` |
+
+**Tool/function calling, not prose-described JSON mode** — found necessary via live testing: with `response_format: {"type": "json_object"}` and a prose-described schema, Groq returned different field names than requested (`amount`/`type`/`date` instead of `amount_vnd`/`tx_type`/`occurred_at`). Forcing a tool call against `ExtractResponse.model_json_schema()` (same schema used for Pydantic validation) makes the provider's output structurally conform by construction. Both Groq (`tools`/`tool_choice`) and Anthropic (`tools`/`tool_choice`) use this same approach.
+
+**`temperature=0`** — the SDK default was observed to return a different, sometimes wrong, Category for the identical input across repeated calls; this is a deterministic-classification task, not creative generation.
 
 ---
 
@@ -126,7 +134,7 @@ No `ai-service/`, `ai_service/`, or `python_service/` directory exists in the re
 
 | Tool | Purpose |
 |---|---|
-| Docker Compose (`docker-compose.yml`, repo root) | Orchestrates `postgres`, `backend`, `frontend` (Flutter web build), `web` (Next.js) on one bridge network (`pfm_network`) |
+| Docker Compose (`docker-compose.yml`, repo root) | Orchestrates `postgres`, `backend`, `ai-service`, `web` (Next.js) on one bridge network (`pfm_network`). `mobile/` is not a service — see §1 |
 | — | No Nginx, Redis, or reverse-proxy service defined |
 
 ---
@@ -165,6 +173,7 @@ This is a `{success, data}`-wrapped envelope, **not** the bare `{error_code, mes
 | Query layer | sqlc | GORM | Type safety, explicit SQL, no N+1 magic |
 | API design | Hand-written Go handlers | oapi-codegen (originally planned) | Never actually wired up — `docs/open-ai.md` remains a manual sketch |
 | Vector DB | (none enabled) | pgvector | Planned for later AI/RAG use, not enabled in any current migration |
-| LLM | Groq (primary), Anthropic (fallback) — not yet implemented | Anthropic-only | Budget — Groq free tier prioritized per `docs/features.md` §6 |
+| LLM | Groq (primary), Anthropic (fallback), tool/function calling | Prose-described JSON schema (`response_format: json_object`) | Prose mode was observed live to not reliably hold the requested field names — tool calling makes output conform to schema by construction |
+| Mobile framework | React Native (Expo) | Flutter (previous choice) | User-directed change 2026-08-16, no further rationale recorded — `mobile/` was deleted and rebuilt from scratch |
+| Mobile state management | TanStack Query + Zustand | Riverpod (Flutter-only, dropped with Flutter) | Matches `frontend/`'s exact pairing — one state-management mental model across both clients |
 | Auth token gen (invite) | `crypto/rand` | UUID | UUIDs are not a cryptographically secure token source |
-| Mobile networking | `dio` + `retrofit` | Plain `dio` / `http` | Type-safe generated client, already adopted in `auth`/`admin` features |

@@ -8,13 +8,13 @@ When invoked, you read the corresponding `spec.md`, cross-check it against the c
 
 The `spec.md` for the same feature **must already exist** at `{root}/specs/{feature}/spec.md`. If it doesn't, stop and say so — do not invent a plan from an assumed spec.
 
-> **Frontend priority:** implementation currently focuses on `frontend/` (Next.js web) first. `mobile/` (Flutter) sections are included in plans but only implemented when explicitly requested.
+> **Frontend priority:** implementation currently focuses on `frontend/` (Next.js web) first. `mobile/` (React Native + Expo, rebuilt from Flutter 2026-08-16 — project scaffold only, no feature screens yet) sections are included in plans but only implemented when explicitly requested.
 
 ---
 
 ## Role
 
-Turn an approved `spec.md` into a concrete implementation plan: package/file layout, domain objects, business-rule ownership, sequence diagrams, error handling, and a checklist of open tasks — split correctly across Next.js web, Go Fiber, Flutter mobile, and (when relevant) Python FastAPI AI service.
+Turn an approved `spec.md` into a concrete implementation plan: package/file layout, domain objects, business-rule ownership, sequence diagrams, error handling, and a checklist of open tasks — split correctly across Next.js web, Go Fiber, React Native (Expo) mobile, and (when relevant) Python FastAPI AI service.
 
 ---
 
@@ -31,7 +31,7 @@ Always produce in this order, per feature:
    - Sequence diagram (rules below)
 4. **Error Flows** — table: scenario → HTTP status → error code
 5. **Constitution / Convention Notes** — table mapping project rules to how this story satisfies them
-6. **Element/Key IDs** — `data-testid` attributes for QA automation (web) or `Key()` for Flutter
+6. **Element/Key IDs** — `data-testid` attributes for QA automation (web) or `testID` for React Native
 7. **Open Tasks** — table of concrete, file-scoped tasks a developer picks up directly
 
 ---
@@ -59,7 +59,7 @@ Always produce in this order, per feature:
 - Timestamps: state UTC storage / local display explicitly wherever a new field or endpoint touches time.
 - Soft delete (`deleted_at`) must be called out explicitly for any entity that supports it — never silently imply hard delete.
 - If a decision can't be made from `spec.md` alone, state the assumption explicitly under Open Tasks or Pre-flight Findings — never silently pick one and move on.
-- Keep backend (Go Fiber / FastAPI) and frontend (Next.js / Flutter) sections clearly separated — a rule enforced in the Go service must not be silently assumed to also be enforced in the frontend.
+- Keep backend (Go Fiber / FastAPI) and frontend (Next.js / React Native) sections clearly separated — a rule enforced in the Go service must not be silently assumed to also be enforced in the frontend.
 
 ---
 
@@ -117,24 +117,26 @@ frontend/src/
         └── types.ts                             # TS interfaces for this feature's API shapes
 ```
 
-### Flutter Mobile (`mobile/lib/`) — implement only when explicitly requested
+### React Native Mobile (`mobile/`, Expo) — implement only when explicitly requested
 
 ```text
-mobile/lib/features/[feature]/
-├── data/
-│   └── [feature]_repository_impl.dart  # implements domain interface; dio calls + drift cache
-├── domain/
-│   ├── [entity]_models.dart             # pure Dart, freezed, zero framework imports
-│   └── [feature]_repository.dart        # abstract interface
-└── presentation/
-    ├── pages/
-    │   └── [feature]_page.dart          # ConsumerWidget, composes widgets
-    ├── providers/
-    │   ├── [feature]_provider.dart      # @riverpod AsyncNotifier
-    │   └── [feature]_provider.g.dart    # generated — do not edit
-    └── widgets/
-        └── [widget_name].dart
+mobile/
+├── app/                                    # Expo Router file-based routes (thin — compose from src/features)
+│   └── (app)/[feature]/
+│       └── index.tsx                       # route entry, composes feature components
+└── src/features/[feature]/
+    ├── api/
+    │   ├── use-[feature]s-query.ts          # TanStack Query list/read hooks
+    │   ├── use-[feature]-query.ts            # single resource hook
+    │   ├── use-create-[feature]-mutation.ts
+    │   ├── use-update-[feature]-mutation.ts
+    │   └── use-delete-[feature]-mutation.ts
+    ├── components/
+    │   └── [feature]-list.tsx, create-[feature]-sheet.tsx, etc.
+    └── types.ts                             # TS interfaces for this feature's API shapes — mirrors frontend/'s equivalent
 ```
+
+Same `api`/`components`/`types.ts` shape as the Next.js web layout above, deliberately — `mobile/` uses the same TanStack Query + Zustand pairing as `frontend/` (not Riverpod, which was Flutter-only and was dropped along with Flutter on 2026-08-16), so a feature's web and mobile implementations read as the same architecture in two renderers, not two different mental models. State that needs to be global (session, ui prefs) goes in `mobile/src/stores/`, same convention as the web `stores/` folder below.
 
 ### Python FastAPI — AI Service (only for AI/LLM-touching stories)
 
@@ -199,11 +201,11 @@ ai-service/app/
 |---------|------------|--------|------|
 | [button/input/row] | `[action]-[entity]-btn` | Exists / **Missing** | `components/[file].tsx` |
 
-**Mobile (`Key()`):**
+**Mobile (`testID`):**
 
-| Element | Key | Status | File |
-|---------|-----|--------|------|
-| [button/input] | `Key('btn-[action]-[entity]')` | Exists / **Missing** | `widgets/[file].dart` |
+| Element | testID | Status | File |
+|---------|--------|--------|------|
+| [button/input] | `testID="btn-[action]-[entity]"` | Exists / **Missing** | `components/[file].tsx` |
 
 ### Open Tasks
 
@@ -221,8 +223,8 @@ ai-service/app/
 | T10 | Web: table + skeleton + dialogs | `frontend/src/features/[feature]/components/*.tsx` |
 | T11 | Web: types | `frontend/src/features/[feature]/types.ts` |
 | T12 | Web: page route | `frontend/src/app/app/[feature]/page.tsx` |
-| T13 | Mobile: provider (only when mobile scope active) | `mobile/lib/features/[feature]/presentation/providers/[feature]_provider.dart` |
-| T14 | Mobile: page (only when mobile scope active) | `mobile/lib/features/[feature]/presentation/pages/[feature]_page.dart` |
+| T13 | Mobile: TanStack Query hooks (only when mobile scope active) | `mobile/src/features/[feature]/api/use-*.ts` |
+| T14 | Mobile: screen + route entry (only when mobile scope active) | `mobile/src/features/[feature]/components/*.tsx`, `mobile/app/(app)/[feature]/index.tsx` |
 
 ---
 
@@ -237,7 +239,7 @@ ai-service/app/
 
 ## Project Context
 
-Stack: Flutter (Riverpod 2.x codegen, go_router, drift, dio) | Next.js (App Router, TanStack Query, Zustand, shadcn/ui, Axios) | Go 1.22+ (Fiber v2, sqlc, pgx/v5, golang-jwt v5, golang-migrate) | Python 3.12+ (FastAPI, Pydantic v2, Groq SDK)
+Stack: React Native + Expo (Expo Router, TanStack Query, Zustand, Axios, expo-secure-store) | Next.js (App Router, TanStack Query, Zustand, shadcn/ui, Axios) | Go 1.22+ (Fiber v2, sqlc, pgx/v5, golang-jwt v5, golang-migrate) | Python 3.12+ (FastAPI, Pydantic v2, Groq SDK + Anthropic fallback, tool/function calling)
 DB: PostgreSQL 16 · UUID v4 IDs · BIGINT cents (money) · TIMESTAMPTZ UTC · soft delete via `deleted_at`
 Auth: JWT access (15m) + refresh (7d) · invite-only flow · roles: `admin` | `member`
-Frontend priority: `frontend/` (Next.js web) first · `mobile/` (Flutter) only when explicitly requested
+Frontend priority: `frontend/` (Next.js web) first · `mobile/` (React Native/Expo, project scaffold only as of 2026-08-16) only when explicitly requested

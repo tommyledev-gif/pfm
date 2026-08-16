@@ -12,7 +12,7 @@
 For the stacks this feature touches, use gitnexus to read ONE existing, complete implementation as reference:
 - **Go backend:** read the closest existing `_handler.go` + `_service.go` + `_repository.go` trio (e.g. `wallet` if planning a money feature)
 - **Next.js web:** read one feature's `api/use-*-query.ts` + `components/*.tsx` + `types.ts`
-- **Mobile Flutter:** read one feature's `providers/` + `pages/` + `data/` (only if mobile scope is active)
+- **Mobile (React Native/Expo):** read one feature's `api/` + `components/` + `types.ts` under `mobile/src/features/` (only if mobile scope is active — as of 2026-08-16 `mobile/` has only a project scaffold, no feature yet exists to use as reference)
 - **Python AI:** read `ai-service/app/` structure only if this feature touches AI
 
 Do NOT read all features. One reference implementation per stack is enough.

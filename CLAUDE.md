@@ -1,27 +1,29 @@
 # PFM — Personal Finance Management
 
-Mobile app quản lý chi tiêu cá nhân. Flutter + Go + Python AI service.
+Mobile app quản lý chi tiêu cá nhân. React Native (Expo) + Go + Python AI service.
 
 ## Architecture
 
-[Flutter App] → HTTPS → [Go Backend :8080] → [PostgreSQL 16]
+[React Native App (Expo)] → HTTPS → [Go Backend :8080] → [PostgreSQL 16]
 ↓ REST internal
 [Python AI Service :8000]
 
 
-Infra: Docker Compose. Không deploy App Store/Play Store — chỉ build .apk/.ipa để test.
+Infra: Docker Compose (backend, ai-service, postgres, Next.js web only — `mobile/` is not containerized, see below). Không deploy App Store/Play Store — chỉ build .apk/.ipa (qua EAS Build) để test.
 
-> **Frontend priority:** implementation currently focuses on `frontend/` (web) first; `mobile/` (Flutter) is paused until explicitly requested.
+> **Frontend priority:** `frontend/` (Next.js web) is feature-complete-first priority. `mobile/` (React Native + Expo, migrated from Flutter 2026-08-16) has only an initial project scaffold — Expo Router, TanStack Query, Zustand, Axios, and secure-store are wired, but no feature screens (auth, wallets, etc.) exist yet. Build mobile features only when explicitly requested.
+>
+> **Mobile is not Dockerized.** Expo's dev flow is `npx expo start` (Metro bundler + Expo Go / simulator), not a container. `npx expo export --platform web` can produce a static bundle if a containerized web preview is ever needed later.
 
 ## Tech Stack
 
-**Mobile:** Flutter (Dart) · Riverpod 2.x codegen · go_router · drift (SQLite offline) · dio + retrofit · fl_chart · flutter_form_builder · flutter_secure_storage · envied
+**Mobile:** React Native (Expo SDK, TypeScript) · Expo Router (file-based routing, `Stack.Protected` for auth-gated routes) · TanStack Query (server state) · Zustand (client/global state — same pairing as `frontend/`, for one consistent mental model across both clients) · Axios (calls the Go backend directly — no BFF proxy on mobile, unlike `frontend/`) · expo-secure-store (JWT storage)
 
-**Backend:** Go 1.22+ · Fiber v2 · sqlc (không dùng GORM) · pgx/v5 · golang-jwt v5 · go-playground/validator v10 · golang-migrate · Zap logger · oapi-codegen (API-first)
+**Backend:** Go 1.22+ · Fiber v2 · sqlc (không dùng GORM) · pgx/v5 · golang-jwt v5 · go-playground/validator v10 · golang-migrate · Zap logger
 
-**AI Service:** Python 3.12+ · FastAPI · Pydantic v2 · Groq SDK (primary, free tier) · Anthropic SDK (fallback) · FastAPI BackgroundTasks
+**AI Service:** Python 3.12+ · FastAPI · Pydantic v2 · Groq SDK (primary, free tier) · Anthropic SDK (fallback) · tool/function calling for structured extraction (prose-described JSON schemas are not reliable — see `specs/ai-chat-assistant/`)
 
-**API contract:** `api-spec/openapi.yaml` là single source of truth. oapi-codegen gen Go server stubs. openapi-generator gen Dart client.
+**API contract:** No `api-spec/openapi.yaml`/codegen pipeline exists — every backend DTO, and every mobile/web API type, is hand-written to match. Keep them in sync by hand across `backend/internal/dto/`, `frontend/src/features/*/types.ts`, and `mobile/src/features/*/types.ts`.
 
 ## Folder Structure
 
@@ -30,14 +32,19 @@ pfm/
 ├── .claude/commands/ # /ba /qc /dev slash commands
 ├── api-spec/
 │ └── openapi.yaml # source of truth cho tất cả API
-├── mobile/lib/
-│ └── features/{feature}/
-│ ├── data/ # repository impl, API calls, drift
-│ ├── domain/ # pure Dart model + interface
-│ └── presentation/
-│ ├── pages/
-│ ├── widgets/
-│ └── providers/ # Riverpod providers
+├── mobile/
+│ ├── app/ # Expo Router file-based routes (thin — compose from src/features)
+│ │ ├── _layout.tsx # Root layout: providers + Stack.Protected auth guard
+│ │ ├── (auth)/ # Unauthenticated route group
+│ │ └── (app)/ # Authenticated route group
+│ └── src/
+│ ├── features/{feature}/
+│ │ ├── api/ # TanStack Query hooks (use-*-query.ts, use-*-mutation.ts) — same convention as frontend/
+│ │ ├── components/ # screen-specific components
+│ │ └── types.ts
+│ ├── components/{ui,shared}/ # reusable primitives / cross-feature components
+│ ├── lib/ # axios.ts, query-client.ts, secure-storage.ts, constants.ts, currency.ts
+│ └── stores/ # global Zustand stores (session, ui prefs)
 ├── backend/
 │ ├── cmd/server/
 │ └── internal/
@@ -104,8 +111,8 @@ Wallet balance update và transaction insert luôn trong **cùng 1 DB transactio
 - Không log sensitive data (password, token, email trong prod log).
 - Validation: shape/type ở handler, business rules ở service. Không mix.
 - Handler không import repository trực tiếp — qua service.
-- `ref.watch` trong `build()` only. `ref.read` trong callbacks/actions only.
-- Dart: `final` by default. `const` constructor everywhere possible.
+- Mobile: server state qua TanStack Query only — never copy API data vào `useState`/Zustand (giống rule của `frontend/`).
+- TypeScript: `const` by default, không dùng `any`.
 - Go: wrap error với context — `fmt.Errorf("service.Create: %w", err)`.
 - SQL: viết trong `.sql` file → sqlc gen. Không raw string query trong Go.
 

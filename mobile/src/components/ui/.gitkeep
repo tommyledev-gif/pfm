@@ -1,0 +1,1 @@
+Reusable primitives (Button, Input, etc. — the RN equivalent of frontend/src/components/ui/ shadcn primitives) go here as features need them.
