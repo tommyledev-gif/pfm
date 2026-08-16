@@ -20,6 +20,7 @@ Software Requirement Specification (SRS)
   - [FR-06: Investment Management](#fr-06-investment-management)
   - [FR-07: Financial Reporting](#fr-07-financial-reporting)
   - [FR-08: Data Overview Dashboard](#fr-08-data-overview-dashboard)
+  - [FR-09: AI Chat Assistance](#fr-09-ai-chat-assistance)
 - [3. Non-Functional Requirements (NFR)](#3-non-functional-requirements-nfr)
   - [NFR-01: Performance](#nfr-01-performance)
   - [NFR-02: Availability](#nfr-02-availability)
@@ -41,6 +42,7 @@ Software Requirement Specification (SRS)
   - [BF-07: Supporting BF – Investment Management](#bf-07-supporting-bf-investment-management)
   - [BF-08: Supporting BF – Reporting and Dashboard](#bf-08-supporting-bf-reporting-and-dashboard)
   - [BF-09: Supporting BF – Notification Handling](#bf-09-supporting-bf-notification-handling)
+  - [BF-10: Supporting BF – AI Chat Assistant](#bf-10-supporting-bf-ai-chat-assistant)
 - [6. Features and User Stories (US)](#6-features-and-user-stories-us)
   - [Feature-01: User Management](#feature-01-user-management)
     - [US-01: Register a User [MVP]](#us-01-register-a-user-mvp)
@@ -95,6 +97,11 @@ Software Requirement Specification (SRS)
     - [US-02: View a Notification (MVP)](#us-02-view-a-notification-mvp)
     - [US-03: Mark a Notification as Read](#us-03-mark-a-notification-as-read)
   - [Feature-11: Data Overview Dashboard](#feature-11-data-overview-dashboard)
+  - [Feature-12: AI Chat Assistant](#feature-12-ai-chat-assistant)
+    - [US-01: Create a Transaction via Chat [MVP]](#us-01-create-a-transaction-via-chat-mvp)
+    - [US-02: Edit a Transaction via Chat [MVP]](#us-02-edit-a-transaction-via-chat-mvp)
+    - [US-03: Query Spending via Chat [MVP]](#us-03-query-spending-via-chat-mvp)
+    - [US-04: General Financial Advice [Post-MVP]](#us-04-general-financial-advice-post-mvp)
 - [Feature-level Release (Overview)](#feature-level-release-overview)
 
 # 1. Introduction – Personal Finance Management (PFM) {#1-introduction-personal-finance-management-pfm}
@@ -228,6 +235,12 @@ Reports may include summaries of income and expenses, spending by Category, Wall
 The System shall **provide a dashboard that presents key financial information** in a clear and easy-to-understand format.
 
 The dashboard may include current balances, recent Transactions, Budget status, and Goal progress.
+
+## FR-09: AI Chat Assistance {#fr-09-ai-chat-assistance}
+
+The System shall provide a conversational (chat-based) interface that allows Users to **create, edit, and query Transactions using natural-language messages**, as an alternative to manual form entry.
+
+The AI shall resolve messages against the User's own Wallets and Categories, and shall require **explicit User confirmation** before any Transaction is created or modified. The AI shall not bypass the validation and ownership rules enforced by Transaction Management (FR-02).
 
 # 3. Non-Functional Requirements (NFR) {#3-non-functional-requirements-nfr}
 
@@ -369,6 +382,16 @@ This flow describes how the System communicates important events.
 1. The User **views the list of Notifications.**  
 2. The User **views a Notification.**  
 3. The User **takes appropriate action on a Notification** if needed.
+
+## BF-10: Supporting BF – AI Chat Assistant {#bf-10-supporting-bf-ai-chat-assistant}
+
+This flow describes how Users interact with the System through natural-language chat instead of manual forms.
+
+1. The User **opens the AI Chat interface** and **sends a natural-language message** describing a Transaction, an edit request, or a spending question.  
+2. The System **interprets the message** and returns either a proposed action (create/edit a Transaction) or a direct answer (spending query).  
+3. For a proposed create/edit action, the System **shows a confirmation card**; the User **approves or cancels** it.  
+4. Upon approval, the System **creates or updates the Transaction** through the standard Transaction Management flow (FR-02).  
+5. The User **reviews the resulting Transaction** from the standard Transaction list.
 
 # 6. Features and User Stories (US) {#6-features-and-user-stories-us}
 
@@ -607,6 +630,98 @@ The User Stories of this feature are described below.
 
 ## Feature-11: Data Overview Dashboard {#feature-11-data-overview-dashboard}
 
+## Feature-12: AI Chat Assistant {#feature-12-ai-chat-assistant}
+
+Provides a conversational interface, backed by the AI Service (see CLAUDE.md architecture), that lets Users record, edit, and query Transactions using natural-language (Vietnamese) messages instead of manual forms. All AI-proposed writes require explicit User confirmation before being persisted, and go through the same ownership and validation rules as manual Transaction entry (FR-02).  
+The User Stories of this feature are described below.
+
+### US-01: Create a Transaction via Chat [MVP] {#us-01-create-a-transaction-via-chat-mvp}
+
+*As a User*  
+*I want to describe an expense or income in a natural-language chat message*  
+*so that the System creates the Transaction for me without filling a form.*
+
+  **Background**:  
+    **Given** the User is logged in  
+     And the User has a default Wallet "Cash Wallet"  
+     And the User has a Category "Food" (type Expense)
+
+  **Scenario: Create a single expense transaction from a chat message**  
+    **Given** the User is on the "AI Chat" screen  
+    **When** the User sends the message "ăn trưa 50k"  
+    **Then** the System proposes 1 expense Transaction: amount 50,000, category "Food", date today, wallet "Cash Wallet"  
+     And the System shows a confirmation card before creating anything  
+    **When** the User taps "Confirm"  
+    **Then** the System creates the Transaction  
+     And the System updates the wallet balance accordingly
+
+  **Scenario: Create multiple transactions from one message**  
+    **When** the User sends the message "hôm qua cơm tấm 30k và 2 trà đá 5k"  
+    **Then** the System proposes 2 expense Transactions dated yesterday: 30,000 and 10,000 (2 × 5,000), both category "Food"  
+     And each proposed Transaction is shown in the confirmation card before creation
+
+  **Scenario: Ask for clarification when required information is missing**  
+    **When** the User sends the message "50k"  
+    **Then** the System does not create a Transaction  
+     And the System asks a clarifying question about transaction type and category
+
+  **Scenario: Do not create when the AI cannot confidently resolve the Category**  
+    **Given** the AI's confidence in the matched Category is below the System's threshold  
+    **When** the User sends an ambiguous message  
+    **Then** the System marks the proposal as "needs review"  
+     And does not create the Transaction until the User confirms or corrects the Category
+
+### US-02: Edit a Transaction via Chat [MVP] {#us-02-edit-a-transaction-via-chat-mvp}
+
+*As a User*  
+*I want to reference an existing Transaction in a chat message with an edit prefix*  
+*so that the System updates it instead of creating a duplicate.*
+
+  **Background**:  
+    **Given** the User is logged in  
+     And the User previously recorded a Transaction "Cơm tấm" for 30,000 dated yesterday
+
+  **Scenario: Update an existing transaction when exactly one match is found**  
+    **When** the User sends the message "sửa@ hôm qua cơm tấm 45k"  
+    **Then** the System finds the single matching Transaction "Cơm tấm" dated yesterday  
+     And the System shows a confirmation card with the amount change from 30,000 to 45,000  
+    **When** the User taps "Confirm"  
+    **Then** the System updates the Transaction amount to 45,000
+
+  **Scenario: Let the User choose when multiple transactions match**  
+    **Given** the User has 3 Transactions with note containing "cà phê"  
+    **When** the User sends the message "sửa@ cà phê"  
+    **Then** the System lists the 3 matching Transactions for the User to choose from  
+     And no Transaction is updated until the User selects one
+
+  **Scenario: Reject the edit when no matching transaction is found**  
+    **When** the User sends the message "sửa@ meeting lunch tháng trước"  
+     And no Transaction matches  
+    **Then** the System does not create or update any Transaction  
+     And the System shows the message "Không tìm thấy giao dịch phù hợp"
+
+### US-03: Query Spending via Chat [MVP] {#us-03-query-spending-via-chat-mvp}
+
+*As a User*  
+*I want to ask the System about my spending in natural language*  
+*so that I can check my financial status without opening the Reports screen.*
+
+  **Scenario: Answer a total-spending question with real data**  
+    **Given** the User has recorded Transactions this month totaling 2,450,000 in expenses  
+    **When** the User sends the message "tháng này tôi tiêu bao nhiêu?"  
+    **Then** the System responds with the actual total, e.g. "Tháng này bạn đã chi 2,450,000đ"  
+     And the System does not fabricate figures not derived from the User's own data
+
+  **Scenario: Compare spending between two periods**  
+    **When** the User sends the message "ăn uống tháng này so với tháng trước?"  
+    **Then** the System responds with both periods' totals for category "Food" and the percentage change
+
+### US-04: General Financial Advice [Post-MVP] {#us-04-general-financial-advice-post-mvp}
+
+*As a User*  
+*I want to ask the AI for general personal-finance guidance*  
+*so that I get direction on managing my spending, based on my own recorded data.*
+
 # Feature-level Release (Overview) {#feature-level-release-overview}
 
 The following table shows how the complete product scope defined in the SRS is delivered incrementally.
@@ -626,4 +741,5 @@ The MVP includes eight core features to ensure a usable and valuable first relea
 | 9 | **Investment Management** |  |  | ✔ | Advanced feature for mature users |
 | 10 | **Notification Handling** | ✔ | ✔ | ✔ | User feedback and engagement |
 | 11 | **Data Overview Dashboard** |  | ✔ | ✔ | High-level financial insights |
+| 12 | **AI Chat Assistant** |  | ✔ | ✔ | Conversational transaction entry/edit/query; depends on stable Transaction Management (F-06); all AI-proposed writes require explicit User confirmation |
 

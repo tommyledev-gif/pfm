@@ -23,6 +23,7 @@ Software Design Specification (SDS)
     - [8. Asset](#8-asset)
     - [9. Holding](#9-holding)
     - [10. Notification](#10-notification)
+    - [11. ChatMessage](#11-chatmessage)
   - [2. Domain Object Relationships](#2-domain-object-relationships)
 - [3. UI Design](#3-ui-design)
   - [1. Wireframe](#1-wireframe)
@@ -56,6 +57,8 @@ Software Design Specification (SDS)
   - [9. Feature-09: Investment Portfolio](#9-feature-09-investment-portfolio)
   - [10. Feature-10: Notification Handling](#10-feature-10-notification-handling)
   - [11. Feature-11: Data Overview Dashboard](#11-feature-11-data-overview-dashboard)
+  - [12. Feature-12: AI Chat Assistant](#12-feature-12-ai-chat-assistant)
+    - [1. US-12-01: Create a Transaction via Chat](#1-us-12-01-create-a-transaction-via-chat)
 - [6. API Design](#6-api-design)
   - [1. API Design Standards](#1-api-design-standards)
   - [2. API Index](#2-api-index)
@@ -66,6 +69,8 @@ Software Design Specification (SDS)
     - [4. `POST /categories`](#4-post-categories)
     - [5. `POST /budgets`](#5-post-budgets)
     - [6. `POST /transactions`](#6-post-transactions)
+    - [7. `PUT /transactions/{id}`](#7-put-transactionsid)
+    - [8. `POST /ai/chat`](#8-post-aichat)
   - [4. API  → User Story Traceability](#4-api-user-story-traceability)
 - [7. Security Design](#7-security-design)
   - [1. Authentication](#1-authentication)
@@ -130,7 +135,7 @@ Domain objects are grouped by delivery phase, per the [Feature-level Release tab
 | --- | --- |
 | **Phase 0** (current scope — see [docs/features.md](docs/features.md)) | User |
 | **MVP** | Wallet, Category, Budget, Transaction, Notification |
-| **Release 1** | FinancialGoal |
+| **Release 1** | FinancialGoal, ChatMessage |
 | **Release 2** | InvestmentPortfolio, Asset, Holding |
 
 ## 1. Domain Objects {#1-domain-objects}
@@ -189,6 +194,14 @@ A system-generated message to a User (e.g. budget limit reached). Read-only from
 
 Key attributes: `id`, `user_id`, `type`, `title`, `body`, `is_read`, `created_at`.
 
+### 11. ChatMessage {#11-chatmessage} *(Release 1)*
+
+A single message exchanged between a User and the AI Chat Assistant (SRS Feature-12), either from the User or the assistant. When a message results in a created/updated Transaction, it links back to the affected Transaction(s) for audit/traceability — the AI never writes to the database directly; it only proposes actions that a User must confirm through the standard Transaction Management flow (FR-02).
+
+Key attributes: `id`, `user_id`, `conversation_id`, `role` (user/assistant), `content`, `intent`, `transaction_ids` (nullable array, set once confirmed), `created_at`.
+
+> **Schema note:** realizing this feature also requires two small additions to existing MVP tables, not new domain concepts: (1) `categories.description` (nullable) so the AI can disambiguate between similarly-named Categories, and (2) an idempotency mechanism for `POST /transactions` (e.g. a unique `idempotency_key` column or a dedicated keys table) so a duplicate confirm-tap from the chat UI cannot create a duplicate Transaction. Exact shape to be finalized at `/cook-plan` time.
+
 ## 2. Domain Object Relationships {#2-domain-object-relationships}
 
 **Conceptual Data Model (CDM)** — composition (`*--`, filled diamond) marks a part with no meaning or lifecycle outside its whole; aggregation (`o--`, hollow diamond) marks a part that can exist independently of the whole; a plain association (`-->`) marks a reference/classification link with no ownership semantics.
@@ -241,6 +254,13 @@ classDiagram
       +BIGINT amount
       +BIGINT current_value
     }
+    class ChatMessage {
+      +UUID id
+      +UUID conversation_id
+      +string role
+      +string content
+      +string intent
+    }
 
     User "1" *-- "0..*" Wallet : owns
     User "1" *-- "0..*" Transaction : records
@@ -249,11 +269,13 @@ classDiagram
     User "0..1" o-- "0..*" Category : defines (user-defined only)
     User "1" *-- "0..*" FinancialGoal : sets
     User "1" *-- "0..1" InvestmentPortfolio : owns
+    User "1" *-- "0..*" ChatMessage : exchanges
 
     Wallet "1" *-- "0..*" Transaction : holds history of
 
     Transaction "0..*" --> "1" Category : classified by
     Budget "0..*" --> "1" Category : limits spending on
+    ChatMessage "0..*" --> "0..*" Transaction : proposes/confirms
 
     InvestmentPortfolio "1" *-- "0..*" Holding : contains
     Holding "0..*" --> "1" Asset : references
@@ -275,6 +297,8 @@ classDiagram
 | 10 | Category | limits | Budget | 1 : 0..* | Association | Budget references a Category to track against |
 | 11 | InvestmentPortfolio | contains | Holding | 1 : 0..* | Composition | A Holding has no meaning outside its Portfolio (Release 2) |
 | 12 | Asset | referenced by | Holding | 1 : 0..* | Association | Asset is shared reference data across all Portfolios (Release 2) |
+| 13 | User | exchanges | ChatMessage | 1 : 0..* | Composition | A ChatMessage has no meaning outside its owning User's conversation (Release 1) |
+| 14 | ChatMessage | proposes/confirms | Transaction | 0..* : 0..* | Association | A ChatMessage may reference the Transaction(s) it created or edited, once User-confirmed; the AI never persists a Transaction on its own |
 
 Note: derived figures such as Wallet `balance` or Budget "spent so far" are **computed from Transactions**, not separate stored relationships — they are covered by rows 8–9 above, not modeled as their own line.
 
@@ -360,6 +384,9 @@ This view supports maintainability and team collaboration.
 
 This section defines business rules and constraints derived from the domain model.
 
+* AI Chat Assistant (Feature-12): the AI Service never writes to the database directly. Every AI-proposed `create_transaction` / `edit_transaction` action is a **suggestion only**; it becomes a real write exclusively through the standard `POST /transactions` / `PUT /transactions/{id}` endpoints, after explicit User confirmation.  
+* Any Wallet/Category ID returned by the AI Service must be **re-validated for ownership** by the Backend before use — the AI Service is untrusted input with respect to authorization, even though it runs on the internal Docker network (see §7 Security Design).
+
 **Database Design**
 
 This section maps the Domain Model to the physical Database Structure.
@@ -409,6 +436,7 @@ These scenarios represent the Scenarios (+1 View) of the “4+1 Views” Model.
 | S-TRX-01 | Feature-06: Transaction Management | **US-06-01 Create a Transaction for a Wallet** | ✔ | Primary core scenario |
 | S-RPT-01 | Feature-07: Financial Reporting | **US-07-01 View the Summary Report** | ✔ | Insight & feedback loop |
 | S-NOT-01 | Feature-10: Notification Handling | **US-10-01 View the list of Notifications** | ✔ | User awareness |
+| S-CHAT-01 | Feature-12: AI Chat Assistant | **US-12-01 Create a Transaction via Chat** |  | Reuses Transaction Management write path; Release 1 |
 
 ## 7. Architecture Principles {#7-architecture-principles}
 
@@ -508,6 +536,50 @@ Main Flow
 
 ## 11. Feature-11: Data Overview Dashboard {#11-feature-11-data-overview-dashboard}
 
+## 12. Feature-12: AI Chat Assistant {#12-feature-12-ai-chat-assistant}
+
+### 1. US-12-01: Create a Transaction via Chat {#1-us-12-01-create-a-transaction-via-chat}
+
+**Goal:** Allow an authenticated User to create one or more Transactions by sending a natural-language chat message, with explicit confirmation before any write.
+
+**Preconditions**:
+
+* User is authenticated.  
+* User has at least one Wallet (a default Wallet is used when the message does not name one).
+
+**Client:** `frontend/` (web) per current implementation priority (CLAUDE.md) — a mobile Flutter chat UI is deferred until `mobile/` work is explicitly resumed.
+
+**Layers Involved**:
+
+* ChatHandler → ChatService (Go Backend)  
+* WalletRepository, CategoryRepository (context injection: the User's own Wallets/Categories, never another User's)  
+* AI Service client (internal REST call to Python AI Service, per CLAUDE.md architecture — reuses the existing Groq-primary/Anthropic-fallback client, no new provider)  
+* TransactionRepository (only invoked after User confirmation, via the existing `POST /transactions` flow)
+
+**APIs Involved:**
+
+Endpoint: `POST /ai/chat`
+
+Success Response
+
+* message (assistant reply, Vietnamese)  
+* intent (`create_transaction` | `edit_transaction` | `query_spending` | `general_advice` | `ambiguous`)  
+* actions[] — proposed Transaction payload(s), each with a pre-generated idempotency key and a confidence score; empty for query/advice/ambiguous intents
+
+Error Responses
+
+* 400 INVALID_INPUT  
+* 502 AI_SERVICE_UNAVAILABLE (Groq/Anthropic both failing — return a retryable error, do not crash)
+
+Main Flow
+
+* Controller receives the message and validates input.  
+* Service loads the User's own Wallets and Categories as context.  
+* Service calls the AI Service, which returns a structured intent + proposed action(s).  
+* Service **re-validates that every Wallet/Category ID in the response belongs to the requesting User** before returning it to the client — the AI Service is treated as untrusted input for authorization purposes (see §7 Security Design).  
+* For `create_transaction` / `edit_transaction`, the client renders a confirmation card; nothing is persisted until the User confirms.  
+* On confirmation, the client calls the existing `POST /transactions` (or `PUT /transactions/{id}`) endpoint, using the pre-generated idempotency key to guard against duplicate confirms.
+
    # 
 
 # 6. API Design {#6-api-design}
@@ -535,6 +607,8 @@ Main Flow
 | API-TRX-01 | `POST /transactions` | Transaction Management |
 | API-TRX-02 | `GET /transactions` | Transaction Management |
 | API-TRX-03 | `GET /transactions/{id}` | Transaction Management |
+| API-TRX-04 | `PUT /transactions/{id}` | Transaction Management |
+| API-CHAT-01 | `POST /ai/chat` | AI Chat Assistant |
 
 ## 3. API Specification {#3-api-specification}
 
@@ -554,11 +628,25 @@ Main Flow
 | ----- | ----- | ----- |
 | Controller receives request and validates input. Service validates wallet ownership. Service creates a Transaction. Repository persists data transactionally. Optional: budget update and notification trigger. Controller returns a response.  | transaction_id status message | 400:  INVALID_INPUT 403:  WALLET_ACCESS_DENIED 404:  WALLET_NOT_FOUND  |
 
+### 7. `PUT /transactions/{id}` {#7-put-transactionsid}
+
+| Main Flow | Success Response | Error Responses |
+| ----- | ----- | ----- |
+| Controller receives request and validates input. Service validates the Transaction belongs to the requesting User. Service applies the update and re-adjusts the Wallet balance in the same DB transaction. Controller returns a response. | transaction_id status message | 400: INVALID_INPUT 403: WALLET_ACCESS_DENIED 404: TRANSACTION_NOT_FOUND |
+
+### 8. `POST /ai/chat` {#8-post-aichat}
+
+| Main Flow | Success Response | Error Responses |
+| ----- | ----- | ----- |
+| Controller receives message and validates input. Service loads the User's own Wallets/Categories as context, calls the AI Service, then re-validates ownership of every ID the AI Service returns before responding. No Transaction is written by this endpoint. | message intent actions[] | 400: INVALID_INPUT 502: AI_SERVICE_UNAVAILABLE |
+
 ## 4. API  → User Story Traceability {#4-api-user-story-traceability}
 
 | API | Feature | US |
 | ----- | ----- | ----- |
 | `POST /wallets` | Wallet Management | US-03-01 |
+| `PUT /transactions/{id}` | Transaction Management | US-12-02 (AI Chat edit flow) |
+| `POST /ai/chat` | AI Chat Assistant | US-12-01, US-12-02, US-12-03 |
 | `POST /transactions` | Transaction Management | US-06-01 |
 
 # 7. Security Design {#7-security-design}
@@ -571,9 +659,13 @@ All protected APIs require authenticated user context.
 
 Users can only access data they own, for example: Wallet, Transaction, Category...
 
+For AI Chat Assistant (Feature-12): the AI Service is treated as **untrusted input** with respect to authorization, even though it runs on the internal Docker network — the Go Backend must re-validate that every Wallet/Category ID the AI Service returns actually belongs to the requesting User before it is shown to the client or used in any write.
+
 ## 3. Threat Modeling {#3-threat-modeling}
 
-   # 
+* **AI hallucinated ownership** — the AI Service could return a Wallet/Category ID belonging to a different User (model error, not necessarily malicious). Mitigated by mandatory ownership re-validation in `ChatService` before the response leaves the Backend (see §6.3 `POST /ai/chat`).  
+* **Duplicate transaction from double-confirm** — a repeated tap on the chat confirmation card must not create two Transactions. Mitigated by an idempotency key pre-generated per proposed action (see Domain Model §11 ChatMessage, schema note).  
+* **AI Service unavailability** — Groq/Anthropic outage must degrade to a clear retryable error on `POST /ai/chat`, never a crash or a silently-dropped write.
 
    # 
 
@@ -593,7 +685,9 @@ Users can only access data they own, for example: Wallet, Transaction, Category.
 # 9. Design Decisions and Trade-offs {#9-design-decisions-and-trade-offs}
 
 * Monolith chosen for early simplicity and clarity.  
-* Design allows future evolution without rewriting fundamentals.
+* Design allows future evolution without rewriting fundamentals.  
+* AI Chat Assistant (Feature-12) reuses the existing AI Service (Python/FastAPI, Groq SDK primary + Anthropic SDK fallback per CLAUDE.md tech stack) — no new LLM provider or client is introduced. Complexity-based model routing within the AI Service (e.g. a fast/cheap model for simple single-item extraction vs. a stronger model for multi-item or edit/query intents) is an AI Service implementation detail to be finalized at `/cook-plan` time, not a fixed choice baked into this SDS.  
+* Client surface for Feature-12 is `frontend/` (web) first, matching the project's current implementation priority; a Flutter chat UI in `mobile/` is out of scope until mobile work is explicitly resumed.
 
   # 
 
