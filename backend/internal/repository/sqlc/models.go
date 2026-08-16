@@ -83,19 +83,21 @@ type BudgetLimit struct {
 	AmountLimit int64
 }
 
-// Transaction mirrors the transactions table exactly (008_transactions.sql).
+// Transaction mirrors the transactions table exactly (008_transactions.sql +
+// the additive idempotency_key column from 010_transactions_idempotency_key.sql).
 type Transaction struct {
-	ID         uuid.UUID
-	UserID     uuid.UUID
-	WalletID   uuid.UUID
-	CategoryID uuid.UUID
-	Amount     int64
-	Type       string
-	Note       *string
-	OccurredAt time.Time
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
-	DeletedAt  *time.Time
+	ID             uuid.UUID
+	UserID         uuid.UUID
+	WalletID       uuid.UUID
+	CategoryID     uuid.UUID
+	Amount         int64
+	Type           string
+	Note           *string
+	OccurredAt     time.Time
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	DeletedAt      *time.Time
+	IdempotencyKey *uuid.UUID
 }
 
 // Notification mirrors the notifications table exactly (009_notifications.sql).
@@ -115,4 +117,21 @@ type Notification struct {
 	Currency        *string
 	PeriodStart     *time.Time
 	CreatedAt       time.Time
+}
+
+// ChatMessage mirrors the chat_messages table exactly (011_chat_messages.sql,
+// specs/ai-chat-assistant). TransactionIDs is left NULL by every write this
+// cut performs (linking a confirmed Transaction back to its originating
+// message is explicitly deferred — specs/ai-chat-assistant/spec.md Open
+// Question #8). No DeletedAt: append-only historical log, same precedent as
+// Notification.
+type ChatMessage struct {
+	ID             uuid.UUID
+	UserID         uuid.UUID
+	ConversationID uuid.UUID
+	Role           string
+	Content        string
+	Intent         *string
+	TransactionIDs []uuid.UUID
+	CreatedAt      time.Time
 }

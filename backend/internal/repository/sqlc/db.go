@@ -1,9 +1,19 @@
 // Package sqlc holds hand-authored code standing in for `sqlc generate`
-// output. Go/sqlc are not installed in the environment this was written in,
-// so this could not be generated and verified by the real toolchain — the
-// queries in db/queries/*.sql are the actual source of truth; once sqlc is
-// available, run `sqlc generate` from backend/ and diff the result against
-// this package before trusting either over the other.
+// output. It was originally written in an environment without sqlc
+// installed, so it could not be generated and verified by the real toolchain
+// — the queries in db/queries/*.sql are the actual source of truth.
+//
+// A real sqlc (v1.31.1) IS available in this environment as of
+// specs/ai-chat-assistant — but running `sqlc generate` unmodified rewrites
+// every file in this package to pgtype-wrapped nullable types (pgtype.UUID,
+// pgtype.Timestamptz, pgtype.Date) instead of this package's existing plain
+// pointer convention (*uuid.UUID, *time.Time), which breaks every existing
+// repository/service call site across every feature. Reconciling the whole
+// package onto real sqlc's conventions is a legitimate, separate technical
+// debt item — out of scope for any single feature's implementation — so new
+// queries added here (this file's own CreateChatMessage/GetTransactionBy...
+// additions included) continue to be hand-authored in the existing plain
+// pointer style until that reconciliation is deliberately scheduled.
 package sqlc
 
 import (

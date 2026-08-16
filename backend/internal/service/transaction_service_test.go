@@ -52,7 +52,7 @@ func TestTransactionService_CreateTransaction_ExpenseSuccess(t *testing.T) {
 	wallet := seedTestWallet(t, walletRepo, txRepo, userID, 1000000)
 	category := seedTestCategory(categoryRepo, userID, "Food", model.CategoryTypeExpense)
 
-	transaction, balance, err := svc.CreateTransaction(context.Background(), userID, dto.CreateTransactionRequest{
+	transaction, balance, _, err := svc.CreateTransaction(context.Background(), userID, dto.CreateTransactionRequest{
 		WalletID:   wallet.ID,
 		CategoryID: category.ID,
 		Amount:     200000,
@@ -61,8 +61,8 @@ func TestTransactionService_CreateTransaction_ExpenseSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if balance != 800000 {
-		t.Fatalf("expected wallet balance 800000, got %d", balance)
+	if balance == nil || *balance != 800000 {
+		t.Fatalf("expected wallet balance 800000, got %v", balance)
 	}
 	if transaction.WalletName != wallet.Name || transaction.CategoryName != category.Name {
 		t.Fatalf("expected denormalized names attached, got %+v", transaction)
@@ -76,7 +76,7 @@ func TestTransactionService_CreateTransaction_IncomeSuccess(t *testing.T) {
 	wallet := seedTestWallet(t, walletRepo, txRepo, userID, 1000000)
 	category := seedTestCategory(categoryRepo, userID, "Salary", model.CategoryTypeIncome)
 
-	_, balance, err := svc.CreateTransaction(context.Background(), userID, dto.CreateTransactionRequest{
+	_, balance, _, err := svc.CreateTransaction(context.Background(), userID, dto.CreateTransactionRequest{
 		WalletID:   wallet.ID,
 		CategoryID: category.ID,
 		Amount:     500000,
@@ -85,8 +85,8 @@ func TestTransactionService_CreateTransaction_IncomeSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if balance != 1500000 {
-		t.Fatalf("expected wallet balance 1500000, got %d", balance)
+	if balance == nil || *balance != 1500000 {
+		t.Fatalf("expected wallet balance 1500000, got %v", balance)
 	}
 }
 
@@ -98,7 +98,7 @@ func TestTransactionService_CreateTransaction_InsufficientBalance(t *testing.T) 
 	wallet := seedTestWallet(t, walletRepo, txRepo, userID, 1000000)
 	category := seedTestCategory(categoryRepo, userID, "Shopping", model.CategoryTypeExpense)
 
-	_, _, err := svc.CreateTransaction(context.Background(), userID, dto.CreateTransactionRequest{
+	_, _, _, err := svc.CreateTransaction(context.Background(), userID, dto.CreateTransactionRequest{
 		WalletID:   wallet.ID,
 		CategoryID: category.ID,
 		Amount:     2000000,
@@ -118,7 +118,7 @@ func TestTransactionService_CreateTransaction_WalletAccessDenied(t *testing.T) {
 	wallet := seedTestWallet(t, walletRepo, txRepo, ownerID, 1000000)
 	category := seedTestCategory(categoryRepo, callerID, "Food", model.CategoryTypeExpense)
 
-	_, _, err := svc.CreateTransaction(context.Background(), callerID, dto.CreateTransactionRequest{
+	_, _, _, err := svc.CreateTransaction(context.Background(), callerID, dto.CreateTransactionRequest{
 		WalletID:   wallet.ID,
 		CategoryID: category.ID,
 		Amount:     1000,
@@ -133,7 +133,7 @@ func TestTransactionService_CreateTransaction_WalletNotFound(t *testing.T) {
 	userID := uuid.New()
 	category := seedTestCategory(categoryRepo, userID, "Food", model.CategoryTypeExpense)
 
-	_, _, err := svc.CreateTransaction(context.Background(), userID, dto.CreateTransactionRequest{
+	_, _, _, err := svc.CreateTransaction(context.Background(), userID, dto.CreateTransactionRequest{
 		WalletID:   uuid.New(),
 		CategoryID: category.ID,
 		Amount:     1000,
@@ -149,7 +149,7 @@ func TestTransactionService_CreateTransaction_CategoryTypeMismatch(t *testing.T)
 	wallet := seedTestWallet(t, walletRepo, txRepo, userID, 1000000)
 	salary := seedTestCategory(categoryRepo, userID, "Salary", model.CategoryTypeIncome)
 
-	_, _, err := svc.CreateTransaction(context.Background(), userID, dto.CreateTransactionRequest{
+	_, _, _, err := svc.CreateTransaction(context.Background(), userID, dto.CreateTransactionRequest{
 		WalletID:   wallet.ID,
 		CategoryID: salary.ID,
 		Amount:     1000,
@@ -173,7 +173,7 @@ func TestTransactionService_CreateTransaction_ConcurrentInsufficientBalanceRace(
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			_, _, err := svc.CreateTransaction(context.Background(), userID, dto.CreateTransactionRequest{
+			_, _, _, err := svc.CreateTransaction(context.Background(), userID, dto.CreateTransactionRequest{
 				WalletID:   wallet.ID,
 				CategoryID: category.ID,
 				Amount:     500000,
@@ -208,7 +208,7 @@ func TestTransactionService_GetTransaction_OwnershipSplit(t *testing.T) {
 	wallet := seedTestWallet(t, walletRepo, txRepo, ownerID, 1000000)
 	category := seedTestCategory(categoryRepo, ownerID, "Food", model.CategoryTypeExpense)
 
-	transaction, _, err := svc.CreateTransaction(context.Background(), ownerID, dto.CreateTransactionRequest{
+	transaction, _, _, err := svc.CreateTransaction(context.Background(), ownerID, dto.CreateTransactionRequest{
 		WalletID:   wallet.ID,
 		CategoryID: category.ID,
 		Amount:     100000,
@@ -239,7 +239,7 @@ func TestTransactionService_UpdateTransaction_AmountChangeAllowsNegativeBalance(
 	wallet := seedTestWallet(t, walletRepo, txRepo, userID, 1000000)
 	salary := seedTestCategory(categoryRepo, userID, "Salary", model.CategoryTypeIncome)
 
-	transaction, _, err := svc.CreateTransaction(context.Background(), userID, dto.CreateTransactionRequest{
+	transaction, _, _, err := svc.CreateTransaction(context.Background(), userID, dto.CreateTransactionRequest{
 		WalletID:   wallet.ID,
 		CategoryID: salary.ID,
 		Amount:     500000,
@@ -272,7 +272,7 @@ func TestTransactionService_UpdateTransaction_CategoryTypeMismatch(t *testing.T)
 	food := seedTestCategory(categoryRepo, userID, "Food", model.CategoryTypeExpense)
 	salary := seedTestCategory(categoryRepo, userID, "Salary", model.CategoryTypeIncome)
 
-	transaction, _, err := svc.CreateTransaction(context.Background(), userID, dto.CreateTransactionRequest{
+	transaction, _, _, err := svc.CreateTransaction(context.Background(), userID, dto.CreateTransactionRequest{
 		WalletID:   wallet.ID,
 		CategoryID: food.ID,
 		Amount:     100000,
@@ -304,7 +304,7 @@ func TestTransactionService_DeleteTransaction_ReversesBalance(t *testing.T) {
 	wallet := seedTestWallet(t, walletRepo, txRepo, userID, 1000000)
 	food := seedTestCategory(categoryRepo, userID, "Food", model.CategoryTypeExpense)
 
-	transaction, _, err := svc.CreateTransaction(context.Background(), userID, dto.CreateTransactionRequest{
+	transaction, _, _, err := svc.CreateTransaction(context.Background(), userID, dto.CreateTransactionRequest{
 		WalletID:   wallet.ID,
 		CategoryID: food.ID,
 		Amount:     200000,
@@ -327,6 +327,86 @@ func TestTransactionService_DeleteTransaction_ReversesBalance(t *testing.T) {
 	assertAppErrCode(t, err, common.ErrCodeTransactionNotFound)
 }
 
+// specs/ai-chat-assistant/spec.md S-AI-12/S-AI-13: a fresh idempotency_key
+// creates normally (wasReplay=false); reusing that same key returns the
+// original Transaction (wasReplay=true) without a second balance mutation.
+func TestTransactionService_CreateTransaction_IdempotencyKeyReplay(t *testing.T) {
+	svc, txRepo, walletRepo, categoryRepo := newTestTransactionService(t)
+	userID := uuid.New()
+	wallet := seedTestWallet(t, walletRepo, txRepo, userID, 1000000)
+	category := seedTestCategory(categoryRepo, userID, "Food", model.CategoryTypeExpense)
+	key := uuid.New()
+
+	req := dto.CreateTransactionRequest{
+		WalletID:       wallet.ID,
+		CategoryID:     category.ID,
+		Amount:         200000,
+		Type:           "expense",
+		IdempotencyKey: &key,
+	}
+
+	first, balance1, wasReplay1, err := svc.CreateTransaction(context.Background(), userID, req)
+	if err != nil {
+		t.Fatalf("unexpected error on first create: %v", err)
+	}
+	if wasReplay1 {
+		t.Fatalf("expected wasReplay=false on a fresh key")
+	}
+	if balance1 == nil || *balance1 != 800000 {
+		t.Fatalf("expected balance 800000 after first create, got %v", balance1)
+	}
+
+	second, balance2, wasReplay2, err := svc.CreateTransaction(context.Background(), userID, req)
+	if err != nil {
+		t.Fatalf("unexpected error on replayed create: %v", err)
+	}
+	if !wasReplay2 {
+		t.Fatalf("expected wasReplay=true on a reused key")
+	}
+	if second.ID != first.ID {
+		t.Fatalf("expected the same Transaction returned, got a different ID")
+	}
+	// Nothing was mutated on a replay — nil, not a snapshotted figure,
+	// matching UpdateTransaction's own "nil means untouched" convention.
+	if balance2 != nil {
+		t.Fatalf("expected nil balance on replay (nothing mutated), got %v", *balance2)
+	}
+	if got := txRepo.balanceOf(wallet.ID); got != 800000 {
+		t.Fatalf("expected wallet balance decremented only once, got %d", got)
+	}
+}
+
+// Every pre-existing call site omits IdempotencyKey — confirms wasReplay is
+// always false and behavior is completely unchanged (plan.md Regression
+// Scope).
+func TestTransactionService_CreateTransaction_NoIdempotencyKey_NeverReplay(t *testing.T) {
+	svc, txRepo, walletRepo, categoryRepo := newTestTransactionService(t)
+	userID := uuid.New()
+	wallet := seedTestWallet(t, walletRepo, txRepo, userID, 1000000)
+	category := seedTestCategory(categoryRepo, userID, "Food", model.CategoryTypeExpense)
+
+	req := dto.CreateTransactionRequest{WalletID: wallet.ID, CategoryID: category.ID, Amount: 100000, Type: "expense"}
+
+	_, _, wasReplay1, err := svc.CreateTransaction(context.Background(), userID, req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if wasReplay1 {
+		t.Fatalf("expected wasReplay=false with no idempotency key")
+	}
+
+	_, _, wasReplay2, err := svc.CreateTransaction(context.Background(), userID, req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if wasReplay2 {
+		t.Fatalf("expected wasReplay=false on a second call with no key — must create a second Transaction, not replay")
+	}
+	if got := txRepo.balanceOf(wallet.ID); got != 800000 {
+		t.Fatalf("expected wallet balance decremented twice (no dedup without a key), got %d", got)
+	}
+}
+
 // S-TRX-17: omitting occurred_at defaults to "now" rather than failing.
 func TestTransactionService_CreateTransaction_DefaultsOccurredAtToNow(t *testing.T) {
 	svc, txRepo, walletRepo, categoryRepo := newTestTransactionService(t)
@@ -335,7 +415,7 @@ func TestTransactionService_CreateTransaction_DefaultsOccurredAtToNow(t *testing
 	category := seedTestCategory(categoryRepo, userID, "Food", model.CategoryTypeExpense)
 
 	before := time.Now().UTC()
-	transaction, _, err := svc.CreateTransaction(context.Background(), userID, dto.CreateTransactionRequest{
+	transaction, _, _, err := svc.CreateTransaction(context.Background(), userID, dto.CreateTransactionRequest{
 		WalletID:   wallet.ID,
 		CategoryID: category.ID,
 		Amount:     1000,

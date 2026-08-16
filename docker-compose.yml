@@ -19,7 +19,9 @@ services:
       - ./backend/db/migrations/007_budgets.sql:/docker-entrypoint-initdb.d/06_budgets.sql:ro
       - ./backend/db/migrations/008_transactions.sql:/docker-entrypoint-initdb.d/07_transactions.sql:ro
       - ./backend/db/migrations/009_notifications.sql:/docker-entrypoint-initdb.d/08_notifications.sql:ro
-      - ./infra/postgres/init/seed_dev_admin.sh:/docker-entrypoint-initdb.d/09_seed_dev_admin.sh:ro
+      - ./backend/db/migrations/010_transactions_idempotency_key.sql:/docker-entrypoint-initdb.d/09_transactions_idempotency_key.sql:ro
+      - ./backend/db/migrations/011_chat_messages.sql:/docker-entrypoint-initdb.d/10_chat_messages.sql:ro
+      - ./infra/postgres/init/seed_dev_admin.sh:/docker-entrypoint-initdb.d/11_seed_dev_admin.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -44,11 +46,25 @@ services:
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
       SMTP_FROM_NAME: ${SMTP_FROM_NAME}
       APP_BASE_URL: ${APP_BASE_URL}
+      AI_SERVICE_URL: http://ai-service:8000
     ports:
       - "${BACKEND_PORT}:8080"
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - pfm_network
+
+  # Python AI Service (ai-service/) — internal only, no host port. Backend
+  # reaches it via the compose service name (AI_SERVICE_URL above), never a
+  # host-mapped port (specs/ai-chat-assistant/plan.md Finding #5).
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    environment:
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
     networks:
       - pfm_network
 

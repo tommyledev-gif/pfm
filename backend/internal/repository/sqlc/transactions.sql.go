@@ -8,9 +8,9 @@ import (
 )
 
 const createTransaction = `-- name: CreateTransaction :one
-INSERT INTO transactions (user_id, wallet_id, category_id, amount, type, note, occurred_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, created_at, updated_at, deleted_at
+INSERT INTO transactions (user_id, wallet_id, category_id, amount, type, note, occurred_at, idempotency_key)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, created_at, updated_at, deleted_at, idempotency_key
 `
 
 type CreateTransactionParams struct {
@@ -21,16 +21,65 @@ type CreateTransactionParams struct {
 	Type       string
 	Note       *string
 	OccurredAt time.Time
+	// IdempotencyKey is nullable — every pre-existing caller omits it and gets
+	// NULL, which the partial unique index (010_transactions_idempotency_key.sql)
+	// never treats as a collision (specs/ai-chat-assistant/plan.md Finding #3).
+	IdempotencyKey *uuid.UUID
 }
 
 func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionParams) (Transaction, error) {
 	row := q.db.QueryRow(ctx, createTransaction,
-		arg.UserID, arg.WalletID, arg.CategoryID, arg.Amount, arg.Type, arg.Note, arg.OccurredAt,
+		arg.UserID, arg.WalletID, arg.CategoryID, arg.Amount, arg.Type, arg.Note, arg.OccurredAt, arg.IdempotencyKey,
 	)
 	var i Transaction
 	err := row.Scan(
 		&i.ID, &i.UserID, &i.WalletID, &i.CategoryID, &i.Amount, &i.Type,
+		&i.Note, &i.OccurredAt, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.IdempotencyKey,
+	)
+	return i, err
+}
+
+const getTransactionByIdempotencyKey = `-- name: GetTransactionByIdempotencyKey :one
+SELECT
+    t.id, t.user_id, t.wallet_id, t.category_id, t.amount, t.type, t.note,
+    t.occurred_at, t.created_at, t.updated_at, t.deleted_at,
+    w.name AS wallet_name, c.name AS category_name
+FROM transactions t
+JOIN wallets w ON w.id = t.wallet_id
+JOIN categories c ON c.id = t.category_id
+WHERE t.user_id = $1
+  AND t.idempotency_key = $2
+  AND t.deleted_at IS NULL
+LIMIT 1
+`
+
+type GetTransactionByIdempotencyKeyRow struct {
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	WalletID     uuid.UUID
+	CategoryID   uuid.UUID
+	Amount       int64
+	Type         string
+	Note         *string
+	OccurredAt   time.Time
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	DeletedAt    *time.Time
+	WalletName   string
+	CategoryName string
+}
+
+// GetTransactionByIdempotencyKey backs the AI Chat confirm-step replay check
+// (specs/ai-chat-assistant/spec.md Resolved design decision #5, S-AI-13) —
+// scoped by (user_id, idempotency_key) so one caller can never observe or
+// collide with another caller's key.
+func (q *Queries) GetTransactionByIdempotencyKey(ctx context.Context, userID uuid.UUID, idempotencyKey uuid.UUID) (GetTransactionByIdempotencyKeyRow, error) {
+	row := q.db.QueryRow(ctx, getTransactionByIdempotencyKey, userID, idempotencyKey)
+	var i GetTransactionByIdempotencyKeyRow
+	err := row.Scan(
+		&i.ID, &i.UserID, &i.WalletID, &i.CategoryID, &i.Amount, &i.Type,
 		&i.Note, &i.OccurredAt, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
+		&i.WalletName, &i.CategoryName,
 	)
 	return i, err
 }
@@ -174,7 +223,7 @@ SET
 WHERE id = $1
   AND user_id = $2
   AND deleted_at IS NULL
-RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, created_at, updated_at, deleted_at
+RETURNING *
 `
 
 type UpdateTransactionParams struct {
@@ -186,6 +235,10 @@ type UpdateTransactionParams struct {
 	Note       *string
 }
 
+// UpdateTransaction's query is RETURNING * (db/queries/transactions.sql) —
+// the Scan below includes IdempotencyKey as the trailing column added by
+// 010_transactions_idempotency_key.sql, even though this statement never
+// touches that column itself.
 func (q *Queries) UpdateTransaction(ctx context.Context, arg UpdateTransactionParams) (Transaction, error) {
 	row := q.db.QueryRow(ctx, updateTransaction,
 		arg.ID, arg.UserID, arg.Amount, arg.CategoryID, arg.OccurredAt, arg.Note,
@@ -193,7 +246,7 @@ func (q *Queries) UpdateTransaction(ctx context.Context, arg UpdateTransactionPa
 	var i Transaction
 	err := row.Scan(
 		&i.ID, &i.UserID, &i.WalletID, &i.CategoryID, &i.Amount, &i.Type,
-		&i.Note, &i.OccurredAt, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
+		&i.Note, &i.OccurredAt, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.IdempotencyKey,
 	)
 	return i, err
 }
@@ -204,7 +257,7 @@ SET deleted_at = NOW()
 WHERE id = $1
   AND user_id = $2
   AND deleted_at IS NULL
-RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, created_at, updated_at, deleted_at
+RETURNING *
 `
 
 type SoftDeleteTransactionParams struct {
@@ -212,12 +265,14 @@ type SoftDeleteTransactionParams struct {
 	UserID uuid.UUID
 }
 
+// SoftDeleteTransaction's query is RETURNING * — same trailing-column note as
+// UpdateTransaction above.
 func (q *Queries) SoftDeleteTransaction(ctx context.Context, arg SoftDeleteTransactionParams) (Transaction, error) {
 	row := q.db.QueryRow(ctx, softDeleteTransaction, arg.ID, arg.UserID)
 	var i Transaction
 	err := row.Scan(
 		&i.ID, &i.UserID, &i.WalletID, &i.CategoryID, &i.Amount, &i.Type,
-		&i.Note, &i.OccurredAt, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
+		&i.Note, &i.OccurredAt, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.IdempotencyKey,
 	)
 	return i, err
 }

@@ -21,6 +21,13 @@ type CreateTransactionRequest struct {
 	Type       string    `json:"type" validate:"required,oneof=income expense"`
 	OccurredAt *string   `json:"occurred_at"`
 	Note       *string   `json:"note" validate:"omitempty,max=500"`
+	// IdempotencyKey is optional and general-purpose — any caller may supply
+	// one (specs/ai-chat-assistant/spec.md Resolved design decision #5, Open
+	// Questions #4). Every existing caller (the manual "Add transaction"
+	// dialog) omits it, so behavior for them is unchanged: a fresh 201 every
+	// time. Reusing a previously-used key returns the original Transaction
+	// (200) instead of creating a duplicate.
+	IdempotencyKey *uuid.UUID `json:"idempotency_key"`
 }
 
 // UpdateTransactionRequest is the body of PATCH /transactions/{id}.

@@ -83,6 +83,11 @@ const (
 	// (specs/notification-handling/spec.md S-NOT-14/S-NOT-15).
 	ErrCodeNotificationAccessDenied = "NOTIFICATION_ACCESS_DENIED"
 	ErrCodeNotificationNotFound     = "NOTIFICATION_NOT_FOUND"
+	// ErrCodeAIServiceUnavailable backs POST /ai/chat's 502 when the AI
+	// Service is unreachable or times out (Groq and Anthropic both failing
+	// inside that service) — a system error, never surfaced with internal
+	// detail (specs/ai-chat-assistant/spec.md S-AI-10).
+	ErrCodeAIServiceUnavailable = "AI_SERVICE_UNAVAILABLE"
 )
 
 // AppError is the single sentinel-error shape services return for known
@@ -132,6 +137,7 @@ var (
 	ErrCurrencyLocked           = &AppError{Code: ErrCodeCurrencyLocked, Status: http.StatusConflict, Message: "currency cannot be changed once the wallet has transactions"}
 	ErrNotificationAccessDenied = &AppError{Code: ErrCodeNotificationAccessDenied, Status: http.StatusForbidden, Message: "you do not have access to this notification"}
 	ErrNotificationNotFound     = &AppError{Code: ErrCodeNotificationNotFound, Status: http.StatusNotFound, Message: "notification not found"}
+	ErrAIServiceUnavailable     = &AppError{Code: ErrCodeAIServiceUnavailable, Status: http.StatusBadGateway, Message: "the assistant is temporarily unavailable, please try again"}
 )
 
 // NewInvalidInputError builds a 400 INVALID_INPUT error with a field-specific message.

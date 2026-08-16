@@ -40,12 +40,21 @@ func (h *TransactionHandler) CreateTransaction(c *fiber.Ctx) error {
 		return response.Error(c, h.logger, common.ErrUnauthenticated)
 	}
 
-	transaction, walletBalance, err := h.transactionService.CreateTransaction(c.Context(), userID, req)
+	transaction, walletBalance, wasReplay, err := h.transactionService.CreateTransaction(c.Context(), userID, req)
 	if err != nil {
 		return response.Error(c, h.logger, err)
 	}
 
-	return response.Success(c, fiber.StatusCreated, "transaction created successfully", dto.NewTransactionResponseWithBalance(transaction, &walletBalance))
+	// wasReplay means req.IdempotencyKey matched an already-created
+	// Transaction — 200, not 201, and nothing new was written
+	// (specs/ai-chat-assistant/spec.md Resolved design decision #5, S-AI-13).
+	status := fiber.StatusCreated
+	message := "transaction created successfully"
+	if wasReplay {
+		status = fiber.StatusOK
+		message = "transaction already created"
+	}
+	return response.Success(c, status, message, dto.NewTransactionResponseWithBalance(transaction, walletBalance))
 }
 
 // ListTransactions handles GET /transactions.

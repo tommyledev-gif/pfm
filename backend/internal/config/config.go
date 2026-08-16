@@ -26,6 +26,13 @@ type Config struct {
 	// AppBaseURL is the web frontend origin the activation link points at
 	// (`{AppBaseURL}/activate?token=...`), not the API's own origin.
 	AppBaseURL string
+
+	// AIServiceURL is the internal-only base URL for the Python AI Service
+	// (Feature-12 AI Chat Assistant) — reachable only via the Docker network
+	// service name, never a host-mapped port. Empty means "not configured";
+	// ChatService's AIServiceClient call then fails and POST /ai/chat
+	// degrades to 502 AI_SERVICE_UNAVAILABLE rather than failing startup.
+	AIServiceURL string
 }
 
 func Load() (*Config, error) {
@@ -42,6 +49,8 @@ func Load() (*Config, error) {
 		SMTPFromEmail: getEnvOrDefault("SMTP_FROM_EMAIL", "no-reply@pfm.local"),
 		SMTPFromName:  getEnvOrDefault("SMTP_FROM_NAME", "PFM"),
 		AppBaseURL:    getEnvOrDefault("APP_BASE_URL", "http://localhost:8082"),
+
+		AIServiceURL: getEnvOrDefault("AI_SERVICE_URL", "http://ai-service:8000"),
 	}
 	if cfg.DatabaseURL == "" {
 		return nil, fmt.Errorf("config.Load: DATABASE_URL is required")

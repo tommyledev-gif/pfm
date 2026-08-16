@@ -26,6 +26,7 @@ export const ROUTES = {
   transactions: "/app/transactions",
   reports: "/app/reports",
   notifications: "/app/notifications",
+  aiChat: "/app/ai-chat",
 } as const;
 
 export const USER_ROLES = ["admin", "member"] as const;
@@ -66,3 +67,6 @@ export type TransactionType = (typeof TRANSACTION_TYPES)[number];
 
 // Mirrors common.TransactionNoteMaxLength (backend/internal/common/constants.go).
 export const TRANSACTION_NOTE_MAX_LENGTH = 500;
+
+// Mirrors common.AIChatMessageMaxLength (backend/internal/common/constants.go).
+export const AI_CHAT_MESSAGE_MAX_LENGTH = 1000;

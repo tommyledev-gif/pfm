@@ -29,6 +29,12 @@ export interface CreateTransactionRequest {
   type: TransactionType;
   occurred_at?: string;
   note?: string;
+  // Optional, general-purpose (specs/ai-chat-assistant/spec.md Resolved
+  // design decision #5) — omitted by the manual "Add transaction" dialog
+  // (unchanged 201-every-time behavior); supplied by the AI Chat confirm
+  // flow. Reusing a previously-used key returns the original Transaction
+  // (200) instead of creating a duplicate.
+  idempotency_key?: string;
 }
 
 // wallet_id and type are never accepted by PATCH (spec.md Context #5) —

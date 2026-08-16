@@ -45,22 +45,53 @@ type CreateTransactionParams struct {
 	Type       string
 	Note       *string
 	OccurredAt time.Time
+	// IdempotencyKey is nil for every manual create (existing behavior,
+	// unchanged) and non-nil only for the AI Chat confirm flow
+	// (specs/ai-chat-assistant/plan.md Finding #3).
+	IdempotencyKey *uuid.UUID
 }
 
 func (r *TransactionRepository) CreateTransaction(ctx context.Context, tx pgx.Tx, arg CreateTransactionParams) (*model.Transaction, error) {
 	row, err := r.q.WithTx(tx).CreateTransaction(ctx, sqlc.CreateTransactionParams{
-		UserID:     arg.UserID,
-		WalletID:   arg.WalletID,
-		CategoryID: arg.CategoryID,
-		Amount:     arg.Amount,
-		Type:       arg.Type,
-		Note:       arg.Note,
-		OccurredAt: arg.OccurredAt,
+		UserID:         arg.UserID,
+		WalletID:       arg.WalletID,
+		CategoryID:     arg.CategoryID,
+		Amount:         arg.Amount,
+		Type:           arg.Type,
+		Note:           arg.Note,
+		OccurredAt:     arg.OccurredAt,
+		IdempotencyKey: arg.IdempotencyKey,
 	})
 	if err != nil {
 		return nil, err
 	}
 	return toTransactionModel(row), nil
+}
+
+// GetTransactionByIdempotencyKey backs the AI Chat confirm-step replay check
+// (specs/ai-chat-assistant/spec.md Resolved design decision #5, S-AI-13) —
+// returns pgx.ErrNoRows when no non-deleted Transaction matches
+// (user_id, idempotency_key), the signal that the key is fresh.
+func (r *TransactionRepository) GetTransactionByIdempotencyKey(ctx context.Context, userID, idempotencyKey uuid.UUID) (*model.Transaction, error) {
+	row, err := r.q.GetTransactionByIdempotencyKey(ctx, userID, idempotencyKey)
+	if err != nil {
+		return nil, err
+	}
+	return &model.Transaction{
+		ID:           row.ID,
+		UserID:       row.UserID,
+		WalletID:     row.WalletID,
+		WalletName:   row.WalletName,
+		CategoryID:   row.CategoryID,
+		CategoryName: row.CategoryName,
+		Amount:       row.Amount,
+		Type:         model.TransactionType(row.Type),
+		Note:         row.Note,
+		OccurredAt:   row.OccurredAt,
+		CreatedAt:    row.CreatedAt,
+		UpdatedAt:    row.UpdatedAt,
+		DeletedAt:    row.DeletedAt,
+	}, nil
 }
 
 // DecrementWalletBalanceIfSufficient backs the insufficient-balance floor for

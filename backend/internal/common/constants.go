@@ -103,6 +103,31 @@ const (
 	NotificationJobInterval = 5 * time.Minute
 )
 
+// AI Chat Assistant (Feature-12 US-01, specs/ai-chat-assistant).
+const (
+	// AIChatMessageMaxLength is an explicit assumption (spec.md Main Flow
+	// step 2 / Open Questions #6) — no source document commits to a number.
+	AIChatMessageMaxLength = 1000
+	// AIChatConfidenceThreshold gates which AI-proposed items are surfaced
+	// for confirmation vs. folded into an ambiguous reply (spec.md Resolved
+	// design decision #8) — carried over from the original product proposal,
+	// not an SRS-native number; flagged for product sign-off (spec.md Open
+	// Questions #3).
+	AIChatConfidenceThreshold = 0.6
+	// AIChatRateLimit/AIChatRateLimitWindow are an explicit assumption
+	// (spec.md Open Questions #1) — applies only to POST /ai/chat, never to
+	// the confirm step (POST /transactions).
+	AIChatRateLimit       = 30
+	AIChatRateLimitWindow = 1 * time.Hour
+	// VNDToCentsFactor converts the AI Service's plain-VND integer output
+	// (e.g. 50000 for "50k") into this app's BIGINT-integer-cents storage
+	// convention — the same conversion the manual create-transaction form's
+	// toCents() helper already applies at its own client boundary. Found via
+	// live testing: every AI-proposed amount displayed 100x too small
+	// without this.
+	VNDToCentsFactor = 100
+)
+
 // SupportedCurrencies is the same {VND, USD} allow-list as Wallet's currency
 // (WalletDefaultCurrency above), but expressed as a real Go-side lookup — not
 // just a struct-tag oneof — because `limits` map-KEY validation cannot be

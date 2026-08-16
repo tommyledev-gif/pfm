@@ -98,16 +98,33 @@ type BudgetRepo interface {
 // TransactionRepo is the repository contract TransactionService depends on
 // (F-06). *repository.TransactionRepository satisfies this structurally;
 // tests substitute an in-memory fake, same convention as WalletRepo/
-// CategoryRepo/BudgetRepo.
+// CategoryRepo/BudgetRepo. GetTransactionByIdempotencyKey was added by
+// specs/ai-chat-assistant/plan.md Finding #3 — backs the idempotency replay
+// check on CreateTransaction now that the column exists.
 type TransactionRepo interface {
 	BeginTx(ctx context.Context) (pgx.Tx, error)
 	CreateTransaction(ctx context.Context, tx pgx.Tx, arg repository.CreateTransactionParams) (*model.Transaction, error)
+	GetTransactionByIdempotencyKey(ctx context.Context, userID, idempotencyKey uuid.UUID) (*model.Transaction, error)
 	DecrementWalletBalanceIfSufficient(ctx context.Context, tx pgx.Tx, walletID uuid.UUID, amount int64) (*model.Wallet, error)
 	AdjustWalletBalance(ctx context.Context, tx pgx.Tx, walletID uuid.UUID, delta int64) (*model.Wallet, error)
 	ListTransactionsByUser(ctx context.Context, userID uuid.UUID, filter repository.ListTransactionsFilter) ([]*model.Transaction, error)
 	GetTransactionByID(ctx context.Context, id uuid.UUID) (*model.Transaction, error)
 	UpdateTransaction(ctx context.Context, tx pgx.Tx, arg repository.UpdateTransactionParams) (*model.Transaction, error)
 	SoftDeleteTransaction(ctx context.Context, tx pgx.Tx, id, userID uuid.UUID) (*model.Transaction, error)
+}
+
+// ChatRepo is the repository contract ChatService depends on (Feature-12 AI
+// Chat Assistant). *repository.ChatRepository satisfies this structurally;
+// tests substitute an in-memory fake, same convention as every other repo.
+type ChatRepo interface {
+	CreateChatMessage(ctx context.Context, arg repository.CreateChatMessageParams) (*model.ChatMessage, error)
+}
+
+// AIServiceClient is the contract ChatService depends on for talking to the
+// Python AI Service (specs/ai-chat-assistant/plan.md AI-T10). A real HTTP
+// implementation lives in ai_service_client.go; tests substitute a fake.
+type AIServiceClient interface {
+	Extract(ctx context.Context, req AIExtractRequest) (*AIExtractResponse, error)
 }
 
 // ReportRepo is the repository contract ReportService depends on (F-07).
@@ -145,4 +162,5 @@ var (
 	_ TransactionRepo  = (*repository.TransactionRepository)(nil)
 	_ ReportRepo       = (*repository.ReportRepository)(nil)
 	_ NotificationRepo = (*repository.NotificationRepository)(nil)
+	_ ChatRepo         = (*repository.ChatRepository)(nil)
 )

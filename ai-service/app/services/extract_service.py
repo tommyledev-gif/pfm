@@ -1,0 +1,110 @@
+"""Groq-primary, Anthropic-fallback extraction logic for POST /extract.
+
+Uses tool/function calling on both providers, not prose-described JSON mode —
+a prose "return this exact JSON shape" instruction is not reliably followed
+even in `response_format={"type": "json_object"}` mode: field names/types
+drift from what was asked (observed directly against the real Groq API —
+the model returned `amount`/`type`/`date` instead of the requested
+`amount_vnd`/`tx_type`/`occurred_at`). Forcing a tool call against
+ExtractResponse's own JSON schema makes the provider's output structurally
+conform by construction, and keeps the schema itself as the single source of
+truth (dev.md LLM Rules).
+
+dev.md LLM Rules: max_tokens always explicit, log only prompt length/token
+counts and the failure type/message (never prompt content — may contain
+arbitrary user text), wrap every SDK call in try/except with a typed
+fallback, never let a raw LLM error propagate as a 500 to the Go Backend.
+"""
+
+import json
+import logging
+
+from app.core.config import settings
+from app.core.groq_client import get_anthropic_client, get_groq_client
+from app.schemas.extract_schema import ExtractRequest, ExtractResponse
+from app.services.prompt_builder import build_system_prompt
+
+logger = logging.getLogger(__name__)
+
+_TOOL_NAME = "extract_transactions"
+_TOOL_DESCRIPTION = "Extract structured transaction proposals from a Vietnamese natural-language message."
+
+
+class ExtractionUnavailableError(Exception):
+    """Raised when both Groq and Anthropic fail — the router maps this to a
+    503, which the Go Backend's AIServiceClient turns into 502
+    AI_SERVICE_UNAVAILABLE (specs/ai-chat-assistant/spec.md S-AI-10)."""
+
+
+async def extract_transactions(req: ExtractRequest) -> ExtractResponse:
+    system_prompt = build_system_prompt(req.wallets, req.categories, req.now)
+
+    try:
+        return _call_groq(system_prompt, req.message)
+    except Exception as exc:  # noqa: BLE001 - any Groq failure falls back, never propagates raw
+        logger.warning(
+            "groq extraction failed, falling back to anthropic",
+            extra={"prompt_chars": len(req.message), "error_type": type(exc).__name__, "error": str(exc)},
+        )
+        try:
+            return _call_anthropic(system_prompt, req.message)
+        except Exception as fallback_exc:  # noqa: BLE001
+            logger.error(
+                "anthropic fallback also failed",
+                extra={
+                    "prompt_chars": len(req.message),
+                    "error_type": type(fallback_exc).__name__,
+                    "error": str(fallback_exc),
+                },
+            )
+            raise ExtractionUnavailableError from fallback_exc
+
+
+def _extract_tool_schema() -> dict:
+    # Single source of truth: the tool's JSON schema IS ExtractResponse's own
+    # schema, so provider output and Pydantic validation can never drift.
+    return ExtractResponse.model_json_schema()
+
+
+def _call_groq(system_prompt: str, message: str) -> ExtractResponse:
+    client = get_groq_client()
+    tool = {
+        "type": "function",
+        "function": {"name": _TOOL_NAME, "description": _TOOL_DESCRIPTION, "parameters": _extract_tool_schema()},
+    }
+    completion = client.chat.completions.create(
+        model=settings.groq_model,
+        max_tokens=settings.max_tokens,
+        temperature=settings.temperature,
+        tools=[tool],
+        tool_choice={"type": "function", "function": {"name": _TOOL_NAME}},
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": message},
+        ],
+    )
+    tool_calls = completion.choices[0].message.tool_calls
+    if not tool_calls:
+        raise ValueError("groq response contained no tool call")
+    completion_tokens = completion.usage.completion_tokens if completion.usage else None
+    logger.info("groq extraction completed", extra={"prompt_chars": len(message), "completion_tokens": completion_tokens})
+    return ExtractResponse.model_validate(json.loads(tool_calls[0].function.arguments))
+
+
+def _call_anthropic(system_prompt: str, message: str) -> ExtractResponse:
+    client = get_anthropic_client()
+    tool = {"name": _TOOL_NAME, "description": _TOOL_DESCRIPTION, "input_schema": _extract_tool_schema()}
+    response = client.messages.create(
+        model=settings.anthropic_model,
+        max_tokens=settings.max_tokens,
+        temperature=settings.temperature,
+        system=system_prompt,
+        tools=[tool],
+        tool_choice={"type": "tool", "name": _TOOL_NAME},
+        messages=[{"role": "user", "content": message}],
+    )
+    tool_use_blocks = [block for block in response.content if block.type == "tool_use"]
+    if not tool_use_blocks:
+        raise ValueError("anthropic response contained no tool_use block")
+    logger.info("anthropic fallback completed", extra={"prompt_chars": len(message)})
+    return ExtractResponse.model_validate(tool_use_blocks[0].input)

@@ -27,12 +27,19 @@ type fakeTransactionRepo struct {
 	mu           sync.Mutex
 	transactions map[uuid.UUID]*model.Transaction
 	wallets      map[uuid.UUID]*model.Wallet
+	// idempotencyIndex maps "userID|idempotencyKey" -> transaction ID —
+	// mirrors the real partial unique index on (user_id, idempotency_key)
+	// without needing an IdempotencyKey field on model.Transaction itself
+	// (specs/ai-chat-assistant/plan.md — the field is never exposed in any
+	// response, only used to look the row back up).
+	idempotencyIndex map[string]uuid.UUID
 }
 
 func newFakeTransactionRepo() *fakeTransactionRepo {
 	return &fakeTransactionRepo{
-		transactions: make(map[uuid.UUID]*model.Transaction),
-		wallets:      make(map[uuid.UUID]*model.Wallet),
+		transactions:     make(map[uuid.UUID]*model.Transaction),
+		wallets:          make(map[uuid.UUID]*model.Wallet),
+		idempotencyIndex: make(map[string]uuid.UUID),
 	}
 }
 
@@ -77,8 +84,33 @@ func (f *fakeTransactionRepo) CreateTransaction(_ context.Context, _ pgx.Tx, arg
 		UpdatedAt:  now,
 	}
 	f.transactions[t.ID] = t
+	if arg.IdempotencyKey != nil {
+		f.idempotencyIndex[idempotencyIndexKey(arg.UserID, *arg.IdempotencyKey)] = t.ID
+	}
 	cp := *t
 	return &cp, nil
+}
+
+// GetTransactionByIdempotencyKey mirrors the real query's pgx.ErrNoRows
+// signal for a fresh key (specs/ai-chat-assistant/spec.md S-AI-13).
+func (f *fakeTransactionRepo) GetTransactionByIdempotencyKey(_ context.Context, userID, idempotencyKey uuid.UUID) (*model.Transaction, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	id, ok := f.idempotencyIndex[idempotencyIndexKey(userID, idempotencyKey)]
+	if !ok {
+		return nil, pgx.ErrNoRows
+	}
+	t, ok := f.transactions[id]
+	if !ok || t.DeletedAt != nil {
+		return nil, pgx.ErrNoRows
+	}
+	cp := *t
+	return &cp, nil
+}
+
+func idempotencyIndexKey(userID, idempotencyKey uuid.UUID) string {
+	return userID.String() + "|" + idempotencyKey.String()
 }
 
 // DecrementWalletBalanceIfSufficient mirrors the real conditional UPDATE —

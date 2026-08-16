@@ -1,7 +1,30 @@
 -- name: CreateTransaction :one
-INSERT INTO transactions (user_id, wallet_id, category_id, amount, type, note, occurred_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+-- idempotency_key ($8) is nullable — every pre-existing caller omits it and
+-- gets NULL, which the partial unique index (010_transactions_idempotency_key.sql)
+-- never treats as a collision (specs/ai-chat-assistant/plan.md Finding #3).
+INSERT INTO transactions (user_id, wallet_id, category_id, amount, type, note, occurred_at, idempotency_key)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING *;
+
+-- name: GetTransactionByIdempotencyKey :one
+-- Backs the AI Chat confirm-step replay check (specs/ai-chat-assistant/spec.md
+-- Resolved design decision #5, S-AI-13) — scoped by (user_id, idempotency_key)
+-- so one caller can never observe another's key. Joined with wallets/categories
+-- for the same reason GetTransactionByID is (display names), and uses the same
+-- plain (non-deleted_at-filtered) categories join as GetTransactionByID
+-- (Finding #6 precedent) so a replayed response never breaks on a since-deleted
+-- category.
+SELECT
+    t.id, t.user_id, t.wallet_id, t.category_id, t.amount, t.type, t.note,
+    t.occurred_at, t.created_at, t.updated_at, t.deleted_at,
+    w.name AS wallet_name, c.name AS category_name
+FROM transactions t
+JOIN wallets w ON w.id = t.wallet_id
+JOIN categories c ON c.id = t.category_id
+WHERE t.user_id = $1
+  AND t.idempotency_key = $2
+  AND t.deleted_at IS NULL
+LIMIT 1;
 
 -- name: GetTransactionByID :one
 -- Deliberately NOT scoped by user_id, matching GetWalletByID/GetCategoryByID/

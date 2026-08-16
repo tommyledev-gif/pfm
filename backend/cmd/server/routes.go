@@ -14,7 +14,7 @@ import (
 // (/api/v1). Auth/rate-limit middleware ordering matters: JWTAuth must run
 // before RequireRole (role comes from the token) and before
 // InviteRateLimiter (keyed by the caller's user ID from that same token).
-func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, tokens *service.TokenService, logger *zap.Logger) {
+func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, chatHandler *handler.ChatHandler, tokens *service.TokenService, logger *zap.Logger) {
 	v1 := app.Group("/api/v1")
 
 	auth := v1.Group("/auth")
@@ -78,4 +78,13 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	notifications.Get("/", notificationHandler.ListNotifications)
 	notifications.Get("/:id", notificationHandler.GetNotification)
 	notifications.Post("/:id/read", notificationHandler.MarkNotificationRead)
+
+	// Feature-12 AI Chat Assistant (US-01 only) — no RequireRole gate: every
+	// active user chats only with their own context (plan.md Security &
+	// Actor Resolution). AIChatRateLimiter runs after JWTAuth so
+	// common.LocalsUserID is already populated (same ordering rule as
+	// InviteRateLimiter). The confirm step reuses POST /transactions above —
+	// no separate route.
+	ai := v1.Group("/ai", middleware.JWTAuth(tokens, logger), middleware.AIChatRateLimiter(logger))
+	ai.Post("/chat", chatHandler.Chat)
 }

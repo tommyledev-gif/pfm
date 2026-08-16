@@ -46,6 +46,9 @@ export function AppHeader() {
           <Link href={ROUTES.notifications} className="text-muted-foreground hover:text-foreground">
             Notifications
           </Link>
+          <Link href={ROUTES.aiChat} className="text-muted-foreground hover:text-foreground">
+            AI Chat
+          </Link>
         </nav>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           {userEmail && <span>{userEmail}</span>}

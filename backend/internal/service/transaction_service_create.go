@@ -19,35 +19,75 @@ import (
 // decrement for expense, unconditional increment for income) and the row
 // insert run inside one DB transaction (CLAUDE.md rule, spec.md Edge Cases
 // US-01 #2).
-func (s *TransactionService) CreateTransaction(ctx context.Context, userID uuid.UUID, req dto.CreateTransactionRequest) (*model.Transaction, int64, error) {
+//
+// The returned *int64 is nil exactly when the Wallet balance was not touched
+// by this call — same "nil means untouched" convention as UpdateTransaction/
+// dto.NewTransactionResponseWithBalance already use. On a replay
+// (wasReplay=true), nothing was mutated, so no balance is returned — this
+// call made no change for the caller to be informed of.
+//
+// The returned bool is wasReplay (specs/ai-chat-assistant/spec.md Resolved
+// design decision #5) — true means req.IdempotencyKey matched an
+// already-created Transaction and nothing new was written; the handler picks
+// 200 vs 201 based on it. Every caller that omits IdempotencyKey (every
+// pre-existing call site) always gets wasReplay=false, i.e. unchanged 201
+// behavior (specs/ai-chat-assistant/plan.md Regression Scope).
+func (s *TransactionService) CreateTransaction(ctx context.Context, userID uuid.UUID, req dto.CreateTransactionRequest) (*model.Transaction, *int64, bool, error) {
+	if req.IdempotencyKey != nil {
+		existing, err := s.lookupIdempotentTransaction(ctx, userID, *req.IdempotencyKey)
+		if err == nil {
+			return existing, nil, true, nil
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil, false, fmt.Errorf("service.CreateTransaction: %w", err)
+		}
+	}
+
 	wallet, err := s.getOwnedWallet(ctx, userID, req.WalletID)
 	if err != nil {
-		return nil, 0, err
+		return nil, nil, false, err
 	}
 	category, err := s.getVisibleCategory(ctx, userID, req.CategoryID)
 	if err != nil {
-		return nil, 0, err
+		return nil, nil, false, err
 	}
 	if string(category.Type) != req.Type {
-		return nil, 0, common.ErrCategoryTypeMismatch
+		return nil, nil, false, common.ErrCategoryTypeMismatch
 	}
 
 	occurredAt := time.Now().UTC()
 	if req.OccurredAt != nil {
 		parsed, err := parseFlexibleTimestamp(*req.OccurredAt)
 		if err != nil {
-			return nil, 0, common.NewInvalidInputError("occurred_at must be a valid date or timestamp")
+			return nil, nil, false, common.NewInvalidInputError("occurred_at must be a valid date or timestamp")
 		}
 		occurredAt = parsed
 	}
 
 	transaction, walletBalance, err := s.createTransactionTx(ctx, userID, wallet.ID, req, occurredAt)
 	if err != nil {
-		return nil, 0, err
+		// Two confirms racing past the lookup above with the same fresh key
+		// (specs/ai-chat-assistant/plan.md Finding #13): the partial unique
+		// index rejects the loser's insert. Re-look-up and return the
+		// winner's Transaction as a replay instead of a raw 500 — the DB
+		// constraint, not the lookup, is the actual concurrency guard.
+		if req.IdempotencyKey != nil && isUniqueViolation(err) {
+			if existing, lookupErr := s.lookupIdempotentTransaction(ctx, userID, *req.IdempotencyKey); lookupErr == nil {
+				return existing, nil, true, nil
+			}
+		}
+		return nil, nil, false, err
 	}
 	transaction.WalletName = wallet.Name
 	transaction.CategoryName = category.Name
-	return transaction, walletBalance, nil
+	return transaction, &walletBalance, false, nil
+}
+
+// lookupIdempotentTransaction returns the existing Transaction for a
+// previously-used idempotency key, or a pgx.ErrNoRows-wrapping error if the
+// key is fresh (checked via errors.Is by callers).
+func (s *TransactionService) lookupIdempotentTransaction(ctx context.Context, userID, key uuid.UUID) (*model.Transaction, error) {
+	return s.repo.GetTransactionByIdempotencyKey(ctx, userID, key)
 }
 
 // createTransactionTx returns the Wallet's new balance alongside the created
@@ -83,13 +123,14 @@ func (s *TransactionService) createTransactionTx(ctx context.Context, userID uui
 	}
 
 	transaction, err := s.repo.CreateTransaction(ctx, tx, repository.CreateTransactionParams{
-		UserID:     userID,
-		WalletID:   walletID,
-		CategoryID: req.CategoryID,
-		Amount:     req.Amount,
-		Type:       req.Type,
-		Note:       req.Note,
-		OccurredAt: occurredAt,
+		UserID:         userID,
+		WalletID:       walletID,
+		CategoryID:     req.CategoryID,
+		Amount:         req.Amount,
+		Type:           req.Type,
+		Note:           req.Note,
+		OccurredAt:     occurredAt,
+		IdempotencyKey: req.IdempotencyKey,
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("service.CreateTransaction: %w", err)
