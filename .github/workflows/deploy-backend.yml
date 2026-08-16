@@ -1,0 +1,104 @@
+name: Backend CI-CD Deploy
+
+# Monorepo trigger: only fires when backend/ (or this workflow) changes, so a
+# frontend/mobile/ai-service-only push never rebuilds or redeploys the Go API.
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: backend-deploy-develop
+  cancel-in-progress: true
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Only backend/ is sent to the Docker build context — the image never
+      # contains frontend/mobile/ai-service source, keeping it small and the
+      # blast radius of a backend deploy limited to the backend.
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/pfm-backend:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/pfm-backend:${{ github.sha }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      # Only the backend's deploy files land on the VPS — no frontend/
+      # mobile/ai-service source ever leaves the CI runner.
+      - name: Sync deployment files to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          source: "backend/deploy.sh,backend/docker-compose.yml,backend/db/migrations"
+          target: "${{ secrets.VPS_APP_DIR }}"
+
+      - name: Deploy to VPS over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd "${{ secrets.VPS_APP_DIR }}/backend"
+
+            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+            if [ -n "${{ secrets.VPS_ENV_PROD }}" ]; then
+              printf '%s\n' "${{ secrets.VPS_ENV_PROD }}" | sed -e 's/\r$//' > .env.prod
+            fi
+
+            chmod +x deploy.sh
+            DOCKER_REGISTRY_USER="${{ secrets.DOCKERHUB_USERNAME }}" \
+              PFM_BACKEND_IMAGE_TAG="${{ github.sha }}" \
+              ./deploy.sh
+
+            for i in $(seq 1 20); do
+              if docker exec pfm-backend-container wget -qO /dev/null http://localhost:8080/api/v1/health; then
+                echo "Health check passed: /api/v1/health is up"
+                exit 0
+              fi
+              echo "Attempt ${i}/20: health endpoint not ready, retrying in 10s"
+              sleep 10
+            done
+
+            echo "Health check timeout: /api/v1/health never came up"
+            docker logs --tail 200 pfm-backend-container || true
+            exit 1

@@ -1,0 +1,86 @@
+# Production compose for the backend ONLY — deployed to the VPS by
+# .github/workflows/deploy-backend.yml. Not used for local dev (see the
+# root docker-compose.yml, which also runs frontend/ai-service and builds
+# the backend image locally instead of pulling it from a registry).
+#
+# Variable substitution below (${VAR}) is resolved by `docker compose
+# --env-file .env.prod ...` (see deploy.sh) — .env.prod itself is written on
+# the VPS from the VPS_ENV_PROD GitHub secret, it is never committed.
+services:
+  pfm-postgres:
+    image: postgres:16-alpine
+    container_name: pfm-postgres-container
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      # Security: bind only to localhost — nothing but pfm-backend needs this.
+      - "127.0.0.1:${POSTGRES_PORT_EXTERNAL:-5432}:5432"
+    volumes:
+      - pfm_postgres_data:/var/lib/postgresql/data
+      # Mounted individually (not the whole migrations/ dir) so
+      # 002_seed_admin.sql — a manual, placeholder-hash script never meant to
+      # autorun — stays excluded. Mirrors the root docker-compose.yml mount list.
+      - ./db/migrations/001_init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+      - ./db/migrations/003_revoked_tokens.sql:/docker-entrypoint-initdb.d/02_revoked_tokens.sql:ro
+      - ./db/migrations/004_wallets.sql:/docker-entrypoint-initdb.d/03_wallets.sql:ro
+      - ./db/migrations/005_categories.sql:/docker-entrypoint-initdb.d/04_categories.sql:ro
+      - ./db/migrations/006_seed_categories.sql:/docker-entrypoint-initdb.d/05_seed_categories.sql:ro
+      - ./db/migrations/007_budgets.sql:/docker-entrypoint-initdb.d/06_budgets.sql:ro
+      - ./db/migrations/008_transactions.sql:/docker-entrypoint-initdb.d/07_transactions.sql:ro
+      - ./db/migrations/009_notifications.sql:/docker-entrypoint-initdb.d/08_notifications.sql:ro
+      - ./db/migrations/010_transactions_idempotency_key.sql:/docker-entrypoint-initdb.d/09_transactions_idempotency_key.sql:ro
+      - ./db/migrations/011_chat_messages.sql:/docker-entrypoint-initdb.d/10_chat_messages.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: ${MEM_LIMIT_POSTGRES:-512M}
+
+  pfm-backend:
+    image: ${DOCKER_REGISTRY_USER}/pfm-backend:${PFM_BACKEND_IMAGE_TAG:-latest}
+    container_name: pfm-backend-container
+    restart: unless-stopped
+    pull_policy: always
+    environment:
+      PORT: 8080
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pfm-postgres:5432/${POSTGRES_DB}?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME}
+      APP_BASE_URL: ${APP_BASE_URL}
+      # ai-service isn't deployed by this compose file — leave blank/unset to
+      # keep the default http://ai-service:8000, which simply won't resolve;
+      # POST /ai/chat then degrades to 502 AI_SERVICE_UNAVAILABLE instead of
+      # failing startup (see internal/config/config.go).
+      AI_SERVICE_URL: ${AI_SERVICE_URL:-}
+    ports:
+      # 80 so Cloudflare/VPS firewall (setup-ufw.sh) can reach it directly.
+      - "${BACKEND_PORT_EXTERNAL:-80}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://localhost:8080/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      pfm-postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: ${MEM_LIMIT_BACKEND:-512M}
+
+volumes:
+  pfm_postgres_data:
+    driver: local

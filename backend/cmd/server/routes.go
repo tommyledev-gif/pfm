@@ -17,6 +17,12 @@ import (
 func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, chatHandler *handler.ChatHandler, tokens *service.TokenService, logger *zap.Logger) {
 	v1 := app.Group("/api/v1")
 
+	// Deploy-verification probe (CI/CD health check after a VPS deploy) — no
+	// auth, no DB call, just proves the process is up and serving.
+	v1.Get("/health", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{"status": "ok"})
+	})
+
 	auth := v1.Group("/auth")
 	auth.Post("/activate", authHandler.Activate)
 	auth.Post("/login", middleware.LoginRateLimiter(logger), authHandler.Login)

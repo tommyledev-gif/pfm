@@ -1,0 +1,185 @@
+version: '3.8'
+
+services:
+  krows-postgres:
+    image: postgres:16-alpine
+    container_name: krows-postgres-container
+    restart: unless-stopped
+    env_file:
+      - ${ENV_FILE_PATH:-.env.prod}
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-krows_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-mat_khau_postgres_123}
+      POSTGRES_DB: ${DB_DATABASE_NAME:-krows_prod_db}
+    # PgBouncer multiplexes down to a handful of backend connections, so Postgres
+    # itself no longer needs a large max_connections. Tuned for the 4GB VPS budget.
+    command:
+      [
+        "postgres",
+        "-c", "max_connections=50",
+        "-c", "shared_buffers=256MB",
+        "-c", "effective_cache_size=512MB",
+        "-c", "work_mem=4MB",
+        "-c", "maintenance_work_mem=64MB",
+      ]
+    ports:
+      # Security: bind only to localhost to avoid public port exposure
+      - "127.0.0.1:${DB_PORT_EXTERNAL:-5432}:5432"
+    volumes:
+      - krows_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-krows_user} -d ${DB_DATABASE_NAME:-krows_prod_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: ${MEM_LIMIT_POSTGRES:-1.5G}
+
+  krows-redis:
+    image: redis:7-alpine
+    container_name: krows-redis-container
+    restart: unless-stopped
+    env_file:
+      - ${ENV_FILE_PATH:-.env.prod}
+    command: ["sh", "-c", "redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-mat_khau_redis_123}"]
+    ports:
+      # Security: bind only to localhost to avoid public port exposure
+      - "127.0.0.1:${REDIS_PORT_EXTERNAL:-6379}:6379"
+    volumes:
+      - krows_redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:-mat_khau_redis_123} ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: ${MEM_LIMIT_REDIS:-512M}
+
+  # Sits between krows-api and krows-postgres so 4 PM2 workers (each with their own
+  # Prisma connection pool) share a small set of real backend connections instead of
+  # opening max_connections-worth of direct sessions.
+  krows-pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: krows-pgbouncer-container
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://${DB_USERNAME:-krows_user}:${DB_PASSWORD:-mat_khau_postgres_123}@krows-postgres:5432/${DB_DATABASE_NAME:-krows_prod_db}
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: "400"
+      DEFAULT_POOL_SIZE: "20"
+      # Postgres 16 hashes POSTGRES_PASSWORD with scram-sha-256 by default; must match
+      # or PgBouncer can't authenticate to the backend.
+      AUTH_TYPE: scram-sha-256
+    # Image is a transparent proxy: listens on the standard Postgres port 5432
+    # internally (not the traditional standalone PgBouncer port 6432).
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432 -U ${DB_USERNAME:-krows_user}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      krows-postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: ${MEM_LIMIT_PGBOUNCER:-64M}
+
+  krows-api:
+    image: ${DOCKER_REGISTRY_USER}/krows-api:${KROWS_API_IMAGE_TAG:-latest}
+    container_name: krows-api-container
+    restart: unless-stopped
+    pull_policy: missing
+    env_file:
+      - ${ENV_FILE_PATH:-.env.prod}
+    ports:
+      - "${API_PORT_EXTERNAL:-80}:${API_PORT_INTERNAL:-6769}"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "const http=require('http');const port=Number(process.env.API_PORT_INTERNAL||6769);const req=http.get({host:'localhost',port,path:'/api/v1/health',timeout:4000},res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));req.on('timeout',()=>{req.destroy();process.exit(1);});",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      krows-postgres:
+        condition: service_healthy
+      krows-redis:
+        condition: service_healthy
+      krows-pgbouncer:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          # 4 PM2 cluster workers share this budget; ~800M is too tight for 4 Nest+Prisma
+          # processes under load, so this is raised from the single-process 1G default.
+          cpus: "2.5"
+          memory: ${MEM_LIMIT_API:-1.4G}
+
+  krows-migrate:
+    image: ${DOCKER_REGISTRY_USER}/krows-api:${KROWS_API_IMAGE_TAG:-latest}
+    container_name: krows-migrate-container
+    pull_policy: missing
+    env_file:
+      - ${ENV_FILE_PATH:-.env.prod}
+    command: ["npx", "prisma", "migrate", "deploy"]
+    depends_on:
+      krows-postgres:
+        condition: service_healthy
+    restart: "no"
+
+  krows-backup:
+    image: eeshugerman/postgres-backup-s3:16
+    container_name: krows-backup-container
+    restart: unless-stopped
+    env_file:
+      - ${ENV_FILE_PATH:-.env.prod}
+    environment:
+      POSTGRES_HOST: krows-postgres
+      POSTGRES_USER: ${DB_USERNAME:-krows_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-mat_khau_postgres_123}
+      POSTGRES_DATABASE: ${DB_DATABASE_NAME:-krows_prod_db}
+      S3_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      S3_BUCKET: ${R2_BUCKET_NAME:-krows-db-backups}
+      S3_ENDPOINT: ${R2_ENDPOINT_URL}
+      S3_S3V4: "yes"
+      AWS_DEFAULT_REGION: ${R2_REGION:-auto}
+      AWS_REGION: ${R2_REGION:-auto}
+      S3_PREFIX: "krows-prod/"
+      SCHEDULE: "@daily"
+      BACKUP_KEEP_DAYS: 30
+    depends_on:
+      krows-postgres:
+        condition: service_healthy
+    
+  # Load testing. Idles on purpose (no script arg = k6 image exits immediately) so you
+  # can `docker compose exec k6 k6 run ...` repeatedly instead of recreating it per run.
+  k6:
+    image: grafana/k6:latest
+    container_name: krows-k6-container
+    volumes:
+      - ./k6:/scripts
+    working_dir: /scripts
+    entrypoint: ["sleep", "infinity"]
+    environment:
+      # Same compose network as krows-api — hit it by service name/internal port
+      # directly instead of bouncing out through the host and back in.
+      BASE_URL: http://krows-api:${API_PORT_INTERNAL:-6769}
+    depends_on:
+      krows-api:
+        condition: service_healthy
+
+volumes:
+  krows_postgres_data:
+    driver: local
+  krows_redis_data:
+    driver: local
