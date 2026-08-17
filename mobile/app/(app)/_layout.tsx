@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 
 import { BottomNav } from "@/components/shared/BottomNav";
 import { colors } from "@/lib/theme";
+import { useKeyboardHeight } from "@/lib/use-keyboard-height";
 
 // Notifications is a full-screen overlay without the bottom nav (README:
 // bell opens a "full-screen Notifications overlay"). AI Chat keeps the nav
@@ -13,7 +14,13 @@ const ROUTES_WITHOUT_NAV = ["/notifications"];
 
 export default function AppLayout() {
   const pathname = usePathname();
-  const showNav = !ROUTES_WITHOUT_NAV.includes(pathname);
+  // BottomNav is an absolutely-positioned overlay outside any screen's own
+  // KeyboardAvoidingView, so it never moves out of the way on its own — a
+  // focused input (AI Chat's, but any future one too) can end up sharing the
+  // keyboard-covered strip with it. Hiding it while the keyboard is open
+  // sidesteps needing every screen to account for its exact float height.
+  const keyboardVisible = useKeyboardHeight() > 0;
+  const showNav = !ROUTES_WITHOUT_NAV.includes(pathname) && !keyboardVisible;
 
   return (
     <View style={styles.container}>

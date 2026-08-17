@@ -18,6 +18,7 @@ fallback, never let a raw LLM error propagate as a 500 to the Go Backend.
 
 import json
 import logging
+from copy import deepcopy
 
 from app.core.config import settings
 from app.core.groq_client import get_anthropic_client, get_groq_client
@@ -60,10 +61,37 @@ async def extract_transactions(req: ExtractRequest) -> ExtractResponse:
             raise ExtractionUnavailableError from fallback_exc
 
 
+def _dereference_schema(schema: dict) -> dict:
+    """Inlines Pydantic's `$defs`/`$ref` indirection (used here for
+    ExtractResponse.transactions: list[ProposedTransaction]).
+
+    Live-tested against the real Groq API (2026-08-17, migrating off the
+    decommissioned llama-3.3-70b-versatile): both openai/gpt-oss-120b and
+    -20b mishandle a $ref-nested schema under forced tool_choice — silently
+    dropping a required field (`confidence`) or, on gpt-oss-120b, emitting a
+    stray `json`/`functions.<name>` tool call instead of the requested one.
+    A fully flattened schema fixed both providers to a 0/10 failure rate
+    across a Vietnamese-input regression set, without touching any actual
+    field definition — ExtractResponse stays the single source of truth,
+    this only removes the indirection Groq's schema validator can't follow.
+    """
+    defs = schema.get("$defs", {})
+
+    def resolve(node):
+        if isinstance(node, dict):
+            if "$ref" in node:
+                key = node["$ref"].rsplit("/", 1)[-1]
+                return resolve(deepcopy(defs[key]))
+            return {k: resolve(v) for k, v in node.items() if k != "$defs"}
+        if isinstance(node, list):
+            return [resolve(item) for item in node]
+        return node
+
+    return resolve(schema)
+
+
 def _extract_tool_schema() -> dict:
-    # Single source of truth: the tool's JSON schema IS ExtractResponse's own
-    # schema, so provider output and Pydantic validation can never drift.
-    return ExtractResponse.model_json_schema()
+    return _dereference_schema(ExtractResponse.model_json_schema())
 
 
 def _call_groq(system_prompt: str, message: str) -> ExtractResponse:

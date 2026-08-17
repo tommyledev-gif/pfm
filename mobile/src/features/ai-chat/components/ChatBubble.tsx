@@ -28,7 +28,7 @@ const styles = StyleSheet.create({
   rowUser: { justifyContent: "flex-end" },
   rowAssistant: { justifyContent: "flex-start" },
   bubble: { maxWidth: "82%", borderRadius: radii.listCard, padding: spacing.lg },
-  bubbleUser: { backgroundColor: colors.lavender, borderBottomRightRadius: 4 },
+  bubbleUser: { backgroundColor: colors.mustard, borderBottomRightRadius: 4 },
   bubbleAssistant: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.surfaceBorder, borderBottomLeftRadius: 4 },
   textUser: { ...typography.body, color: colors.onGreen },
   textAssistant: { ...typography.body, color: colors.textPrimary },

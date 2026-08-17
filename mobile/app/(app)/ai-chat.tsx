@@ -1,15 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  FlatList,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { useMemo, useRef, useState } from "react";
+import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SendIcon, SparkleIcon } from "@/components/ui/Icon";
@@ -19,6 +9,7 @@ import { ChatBubble } from "@/features/ai-chat/components/ChatBubble";
 import { EditMessageModal } from "@/features/ai-chat/components/EditMessageModal";
 import { TransactionActionCard } from "@/features/ai-chat/components/TransactionActionCard";
 import { colors, radii, spacing, typography } from "@/lib/theme";
+import { useKeyboardHeight } from "@/lib/use-keyboard-height";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useSendChatMessageMutation } from "@/features/ai-chat/api/use-send-chat-message-mutation";
@@ -26,8 +17,11 @@ import { useCreateTransactionMutation } from "@/features/transactions/api/use-cr
 import { ChatMessage } from "@/features/ai-chat/types";
 import { useChatStore } from "@/stores/chat-store";
 
+// A per-session counter would collide with ids from a previous session now
+// that chat-store.ts persists the thread to disk (e.g. a fresh "msg_1" after
+// restart could match an already-persisted message's id).
 let idCounter = 0;
-const nextId = () => `msg_${++idCounter}`;
+const nextId = () => `msg_${Date.now()}_${++idCounter}`;
 
 // Design's typing indicator is meant to be felt, not just a technicality —
 // README: "typing indicator (~1.3s)" — so even a fast API response holds the
@@ -57,24 +51,12 @@ export default function AiChatScreen() {
   const [sending, setSending] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
-  // BottomNav is a floating overlay rendered by app/(app)/_layout.tsx, not a
-  // sibling this screen controls — it isn't pushed up with the keyboard, so
-  // the input bar only needs clearance above it while the keyboard is
-  // closed. Tracking visibility manually (rather than relying solely on
-  // KeyboardAvoidingView) keeps that clearance from adding dead space once
-  // the keyboard is open and the nav is hidden behind it anyway.
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
-
-  useEffect(() => {
-    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
-    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
+  // Drives the input bar's own margin directly off the measured keyboard
+  // height — see use-keyboard-height.ts for why this isn't
+  // KeyboardAvoidingView. BottomNav (app/(app)/_layout.tsx) hides itself on
+  // the same signal, so the input only needs nav clearance while it's closed.
+  const keyboardHeight = useKeyboardHeight();
+  const keyboardVisible = keyboardHeight > 0;
 
   const wallets = useWalletsQuery();
   const categories = useCategoriesQuery();
@@ -121,11 +103,7 @@ export default function AiChatScreen() {
 
   return (
     <Screen>
-    <KeyboardAvoidingView
-      style={styles.screen}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={insets.top}
-    >
+    <View style={styles.screen}>
       <View style={styles.header}>
         <SparkleIcon size={20} />
         <Text style={styles.headerTitle}>Noctis AI</Text>
@@ -175,7 +153,7 @@ export default function AiChatScreen() {
       <View
         style={[
           styles.inputBar,
-          { marginBottom: keyboardVisible ? spacing.md : insets.bottom + NAV_CLEARANCE },
+          { marginBottom: keyboardVisible ? spacing.sm : insets.bottom + NAV_CLEARANCE },
         ]}
       >
         <TextInput
@@ -191,7 +169,7 @@ export default function AiChatScreen() {
           <SendIcon size={18} />
         </Pressable>
       </View>
-    </KeyboardAvoidingView>
+    </View>
 
     <EditMessageModal
       visible={Boolean(editingMessage)}
