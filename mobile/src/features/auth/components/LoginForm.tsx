@@ -1,14 +1,23 @@
 import { useState } from "react";
-import { StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { PillButton } from "@/components/ui/PillButton";
+import { EyeIcon, EyeOffIcon } from "@/components/ui/Icon";
 import { getErrorMessage } from "@/lib/axios";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { useLoginMutation } from "@/features/auth/api/use-login-mutation";
 
+// Backend error messages are lowercase sentence fragments (e.g. "invalid
+// email or password" — backend/internal/common/errors.go) meant to be
+// embedded in JSON, not shown verbatim as UI copy.
+function capitalize(text: string): string {
+  return text.length ? text.charAt(0).toUpperCase() + text.slice(1) : text;
+}
+
 export function LoginForm() {
   const [email, setEmail] = useState("admin@pfm.local");
   const [password, setPassword] = useState("DevAdmin@123");
+  const [showPassword, setShowPassword] = useState(false);
   const login = useLoginMutation();
 
   return (
@@ -22,16 +31,25 @@ export function LoginForm() {
         keyboardType="email-address"
         style={styles.input}
       />
-      <TextInput
-        value={password}
-        onChangeText={setPassword}
-        placeholder="Password"
-        placeholderTextColor={colors.textMuted}
-        secureTextEntry
-        style={styles.input}
-      />
+      <View style={styles.passwordRow}>
+        <TextInput
+          value={password}
+          onChangeText={setPassword}
+          placeholder="Password"
+          placeholderTextColor={colors.textMuted}
+          secureTextEntry={!showPassword}
+          style={styles.passwordInput}
+        />
+        <Pressable onPress={() => setShowPassword((v) => !v)} hitSlop={8} style={styles.eyeButton}>
+          {showPassword ? (
+            <EyeOffIcon size={20} color={colors.textSecondary} />
+          ) : (
+            <EyeIcon size={20} color={colors.textSecondary} />
+          )}
+        </Pressable>
+      </View>
       {login.isError ? (
-        <Text style={styles.error}>{getErrorMessage(login.error, "Login failed")}</Text>
+        <Text style={styles.error}>{capitalize(getErrorMessage(login.error, "Login failed"))}</Text>
       ) : null}
       <PillButton
         label="Log In"
@@ -56,6 +74,23 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     ...typography.body,
   },
+  passwordRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    borderRadius: radii.listCard,
+    paddingRight: spacing.md,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 14,
+    color: colors.textPrimary,
+    ...typography.body,
+  },
+  eyeButton: { padding: spacing.xs },
   button: { marginTop: spacing.sm },
   error: { color: colors.peach, ...typography.caption },
 });

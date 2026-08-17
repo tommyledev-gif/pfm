@@ -23,6 +23,9 @@ export const MAX_PAGE_SIZE = 100;
 export const USER_ROLES = ["admin", "member"] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
+export const USER_STATUSES = ["pending", "active", "disabled"] as const;
+export type UserStatus = (typeof USER_STATUSES)[number];
+
 export const WALLET_TYPES = ["cash", "bank", "e_wallet", "other"] as const;
 export type WalletType = (typeof WALLET_TYPES)[number];
 

@@ -1,0 +1,16 @@
+# Reduces the build context sent to the Docker daemon and keeps local dev
+# artifacts out of the image. Only requirements.txt and app/ are needed.
+.git
+.gitignore
+*.md
+
+.env
+.env.*
+
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/

@@ -1,0 +1,31 @@
+name: Backend Test
+
+# Reusable workflow (workflow_call) so the same go vet/test steps run both
+# as a gate before deploy-backend.yml builds an image, and as a PR check in
+# ci-pr.yml — one definition, no drift between the two.
+on:
+  workflow_call:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: backend/go.sum
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...

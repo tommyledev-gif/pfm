@@ -1,0 +1,19 @@
+# Reduces the build context sent to the Docker daemon and keeps ops/docs
+# artifacts out of the image. The final binary only needs go.mod/go.sum,
+# cmd/, internal/ — db/ (sqlc source + migrations) and the deploy scripts
+# are not read at build or run time (migrations run via the postgres
+# container's docker-entrypoint-initdb.d mount, not from inside this image).
+.git
+.gitignore
+*.md
+
+.env
+.env.prod
+.env.prod.example
+
+db/
+
+deploy.sh
+docker-compose.yml
+setup-ufw.sh
+vps-bootstrap.sh

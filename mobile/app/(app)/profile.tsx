@@ -21,13 +21,13 @@ import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { totalBalance } from "@/features/wallets/wallet-totals";
 import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary-query";
 
-// Household Members/Security/Help & Support have no mobile screens yet —
-// out of the design handoff's scope (it maps them as entry points only).
-// Wallets/Categories now navigate to real management screens.
+// Security/Help & Support have no mobile screens yet — out of the design
+// handoff's scope (it maps them as entry points only). Wallets/Categories/
+// Household Members now navigate to real management screens.
 const SETTINGS_ROWS = [
   { label: "Wallets", Icon: WalletIcon, href: "/wallets" as const },
   { label: "Categories", Icon: TagIcon, href: "/categories" as const },
-  { label: "Household Members", Icon: UsersIcon, href: null },
+  { label: "Household Members", Icon: UsersIcon, href: "/users" as const },
   { label: "Security", Icon: ShieldIcon, href: null },
   { label: "Help & Support", Icon: HelpIcon, href: null },
 ];

@@ -1,6 +1,7 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -15,6 +16,7 @@ import { SendIcon, SparkleIcon } from "@/components/ui/Icon";
 import { Screen } from "@/components/shared/Screen";
 import { TypingIndicator } from "@/components/shared/TypingIndicator";
 import { ChatBubble } from "@/features/ai-chat/components/ChatBubble";
+import { EditMessageModal } from "@/features/ai-chat/components/EditMessageModal";
 import { TransactionActionCard } from "@/features/ai-chat/components/TransactionActionCard";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
@@ -32,6 +34,16 @@ const nextId = () => `msg_${++idCounter}`;
 // dots for a beat before the reply appears.
 const MIN_TYPING_MS = 1300;
 
+// Holding a bubble for this long opens the edit modal directly (skips an
+// intermediate "Edit" affordance — a modal is simpler than expanding the
+// bubble in place and reuses the same growing-textarea/keyboard handling).
+const EDIT_LONG_PRESS_MS = 2000;
+
+// BottomNav (components/shared/BottomNav.tsx) floats at insets.bottom + 16,
+// standing 64px tall — this is how far above the screen's bottom edge the
+// input bar's own bottom must sit to clear it when the keyboard is closed.
+const NAV_CLEARANCE = 120;
+
 export default function AiChatScreen() {
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<ChatMessage>>(null);
@@ -44,6 +56,25 @@ export default function AiChatScreen() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
+  // BottomNav is a floating overlay rendered by app/(app)/_layout.tsx, not a
+  // sibling this screen controls — it isn't pushed up with the keyboard, so
+  // the input bar only needs clearance above it while the keyboard is
+  // closed. Tracking visibility manually (rather than relying solely on
+  // KeyboardAvoidingView) keeps that clearance from adding dead space once
+  // the keyboard is open and the nav is hidden behind it anyway.
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const wallets = useWalletsQuery();
   const categories = useCategoriesQuery();
@@ -92,7 +123,7 @@ export default function AiChatScreen() {
     <Screen>
     <KeyboardAvoidingView
       style={styles.screen}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={insets.top}
     >
       <View style={styles.header}>
@@ -102,24 +133,30 @@ export default function AiChatScreen() {
 
       <FlatList
         ref={listRef}
+        style={styles.list}
         data={thread}
         keyExtractor={(m) => m.id}
         contentContainerStyle={styles.thread}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
         renderItem={({ item }) => (
-          <ChatBubble role={item.role} text={item.text}>
-            {item.action ? (
-              <TransactionActionCard
-                action={item.action}
-                walletName={walletById.get(item.action.payload.wallet_id)?.name ?? "Wallet"}
-                categoryName={categoryById.get(item.action.payload.category_id)?.name ?? "Category"}
-                currency={walletById.get(item.action.payload.wallet_id)?.currency ?? "VND"}
-                confirmed={Boolean(item.confirmed)}
-                saving={confirmingId === item.id}
-                onConfirm={() => confirmAction(item)}
-              />
-            ) : null}
-          </ChatBubble>
+          <Pressable
+            onLongPress={() => setEditingMessage(item)}
+            delayLongPress={EDIT_LONG_PRESS_MS}
+          >
+            <ChatBubble role={item.role} text={item.text}>
+              {item.action ? (
+                <TransactionActionCard
+                  action={item.action}
+                  walletName={walletById.get(item.action.payload.wallet_id)?.name ?? "Wallet"}
+                  categoryName={categoryById.get(item.action.payload.category_id)?.name ?? "Category"}
+                  currency={walletById.get(item.action.payload.wallet_id)?.currency ?? "VND"}
+                  confirmed={Boolean(item.confirmed)}
+                  saving={confirmingId === item.id}
+                  onConfirm={() => confirmAction(item)}
+                />
+              ) : null}
+            </ChatBubble>
+          </Pressable>
         )}
         ListEmptyComponent={
           <Text style={styles.hint}>
@@ -135,21 +172,36 @@ export default function AiChatScreen() {
         }
       />
 
-      <View style={[styles.inputBar, { bottom: insets.bottom + 120 }]}>
+      <View
+        style={[
+          styles.inputBar,
+          { marginBottom: keyboardVisible ? spacing.md : insets.bottom + NAV_CLEARANCE },
+        ]}
+      >
         <TextInput
           value={input}
           onChangeText={setInput}
-          onSubmitEditing={send}
           placeholder="Describe a transaction…"
           placeholderTextColor={colors.textMuted}
           style={styles.input}
-          returnKeyType="send"
+          multiline
+          textAlignVertical="top"
         />
         <Pressable style={styles.sendButton} onPress={send} disabled={!input.trim() || sending}>
           <SendIcon size={18} />
         </Pressable>
       </View>
     </KeyboardAvoidingView>
+
+    <EditMessageModal
+      visible={Boolean(editingMessage)}
+      initialText={editingMessage?.text ?? ""}
+      onCancel={() => setEditingMessage(null)}
+      onSave={(text) => {
+        if (editingMessage) updateMessage(editingMessage.id, { text });
+        setEditingMessage(null);
+      }}
+    />
     </Screen>
   );
 }
@@ -158,25 +210,27 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bgApp },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, paddingVertical: spacing.lg },
   headerTitle: { ...typography.cardTitle, color: colors.textPrimary },
-  thread: { paddingHorizontal: spacing.xl, gap: spacing.md, paddingBottom: 180, flexGrow: 1 },
+  list: { flex: 1 },
+  thread: { paddingHorizontal: spacing.xl, gap: spacing.md, paddingBottom: spacing.md, flexGrow: 1 },
   hint: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xxl },
   typingRow: { alignItems: "flex-start" },
   inputBar: {
-    position: "absolute",
-    left: spacing.xl,
-    right: spacing.xl,
+    marginHorizontal: spacing.xl,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-end",
     gap: spacing.sm,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
-    borderRadius: radii.pill,
+    borderRadius: radii.hero,
     paddingLeft: spacing.lg,
     paddingRight: spacing.xs,
     paddingVertical: spacing.xs,
   },
-  input: { flex: 1, color: colors.textPrimary, paddingVertical: spacing.sm, ...typography.body },
+  // ~3 lines of typography.body before it scrolls internally instead of
+  // growing further (multiline TextInputs scroll their own content once
+  // it exceeds maxHeight — no manual measurement needed).
+  input: { flex: 1, minHeight: 40, maxHeight: 88, color: colors.textPrimary, paddingVertical: spacing.sm, ...typography.body },
   sendButton: {
     width: 40,
     height: 40,

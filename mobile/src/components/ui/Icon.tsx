@@ -225,3 +225,26 @@ export function LogOutIcon({ size, color = "#FF9E96", strokeWidth = 2 }: IconPro
     </Svg>
   );
 }
+
+export function EyeIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
+  return (
+    <Svg {...base(size)} fill="none">
+      <Path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" stroke={color} strokeWidth={strokeWidth} strokeLinejoin="round" />
+      <Circle cx="12" cy="12" r="2.8" stroke={color} strokeWidth={strokeWidth} />
+    </Svg>
+  );
+}
+
+export function EyeOffIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
+  return (
+    <Svg {...base(size)} fill="none">
+      <Path
+        d="M4 4l16 16M9.6 9.7a2.8 2.8 0 0 0 3.9 3.9M6.3 6.7C3.9 8.3 2.5 12 2.5 12S6 18.5 12 18.5c1.6 0 3-.4 4.2-1.1M17.8 15.2C20.1 13.6 21.5 12 21.5 12S18 5.5 12 5.5c-.7 0-1.3.1-1.9.2"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
