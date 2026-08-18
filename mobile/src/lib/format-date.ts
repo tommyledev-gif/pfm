@@ -12,6 +12,23 @@ export function formatDateRange(fromIso: string, toIso: string): string {
   return `${from} – ${to}`;
 }
 
+// Accepts either a plain "YYYY-MM-DD" date-only string OR a full timestamp
+// (the AI chat action's occurred_at arrives as a real time.Time from the Go
+// Backend — e.g. "2026-08-18T00:00:00Z" — not the date-only string the AI
+// Service itself works with internally). Appending T00:00:00Z only to the
+// date-only case anchors it to UTC midnight so a negative local timezone
+// offset can't roll it back a day; appending it to an already-full
+// timestamp would double up the suffix and produce an Invalid Date.
+export function formatDateShort(value: string): string {
+  const iso = value.includes("T") ? value : `${value}T00:00:00Z`;
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
 export function dayLabel(iso: string): string {
   const date = new Date(iso);
   const now = new Date();

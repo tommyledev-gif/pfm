@@ -36,4 +36,10 @@ export interface ChatMessage {
   text: string;
   action?: ChatAction;
   confirmed?: boolean;
+  // Edits never mutate a message that already has a resolved action in
+  // place — they append a corrected message at the end of the thread
+  // instead, so the original stays as an honest record of what the AI (or
+  // the user) actually said at the time.
+  edited?: boolean; // this message is the corrected result of editing an earlier one
+  superseded?: boolean; // an edited replacement for this message now exists further down the thread
 }
