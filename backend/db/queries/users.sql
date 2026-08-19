@@ -70,12 +70,23 @@ WHERE deleted_at IS NULL
   AND (sqlc.narg('role')::text IS NULL OR role = sqlc.narg('role'));
 
 -- name: SeedAdminUser :one
--- Idempotent bootstrap for cmd/seed: ON CONFLICT targets the partial unique
--- index from 001_init.sql (email unique only among non-deleted rows), so
--- re-running this on every deploy is a safe no-op once the row exists. No
--- rows returned on conflict -> pgx.ErrNoRows, which cmd/seed treats as
--- "already seeded". Never used by the invite/activate flow.
+-- Idempotent + self-healing bootstrap for cmd/seed: ON CONFLICT targets the
+-- partial unique index from 001_init.sql (email unique only among
+-- non-deleted rows). Creates the admin row on first run, and re-syncs
+-- password_hash on every later run — a plain DO NOTHING would leave a wrong
+-- first-run password (e.g. a typo'd SEED_ADMIN_PASSWORD secret) stuck
+-- forever even after the secret is corrected and redeployed. The
+-- "WHERE users.role = 'admin'" guard means this can never silently
+-- overwrite an unrelated user who happens to share the seed email — that
+-- case matches zero rows (same as DO NOTHING), which RETURNING surfaces as
+-- pgx.ErrNoRows, and cmd/seed treats as "skip, not ours to touch". Never
+-- used by the invite/activate flow.
 INSERT INTO users (email, full_name, password_hash, status, role)
 VALUES ($1, $2, $3, 'active', 'admin')
-ON CONFLICT (email) WHERE deleted_at IS NULL DO NOTHING
+ON CONFLICT (email) WHERE deleted_at IS NULL
+DO UPDATE SET
+    password_hash = EXCLUDED.password_hash,
+    full_name     = EXCLUDED.full_name,
+    updated_at    = NOW()
+WHERE users.role = 'admin'
 RETURNING *;

@@ -1,8 +1,10 @@
 // cmd/seed bootstraps the first admin account. Invite-only auth (see
 // CLAUDE.md) means a brand-new environment has no one to send the first
 // invite from — this is the one exception that creates a user directly.
-// Idempotent (SeedAdminUser is ON CONFLICT DO NOTHING), so deploy.sh runs it
-// after every deploy without duplicating the admin row once it exists.
+// SeedAdminUser upserts by design: it creates the admin row on first run and
+// re-syncs the password hash on every later run, so correcting a wrong
+// SEED_ADMIN_PASSWORD and redeploying actually fixes it instead of leaving
+// the bad first-run password stuck. deploy.sh runs this after every deploy.
 package main
 
 import (
@@ -57,11 +59,11 @@ func main() {
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			log.Printf("seed: admin user %s already exists, skipping", email)
+			log.Printf("seed: %s already exists as a non-admin user, skipping (not the seeded admin)", email)
 			return
 		}
-		log.Fatalf("seed: insert admin user: %v", err)
+		log.Fatalf("seed: upsert admin user: %v", err)
 	}
 
-	log.Printf("seed: created admin user %s (id=%s)", user.Email, user.ID)
+	log.Printf("seed: admin user %s is ready (id=%s)", user.Email, user.ID)
 }
