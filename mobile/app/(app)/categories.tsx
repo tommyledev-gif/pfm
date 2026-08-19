@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   chipRow: { flexDirection: "row", gap: spacing.sm, paddingHorizontal: spacing.xl, paddingBottom: spacing.md },
-  list: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl },
+  list: { paddingHorizontal: spacing.xl, paddingBottom: 140 },
   loader: { marginTop: spacing.xxl },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
 });

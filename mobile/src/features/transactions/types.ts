@@ -40,3 +40,13 @@ export interface CreateTransactionRequest {
   note?: string;
   idempotency_key?: string;
 }
+
+// wallet_id and type are never accepted by PATCH (backend dto.
+// UpdateTransactionRequest excludes them structurally) — mirrors
+// frontend/src/features/transactions/types.ts's UpdateTransactionRequest.
+export interface UpdateTransactionRequest {
+  amount?: number;
+  category_id?: string;
+  occurred_at?: string;
+  note?: string;
+}

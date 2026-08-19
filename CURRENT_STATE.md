@@ -1,6 +1,6 @@
 # PFM — Current Project State
 
-_Last updated: 2026-08-16_
+_Last updated: 2026-08-19_
 _Command: /cook-state_
 
 > ⚡ Load file này đầu tiên khi bắt đầu session mới.
@@ -10,11 +10,11 @@ _Command: /cook-state_
 
 ## TL;DR — Project Health
 
-- **Phase:** MVP done (backend+web full F-01→F-07, F-10); AI Chat (Feature-12 US-01) done backend+web+mobile; Mobile screen build-out (Home/Transactions/Insights/AI Chat/Notifications/Profile + login) done this session
-- **Overall completion:** MVP 100% backend+web. Mobile: went from scaffold-only to a working screen set this session, matched against `mobile/design_handoff_pfm_app/` design spec (excludes dedicated Wallets/Categories/Household-Members/Security screens — out of design-handoff scope, Profile has inert entry-point rows for these)
-- **Last feature shipped:** Mobile screen build-out (this session) — Home, Transactions, Insights (Spending + Budgets), AI Chat, Notifications, Profile, login form
+- **Phase:** MVP done (backend+web full F-01→F-07, F-10); AI Chat (Feature-12 US-01) done backend+web+mobile; Mobile now has full CRUD on Wallet/Category/Budget/Transaction (this session), matching web's feature depth
+- **Overall completion:** MVP 100% backend+web. Mobile: full CRUD on F-03/F-04/F-05/F-06 (this session closed the remaining gaps — Transaction manual create/edit/delete, Category delete, Budget delete); still excludes dedicated Household-Members/Security screens (out of design-handoff scope) and F-01 User Management
+- **Last feature shipped:** Mobile Transaction/Category/Budget CRUD completion (this session) — `TransactionFormModal` (manual create+edit+delete, previously AI-Chat-only), Category delete wired to existing unused mutation, Budget delete (new mutation + wiring)
 - **Currently in progress:** nothing checked out
-- **Next up:** manual verification on-device (`npx expo start`, per `mobile/AGENTS.md` — not verified in this session, no emulator/device available); QC coverage gap (FEAT-QC); Financial Goal (F-08) or Data Overview Dashboard (F-11)
+- **Next up:** manual verification on-device (`npx expo start`, per `mobile/AGENTS.md` — not verified in this or prior sessions, no emulator/device available); QC coverage gap (FEAT-QC); Feature-12 AI Chat US-02 (edit via chat)/US-03 (query spending) — currently unimplemented at every layer, not just mobile; Financial Goal (F-08) or Data Overview Dashboard (F-11)
 - **Blockers:** none
 
 ---
@@ -27,15 +27,17 @@ _Command: /cook-state_
 |---|---|---|---|
 | F-01 User Management (invite/activate/list) | ✅ | ✅ (`features/users`) | ❌ (no mobile screen — not in design-handoff scope) |
 | F-02 System Security (JWT auth, login/logout) | ✅ | ✅ (`features/auth`) | ✅ login form + mutation (`features/auth`), no `/auth/refresh` on any client |
-| F-03 Wallet Management | ✅ | ✅ (`features/wallets`) | 🔶 read-only (Home hero/wallet cards, Profile net worth) |
-| F-04 Category Management | ✅ | ✅ (`features/categories`) | 🔶 read-only (Transactions/Insights/AI Chat, colors derived client-side) |
-| F-05 Budget Management | ✅ (per-currency `budget_limits` child table) | ✅ (`features/budgets`) | ✅ read + create (Insights → Budgets tab, "+ New budget" modal) |
-| F-06 Transaction Management | ✅ (atomic wallet-balance update) | ✅ (`features/transactions`) | ✅ read + create (Home recent list, Transactions screen w/ filters+infinite scroll, AI Chat confirm) |
+| F-03 Wallet Management | ✅ | ✅ (`features/wallets`) | ✅ full CRUD (Profile → Wallets: create/edit modal, set-default) |
+| F-04 Category Management | ✅ | ✅ (`features/categories`) | ✅ full CRUD (Profile → Categories: create/edit/delete modal, 409 CATEGORY_IN_USE surfaced) |
+| F-05 Budget Management | ✅ (per-currency `budget_limits` child table) | ✅ (`features/budgets`) | ✅ full CRUD (Insights → Budgets tab: create/edit/delete modal) |
+| F-06 Transaction Management | ✅ (atomic wallet-balance update) | ✅ (`features/transactions`) | ✅ full CRUD (manual `+` on Transactions screen + tap-to-edit/delete on Home/Transactions rows, alongside AI Chat create) |
 | F-07 Financial Reporting (summary) | ✅ (`report_handler/service/repository`, aggregate queries reuse `transactions.sql`) | ✅ (`features/reports`) | ✅ (Insights → Spending tab: stat cards + clickable SVG donut chart + legend) |
 | F-10 Notification Handling | ✅ (background scheduler) | ✅ (`features/notifications`) | ✅ (bell → full-screen Notifications overlay, day-grouped, unread toggle) |
 | Feature-12 AI Chat (US-01 create-via-chat) | ✅ | ✅ (`features/ai-chat`) | ✅ (raised nav button → AI Chat screen, transaction-card confirm reuses `POST /transactions`) |
 
-**2026-08-16: `mobile/` was deleted and rebuilt from scratch as React Native (Expo)**, replacing the previous Flutter app (which had shipped F-01/F-02 mobile screens — those are gone, not carried over). Later the same session, the full screen set above was built against `mobile/design_handoff_pfm_app/`. Not built: dedicated mobile screens for Wallets/Categories/Household-Members/Security CRUD — the design handoff maps these as Profile entry-point rows only (currently inert, no screens behind them).
+**2026-08-16: `mobile/` was deleted and rebuilt from scratch as React Native (Expo)**, replacing the previous Flutter app (which had shipped F-01/F-02 mobile screens — those are gone, not carried over). Later the same session, the full screen set above was built against `mobile/design_handoff_pfm_app/`. Not built: a dedicated Household-Members/Security screen (design handoff maps these as inert Profile entry-point rows only) and F-01 User Management.
+
+**2026-08-19: closed the remaining mobile CRUD gaps** — `TransactionFormModal.tsx` (new: manual create, previously only reachable via AI Chat; plus edit and delete, previously nonexistent), Category delete (wired the already-existing but unused `use-delete-category-mutation.ts` into `CategoryFormModal.tsx`), Budget delete (new `use-delete-budget-mutation.ts` + wired into `NewBudgetModal.tsx`). Wallet was already full CRUD before this session — `CURRENT_STATE.md`'s prior "read-only" note for Wallet/Category was stale relative to the code even before today.
 
 ---
 
@@ -173,9 +175,10 @@ Wallets/categories/budgets/transactions/reports/notifications/ai groups have **n
 
 - [ ] `/auth/refresh` endpoint chưa implement — hiện tại 401 = force re-login (không phải bug, là quyết định MVP); worse UX impact on mobile than web
 - [ ] `test_cases.md` thiếu cho wallet/category/budget/transaction/financial-reporting/notification-handling — chạy `/cook-qc` cho từng feature
-- [ ] Mobile: screens not yet verified on-device/emulator (`npx expo start`) — only type-checked/linted/web-exported this session, no emulator available
+- [ ] Mobile: screens not yet verified on-device/emulator (`npx expo start`) — only type-checked/linted/web-exported across both mobile sessions so far, no emulator available
 - [ ] Mobile: no offline/local-DB layer — TanStack Query cache is the only client persistence
-- [ ] Mobile: no dedicated Wallets/Categories/Household-Members/Security screens — Profile rows for these are inert (design-handoff scope only)
+- [ ] Mobile: no dedicated Household-Members/Security screens — Profile rows for these are inert (design-handoff scope only)
+- [ ] Feature-12 AI Chat US-02 (edit-via-chat)/US-03 (query-spending) intents are unimplemented at every layer (ai-service/backend/web/mobile) — only `create_transaction`/`ambiguous` exist in `ChatResponse.intent` today
 - [ ] Root có untracked `clear-port.md` (personal PowerShell helper để free port 8080/8081/8082, không phải project code — không cần commit)
 
 ---

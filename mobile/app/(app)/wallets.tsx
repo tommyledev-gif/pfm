@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  list: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl },
+  list: { paddingHorizontal: spacing.xl, paddingBottom: 140 },
   loader: { marginTop: spacing.xxl },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
 });

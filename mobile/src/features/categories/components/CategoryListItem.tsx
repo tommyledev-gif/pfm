@@ -22,7 +22,12 @@ export function CategoryListItem({ category, onPress }: { category: Category; on
   };
 
   return (
-    <Pressable style={styles.row} onPress={isSystem ? undefined : onPress} disabled={isSystem}>
+    <Pressable
+      style={styles.row}
+      onPress={isSystem ? undefined : onPress}
+      onLongPress={isSystem ? undefined : onPress}
+      disabled={isSystem}
+    >
       <Avatar name={category.name} color={colorForCategory(category.id)} size={40} />
       <View style={styles.info}>
         <Text style={styles.name}>{category.name}</Text>

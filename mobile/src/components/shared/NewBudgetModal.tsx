@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
+import { Drawer } from "@/components/shared/Drawer";
 import { PillButton } from "@/components/ui/PillButton";
+import { TrashIcon } from "@/components/ui/Icon";
 import { getErrorMessage } from "@/lib/axios";
 import { toCents, toMajorUnits } from "@/lib/currency";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useCreateBudgetMutation } from "@/features/budgets/api/use-create-budget-mutation";
 import { useUpdateBudgetMutation } from "@/features/budgets/api/use-update-budget-mutation";
+import { useDeleteBudgetMutation } from "@/features/budgets/api/use-delete-budget-mutation";
 import { Budget } from "@/features/budgets/types";
 import { WalletCurrency } from "@/lib/constants";
 
@@ -28,6 +31,7 @@ export function NewBudgetModal({ visible, onClose, currency, editingBudget }: Ne
   const categories = useCategoriesQuery("expense");
   const createBudget = useCreateBudgetMutation();
   const updateBudget = useUpdateBudgetMutation();
+  const deleteBudget = useDeleteBudgetMutation();
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
 
@@ -55,66 +59,75 @@ export function NewBudgetModal({ visible, onClose, currency, editingBudget }: Ne
     }
   };
 
+  const confirmDelete = () => {
+    if (!editingBudget) return;
+    Alert.alert("Delete budget?", "This cannot be undone.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => deleteBudget.mutate(editingBudget.id, { onSuccess: onClose }),
+      },
+    ]);
+  };
+
+  const activeError = mutation.isError ? mutation.error : deleteBudget.isError ? deleteBudget.error : null;
+
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View style={styles.sheet}>
-          <Text style={styles.title}>{isEditing ? "Edit budget" : "New budget"}</Text>
+    <Drawer visible={visible} onClose={onClose}>
+      <Text style={styles.title}>{isEditing ? "Edit budget" : "New budget"}</Text>
 
-          <Text style={styles.label}>Category</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
-            {categories.data?.map((c) => (
-              <Pressable
-                key={c.id}
-                onPress={() => !isEditing && setCategoryId(c.id)}
-                style={[styles.categoryChip, categoryId === c.id && styles.categoryChipActive]}
-              >
-                <Text style={[styles.categoryChipLabel, categoryId === c.id && styles.categoryChipLabelActive]}>
-                  {c.name}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
+      <Text style={styles.label}>Category</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
+        {categories.data?.map((c) => (
+          <Pressable
+            key={c.id}
+            onPress={() => !isEditing && setCategoryId(c.id)}
+            style={[styles.categoryChip, categoryId === c.id && styles.categoryChipActive]}
+          >
+            <Text style={[styles.categoryChipLabel, categoryId === c.id && styles.categoryChipLabelActive]}>
+              {c.name}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
 
-          <Text style={styles.label}>Monthly limit ({currency})</Text>
-          <TextInput
-            value={amount}
-            onChangeText={setAmount}
-            placeholder="0"
-            placeholderTextColor={colors.textMuted}
-            keyboardType="numeric"
-            style={styles.input}
-          />
+      <Text style={styles.label}>Monthly limit ({currency})</Text>
+      <TextInput
+        value={amount}
+        onChangeText={setAmount}
+        placeholder="0"
+        placeholderTextColor={colors.textMuted}
+        keyboardType="numeric"
+        style={styles.input}
+      />
 
-          {mutation.isError ? (
-            <Text style={styles.error}>{getErrorMessage(mutation.error, "Could not save budget")}</Text>
-          ) : null}
+      {activeError ? (
+        <Text style={styles.error}>{getErrorMessage(activeError, "Could not save budget")}</Text>
+      ) : null}
 
-          <View style={styles.actions}>
-            <PillButton label="Cancel" variant="outline" onPress={onClose} style={styles.flexButton} />
-            <PillButton
-              label={isEditing ? "Save" : "Create"}
-              onPress={submit}
-              loading={mutation.isPending}
-              disabled={!categoryId || !amount}
-              style={styles.flexButton}
-            />
-          </View>
-        </View>
+      <View style={styles.actions}>
+        <PillButton label="Cancel" variant="outline" onPress={onClose} style={styles.flexButton} />
+        <PillButton
+          label={isEditing ? "Save" : "Create"}
+          onPress={submit}
+          loading={mutation.isPending}
+          disabled={!categoryId || !amount}
+          style={styles.flexButton}
+        />
       </View>
-    </Modal>
+
+      {isEditing ? (
+        <Pressable style={styles.deleteRow} onPress={confirmDelete} disabled={deleteBudget.isPending}>
+          <TrashIcon size={18} />
+          <Text style={styles.deleteLabel}>Delete budget</Text>
+        </Pressable>
+      ) : null}
+    </Drawer>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radii.hero,
-    borderTopRightRadius: radii.hero,
-    padding: spacing.xl,
-    gap: spacing.md,
-  },
   title: { ...typography.title, color: colors.textPrimary },
   label: { ...typography.caption, color: colors.textSecondary },
   categoryRow: { gap: spacing.sm },
@@ -142,4 +155,6 @@ const styles = StyleSheet.create({
   error: { color: colors.peach, ...typography.caption },
   actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
   flexButton: { flex: 1 },
+  deleteRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, paddingVertical: spacing.sm },
+  deleteLabel: { ...typography.body, color: colors.peach },
 });

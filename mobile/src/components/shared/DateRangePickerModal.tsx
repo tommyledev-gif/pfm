@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { Calendar, DateData } from "react-native-calendars";
 import { MarkingProps } from "react-native-calendars/src/calendar/day/marking";
 
+import { Drawer } from "@/components/shared/Drawer";
 import { PillButton } from "@/components/ui/PillButton";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 
@@ -72,50 +73,38 @@ export function DateRangePickerModal({ visible, onClose, from, to, onApply }: Da
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable onPress={() => {}} style={styles.sheet}>
-          <Text style={styles.title}>Date range</Text>
-          <Text style={styles.subtitle}>
-            {start ? `${start}${end && end !== start ? `  –  ${end}` : ""}` : "Select a start date"}
-          </Text>
+    <Drawer visible={visible} onClose={onClose}>
+      <Text style={styles.title}>Date range</Text>
+      <Text style={styles.subtitle}>
+        {start ? `${start}${end && end !== start ? `  –  ${end}` : ""}` : "Select a start date"}
+      </Text>
 
-          <Calendar
-            markingType="period"
-            markedDates={markedDates}
-            onDayPress={onDayPress}
-            theme={{
-              calendarBackground: "transparent",
-              monthTextColor: colors.textPrimary,
-              textMonthFontWeight: "700",
-              arrowColor: colors.textPrimary,
-              dayTextColor: colors.textPrimary,
-              textDisabledColor: colors.textMuted,
-              textSectionTitleColor: colors.textSecondary,
-              todayTextColor: colors.green,
-            }}
-            style={styles.calendar}
-          />
+      <Calendar
+        markingType="period"
+        markedDates={markedDates}
+        onDayPress={onDayPress}
+        theme={{
+          calendarBackground: "transparent",
+          monthTextColor: colors.textPrimary,
+          textMonthFontWeight: "700",
+          arrowColor: colors.textPrimary,
+          dayTextColor: colors.textPrimary,
+          textDisabledColor: colors.textMuted,
+          textSectionTitleColor: colors.textSecondary,
+          todayTextColor: colors.green,
+        }}
+        style={styles.calendar}
+      />
 
-          <View style={styles.actions}>
-            <PillButton label="Clear" variant="outline" onPress={clear} style={styles.flexButton} />
-            <PillButton label="Apply" onPress={apply} disabled={!start} style={styles.flexButton} />
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+      <View style={styles.actions}>
+        <PillButton label="Clear" variant="outline" onPress={clear} style={styles.flexButton} />
+        <PillButton label="Apply" onPress={apply} disabled={!start} style={styles.flexButton} />
+      </View>
+    </Drawer>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radii.hero,
-    borderTopRightRadius: radii.hero,
-    padding: spacing.xl,
-    gap: spacing.md,
-  },
   title: { ...typography.title, color: colors.textPrimary },
   subtitle: { ...typography.caption, color: colors.textSecondary },
   calendar: { borderRadius: radii.listCard },

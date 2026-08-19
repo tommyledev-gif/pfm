@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
@@ -12,11 +12,14 @@ import { colors, radii, spacing, typography } from "@/lib/theme";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { totalBalance } from "@/features/wallets/wallet-totals";
 import { useTransactionsQuery } from "@/features/transactions/api/use-transactions-query";
+import { Transaction } from "@/features/transactions/types";
+import { TransactionFormModal } from "@/features/transactions/components/TransactionFormModal";
 
 export default function HomeScreen() {
   const router = useRouter();
   const wallets = useWalletsQuery();
   const recent = useTransactionsQuery({ limit: 4 });
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   const walletCurrencyMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -75,7 +78,11 @@ export default function HomeScreen() {
           </View>
         </>
       }
-      renderItem={({ item }) => <TransactionRow transaction={item} currency={walletCurrencyMap.get(item.wallet_id)} />}
+      renderItem={({ item }) => (
+        <Pressable onPress={() => setEditingTransaction(item)}>
+          <TransactionRow transaction={item} currency={walletCurrencyMap.get(item.wallet_id)} />
+        </Pressable>
+      )}
       ListEmptyComponent={
         recent.isLoading ? (
           <ActivityIndicator color={colors.green} style={styles.loader} />
@@ -83,6 +90,12 @@ export default function HomeScreen() {
           <Text style={styles.empty}>No transactions yet.</Text>
         )
       }
+      />
+
+      <TransactionFormModal
+        visible={Boolean(editingTransaction)}
+        onClose={() => setEditingTransaction(null)}
+        editingTransaction={editingTransaction}
       />
     </Screen>
   );
