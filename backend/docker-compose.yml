@@ -69,7 +69,7 @@ services:
       # 80 so Cloudflare/VPS firewall (setup-ufw.sh) can reach it directly.
       - "${BACKEND_PORT_EXTERNAL:-80}:8080"
     healthcheck:
-      test: ["CMD", "wget", "-qO", "/dev/null", "http://localhost:8080/api/v1/health"]
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:8080/api/v1/health"]
       interval: 10s
       timeout: 5s
       retries: 5
