@@ -65,6 +65,13 @@ services:
       # POST /ai/chat then degrades to 502 AI_SERVICE_UNAVAILABLE instead of
       # failing startup (see internal/config/config.go).
       AI_SERVICE_URL: ${AI_SERVICE_URL:-}
+      # Read only by ./seed (see deploy.sh), not by the server process. Blank
+      # means "skip admin bootstrap" — set these in .env.prod only for the
+      # very first deploy of a fresh environment (invite-only auth has no one
+      # to send the first invite from otherwise).
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      SEED_ADMIN_NAME: ${SEED_ADMIN_NAME:-Admin}
     ports:
       # 80 so Cloudflare/VPS firewall (setup-ufw.sh) can reach it directly.
       - "${BACKEND_PORT_EXTERNAL:-80}:8080"

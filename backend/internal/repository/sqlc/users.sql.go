@@ -201,3 +201,29 @@ func (q *Queries) CountUsers(ctx context.Context, arg CountUsersParams) (int64, 
 	err := row.Scan(&count)
 	return count, err
 }
+
+const seedAdminUser = `-- name: SeedAdminUser :one
+INSERT INTO users (email, full_name, password_hash, status, role)
+VALUES ($1, $2, $3, 'active', 'admin')
+ON CONFLICT (email) WHERE deleted_at IS NULL DO NOTHING
+RETURNING id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at
+`
+
+type SeedAdminUserParams struct {
+	Email        string
+	FullName     *string
+	PasswordHash *string
+}
+
+// SeedAdminUser returns pgx.ErrNoRows on conflict (see the query above) —
+// cmd/seed treats that as "admin already seeded", not an error.
+func (q *Queries) SeedAdminUser(ctx context.Context, arg SeedAdminUserParams) (User, error) {
+	row := q.db.QueryRow(ctx, seedAdminUser, arg.Email, arg.FullName, arg.PasswordHash)
+	var i User
+	err := row.Scan(
+		&i.ID, &i.Email, &i.FullName, &i.PasswordHash, &i.Status, &i.Role,
+		&i.InvitedBy, &i.InviteToken, &i.InviteExpiresAt, &i.ActivatedAt,
+		&i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
+	)
+	return i, err
+}

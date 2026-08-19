@@ -68,3 +68,14 @@ SELECT COUNT(*) FROM users
 WHERE deleted_at IS NULL
   AND (sqlc.narg('status')::text IS NULL OR status = sqlc.narg('status'))
   AND (sqlc.narg('role')::text IS NULL OR role = sqlc.narg('role'));
+
+-- name: SeedAdminUser :one
+-- Idempotent bootstrap for cmd/seed: ON CONFLICT targets the partial unique
+-- index from 001_init.sql (email unique only among non-deleted rows), so
+-- re-running this on every deploy is a safe no-op once the row exists. No
+-- rows returned on conflict -> pgx.ErrNoRows, which cmd/seed treats as
+-- "already seeded". Never used by the invite/activate flow.
+INSERT INTO users (email, full_name, password_hash, status, role)
+VALUES ($1, $2, $3, 'active', 'admin')
+ON CONFLICT (email) WHERE deleted_at IS NULL DO NOTHING
+RETURNING *;

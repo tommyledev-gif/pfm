@@ -20,4 +20,12 @@ fi
 # this file directly, no need to `source` it into the shell first.
 docker compose --env-file "$ENV_FILE_PATH" pull
 docker compose --env-file "$ENV_FILE_PATH" up -d --remove-orphans
+
+# One-shot bootstrap of the first admin user (see cmd/seed). Runs on every
+# deploy but is idempotent — a no-op once the admin row exists, and a no-op
+# entirely if SEED_ADMIN_EMAIL/SEED_ADMIN_PASSWORD aren't set in
+# $ENV_FILE_PATH. `run --rm` starts a throwaway container on the same
+# network/env as pfm-backend without touching the already-running one.
+docker compose --env-file "$ENV_FILE_PATH" run --rm --entrypoint ./seed pfm-backend
+
 docker image prune -f
