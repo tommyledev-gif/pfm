@@ -1,7 +1,7 @@
-# Production compose for the backend ONLY — deployed to the VPS by
-# .github/workflows/deploy-backend.yml. Not used for local dev (see the
-# root docker-compose.yml, which also runs frontend/ai-service and builds
-# the backend image locally instead of pulling it from a registry).
+# Production compose for the backend + ai-service — deployed to the VPS by
+# .github/workflows/deploy-backend.yml and deploy-ai-service.yml. Not used
+# for local dev (see the root docker-compose.yml, which also runs frontend
+# and builds images locally instead of pulling from a registry).
 #
 # Variable substitution below (${VAR}) is resolved by `docker compose
 # --env-file .env.prod ...` (see deploy.sh) — .env.prod itself is written on
@@ -60,10 +60,11 @@ services:
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
       SMTP_FROM_NAME: ${SMTP_FROM_NAME}
       APP_BASE_URL: ${APP_BASE_URL}
-      # ai-service isn't deployed by this compose file — leave blank/unset to
-      # keep the default http://ai-service:8000, which simply won't resolve;
-      # POST /ai/chat then degrades to 502 AI_SERVICE_UNAVAILABLE instead of
-      # failing startup (see internal/config/config.go).
+      # Leave blank/unset — the Go default (http://ai-service:8000, see
+      # internal/config/config.go) already resolves to the ai-service
+      # container below via the compose network. No hard dependency: if
+      # ai-service is down/misconfigured, POST /ai/chat just degrades to
+      # 502 AI_SERVICE_UNAVAILABLE instead of failing backend startup.
       AI_SERVICE_URL: ${AI_SERVICE_URL:-}
       # Read only by ./seed (see deploy.sh), not by the server process. Blank
       # means "skip admin bootstrap" — set these in .env.prod only for the
@@ -87,6 +88,29 @@ services:
       resources:
         limits:
           memory: ${MEM_LIMIT_BACKEND:-512M}
+
+  # Python AI Service — internal only, no host-mapped port (backend reaches
+  # it over the compose network by service name, matching root
+  # docker-compose.yml's dev setup and specs/ai-chat-assistant/plan.md
+  # Finding #5). Image is built/pushed by deploy-ai-service.yml, not built
+  # on the VPS.
+  ai-service:
+    image: ${DOCKER_REGISTRY_USER}/pfm-ai-service:${PFM_AI_SERVICE_IMAGE_TAG:-latest}
+    container_name: pfm-ai-service-container
+    restart: unless-stopped
+    pull_policy: always
+    environment:
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: ${MEM_LIMIT_AI_SERVICE:-192M}
 
 volumes:
   pfm_postgres_data:
