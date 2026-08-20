@@ -33,6 +33,18 @@ type Config struct {
 	// ChatService's AIServiceClient call then fails and POST /ai/chat
 	// degrades to 502 AI_SERVICE_UNAVAILABLE rather than failing startup.
 	AIServiceURL string
+
+	// R2* configures the Cloudflare R2 bucket that stores user-uploaded
+	// category icons (service.R2IconUploader). R2AccountID empty means "not
+	// configured yet" — main.go falls back to
+	// service.UnconfiguredIconUploader, same "don't fail startup" pattern as
+	// SMTPHost/AIServiceURL above; POST /categories/icon then degrades to
+	// 503 ICON_UPLOAD_UNAVAILABLE.
+	R2AccountID       string
+	R2AccessKeyID     string
+	R2SecretAccessKey string
+	R2Bucket          string
+	R2PublicBaseURL   string
 }
 
 func Load() (*Config, error) {
@@ -51,6 +63,12 @@ func Load() (*Config, error) {
 		AppBaseURL:    getEnvOrDefault("APP_BASE_URL", "http://localhost:8082"),
 
 		AIServiceURL: getEnvOrDefault("AI_SERVICE_URL", "http://ai-service:8000"),
+
+		R2AccountID:       os.Getenv("R2_ACCOUNT_ID"),
+		R2AccessKeyID:     os.Getenv("R2_ACCESS_KEY_ID"),
+		R2SecretAccessKey: os.Getenv("R2_SECRET_ACCESS_KEY"),
+		R2Bucket:          os.Getenv("R2_BUCKET"),
+		R2PublicBaseURL:   os.Getenv("R2_PUBLIC_BASE_URL"),
 	}
 	if cfg.DatabaseURL == "" {
 		return nil, fmt.Errorf("config.Load: DATABASE_URL is required")

@@ -1,6 +1,6 @@
 -- name: CreateCategory :one
-INSERT INTO categories (user_id, name, icon, type)
-VALUES ($1, $2, $3, $4)
+INSERT INTO categories (user_id, name, icon, type, icon_url)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 
 -- name: NameTypeExists :one
@@ -43,7 +43,8 @@ LIMIT 1;
 UPDATE categories
 SET
     name = COALESCE(sqlc.narg('name'), name),
-    icon = COALESCE(sqlc.narg('icon'), icon)
+    icon = COALESCE(sqlc.narg('icon'), icon),
+    icon_url = COALESCE(sqlc.narg('icon_url'), icon_url)
 WHERE id = $1
   AND user_id = $2
   AND deleted_at IS NULL

@@ -133,6 +133,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: spacing.sm,
     paddingVertical: spacing.md,
+    backgroundColor: "rgba(255,158,150,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,158,150,0.35)",
+    borderRadius: 16,
   },
   logoutLabel: { ...typography.body, color: colors.peach },
 });

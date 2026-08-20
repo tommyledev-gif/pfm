@@ -14,11 +14,13 @@ import { totalBalance } from "@/features/wallets/wallet-totals";
 import { useTransactionsQuery } from "@/features/transactions/api/use-transactions-query";
 import { Transaction } from "@/features/transactions/types";
 import { TransactionFormModal } from "@/features/transactions/components/TransactionFormModal";
+import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 
 export default function HomeScreen() {
   const router = useRouter();
   const wallets = useWalletsQuery();
   const recent = useTransactionsQuery({ limit: 4 });
+  const categories = useCategoriesQuery();
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   const walletCurrencyMap = useMemo(() => {
@@ -26,6 +28,8 @@ export default function HomeScreen() {
     wallets.data?.forEach((w) => map.set(w.id, w.currency));
     return map;
   }, [wallets.data]);
+
+  const categoryById = useMemo(() => new Map(categories.data?.map((c) => [c.id, c])), [categories.data]);
 
   const total = wallets.data ? totalBalance(wallets.data) : null;
   const recentTransactions = recent.data?.pages[0]?.data.slice(0, 4) ?? [];
@@ -38,7 +42,7 @@ export default function HomeScreen() {
       data={recentTransactions}
       keyExtractor={(t) => t.id}
       ListHeaderComponent={
-        <>
+        <View style={styles.header}>
           <TopBar userName="Me" />
 
           <View style={styles.hero}>
@@ -59,16 +63,18 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          <Text style={styles.sectionTitle}>Your Wallets</Text>
-          {wallets.isLoading ? (
-            <ActivityIndicator color={colors.green} style={styles.loader} />
-          ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.walletRow}>
-              {wallets.data?.map((w) => (
-                <WalletCard key={w.id} wallet={w} />
-              ))}
-            </ScrollView>
-          )}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Your Wallets</Text>
+            {wallets.isLoading ? (
+              <ActivityIndicator color={colors.green} style={styles.loader} />
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.walletRow}>
+                {wallets.data?.map((w) => (
+                  <WalletCard key={w.id} wallet={w} />
+                ))}
+              </ScrollView>
+            )}
+          </View>
 
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Recent Transactions</Text>
@@ -76,11 +82,15 @@ export default function HomeScreen() {
               <Text style={styles.seeAll}>See all</Text>
             </Pressable>
           </View>
-        </>
+        </View>
       }
       renderItem={({ item }) => (
         <Pressable onPress={() => setEditingTransaction(item)}>
-          <TransactionRow transaction={item} currency={walletCurrencyMap.get(item.wallet_id)} />
+          <TransactionRow
+            transaction={item}
+            currency={walletCurrencyMap.get(item.wallet_id)}
+            category={categoryById.get(item.category_id)}
+          />
         </Pressable>
       )}
       ListEmptyComponent={
@@ -104,6 +114,8 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bgApp },
   content: { paddingBottom: 140, paddingHorizontal: spacing.xl, gap: spacing.md },
+  header: { gap: spacing.xl },
+  section: { gap: spacing.sm },
   hero: { backgroundColor: colors.green, borderRadius: radii.hero, padding: spacing.xl, gap: spacing.md, marginTop: spacing.sm },
   heroPill: {
     alignSelf: "flex-start",
@@ -134,7 +146,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.onGreen,
   },
   addButtonLabel: { ...typography.body, color: colors.green },
-  sectionTitle: { ...typography.cardTitle, color: colors.textPrimary, marginTop: spacing.sm },
+  sectionTitle: { ...typography.cardTitle, color: colors.textPrimary },
   sectionHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   seeAll: { ...typography.caption, color: colors.green },
   walletRow: { gap: spacing.md, paddingBottom: spacing.xs },

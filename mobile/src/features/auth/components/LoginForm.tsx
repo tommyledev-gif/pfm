@@ -15,8 +15,8 @@ function capitalize(text: string): string {
 }
 
 export function LoginForm() {
-  const [email, setEmail] = useState("admin@pfm.local");
-  const [password, setPassword] = useState("DevAdmin@123");
+  const [email, setEmail] = useState("owner@example.com");
+  const [password, setPassword] = useState("000000");
   const [showPassword, setShowPassword] = useState(false);
   const login = useLoginMutation();
 
@@ -49,7 +49,9 @@ export function LoginForm() {
         </Pressable>
       </View>
       {login.isError ? (
-        <Text style={styles.error}>{capitalize(getErrorMessage(login.error, "Login failed"))}</Text>
+        <View style={styles.errorBox}>
+          <Text style={styles.error}>{capitalize(getErrorMessage(login.error, "Login failed"))}</Text>
+        </View>
       ) : null}
       <PillButton
         label="Log In"
@@ -92,5 +94,13 @@ const styles = StyleSheet.create({
   },
   eyeButton: { padding: spacing.xs },
   button: { marginTop: spacing.sm },
+  errorBox: {
+    backgroundColor: "rgba(255,158,150,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,158,150,0.35)",
+    borderRadius: radii.listCard,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
   error: { color: colors.peach, ...typography.caption },
 });

@@ -88,6 +88,14 @@ const (
 	// inside that service) — a system error, never surfaced with internal
 	// detail (specs/ai-chat-assistant/spec.md S-AI-10).
 	ErrCodeAIServiceUnavailable = "AI_SERVICE_UNAVAILABLE"
+	// ErrCodeIconUploadUnavailable backs POST /categories/icon's 503 when R2
+	// isn't configured (no R2_ACCOUNT_ID/etc — see config.Config) — same
+	// "degrade the one endpoint, don't fail startup" convention as
+	// ErrCodeAIServiceUnavailable.
+	ErrCodeIconUploadUnavailable = "ICON_UPLOAD_UNAVAILABLE"
+	// ErrCodeIconUploadFailed backs POST /categories/icon's 502 when R2 is
+	// configured but the upload itself fails (network/auth/bucket error).
+	ErrCodeIconUploadFailed = "ICON_UPLOAD_FAILED"
 )
 
 // AppError is the single sentinel-error shape services return for known
@@ -138,6 +146,8 @@ var (
 	ErrNotificationAccessDenied = &AppError{Code: ErrCodeNotificationAccessDenied, Status: http.StatusForbidden, Message: "you do not have access to this notification"}
 	ErrNotificationNotFound     = &AppError{Code: ErrCodeNotificationNotFound, Status: http.StatusNotFound, Message: "notification not found"}
 	ErrAIServiceUnavailable     = &AppError{Code: ErrCodeAIServiceUnavailable, Status: http.StatusBadGateway, Message: "the assistant is temporarily unavailable, please try again"}
+	ErrIconUploadUnavailable    = &AppError{Code: ErrCodeIconUploadUnavailable, Status: http.StatusServiceUnavailable, Message: "icon upload is not configured"}
+	ErrIconUploadFailed         = &AppError{Code: ErrCodeIconUploadFailed, Status: http.StatusBadGateway, Message: "could not upload icon, please try again"}
 )
 
 // NewInvalidInputError builds a 400 INVALID_INPUT error with a field-specific message.

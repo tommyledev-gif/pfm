@@ -12,6 +12,7 @@ import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useTransactionsQuery } from "@/features/transactions/api/use-transactions-query";
 import { Transaction } from "@/features/transactions/types";
 import { TransactionFormModal } from "@/features/transactions/components/TransactionFormModal";
+import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 
 const FILTERS: { label: string; value: TransactionType | undefined }[] = [
   { label: "All", value: undefined },
@@ -26,6 +27,7 @@ export default function TransactionsScreen() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const wallets = useWalletsQuery();
+  const categories = useCategoriesQuery();
   const transactions = useTransactionsQuery({ type: filter, from: dateRange.from, to: dateRange.to });
 
   const walletCurrencyMap = useMemo(() => {
@@ -33,6 +35,8 @@ export default function TransactionsScreen() {
     wallets.data?.forEach((w) => map.set(w.id, w.currency));
     return map;
   }, [wallets.data]);
+
+  const categoryById = useMemo(() => new Map(categories.data?.map((c) => [c.id, c])), [categories.data]);
 
   const items = transactions.data?.pages.flatMap((page) => page.data) ?? [];
   const hasDateFilter = Boolean(dateRange.from);
@@ -49,7 +53,7 @@ export default function TransactionsScreen() {
           if (transactions.hasNextPage && !transactions.isFetchingNextPage) transactions.fetchNextPage();
         }}
         ListHeaderComponent={
-          <>
+          <View style={styles.header}>
             <View style={styles.headerRow}>
               <Text style={styles.title}>Transactions</Text>
               <View style={styles.headerActions}>
@@ -79,7 +83,7 @@ export default function TransactionsScreen() {
                 <Chip key={f.label} label={f.label} active={filter === f.value} onPress={() => setFilter(f.value)} />
               ))}
             </View>
-          </>
+          </View>
         }
         renderItem={({ item }) => (
           <Pressable
@@ -88,7 +92,11 @@ export default function TransactionsScreen() {
               setFormOpen(true);
             }}
           >
-            <TransactionRow transaction={item} currency={walletCurrencyMap.get(item.wallet_id)} />
+            <TransactionRow
+              transaction={item}
+              currency={walletCurrencyMap.get(item.wallet_id)}
+              category={categoryById.get(item.category_id)}
+            />
           </Pressable>
         )}
         ListEmptyComponent={
@@ -123,6 +131,7 @@ export default function TransactionsScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bgApp },
   content: { paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: 140, gap: spacing.md },
+  header: { gap: spacing.md },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   title: { ...typography.title, color: colors.textPrimary },
@@ -148,7 +157,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  chipRow: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.sm },
+  chipRow: { flexDirection: "row", gap: spacing.sm },
   loader: { marginVertical: spacing.lg },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
 });

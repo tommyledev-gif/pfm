@@ -8,6 +8,7 @@ import { Category } from "@/features/categories/types";
 export interface UpdateCategoryRequest {
   name?: string;
   icon?: string;
+  icon_url?: string;
 }
 
 export function useUpdateCategoryMutation() {

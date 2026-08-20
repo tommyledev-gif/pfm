@@ -10,4 +10,7 @@ export interface Category {
   icon: string | null;
   type: CategoryType;
   created_at: string;
+  // icon_url is an uploaded custom image (Cloudflare R2) — takes display
+  // priority over `icon`'s free-text emoji when present.
+  icon_url: string | null;
 }

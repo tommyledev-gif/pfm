@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -81,6 +81,18 @@ export default function AiChatScreen() {
   // the same signal, so the input only needs nav clearance while it's closed.
   const keyboardHeight = useKeyboardHeight();
   const keyboardVisible = keyboardHeight > 0;
+
+  // onContentSizeChange (below) only fires once the FlatList has *laid out*
+  // content, which can race the screen mount for a thread restored from
+  // chat-store's persisted state — a screen re-entered mid-conversation must
+  // land on the last message immediately, not wherever the initial layout
+  // happens to leave the scroll offset.
+  useEffect(() => {
+    if (!thread.length) return;
+    const timer = setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const wallets = useWalletsQuery();
   const categories = useCategoriesQuery();
@@ -203,6 +215,8 @@ export default function AiChatScreen() {
                   action={item.action}
                   walletName={walletById.get(item.action.payload.wallet_id)?.name ?? "Wallet"}
                   categoryName={categoryById.get(item.action.payload.category_id)?.name ?? "Category"}
+                  categoryIcon={categoryById.get(item.action.payload.category_id)?.icon}
+                  categoryIconUrl={categoryById.get(item.action.payload.category_id)?.icon_url}
                   currency={walletById.get(item.action.payload.wallet_id)?.currency ?? "VND"}
                   confirmed={Boolean(item.confirmed)}
                   saving={confirmingId === item.id}

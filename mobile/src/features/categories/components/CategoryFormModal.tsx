@@ -1,15 +1,19 @@
 import { useEffect, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 
+import { Avatar } from "@/components/ui/Avatar";
 import { Drawer } from "@/components/shared/Drawer";
 import { PillButton } from "@/components/ui/PillButton";
 import { TrashIcon } from "@/components/ui/Icon";
 import { getErrorMessage } from "@/lib/axios";
+import { colorForCategory } from "@/lib/category-color";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { CATEGORY_TYPES, CategoryType } from "@/lib/constants";
 import { useCreateCategoryMutation } from "@/features/categories/api/use-create-category-mutation";
 import { useUpdateCategoryMutation } from "@/features/categories/api/use-update-category-mutation";
 import { useDeleteCategoryMutation } from "@/features/categories/api/use-delete-category-mutation";
+import { useUploadCategoryIconMutation } from "@/features/categories/api/use-upload-category-icon-mutation";
 import { Category } from "@/features/categories/types";
 
 interface CategoryFormModalProps {
@@ -19,16 +23,19 @@ interface CategoryFormModalProps {
 }
 
 // Profile → Categories management: create/edit form. `icon` is a free-text
-// string on the backend (max 32 chars, not an enum) — presented as a plain
-// text field rather than an icon picker. `type` can't change after creation
-// (UpdateCategoryRequest doesn't accept it), so it's fixed once editing.
+// emoji/label string on the backend (max 32 chars, not an enum) — presented
+// as a plain text field, used only when no uploaded photo (`icon_url`) is
+// set. `type` can't change after creation (UpdateCategoryRequest doesn't
+// accept it), so it's fixed once editing.
 export function CategoryFormModal({ visible, onClose, editingCategory }: CategoryFormModalProps) {
   const isEditing = Boolean(editingCategory);
   const createCategory = useCreateCategoryMutation();
   const updateCategory = useUpdateCategoryMutation();
   const deleteCategory = useDeleteCategoryMutation();
+  const uploadIcon = useUploadCategoryIconMutation();
   const [name, setName] = useState("");
   const [icon, setIcon] = useState("");
+  const [iconUrl, setIconUrl] = useState<string | undefined>(undefined);
   const [type, setType] = useState<CategoryType>("expense");
 
   useEffect(() => {
@@ -36,25 +43,50 @@ export function CategoryFormModal({ visible, onClose, editingCategory }: Categor
     if (editingCategory) {
       setName(editingCategory.name);
       setIcon(editingCategory.icon ?? "");
+      setIconUrl(editingCategory.icon_url ?? undefined);
       setType(editingCategory.type);
     } else {
       setName("");
       setIcon("");
+      setIconUrl(undefined);
       setType("expense");
     }
   }, [visible, editingCategory]);
 
   const mutation = isEditing ? updateCategory : createCategory;
 
+  // Uploads immediately on pick (POST /categories/icon returns the R2 URL
+  // right away) rather than deferring to submit — the same uploaded image
+  // then just rides along as icon_url on whichever mutation (create/update)
+  // the user eventually submits.
+  const pickIcon = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) return;
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.8,
+    });
+    if (result.canceled) return;
+
+    const asset = result.assets[0];
+    const mimeType = asset.mimeType ?? "image/jpeg";
+    const name = asset.fileName ?? `icon.${mimeType.split("/")[1] ?? "jpg"}`;
+    uploadIcon.mutate(
+      { uri: asset.uri, name, mimeType },
+      { onSuccess: (data) => setIconUrl(data.icon_url) },
+    );
+  };
+
   const submit = () => {
     if (!name.trim()) return;
     if (isEditing && editingCategory) {
       updateCategory.mutate(
-        { id: editingCategory.id, body: { name, icon: icon || undefined } },
+        { id: editingCategory.id, body: { name, icon: icon || undefined, icon_url: iconUrl } },
         { onSuccess: onClose },
       );
     } else {
-      createCategory.mutate({ name, icon: icon || undefined, type }, { onSuccess: onClose });
+      createCategory.mutate({ name, icon: icon || undefined, type, icon_url: iconUrl }, { onSuccess: onClose });
     }
   };
 
@@ -70,11 +102,36 @@ export function CategoryFormModal({ visible, onClose, editingCategory }: Categor
     ]);
   };
 
-  const activeError = mutation.isError ? mutation.error : deleteCategory.isError ? deleteCategory.error : null;
+  const activeError = mutation.isError
+    ? mutation.error
+    : deleteCategory.isError
+      ? deleteCategory.error
+      : uploadIcon.isError
+        ? uploadIcon.error
+        : null;
 
   return (
     <Drawer visible={visible} onClose={onClose}>
       <Text style={styles.title}>{isEditing ? "Edit category" : "New category"}</Text>
+
+      <View style={styles.iconPickerRow}>
+        <View style={styles.iconPreview}>
+          {uploadIcon.isPending ? (
+            <ActivityIndicator color={colors.textPrimary} />
+          ) : (
+            <Avatar
+              name={name || "?"}
+              color={editingCategory ? colorForCategory(editingCategory.id) : colors.lavender}
+              size={56}
+              icon={icon}
+              iconUrl={iconUrl}
+            />
+          )}
+        </View>
+        <Pressable onPress={pickIcon} disabled={uploadIcon.isPending} hitSlop={8}>
+          <Text style={styles.changePhoto}>{iconUrl ? "Change photo" : "Upload photo"}</Text>
+        </Pressable>
+      </View>
 
       <Text style={styles.label}>Name</Text>
       <TextInput
@@ -85,7 +142,7 @@ export function CategoryFormModal({ visible, onClose, editingCategory }: Categor
         style={styles.input}
       />
 
-      <Text style={styles.label}>Icon (optional)</Text>
+      <Text style={styles.label}>Emoji icon (used when no photo is set)</Text>
       <TextInput
         value={icon}
         onChangeText={setIcon}
@@ -136,6 +193,9 @@ export function CategoryFormModal({ visible, onClose, editingCategory }: Categor
 
 const styles = StyleSheet.create({
   title: { ...typography.title, color: colors.textPrimary },
+  iconPickerRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  iconPreview: { width: 56, height: 56, alignItems: "center", justifyContent: "center" },
+  changePhoto: { ...typography.label, color: colors.green },
   label: { ...typography.caption, color: colors.textSecondary },
   chipRow: { flexDirection: "row", gap: spacing.sm },
   chip: {

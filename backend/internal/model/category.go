@@ -24,6 +24,10 @@ type Category struct {
 	Type      CategoryType
 	CreatedAt time.Time
 	DeletedAt *time.Time
+	// IconURL is an uploaded custom image (Cloudflare R2 — see
+	// service.R2IconUploader), distinct from Icon's free-text emoji/label.
+	// When set, clients should prefer it over Icon for display.
+	IconURL *string
 }
 
 // IsSystem reports whether this category is a shared, system-defined

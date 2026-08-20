@@ -13,13 +13,30 @@ import { Transaction } from "@/features/transactions/types";
 // `currency` comes from the caller's wallet lookup — Transaction itself
 // carries no currency field (only a denormalized wallet_name), the backend
 // resolves currency via the wallet relation, so mobile must too.
-export function TransactionRow({ transaction, currency }: { transaction: Transaction; currency?: string }) {
+// `category` is an optional lookup result (icon/icon_url) from the caller's
+// own categories fetch — Transaction itself only carries a denormalized
+// category_name, same reasoning as the `currency` prop above.
+export function TransactionRow({
+  transaction,
+  currency,
+  category,
+}: {
+  transaction: Transaction;
+  currency?: string;
+  category?: { icon: string | null; icon_url: string | null };
+}) {
   const isIncome = transaction.type === "income";
   const label = transaction.note?.trim() || transaction.category_name;
 
   return (
     <View style={styles.row}>
-      <Avatar name={label} color={colorForCategory(transaction.category_id)} size={44} />
+      <Avatar
+        name={label}
+        color={colorForCategory(transaction.category_id)}
+        size={44}
+        icon={category?.icon}
+        iconUrl={category?.icon_url}
+      />
       <View style={styles.middle}>
         <Text style={styles.title} numberOfLines={1}>
           {label}

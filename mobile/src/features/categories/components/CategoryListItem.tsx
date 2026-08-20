@@ -28,7 +28,13 @@ export function CategoryListItem({ category, onPress }: { category: Category; on
       onLongPress={isSystem ? undefined : onPress}
       disabled={isSystem}
     >
-      <Avatar name={category.name} color={colorForCategory(category.id)} size={40} />
+      <Avatar
+        name={category.name}
+        color={colorForCategory(category.id)}
+        size={40}
+        icon={category.icon}
+        iconUrl={category.icon_url}
+      />
       <View style={styles.info}>
         <Text style={styles.name}>{category.name}</Text>
         <Text style={styles.sub}>

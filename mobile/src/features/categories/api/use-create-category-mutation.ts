@@ -8,6 +8,7 @@ export interface CreateCategoryRequest {
   name: string;
   icon?: string;
   type: CategoryType;
+  icon_url?: string;
 }
 
 export function useCreateCategoryMutation() {

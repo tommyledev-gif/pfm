@@ -39,10 +39,11 @@ func (s *CategoryService) CreateCategory(ctx context.Context, userID uuid.UUID, 
 	}
 
 	category, err := s.repo.CreateCategory(ctx, repository.CreateCategoryParams{
-		UserID: userID,
-		Name:   req.Name,
-		Icon:   req.Icon,
-		Type:   req.Type,
+		UserID:  userID,
+		Name:    req.Name,
+		Icon:    req.Icon,
+		Type:    req.Type,
+		IconURL: req.IconURL,
 	})
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -153,10 +154,11 @@ func (s *CategoryService) UpdateCategory(ctx context.Context, userID, categoryID
 	}
 
 	updated, err := s.repo.UpdateCategory(ctx, repository.UpdateCategoryParams{
-		ID:     categoryID,
-		UserID: userID,
-		Name:   req.Name,
-		Icon:   req.Icon,
+		ID:      categoryID,
+		UserID:  userID,
+		Name:    req.Name,
+		Icon:    req.Icon,
+		IconURL: req.IconURL,
 	})
 	if err != nil {
 		if isUniqueViolation(err) {

@@ -1,8 +1,10 @@
 import { StyleSheet, Text, View } from "react-native";
 
+import { Avatar } from "@/components/ui/Avatar";
 import { CalendarIcon, CheckIcon, EditIcon } from "@/components/ui/Icon";
 import { PillButton } from "@/components/ui/PillButton";
 import { PillTag } from "@/components/ui/PillTag";
+import { colorForCategory } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
 import { formatDateShort } from "@/lib/format-date";
 import { colors, spacing, typography } from "@/lib/theme";
@@ -12,6 +14,8 @@ interface TransactionActionCardProps {
   action: ChatAction;
   walletName: string;
   categoryName: string;
+  categoryIcon?: string | null;
+  categoryIconUrl?: string | null;
   currency: string;
   confirmed: boolean;
   saving: boolean;
@@ -32,6 +36,8 @@ export function TransactionActionCard({
   action,
   walletName,
   categoryName,
+  categoryIcon,
+  categoryIconUrl,
   currency,
   confirmed,
   saving,
@@ -51,6 +57,13 @@ export function TransactionActionCard({
         </View>
       ) : null}
       <View style={styles.topRow}>
+        <Avatar
+          name={categoryName}
+          color={colorForCategory(payload.category_id)}
+          size={32}
+          icon={categoryIcon}
+          iconUrl={categoryIconUrl}
+        />
         <Text style={styles.merchant} numberOfLines={1}>
           {payload.note || categoryName}
         </Text>

@@ -19,6 +19,7 @@ type CategoryResponse struct {
 	Icon      *string    `json:"icon"`
 	Type      string     `json:"type"`
 	CreatedAt time.Time  `json:"created_at"`
+	IconURL   *string    `json:"icon_url"`
 }
 
 func NewCategoryResponse(c *model.Category) CategoryResponse {
@@ -29,6 +30,7 @@ func NewCategoryResponse(c *model.Category) CategoryResponse {
 		Icon:      c.Icon,
 		Type:      string(c.Type),
 		CreatedAt: c.CreatedAt,
+		IconURL:   c.IconURL,
 	}
 }
 

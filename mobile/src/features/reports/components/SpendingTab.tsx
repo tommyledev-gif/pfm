@@ -9,6 +9,7 @@ import { colorForCategory } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
 import { formatDateRange } from "@/lib/format-date";
 import { colors, radii, spacing, typography } from "@/lib/theme";
+import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary-query";
 
 // Insights → Spending tab — README: date-range label, Income/Expense stat
@@ -19,6 +20,7 @@ export function SpendingTab() {
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
   const [pickerOpen, setPickerOpen] = useState(false);
   const summary = useReportSummaryQuery(dateRange);
+  const categories = useCategoriesQuery();
   const [selected, setSelected] = useState<string | null>(null);
 
   if (summary.isLoading) {
@@ -32,9 +34,17 @@ export function SpendingTab() {
   const primaryTotal = totals[0];
   const currency = primaryTotal?.currency ?? "VND";
 
+  const categoryById = new Map(categories.data?.map((c) => [c.id, c]));
   const segments = by_category
     .filter((c) => c.type === "expense" && c.currency === currency)
-    .map((c) => ({ key: c.category_id, label: c.category_name, amount: c.amount, color: colorForCategory(c.category_id) }));
+    .map((c) => ({
+      key: c.category_id,
+      label: c.category_name,
+      amount: c.amount,
+      color: colorForCategory(c.category_id),
+      icon: categoryById.get(c.category_id)?.icon,
+      iconUrl: categoryById.get(c.category_id)?.icon_url,
+    }));
 
   const totalExpense = segments.reduce((sum, s) => sum + s.amount, 0);
 

@@ -15,6 +15,11 @@ import (
 // before RequireRole (role comes from the token) and before
 // InviteRateLimiter (keyed by the caller's user ID from that same token).
 func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, chatHandler *handler.ChatHandler, tokens *service.TokenService, logger *zap.Logger) {
+	// Serves the invite-activation form at the backend's own domain — see
+	// handler.ActivatePageHandler doc comment for why this lives here instead
+	// of on the (currently undeployed) frontend/ Next.js app.
+	app.Get("/activate", handler.ActivatePageHandler)
+
 	v1 := app.Group("/api/v1")
 
 	// Deploy-verification probe (CI/CD health check after a VPS deploy) — no
@@ -45,6 +50,9 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	// manages only their own categories and reads system ones identically
 	// (plan.md Security & Actor Resolution).
 	categories := v1.Group("/categories", middleware.JWTAuth(tokens, logger))
+	// A standalone upload step, not nested under "/:id" — a client picks an
+	// image before a category exists yet (the create form).
+	categories.Post("/icon", categoryHandler.UploadIcon)
 	categories.Post("/", categoryHandler.CreateCategory)
 	categories.Get("/", categoryHandler.ListCategories)
 	categories.Get("/:id", categoryHandler.GetCategory)

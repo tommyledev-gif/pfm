@@ -8,6 +8,7 @@ import { colors, radii, spacing, typography } from "@/lib/theme";
 import { WalletCurrency } from "@/lib/constants";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { Budget } from "@/features/budgets/types";
+import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { primaryCurrency } from "@/features/wallets/wallet-totals";
 
@@ -18,6 +19,8 @@ import { primaryCurrency } from "@/features/wallets/wallet-totals";
 export function BudgetsTab() {
   const budgets = useBudgetsQuery();
   const wallets = useWalletsQuery();
+  const categories = useCategoriesQuery();
+  const categoryById = new Map(categories.data?.map((c) => [c.id, c]));
   const [modalOpen, setModalOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const currency: WalletCurrency = (wallets.data ? primaryCurrency(wallets.data) : undefined) ?? "VND";
@@ -59,7 +62,7 @@ export function BudgetsTab() {
                 setModalOpen(true);
               }}
             >
-              <BudgetCard budget={budget} limit={limit} maxLimit={maxLimit} />
+              <BudgetCard budget={budget} limit={limit} maxLimit={maxLimit} category={categoryById.get(budget.category_id)} />
             </Pressable>
           ))
         )}

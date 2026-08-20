@@ -52,6 +52,7 @@ func main() {
 
 	tokenService := service.NewTokenService(cfg.JWTSecret)
 	emailSender := newEmailSender(cfg, logger)
+	iconUploader := newIconUploader(cfg, logger)
 	userService := service.NewUserService(userRepo, emailSender, logger)
 	authService := service.NewAuthService(userRepo, revokedRepo, tokenService, logger)
 	walletService := service.NewWalletService(walletRepo, logger)
@@ -66,7 +67,7 @@ func main() {
 	userHandler := handler.NewUserHandler(userService, logger)
 	authHandler := handler.NewAuthHandler(authService, logger)
 	walletHandler := handler.NewWalletHandler(walletService, logger)
-	categoryHandler := handler.NewCategoryHandler(categoryService, logger)
+	categoryHandler := handler.NewCategoryHandler(categoryService, iconUploader, logger)
 	budgetHandler := handler.NewBudgetHandler(budgetService, logger)
 	transactionHandler := handler.NewTransactionHandler(transactionService, logger)
 	reportHandler := handler.NewReportHandler(reportService, logger)
@@ -158,4 +159,27 @@ func newEmailSender(cfg *config.Config, logger *zap.Logger) service.EmailSender 
 		FromName:   cfg.SMTPFromName,
 		AppBaseURL: cfg.AppBaseURL,
 	})
+}
+
+// newIconUploader picks R2 once R2_ACCOUNT_ID is set, otherwise falls back
+// to a placeholder that fails only the individual upload request — same
+// "don't fail startup" convention as newEmailSender.
+func newIconUploader(cfg *config.Config, logger *zap.Logger) service.IconUploader {
+	if cfg.R2AccountID == "" {
+		logger.Warn("R2_ACCOUNT_ID not set — category icon uploads will fail with 503 ICON_UPLOAD_UNAVAILABLE")
+		return service.UnconfiguredIconUploader{}
+	}
+	uploader, err := service.NewR2IconUploader(service.R2Config{
+		AccountID:       cfg.R2AccountID,
+		AccessKeyID:     cfg.R2AccessKeyID,
+		SecretAccessKey: cfg.R2SecretAccessKey,
+		Bucket:          cfg.R2Bucket,
+		PublicBaseURL:   cfg.R2PublicBaseURL,
+	})
+	if err != nil {
+		logger.Error("failed to configure R2 icon uploader — falling back to disabled uploads", zap.Error(err))
+		return service.UnconfiguredIconUploader{}
+	}
+	logger.Info("R2 icon uploader configured", zap.String("bucket", cfg.R2Bucket))
+	return uploader
 }

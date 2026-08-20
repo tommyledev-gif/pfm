@@ -34,18 +34,20 @@ func (r *CategoryRepository) BeginTx(ctx context.Context) (pgx.Tx, error) {
 }
 
 type CreateCategoryParams struct {
-	UserID uuid.UUID
-	Name   string
-	Icon   *string
-	Type   string
+	UserID  uuid.UUID
+	Name    string
+	Icon    *string
+	Type    string
+	IconURL *string
 }
 
 func (r *CategoryRepository) CreateCategory(ctx context.Context, arg CreateCategoryParams) (*model.Category, error) {
 	row, err := r.q.CreateCategory(ctx, sqlc.CreateCategoryParams{
-		UserID: &arg.UserID,
-		Name:   arg.Name,
-		Icon:   arg.Icon,
-		Type:   arg.Type,
+		UserID:  &arg.UserID,
+		Name:    arg.Name,
+		Icon:    arg.Icon,
+		Type:    arg.Type,
+		IconURL: arg.IconURL,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("repository.CreateCategory: %w", err)
@@ -98,10 +100,11 @@ func (r *CategoryRepository) GetCategoryByID(ctx context.Context, id uuid.UUID) 
 }
 
 type UpdateCategoryParams struct {
-	ID     uuid.UUID
-	UserID uuid.UUID
-	Name   *string
-	Icon   *string
+	ID      uuid.UUID
+	UserID  uuid.UUID
+	Name    *string
+	Icon    *string
+	IconURL *string
 }
 
 // UpdateCategory is scoped by id + user_id — a system category or another
@@ -109,10 +112,11 @@ type UpdateCategoryParams struct {
 // already have been checked by the caller via getOwnedCategory beforehand).
 func (r *CategoryRepository) UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (*model.Category, error) {
 	row, err := r.q.UpdateCategory(ctx, sqlc.UpdateCategoryParams{
-		ID:     arg.ID,
-		UserID: arg.UserID,
-		Name:   arg.Name,
-		Icon:   arg.Icon,
+		ID:      arg.ID,
+		UserID:  arg.UserID,
+		Name:    arg.Name,
+		Icon:    arg.Icon,
+		IconURL: arg.IconURL,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("repository.UpdateCategory: %w", err)
@@ -168,5 +172,6 @@ func toCategoryModel(row sqlc.Category) *model.Category {
 		Type:      model.CategoryType(row.Type),
 		CreatedAt: row.CreatedAt,
 		DeletedAt: row.DeletedAt,
+		IconURL:   row.IconURL,
 	}
 }

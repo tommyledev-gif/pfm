@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Circle, G } from "react-native-svg";
 
+import { Avatar } from "@/components/ui/Avatar";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { formatCurrency } from "@/lib/currency";
 import { colors, typography } from "@/lib/theme";
@@ -10,6 +11,8 @@ export interface DonutSegment {
   label: string;
   amount: number;
   color: string;
+  icon?: string | null;
+  iconUrl?: string | null;
 }
 
 interface DonutChartProps {
@@ -98,7 +101,7 @@ export function DonutLegendRow({
   return (
     <Pressable onPress={onPress} style={[legendStyles.row, selected && legendStyles.rowSelected]}>
       <View style={legendStyles.headRow}>
-        <View style={[legendStyles.dot, { backgroundColor: segment.color }]} />
+        <Avatar name={segment.label} color={segment.color} size={22} icon={segment.icon} iconUrl={segment.iconUrl} />
         <Text style={legendStyles.name} numberOfLines={1}>
           {segment.label}
         </Text>
@@ -122,7 +125,6 @@ const legendStyles = StyleSheet.create({
   row: { gap: 6, paddingVertical: 8 },
   rowSelected: { opacity: 1 },
   headRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  dot: { width: 10, height: 10, borderRadius: 5 },
   name: { flex: 1, ...typography.label, color: colors.textPrimary },
   value: { ...typography.tiny, color: colors.textSecondary },
 });

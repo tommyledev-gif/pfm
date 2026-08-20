@@ -9,6 +9,11 @@ type CreateCategoryRequest struct {
 	Name string  `json:"name" validate:"required,max=50"`
 	Icon *string `json:"icon" validate:"omitempty,max=32"`
 	Type string  `json:"type" validate:"required,oneof=income expense"`
+	// IconURL is the URL returned by POST /categories/icon (a prior upload)
+	// — never a client-supplied arbitrary URL, but not validated as such
+	// here since the handler has no way to tell the two apart; it is just
+	// stored as-is, same trust level as Icon.
+	IconURL *string `json:"icon_url" validate:"omitempty,max=500"`
 }
 
 // UpdateCategoryRequest is the body of PATCH /categories/{id}. Deliberately
@@ -17,12 +22,13 @@ type CreateCategoryRequest struct {
 // by UpdateWalletRequest) so an unrecognized field like "type" is rejected
 // with 400, not silently ignored.
 type UpdateCategoryRequest struct {
-	Name *string `json:"name" validate:"omitempty,max=50"`
-	Icon *string `json:"icon" validate:"omitempty,max=32"`
+	Name    *string `json:"name" validate:"omitempty,max=50"`
+	Icon    *string `json:"icon" validate:"omitempty,max=32"`
+	IconURL *string `json:"icon_url" validate:"omitempty,max=500"`
 }
 
 // HasUpdates reports whether at least one field was supplied — an empty
 // body is a client mistake (400), not a no-op 200 (spec.md S-CAT-25).
 func (r UpdateCategoryRequest) HasUpdates() bool {
-	return r.Name != nil || r.Icon != nil
+	return r.Name != nil || r.Icon != nil || r.IconURL != nil
 }

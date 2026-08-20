@@ -21,6 +21,7 @@ services:
       - ./backend/db/migrations/009_notifications.sql:/docker-entrypoint-initdb.d/08_notifications.sql:ro
       - ./backend/db/migrations/010_transactions_idempotency_key.sql:/docker-entrypoint-initdb.d/09_transactions_idempotency_key.sql:ro
       - ./backend/db/migrations/011_chat_messages.sql:/docker-entrypoint-initdb.d/10_chat_messages.sql:ro
+      - ./backend/db/migrations/012_categories_icon_url.sql:/docker-entrypoint-initdb.d/11_categories_icon_url.sql:ro
       - ./infra/postgres/init/seed_dev_admin.sh:/docker-entrypoint-initdb.d/11_seed_dev_admin.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
@@ -47,6 +48,11 @@ services:
       SMTP_FROM_NAME: ${SMTP_FROM_NAME}
       APP_BASE_URL: ${APP_BASE_URL}
       AI_SERVICE_URL: http://ai-service:8000
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_BUCKET: ${R2_BUCKET:-}
+      R2_PUBLIC_BASE_URL: ${R2_PUBLIC_BASE_URL:-}
     ports:
       - "${BACKEND_PORT}:8080"
     depends_on:

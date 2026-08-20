@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"io"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -20,11 +22,12 @@ import (
 // (same reasoning as WalletHandler).
 type CategoryHandler struct {
 	categoryService *service.CategoryService
+	iconUploader    service.IconUploader
 	logger          *zap.Logger
 }
 
-func NewCategoryHandler(categoryService *service.CategoryService, logger *zap.Logger) *CategoryHandler {
-	return &CategoryHandler{categoryService: categoryService, logger: logger}
+func NewCategoryHandler(categoryService *service.CategoryService, iconUploader service.IconUploader, logger *zap.Logger) *CategoryHandler {
+	return &CategoryHandler{categoryService: categoryService, iconUploader: iconUploader, logger: logger}
 }
 
 // CreateCategory handles POST /categories (registered behind JWTAuth only —
@@ -137,6 +140,50 @@ func (h *CategoryHandler) DeleteCategory(c *fiber.Ctx) error {
 	}
 
 	return response.Success(c, fiber.StatusOK, "category deleted successfully", dto.NewCategoryResponse(category))
+}
+
+// UploadIcon handles POST /categories/icon (multipart, field "file") — a
+// standalone upload step rather than part of Create/Update, so a client can
+// pick an image before a category exists yet (the create form) and reuse
+// the same returned icon_url on both Create and Update requests.
+func (h *CategoryHandler) UploadIcon(c *fiber.Ctx) error {
+	if _, err := callerUUID(c); err != nil {
+		return response.Error(c, h.logger, common.ErrUnauthenticated)
+	}
+
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		return response.Error(c, h.logger, common.NewInvalidInputError("missing \"file\" in multipart body"))
+	}
+	if fileHeader.Size > common.CategoryIconMaxUploadBytes {
+		return response.Error(c, h.logger, common.NewInvalidInputError("icon file exceeds the 2MB size limit"))
+	}
+	contentType := fileHeader.Header.Get("Content-Type")
+	if !common.CategoryIconAllowedContentTypes[contentType] {
+		return response.Error(c, h.logger, common.NewInvalidInputError("icon must be a PNG, JPEG, or SVG image"))
+	}
+
+	file, err := fileHeader.Open()
+	if err != nil {
+		return response.Error(c, h.logger, common.NewInvalidInputError("could not read uploaded file"))
+	}
+	defer file.Close() //nolint:errcheck // read-only handle, nothing to flush
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return response.Error(c, h.logger, common.NewInvalidInputError("could not read uploaded file"))
+	}
+
+	iconURL, err := h.iconUploader.UploadIcon(c.Context(), fileHeader.Filename, contentType, data)
+	if err != nil {
+		h.logger.Error("icon upload failed", zap.Error(err))
+		if _, unconfigured := h.iconUploader.(service.UnconfiguredIconUploader); unconfigured {
+			return response.Error(c, h.logger, common.ErrIconUploadUnavailable)
+		}
+		return response.Error(c, h.logger, common.ErrIconUploadFailed)
+	}
+
+	return response.Success(c, fiber.StatusOK, "icon uploaded successfully", fiber.Map{"icon_url": iconURL})
 }
 
 // categoryIDParam parses the :id path segment, returning 400 INVALID_INPUT

@@ -74,6 +74,21 @@ const (
 	CategoryIconMaxLength = 32
 )
 
+// Category icon uploads (Cloudflare R2 — see service.R2IconUploader).
+// CategoryIconMaxUploadBytes is a plan-owned assumption, same convention as
+// CategoryIconMaxLength above — no spec commits to a number.
+const CategoryIconMaxUploadBytes = 2 * 1024 * 1024 // 2 MiB
+
+// CategoryIconAllowedContentTypes is the upload allow-list — png/jpg/svg
+// per the product ask, checked against the multipart part's declared
+// Content-Type (not sniffed from bytes; good enough for an
+// invite-only app with no anonymous upload surface).
+var CategoryIconAllowedContentTypes = map[string]bool{
+	"image/png":     true,
+	"image/jpeg":    true,
+	"image/svg+xml": true,
+}
+
 // Budgets (F-05).
 const (
 	// BudgetPeriodMonthly is the only accepted `period` value in MVP
