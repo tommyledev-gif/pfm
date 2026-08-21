@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { ChevronLeftIcon, PlusIcon } from "@/components/ui/Icon";
@@ -11,6 +11,9 @@ import { useCategoriesQuery } from "@/features/categories/api/use-categories-que
 import { Category } from "@/features/categories/types";
 import { CategoryFormModal } from "@/features/categories/components/CategoryFormModal";
 import { CategoryListItem } from "@/features/categories/components/CategoryListItem";
+import { CategoryListItemSkeleton } from "@/features/categories/components/CategoryListItemSkeleton";
+
+const LIST_SKELETON_COUNT = 6;
 
 export default function CategoriesScreen() {
   const router = useRouter();
@@ -44,7 +47,13 @@ export default function CategoriesScreen() {
       </View>
 
       {categories.isLoading ? (
-        <ActivityIndicator color={colors.green} style={styles.loader} />
+        <View style={styles.list}>
+          {Array.from({ length: LIST_SKELETON_COUNT }).map((_, i) => (
+            <View key={i} style={i > 0 ? styles.skeletonSpacing : undefined}>
+              <CategoryListItemSkeleton />
+            </View>
+          ))}
+        </View>
       ) : (
         <FlatList
           data={categories.data ?? []}
@@ -89,6 +98,6 @@ const styles = StyleSheet.create({
   },
   chipRow: { flexDirection: "row", gap: spacing.sm, paddingHorizontal: spacing.xl, paddingBottom: spacing.md },
   list: { paddingHorizontal: spacing.xl, paddingBottom: 140 },
-  loader: { marginTop: spacing.xxl },
+  skeletonSpacing: { marginTop: spacing.sm },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
 });

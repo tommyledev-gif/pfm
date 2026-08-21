@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { CalendarIcon } from "@/components/ui/Icon";
 import { Card } from "@/components/ui/Card";
@@ -11,6 +11,7 @@ import { formatDateRange } from "@/lib/format-date";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary-query";
+import { SpendingTabSkeleton } from "@/features/reports/components/SpendingTabSkeleton";
 
 // Insights → Spending tab — README: date-range label, Income/Expense stat
 // cards, donut ("By Category" default), legend list with progress bars.
@@ -24,7 +25,7 @@ export function SpendingTab() {
   const [selected, setSelected] = useState<string | null>(null);
 
   if (summary.isLoading) {
-    return <ActivityIndicator color={colors.green} style={styles.loader} />;
+    return <SpendingTabSkeleton />;
   }
   if (!summary.data) {
     return <Text style={styles.empty}>Could not load report.</Text>;
@@ -127,6 +128,5 @@ const styles = StyleSheet.create({
   statLabel: { ...typography.caption, color: colors.textSecondary },
   statValue: { ...typography.cardTitle },
   donutCard: { alignItems: "center", paddingVertical: spacing.xl },
-  loader: { marginTop: spacing.xxl },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
 });

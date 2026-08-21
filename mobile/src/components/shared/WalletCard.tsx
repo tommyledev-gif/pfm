@@ -19,22 +19,44 @@ const TYPE_LABEL: Record<Wallet["type"], string> = {
   other: "Other",
 };
 
-// "Your Wallets" horizontal scroll card — README: "name, type, balance,
-// color dot per wallet type".
+// "Your Wallets" horizontal scroll card.
+// Compact 2-row layout: identity/type on top, balance below.
 export function WalletCard({ wallet }: { wallet: Wallet }) {
+  const typeColor = TYPE_COLOR[wallet.type];
+
   return (
     <View style={styles.card}>
-      <View style={styles.headerRow}>
-        <Avatar name={wallet.name} color={TYPE_COLOR[wallet.type]} size={32} icon={wallet.icon} iconUrl={wallet.icon_url} />
+      <View style={styles.topRow}>
+        <View style={styles.identity}>
+          <Avatar
+            name={wallet.name}
+            color={typeColor}
+            size={32}
+            icon={wallet.icon}
+            iconUrl={wallet.icon_url}
+          />
+
+          <Text
+            style={styles.name}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {wallet.name}
+          </Text>
+        </View>
+
         <View style={styles.typeRow}>
-          <View style={[styles.dot, { backgroundColor: TYPE_COLOR[wallet.type] }]} />
-          <Text style={styles.type}>{TYPE_LABEL[wallet.type]}</Text>
+          <View style={[styles.dot, { backgroundColor: typeColor }]} />
+
+          <Text style={styles.type} numberOfLines={1}>
+            {TYPE_LABEL[wallet.type]}
+          </Text>
         </View>
       </View>
-      <Text style={styles.name} numberOfLines={1}>
-        {wallet.name}
+
+      <Text style={styles.balance} numberOfLines={1} adjustsFontSizeToFit>
+        {formatCurrency(wallet.balance, wallet.currency)}
       </Text>
-      <Text style={styles.balance}>{formatCurrency(wallet.balance, wallet.currency)}</Text>
     </View>
   );
 }
@@ -46,13 +68,54 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     borderRadius: radii.listCard,
-    padding: spacing.lg,
+    padding: spacing.md,
     gap: spacing.sm,
   },
-  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  typeRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  type: { ...typography.tiny, color: colors.textSecondary },
-  name: { ...typography.body, color: colors.textPrimary },
-  balance: { ...typography.cardTitle, color: colors.textPrimary },
+
+  topRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  identity: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: spacing.sm,
+  },
+
+  name: {
+    flex: 1,
+    minWidth: 0,
+    marginLeft: spacing.sm,
+    ...typography.body,
+    color: colors.textPrimary,
+  },
+
+  typeRow: {
+    flexShrink: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+
+  type: {
+    ...typography.tiny,
+    color: colors.textSecondary,
+  },
+
+  balance: {
+    alignSelf: "flex-end",
+    maxWidth: "100%",
+    ...typography.cardTitle,
+    color: colors.textPrimary,
+  },
 });

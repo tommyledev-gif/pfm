@@ -30,3 +30,11 @@ type LoginRequest struct {
 type LogoutRequest struct {
 	RefreshToken string `json:"refresh_token" validate:"required"`
 }
+
+// RefreshRequest is the body of POST /auth/refresh — same shape as
+// LogoutRequest (specs/mobile-session-refresh/spec.md decision #1), for the
+// same reason: only presence is validated here, malformed/expired/revoked
+// tokens are all distinguished inside AuthService.Refresh.
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token" validate:"required"`
+}

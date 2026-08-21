@@ -19,10 +19,12 @@ export function UserListItem({ user }: { user: User }) {
       <Avatar name={displayName} size={40} />
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>{displayName}</Text>
-        <Text style={styles.email} numberOfLines={1}>{user.email}</Text>
+        <Text style={styles.email} numberOfLines={1}>{user.email}</Text>    
       </View>
-      <View style={styles.tags}>
-        <PillTag label={user.role === "admin" ? "Admin" : "Member"} />
+     <View style={
+  styles.tags}>
+
+      <PillTag color={user.role === "admin" ? "success" : "info"} label={user.role === "admin" ? "Admin" : "Member"} />
         <Text style={[styles.status, { color: STATUS_COLOR[user.status] }]}>{user.status}</Text>
       </View>
     </View>

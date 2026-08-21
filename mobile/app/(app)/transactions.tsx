@@ -12,7 +12,10 @@ import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useTransactionsQuery } from "@/features/transactions/api/use-transactions-query";
 import { Transaction } from "@/features/transactions/types";
 import { TransactionFormModal } from "@/features/transactions/components/TransactionFormModal";
+import { TransactionRowSkeleton } from "@/features/transactions/components/TransactionRowSkeleton";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
+
+const LIST_SKELETON_COUNT = 6;
 
 const FILTERS: { label: string; value: TransactionType | undefined }[] = [
   { label: "All", value: undefined },
@@ -101,7 +104,11 @@ export default function TransactionsScreen() {
         )}
         ListEmptyComponent={
           transactions.isLoading ? (
-            <ActivityIndicator color={colors.green} style={styles.loader} />
+            <View>
+              {Array.from({ length: LIST_SKELETON_COUNT }).map((_, i) => (
+                <TransactionRowSkeleton key={i} />
+              ))}
+            </View>
           ) : (
             <Text style={styles.empty}>No transactions found.</Text>
           )

@@ -11,7 +11,8 @@ export const colors = {
   textMuted: "rgba(255,255,255,0.4)",
 
   green: "#85FF33",
-  greenDark: "#2f5913",
+  greenDark: "#0a521e",
+  blueDark: "#207ca1",
   onGreen: "#06130A",
   lavender: "#B49AFF",
   mint: "#7EEBC0",
@@ -22,6 +23,10 @@ export const colors = {
   trackMuted: "rgba(255,255,255,0.22)",
   navBg: "rgba(15,17,22,0.72)",
   navBorder: "rgba(255,255,255,0.08)",
+  error: "#FF9E96",
+  info: "#5dbde3",
+  warning: "#F2C94C",
+  
 } as const;
 
 // Deterministic palette used to color category/wallet icon circles and

@@ -69,6 +69,30 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	})
 }
 
+// Refresh handles POST /auth/refresh — deliberately NOT behind JWTAuth,
+// same reasoning as Logout: the access token is expected to already be
+// expired/absent by the time this is called, so the refresh token itself
+// (in the body) is the only credential available.
+func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
+	var req dto.RefreshRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, h.logger, common.NewInvalidInputError("malformed request body"))
+	}
+	if err := validate.Struct(req); err != nil {
+		return response.Error(c, h.logger, newValidationError(err))
+	}
+
+	accessToken, refreshToken, err := h.authService.Refresh(c.Context(), req.RefreshToken)
+	if err != nil {
+		return response.Error(c, h.logger, err)
+	}
+
+	return response.Success(c, fiber.StatusOK, "token refreshed successfully", dto.TokenPairResponse{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	})
+}
+
 // Logout handles POST /auth/logout — deliberately NOT behind JWTAuth; it
 // only needs the refresh token payload (plan.md Constitution Notes).
 func (h *AuthHandler) Logout(c *fiber.Ctx) error {

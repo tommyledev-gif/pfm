@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { ChevronLeftIcon, PlusIcon } from "@/components/ui/Icon";
@@ -7,7 +7,10 @@ import { Screen } from "@/components/shared/Screen";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { useUsersQuery } from "@/features/users/api/use-users-query";
 import { UserListItem } from "@/features/users/components/UserListItem";
+import { UserListItemSkeleton } from "@/features/users/components/UserListItemSkeleton";
 import { InviteUserModal } from "@/features/users/components/InviteUserModal";
+
+const LIST_SKELETON_COUNT = 4;
 
 // Household Members screen — backend enforces admin-only access on
 // GET/POST /admin/users* (403 for members); mobile does not add a
@@ -30,7 +33,13 @@ export default function UsersScreen() {
       </View>
 
       {users.isLoading ? (
-        <ActivityIndicator color={colors.green} style={styles.loader} />
+        <View style={styles.list}>
+          {Array.from({ length: LIST_SKELETON_COUNT }).map((_, i) => (
+            <View key={i} style={i > 0 ? styles.skeletonSpacing : undefined}>
+              <UserListItemSkeleton />
+            </View>
+          ))}
+        </View>
       ) : (
         <FlatList
           data={users.data?.data ?? []}
@@ -70,6 +79,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   list: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl },
-  loader: { marginTop: spacing.xxl },
+  skeletonSpacing: { marginTop: spacing.sm },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
 });

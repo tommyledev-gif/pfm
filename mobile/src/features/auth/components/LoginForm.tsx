@@ -56,9 +56,11 @@ export function LoginForm() {
       <PillButton
         label="Log In"
         loading={login.isPending}
+        variant="outline"
         disabled={!email || !password}
         onPress={() => login.mutate({ email, password })}
         style={styles.button}
+        textStyle={{color: colors.green}}
       />
     </View>
   );
@@ -93,7 +95,7 @@ const styles = StyleSheet.create({
     ...typography.body,
   },
   eyeButton: { padding: spacing.xs },
-  button: { marginTop: spacing.sm },
+  button: { marginTop: spacing.sm, backgroundColor: colors.greenDark },
   errorBox: {
     backgroundColor: "rgba(255,158,150,0.12)",
     borderWidth: 1,

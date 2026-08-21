@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { PlusIcon } from "@/components/ui/Icon";
 import { BudgetCard } from "@/components/shared/BudgetCard";
@@ -8,9 +8,12 @@ import { colors, radii, spacing, typography } from "@/lib/theme";
 import { WalletCurrency } from "@/lib/constants";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { Budget } from "@/features/budgets/types";
+import { BudgetCardSkeleton } from "@/features/budgets/components/BudgetCardSkeleton";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { primaryCurrency } from "@/features/wallets/wallet-totals";
+
+const CARD_SKELETON_COUNT = 3;
 
 // Insights → Budgets tab — README: "+ New budget" top-right action, list of
 // budget cards, each showing Budget vs Actual stacked bars scaled to the
@@ -26,7 +29,13 @@ export function BudgetsTab() {
   const currency: WalletCurrency = (wallets.data ? primaryCurrency(wallets.data) : undefined) ?? "VND";
 
   if (budgets.isLoading) {
-    return <ActivityIndicator color={colors.green} style={styles.loader} />;
+    return (
+      <View style={styles.list}>
+        {Array.from({ length: CARD_SKELETON_COUNT }).map((_, i) => (
+          <BudgetCardSkeleton key={i} />
+        ))}
+      </View>
+    );
   }
 
   const rows = (budgets.data ?? []).flatMap((budget) =>
@@ -93,6 +102,5 @@ const styles = StyleSheet.create({
   },
   newButtonLabel: { ...typography.caption, color: colors.onGreen },
   list: { gap: spacing.md, paddingBottom: 140 },
-  loader: { marginTop: spacing.xxl },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
 });

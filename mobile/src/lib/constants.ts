@@ -10,11 +10,20 @@ export const SECURE_STORE_REFRESH_TOKEN_KEY = "pfm_refresh_token";
 // The login email is captured client-side and persisted here so Profile has
 // something to display; it is not re-verified against the server.
 export const SECURE_STORE_EMAIL_KEY = "pfm_user_email";
+// Device-local timestamp (ms since epoch) of when the current token pair was
+// issued — used only to decide whether a proactive refresh is already due
+// right after a cold start (specs/mobile-session-refresh/spec.md S-REF-13).
+export const SECURE_STORE_ISSUED_AT_KEY = "pfm_tokens_issued_at";
 
 // Mirrors common.AccessTokenTTL / common.RefreshTokenTTL
 // (backend/internal/common/constants.go).
 export const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 export const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
+// How long before the access token's expiry the mobile client proactively
+// calls POST /auth/refresh (specs/mobile-session-refresh/spec.md decision #3,
+// Open Question #1). Reactive refresh-on-401 (lib/axios.ts) is the fallback
+// for whenever this proactive timer couldn't fire (e.g. app backgrounded).
+export const PROACTIVE_REFRESH_LEAD_SECONDS = 3 * 60;
 
 // Mirrors common.DefaultListLimit / common.MaxListLimit.
 export const DEFAULT_PAGE_SIZE = 20;

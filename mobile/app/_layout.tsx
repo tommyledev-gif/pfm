@@ -4,8 +4,16 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Stack } from "expo-router";
 
+import { DebugBubble } from "@/components/debug/DebugBubble";
+import { NavigationLogger } from "@/components/debug/NavigationLogger";
+import { installGlobalErrorLogger } from "@/lib/global-error-logger";
 import { queryClient } from "@/lib/query-client";
 import { useSessionStore } from "@/stores/session-store";
+
+// Installed once at module scope, not inside the component — a global
+// error handler must be wired before the very first render, not after an
+// effect runs (specs/mobile-debug-console/spec.md decision #5).
+installGlobalErrorLogger();
 
 // Root layout — providers + the top-level authenticated/unauthenticated
 // split, mirrors frontend/'s middleware.ts route-protection role and
@@ -42,6 +50,10 @@ export default function RootLayout() {
             </Stack.Protected>
           </Stack>
         )}
+        {/* Rendered above everything, on every screen including login —
+            specs/mobile-debug-console/spec.md decision #4. */}
+        <NavigationLogger />
+        <DebugBubble />
       </QueryClientProvider>
     </SafeAreaProvider>
   );

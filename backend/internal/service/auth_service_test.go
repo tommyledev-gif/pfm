@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 
@@ -180,6 +182,145 @@ func TestAuthService_Logout_ConcurrentRace(t *testing.T) {
 	if got := revokedRepo.revokedCount(); got != 1 {
 		t.Fatalf("expected exactly 1 revoked row after concurrent logout, got %d", got)
 	}
+}
+
+// S-REF-01 through S-REF-08 (specs/mobile-session-refresh/spec.md).
+func TestAuthService_Refresh(t *testing.T) {
+	t.Run("happy path rotates the token and issues a new pair", func(t *testing.T) {
+		svc, repo, revokedRepo := newTestAuthService(t)
+		seedActiveUser(t, repo, "homer@example.com", "correcthorse1", model.UserStatusActive)
+		_, refresh, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1")
+		if err != nil {
+			t.Fatalf("login failed: %v", err)
+		}
+
+		access, newRefresh, err := svc.Refresh(context.Background(), refresh)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if access == "" || newRefresh == "" {
+			t.Fatal("expected non-empty access and refresh tokens")
+		}
+		if newRefresh == refresh {
+			t.Fatal("expected a rotated (different) refresh token")
+		}
+		if got := revokedRepo.revokedCount(); got != 1 {
+			t.Fatalf("expected exactly 1 revoked row (the old token), got %d", got)
+		}
+	})
+
+	t.Run("reuse of an already-rotated token fails", func(t *testing.T) {
+		svc, repo, _ := newTestAuthService(t)
+		seedActiveUser(t, repo, "homer@example.com", "correcthorse1", model.UserStatusActive)
+		_, refresh, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1")
+		if err != nil {
+			t.Fatalf("login failed: %v", err)
+		}
+		if _, _, err := svc.Refresh(context.Background(), refresh); err != nil {
+			t.Fatalf("first refresh failed: %v", err)
+		}
+
+		_, _, err = svc.Refresh(context.Background(), refresh)
+		var appErr *common.AppError
+		if !errors.As(err, &appErr) || appErr.Code != common.ErrCodeUnauthenticated {
+			t.Fatalf("expected UNAUTHENTICATED on reuse, got %v", err)
+		}
+	})
+
+	t.Run("logged-out token cannot be refreshed", func(t *testing.T) {
+		svc, repo, _ := newTestAuthService(t)
+		seedActiveUser(t, repo, "homer@example.com", "correcthorse1", model.UserStatusActive)
+		_, refresh, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1")
+		if err != nil {
+			t.Fatalf("login failed: %v", err)
+		}
+		if err := svc.Logout(context.Background(), refresh); err != nil {
+			t.Fatalf("logout failed: %v", err)
+		}
+
+		_, _, err = svc.Refresh(context.Background(), refresh)
+		var appErr *common.AppError
+		if !errors.As(err, &appErr) || appErr.Code != common.ErrCodeUnauthenticated {
+			t.Fatalf("expected UNAUTHENTICATED, got %v", err)
+		}
+	})
+
+	t.Run("expired refresh token is rejected", func(t *testing.T) {
+		svc, repo, _ := newTestAuthService(t)
+		seedActiveUser(t, repo, "homer@example.com", "correcthorse1", model.UserStatusActive)
+		user, err := repo.GetUserByEmail(context.Background(), "homer@example.com")
+		if err != nil {
+			t.Fatalf("seed lookup failed: %v", err)
+		}
+		expired := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				ID:        uuid.NewString(),
+				Subject:   user.ID.String(),
+				IssuedAt:  jwt.NewNumericDate(time.Now().UTC().Add(-8 * 24 * time.Hour)),
+				ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(-1 * time.Hour)),
+			},
+		})
+		expiredStr, err := expired.SignedString(svc.tokens.signingKey)
+		if err != nil {
+			t.Fatalf("failed to sign expired token: %v", err)
+		}
+
+		_, _, err = svc.Refresh(context.Background(), expiredStr)
+		var appErr *common.AppError
+		if !errors.As(err, &appErr) || appErr.Code != common.ErrCodeUnauthenticated {
+			t.Fatalf("expected UNAUTHENTICATED, got %v", err)
+		}
+	})
+
+	t.Run("malformed refresh token is rejected as invalid input", func(t *testing.T) {
+		svc, _, _ := newTestAuthService(t)
+		_, _, err := svc.Refresh(context.Background(), "not-a-jwt")
+		var appErr *common.AppError
+		if !errors.As(err, &appErr) || appErr.Code != common.ErrCodeInvalidInput {
+			t.Fatalf("expected INVALID_INPUT, got %v", err)
+		}
+	})
+
+	t.Run("disabled user cannot refresh", func(t *testing.T) {
+		svc, repo, _ := newTestAuthService(t)
+		seedActiveUser(t, repo, "homer@example.com", "correcthorse1", model.UserStatusActive)
+		_, refresh, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1")
+		if err != nil {
+			t.Fatalf("login failed: %v", err)
+		}
+		repo.mu.Lock()
+		repo.byEmail["homer@example.com"].Status = model.UserStatusDisabled
+		repo.mu.Unlock()
+
+		_, _, err = svc.Refresh(context.Background(), refresh)
+		var appErr *common.AppError
+		if !errors.As(err, &appErr) || appErr.Code != common.ErrCodeUnauthenticated {
+			t.Fatalf("expected UNAUTHENTICATED, got %v", err)
+		}
+	})
+
+	t.Run("two devices refresh independently", func(t *testing.T) {
+		svc, repo, revokedRepo := newTestAuthService(t)
+		seedActiveUser(t, repo, "homer@example.com", "correcthorse1", model.UserStatusActive)
+		_, refreshA, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1")
+		if err != nil {
+			t.Fatalf("device A login failed: %v", err)
+		}
+		_, refreshB, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1")
+		if err != nil {
+			t.Fatalf("device B login failed: %v", err)
+		}
+
+		if _, _, err := svc.Refresh(context.Background(), refreshA); err != nil {
+			t.Fatalf("device A refresh failed: %v", err)
+		}
+		if _, _, err := svc.Refresh(context.Background(), refreshB); err != nil {
+			t.Fatalf("device B refresh should still succeed independently: %v", err)
+		}
+		if got := revokedRepo.revokedCount(); got != 2 {
+			t.Fatalf("expected 2 revoked rows (one per device's old token), got %d", got)
+		}
+	})
 }
 
 func newPendingInvite(t *testing.T, svc *AuthService, repo *fakeUserRepo, email string, expiresAt time.Time) string {

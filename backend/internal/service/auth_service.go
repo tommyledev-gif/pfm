@@ -140,6 +140,60 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 	return accessToken, refreshToken, nil
 }
 
+// Refresh implements the session-refresh extension to F-02
+// (specs/mobile-session-refresh/spec.md US-01). It rotates the presented
+// refresh token: the new pair is generated *before* the old token is
+// revoked (spec.md Edge Case #1) so a mid-request failure never leaves the
+// caller with no valid credentials at all — worst case, the old token
+// simply outlives its intended single use by the remainder of its own TTL.
+func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (accessToken string, newRefreshToken string, err error) {
+	jti, subject, expiresAt, err := s.tokens.ParseRefreshTokenUnverified(refreshToken)
+	if err != nil {
+		return "", "", common.NewInvalidInputError("refresh token is malformed")
+	}
+
+	if expiresAt.Before(time.Now().UTC()) {
+		return "", "", common.ErrUnauthenticated
+	}
+
+	revoked, err := s.revokedRepo.IsRevoked(ctx, jti)
+	if err != nil {
+		return "", "", fmt.Errorf("service.Refresh: %w", err)
+	}
+	if revoked {
+		return "", "", common.ErrUnauthenticated
+	}
+
+	userID, err := uuid.Parse(subject)
+	if err != nil {
+		return "", "", common.ErrUnauthenticated
+	}
+	user, err := s.userRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", "", common.ErrUnauthenticated
+		}
+		return "", "", fmt.Errorf("service.Refresh: %w", err)
+	}
+	if user.Status != model.UserStatusActive {
+		return "", "", common.ErrUnauthenticated
+	}
+
+	accessToken, newRefreshToken, err = s.tokens.GenerateTokenPair(user)
+	if err != nil {
+		return "", "", fmt.Errorf("service.Refresh: %w", err)
+	}
+
+	// Revoke only after the new pair is safely generated — a failure here is
+	// logged, not returned, since the caller already holds usable
+	// credentials (plan.md Pre-flight Finding #1).
+	if err := s.revokedRepo.Revoke(ctx, jti, &userID, expiresAt); err != nil {
+		s.logger.Error("service.Refresh: failed to revoke rotated refresh token", zap.String("jti", jti), zap.Error(err))
+	}
+
+	return accessToken, newRefreshToken, nil
+}
+
 // Logout implements F-02 US-05. Revocation is a conflict-safe upsert, so
 // double-logout and logout-with-an-expired-token are both harmless no-op
 // successes by construction — see repository.RevokedTokenRepository.Revoke.

@@ -32,6 +32,11 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	auth.Post("/activate", authHandler.Activate)
 	auth.Post("/login", middleware.LoginRateLimiter(logger), authHandler.Login)
 	auth.Post("/logout", authHandler.Logout)
+	// /auth/refresh is unauthenticated like /auth/logout — no rate limiter
+	// (specs/mobile-session-refresh/plan.md Pre-flight Finding #2): the
+	// refresh token itself is the credential, so there is no
+	// password-guessing surface like /auth/login has.
+	auth.Post("/refresh", authHandler.Refresh)
 
 	admin := v1.Group("/admin", middleware.JWTAuth(tokens, logger), middleware.RequireRole(string(model.UserRoleAdmin), logger))
 	admin.Post("/users/invite", middleware.InviteRateLimiter(logger), userHandler.InviteUser)

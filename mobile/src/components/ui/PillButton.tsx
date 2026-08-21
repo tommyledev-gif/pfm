@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, ViewStyle } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextStyle, ViewStyle } from "react-native";
 
 import { colors, radii, typography } from "@/lib/theme";
 
@@ -11,12 +11,13 @@ interface PillButtonProps {
   disabled?: boolean;
   loading?: boolean;
   style?: ViewStyle;
+  textStyle?: TextStyle;
 }
 
 // The design's recurring "black pill on neon green" action button (hero
 // card's Add Transaction, chat's Confirm & Save, etc.) — one component so
 // every screen renders the exact same pill shape/colors.
-export function PillButton({ label, icon, onPress, variant = "solid", disabled, loading, style }: PillButtonProps) {
+export function PillButton({ label, icon, onPress, variant = "solid", disabled, loading, style, textStyle }: PillButtonProps) {
   const isOutline = variant === "outline";
   return (
     <Pressable
@@ -36,7 +37,7 @@ export function PillButton({ label, icon, onPress, variant = "solid", disabled, 
         <>
           {icon}
           {label ? (
-            <Text style={[styles.label, isOutline ? styles.outlineLabel : styles.solidLabel]}>{label}</Text>
+            <Text style={[styles.label, isOutline ? styles.outlineLabel : styles.solidLabel, textStyle]}>{label}</Text>
           ) : null}
         </>
       )}

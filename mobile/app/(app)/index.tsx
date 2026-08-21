@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { EditIcon, PlusIcon } from "@/components/ui/Icon";
@@ -11,10 +11,15 @@ import { formatCurrency } from "@/lib/currency";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { totalBalance } from "@/features/wallets/wallet-totals";
+import { WalletCardSkeleton } from "@/features/wallets/components/WalletCardSkeleton";
 import { useTransactionsQuery } from "@/features/transactions/api/use-transactions-query";
 import { Transaction } from "@/features/transactions/types";
 import { TransactionFormModal } from "@/features/transactions/components/TransactionFormModal";
+import { TransactionRowSkeleton } from "@/features/transactions/components/TransactionRowSkeleton";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
+
+const WALLET_SKELETON_COUNT = 3;
+const RECENT_TRANSACTION_SKELETON_COUNT = 4;
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -66,7 +71,11 @@ export default function HomeScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Your Wallets</Text>
             {wallets.isLoading ? (
-              <ActivityIndicator color={colors.green} style={styles.loader} />
+              <View style={[styles.walletRow, styles.walletRowStatic]}>
+                {Array.from({ length: WALLET_SKELETON_COUNT }).map((_, i) => (
+                  <WalletCardSkeleton key={i} />
+                ))}
+              </View>
             ) : (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.walletRow}>
                 {wallets.data?.map((w) => (
@@ -95,7 +104,11 @@ export default function HomeScreen() {
       )}
       ListEmptyComponent={
         recent.isLoading ? (
-          <ActivityIndicator color={colors.green} style={styles.loader} />
+          <View>
+            {Array.from({ length: RECENT_TRANSACTION_SKELETON_COUNT }).map((_, i) => (
+              <TransactionRowSkeleton key={i} />
+            ))}
+          </View>
         ) : (
           <Text style={styles.empty}>No transactions yet.</Text>
         )
@@ -150,6 +163,6 @@ const styles = StyleSheet.create({
   sectionHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   seeAll: { ...typography.caption, color: colors.green },
   walletRow: { gap: spacing.md, paddingBottom: spacing.xs },
-  loader: { marginVertical: spacing.lg },
+  walletRowStatic: { flexDirection: "row" },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
 });
