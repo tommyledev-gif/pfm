@@ -56,10 +56,41 @@ func Error(c *fiber.Ctx, logger *zap.Logger, err error) error {
 		})
 	}
 
+	// Fiber's own routing-level errors — an unmatched route (404) or a
+	// mismatched HTTP verb (405) — arrive here before any handler ever runs.
+	// They are not application errors and must keep their real status
+	// instead of being coerced into a generic 500 (SDS.md §6.1 / §12.1 Known
+	// Issues Log Items 1 & 4: this exact bug turned a stale-VPS 404/405 into
+	// a misleading "unexpected error occurred" for both the client and, via
+	// the logger.Error call below, the operator reading logs).
+	var fiberErr *fiber.Error
+	if errors.As(err, &fiberErr) {
+		return c.Status(fiberErr.Code).JSON(Body{
+			Success:   false,
+			ErrorCode: errCodeForFiberStatus(fiberErr.Code),
+			Message:   fiberErr.Message,
+		})
+	}
+
 	logger.Error("unhandled error", zap.Error(err), zap.String("path", c.Path()), zap.String("method", c.Method()))
 	return c.Status(http.StatusInternalServerError).JSON(Body{
 		Success:   false,
 		ErrorCode: "INTERNAL_ERROR",
 		Message:   "an unexpected error occurred",
 	})
+}
+
+// errCodeForFiberStatus maps a *fiber.Error's status to one of common's
+// error-code constants — never a raw string, per this package's own
+// convention (see common/errors.go's "never construct these as raw strings
+// elsewhere" doc comment).
+func errCodeForFiberStatus(status int) string {
+	switch status {
+	case http.StatusNotFound:
+		return common.ErrCodeNotFound
+	case http.StatusMethodNotAllowed:
+		return common.ErrCodeMethodNotAllowed
+	default:
+		return common.ErrCodeRequestError
+	}
 }

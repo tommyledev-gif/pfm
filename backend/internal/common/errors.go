@@ -96,6 +96,16 @@ const (
 	// ErrCodeIconUploadFailed backs POST /categories/icon's 502 when R2 is
 	// configured but the upload itself fails (network/auth/bucket error).
 	ErrCodeIconUploadFailed = "ICON_UPLOAD_FAILED"
+	// ErrCodeMethodNotAllowed/ErrCodeRequestError back response.Error's
+	// *fiber.Error branch (SDS.md §6.1 / §12.1 Known Issues Log Items 1 & 4)
+	// — a routing-level error raised by Fiber itself, before any handler
+	// runs, for an unmatched HTTP verb (405) or any other framework-level
+	// rejection Fiber didn't already give a 404 for (ErrCodeNotFound above
+	// covers that case). These must keep their real status instead of being
+	// coerced into a generic 500 INTERNAL_ERROR, which previously hid a
+	// stale-deployment 404/405 behind a misleading "unexpected error occurred".
+	ErrCodeMethodNotAllowed = "METHOD_NOT_ALLOWED"
+	ErrCodeRequestError     = "REQUEST_ERROR"
 )
 
 // AppError is the single sentinel-error shape services return for known

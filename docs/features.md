@@ -9,25 +9,28 @@ _Updated by: /renew-features_
 
 ## 1. Project State Summary
 
-**MVP is fully complete and mobile has reached full feature parity with web** — every screen that was a Profile entry-point-only row as of the last `/renew-docs` (2026-08-16) is now a real CRUD screen (Wallets, Categories, Budgets, Users/admin). Since then, three real defects were found and confirmed via code inspection during this session's `/renew-docs` pass (not yet fixed) — see `SDS.md` §12.1 Known Issues Log for full root-cause detail:
+**MVP is fully complete and mobile has reached full feature parity with web** — every screen that was a Profile entry-point-only row as of the last `/renew-docs` (2026-08-16) is now a real CRUD screen (Wallets, Categories, Budgets, Users/admin). Since then, four items were found via code inspection during this session — see `SDS.md` §12.1 Known Issues Log for full root-cause detail; three are now fixed/shipped, one remains a pure deployment-verification step nobody in this session could execute:
 
-1. **Production VPS lagging behind `develop`** — category icon upload (`405`) and the `/activate` page (`404`→coerced `500`) both work in code as of commit `fe4f6cc` but the symptoms observed on `app.example.com` match an older deployed build. `deploy-backend.yml` should auto-deploy on push to `develop`; its run history for the current `HEAD` needs checking before assuming a manual redeploy is required.
-2. **Global error handler masks real HTTP statuses** — `backend/internal/response/response.go`'s `Error()` only special-cases `*common.AppError`; any Fiber-level routing error (404/405) falls through to a blanket `500 INTERNAL_ERROR`, hiding the real cause from both client and logs. Real fix needed regardless of the deployment gap above.
-3. **Keyboard covers the focused input in every bottom-sheet form** — the shared `Drawer.tsx` component (Wallet/Category/Budget/Transaction forms) has no keyboard-avoidance logic at all. Fix: wire in the project's existing `useKeyboardHeight()` hook, not a new third-party library.
+1. **Production VPS lagging behind `develop`** — category icon upload (`405`) and the `/activate` page (`404`→coerced `500`) both work in code as of commit `fe4f6cc` but the symptoms observed on `app.example.com` match an older deployed build. **Still outstanding** — `deploy-backend.yml` should auto-deploy on push to `develop`; its run history for the current `HEAD` needs checking (`gh` CLI wasn't available this session) before assuming a manual redeploy/`workflow_dispatch` is required.
+2. **Global error handler masks real HTTP statuses — ✅ fixed.** `response.Error()` now special-cases `*fiber.Error`, preserving real routing-error statuses instead of a blanket `500 INTERNAL_ERROR`. New tests in `internal/response/response_test.go`.
+3. **Keyboard covers the focused input in every bottom-sheet form — ✅ fixed.** `Drawer.tsx` now wires in the project's existing `useKeyboardHeight()` hook.
+4. **Wallet/Budget icon support — ✅ shipped** as FEAT-ICON (see §3 below).
 
 **Implemented (code + DB + Web + Mobile UI, full CRUD unless noted):**
 - **User Management (F-01)** — invite-only flow, admin invite/list, HTML activation page at `GET /activate` (backend + web `features/users` + mobile `features/users`, `app/(app)/users.tsx`, admin-only)
 - **System Security (F-02)** — JWT login/logout, invite-token activation, rate limiting (backend + web `features/auth` + mobile `features/auth`)
-- **Wallet Management (F-03)** — CRUD, set-default with DB-level uniqueness (backend + web `features/wallets` + mobile `features/wallets`, `app/(app)/wallets.tsx` — **full CRUD now, was read-only as of 2026-08-16**). No icon/photo field yet — see Known Issues Log Item 3 below.
+- **Wallet Management (F-03)** — CRUD, set-default with DB-level uniqueness, **uploaded-photo icon support** (migration `013_wallets_icon.sql`, `POST /wallets/icon`) on top of an emoji `icon` text field (backend + mobile `features/wallets`, `app/(app)/wallets.tsx` — **full CRUD + photo upload now**; web (`frontend/`) has CRUD but not the icon feature, deferred). No `updated_at`/DTO gap remaining — see FEAT-ICON.
 - **Category Management (F-04)** — CRUD, system + user categories, dedup index, **uploaded-photo icon support** (Cloudflare R2 via `minio-go`, migration `012_categories_icon_url.sql`) on top of the existing emoji `icon` text field (backend + web `features/categories` + mobile `features/categories`, `app/(app)/categories.tsx` — **full CRUD + photo upload now, was read-only as of 2026-08-16**). Photo upload currently broken on production per Known Issues Log Item 1 (deployment gap, not a code bug).
-- **Budget Management (F-05)** — per-category budget, per-currency limits (backend + web `features/budgets` + mobile `features/budgets`, Insights → Budgets tab). No icon/photo field yet — see Known Issues Log Item 3.
+- **Budget Management (F-05)** — per-category budget, per-currency limits, **uploaded-photo icon support independent of its linked Category's own icon** (migration `014_budgets_icon.sql`, `POST /budgets/icon`) (backend + mobile `features/budgets`, Insights → Budgets tab — full CRUD + photo upload; web deferred, same as Wallet).
 - **Transaction Management (F-06)** — CRUD with atomic wallet-balance update (backend + web `features/transactions` + mobile `features/transactions`)
 - **Financial Reporting (F-07)** — summary + by-category totals, filters by date/wallet/category (backend + web `features/reports` + mobile Insights → Spending, incl. donut chart)
 - **Notification Handling (F-10)** — budget-exceeded alerts via background scheduler, list/view/mark-read (backend + web `features/notifications` + mobile bell → full-screen overlay)
 - **AI Chat Assistant (Feature-12) — US-01 "Create a Transaction via Chat" only** (`specs/ai-chat-assistant/spec.md`) — `ai-service/` (FastAPI, Groq primary/Anthropic fallback, currently `openai/gpt-oss-120b` on Groq's free tier — see constraint note above), `chat_handler.go`/`ChatService`, migration `011_chat_messages.sql`, `idempotency_key` on `transactions` (migration `010`), web `features/ai-chat`, mobile `app/(app)/ai-chat.tsx` (also ships `EditTransactionModal`/`EditMessageModal` — these only edit a not-yet-confirmed proposal or resend a sent message, **not** the SRS's separate "edit an existing transaction via `sửa@` prefix" flow; confirmed `chat_service.go` has no `edit_transaction`/`query_spending`/`general_advice` handling, so US-02/03/04 remain fully unbuilt, not partial).
 
-**New since 2026-08-16, not yet spec'd for implementation:**
-- **Wallet & Budget icon/photo support** — extend the pattern already shipped for Categories (emoji text + uploaded photo, replace/remove) to Wallets and Budgets. No DB column, DTO field, endpoint, or mobile UI exists yet for either. Target design already captured in `SDS.md` (Domain Model §2.1.2/§2.1.4, UI/UX Principles §3.2) — run `/cook-ba` next.
+**Shipped this session (specced → planned → implemented, full loop):**
+- **Wallet & Budget icon/photo support** (`specs/wallet-budget-icons/`) — see FEAT-ICON in §3/§4 above for full detail.
+
+**Documented this session, no code needed:**
 - **CI/CD (GitHub Actions) and EAS Build** — `.github/workflows/{ci-pr,backend-test,deploy-backend,deploy-ai-service}.yml` auto-test/build/deploy on push to `develop`; `mobile/eas.json` builds an internal `.apk`. Neither was documented before this run's `/renew-docs`. No spec needed (infra, not a product feature) but worth knowing when debugging "why isn't my change live" questions.
 
 **SRS items chưa spec (chưa bắt đầu ở bất kỳ layer nào):**
@@ -44,9 +47,9 @@ _Updated by: /renew-features_
 |---|---------|---------|------|---------|-----|--------|--------|
 | 1 | User Management | Feature-01 | ✓ | ✓ | ✓ | ✓ | DONE |
 | 2 | System Security | Feature-02 | ✓ | ✓ | ✓ | ✓ | DONE |
-| 3 | Wallet Management | FR-01 | ✓ | ✓ | ✓ | ✓ full CRUD | DONE (icon support PARTIAL — planned, not started) |
+| 3 | Wallet Management | FR-01 | ✓ | ✓ | ✓ | ✓ full CRUD + photo upload | DONE (icon/photo shipped 2026-08-21 — FEAT-ICON) |
 | 4 | Category Management | FR-03 | ✓ | ✓ | ✓ | ✓ full CRUD + photo upload | DONE (photo upload blocked on prod — deployment gap, see §1) |
-| 5 | Budget Management | FR-04 | ✓ | ✓ | ✓ | ✓ full CRUD | DONE (icon support PARTIAL — planned, not started) |
+| 5 | Budget Management | FR-04 | ✓ | ✓ | ✓ | ✓ full CRUD + photo upload | DONE (icon/photo shipped 2026-08-21 — FEAT-ICON) |
 | 6 | Transaction Management | FR-02 | ✓ | ✓ | ✓ | ✓ | DONE |
 | 7 | Financial Reporting | FR-07 | ✓ | ✓ | ✓ | ✓ | DONE |
 | 8 | Financial Goal | FR-05 | ✗ | ✗ | ✗ | ✗ | BACKLOG (Release 1) |
@@ -55,7 +58,7 @@ _Updated by: /renew-features_
 | 11 | Data Overview Dashboard | FR-08 | ✗ | ✗ | ✗ | 🔶 Home screen covers some of this informally | BACKLOG (Release 1) |
 | 12 | AI Chat Assistant — US-01 Create via Chat | FR-09 / Feature-12 | ✓ | ✓ | ✓ | ✓ | DONE |
 | — | AI Chat Assistant — US-02/03/04 (Edit/Query/Advice) | FR-09 / Feature-12 | ✗ | ✗ | ✗ | ✗ | BACKLOG (Release 1) — not yet specced |
-| — | Wallet/Budget icon & photo support | (SDS §12.1 Known Issues Log Item 3) | ✗ | ✗ | ✗ | ✗ | BACKLOG — next `/cook-ba` candidate |
+| — | Wallet/Budget icon & photo support | (SDS §12.1 Known Issues Log Item 3) | ✓ | ✓ | ✗ | ✓ | DONE (2026-08-21) — mobile only, `frontend/` parity deferred |
 
 ---
 
@@ -73,35 +76,21 @@ _Updated by: /renew-features_
 - **Rough complexity:** S
 - **Clarifying questions to resolve before BA:** none — this is an operational check, not a spec. Check `deploy-backend.yml`'s run history for `fe4f6cc`/current `HEAD`; re-run via `workflow_dispatch` if it never fired or failed.
 
-#### [FEAT-BUG-02] Fix global error handler swallowing real HTTP statuses
+#### [FEAT-BUG-02] Fix global error handler swallowing real HTTP statuses — ✅ DONE (2026-08-21)
 - **Type:** Bug Fix
 - **SRS ref:** NFR-06 (updated this session to require accurate error responses)
-- **Rationale:** `response.Error()` coerces every non-`AppError` (including Fiber's own 404/405) into `500 INTERNAL_ERROR`. Masks real failures in both logs and client responses — directly caused the confusing symptom in FEAT-BUG-01.
-- **Scope:** Backend only
-- **Dependencies:** None
-- **Rough complexity:** S
-- **Clarifying questions to resolve before BA:**
-  - [ ] Should the new routing-error codes be `NOT_FOUND`/`METHOD_NOT_ALLOWED` exactly, or namespaced (e.g. `ROUTE_NOT_FOUND`) to avoid colliding with existing per-entity `{ENTITY}_NOT_FOUND` codes?
+- **Resolution:** `response.Error()` now special-cases `*fiber.Error` (Fiber's own 404/405, raised before any handler runs) and preserves the real status + a matching `common.ErrCodeNotFound`/`ErrCodeMethodNotAllowed`/`ErrCodeRequestError`, instead of coercing everything into `500 INTERNAL_ERROR`. New `internal/response/response_test.go` (4 tests) locks in the exact 405 scenario from the original report, plus regression guards that `*common.AppError` and genuinely-unknown errors are unaffected. `go test ./...` passes.
 
-#### [FEAT-BUG-03] Fix keyboard covering focused input in Drawer forms
+#### [FEAT-BUG-03] Fix keyboard covering focused input in Drawer forms — ✅ DONE (2026-08-21)
 - **Type:** Bug Fix
 - **SRS ref:** UXR-04 (added this session)
-- **Rationale:** Every Wallet/Category/Budget/Transaction form is affected — a User can't see what they're typing on some devices.
-- **Scope:** Mobile only
-- **Dependencies:** None
-- **Rough complexity:** S
-- **Clarifying questions to resolve before BA:** none — the fix is already scoped (wire `useKeyboardHeight()` into `Drawer.tsx`); likely simple enough to skip straight to `/cook-plan`.
+- **Resolution:** `Drawer.tsx` now calls the project's existing `useKeyboardHeight()` hook and pads the `ScrollView`'s content bottom by the live keyboard height — not `KeyboardAvoidingView`, not a third-party library, consistent with why that hook exists. Verified via `tsc --noEmit`, `eslint`, and a full `expo export --platform web` smoke-build. **Not verified on-device/emulator** — none available this session; carry forward to the next mobile on-device verification pass.
 
-#### [FEAT-ICON] Wallet & Budget icon/photo support
+#### [FEAT-ICON] Wallet & Budget icon/photo support — ✅ DONE (2026-08-21)
 - **Type:** Enhancement (extends existing Category pattern to two more entities)
 - **SRS ref:** FR-01, FR-04 (both updated this session), SDS §12.1 Known Issues Log Item 3
-- **Rationale:** User explicitly requested this alongside the 3 bugs above; full-stack scope matches this run's stated priority.
-- **Scope:** Full-stack — migration (`icon`/`icon_url` on `wallets` and `budgets`), DTO/service/repository changes, upload endpoint (generalize `POST /categories/icon` or add `/wallets/icon` + `/budgets/icon` siblings), mobile form changes mirroring `CategoryFormModal.tsx`
-- **Dependencies:** None (Category's pattern is the reference implementation)
-- **Rough complexity:** M
-- **Clarifying questions to resolve before BA:**
-  - [ ] Generalize the existing `/categories/icon` upload endpoint into one shared `POST /icons` (any entity type), or add two near-duplicate `/wallets/icon` + `/budgets/icon` endpoints matching the Category precedent exactly?
-  - [ ] Does a Budget's icon default to its Category's icon when unset, or show a generic placeholder?
+- **Resolution:** Specced (`specs/wallet-budget-icons/spec.md`), planned (`plan.md`), and implemented full-stack — migrations `013_wallets_icon.sql`/`014_budgets_icon.sql`, sibling `POST /wallets/icon`/`POST /budgets/icon` endpoints (not a generalized shared route — explicit plan.md assumption, to avoid touching the already-shipped Category endpoint), full DTO/service/repository/handler wiring including a new `dto.OptionalString` type to correctly distinguish "omitted" from "explicit null" for `icon_url` clearing, and mobile form/list/card updates mirroring `CategoryFormModal.tsx`. Verified against a real (throwaway) Postgres instance, not just in-memory fakes.
+- **Deliberately deferred** (flagged in plan.md, needs sign-off): retrofitting Category's own identical "can never clear `icon_url`" bug (same COALESCE-vs-explicit-null root cause discovered while building this); web (`frontend/`) parity (scoped mobile-only).
 
 ### 📋 Medium Priority (next 2-3 sprints)
 
@@ -155,8 +144,8 @@ _Updated by: /renew-features_
 
 - [ ] [Wallet/Category/Budget/Transaction/Financial Reporting/Notification] No `test_cases.md` yet — see FEAT-QC above
 - [ ] [System Security] `/auth/refresh` endpoint not implemented — 401 forces full re-login; acceptable for MVP but worth an explicit decision before Release 1 (mobile session UX suffers more than web)
-- [ ] [Wallet Management] No icon/photo field — see FEAT-ICON above
-- [ ] [Budget Management] No icon/photo field — see FEAT-ICON above
+- [x] [Wallet Management] Icon/photo field — shipped as FEAT-ICON (2026-08-21)
+- [x] [Budget Management] Icon/photo field — shipped as FEAT-ICON (2026-08-21)
 - [x] [Mobile] Dedicated Wallets/Categories/Users screens — **shipped** between 2026-08-16 and 2026-08-21 (`455bfb1` → `fe4f6cc`); Profile rows are no longer inert
 - [x] [Transaction Management] `POST /transactions` idempotency key — shipped as part of FEAT-AI-01 (migration `010_transactions_idempotency_key.sql`)
 - [x] [Category Management] Photo upload (R2) — shipped in code (`fe4f6cc`); blocked on production by the deployment gap in FEAT-BUG-01, not a code gap
