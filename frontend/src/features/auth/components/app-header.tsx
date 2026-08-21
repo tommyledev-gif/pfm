@@ -3,6 +3,7 @@
 import axios from "axios";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/lib/constants";
@@ -10,11 +11,16 @@ import { useAuthStore } from "@/stores/auth-store";
 
 export function AppHeader() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const userEmail = useAuthStore((s) => s.userEmail);
   const clearUser = useAuthStore((s) => s.clear);
 
   async function handleLogout() {
     await axios.post("/api/auth/logout");
+    // See login-form.tsx's onSuccess — same cross-account cache leak, other
+    // direction: without this, a subsequent login as a different account
+    // could still briefly render this account's cached data.
+    queryClient.clear();
     clearUser();
     router.push(ROUTES.login);
     router.refresh();

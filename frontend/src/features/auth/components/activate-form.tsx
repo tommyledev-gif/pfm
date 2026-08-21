@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/shared/error-banner";
@@ -14,6 +15,7 @@ import { useAuthStore } from "@/stores/auth-store";
 export function ActivateForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const setUserEmail = useAuthStore((s) => s.setUserEmail);
 
   const token = searchParams.get("token") ?? "";
@@ -34,6 +36,9 @@ export function ActivateForm() {
       {
         onSuccess: (result) => {
           if (!result.success) return;
+          // Same cross-account cache leak as login-form.tsx — activation
+          // logs the user straight into a session too.
+          queryClient.clear();
           if (result.email) setUserEmail(result.email);
           router.push(ROUTES.app);
           router.refresh();

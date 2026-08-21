@@ -1,5 +1,6 @@
 import { create } from "zustand";
 
+import { queryClient } from "@/lib/query-client";
 import { secureStorage } from "@/lib/secure-storage";
 import {
   SECURE_STORE_ACCESS_TOKEN_KEY,
@@ -48,6 +49,12 @@ export const useSessionStore = create<SessionState>((set) => ({
       secureStorage.setItem(SECURE_STORE_REFRESH_TOKEN_KEY, refreshToken),
       secureStorage.setItem(SECURE_STORE_EMAIL_KEY, email),
     ]);
+    // Every cached query (wallets, transactions, budgets, ...) is keyed
+    // globally, never per-user — without this, logging in as a different
+    // account renders the previous account's cached data for a moment
+    // before the first refetch overwrites it. Cleared before the session
+    // state flips so no protected screen can mount against stale data.
+    queryClient.clear();
     set({ accessToken, refreshToken, email });
   },
 
@@ -57,6 +64,7 @@ export const useSessionStore = create<SessionState>((set) => ({
       secureStorage.removeItem(SECURE_STORE_REFRESH_TOKEN_KEY),
       secureStorage.removeItem(SECURE_STORE_EMAIL_KEY),
     ]);
+    queryClient.clear();
     set({ accessToken: null, refreshToken: null, email: null });
   },
 }));

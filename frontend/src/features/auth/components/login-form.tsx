@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/shared/error-banner";
@@ -14,6 +15,7 @@ import { useAuthStore } from "@/stores/auth-store";
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const setUserEmail = useAuthStore((s) => s.setUserEmail);
 
   const [email, setEmail] = useState("");
@@ -28,6 +30,10 @@ export function LoginForm() {
       {
         onSuccess: (result) => {
           if (!result.success) return;
+          // Every cached query is keyed globally, never per-user — without
+          // this, logging in as a different account renders the previous
+          // account's cached data until the first refetch overwrites it.
+          queryClient.clear();
           setUserEmail(email);
           const redirectTo = searchParams.get("redirect") ?? ROUTES.app;
           router.push(redirectTo);
