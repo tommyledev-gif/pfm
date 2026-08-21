@@ -1,8 +1,10 @@
-import { StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { AmountRevealPopup } from "@/components/ui/AmountRevealPopup";
 import { Avatar } from "@/components/ui/Avatar";
 import { colorForCategory } from "@/lib/category-color";
-import { formatCurrency } from "@/lib/currency";
+import { formatCurrencyTruncated } from "@/lib/currency";
 import { formatTime } from "@/lib/format-date";
 import { colors, spacing, typography } from "@/lib/theme";
 import { Transaction } from "@/features/transactions/types";
@@ -27,6 +29,7 @@ export function TransactionRow({
 }) {
   const isIncome = transaction.type === "income";
   const label = transaction.note?.trim() || transaction.category_name;
+  const [revealVisible, setRevealVisible] = useState(false);
 
   return (
     <View style={styles.row}>
@@ -45,13 +48,23 @@ export function TransactionRow({
           {transaction.category_name} · {transaction.wallet_name}
         </Text>
       </View>
-      <View style={styles.right}>
-        <Text style={[styles.amount, { color: isIncome ? colors.green : colors.peach }]}>
+      {/* Long-press reveals the untruncated amount + Vietnamese words (AmountRevealPopup) — a nested
+          Pressable inside whatever outer row-tap the caller wraps this in, same idiom as the
+          chat-bubble long-press-to-edit flow; a plain tap still passes through to the outer row. */}
+      <Pressable style={styles.right} onLongPress={() => setRevealVisible(true)}>
+        <Text style={[styles.amount, { color: isIncome ? colors.green : colors.peach }]} numberOfLines={1}>
           {isIncome ? "+" : "-"}
-          {formatCurrency(transaction.amount, currency)}
+          {formatCurrencyTruncated(transaction.amount, currency)}
         </Text>
         <Text style={styles.time}>{formatTime(transaction.occurred_at)}</Text>
-      </View>
+      </Pressable>
+
+      <AmountRevealPopup
+        visible={revealVisible}
+        onClose={() => setRevealVisible(false)}
+        amountCents={transaction.amount}
+        currency={currency ?? "VND"}
+      />
     </View>
   );
 }

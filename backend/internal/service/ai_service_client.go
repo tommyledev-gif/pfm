@@ -33,8 +33,19 @@ type AICategoryContext struct {
 	Type string
 }
 
+// AIChatTurn is one prior message in the conversation, given to the AI
+// Service as context so a short follow-up ("20k" after "mua cà phê ở
+// highlands") can be disambiguated using what was already said instead of
+// being judged in isolation. Role is "user" or "assistant" — mirrors
+// model.ChatRole's own string values.
+type AIChatTurn struct {
+	Role    string
+	Content string
+}
+
 type AIExtractRequest struct {
 	Message    string
+	History    []AIChatTurn
 	Wallets    []AIWalletContext
 	Categories []AICategoryContext
 	Now        time.Time
@@ -96,8 +107,14 @@ type aiWireCategory struct {
 	Type string `json:"type"`
 }
 
+type aiWireChatTurn struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
 type aiWireRequest struct {
 	Message    string           `json:"message"`
+	History    []aiWireChatTurn `json:"history"`
 	Wallets    []aiWireWallet   `json:"wallets"`
 	Categories []aiWireCategory `json:"categories"`
 	Now        string           `json:"now"`
@@ -164,8 +181,13 @@ func toWireRequest(req AIExtractRequest) aiWireRequest {
 	for _, c := range req.Categories {
 		categories = append(categories, aiWireCategory{ID: c.ID.String(), Name: c.Name, Type: c.Type})
 	}
+	history := make([]aiWireChatTurn, 0, len(req.History))
+	for _, h := range req.History {
+		history = append(history, aiWireChatTurn{Role: h.Role, Content: h.Content})
+	}
 	return aiWireRequest{
 		Message:    req.Message,
+		History:    history,
 		Wallets:    wallets,
 		Categories: categories,
 		Now:        req.Now.UTC().Format(time.RFC3339),

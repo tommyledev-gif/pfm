@@ -22,7 +22,7 @@ from copy import deepcopy
 
 from app.core.config import settings
 from app.core.groq_client import get_anthropic_client, get_groq_client
-from app.schemas.extract_schema import ExtractRequest, ExtractResponse
+from app.schemas.extract_schema import ChatTurn, ExtractRequest, ExtractResponse
 from app.services.prompt_builder import build_system_prompt
 
 logger = logging.getLogger(__name__)
@@ -41,14 +41,14 @@ async def extract_transactions(req: ExtractRequest) -> ExtractResponse:
     system_prompt = build_system_prompt(req.wallets, req.categories, req.now)
 
     try:
-        return _call_groq(system_prompt, req.message)
+        return _call_groq(system_prompt, req.history, req.message)
     except Exception as exc:  # noqa: BLE001 - any Groq failure falls back, never propagates raw
         logger.warning(
             "groq extraction failed, falling back to anthropic",
             extra={"prompt_chars": len(req.message), "error_type": type(exc).__name__, "error": str(exc)},
         )
         try:
-            return _call_anthropic(system_prompt, req.message)
+            return _call_anthropic(system_prompt, req.history, req.message)
         except Exception as fallback_exc:  # noqa: BLE001
             logger.error(
                 "anthropic fallback also failed",
@@ -94,7 +94,25 @@ def _extract_tool_schema() -> dict:
     return _dereference_schema(ExtractResponse.model_json_schema())
 
 
-def _call_groq(system_prompt: str, message: str) -> ExtractResponse:
+def _history_messages(history: list[ChatTurn]) -> list[dict]:
+    """Converts stored history turns into chat-message dicts, defensively
+    dropping any leading non-"user" turn.
+
+    Anthropic's API requires its messages array to start with "user" and
+    strictly alternate roles — the chat_messages table always writes a user
+    message immediately followed by exactly one assistant reply
+    (ChatService.Chat), so the last N rows only fail to start on "user" if
+    common.AIChatHistoryLimit is ever changed from its current even value to
+    an odd one. This makes that case fail safe (drop the stray turn) instead
+    of erroring out the whole request.
+    """
+    turns = list(history)
+    while turns and turns[0].role != "user":
+        turns.pop(0)
+    return [{"role": turn.role, "content": turn.content} for turn in turns]
+
+
+def _call_groq(system_prompt: str, history: list[ChatTurn], message: str) -> ExtractResponse:
     client = get_groq_client()
     tool = {
         "type": "function",
@@ -108,6 +126,7 @@ def _call_groq(system_prompt: str, message: str) -> ExtractResponse:
         tool_choice={"type": "function", "function": {"name": _TOOL_NAME}},
         messages=[
             {"role": "system", "content": system_prompt},
+            *_history_messages(history),
             {"role": "user", "content": message},
         ],
     )
@@ -119,7 +138,7 @@ def _call_groq(system_prompt: str, message: str) -> ExtractResponse:
     return ExtractResponse.model_validate(json.loads(tool_calls[0].function.arguments))
 
 
-def _call_anthropic(system_prompt: str, message: str) -> ExtractResponse:
+def _call_anthropic(system_prompt: str, history: list[ChatTurn], message: str) -> ExtractResponse:
     client = get_anthropic_client()
     tool = {"name": _TOOL_NAME, "description": _TOOL_DESCRIPTION, "input_schema": _extract_tool_schema()}
     response = client.messages.create(
@@ -129,7 +148,10 @@ def _call_anthropic(system_prompt: str, message: str) -> ExtractResponse:
         system=system_prompt,
         tools=[tool],
         tool_choice={"type": "tool", "name": _TOOL_NAME},
-        messages=[{"role": "user", "content": message}],
+        messages=[
+            *_history_messages(history),
+            {"role": "user", "content": message},
+        ],
     )
     tool_use_blocks = [block for block in response.content if block.type == "tool_use"]
     if not tool_use_blocks:

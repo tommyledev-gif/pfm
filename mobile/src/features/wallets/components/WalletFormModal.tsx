@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 
+import { AmountInput } from "@/components/ui/AmountInput";
 import { Avatar } from "@/components/ui/Avatar";
 import { Drawer } from "@/components/shared/Drawer";
+import { FieldError } from "@/components/ui/FieldError";
 import { PillButton } from "@/components/ui/PillButton";
 import { getErrorMessage } from "@/lib/axios";
 import { toCents } from "@/lib/currency";
@@ -15,10 +17,10 @@ import { useUploadWalletIconMutation } from "@/features/wallets/api/use-upload-w
 import { Wallet } from "@/features/wallets/types";
 
 const TYPE_LABEL: Record<WalletType, string> = {
-  cash: "Cash",
-  bank: "Bank",
-  e_wallet: "E-wallet",
-  other: "Other",
+  cash: "Tiền mặt",
+  bank: "Ngân hàng",
+  e_wallet: "Ví điện tử",
+  other: "Khác",
 };
 
 interface WalletFormModalProps {
@@ -44,6 +46,7 @@ export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormM
   const [initialBalance, setInitialBalance] = useState("");
   const [icon, setIcon] = useState("");
   const [iconUrl, setIconUrl] = useState<string | undefined>(undefined);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -61,6 +64,7 @@ export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormM
       setIcon("");
       setIconUrl(undefined);
     }
+    setSubmitAttempted(false);
   }, [visible, editingWallet]);
 
   const mutation = isEditing ? updateWallet : createWallet;
@@ -87,8 +91,13 @@ export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormM
     );
   };
 
+  const errors = {
+    name: !name.trim() ? "Vui lòng nhập tên ví" : undefined,
+  };
+
   const submit = () => {
-    if (!name.trim()) return;
+    setSubmitAttempted(true);
+    if (errors.name) return;
     if (isEditing && editingWallet) {
       updateWallet.mutate(
         { id: editingWallet.id, body: { name, type, icon: icon || undefined, icon_url: iconUrl } },
@@ -113,7 +122,7 @@ export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormM
 
   return (
     <Drawer visible={visible} onClose={onClose}>
-      <Text style={styles.title}>{isEditing ? "Edit wallet" : "New wallet"}</Text>
+      <Text style={styles.title}>{isEditing ? "Sửa ví" : "Ví mới"}</Text>
 
       <View style={styles.iconPickerRow}>
         <View style={styles.iconPreview}>
@@ -124,23 +133,24 @@ export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormM
           )}
         </View>
         <Pressable onPress={pickIcon} disabled={uploadIcon.isPending} hitSlop={8}>
-          <Text style={styles.changePhoto}>{iconUrl ? "Change photo" : "Upload photo"}</Text>
+          <Text style={styles.changePhoto}>{iconUrl ? "Đổi ảnh" : "Tải ảnh lên"}</Text>
         </Pressable>
       </View>
 
-      <Text style={styles.label}>Name</Text>
-      <TextInput value={name} onChangeText={setName} placeholder="e.g. Cash" placeholderTextColor={colors.textMuted} style={styles.input} />
+      <Text style={styles.label}>Tên</Text>
+      <TextInput value={name} onChangeText={setName} placeholder="vd: Tiền mặt" placeholderTextColor={colors.textMuted} style={styles.input} />
+      {submitAttempted ? <FieldError message={errors.name} /> : null}
 
-      <Text style={styles.label}>Emoji icon (used when no photo is set)</Text>
+      <Text style={styles.label}>Biểu tượng emoji (dùng khi chưa có ảnh)</Text>
       <TextInput
         value={icon}
         onChangeText={setIcon}
-        placeholder="e.g. 💵"
+        placeholder="vd: 💵"
         placeholderTextColor={colors.textMuted}
         style={styles.input}
       />
 
-      <Text style={styles.label}>Type</Text>
+      <Text style={styles.label}>Loại</Text>
       <View style={styles.chipRow}>
         {WALLET_TYPES.map((t) => (
           <Pressable key={t} onPress={() => setType(t)} style={[styles.chip, type === t && styles.chipActive]}>
@@ -149,7 +159,7 @@ export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormM
         ))}
       </View>
 
-      <Text style={styles.label}>Currency{isEditing ? " (locked after creation)" : ""}</Text>
+      <Text style={styles.label}>Đơn vị tiền tệ{isEditing ? " (khóa sau khi tạo)" : ""}</Text>
       <View style={styles.chipRow}>
         {WALLET_CURRENCIES.map((c) => (
           <Pressable
@@ -164,29 +174,22 @@ export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormM
 
       {!isEditing ? (
         <>
-          <Text style={styles.label}>Initial balance ({currency})</Text>
-          <TextInput
-            value={initialBalance}
-            onChangeText={setInitialBalance}
-            placeholder="0"
-            placeholderTextColor={colors.textMuted}
-            keyboardType="numeric"
-            style={styles.input}
-          />
+          <Text style={styles.label}>Số dư ban đầu ({currency})</Text>
+          <AmountInput value={initialBalance} onChangeText={setInitialBalance} />
         </>
       ) : null}
 
       {activeError ? (
-        <Text style={styles.error}>{getErrorMessage(activeError, "Could not save wallet")}</Text>
+        <Text style={styles.error}>{getErrorMessage(activeError, "Không thể lưu ví")}</Text>
       ) : null}
 
       <View style={styles.actions}>
-        <PillButton label="Cancel" variant="outline" onPress={onClose} style={styles.flexButton} />
+        <PillButton label="Hủy" variant="outline" onPress={onClose} style={styles.flexButton} />
         <PillButton
-          label={isEditing ? "Save" : "Create"}
+          label={isEditing ? "Lưu" : "Tạo"}
           onPress={submit}
           loading={mutation.isPending}
-          disabled={!name.trim()}
+          disabled={submitAttempted && Boolean(errors.name)}
           style={styles.flexButton}
         />
       </View>

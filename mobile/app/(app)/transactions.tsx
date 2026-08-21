@@ -18,9 +18,9 @@ import { useCategoriesQuery } from "@/features/categories/api/use-categories-que
 const LIST_SKELETON_COUNT = 6;
 
 const FILTERS: { label: string; value: TransactionType | undefined }[] = [
-  { label: "All", value: undefined },
-  { label: "Income", value: "income" },
-  { label: "Expense", value: "expense" },
+  { label: "Tất cả", value: undefined },
+  { label: "Thu", value: "income" },
+  { label: "Chi", value: "expense" },
 ];
 
 export default function TransactionsScreen() {
@@ -58,7 +58,7 @@ export default function TransactionsScreen() {
         ListHeaderComponent={
           <View style={styles.header}>
             <View style={styles.headerRow}>
-              <Text style={styles.title}>Transactions</Text>
+              <Text style={styles.title}>Giao dịch</Text>
               <View style={styles.headerActions}>
                 <Pressable
                   style={[styles.dateButton, hasDateFilter && styles.dateButtonActive]}
@@ -66,7 +66,7 @@ export default function TransactionsScreen() {
                 >
                   <CalendarIcon size={16} color={hasDateFilter ? colors.onGreen : colors.textSecondary} />
                   <Text style={[styles.dateButtonLabel, hasDateFilter && styles.dateButtonLabelActive]}>
-                    {hasDateFilter ? `${dateRange.from} – ${dateRange.to}` : "Date range"}
+                    {hasDateFilter ? `${dateRange.from} – ${dateRange.to}` : "Khoảng thời gian"}
                   </Text>
                 </Pressable>
                 <Pressable
@@ -110,7 +110,7 @@ export default function TransactionsScreen() {
               ))}
             </View>
           ) : (
-            <Text style={styles.empty}>No transactions found.</Text>
+            <Text style={styles.empty}>Không tìm thấy giao dịch nào.</Text>
           )
         }
         ListFooterComponent={

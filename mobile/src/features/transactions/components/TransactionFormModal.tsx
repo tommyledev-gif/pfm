@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
+import { AmountInput } from "@/components/ui/AmountInput";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Drawer } from "@/components/shared/Drawer";
+import { FieldError } from "@/components/ui/FieldError";
 import { PillButton } from "@/components/ui/PillButton";
 import { TrashIcon } from "@/components/ui/Icon";
 import { SingleDatePickerModal } from "@/components/shared/SingleDatePickerModal";
@@ -43,6 +46,8 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
   const [note, setNote] = useState("");
   const [occurredAt, setOccurredAt] = useState(todayIso());
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const createTransaction = useCreateTransactionMutation();
   const updateTransaction = useUpdateTransactionMutation();
@@ -67,36 +72,34 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
       setNote("");
       setOccurredAt(todayIso());
     }
+    setSubmitAttempted(false);
   }, [visible, editingTransaction, wallets.data]);
 
+  const amountValue = Number(amount);
+  const errors = {
+    wallet: !isEditing && !walletId ? "Vui lòng chọn ví" : undefined,
+    category: !categoryId ? "Vui lòng chọn danh mục" : undefined,
+    amount: !amount || !(amountValue > 0) ? "Vui lòng nhập số tiền hợp lệ" : undefined,
+  };
+  const hasErrors = Boolean(errors.wallet || errors.category || errors.amount);
+
   const submit = () => {
-    if (!walletId || !categoryId || !amount) return;
+    setSubmitAttempted(true);
+    if (hasErrors || !walletId || !categoryId) return;
     if (isEditing && editingTransaction) {
       updateTransaction.mutate(
         {
           id: editingTransaction.id,
-          body: { amount: toCents(Number(amount)), category_id: categoryId, occurred_at: occurredAt, note: note || undefined },
+          body: { amount: toCents(amountValue), category_id: categoryId, occurred_at: occurredAt, note: note || undefined },
         },
         { onSuccess: onClose },
       );
     } else {
       createTransaction.mutate(
-        { wallet_id: walletId, category_id: categoryId, amount: toCents(Number(amount)), type, occurred_at: occurredAt, note: note || undefined },
+        { wallet_id: walletId, category_id: categoryId, amount: toCents(amountValue), type, occurred_at: occurredAt, note: note || undefined },
         { onSuccess: onClose },
       );
     }
-  };
-
-  const confirmDelete = () => {
-    if (!editingTransaction) return;
-    Alert.alert("Delete transaction?", "This cannot be undone and will reconcile the wallet balance.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => deleteTransaction.mutate(editingTransaction.id, { onSuccess: onClose }),
-      },
-    ]);
   };
 
   const activeError = mutation.isError ? mutation.error : deleteTransaction.isError ? deleteTransaction.error : null;
@@ -104,9 +107,9 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
   return (
     <>
       <Drawer visible={visible} onClose={onClose}>
-        <Text style={styles.title}>{isEditing ? "Edit transaction" : "New transaction"}</Text>
+        <Text style={styles.title}>{isEditing ? "Sửa giao dịch" : "Giao dịch mới"}</Text>
 
-        <Text style={styles.label}>Wallet{isEditing ? " (locked after creation)" : ""}</Text>
+        <Text style={styles.label}>Ví{isEditing ? " (khóa sau khi tạo)" : ""}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
           {wallets.data?.map((w) => (
             <Pressable
@@ -118,8 +121,9 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
             </Pressable>
           ))}
         </ScrollView>
+        {submitAttempted ? <FieldError message={errors.wallet} /> : null}
 
-        <Text style={styles.label}>Type{isEditing ? " (locked after creation)" : ""}</Text>
+        <Text style={styles.label}>Loại{isEditing ? " (khóa sau khi tạo)" : ""}</Text>
         <View style={styles.chipRow}>
           {TRANSACTION_TYPES.map((t) => (
             <Pressable
@@ -132,13 +136,13 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
               style={[styles.chip, type === t && styles.chipActive, isEditing && styles.chipDisabled]}
             >
               <Text style={[styles.chipLabel, type === t && styles.chipLabelActive]}>
-                {t === "expense" ? "Expense" : "Income"}
+                {t === "expense" ? "Chi" : "Thu"}
               </Text>
             </Pressable>
           ))}
         </View>
 
-        <Text style={styles.label}>Category</Text>
+        <Text style={styles.label}>Danh mục</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
           {categories.data?.map((c) => (
             <Pressable
@@ -150,52 +154,59 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
             </Pressable>
           ))}
         </ScrollView>
+        {submitAttempted ? <FieldError message={errors.category} /> : null}
 
-        <Text style={styles.label}>Amount</Text>
-        <TextInput
-          value={amount}
-          onChangeText={setAmount}
-          placeholder="0"
-          placeholderTextColor={colors.textMuted}
-          keyboardType="numeric"
-          style={styles.input}
-        />
+        <Text style={styles.label}>Số tiền</Text>
+        <AmountInput value={amount} onChangeText={setAmount} />
+        {submitAttempted ? <FieldError message={errors.amount} /> : null}
 
-        <Text style={styles.label}>Date</Text>
+        <Text style={styles.label}>Ngày</Text>
         <Pressable style={styles.input} onPress={() => setDatePickerOpen(true)}>
           <Text style={{ color: colors.textPrimary, ...typography.body }}>{formatDateShort(occurredAt)}</Text>
         </Pressable>
 
-        <Text style={styles.label}>Note (optional)</Text>
+        <Text style={styles.label}>Ghi chú (không bắt buộc)</Text>
         <TextInput
           value={note}
           onChangeText={setNote}
-          placeholder="e.g. Lunch"
+          placeholder="vd: Ăn trưa"
           placeholderTextColor={colors.textMuted}
           maxLength={TRANSACTION_NOTE_MAX_LENGTH}
           style={styles.input}
         />
 
-        {activeError ? <Text style={styles.error}>{getErrorMessage(activeError, "Could not save transaction")}</Text> : null}
+        {activeError ? <Text style={styles.error}>{getErrorMessage(activeError, "Không thể lưu giao dịch")}</Text> : null}
 
         <View style={styles.actions}>
-          <PillButton label="Cancel" variant="outline" onPress={onClose} style={styles.flexButton} />
+          <PillButton label="Hủy" variant="outline" onPress={onClose} style={styles.flexButton} />
           <PillButton
-            label={isEditing ? "Save" : "Create"}
+            label={isEditing ? "Lưu" : "Tạo"}
             onPress={submit}
             loading={mutation.isPending}
-            disabled={!walletId || !categoryId || !amount}
+            disabled={submitAttempted && hasErrors}
             style={styles.flexButton}
           />
         </View>
 
         {isEditing ? (
-          <Pressable style={styles.deleteRow} onPress={confirmDelete} disabled={deleteTransaction.isPending}>
+          <Pressable style={styles.deleteRow} onPress={() => setConfirmDeleteOpen(true)} disabled={deleteTransaction.isPending}>
             <TrashIcon size={18} />
-            <Text style={styles.deleteLabel}>Delete transaction</Text>
+            <Text style={styles.deleteLabel}>Xóa giao dịch</Text>
           </Pressable>
         ) : null}
       </Drawer>
+
+      <ConfirmDialog
+        visible={confirmDeleteOpen}
+        title="Xóa giao dịch?"
+        message="Hành động này không thể hoàn tác và sẽ điều chỉnh lại số dư ví."
+        onCancel={() => setConfirmDeleteOpen(false)}
+        onConfirm={() => {
+          setConfirmDeleteOpen(false);
+          if (editingTransaction) deleteTransaction.mutate(editingTransaction.id, { onSuccess: onClose });
+        }}
+        loading={deleteTransaction.isPending}
+      />
 
       <SingleDatePickerModal
         visible={datePickerOpen}

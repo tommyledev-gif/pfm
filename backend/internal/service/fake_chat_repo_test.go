@@ -41,6 +41,25 @@ func (f *fakeChatRepo) CreateChatMessage(_ context.Context, arg repository.Creat
 	return &cp, nil
 }
 
+func (f *fakeChatRepo) ListRecentMessagesByConversation(_ context.Context, conversationID uuid.UUID, limit int32) ([]*model.ChatMessage, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	// Newest-first, capped at limit — mirrors the real repository's ORDER BY
+	// created_at DESC LIMIT contract exactly, since ChatService.buildHistory
+	// depends on that ordering to reverse it back to chronological.
+	matching := make([]*model.ChatMessage, 0, len(f.messages))
+	for i := len(f.messages) - 1; i >= 0; i-- {
+		if f.messages[i].ConversationID == conversationID {
+			matching = append(matching, f.messages[i])
+		}
+	}
+	if int32(len(matching)) > limit {
+		matching = matching[:limit]
+	}
+	return matching, nil
+}
+
 func (f *fakeChatRepo) messageCount() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()

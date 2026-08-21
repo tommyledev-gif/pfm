@@ -147,6 +147,18 @@ const (
 	// the confirm step (POST /transactions).
 	AIChatRateLimit       = 30
 	AIChatRateLimitWindow = 1 * time.Hour
+	// AIChatHistoryLimit caps how many prior messages (both roles) are sent
+	// to the AI Service as conversation context — enough to disambiguate a
+	// short follow-up ("20k" after "mua cà phê ở highlands") without the
+	// request body growing unbounded on a long-running conversation. An
+	// explicit assumption, same convention as AIChatConfidenceThreshold —
+	// no source document commits to a number. Must stay an EVEN number:
+	// chat_messages always alternates user/assistant in pairs, and the AI
+	// Service's Anthropic fallback requires its messages array to start with
+	// "user" — taking the last N rows only lands on a user-turn boundary
+	// when N is even (see ai-service/app/services/extract_service.py's
+	// _history_messages, which fails safe if this is ever changed anyway).
+	AIChatHistoryLimit = 10
 	// VNDToCentsFactor converts the AI Service's plain-VND integer output
 	// (e.g. 50000 for "50k") into this app's BIGINT-integer-cents storage
 	// convention — the same conversion the manual create-transaction form's

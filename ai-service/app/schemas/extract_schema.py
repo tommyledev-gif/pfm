@@ -28,10 +28,22 @@ class CategoryContext(BaseModel):
     type: str
 
 
+class ChatTurn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["user", "assistant"]
+    content: str
+
+
 class ExtractRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     message: str
+    # Prior turns in the same conversation, oldest first, never including
+    # `message` itself — lets the model disambiguate a short follow-up (e.g.
+    # "20k" after "mua cà phê") using what was already said instead of
+    # judging it in isolation. Empty for a brand-new conversation.
+    history: list[ChatTurn] = Field(default_factory=list)
     wallets: list[WalletContext]
     categories: list[CategoryContext]
     now: str  # RFC3339, UTC — the Go Backend's server time, never client-supplied

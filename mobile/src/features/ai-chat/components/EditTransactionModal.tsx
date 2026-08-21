@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Calendar, DateData } from "react-native-calendars";
 
+import { AmountInput } from "@/components/ui/AmountInput";
+import { Drawer } from "@/components/shared/Drawer";
 import { PillButton } from "@/components/ui/PillButton";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { toCents, toMajorUnits } from "@/lib/currency";
@@ -19,11 +21,18 @@ interface EditTransactionModalProps {
 }
 
 // Lets the user correct a proposal the AI got wrong (wrong category, wrong
-// date, wrong amount, …) before confirming it — opened via a 2s long-press
+// date, wrong amount, …) before confirming it — opened via a 500ms long-press
 // on an assistant chat bubble that carries a transaction action (see
 // ai-chat.tsx). Saving never mutates the original proposal in place; the
 // caller appends a new, "Edited"-badged message instead so the thread stays
 // an honest record of what the AI actually proposed at the time.
+//
+// Built on the shared Drawer (single ScrollView, keyboard-safe padding) like
+// every other form sheet in the app — this modal used to roll its own bare
+// Modal/View/ScrollView with zero keyboard mitigation, one of the two worst
+// offenders behind the "keyboard covers the input" reports. The Save/Cancel
+// row now scrolls with the rest of the fields rather than staying pinned,
+// matching how every other Drawer-based form already behaves.
 export function EditTransactionModal({ visible, payload, onClose, onSave }: EditTransactionModalProps) {
   const [type, setType] = useState<TransactionType>("expense");
   const [amount, setAmount] = useState("");
@@ -77,109 +86,99 @@ export function EditTransactionModal({ visible, payload, onClose, onSave }: Edit
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View style={styles.sheet}>
-          <Text style={styles.title}>Edit transaction</Text>
+    <Drawer visible={visible} onClose={onClose}>
+      <Text style={styles.title}>Sửa giao dịch</Text>
 
-          <ScrollView contentContainerStyle={styles.fields} showsVerticalScrollIndicator={false}>
-            <Text style={styles.label}>Type</Text>
-            <View style={styles.chipRow}>
-              {TRANSACTION_TYPES.map((t) => (
-                <Pressable key={t} onPress={() => setType(t)} style={[styles.chip, type === t && styles.chipActive]}>
-                  <Text style={[styles.chipLabel, type === t && styles.chipLabelActive]}>
-                    {t === "expense" ? "Expense" : "Income"}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <Text style={styles.label}>Amount (VND)</Text>
-            <TextInput
-              value={amount}
-              onChangeText={setAmount}
-              placeholder="0"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="numeric"
-              style={styles.input}
-            />
-
-            <Text style={styles.label}>Category</Text>
-            <View style={styles.chipRow}>
-              {(categories.data ?? []).map((c) => (
-                <Pressable
-                  key={c.id}
-                  onPress={() => setCategoryId(c.id)}
-                  style={[styles.chip, categoryId === c.id && styles.chipActive]}
-                >
-                  <Text style={[styles.chipLabel, categoryId === c.id && styles.chipLabelActive]}>{c.name}</Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <Text style={styles.label}>Wallet</Text>
-            <View style={styles.chipRow}>
-              {(wallets.data ?? []).map((w) => (
-                <Pressable
-                  key={w.id}
-                  onPress={() => setWalletId(w.id)}
-                  style={[styles.chip, walletId === w.id && styles.chipActive]}
-                >
-                  <Text style={[styles.chipLabel, walletId === w.id && styles.chipLabelActive]}>{w.name}</Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <Text style={styles.label}>Date{occurredAt ? ` — ${formatDateShort(occurredAt)}` : ""}</Text>
-            <Calendar
-              current={occurredAt || undefined}
-              markedDates={markedDates}
-              onDayPress={(day: DateData) => setOccurredAt(day.dateString)}
-              theme={{
-                calendarBackground: "transparent",
-                monthTextColor: colors.textPrimary,
-                arrowColor: colors.textPrimary,
-                dayTextColor: colors.textPrimary,
-                textDisabledColor: colors.textMuted,
-                textSectionTitleColor: colors.textSecondary,
-                todayTextColor: colors.green,
-              }}
-              style={styles.calendar}
-            />
-
-            <Text style={styles.label}>Note (optional)</Text>
-            <TextInput
-              value={note}
-              onChangeText={setNote}
-              placeholder="e.g. Coffee with a friend"
-              placeholderTextColor={colors.textMuted}
-              style={styles.input}
-            />
-          </ScrollView>
-
-          <View style={styles.actions}>
-            <PillButton label="Cancel" variant="outline" onPress={onClose} style={styles.flexButton} />
-            <PillButton label="Save" onPress={submit} disabled={!canSave} style={styles.flexButton} />
-          </View>
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>Loại</Text>
+        <View style={styles.chipRow}>
+          {TRANSACTION_TYPES.map((t) => (
+            <Pressable key={t} onPress={() => setType(t)} style={[styles.chip, type === t && styles.chipActive]}>
+              <Text style={[styles.chipLabel, type === t && styles.chipLabelActive]}>
+                {t === "expense" ? "Chi" : "Thu"}
+              </Text>
+            </Pressable>
+          ))}
         </View>
       </View>
-    </Modal>
+
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>Số tiền (VND)</Text>
+        <AmountInput value={amount} onChangeText={setAmount} />
+      </View>
+
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>Danh mục</Text>
+        <View style={styles.chipRow}>
+          {(categories.data ?? []).map((c) => (
+            <Pressable
+              key={c.id}
+              onPress={() => setCategoryId(c.id)}
+              style={[styles.chip, categoryId === c.id && styles.chipActive]}
+            >
+              <Text style={[styles.chipLabel, categoryId === c.id && styles.chipLabelActive]}>{c.name}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>Ví</Text>
+        <View style={styles.chipRow}>
+          {(wallets.data ?? []).map((w) => (
+            <Pressable
+              key={w.id}
+              onPress={() => setWalletId(w.id)}
+              style={[styles.chip, walletId === w.id && styles.chipActive]}
+            >
+              <Text style={[styles.chipLabel, walletId === w.id && styles.chipLabelActive]}>{w.name}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>Ngày{occurredAt ? ` — ${formatDateShort(occurredAt)}` : ""}</Text>
+        <Calendar
+          current={occurredAt || undefined}
+          markedDates={markedDates}
+          onDayPress={(day: DateData) => setOccurredAt(day.dateString)}
+          theme={{
+            calendarBackground: "transparent",
+            monthTextColor: colors.textPrimary,
+            arrowColor: colors.textPrimary,
+            dayTextColor: colors.textPrimary,
+            textDisabledColor: colors.textMuted,
+            textSectionTitleColor: colors.textSecondary,
+            todayTextColor: colors.green,
+          }}
+          style={styles.calendar}
+        />
+      </View>
+
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>Ghi chú (không bắt buộc)</Text>
+        <TextInput
+          value={note}
+          onChangeText={setNote}
+          placeholder="vd: Cà phê với bạn"
+          placeholderTextColor={colors.textMuted}
+          style={styles.input}
+        />
+      </View>
+
+      <View style={styles.actions}>
+        <PillButton label="Hủy" variant="outline" onPress={onClose} style={styles.flexButton} />
+        <PillButton label="Lưu" onPress={submit} disabled={!canSave} style={styles.flexButton} />
+      </View>
+    </Drawer>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
-  sheet: {
-    maxHeight: "85%",
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radii.hero,
-    borderTopRightRadius: radii.hero,
-    padding: spacing.xl,
-    gap: spacing.md,
-  },
   title: { ...typography.title, color: colors.textPrimary },
-  fields: { gap: spacing.sm, paddingBottom: spacing.sm },
-  label: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs },
+  fieldGroup: { gap: spacing.xs },
+  label: { ...typography.caption, color: colors.textSecondary },
   chipRow: { flexDirection: "row", gap: spacing.sm, flexWrap: "wrap" },
   chip: {
     paddingVertical: 8,

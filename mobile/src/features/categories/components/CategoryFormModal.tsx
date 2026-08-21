@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 
 import { Avatar } from "@/components/ui/Avatar";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Drawer } from "@/components/shared/Drawer";
+import { FieldError } from "@/components/ui/FieldError";
 import { PillButton } from "@/components/ui/PillButton";
 import { TrashIcon } from "@/components/ui/Icon";
 import { getErrorMessage } from "@/lib/axios";
@@ -37,6 +39,8 @@ export function CategoryFormModal({ visible, onClose, editingCategory }: Categor
   const [icon, setIcon] = useState("");
   const [iconUrl, setIconUrl] = useState<string | undefined>(undefined);
   const [type, setType] = useState<CategoryType>("expense");
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -51,6 +55,7 @@ export function CategoryFormModal({ visible, onClose, editingCategory }: Categor
       setIconUrl(undefined);
       setType("expense");
     }
+    setSubmitAttempted(false);
   }, [visible, editingCategory]);
 
   const mutation = isEditing ? updateCategory : createCategory;
@@ -78,8 +83,13 @@ export function CategoryFormModal({ visible, onClose, editingCategory }: Categor
     );
   };
 
+  const errors = {
+    name: !name.trim() ? "Vui lòng nhập tên danh mục" : undefined,
+  };
+
   const submit = () => {
-    if (!name.trim()) return;
+    setSubmitAttempted(true);
+    if (errors.name) return;
     if (isEditing && editingCategory) {
       updateCategory.mutate(
         { id: editingCategory.id, body: { name, icon: icon || undefined, icon_url: iconUrl } },
@@ -88,18 +98,6 @@ export function CategoryFormModal({ visible, onClose, editingCategory }: Categor
     } else {
       createCategory.mutate({ name, icon: icon || undefined, type, icon_url: iconUrl }, { onSuccess: onClose });
     }
-  };
-
-  const confirmDelete = () => {
-    if (!editingCategory) return;
-    Alert.alert("Delete category?", "This cannot be undone.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => deleteCategory.mutate(editingCategory.id, { onSuccess: onClose }),
-      },
-    ]);
   };
 
   const activeError = mutation.isError
@@ -111,83 +109,98 @@ export function CategoryFormModal({ visible, onClose, editingCategory }: Categor
         : null;
 
   return (
-    <Drawer visible={visible} onClose={onClose}>
-      <Text style={styles.title}>{isEditing ? "Edit category" : "New category"}</Text>
+    <>
+      <Drawer visible={visible} onClose={onClose}>
+        <Text style={styles.title}>{isEditing ? "Sửa danh mục" : "Danh mục mới"}</Text>
 
-      <View style={styles.iconPickerRow}>
-        <View style={styles.iconPreview}>
-          {uploadIcon.isPending ? (
-            <ActivityIndicator color={colors.textPrimary} />
-          ) : (
-            <Avatar
-              name={name || "?"}
-              color={editingCategory ? colorForCategory(editingCategory.id) : colors.lavender}
-              size={56}
-              icon={icon}
-              iconUrl={iconUrl}
-            />
-          )}
-        </View>
-        <Pressable onPress={pickIcon} disabled={uploadIcon.isPending} hitSlop={8}>
-          <Text style={styles.changePhoto}>{iconUrl ? "Change photo" : "Upload photo"}</Text>
-        </Pressable>
-      </View>
-
-      <Text style={styles.label}>Name</Text>
-      <TextInput
-        value={name}
-        onChangeText={setName}
-        placeholder="e.g. Groceries"
-        placeholderTextColor={colors.textMuted}
-        style={styles.input}
-      />
-
-      <Text style={styles.label}>Emoji icon (used when no photo is set)</Text>
-      <TextInput
-        value={icon}
-        onChangeText={setIcon}
-        placeholder="e.g. cart"
-        placeholderTextColor={colors.textMuted}
-        style={styles.input}
-      />
-
-      <Text style={styles.label}>Type{isEditing ? " (locked after creation)" : ""}</Text>
-      <View style={styles.chipRow}>
-        {CATEGORY_TYPES.map((t) => (
-          <Pressable
-            key={t}
-            onPress={() => !isEditing && setType(t)}
-            style={[styles.chip, type === t && styles.chipActive, isEditing && styles.chipDisabled]}
-          >
-            <Text style={[styles.chipLabel, type === t && styles.chipLabelActive]}>
-              {t === "expense" ? "Expense" : "Income"}
-            </Text>
+        <View style={styles.iconPickerRow}>
+          <View style={styles.iconPreview}>
+            {uploadIcon.isPending ? (
+              <ActivityIndicator color={colors.textPrimary} />
+            ) : (
+              <Avatar
+                name={name || "?"}
+                color={editingCategory ? colorForCategory(editingCategory.id) : colors.lavender}
+                size={56}
+                icon={icon}
+                iconUrl={iconUrl}
+              />
+            )}
+          </View>
+          <Pressable onPress={pickIcon} disabled={uploadIcon.isPending} hitSlop={8}>
+            <Text style={styles.changePhoto}>{iconUrl ? "Đổi ảnh" : "Tải ảnh lên"}</Text>
           </Pressable>
-        ))}
-      </View>
+        </View>
 
-      {activeError ? (
-        <Text style={styles.error}>{getErrorMessage(activeError, "Could not save category")}</Text>
-      ) : null}
-
-      <View style={styles.actions}>
-        <PillButton label="Cancel" variant="outline" onPress={onClose} style={styles.flexButton} />
-        <PillButton
-          label={isEditing ? "Save" : "Create"}
-          onPress={submit}
-          loading={mutation.isPending}
-          disabled={!name.trim()}
-          style={styles.flexButton}
+        <Text style={styles.label}>Tên</Text>
+        <TextInput
+          value={name}
+          onChangeText={setName}
+          placeholder="vd: Đi chợ"
+          placeholderTextColor={colors.textMuted}
+          style={styles.input}
         />
-      </View>
+        {submitAttempted ? <FieldError message={errors.name} /> : null}
 
-      {isEditing ? (
-        <Pressable style={styles.deleteRow} onPress={confirmDelete} disabled={deleteCategory.isPending}>
-          <TrashIcon size={18} />
-          <Text style={styles.deleteLabel}>Delete category</Text>
-        </Pressable>
-      ) : null}
-    </Drawer>
+        <Text style={styles.label}>Biểu tượng emoji (dùng khi chưa có ảnh)</Text>
+        <TextInput
+          value={icon}
+          onChangeText={setIcon}
+          placeholder="vd: 🛒"
+          placeholderTextColor={colors.textMuted}
+          style={styles.input}
+        />
+
+        <Text style={styles.label}>Loại{isEditing ? " (khóa sau khi tạo)" : ""}</Text>
+        <View style={styles.chipRow}>
+          {CATEGORY_TYPES.map((t) => (
+            <Pressable
+              key={t}
+              onPress={() => !isEditing && setType(t)}
+              style={[styles.chip, type === t && styles.chipActive, isEditing && styles.chipDisabled]}
+            >
+              <Text style={[styles.chipLabel, type === t && styles.chipLabelActive]}>
+                {t === "expense" ? "Chi" : "Thu"}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        {activeError ? (
+          <Text style={styles.error}>{getErrorMessage(activeError, "Không thể lưu danh mục")}</Text>
+        ) : null}
+
+        <View style={styles.actions}>
+          <PillButton label="Hủy" variant="outline" onPress={onClose} style={styles.flexButton} />
+          <PillButton
+            label={isEditing ? "Lưu" : "Tạo"}
+            onPress={submit}
+            loading={mutation.isPending}
+            disabled={submitAttempted && Boolean(errors.name)}
+            style={styles.flexButton}
+          />
+        </View>
+
+        {isEditing ? (
+          <Pressable style={styles.deleteRow} onPress={() => setConfirmDeleteOpen(true)} disabled={deleteCategory.isPending}>
+            <TrashIcon size={18} />
+            <Text style={styles.deleteLabel}>Xóa danh mục</Text>
+          </Pressable>
+        ) : null}
+      </Drawer>
+
+      <ConfirmDialog
+        visible={confirmDeleteOpen}
+        title="Xóa danh mục?"
+        message="Hành động này không thể hoàn tác."
+        onCancel={() => setConfirmDeleteOpen(false)}
+        onConfirm={() => {
+          setConfirmDeleteOpen(false);
+          if (editingCategory) deleteCategory.mutate(editingCategory.id, { onSuccess: onClose });
+        }}
+        loading={deleteCategory.isPending}
+      />
+    </>
   );
 }
 

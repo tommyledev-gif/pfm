@@ -9,6 +9,8 @@ import { ChatBubble } from "@/features/ai-chat/components/ChatBubble";
 import { EditMessageModal } from "@/features/ai-chat/components/EditMessageModal";
 import { EditTransactionModal } from "@/features/ai-chat/components/EditTransactionModal";
 import { TransactionActionCard } from "@/features/ai-chat/components/TransactionActionCard";
+import { TransactionFormModal } from "@/features/transactions/components/TransactionFormModal";
+import { getErrorCode } from "@/lib/axios";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { useKeyboardHeight } from "@/lib/use-keyboard-height";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
@@ -69,6 +71,7 @@ export default function AiChatScreen() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [manualEntryOpen, setManualEntryOpen] = useState(false);
   // Two different long-press targets need two different editors: a plain
   // chat bubble (user text, or an actionless assistant reply) opens a text
   // editor, while an assistant bubble carrying a transaction proposal opens
@@ -103,8 +106,12 @@ export default function AiChatScreen() {
   const categoryById = useMemo(() => new Map(categories.data?.map((c) => [c.id, c])), [categories.data]);
 
   // Shared by both a fresh send and a resend-after-editing-the-user-message
-  // flow — same typing-indicator pacing and fallback-on-failure text either
-  // way, only the resulting message's `edited` flag differs.
+  // flow — same typing-indicator pacing either way, only the resulting
+  // message's `edited` flag differs. On failure, a rate-limit or
+  // AI-service-unavailable response gets its own distinct copy plus a
+  // manual-entry offer — both already exist server-side (AIChatRateLimiter,
+  // ErrAIServiceUnavailable) and are distinguishable by error_code — instead
+  // of the generic "couldn't process that" text every other failure gets.
   const requestAssistantReply = async (message: string, edited?: boolean): Promise<ChatMessage> => {
     const startedAt = Date.now();
     try {
@@ -113,12 +120,24 @@ export default function AiChatScreen() {
       if (elapsed < MIN_TYPING_MS) {
         await new Promise((resolve) => setTimeout(resolve, MIN_TYPING_MS - elapsed));
       }
-      return { id: nextId(), role: "assistant", text: response.message, action: response.actions[0], edited };
-    } catch {
       return {
         id: nextId(),
         role: "assistant",
-        text: "Sorry, I couldn't process that. Please try again.",
+        text: response.message,
+        action: response.actions[0],
+        intent: response.intent === "ambiguous" ? "ambiguous" : undefined,
+        edited,
+      };
+    } catch (err) {
+      const code = getErrorCode(err);
+      const isBusy = code === "RATE_LIMITED" || code === "AI_SERVICE_UNAVAILABLE";
+      return {
+        id: nextId(),
+        role: "assistant",
+        text: isBusy
+          ? "Hệ thống đang bận, vui lòng thử lại sau."
+          : "Xin lỗi, mình chưa xử lý được. Vui lòng thử lại.",
+        offerManualEntry: isBusy,
         edited,
       };
     }
@@ -170,7 +189,7 @@ export default function AiChatScreen() {
     addMessage({
       id: nextId(),
       role: "assistant",
-      text: "Here's the corrected transaction.",
+      text: "Đây là giao dịch đã được chỉnh sửa.",
       action: { type: "create_transaction", payload, idempotency_key: uuidv4(), confidence: 1 },
       edited: true,
     });
@@ -206,15 +225,29 @@ export default function AiChatScreen() {
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
         renderItem={({ item }) => (
           <Pressable
-            onLongPress={() => (item.action ? setEditingActionMessage(item) : setEditingMessage(item))}
+            onLongPress={() => {
+              // The AI's own clarifying question (rare now — only a missing
+              // amount or a non-transaction message) has nothing for the
+              // user to "correct" the way an edit modal implies, unlike a
+              // transaction proposal (always editable) or a user's own
+              // message (item 16 — don't let ambiguous AI questions be
+              // held-and-edited like ordinary text).
+              if (item.action) {
+                setEditingActionMessage(item);
+              } else if (item.role === "assistant" && item.intent === "ambiguous") {
+                return;
+              } else {
+                setEditingMessage(item);
+              }
+            }}
             delayLongPress={EDIT_LONG_PRESS_MS}
           >
             <ChatBubble role={item.role} text={item.text}>
               {item.action ? (
                 <TransactionActionCard
                   action={item.action}
-                  walletName={walletById.get(item.action.payload.wallet_id)?.name ?? "Wallet"}
-                  categoryName={categoryById.get(item.action.payload.category_id)?.name ?? "Category"}
+                  walletName={walletById.get(item.action.payload.wallet_id)?.name ?? "Ví"}
+                  categoryName={categoryById.get(item.action.payload.category_id)?.name ?? "Danh mục"}
                   categoryIcon={categoryById.get(item.action.payload.category_id)?.icon}
                   categoryIconUrl={categoryById.get(item.action.payload.category_id)?.icon_url}
                   currency={walletById.get(item.action.payload.wallet_id)?.currency ?? "VND"}
@@ -224,13 +257,17 @@ export default function AiChatScreen() {
                   edited={item.edited}
                   superseded={item.superseded}
                 />
+              ) : item.offerManualEntry ? (
+                <Pressable style={styles.manualEntryButton} onPress={() => setManualEntryOpen(true)}>
+                  <Text style={styles.manualEntryLabel}>Tạo giao dịch thủ công</Text>
+                </Pressable>
               ) : null}
             </ChatBubble>
           </Pressable>
         )}
         ListEmptyComponent={
           <Text style={styles.hint}>
-            Tell me what you spent — e.g. &ldquo;Coffee 50k from cash&rdquo; — and I&apos;ll draft the transaction for you.
+            Cho mình biết bạn đã chi hay thu gì — vd: &ldquo;Cà phê 50k tiền mặt&rdquo; — mình sẽ soạn sẵn giao dịch cho bạn.
           </Text>
         }
         ListFooterComponent={
@@ -251,7 +288,7 @@ export default function AiChatScreen() {
         <TextInput
           value={input}
           onChangeText={setInput}
-          placeholder="Describe a transaction…"
+          placeholder="Mô tả một giao dịch…"
           placeholderTextColor={colors.textMuted}
           style={styles.input}
           multiline
@@ -289,6 +326,8 @@ export default function AiChatScreen() {
         if (target) editAction(target, payload);
       }}
     />
+
+    <TransactionFormModal visible={manualEntryOpen} onClose={() => setManualEntryOpen(false)} />
     </Screen>
   );
 }
@@ -301,6 +340,15 @@ const styles = StyleSheet.create({
   thread: { paddingHorizontal: spacing.xl, gap: spacing.md, paddingBottom: spacing.md, flexGrow: 1 },
   hint: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xxl },
   typingRow: { alignItems: "flex-start" },
+  manualEntryButton: {
+    alignSelf: "flex-start",
+    marginTop: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radii.pill,
+    backgroundColor: colors.green,
+  },
+  manualEntryLabel: { ...typography.label, color: colors.onGreen },
   inputBar: {
     marginHorizontal: spacing.xl,
     flexDirection: "row",

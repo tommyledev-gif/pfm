@@ -129,35 +129,35 @@ func (e *AppError) Error() string {
 // message varies per call site (e.g. field-specific validation failures) are
 // built with NewValidationError/NewWeakPasswordError instead.
 var (
-	ErrEmailAlreadyExists       = &AppError{Code: ErrCodeEmailAlreadyExists, Status: http.StatusConflict, Message: "an account with this email already exists"}
-	ErrForbidden                = &AppError{Code: ErrCodeForbidden, Status: http.StatusForbidden, Message: "you do not have permission to perform this action"}
-	ErrNotFound                 = &AppError{Code: ErrCodeNotFound, Status: http.StatusNotFound, Message: "resource not found"}
-	ErrTokenExpired             = &AppError{Code: ErrCodeTokenExpired, Status: http.StatusGone, Message: "this invite link has expired"}
-	ErrRateLimited              = &AppError{Code: ErrCodeRateLimited, Status: http.StatusTooManyRequests, Message: "too many requests, please try again later"}
-	ErrInvalidCredentials       = &AppError{Code: ErrCodeInvalidCredentials, Status: http.StatusUnauthorized, Message: "invalid email or password"}
-	ErrAccountNotActive         = &AppError{Code: ErrCodeAccountNotActivated, Status: http.StatusUnauthorized, Message: "this account has not been activated yet"}
-	ErrAccountDisabled          = &AppError{Code: ErrCodeAccountDisabled, Status: http.StatusUnauthorized, Message: "this account has been disabled"}
-	ErrPasswordMismatch         = &AppError{Code: ErrCodePasswordMismatch, Status: http.StatusBadRequest, Message: "password and confirmation do not match"}
-	ErrUnauthenticated          = &AppError{Code: ErrCodeUnauthenticated, Status: http.StatusUnauthorized, Message: "authentication required"}
-	ErrWalletAccessDenied       = &AppError{Code: ErrCodeWalletAccessDenied, Status: http.StatusForbidden, Message: "you do not have access to this wallet"}
-	ErrWalletNotFound           = &AppError{Code: ErrCodeWalletNotFound, Status: http.StatusNotFound, Message: "wallet not found"}
-	ErrCategoryAccessDenied     = &AppError{Code: ErrCodeCategoryAccessDenied, Status: http.StatusForbidden, Message: "you do not have access to this category"}
-	ErrCategoryNotFound         = &AppError{Code: ErrCodeCategoryNotFound, Status: http.StatusNotFound, Message: "category not found"}
-	ErrCategoryInUse            = &AppError{Code: ErrCodeCategoryInUse, Status: http.StatusConflict, Message: "an active budget references this category"}
-	ErrBudgetAccessDenied       = &AppError{Code: ErrCodeBudgetAccessDenied, Status: http.StatusForbidden, Message: "you do not have access to this budget"}
-	ErrBudgetNotFound           = &AppError{Code: ErrCodeBudgetNotFound, Status: http.StatusNotFound, Message: "budget not found"}
-	ErrBudgetAlreadyExists      = &AppError{Code: ErrCodeBudgetAlreadyExists, Status: http.StatusConflict, Message: "an active budget already exists for this category"}
-	ErrInvalidCategoryType      = &AppError{Code: ErrCodeInvalidCategoryType, Status: http.StatusUnprocessableEntity, Message: "budgets can only be set on expense categories"}
-	ErrTransactionAccessDenied  = &AppError{Code: ErrCodeTransactionAccessDenied, Status: http.StatusForbidden, Message: "you do not have access to this transaction"}
-	ErrTransactionNotFound      = &AppError{Code: ErrCodeTransactionNotFound, Status: http.StatusNotFound, Message: "transaction not found"}
-	ErrInsufficientBalance      = &AppError{Code: ErrCodeInsufficientBalance, Status: http.StatusConflict, Message: "Insufficient balance"}
-	ErrCategoryTypeMismatch     = &AppError{Code: ErrCodeCategoryTypeMismatch, Status: http.StatusUnprocessableEntity, Message: "transaction type must match the category's type"}
-	ErrCurrencyLocked           = &AppError{Code: ErrCodeCurrencyLocked, Status: http.StatusConflict, Message: "currency cannot be changed once the wallet has transactions"}
-	ErrNotificationAccessDenied = &AppError{Code: ErrCodeNotificationAccessDenied, Status: http.StatusForbidden, Message: "you do not have access to this notification"}
-	ErrNotificationNotFound     = &AppError{Code: ErrCodeNotificationNotFound, Status: http.StatusNotFound, Message: "notification not found"}
-	ErrAIServiceUnavailable     = &AppError{Code: ErrCodeAIServiceUnavailable, Status: http.StatusBadGateway, Message: "the assistant is temporarily unavailable, please try again"}
-	ErrIconUploadUnavailable    = &AppError{Code: ErrCodeIconUploadUnavailable, Status: http.StatusServiceUnavailable, Message: "icon upload is not configured"}
-	ErrIconUploadFailed         = &AppError{Code: ErrCodeIconUploadFailed, Status: http.StatusBadGateway, Message: "could not upload icon, please try again"}
+	ErrEmailAlreadyExists       = &AppError{Code: ErrCodeEmailAlreadyExists, Status: http.StatusConflict, Message: "đã tồn tại tài khoản với email này"}
+	ErrForbidden                = &AppError{Code: ErrCodeForbidden, Status: http.StatusForbidden, Message: "bạn không có quyền thực hiện hành động này"}
+	ErrNotFound                 = &AppError{Code: ErrCodeNotFound, Status: http.StatusNotFound, Message: "không tìm thấy tài nguyên"}
+	ErrTokenExpired             = &AppError{Code: ErrCodeTokenExpired, Status: http.StatusGone, Message: "liên kết mời đã hết hạn"}
+	ErrRateLimited              = &AppError{Code: ErrCodeRateLimited, Status: http.StatusTooManyRequests, Message: "quá nhiều yêu cầu, vui lòng thử lại sau"}
+	ErrInvalidCredentials       = &AppError{Code: ErrCodeInvalidCredentials, Status: http.StatusUnauthorized, Message: "email hoặc mật khẩu không đúng"}
+	ErrAccountNotActive         = &AppError{Code: ErrCodeAccountNotActivated, Status: http.StatusUnauthorized, Message: "tài khoản này chưa được kích hoạt"}
+	ErrAccountDisabled          = &AppError{Code: ErrCodeAccountDisabled, Status: http.StatusUnauthorized, Message: "tài khoản này đã bị vô hiệu hóa"}
+	ErrPasswordMismatch         = &AppError{Code: ErrCodePasswordMismatch, Status: http.StatusBadRequest, Message: "mật khẩu và xác nhận mật khẩu không khớp"}
+	ErrUnauthenticated          = &AppError{Code: ErrCodeUnauthenticated, Status: http.StatusUnauthorized, Message: "yêu cầu xác thực"}
+	ErrWalletAccessDenied       = &AppError{Code: ErrCodeWalletAccessDenied, Status: http.StatusForbidden, Message: "bạn không có quyền truy cập ví này"}
+	ErrWalletNotFound           = &AppError{Code: ErrCodeWalletNotFound, Status: http.StatusNotFound, Message: "không tìm thấy ví"}
+	ErrCategoryAccessDenied     = &AppError{Code: ErrCodeCategoryAccessDenied, Status: http.StatusForbidden, Message: "bạn không có quyền truy cập danh mục này"}
+	ErrCategoryNotFound         = &AppError{Code: ErrCodeCategoryNotFound, Status: http.StatusNotFound, Message: "không tìm thấy danh mục"}
+	ErrCategoryInUse            = &AppError{Code: ErrCodeCategoryInUse, Status: http.StatusConflict, Message: "danh mục này đang được một ngân sách sử dụng"}
+	ErrBudgetAccessDenied       = &AppError{Code: ErrCodeBudgetAccessDenied, Status: http.StatusForbidden, Message: "bạn không có quyền truy cập ngân sách này"}
+	ErrBudgetNotFound           = &AppError{Code: ErrCodeBudgetNotFound, Status: http.StatusNotFound, Message: "không tìm thấy ngân sách"}
+	ErrBudgetAlreadyExists      = &AppError{Code: ErrCodeBudgetAlreadyExists, Status: http.StatusConflict, Message: "danh mục này đã có một ngân sách đang hoạt động"}
+	ErrInvalidCategoryType      = &AppError{Code: ErrCodeInvalidCategoryType, Status: http.StatusUnprocessableEntity, Message: "chỉ có thể đặt ngân sách cho danh mục chi tiêu"}
+	ErrTransactionAccessDenied  = &AppError{Code: ErrCodeTransactionAccessDenied, Status: http.StatusForbidden, Message: "bạn không có quyền truy cập giao dịch này"}
+	ErrTransactionNotFound      = &AppError{Code: ErrCodeTransactionNotFound, Status: http.StatusNotFound, Message: "không tìm thấy giao dịch"}
+	ErrInsufficientBalance      = &AppError{Code: ErrCodeInsufficientBalance, Status: http.StatusConflict, Message: "Số dư không đủ"}
+	ErrCategoryTypeMismatch     = &AppError{Code: ErrCodeCategoryTypeMismatch, Status: http.StatusUnprocessableEntity, Message: "loại giao dịch phải khớp với loại danh mục"}
+	ErrCurrencyLocked           = &AppError{Code: ErrCodeCurrencyLocked, Status: http.StatusConflict, Message: "không thể đổi đơn vị tiền tệ khi ví đã có giao dịch"}
+	ErrNotificationAccessDenied = &AppError{Code: ErrCodeNotificationAccessDenied, Status: http.StatusForbidden, Message: "bạn không có quyền truy cập thông báo này"}
+	ErrNotificationNotFound     = &AppError{Code: ErrCodeNotificationNotFound, Status: http.StatusNotFound, Message: "không tìm thấy thông báo"}
+	ErrAIServiceUnavailable     = &AppError{Code: ErrCodeAIServiceUnavailable, Status: http.StatusBadGateway, Message: "trợ lý AI tạm thời không khả dụng, vui lòng thử lại"}
+	ErrIconUploadUnavailable    = &AppError{Code: ErrCodeIconUploadUnavailable, Status: http.StatusServiceUnavailable, Message: "chức năng tải ảnh biểu tượng chưa được cấu hình"}
+	ErrIconUploadFailed         = &AppError{Code: ErrCodeIconUploadFailed, Status: http.StatusBadGateway, Message: "không thể tải ảnh biểu tượng lên, vui lòng thử lại"}
 )
 
 // NewInvalidInputError builds a 400 INVALID_INPUT error with a field-specific message.

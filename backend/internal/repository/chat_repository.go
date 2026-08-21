@@ -50,6 +50,26 @@ func (r *ChatRepository) CreateChatMessage(ctx context.Context, arg CreateChatMe
 	return toChatMessageModel(row), nil
 }
 
+// ListRecentMessagesByConversation returns up to `limit` messages, most
+// recent first — callers wanting chronological order (e.g. ChatService
+// building AI Service conversation history) must reverse the slice
+// themselves, same convention as leaving pagination/ordering decisions to
+// the caller elsewhere in this codebase.
+func (r *ChatRepository) ListRecentMessagesByConversation(ctx context.Context, conversationID uuid.UUID, limit int32) ([]*model.ChatMessage, error) {
+	rows, err := r.q.ListRecentChatMessagesByConversation(ctx, sqlc.ListRecentChatMessagesByConversationParams{
+		ConversationID: conversationID,
+		Limit:          limit,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("repository.ListRecentMessagesByConversation: %w", err)
+	}
+	messages := make([]*model.ChatMessage, 0, len(rows))
+	for _, row := range rows {
+		messages = append(messages, toChatMessageModel(row))
+	}
+	return messages, nil
+}
+
 func toChatMessageModel(row sqlc.ChatMessage) *model.ChatMessage {
 	msg := &model.ChatMessage{
 		ID:             row.ID,

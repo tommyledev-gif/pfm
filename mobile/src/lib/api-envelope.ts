@@ -30,3 +30,13 @@ export function getErrorMessage(error: unknown, fallback: string): string {
   }
   return fallback;
 }
+
+// Lets a caller branch on a specific backend failure (e.g. "RATE_LIMITED" vs
+// "AI_SERVICE_UNAVAILABLE") instead of just displaying a message — same
+// axios.isAxiosError guard as getErrorMessage above.
+export function getErrorCode(error: unknown): string | undefined {
+  if (axios.isAxiosError<ApiEnvelope<unknown>>(error)) {
+    return error.response?.data?.error_code;
+  }
+  return undefined;
+}

@@ -105,9 +105,14 @@ func TestChatService_Chat_HappyPath_ResolvesDefaultWallet(t *testing.T) {
 	}
 }
 
-// S-AI-08: an item below the confidence threshold is dropped, never surfaced
-// for confirmation.
-func TestChatService_Chat_LowConfidence_Dropped(t *testing.T) {
+// Product direction: the assistant should always surface its best guess for
+// the user to confirm or correct, rather than falling back to a generic
+// clarifying question just because it's not fully sure. A below-threshold
+// item must still become a confirmable action, with its real Confidence
+// preserved, and the lead-in message must frame it as a guess rather than a
+// confident proposal — this replaces a prior version of this test that
+// asserted the opposite (silent drop), before that product direction.
+func TestChatService_Chat_LowConfidence_SurfacedAsGuess(t *testing.T) {
 	userID := uuid.New()
 	walletID := uuid.New()
 	categoryID := uuid.New()
@@ -126,8 +131,14 @@ func TestChatService_Chat_LowConfidence_Dropped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if resp.Intent != string(model.ChatIntentAmbiguous) || len(resp.Actions) != 0 {
-		t.Fatalf("expected ambiguous with zero actions, got intent=%s actions=%d", resp.Intent, len(resp.Actions))
+	if resp.Intent != string(model.ChatIntentCreateTransaction) || len(resp.Actions) != 1 {
+		t.Fatalf("expected the low-confidence item still surfaced as one action, got intent=%s actions=%d", resp.Intent, len(resp.Actions))
+	}
+	if resp.Actions[0].Confidence != 0.4 {
+		t.Fatalf("expected the real confidence (0.4) preserved on the action, got %v", resp.Actions[0].Confidence)
+	}
+	if resp.Message == "Đã đề xuất 1 giao dịch, vui lòng xác nhận." {
+		t.Fatalf("expected a guess-framed lead-in message for a low-confidence action, got the confident-proposal wording")
 	}
 }
 

@@ -15,9 +15,13 @@ import (
 )
 
 // ChatService owns Feature-12 US-01's business rules — zero-Wallet
-// short-circuit, the AI Service call, ownership re-validation, the
-// confidence gate, default-Wallet resolution, idempotency-key
-// pre-generation, and assistant-reply templating. Shape validation
+// short-circuit, the AI Service call (with recent conversation history for
+// context), ownership re-validation, default-Wallet resolution,
+// idempotency-key pre-generation, and confidence-aware assistant-reply
+// templating. A low-confidence proposal is no longer dropped in favor of a
+// generic clarifying question — it's surfaced as a guess for the user to
+// confirm or correct, per product direction that the assistant should
+// always attempt its best guess rather than bail out. Shape validation
 // (message/conversation_id format) stays in dto/handler, never here.
 // Depends on WalletRepo/CategoryRepo directly (same precedent as
 // TransactionService reusing them for its own ownership checks), alongside
@@ -54,6 +58,15 @@ func (s *ChatService) Chat(ctx context.Context, userID uuid.UUID, req dto.ChatRe
 		conversationID = *req.ConversationID
 	}
 
+	// Fetched before this turn's own message is written, so it never
+	// includes the message currently being processed — the AI Service gets
+	// only what was actually said *before* now, to disambiguate a follow-up
+	// like "20k" after "mua cà phê ở highlands".
+	history, err := s.buildHistory(ctx, conversationID)
+	if err != nil {
+		return nil, fmt.Errorf("service.Chat: %w", err)
+	}
+
 	if _, err := s.repo.CreateChatMessage(ctx, repository.CreateChatMessageParams{
 		UserID: userID, ConversationID: conversationID, Role: model.ChatRoleUser, Content: req.Message,
 	}); err != nil {
@@ -78,6 +91,7 @@ func (s *ChatService) Chat(ctx context.Context, userID uuid.UUID, req dto.ChatRe
 
 	extractResp, err := s.aiClient.Extract(ctx, AIExtractRequest{
 		Message:    req.Message,
+		History:    history,
 		Wallets:    toAIWalletContexts(wallets),
 		Categories: toAICategoryContexts(categories),
 		Now:        time.Now().UTC(),
@@ -89,14 +103,14 @@ func (s *ChatService) Chat(ctx context.Context, userID uuid.UUID, req dto.ChatRe
 
 	actions, sawWalletDrop := s.resolveActions(userID, wallets, categories, extractResp.Transactions)
 	if len(actions) == 0 {
-		message := "Chi hay thu? Danh mục gì?"
+		message := "Mình chưa hiểu giao dịch này, bạn mô tả rõ hơn giúp mình nhé?"
 		if sawWalletDrop {
 			message = "Vui lòng cho biết bạn muốn dùng ví nào."
 		}
 		return s.respondAmbiguous(ctx, userID, conversationID, message)
 	}
 
-	message := renderConfirmMessage(len(actions))
+	message := renderConfirmMessage(actions)
 	intent := model.ChatIntentCreateTransaction
 	if _, err := s.repo.CreateChatMessage(ctx, repository.CreateChatMessageParams{
 		UserID: userID, ConversationID: conversationID, Role: model.ChatRoleAssistant, Content: message, Intent: &intent,
@@ -110,6 +124,23 @@ func (s *ChatService) Chat(ctx context.Context, userID uuid.UUID, req dto.ChatRe
 		Actions:        actions,
 		ConversationID: conversationID,
 	}, nil
+}
+
+// buildHistory returns the conversation's recent messages in chronological
+// order (oldest first) — ListRecentMessagesByConversation itself returns
+// newest-first, since that's the natural order for "give me the last N",
+// but a transcript handed to the AI Service needs to read top-to-bottom like
+// an actual conversation.
+func (s *ChatService) buildHistory(ctx context.Context, conversationID uuid.UUID) ([]AIChatTurn, error) {
+	recent, err := s.repo.ListRecentMessagesByConversation(ctx, conversationID, common.AIChatHistoryLimit)
+	if err != nil {
+		return nil, err
+	}
+	history := make([]AIChatTurn, len(recent))
+	for i, m := range recent {
+		history[len(recent)-1-i] = AIChatTurn{Role: string(m.Role), Content: m.Content}
+	}
+	return history, nil
 }
 
 func (s *ChatService) respondAmbiguous(ctx context.Context, userID, conversationID uuid.UUID, message string) (*dto.ChatResponse, error) {
@@ -128,10 +159,15 @@ func (s *ChatService) respondAmbiguous(ctx context.Context, userID, conversation
 }
 
 // resolveActions filters+resolves the AI Service's raw proposals into
-// confirmable actions: confidence gate, category/wallet ownership
-// re-validation (spec.md Resolved design decision #4), default-Wallet
-// resolution, and per-item idempotency-key generation. A failed item is
-// simply omitted — never a distinct error (spec.md S-AI-08/S-AI-09).
+// confirmable actions: type/category structural validity, category/wallet
+// ownership re-validation (spec.md Resolved design decision #4),
+// default-Wallet resolution, and per-item idempotency-key generation. Deliberately
+// does NOT gate on Confidence — a below-threshold guess still becomes a
+// confirmable action (renderConfirmMessage frames the reply as a guess
+// instead of a confident proposal when that happens), so the AI's own
+// self-reported uncertainty is surfaced to the user rather than silently
+// discarded. A structurally invalid item (bad type/category/amount/wallet)
+// is simply omitted — never a distinct error (spec.md S-AI-08/S-AI-09).
 //
 // Deliberately takes no context.Context and issues no repository calls — the
 // caller's own Wallets/Categories are already fully loaded in memory
@@ -147,9 +183,6 @@ func (s *ChatService) resolveActions(userID uuid.UUID, wallets []*model.Wallet, 
 	sawWalletDrop := false
 
 	for _, p := range proposed {
-		if p.Confidence < common.AIChatConfidenceThreshold {
-			continue
-		}
 		if p.TxType != string(model.TransactionTypeIncome) && p.TxType != string(model.TransactionTypeExpense) {
 			continue
 		}
@@ -268,8 +301,27 @@ func toAICategoryContexts(categories []*model.Category) []AICategoryContext {
 // renderConfirmMessage is deliberately simple and data-driven, not a second
 // LLM call for phrasing (specs/ai-chat-assistant/plan.md Finding #2) — the
 // per-action detail (amount, category, wallet, date) lives in the
-// confirmation cards, not in this lead-in sentence.
-func renderConfirmMessage(n int) string {
+// confirmation cards, not in this lead-in sentence. Once resolveActions no
+// longer drops a low-confidence guess (it now surfaces it for the user to
+// confirm or correct instead of falling back to a generic clarifying
+// question), the lead-in itself frames the batch as a guess whenever any
+// surfaced action is below the confidence threshold, rather than always
+// reading as a confident proposal.
+func renderConfirmMessage(actions []dto.ChatActionResponse) string {
+	anyLowConfidence := false
+	for _, a := range actions {
+		if a.Confidence < common.AIChatConfidenceThreshold {
+			anyLowConfidence = true
+			break
+		}
+	}
+	n := len(actions)
+	if anyLowConfidence {
+		if n == 1 {
+			return "Mình đoán giao dịch này như bên dưới — bạn xem lại giúp mình nhé."
+		}
+		return fmt.Sprintf("Mình đoán %d giao dịch như bên dưới — bạn xem lại giúp mình nhé.", n)
+	}
 	if n == 1 {
 		return "Đã đề xuất 1 giao dịch, vui lòng xác nhận."
 	}

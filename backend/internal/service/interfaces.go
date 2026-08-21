@@ -120,8 +120,13 @@ type TransactionRepo interface {
 // ChatRepo is the repository contract ChatService depends on (Feature-12 AI
 // Chat Assistant). *repository.ChatRepository satisfies this structurally;
 // tests substitute an in-memory fake, same convention as every other repo.
+// ListRecentMessagesByConversation backs the AI Service conversation-history
+// context added so a follow-up message can be disambiguated using what was
+// already said in the same conversation, instead of being judged in
+// isolation.
 type ChatRepo interface {
 	CreateChatMessage(ctx context.Context, arg repository.CreateChatMessageParams) (*model.ChatMessage, error)
+	ListRecentMessagesByConversation(ctx context.Context, conversationID uuid.UUID, limit int32) ([]*model.ChatMessage, error)
 }
 
 // AIServiceClient is the contract ChatService depends on for talking to the

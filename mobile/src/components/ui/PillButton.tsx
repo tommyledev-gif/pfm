@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextStyle, ViewStyle } from "react-native";
+import { ActivityIndicator, Pressable, StyleProp, StyleSheet, Text, TextStyle, ViewStyle } from "react-native";
 
 import { colors, radii, typography } from "@/lib/theme";
 
@@ -10,8 +10,8 @@ interface PillButtonProps {
   variant?: "solid" | "outline";
   disabled?: boolean;
   loading?: boolean;
-  style?: ViewStyle;
-  textStyle?: TextStyle;
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
 }
 
 // The design's recurring "black pill on neon green" action button (hero

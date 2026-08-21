@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 
+import { AmountInput } from "@/components/ui/AmountInput";
 import { Avatar } from "@/components/ui/Avatar";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Drawer } from "@/components/shared/Drawer";
+import { FieldError } from "@/components/ui/FieldError";
 import { PillButton } from "@/components/ui/PillButton";
 import { TrashIcon } from "@/components/ui/Icon";
 import { getErrorMessage } from "@/lib/axios";
@@ -44,6 +47,8 @@ export function NewBudgetModal({ visible, onClose, currency, editingBudget }: Ne
   const [amount, setAmount] = useState("");
   const [icon, setIcon] = useState("");
   const [iconUrl, setIconUrl] = useState<string | undefined>(undefined);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -59,6 +64,7 @@ export function NewBudgetModal({ visible, onClose, currency, editingBudget }: Ne
       setIcon("");
       setIconUrl(undefined);
     }
+    setSubmitAttempted(false);
   }, [visible, editingBudget, currency]);
 
   const mutation = isEditing ? updateBudget : createBudget;
@@ -82,9 +88,17 @@ export function NewBudgetModal({ visible, onClose, currency, editingBudget }: Ne
     );
   };
 
+  const amountValue = Number(amount);
+  const errors = {
+    category: !categoryId ? "Vui lòng chọn danh mục" : undefined,
+    amount: !amount || !(amountValue > 0) ? "Vui lòng nhập hạn mức hợp lệ" : undefined,
+  };
+  const hasErrors = Boolean(errors.category || errors.amount);
+
   const submit = () => {
-    if (!categoryId || !amount) return;
-    const limits = { [currency]: toCents(Number(amount)) };
+    setSubmitAttempted(true);
+    if (hasErrors || !categoryId) return;
+    const limits = { [currency]: toCents(amountValue) };
     if (isEditing && editingBudget) {
       updateBudget.mutate(
         { id: editingBudget.id, body: { limits, icon: icon || undefined, icon_url: iconUrl } },
@@ -98,18 +112,6 @@ export function NewBudgetModal({ visible, onClose, currency, editingBudget }: Ne
     }
   };
 
-  const confirmDelete = () => {
-    if (!editingBudget) return;
-    Alert.alert("Delete budget?", "This cannot be undone.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => deleteBudget.mutate(editingBudget.id, { onSuccess: onClose }),
-      },
-    ]);
-  };
-
   const activeError = mutation.isError
     ? mutation.error
     : deleteBudget.isError
@@ -119,84 +121,93 @@ export function NewBudgetModal({ visible, onClose, currency, editingBudget }: Ne
         : null;
 
   return (
-    <Drawer visible={visible} onClose={onClose}>
-      <Text style={styles.title}>{isEditing ? "Edit budget" : "New budget"}</Text>
+    <>
+      <Drawer visible={visible} onClose={onClose}>
+        <Text style={styles.title}>{isEditing ? "Sửa ngân sách" : "Ngân sách mới"}</Text>
 
-      <View style={styles.iconPickerRow}>
-        <View style={styles.iconPreview}>
-          {uploadIcon.isPending ? (
-            <ActivityIndicator color={colors.textPrimary} />
-          ) : (
-            <Avatar
-              name={editingBudget?.category_name ?? "?"}
-              color={editingBudget ? colorForCategory(editingBudget.category_id) : colors.lavender}
-              size={56}
-              icon={icon}
-              iconUrl={iconUrl}
-            />
-          )}
-        </View>
-        <Pressable onPress={pickIcon} disabled={uploadIcon.isPending} hitSlop={8}>
-          <Text style={styles.changePhoto}>{iconUrl ? "Change photo" : "Upload photo"}</Text>
-        </Pressable>
-      </View>
-
-      <Text style={styles.label}>Category</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
-        {categories.data?.map((c) => (
-          <Pressable
-            key={c.id}
-            onPress={() => !isEditing && setCategoryId(c.id)}
-            style={[styles.categoryChip, categoryId === c.id && styles.categoryChipActive]}
-          >
-            <Text style={[styles.categoryChipLabel, categoryId === c.id && styles.categoryChipLabelActive]}>
-              {c.name}
-            </Text>
+        <View style={styles.iconPickerRow}>
+          <View style={styles.iconPreview}>
+            {uploadIcon.isPending ? (
+              <ActivityIndicator color={colors.textPrimary} />
+            ) : (
+              <Avatar
+                name={editingBudget?.category_name ?? "?"}
+                color={editingBudget ? colorForCategory(editingBudget.category_id) : colors.lavender}
+                size={56}
+                icon={icon}
+                iconUrl={iconUrl}
+              />
+            )}
+          </View>
+          <Pressable onPress={pickIcon} disabled={uploadIcon.isPending} hitSlop={8}>
+            <Text style={styles.changePhoto}>{iconUrl ? "Đổi ảnh" : "Tải ảnh lên"}</Text>
           </Pressable>
-        ))}
-      </ScrollView>
+        </View>
 
-      <Text style={styles.label}>Emoji icon (used when no photo is set)</Text>
-      <TextInput
-        value={icon}
-        onChangeText={setIcon}
-        placeholder="e.g. 💸"
-        placeholderTextColor={colors.textMuted}
-        style={styles.input}
-      />
+        <Text style={styles.label}>Danh mục</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
+          {categories.data?.map((c) => (
+            <Pressable
+              key={c.id}
+              onPress={() => !isEditing && setCategoryId(c.id)}
+              style={[styles.categoryChip, categoryId === c.id && styles.categoryChipActive]}
+            >
+              <Text style={[styles.categoryChipLabel, categoryId === c.id && styles.categoryChipLabelActive]}>
+                {c.name}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+        {submitAttempted ? <FieldError message={errors.category} /> : null}
 
-      <Text style={styles.label}>Monthly limit ({currency})</Text>
-      <TextInput
-        value={amount}
-        onChangeText={setAmount}
-        placeholder="0"
-        placeholderTextColor={colors.textMuted}
-        keyboardType="numeric"
-        style={styles.input}
-      />
-
-      {activeError ? (
-        <Text style={styles.error}>{getErrorMessage(activeError, "Could not save budget")}</Text>
-      ) : null}
-
-      <View style={styles.actions}>
-        <PillButton label="Cancel" variant="outline" onPress={onClose} style={styles.flexButton} />
-        <PillButton
-          label={isEditing ? "Save" : "Create"}
-          onPress={submit}
-          loading={mutation.isPending}
-          disabled={!categoryId || !amount}
-          style={styles.flexButton}
+        <Text style={styles.label}>Biểu tượng emoji (dùng khi chưa có ảnh)</Text>
+        <TextInput
+          value={icon}
+          onChangeText={setIcon}
+          placeholder="vd: 💸"
+          placeholderTextColor={colors.textMuted}
+          style={styles.input}
         />
-      </View>
 
-      {isEditing ? (
-        <Pressable style={styles.deleteRow} onPress={confirmDelete} disabled={deleteBudget.isPending}>
-          <TrashIcon size={18} />
-          <Text style={styles.deleteLabel}>Delete budget</Text>
-        </Pressable>
-      ) : null}
-    </Drawer>
+        <Text style={styles.label}>Hạn mức hàng tháng ({currency})</Text>
+        <AmountInput value={amount} onChangeText={setAmount} />
+        {submitAttempted ? <FieldError message={errors.amount} /> : null}
+
+        {activeError ? (
+          <Text style={styles.error}>{getErrorMessage(activeError, "Không thể lưu ngân sách")}</Text>
+        ) : null}
+
+        <View style={styles.actions}>
+          <PillButton label="Hủy" variant="outline" onPress={onClose} style={styles.flexButton} />
+          <PillButton
+            label={isEditing ? "Lưu" : "Tạo"}
+            onPress={submit}
+            loading={mutation.isPending}
+            disabled={submitAttempted && hasErrors}
+            style={styles.flexButton}
+          />
+        </View>
+
+        {isEditing ? (
+          <Pressable style={styles.deleteRow} onPress={() => setConfirmDeleteOpen(true)} disabled={deleteBudget.isPending}>
+            <TrashIcon size={18} />
+            <Text style={styles.deleteLabel}>Xóa ngân sách</Text>
+          </Pressable>
+        ) : null}
+      </Drawer>
+
+      <ConfirmDialog
+        visible={confirmDeleteOpen}
+        title="Xóa ngân sách?"
+        message="Hành động này không thể hoàn tác."
+        onCancel={() => setConfirmDeleteOpen(false)}
+        onConfirm={() => {
+          setConfirmDeleteOpen(false);
+          if (editingBudget) deleteBudget.mutate(editingBudget.id, { onSuccess: onClose });
+        }}
+        loading={deleteBudget.isPending}
+      />
+    </>
   );
 }
 

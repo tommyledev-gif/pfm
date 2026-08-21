@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Modal, StyleSheet, Text, TextInput, View } from "react-native";
+import { StyleSheet, Text, TextInput, View } from "react-native";
 
+import { Drawer } from "@/components/shared/Drawer";
 import { PillButton } from "@/components/ui/PillButton";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 
@@ -11,12 +12,19 @@ interface EditMessageModalProps {
   onSave: (text: string) => void;
 }
 
-// Long-press-to-edit on a chat bubble (2s hold, see ai-chat.tsx) opens this
-// directly rather than expanding the bubble in place — a modal keeps the
-// keyboard/growing-textarea handling in one place instead of duplicating it
-// per bubble. Edits are a client-only text patch (chat-store.ts's thread has
-// no backend-persisted history) — they don't re-trigger the AI or touch any
-// already-confirmed transaction.
+// Long-press-to-edit on a chat bubble (500ms hold, see ai-chat.tsx) opens
+// this directly rather than expanding the bubble in place. Edits are a
+// client-only text patch (chat-store.ts's thread has no backend-persisted
+// history) — they don't re-trigger the AI or touch any already-confirmed
+// transaction.
+//
+// Built on the shared Drawer rather than a bare Modal so it gets the same
+// keyboard-safe padding as every other form sheet in the app — this modal
+// used to roll its own Modal/View with zero keyboard mitigation plus an
+// autoFocus TextInput, the single worst offender behind the "keyboard covers
+// the input" reports (the keyboard opened before the sheet's slide-up
+// animation even settled). autoFocus is dropped for the same reason no other
+// form in the app uses it — the user taps in deliberately.
 export function EditMessageModal({ visible, initialText, onCancel, onSave }: EditMessageModalProps) {
   const [text, setText] = useState(initialText);
 
@@ -25,44 +33,31 @@ export function EditMessageModal({ visible, initialText, onCancel, onSave }: Edi
   }, [visible, initialText]);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}>
-      <View style={styles.backdrop}>
-        <View style={styles.sheet}>
-          <Text style={styles.title}>Edit message</Text>
-          <TextInput
-            value={text}
-            onChangeText={setText}
-            placeholder="Edit message…"
-            placeholderTextColor={colors.textMuted}
-            style={styles.input}
-            multiline
-            autoFocus
-            textAlignVertical="top"
-          />
-          <View style={styles.actions}>
-            <PillButton label="Cancel" variant="outline" onPress={onCancel} style={styles.flexButton} />
-            <PillButton
-              label="Save"
-              onPress={() => onSave(text.trim())}
-              disabled={!text.trim()}
-              style={styles.flexButton}
-            />
-          </View>
-        </View>
+    <Drawer visible={visible} onClose={onCancel}>
+      <Text style={styles.title}>Sửa tin nhắn</Text>
+      <TextInput
+        value={text}
+        onChangeText={setText}
+        placeholder="Sửa tin nhắn…"
+        placeholderTextColor={colors.textMuted}
+        style={styles.input}
+        multiline
+        textAlignVertical="top"
+      />
+      <View style={styles.actions}>
+        <PillButton label="Hủy" variant="outline" onPress={onCancel} style={styles.flexButton} />
+        <PillButton
+          label="Lưu"
+          onPress={() => onSave(text.trim())}
+          disabled={!text.trim()}
+          style={styles.flexButton}
+        />
       </View>
-    </Modal>
+    </Drawer>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radii.hero,
-    borderTopRightRadius: radii.hero,
-    padding: spacing.xl,
-    gap: spacing.md,
-  },
   title: { ...typography.title, color: colors.textPrimary },
   input: {
     minHeight: 44,

@@ -112,4 +112,4 @@ apiClient.interceptors.response.use(
 // Re-exported for every existing `import { unwrap } from "@/lib/axios"` call
 // site — the types/helpers themselves now live in lib/api-envelope.ts (no
 // session-store dependency), see that file's doc comment for why.
-export { unwrap, getErrorMessage, type ApiEnvelope } from "@/lib/api-envelope";
+export { unwrap, getErrorMessage, getErrorCode, type ApiEnvelope } from "@/lib/api-envelope";

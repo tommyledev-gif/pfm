@@ -25,3 +25,30 @@ export function toCents(amountMajorUnits: number): number {
 export function toMajorUnits(amountCents: number): number {
   return amountCents / 100;
 }
+
+const MAX_TRUNCATED_DIGITS = 9;
+
+// Caps the displayed integer digit count at MAX_TRUNCATED_DIGITS and appends
+// "…" — TransactionRow/TransactionActionCard render amounts next to other
+// fixed content, and an unbounded 12+ digit number would wrap the row
+// instead of just looking big. Pair with AmountRevealPopup (long-press) so
+// the real value is always still reachable, never actually lost — this is a
+// display cap, not data loss.
+//
+// Truncates the fully-formatted string itself (by counting digit
+// characters) rather than re-formatting a sliced-off number, so whatever
+// currency symbol/placement Intl produced for this locale is preserved
+// as-is instead of being re-derived and risking a mismatch.
+export function formatCurrencyTruncated(amountCents: number, currency: string = "VND"): string {
+  const full = formatCurrency(amountCents, currency);
+  const digitPositions: number[] = [];
+  for (let i = 0; i < full.length; i++) {
+    if (/\d/.test(full[i])) digitPositions.push(i);
+  }
+  if (digitPositions.length <= MAX_TRUNCATED_DIGITS) return full;
+
+  const cutIndex = digitPositions[MAX_TRUNCATED_DIGITS - 1];
+  const lastDigitIndex = digitPositions[digitPositions.length - 1];
+  const suffix = full.slice(lastDigitIndex + 1);
+  return `${full.slice(0, cutIndex + 1)}…${suffix}`;
+}

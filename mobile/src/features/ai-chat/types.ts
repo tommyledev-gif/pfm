@@ -42,4 +42,18 @@ export interface ChatMessage {
   // the user) actually said at the time.
   edited?: boolean; // this message is the corrected result of editing an earlier one
   superseded?: boolean; // an edited replacement for this message now exists further down the thread
+  // Copied from ChatResponse.intent for an assistant reply with no action —
+  // the now-rare true clarifying question (missing amount / not a
+  // transaction at all), as opposed to a normal reply. Used to stop
+  // long-press-to-edit from opening on the AI's own question text (there's
+  // nothing for the user to "correct" in a question), while leaving actual
+  // transaction proposals — always editable via EditTransactionModal — and
+  // user messages untouched.
+  intent?: "ambiguous";
+  // Set client-side (never from the backend) when requestAssistantReply
+  // catches a RATE_LIMITED or AI_SERVICE_UNAVAILABLE error — renders an
+  // inline "create manually" button on this message instead of just an
+  // error string, since the user was already mid-flow trying to log
+  // something.
+  offerManualEntry?: boolean;
 }
