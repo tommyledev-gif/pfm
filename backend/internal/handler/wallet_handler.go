@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"io"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -20,11 +22,12 @@ import (
 // (same reasoning as UserHandler/AuthHandler).
 type WalletHandler struct {
 	walletService *service.WalletService
+	iconUploader  service.IconUploader
 	logger        *zap.Logger
 }
 
-func NewWalletHandler(walletService *service.WalletService, logger *zap.Logger) *WalletHandler {
-	return &WalletHandler{walletService: walletService, logger: logger}
+func NewWalletHandler(walletService *service.WalletService, iconUploader service.IconUploader, logger *zap.Logger) *WalletHandler {
+	return &WalletHandler{walletService: walletService, iconUploader: iconUploader, logger: logger}
 }
 
 // CreateWallet handles POST /wallets (registered behind JWTAuth only — every
@@ -132,6 +135,50 @@ func (h *WalletHandler) SetDefaultWallet(c *fiber.Ctx) error {
 	}
 
 	return response.Success(c, fiber.StatusOK, "default wallet updated successfully", dto.NewWalletResponse(wallet))
+}
+
+// UploadIcon handles POST /wallets/icon (multipart, field "file") — mirrors
+// CategoryHandler.UploadIcon exactly (specs/wallet-budget-icons/spec.md
+// US-01), a standalone upload step so a client can pick a photo before the
+// wallet exists yet (the create form).
+func (h *WalletHandler) UploadIcon(c *fiber.Ctx) error {
+	if _, err := callerUUID(c); err != nil {
+		return response.Error(c, h.logger, common.ErrUnauthenticated)
+	}
+
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		return response.Error(c, h.logger, common.NewInvalidInputError("missing \"file\" in multipart body"))
+	}
+	if fileHeader.Size > common.CategoryIconMaxUploadBytes {
+		return response.Error(c, h.logger, common.NewInvalidInputError("icon file exceeds the 2MB size limit"))
+	}
+	contentType := fileHeader.Header.Get("Content-Type")
+	if !common.CategoryIconAllowedContentTypes[contentType] {
+		return response.Error(c, h.logger, common.NewInvalidInputError("icon must be a PNG, JPEG, or SVG image"))
+	}
+
+	file, err := fileHeader.Open()
+	if err != nil {
+		return response.Error(c, h.logger, common.NewInvalidInputError("could not read uploaded file"))
+	}
+	defer file.Close() //nolint:errcheck // read-only handle, nothing to flush
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return response.Error(c, h.logger, common.NewInvalidInputError("could not read uploaded file"))
+	}
+
+	iconURL, err := h.iconUploader.UploadIcon(c.Context(), common.WalletIconKeyPrefix, fileHeader.Filename, contentType, data)
+	if err != nil {
+		h.logger.Error("icon upload failed", zap.Error(err))
+		if _, unconfigured := h.iconUploader.(service.UnconfiguredIconUploader); unconfigured {
+			return response.Error(c, h.logger, common.ErrIconUploadUnavailable)
+		}
+		return response.Error(c, h.logger, common.ErrIconUploadFailed)
+	}
+
+	return response.Success(c, fiber.StatusOK, "icon uploaded successfully", fiber.Map{"icon_url": iconURL})
 }
 
 // walletIDParam parses the :id path segment, returning 400 INVALID_INPUT

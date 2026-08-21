@@ -90,6 +90,7 @@ Software Design Specification (SDS)
   - [5. Privacy and Ethics Considerations](#5-privacy-and-ethics-considerations)
 - [11. Future Enhancements](#11-future-enhancements)
 - [12. Appendix](#12-appendix)
+  - [1. Known Issues Log](#1-known-issues-log)
 
 # 1. Introduction – Personal Finance Management {#1-introduction-personal-finance-management}
 
@@ -150,19 +151,19 @@ Key attributes: `id`, `email`, `full_name`, `password_hash`, `status` (pending/a
 
 A source or destination of money (cash, bank account, e-wallet). All Transactions are recorded against a Wallet, and its `balance` is updated atomically with every Transaction insert (same DB transaction — CLAUDE.md).
 
-Key attributes: `id`, `user_id`, `name`, `type`, `balance` (BIGINT, integer cents), `currency`, `is_default`.
+Key attributes: `id`, `user_id`, `name`, `type`, `balance` (BIGINT, integer cents), `currency`, `is_default`, `icon` *(planned)*, `icon_url` *(planned)*. The last two mirror Category's icon/photo pattern (§2.1.3) for visual recognition in the Wallet list — not yet implemented; see §12.1 Known Issues Log, Item 3.
 
 ### 3. Category {#3-category}
 
 Classifies Transactions for budgeting and reporting (e.g. Food, Salary). May be **system-defined** (`user_id IS NULL`, shared across all Users) or **user-defined** (`user_id` set, private to that User).
 
-Key attributes: `id`, `user_id` (nullable), `name`, `icon`, `type` (income/expense).
+Key attributes: `id`, `user_id` (nullable), `name`, `icon`, `icon_url`, `type` (income/expense). `icon` is a free-text emoji/short label; `icon_url` is an uploaded photo (`POST /categories/icon`) and takes display precedence over `icon` when both are set — see §12.1 Known Issues Log for the current rollout status of this capability.
 
 ### 4. Budget {#4-budget}
 
 A spending limit a User sets for a Category within a period (e.g. monthly), tracked across **all** of the User's Wallets for that Category (not scoped to a single Wallet — see resolution below). The System tracks actual spend — computed from Transactions in that Category — against the Budget's per-currency limits.
 
-Key attributes: `id`, `user_id`, `category_id`, `limits` (a non-empty set of `(currency, amount_limit)` pairs, at most one entry per currency, each `amount_limit` a BIGINT), `period`, `start_date`.
+Key attributes: `id`, `user_id`, `category_id`, `limits` (a non-empty set of `(currency, amount_limit)` pairs, at most one entry per currency, each `amount_limit` a BIGINT), `period`, `start_date`, `icon` *(planned)*, `icon_url` *(planned)*. The last two let a Budget's own visual identity diverge from its Category's, for the Budget list (mobile `insights.tsx`) — not yet implemented; see §12.1 Known Issues Log, Item 3.
 
 > **Resolved** (was previously an open question): SRS (Feature-05, BF-01 step 5) originally framed a Budget as scoped to *both* a Wallet and a Category. BA clarification (see `specs/budget-management/spec.md`) settled this as **Category-only, aggregated across all Wallets** — the better product model for a personal-finance budgeting feature, not just the path of least schema change. `SRS.md` BF-01/BF-04 wording has been updated to match. A direct consequence of dropping the Wallet scope is that a Category's Transactions can span Wallets of different currencies, so a Budget can no longer hold one blended `amount_limit` — it instead holds independent per-currency limits, each tracked (spent/remaining/status) separately; a currency with real spend but no corresponding limit entry is simply not tracked by that Budget. See `specs/budget-management/spec.md` for full detail.
 
@@ -307,6 +308,9 @@ Note: derived figures such as Wallet `balance` or Budget "spent so far" are **co
 ## 1. Wireframe {#1-wireframe}
 
 ## 2. UI/UX Principles {#2-uiux-principles}
+
+* **Keyboard-safe forms** — whichever field a User is actively typing into must stay visible above the on-screen keyboard, on both iOS and Android, in every bottom-sheet form (Wallet/Category/Budget/Transaction — all built on the shared `Drawer` component). Do not reach for `KeyboardAvoidingView` or a wrapping third-party scroll library by default: the project already hit and worked around a confirmed Android bug where `KeyboardAvoidingView`'s `height` behavior fails to restore layout after the keyboard closes (facebook/react-native#22884), and replaced it with a custom `useKeyboardHeight()` hook (`mobile/src/lib/use-keyboard-height.ts`) already used by the AI Chat screen. New keyboard-safety work should extend that hook's usage (e.g. into `Drawer.tsx`) rather than introduce a second, inconsistent approach — see §12.1 Known Issues Log, Item 2.
+* **Consistent icon/photo picking** — any entity that supports a visual icon (Category today; Wallet and Budget planned) should reuse the same interaction pattern established by `CategoryFormModal.tsx`: an `Avatar` preview, an immediate upload-on-pick via `expo-image-picker` (not deferred to form submit), and a free-text emoji fallback used only when no uploaded photo is set.
 
 # 4. Architecture Design {#4-architecture-design}
 
@@ -547,7 +551,7 @@ Main Flow
 * User is authenticated.  
 * User has at least one Wallet (a default Wallet is used when the message does not name one).
 
-**Client:** `frontend/` (web) per current implementation priority (CLAUDE.md) — a mobile Flutter chat UI is deferred until `mobile/` work is explicitly resumed.
+**Client:** implemented on both `frontend/` (web) and `mobile/` (React Native, `app/(app)/ai-chat.tsx` + `src/features/ai-chat/`) — mobile reached feature parity with web for this flow as of the `455bfb1`→`fe4f6cc` commit range (see `docs/architecture.md` §3).
 
 **Layers Involved**:
 
@@ -596,6 +600,7 @@ Main Flow
   * error_code  
   * message  
   * details (optional)
+* **Framework-level routing errors must keep their real status** — a 404 for an unmatched route or a 405 for a mismatched HTTP verb (both raised by Fiber itself, before any handler runs) must be surfaced to the client with that real status and a matching `error_code` (e.g. `NOT_FOUND`, `METHOD_NOT_ALLOWED`), never coerced into a generic `500 INTERNAL_ERROR`. See §12.1 Known Issues Log, Items 1 & 4 for the confirmed bug this corrects (`backend/internal/response/response.go`'s `Error()` only special-cases `*common.AppError`; everything else — including Fiber's own `*fiber.Error`s — falls through to a blanket `INTERNAL_ERROR`, hiding the real cause from both the client and the logs).
 
 ## 2. API Index {#2-api-index}
 
@@ -687,7 +692,7 @@ For AI Chat Assistant (Feature-12): the AI Service is treated as **untrusted inp
 * Monolith chosen for early simplicity and clarity.  
 * Design allows future evolution without rewriting fundamentals.  
 * AI Chat Assistant (Feature-12) reuses the existing AI Service (Python/FastAPI, Groq SDK primary + Anthropic SDK fallback per CLAUDE.md tech stack) — no new LLM provider or client is introduced. Complexity-based model routing within the AI Service (e.g. a fast/cheap model for simple single-item extraction vs. a stronger model for multi-item or edit/query intents) is an AI Service implementation detail to be finalized at `/cook-plan` time, not a fixed choice baked into this SDS.  
-* Client surface for Feature-12 is `frontend/` (web) first, matching the project's current implementation priority; a Flutter chat UI in `mobile/` is out of scope until mobile work is explicitly resumed.
+* Client surface for Feature-12 was `frontend/` (web) first, matching the project's original implementation priority; `mobile/` (React Native, not Flutter — rebuilt 2026-08-16) has since shipped its own AI Chat screen and reached feature parity for this flow.
 
   # 
 
@@ -789,3 +794,28 @@ Advanced financial-behavior metrics may be introduced in later releases.
 * Architecture diagrams (draw.io)  
 * Optional PlantUML definitions
 
+## 1. Known Issues Log {#1-known-issues-log}
+
+Dated entries for defects/gaps reported from real usage, with confirmed root cause (via code inspection, not assumption) and the resulting design implication captured elsewhere in this document. Kept here rather than deleted so the reasoning survives past the fix.
+
+### 2026-08-21 — Category icon upload, Drawer keyboard behavior, Wallet/Budget icons, account-activation link
+
+**1. Category icon upload returned 405 on production**
+Mobile's `CategoryFormModal.tsx` showed a generic "unexpected error occurred"; the VPS backend log showed `405 Method Not Allowed` for `POST /api/v1/categories/icon`.
+*Root cause (confirmed):* the route `categories.Post("/icon", categoryHandler.UploadIcon)` (`backend/cmd/server/routes.go:55`) and the full mobile upload flow (`useUploadCategoryIconMutation`, `expo-image-picker`, `Avatar` preview, replace via "Change photo") already exist in code as of commit `fe4f6cc`. A 405 on this exact path is Fiber's signature for "path matches an existing route shape (`/:id`) for other verbs (GET/PATCH/DELETE) but not for POST" — meaning **the deployed VPS backend predates `fe4f6cc` and has not been redeployed.** This is a deployment gap, not a missing feature.
+*Compounding bug (confirmed, real fix needed):* see the API Design Standards note in §6.1 — the global error handler coerces this 405 (and any other Fiber-level routing error) into a generic `500 INTERNAL_ERROR`, which is the message the User actually saw. **Action:** (a) CI/CD (`.github/workflows/deploy-backend.yml`) already auto-builds and deploys the backend to the VPS on every push to `develop` that touches `backend/**` — check that workflow's run history for `fe4f6cc` (or the current `HEAD`) before assuming a manual redeploy is needed; if the run failed or never fired, fix that first, otherwise trigger it via `workflow_dispatch`; (b) fix `response.Error` to preserve real routing-error statuses (§6.1).
+
+**2. On-screen keyboard covers the focused input in bottom-sheet forms**
+In the shared `Drawer` component (`mobile/src/components/shared/Drawer.tsx`, used by every Wallet/Category/Budget/Transaction form), a focused `TextInput` can end up hidden behind the keyboard with nothing visibly scrolled into view.
+*Root cause (confirmed):* `Drawer.tsx` wraps its children in a plain `ScrollView` with no keyboard-avoidance logic at all — not `KeyboardAvoidingView`, not the project's own keyboard-height hook, nothing. The project already solved an equivalent problem for the AI Chat screen with a **custom `useKeyboardHeight()` hook** (`mobile/src/lib/use-keyboard-height.ts`), deliberately *not* `KeyboardAvoidingView`, because that API's Android `height` behavior has a known bug where it fails to restore the original layout after the keyboard closes (see that file's own comment, referencing facebook/react-native#22884).
+*Action:* wire `useKeyboardHeight()` into `Drawer.tsx` (pad the sheet's bottom by the live keyboard height) instead of adding the third-party `react-native-keyboard-aware-scroll-view` library proposed in the original report — that library wraps the same native primitives the project already moved off of for a confirmed Android bug, so adopting it would reintroduce the exact failure mode `useKeyboardHeight` exists to avoid. See §3.2 UI/UX Principles.
+
+**3. Wallet and Budget screens lack icon/photo support**
+`mobile/app/(app)/wallets.tsx` and `mobile/app/(app)/insights.tsx` (Budget screen) have no icon/emoji/photo UI at all, unlike Categories.
+*Status (confirmed):* net-new, not started at any layer — no `icon`/`icon_url` columns on `wallets` or `budgets` (only `categories`, added by migration `012_categories_icon_url.sql`), no DTO fields, no upload endpoint, no mobile UI. Target design captured in the Domain Model (§2.1.2 Wallet, §2.1.4 Budget) and the shared picker pattern in §3.2 UI/UX Principles.
+*Action:* **not yet spec'd for implementation** — run `/cook-ba` to produce a `specs/{feature}/spec.md` (DB migration, DTO/service/repository changes, endpoint shape — either generalizing `POST /categories/icon` or adding `/wallets/icon` + `/budgets/icon` siblings, and mobile form changes mirroring `CategoryFormModal.tsx`) before implementation.
+
+**4. Account-activation email link failed on production**
+Clicking the invite email's `{APP_BASE_URL}/activate?token=...` link (generated by `backend/internal/service/smtp_email_sender.go:40`) returned the same generic `{"success":false,"message":"an unexpected error occurred","error_code":"INTERNAL_ERROR"}` body.
+*Root cause (confirmed):* identical to Item 1 — `app.Get("/activate", handler.ActivatePageHandler)` (`backend/internal/handler/activate_page_handler.go`) was added in the same `fe4f6cc` commit and is not yet live on the VPS. Fiber's default "Cannot GET /activate" 404 gets coerced into `500 INTERNAL_ERROR` by the same error-handler gap as Item 1.
+*Action:* no code change needed beyond the shared fixes above (§6.1 error-handler correction, plus confirming the `deploy-backend.yml` run for the current `HEAD` actually succeeded) — the handler itself (a self-contained HTML activation form posting to the existing `POST /api/v1/auth/activate`) is already correct.

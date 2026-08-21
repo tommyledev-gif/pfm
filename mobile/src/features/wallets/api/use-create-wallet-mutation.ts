@@ -10,6 +10,8 @@ export interface CreateWalletRequest {
   currency?: WalletCurrency;
   initial_balance?: number;
   is_default?: boolean;
+  icon?: string;
+  icon_url?: string;
 }
 
 export function useCreateWalletMutation() {

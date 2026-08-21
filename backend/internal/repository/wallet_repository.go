@@ -45,6 +45,8 @@ type CreateWalletParams struct {
 	Balance   int64
 	Currency  string
 	IsDefault bool
+	Icon      *string
+	IconURL   *string
 }
 
 // CreateWallet always runs inside the caller's transaction — even the
@@ -58,6 +60,8 @@ func (r *WalletRepository) CreateWallet(ctx context.Context, tx pgx.Tx, arg Crea
 		Balance:   arg.Balance,
 		Currency:  arg.Currency,
 		IsDefault: arg.IsDefault,
+		Icon:      arg.Icon,
+		IconURL:   arg.IconURL,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("repository.CreateWallet: %w", err)
@@ -111,6 +115,13 @@ type UpdateWalletParams struct {
 	Name     *string
 	Type     *string
 	Currency *string
+	Icon     *string
+	// IconURL is only ever applied when IconURLProvided is true — see
+	// dto.OptionalString / specs/wallet-budget-icons/plan.md Finding #1. A
+	// nil IconURL with IconURLProvided=true means "clear the photo", not
+	// "leave it alone".
+	IconURL         *string
+	IconURLProvided bool
 }
 
 // UpdateWallet is a single-row UPDATE ... RETURNING * — no transaction
@@ -121,11 +132,14 @@ type UpdateWalletParams struct {
 // Finding #2 / WAL-T14).
 func (r *WalletRepository) UpdateWallet(ctx context.Context, arg UpdateWalletParams) (*model.Wallet, error) {
 	row, err := r.q.UpdateWallet(ctx, sqlc.UpdateWalletParams{
-		ID:       arg.ID,
-		UserID:   arg.UserID,
-		Name:     arg.Name,
-		Type:     arg.Type,
-		Currency: arg.Currency,
+		ID:              arg.ID,
+		UserID:          arg.UserID,
+		Name:            arg.Name,
+		Type:            arg.Type,
+		Currency:        arg.Currency,
+		Icon:            arg.Icon,
+		IconURL:         arg.IconURL,
+		IconURLProvided: arg.IconURLProvided,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("repository.UpdateWallet: %w", err)
@@ -166,6 +180,8 @@ func toWalletModel(row sqlc.Wallet) *model.Wallet {
 		Balance:   row.Balance,
 		Currency:  row.Currency,
 		IsDefault: row.IsDefault,
+		Icon:      row.Icon,
+		IconURL:   row.IconURL,
 		CreatedAt: row.CreatedAt,
 		UpdatedAt: row.UpdatedAt,
 		DeletedAt: row.DeletedAt,

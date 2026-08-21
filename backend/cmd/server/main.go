@@ -66,9 +66,9 @@ func main() {
 
 	userHandler := handler.NewUserHandler(userService, logger)
 	authHandler := handler.NewAuthHandler(authService, logger)
-	walletHandler := handler.NewWalletHandler(walletService, logger)
+	walletHandler := handler.NewWalletHandler(walletService, iconUploader, logger)
 	categoryHandler := handler.NewCategoryHandler(categoryService, iconUploader, logger)
-	budgetHandler := handler.NewBudgetHandler(budgetService, logger)
+	budgetHandler := handler.NewBudgetHandler(budgetService, iconUploader, logger)
 	transactionHandler := handler.NewTransactionHandler(transactionService, logger)
 	reportHandler := handler.NewReportHandler(reportService, logger)
 	notificationHandler := handler.NewNotificationHandler(notificationService, logger)

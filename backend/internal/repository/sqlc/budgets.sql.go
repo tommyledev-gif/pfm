@@ -8,9 +8,9 @@ import (
 )
 
 const createBudget = `-- name: CreateBudget :one
-INSERT INTO budgets (user_id, category_id, period, start_date)
-VALUES ($1, $2, $3, $4)
-RETURNING id, user_id, category_id, period, start_date, created_at, updated_at, deleted_at
+INSERT INTO budgets (user_id, category_id, period, start_date, icon, icon_url)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, user_id, category_id, period, start_date, created_at, updated_at, deleted_at, icon, icon_url
 `
 
 type CreateBudgetParams struct {
@@ -18,12 +18,14 @@ type CreateBudgetParams struct {
 	CategoryID uuid.UUID
 	Period     string
 	StartDate  time.Time
+	Icon       *string
+	IconURL    *string
 }
 
 func (q *Queries) CreateBudget(ctx context.Context, arg CreateBudgetParams) (Budget, error) {
-	row := q.db.QueryRow(ctx, createBudget, arg.UserID, arg.CategoryID, arg.Period, arg.StartDate)
+	row := q.db.QueryRow(ctx, createBudget, arg.UserID, arg.CategoryID, arg.Period, arg.StartDate, arg.Icon, arg.IconURL)
 	var i Budget
-	err := row.Scan(&i.ID, &i.UserID, &i.CategoryID, &i.Period, &i.StartDate, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt)
+	err := row.Scan(&i.ID, &i.UserID, &i.CategoryID, &i.Period, &i.StartDate, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.Icon, &i.IconURL)
 	return i, err
 }
 
@@ -79,7 +81,7 @@ func (q *Queries) ListBudgetLimitsByBudgetIDs(ctx context.Context, budgetIDs []u
 }
 
 const listBudgetsByUser = `-- name: ListBudgetsByUser :many
-SELECT b.id, b.user_id, b.category_id, b.period, b.start_date, b.created_at, b.updated_at, b.deleted_at, c.name AS category_name
+SELECT b.id, b.user_id, b.category_id, b.period, b.start_date, b.created_at, b.updated_at, b.deleted_at, b.icon, b.icon_url, c.name AS category_name
 FROM budgets b
 JOIN categories c ON c.id = b.category_id
 WHERE b.user_id = $1
@@ -96,6 +98,8 @@ type ListBudgetsByUserRow struct {
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	DeletedAt    *time.Time
+	Icon         *string
+	IconURL      *string
 	CategoryName string
 }
 
@@ -109,7 +113,7 @@ func (q *Queries) ListBudgetsByUser(ctx context.Context, userID uuid.UUID) ([]Li
 	var items []ListBudgetsByUserRow
 	for rows.Next() {
 		var i ListBudgetsByUserRow
-		if err := rows.Scan(&i.ID, &i.UserID, &i.CategoryID, &i.Period, &i.StartDate, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.CategoryName); err != nil {
+		if err := rows.Scan(&i.ID, &i.UserID, &i.CategoryID, &i.Period, &i.StartDate, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.Icon, &i.IconURL, &i.CategoryName); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -121,7 +125,7 @@ func (q *Queries) ListBudgetsByUser(ctx context.Context, userID uuid.UUID) ([]Li
 }
 
 const getBudgetByID = `-- name: GetBudgetByID :one
-SELECT b.id, b.user_id, b.category_id, b.period, b.start_date, b.created_at, b.updated_at, b.deleted_at, c.name AS category_name
+SELECT b.id, b.user_id, b.category_id, b.period, b.start_date, b.created_at, b.updated_at, b.deleted_at, b.icon, b.icon_url, c.name AS category_name
 FROM budgets b
 JOIN categories c ON c.id = b.category_id
 WHERE b.id = $1
@@ -138,6 +142,8 @@ type GetBudgetByIDRow struct {
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	DeletedAt    *time.Time
+	Icon         *string
+	IconURL      *string
 	CategoryName string
 }
 
@@ -146,7 +152,7 @@ type GetBudgetByIDRow struct {
 func (q *Queries) GetBudgetByID(ctx context.Context, id uuid.UUID) (GetBudgetByIDRow, error) {
 	row := q.db.QueryRow(ctx, getBudgetByID, id)
 	var i GetBudgetByIDRow
-	err := row.Scan(&i.ID, &i.UserID, &i.CategoryID, &i.Period, &i.StartDate, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.CategoryName)
+	err := row.Scan(&i.ID, &i.UserID, &i.CategoryID, &i.Period, &i.StartDate, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.Icon, &i.IconURL, &i.CategoryName)
 	return i, err
 }
 
@@ -165,22 +171,35 @@ func (q *Queries) ExistsActiveBudgetForCategory(ctx context.Context, categoryID 
 	return exists, err
 }
 
-const touchBudgetUpdatedAt = `-- name: TouchBudgetUpdatedAt :exec
+const updateBudgetFields = `-- name: UpdateBudgetFields :one
 UPDATE budgets
-SET updated_at = NOW()
+SET
+    icon             = COALESCE($3, icon),
+    icon_url         = CASE WHEN $4::bool THEN $5 ELSE icon_url END,
+    updated_at       = NOW()
 WHERE id = $1
   AND user_id = $2
   AND deleted_at IS NULL
+RETURNING id, user_id, category_id, period, start_date, created_at, updated_at, deleted_at, icon, icon_url
 `
 
-type TouchBudgetUpdatedAtParams struct {
-	ID     uuid.UUID
-	UserID uuid.UUID
+// UpdateBudgetFieldsParams supersedes the old TouchBudgetUpdatedAtParams —
+// every Update now needs an updated_at bump regardless of which fields
+// changed (specs/wallet-budget-icons/plan.md Finding #1), so this replaces
+// that narrower query rather than living alongside it.
+type UpdateBudgetFieldsParams struct {
+	ID              uuid.UUID
+	UserID          uuid.UUID
+	Icon            *string
+	IconURLProvided bool
+	IconURL         *string
 }
 
-func (q *Queries) TouchBudgetUpdatedAt(ctx context.Context, arg TouchBudgetUpdatedAtParams) error {
-	_, err := q.db.Exec(ctx, touchBudgetUpdatedAt, arg.ID, arg.UserID)
-	return err
+func (q *Queries) UpdateBudgetFields(ctx context.Context, arg UpdateBudgetFieldsParams) (Budget, error) {
+	row := q.db.QueryRow(ctx, updateBudgetFields, arg.ID, arg.UserID, arg.Icon, arg.IconURLProvided, arg.IconURL)
+	var i Budget
+	err := row.Scan(&i.ID, &i.UserID, &i.CategoryID, &i.Period, &i.StartDate, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.Icon, &i.IconURL)
+	return i, err
 }
 
 const softDeleteBudget = `-- name: SoftDeleteBudget :one
@@ -189,7 +208,7 @@ SET deleted_at = NOW()
 WHERE id = $1
   AND user_id = $2
   AND deleted_at IS NULL
-RETURNING id, user_id, category_id, period, start_date, created_at, updated_at, deleted_at
+RETURNING id, user_id, category_id, period, start_date, created_at, updated_at, deleted_at, icon, icon_url
 `
 
 type SoftDeleteBudgetParams struct {
@@ -200,7 +219,7 @@ type SoftDeleteBudgetParams struct {
 func (q *Queries) SoftDeleteBudget(ctx context.Context, arg SoftDeleteBudgetParams) (Budget, error) {
 	row := q.db.QueryRow(ctx, softDeleteBudget, arg.ID, arg.UserID)
 	var i Budget
-	err := row.Scan(&i.ID, &i.UserID, &i.CategoryID, &i.Period, &i.StartDate, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt)
+	err := row.Scan(&i.ID, &i.UserID, &i.CategoryID, &i.Period, &i.StartDate, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.Icon, &i.IconURL)
 	return i, err
 }
 

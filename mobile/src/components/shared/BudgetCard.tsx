@@ -33,12 +33,16 @@ export function BudgetCard({
     <Card style={styles.card}>
       <View style={styles.headerRow}>
         <View style={styles.nameRow}>
+          {/* Budget's own icon/icon_url takes precedence over its linked
+              Category's (specs/wallet-budget-icons/spec.md Edge Case US-04
+              #1) — falls back to the Category's when the Budget has none
+              of its own. */}
           <Avatar
             name={budget.category_name}
             color={categoryColor}
             size={28}
-            icon={category?.icon}
-            iconUrl={category?.icon_url}
+            icon={budget.icon ?? category?.icon}
+            iconUrl={budget.icon_url ?? category?.icon_url}
           />
           <Text style={styles.name}>{budget.category_name}</Text>
         </View>

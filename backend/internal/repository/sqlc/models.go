@@ -46,6 +46,8 @@ type Wallet struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt *time.Time
+	Icon      *string
+	IconURL   *string
 }
 
 // Category mirrors the categories table exactly (005_categories.sql).
@@ -73,6 +75,8 @@ type Budget struct {
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
 	DeletedAt  *time.Time
+	Icon       *string
+	IconURL    *string
 }
 
 // BudgetLimit mirrors the budget_limits table exactly (007_budgets.sql).

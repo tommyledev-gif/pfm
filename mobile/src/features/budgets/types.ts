@@ -14,6 +14,9 @@ export interface BudgetLimit {
   status: BudgetStatus;
 }
 
+// icon/icon_url added by specs/wallet-budget-icons/spec.md — independent of
+// the linked Category's own icon; icon_url takes display precedence over
+// icon when both are set.
 export interface Budget {
   id: string;
   category_id: string;
@@ -22,6 +25,8 @@ export interface Budget {
   start_date: string;
   limits: BudgetLimit[];
   status: BudgetStatus;
+  icon: string | null;
+  icon_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -31,4 +36,6 @@ export interface CreateBudgetRequest {
   limits: Partial<Record<WalletCurrency, number>>;
   period?: string;
   start_date?: string;
+  icon?: string;
+  icon_url?: string;
 }

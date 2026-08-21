@@ -8,7 +8,7 @@ When invoked, you read the corresponding `spec.md`, cross-check it against the c
 
 The `spec.md` for the same feature **must already exist** at `{root}/specs/{feature}/spec.md`. If it doesn't, stop and say so — do not invent a plan from an assumed spec.
 
-> **Frontend priority:** implementation currently focuses on `frontend/` (Next.js web) first. `mobile/` (React Native + Expo, rebuilt from Flutter 2026-08-16 — project scaffold only, no feature screens yet) sections are included in plans but only implemented when explicitly requested.
+> **Frontend priority:** `frontend/` (Next.js web) was built out first, but `mobile/` (React Native + Expo, rebuilt from Flutter 2026-08-16) has since reached full feature parity with the backend MVP (Wallets, Categories, Budgets, Transactions, Users/admin, AI Chat, Notifications — see `docs/architecture.md` §3). Include mobile sections in plans by default for MVP-scope features; still confirm with the user before scoping a Release-1+ feature into mobile if it isn't explicit in the spec.
 
 ---
 
@@ -117,7 +117,7 @@ frontend/src/
         └── types.ts                             # TS interfaces for this feature's API shapes
 ```
 
-### React Native Mobile (`mobile/`, Expo) — implement only when explicitly requested
+### React Native Mobile (`mobile/`, Expo) — now at full MVP feature parity, include by default
 
 ```text
 mobile/
@@ -223,8 +223,8 @@ ai-service/app/
 | T10 | Web: table + skeleton + dialogs | `frontend/src/features/[feature]/components/*.tsx` |
 | T11 | Web: types | `frontend/src/features/[feature]/types.ts` |
 | T12 | Web: page route | `frontend/src/app/app/[feature]/page.tsx` |
-| T13 | Mobile: TanStack Query hooks (only when mobile scope active) | `mobile/src/features/[feature]/api/use-*.ts` |
-| T14 | Mobile: screen + route entry (only when mobile scope active) | `mobile/src/features/[feature]/components/*.tsx`, `mobile/app/(app)/[feature]/index.tsx` |
+| T13 | Mobile: TanStack Query hooks | `mobile/src/features/[feature]/api/use-*.ts` |
+| T14 | Mobile: screen + route entry | `mobile/src/features/[feature]/components/*.tsx`, `mobile/app/(app)/[feature].tsx` |
 
 ---
 
@@ -242,4 +242,4 @@ ai-service/app/
 Stack: React Native + Expo (Expo Router, TanStack Query, Zustand, Axios, expo-secure-store) | Next.js (App Router, TanStack Query, Zustand, shadcn/ui, Axios) | Go 1.22+ (Fiber v2, sqlc, pgx/v5, golang-jwt v5, golang-migrate) | Python 3.12+ (FastAPI, Pydantic v2, Groq SDK + Anthropic fallback, tool/function calling)
 DB: PostgreSQL 16 · UUID v4 IDs · BIGINT cents (money) · TIMESTAMPTZ UTC · soft delete via `deleted_at`
 Auth: JWT access (15m) + refresh (7d) · invite-only flow · roles: `admin` | `member`
-Frontend priority: `frontend/` (Next.js web) first · `mobile/` (React Native/Expo, project scaffold only as of 2026-08-16) only when explicitly requested
+Frontend priority: `frontend/` (Next.js web) built first, but `mobile/` (React Native/Expo) reached full MVP feature parity by 2026-08-21 — include both by default for MVP-scope stories

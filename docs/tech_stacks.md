@@ -1,9 +1,9 @@
 # PFM — Tech Stacks
 
-_Last updated: 2026-08-16_
+_Last updated: 2026-08-21_
 _Updated by: /renew-docs_
 
-> Versions extracted from actual config files (`backend/go.mod`, `mobile/package.json`, `frontend/package.json`, `docker-compose.yml`), not from memory or prior planning docs.
+> Versions extracted from actual config files (`backend/go.mod`, `mobile/package.json`, `frontend/package.json`, `docker-compose.yml`, `.github/workflows/*`), not from memory or prior planning docs.
 
 ---
 
@@ -11,11 +11,12 @@ _Updated by: /renew-docs_
 
 | Component | Status |
 |---|---|
-| Backend (Go) | **Done for MVP** — F-01, F-02, F-03, F-04, F-05, F-06, F-07, F-10 all implemented in `backend/`, plus Feature-12 AI Chat (US-01 only) |
+| Backend (Go) | **Done for MVP** — F-01, F-02, F-03, F-04, F-05, F-06, F-07, F-10 all implemented in `backend/`, plus Feature-12 AI Chat (US-01 only). Since 2026-08-16: category photo upload (R2), real SMTP invite emails, a self-served `/activate` HTML page |
 | Web frontend (Next.js, `frontend/`) | **Done for MVP** — `features/{auth,users,wallets,categories,budgets,transactions,reports,notifications,ai-chat}` all exist |
-| Mobile (React Native/Expo, `mobile/`) | **Screens built 2026-08-16** — rebuilt from Flutter to React Native (Expo) earlier the same day, then the full screen set (Home, Transactions, Insights, AI Chat, Notifications, Profile) was implemented against `mobile/design_handoff_pfm_app/`, plus a real login form. Wallets/Categories/Household Members/Security/Help on Profile are entry-point rows only (design handoff scope), no screens behind them yet |
+| Mobile (React Native/Expo, `mobile/`) | **Full feature parity with backend MVP as of 2026-08-21** — rebuilt from Flutter to React Native (Expo) on 2026-08-16, then (commits `455bfb1` → `fe4f6cc`) every Profile entry-point row that used to be inert became a real CRUD screen: Wallets, Categories (+ photo upload), Budgets, Transactions, Users (admin invite), AI Chat, Notifications. Ships as an EAS-built internal `.apk` (`mobile/eas.json`) |
 | AI Service (Python) | **Implemented** — `ai-service/`, Feature-12 US-01 only (create-transaction-via-chat); Groq primary / Anthropic fallback via tool/function calling |
-| Infra (Docker Compose) | `postgres`, `backend`, `ai-service`, `web` (Next.js). `mobile/` is deliberately **not** containerized — Expo's dev flow is `npx expo start`, not a docker service; the old Flutter-web-build `frontend` service was removed |
+| Infra (Docker Compose) | `postgres`, `backend`, `ai-service`, `web` (Next.js). `mobile/` is deliberately **not** containerized — ships via EAS Build instead (see §CI/CD). No `redis`/`nginx` |
+| CI/CD (GitHub Actions) | **Implemented since last update** — `ci-pr.yml` (PR gate), `backend-test.yml` (shared `go vet`/`go test`), `deploy-backend.yml` and `deploy-ai-service.yml` (path-filtered auto-deploy to the VPS on push to `develop`) — see §6 |
 | API spec (`api-spec/openapi.yaml`) | **Not started** — no `api-spec/` directory; `docs/open-ai.md` is a hand-drafted, aspirational OpenAPI 3.1 sketch, not a generated/enforced contract, and it is already ahead of actual code in places (documents `/auth/refresh`, though `CreateTransactionRequest.idempotency_key` is now real) |
 
 ---
@@ -41,7 +42,7 @@ _Updated by: /renew-docs_
 
 | Layer | Package | Version | Notes |
 |---|---|---|---|
-| Framework | `expo` | `^54.0.0` | `mobile/package.json` |
+| Framework | `expo` | `^54.0.36` | `mobile/package.json` |
 | Runtime | `react-native` | `0.81.5` | |
 | UI library | `react` | `19.1.0` | |
 | Language | `typescript` | `~5.9.2` | strict mode, `@/*` path alias to `src/*` (Metro/Expo CLI supports `tsconfig` paths natively — no `babel-plugin-module-resolver` needed) |
@@ -52,12 +53,17 @@ _Updated by: /renew-docs_
 | Client/global state | `zustand` | `^5.0.15` | same choice as `frontend/`; used for the session store only so far |
 | HTTP client | `axios` | `^1.19.0` | calls the Go backend directly (no BFF — mobile has no server tier to hide the JWT behind) |
 | Secure storage | `expo-secure-store` | `~15.0.8` | JWT access + refresh token storage, plus the login email (see below) |
-| SVG / icons + chart | `react-native-svg` | latest SDK-54-compatible | Added this session: hand-drawn icon set (`src/components/ui/Icon.tsx`) + the Insights donut chart, no icon font/charting library |
-| Blur | `expo-blur` | latest SDK-54-compatible | Added this session: `BlurView` behind the floating bottom-nav pill |
+| SVG / icons + chart | `react-native-svg` | `15.12.1` (pinned) | Hand-drawn icon set (`src/components/ui/Icon.tsx`) + the Insights donut chart, no icon font/charting library |
+| Blur | `expo-blur` | `~15.0.8` | `BlurView` behind the floating bottom-nav pill |
+| Image picking | `expo-image-picker` | `~17.0.11` | Category icon photo upload (`CategoryFormModal.tsx`) — not yet wired for Wallet/Budget (see `SDS.md` §12.1 Known Issues Log, Item 3) |
+| Date pickers | `react-native-calendars` | `^1.1314.0` | Transaction date + report date-range filters (`DateRangePickerModal`/`SingleDatePickerModal`) |
+| Storage (transitive) | `@react-native-async-storage/async-storage` | `2.2.0` | Peer dependency of another package, not used directly — session persistence stays on `expo-secure-store` |
 
 **Dev dependencies:** `typescript ~5.9.2`, `eslint ^9.0.0` + `eslint-config-expo ~10.0.0` (installed via `npx expo lint`). ⚠️ `expo-status-bar` must not be listed in `app.json`'s `plugins` array on this SDK — breaks with `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING` if present.
 
-**Not yet installed:** any form library — the login form and "New budget" modal are plain `useState`, small enough not to need `react-hook-form`. No offline/local-DB layer (the old Flutter stack listed `drift` as intended but never adopted it; TanStack Query's cache is still the only client persistence).
+**Not yet installed:** any form library — every Drawer-based form (Wallet/Category/Budget/Transaction) is plain `useState`, small enough not to need `react-hook-form`. No offline/local-DB layer (the old Flutter stack listed `drift` as intended but never adopted it; TanStack Query's cache is still the only client persistence).
+
+**Distribution:** EAS Build (`mobile/eas.json`, CLI `>= 12.0.0`) — a `preview` profile (`buildType: apk`, internal distribution) and a `production` profile (`autoIncrement: true`), both hardcoded to `EXPO_PUBLIC_API_BASE_URL=https://app.example.com/api/v1` (no separate staging target). Matches CLAUDE.md's "no App Store/Play Store — `.apk`/`.ipa` test builds only" constraint.
 
 **No `GET /users/me` endpoint exists** — the JWT's `AccessClaims` carry only `user_id`/`role`, no name/email (`backend/internal/service/token_service.go`). Profile's displayed name/email come from the email typed at login, persisted via `expo-secure-store` alongside the tokens (`src/stores/session-store.ts`) — not re-verified against the server on each load.
 
@@ -67,7 +73,7 @@ _Updated by: /renew-docs_
 
 | Layer | Library | Version | Status |
 |---|---|---|---|
-| Go | — | `1.22` | `go.mod` |
+| Go | — | `1.23.0` (bumped from `1.22`) | `go.mod` |
 | Web framework | `github.com/gofiber/fiber/v2` | `v2.52.5` | ✅ |
 | DB driver | `github.com/jackc/pgx/v5` | `v5.6.0` | ✅ — used by sqlc-generated code |
 | Query layer | `sqlc` | config in `backend/sqlc.yaml` (`sql_package: pgx/v5`) | ✅ — generates into `internal/repository/sqlc`; no GORM anywhere |
@@ -75,7 +81,9 @@ _Updated by: /renew-docs_
 | Validation | `github.com/go-playground/validator/v10` | `v10.22.0` | ✅ |
 | UUID | `github.com/google/uuid` | `v1.6.0` | ✅ |
 | Logging | `go.uber.org/zap` | `v1.27.0` | ✅ |
-| Password hashing | `golang.org/x/crypto` (bcrypt) | `v0.24.0` | ✅ |
+| Password hashing | `golang.org/x/crypto` (bcrypt) | `v0.36.0` (bumped from `v0.24.0`) | ✅ |
+| Object storage | `github.com/minio/minio-go/v7` | `v7.0.90` | ✅ — new since last update; S3-compatible client used against Cloudflare R2 for category-icon photo uploads (`internal/service/icon_uploader.go`), not against any actual MinIO server |
+| Email | stdlib `net/smtp` (no third-party SMTP dependency) | — | ✅ — new since last update; `internal/service/smtp_email_sender.go` sends invite-activation emails, behind an `EmailSender` interface with a `LogEmailSender` fallback when `SMTP_HOST` is unset |
 | Rate limiting | Fiber's built-in `middleware/limiter` | (bundled with `fiber/v2`) | ✅ — used for `/auth/login` (by IP) and `/admin/users/invite` (by user ID); no other route is rate-limited yet |
 | Migrations | Numbered `.sql` files under `backend/db/migrations/`, mounted directly into Postgres's `docker-entrypoint-initdb.d/` | — | ⚠️ manual — `golang-migrate` is not a dependency in `go.mod`; no automated apply-on-boot for an existing DB volume |
 | API spec generation | — | — | ❌ not adopted — no `oapi-codegen`/`api-spec/openapi.yaml`; handlers/DTOs in `internal/handler/`, `internal/dto/` are hand-written |
@@ -143,7 +151,20 @@ Per `specs/ai-chat-assistant/spec.md` (Release 1, "Create Transaction via Chat" 
 
 ---
 
-## 7. Conventions (unchanged across the codebase)
+## 7. CI/CD (GitHub Actions, `.github/workflows/`) — new since last update
+
+| Workflow | Trigger | Purpose |
+|---|---|---|
+| `ci-pr.yml` | PR → `develop` | Gate check, no deploy |
+| `backend-test.yml` | `workflow_call` from `ci-pr.yml` / `deploy-backend.yml` | `go vet` + `go test` — single definition shared by both callers |
+| `deploy-backend.yml` | Push to `develop` touching `backend/**`, or manual dispatch | Test → build/push Docker image (Docker Hub) → Trivy scan → SSH deploy to VPS |
+| `deploy-ai-service.yml` | Push to `develop` touching `ai-service/**` | Equivalent pipeline for the Python AI Service |
+
+Mobile has no CI workflow — it ships via **EAS Build** (`mobile/eas.json`) directly, outside GitHub Actions.
+
+---
+
+## 8. Conventions (unchanged across the codebase)
 
 ### Money handling
 - Stored as `BIGINT` integer cents (e.g. `150000` = 1,500.00 VND)
@@ -170,7 +191,7 @@ This is a `{success, data}`-wrapped envelope, **not** the bare `{error_code, mes
 
 ---
 
-## 8. Tech Decision Log
+## 9. Tech Decision Log
 
 | Decision | Chosen | Rejected | Reason |
 |---|---|---|---|
@@ -181,3 +202,7 @@ This is a `{success, data}`-wrapped envelope, **not** the bare `{error_code, mes
 | Mobile framework | React Native (Expo) | Flutter (previous choice) | User-directed change 2026-08-16, no further rationale recorded — `mobile/` was deleted and rebuilt from scratch |
 | Mobile state management | TanStack Query + Zustand | Riverpod (Flutter-only, dropped with Flutter) | Matches `frontend/`'s exact pairing — one state-management mental model across both clients |
 | Auth token gen (invite) | `crypto/rand` | UUID | UUIDs are not a cryptographically secure token source |
+| Category icon storage | Cloudflare R2 via `minio-go` (S3-compatible) | `aws-sdk-go-v2`, storing bytes in Postgres | Lighter client for a single-bucket/single-op use case; keeps large binary blobs out of the DB |
+| Invite email delivery | Real SMTP (`net/smtp`, `smtp_email_sender.go`) | Continuing to only log the invite link | Users need an actual clickable link outside the dev machine's logs; an `EmailSender` interface keeps a `LogEmailSender` fallback for local dev / missing config |
+| Mobile distribution | EAS Build → internal `.apk` | Manual `expo export` bundling, App/Play Store submission | Matches CLAUDE.md's "no store submission, `.apk`/`.ipa` test builds only" constraint |
+| CI/CD | GitHub Actions, path-filtered per-package workflows | Single monolithic pipeline | A frontend/mobile-only push shouldn't rebuild or redeploy the Go API or AI Service |

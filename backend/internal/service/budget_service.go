@@ -57,7 +57,7 @@ func (s *BudgetService) CreateBudget(ctx context.Context, userID uuid.UUID, req 
 		limits = append(limits, model.BudgetLimit{Currency: currency, AmountLimit: amount})
 	}
 
-	budget, err := s.createBudgetTx(ctx, userID, req.CategoryID, period, startDate, limits)
+	budget, err := s.createBudgetTx(ctx, userID, req.CategoryID, period, startDate, limits, req.Icon, req.IconURL)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func (s *BudgetService) CreateBudget(ctx context.Context, userID uuid.UUID, req 
 	return budget, nil
 }
 
-func (s *BudgetService) createBudgetTx(ctx context.Context, userID, categoryID uuid.UUID, period string, startDate time.Time, limits []model.BudgetLimit) (*model.Budget, error) {
+func (s *BudgetService) createBudgetTx(ctx context.Context, userID, categoryID uuid.UUID, period string, startDate time.Time, limits []model.BudgetLimit, icon, iconURL *string) (*model.Budget, error) {
 	tx, err := s.repo.BeginTx(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("service.CreateBudget: %w", err)
@@ -100,6 +100,8 @@ func (s *BudgetService) createBudgetTx(ctx context.Context, userID, categoryID u
 		Period:     period,
 		StartDate:  startDate,
 		Limits:     limits,
+		Icon:       icon,
+		IconURL:    iconURL,
 	})
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -172,20 +174,27 @@ func (s *BudgetService) getOwnedBudget(ctx context.Context, userID, budgetID uui
 // UpdateBudget implements US-04. `limits` is a full replacement of the
 // Budget's currency entries, never a per-currency merge (spec.md Edge Case
 // US-04 #1, plan.md Finding #9) — delete-then-insert inside one transaction.
+// Icon/IconURL are independent fields (specs/wallet-budget-icons/spec.md
+// US-04 Edge Case #2): `limits` is only touched when the caller actually
+// sent a `limits` key, so an icon-only update can never wipe existing
+// budget_limits rows, and vice versa.
 func (s *BudgetService) UpdateBudget(ctx context.Context, userID, budgetID uuid.UUID, req dto.UpdateBudgetRequest) (*model.Budget, error) {
 	if !req.HasUpdates() {
-		return nil, common.NewInvalidInputError("limits must be provided")
+		return nil, common.NewInvalidInputError("at least one of limits, icon, or icon_url must be provided")
 	}
 	if _, err := s.getOwnedBudget(ctx, userID, budgetID); err != nil {
 		return nil, err
 	}
 
-	limits := make([]model.BudgetLimit, 0, len(req.Limits))
-	for currency, amount := range req.Limits {
-		limits = append(limits, model.BudgetLimit{Currency: currency, AmountLimit: amount})
+	var limits []model.BudgetLimit
+	if req.Limits != nil {
+		limits = make([]model.BudgetLimit, 0, len(req.Limits))
+		for currency, amount := range req.Limits {
+			limits = append(limits, model.BudgetLimit{Currency: currency, AmountLimit: amount})
+		}
 	}
 
-	if err := s.replaceLimitsTx(ctx, userID, budgetID, limits); err != nil {
+	if err := s.applyUpdateTx(ctx, userID, budgetID, req, limits); err != nil {
 		return nil, err
 	}
 
@@ -203,17 +212,30 @@ func (s *BudgetService) UpdateBudget(ctx context.Context, userID, budgetID uuid.
 	return budget, nil
 }
 
-func (s *BudgetService) replaceLimitsTx(ctx context.Context, userID, budgetID uuid.UUID, limits []model.BudgetLimit) error {
+// applyUpdateTx applies the two independent slices of change UpdateBudget
+// now supports: `limits` (full-replace, only when req.Limits was actually
+// sent) and icon/icon_url (applied unconditionally — a no-op COALESCE/
+// presence-flag when the caller didn't touch them, same convention as
+// UpdateWallet).
+func (s *BudgetService) applyUpdateTx(ctx context.Context, userID, budgetID uuid.UUID, req dto.UpdateBudgetRequest, limits []model.BudgetLimit) error {
 	tx, err := s.repo.BeginTx(ctx)
 	if err != nil {
 		return fmt.Errorf("service.UpdateBudget: %w", err)
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck // no-op once committed
 
-	if err := s.repo.ReplaceBudgetLimits(ctx, tx, budgetID, limits); err != nil {
-		return fmt.Errorf("service.UpdateBudget: %w", err)
+	if req.Limits != nil {
+		if err := s.repo.ReplaceBudgetLimits(ctx, tx, budgetID, limits); err != nil {
+			return fmt.Errorf("service.UpdateBudget: %w", err)
+		}
 	}
-	if err := s.repo.TouchBudgetUpdatedAt(ctx, tx, budgetID, userID); err != nil {
+	if _, err := s.repo.UpdateBudgetFields(ctx, tx, repository.UpdateBudgetFieldsParams{
+		ID:              budgetID,
+		UserID:          userID,
+		Icon:            req.Icon,
+		IconURL:         req.IconURL.Value,
+		IconURLProvided: req.IconURL.Set,
+	}); err != nil {
 		return fmt.Errorf("service.UpdateBudget: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {

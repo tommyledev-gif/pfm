@@ -83,7 +83,11 @@ type BudgetRepo interface {
 	LockCategoryForBudgetCheck(ctx context.Context, tx pgx.Tx, categoryID uuid.UUID) (*model.Category, error)
 	CreateBudget(ctx context.Context, tx pgx.Tx, arg repository.CreateBudgetParams) (*model.Budget, error)
 	ReplaceBudgetLimits(ctx context.Context, tx pgx.Tx, budgetID uuid.UUID, limits []model.BudgetLimit) error
-	TouchBudgetUpdatedAt(ctx context.Context, tx pgx.Tx, id, userID uuid.UUID) error
+	// UpdateBudgetFields superseded TouchBudgetUpdatedAt
+	// (specs/wallet-budget-icons/plan.md Finding #1) — every Update now needs
+	// an updated_at bump regardless of which fields changed, and this also
+	// applies icon/icon_url.
+	UpdateBudgetFields(ctx context.Context, tx pgx.Tx, arg repository.UpdateBudgetFieldsParams) (*model.Budget, error)
 	ListBudgetsByUser(ctx context.Context, userID uuid.UUID) ([]*model.Budget, error)
 	GetBudgetByID(ctx context.Context, id uuid.UUID) (*model.Budget, error)
 	SoftDeleteBudget(ctx context.Context, id, userID uuid.UUID) (*model.Budget, error)

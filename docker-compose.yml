@@ -22,7 +22,9 @@ services:
       - ./backend/db/migrations/010_transactions_idempotency_key.sql:/docker-entrypoint-initdb.d/09_transactions_idempotency_key.sql:ro
       - ./backend/db/migrations/011_chat_messages.sql:/docker-entrypoint-initdb.d/10_chat_messages.sql:ro
       - ./backend/db/migrations/012_categories_icon_url.sql:/docker-entrypoint-initdb.d/11_categories_icon_url.sql:ro
-      - ./infra/postgres/init/seed_dev_admin.sh:/docker-entrypoint-initdb.d/11_seed_dev_admin.sh:ro
+      - ./backend/db/migrations/013_wallets_icon.sql:/docker-entrypoint-initdb.d/12_wallets_icon.sql:ro
+      - ./backend/db/migrations/014_budgets_icon.sql:/docker-entrypoint-initdb.d/13_budgets_icon.sql:ro
+      - ./infra/postgres/init/seed_dev_admin.sh:/docker-entrypoint-initdb.d/14_seed_dev_admin.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s

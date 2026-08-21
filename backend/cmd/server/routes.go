@@ -40,6 +40,10 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	// F-03 Wallet Management — no RequireRole gate: every active user manages
 	// only their own wallets (plan.md Security & Actor Resolution).
 	wallets := v1.Group("/wallets", middleware.JWTAuth(tokens, logger))
+	// A standalone upload step, not nested under "/:id" — a client picks an
+	// image before a wallet exists yet (the create form), same convention as
+	// categories.Post("/icon") (specs/wallet-budget-icons/spec.md US-01).
+	wallets.Post("/icon", walletHandler.UploadIcon)
 	wallets.Post("/", walletHandler.CreateWallet)
 	wallets.Get("/", walletHandler.ListWallets)
 	wallets.Get("/:id", walletHandler.GetWallet)
@@ -62,6 +66,10 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	// F-05 Budget Management — no RequireRole gate: every active user
 	// manages only their own budgets (plan.md Security & Actor Resolution).
 	budgets := v1.Group("/budgets", middleware.JWTAuth(tokens, logger))
+	// A standalone upload step, not nested under "/:id" — a client picks an
+	// image before a budget exists yet (the create form), same convention as
+	// categories.Post("/icon") (specs/wallet-budget-icons/spec.md US-03).
+	budgets.Post("/icon", budgetHandler.UploadIcon)
 	budgets.Post("/", budgetHandler.CreateBudget)
 	budgets.Get("/", budgetHandler.ListBudgets)
 	budgets.Get("/:id", budgetHandler.GetBudget)

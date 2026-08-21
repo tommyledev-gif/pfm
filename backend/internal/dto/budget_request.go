@@ -20,6 +20,11 @@ type CreateBudgetRequest struct {
 	Limits     map[string]int64 `json:"limits"`
 	Period     *string          `json:"period" validate:"omitempty,oneof=monthly"`
 	StartDate  *string          `json:"start_date" validate:"omitempty,datetime=2006-01-02"`
+	// Icon/IconURL are independent of the Budget's linked Category's own icon
+	// (specs/wallet-budget-icons/spec.md Edge Case US-04 #1) — same
+	// emoji-text/uploaded-photo convention as Category and Wallet.
+	Icon    *string `json:"icon" validate:"omitempty,max=32"`
+	IconURL *string `json:"icon_url" validate:"omitempty,max=500"`
 }
 
 // UpdateBudgetRequest is the body of PATCH /budgets/{id}. Deliberately has no
@@ -27,18 +32,25 @@ type CreateBudgetRequest struct {
 // accepted by this endpoint") — decoded via the existing dto.DecodeStrict so
 // an unrecognized field is rejected with 400, not silently ignored. `limits`
 // is a FULL REPLACEMENT of the Budget's currency entries, never a
-// per-currency merge (spec.md Edge Case US-04 #1).
+// per-currency merge (spec.md Edge Case US-04 #1). Icon/IconURL are
+// independent fields (specs/wallet-budget-icons/spec.md US-04 Edge Case #2)
+// — a limits-only update must never touch them, and vice versa. IconURL is
+// an OptionalString, not a plain *string, so an explicit `"icon_url": null`
+// (clear the photo) is distinguishable from the key being omitted (leave it
+// alone) — see dto.OptionalString and plan.md Finding #1.
 type UpdateBudgetRequest struct {
-	Limits map[string]int64 `json:"limits"`
+	Limits  map[string]int64 `json:"limits"`
+	Icon    *string          `json:"icon" validate:"omitempty,max=32"`
+	IconURL OptionalString   `json:"icon_url" validate:"omitempty,max=500"`
 }
 
-// HasUpdates reports whether a `limits` key was supplied at all — an empty
-// body (no key) is a client mistake (400), not a no-op 200 (spec.md
-// S-BUD-36). An explicitly empty map (`{}`) is caught by ValidateLimits
-// instead (S-BUD-30) — HasUpdates only distinguishes "key absent" from
-// "key present".
+// HasUpdates reports whether at least one of `limits`/`icon`/`icon_url` was
+// supplied — an empty body is a client mistake (400), not a no-op 200
+// (spec.md S-BUD-36). An explicitly empty `limits` map (`{}`) is caught by
+// ValidateLimits instead (S-BUD-30) — HasUpdates only distinguishes "no key
+// present at all" from "at least one key present".
 func (r UpdateBudgetRequest) HasUpdates() bool {
-	return r.Limits != nil
+	return r.Limits != nil || r.Icon != nil || r.IconURL.Set
 }
 
 // limitFieldError is one entry in ValidateLimits' `details` array — every

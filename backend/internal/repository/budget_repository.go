@@ -60,6 +60,8 @@ type CreateBudgetParams struct {
 	Period     string
 	StartDate  time.Time
 	Limits     []model.BudgetLimit
+	Icon       *string
+	IconURL    *string
 }
 
 // CreateBudget inserts the budgets row plus one budget_limits row per
@@ -70,6 +72,8 @@ func (r *BudgetRepository) CreateBudget(ctx context.Context, tx pgx.Tx, arg Crea
 		CategoryID: arg.CategoryID,
 		Period:     arg.Period,
 		StartDate:  arg.StartDate,
+		Icon:       arg.Icon,
+		IconURL:    arg.IconURL,
 	})
 	if err != nil {
 		return nil, err
@@ -92,6 +96,8 @@ func (r *BudgetRepository) CreateBudget(ctx context.Context, tx pgx.Tx, arg Crea
 		Period:     row.Period,
 		StartDate:  row.StartDate,
 		Limits:     stripComputedFields(arg.Limits),
+		Icon:       row.Icon,
+		IconURL:    row.IconURL,
 		CreatedAt:  row.CreatedAt,
 		UpdatedAt:  row.UpdatedAt,
 		DeletedAt:  row.DeletedAt,
@@ -117,10 +123,45 @@ func (r *BudgetRepository) ReplaceBudgetLimits(ctx context.Context, tx pgx.Tx, b
 	return nil
 }
 
-// TouchBudgetUpdatedAt bumps updated_at for a Budget whose only change was
-// its currency limits (US-04 step 5), inside the caller's transaction.
-func (r *BudgetRepository) TouchBudgetUpdatedAt(ctx context.Context, tx pgx.Tx, id, userID uuid.UUID) error {
-	return r.q.WithTx(tx).TouchBudgetUpdatedAt(ctx, sqlc.TouchBudgetUpdatedAtParams{ID: id, UserID: userID})
+// UpdateBudgetFieldsParams is BudgetRepository's own param type (mirrors
+// UpdateWalletParams) — IconURL is only ever applied when IconURLProvided is
+// true (dto.OptionalString / plan.md Finding #1): a nil IconURL with
+// IconURLProvided=true means "clear the photo", not "leave it alone".
+type UpdateBudgetFieldsParams struct {
+	ID              uuid.UUID
+	UserID          uuid.UUID
+	Icon            *string
+	IconURL         *string
+	IconURLProvided bool
+}
+
+// UpdateBudgetFields applies icon/icon_url and always bumps updated_at,
+// inside the caller's transaction — supersedes the narrower
+// TouchBudgetUpdatedAt this replaced, since every Update now needs an
+// updated_at bump regardless of which fields changed.
+func (r *BudgetRepository) UpdateBudgetFields(ctx context.Context, tx pgx.Tx, arg UpdateBudgetFieldsParams) (*model.Budget, error) {
+	row, err := r.q.WithTx(tx).UpdateBudgetFields(ctx, sqlc.UpdateBudgetFieldsParams{
+		ID:              arg.ID,
+		UserID:          arg.UserID,
+		Icon:            arg.Icon,
+		IconURLProvided: arg.IconURLProvided,
+		IconURL:         arg.IconURL,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &model.Budget{
+		ID:         row.ID,
+		UserID:     row.UserID,
+		CategoryID: row.CategoryID,
+		Period:     row.Period,
+		StartDate:  row.StartDate,
+		Icon:       row.Icon,
+		IconURL:    row.IconURL,
+		CreatedAt:  row.CreatedAt,
+		UpdatedAt:  row.UpdatedAt,
+		DeletedAt:  row.DeletedAt,
+	}, nil
 }
 
 // ListBudgetsByUser returns all of userID's non-deleted Budgets, each with
@@ -147,6 +188,8 @@ func (r *BudgetRepository) ListBudgetsByUser(ctx context.Context, userID uuid.UU
 			Period:       row.Period,
 			StartDate:    row.StartDate,
 			Limits:       limitsByBudget[row.ID],
+			Icon:         row.Icon,
+			IconURL:      row.IconURL,
 			CreatedAt:    row.CreatedAt,
 			UpdatedAt:    row.UpdatedAt,
 			DeletedAt:    row.DeletedAt,
@@ -177,6 +220,8 @@ func (r *BudgetRepository) GetBudgetByID(ctx context.Context, id uuid.UUID) (*mo
 		Period:       row.Period,
 		StartDate:    row.StartDate,
 		Limits:       limitsByBudget[row.ID],
+		Icon:         row.Icon,
+		IconURL:      row.IconURL,
 		CreatedAt:    row.CreatedAt,
 		UpdatedAt:    row.UpdatedAt,
 		DeletedAt:    row.DeletedAt,
@@ -197,6 +242,8 @@ func (r *BudgetRepository) SoftDeleteBudget(ctx context.Context, id, userID uuid
 		CategoryID: row.CategoryID,
 		Period:     row.Period,
 		StartDate:  row.StartDate,
+		Icon:       row.Icon,
+		IconURL:    row.IconURL,
 		CreatedAt:  row.CreatedAt,
 		UpdatedAt:  row.UpdatedAt,
 		DeletedAt:  row.DeletedAt,

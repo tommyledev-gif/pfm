@@ -84,6 +84,8 @@ func (f *fakeBudgetRepo) CreateBudget(_ context.Context, _ pgx.Tx, arg repositor
 		Period:     arg.Period,
 		StartDate:  arg.StartDate,
 		Limits:     limits,
+		Icon:       arg.Icon,
+		IconURL:    arg.IconURL,
 		CreatedAt:  now,
 		UpdatedAt:  now,
 	}
@@ -105,16 +107,27 @@ func (f *fakeBudgetRepo) ReplaceBudgetLimits(_ context.Context, _ pgx.Tx, budget
 	return nil
 }
 
-func (f *fakeBudgetRepo) TouchBudgetUpdatedAt(_ context.Context, _ pgx.Tx, id, userID uuid.UUID) error {
+// UpdateBudgetFields superseded TouchBudgetUpdatedAt
+// (specs/wallet-budget-icons/plan.md Finding #1) — applies icon/icon_url
+// (icon_url only when IconURLProvided, same presence-flag semantics as the
+// real CASE-based SQL) and always bumps updated_at.
+func (f *fakeBudgetRepo) UpdateBudgetFields(_ context.Context, _ pgx.Tx, arg repository.UpdateBudgetFieldsParams) (*model.Budget, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	b, ok := f.budgets[id]
-	if !ok || b.UserID != userID {
-		return pgx.ErrNoRows
+	b, ok := f.budgets[arg.ID]
+	if !ok || b.UserID != arg.UserID {
+		return nil, pgx.ErrNoRows
+	}
+	if arg.Icon != nil {
+		b.Icon = arg.Icon
+	}
+	if arg.IconURLProvided {
+		b.IconURL = arg.IconURL
 	}
 	b.UpdatedAt = time.Now().UTC()
-	return nil
+	cp := *b
+	return &cp, nil
 }
 
 func (f *fakeBudgetRepo) ListBudgetsByUser(_ context.Context, userID uuid.UUID) ([]*model.Budget, error) {

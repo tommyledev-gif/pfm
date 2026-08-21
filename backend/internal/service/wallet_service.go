@@ -79,6 +79,8 @@ func (s *WalletService) createWalletTx(ctx context.Context, userID uuid.UUID, re
 		Balance:   req.InitialBalance,
 		Currency:  currency,
 		IsDefault: makeDefault,
+		Icon:      req.Icon,
+		IconURL:   req.IconURL,
 	})
 	if err != nil {
 		return nil, err
@@ -129,10 +131,12 @@ func (s *WalletService) getOwnedWallet(ctx context.Context, userID, walletID uui
 // Finding #2 / WAL-T14, closing the deferral this comment used to describe)
 // — a currency change is rejected once any non-deleted Transaction
 // references the wallet. A currency value equal to the wallet's current one
-// is not treated as a "change" and never triggers the check.
+// is not treated as a "change" and never triggers the check. Icon/IconURL
+// are independent of the currency lock — never gated by it
+// (specs/wallet-budget-icons/spec.md Edge Case US-02 #3).
 func (s *WalletService) UpdateWallet(ctx context.Context, userID, walletID uuid.UUID, req dto.UpdateWalletRequest) (*model.Wallet, error) {
 	if !req.HasUpdates() {
-		return nil, common.NewInvalidInputError("at least one of name, type, or currency must be provided")
+		return nil, common.NewInvalidInputError("at least one of name, type, currency, icon, or icon_url must be provided")
 	}
 	wallet, err := s.getOwnedWallet(ctx, userID, walletID)
 	if err != nil {
@@ -150,11 +154,14 @@ func (s *WalletService) UpdateWallet(ctx context.Context, userID, walletID uuid.
 	}
 
 	updated, err := s.repo.UpdateWallet(ctx, repository.UpdateWalletParams{
-		ID:       walletID,
-		UserID:   userID,
-		Name:     req.Name,
-		Type:     req.Type,
-		Currency: req.Currency,
+		ID:              walletID,
+		UserID:          userID,
+		Name:            req.Name,
+		Type:            req.Type,
+		Currency:        req.Currency,
+		Icon:            req.Icon,
+		IconURL:         req.IconURL.Value,
+		IconURLProvided: req.IconURL.Set,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("service.UpdateWallet: %w", err)

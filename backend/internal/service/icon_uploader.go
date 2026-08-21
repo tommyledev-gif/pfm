@@ -11,15 +11,20 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
-// IconUploader is the storage boundary for user-uploaded category icons
-// (spec: any category avatar the client renders should support a custom
-// png/jpg/svg image, not just the built-in emoji `icon` string). Mirrors
-// EmailSender's shape — CategoryHandler depends on this interface, not the
-// provider, so swapping storage backends later never touches the handler.
+// IconUploader is the storage boundary for user-uploaded entity icons
+// (spec: a Category/Wallet/Budget avatar the client renders should support a
+// custom png/jpg/svg image, not just a free-text emoji string). Mirrors
+// EmailSender's shape — CategoryHandler/WalletHandler/BudgetHandler depend on
+// this interface, not the provider, so swapping storage backends later never
+// touches a handler. keyPrefix (e.g. "category-icons", "wallet-icons",
+// "budget-icons") was added by specs/wallet-budget-icons/plan.md Finding #5
+// so one uploader implementation serves all three entities' distinctly
+// namespaced object keys, instead of three near-duplicate uploader structs.
 type IconUploader interface {
-	// UploadIcon stores data under a random key derived from filename and
-	// returns the publicly-reachable URL to save on the category row.
-	UploadIcon(ctx context.Context, filename, contentType string, data []byte) (string, error)
+	// UploadIcon stores data under a random key (namespaced by keyPrefix,
+	// derived from filename) and returns the publicly-reachable URL to save
+	// on the caller's row.
+	UploadIcon(ctx context.Context, keyPrefix, filename, contentType string, data []byte) (string, error)
 }
 
 // R2Config is the subset of config.Config the R2 uploader needs — passed as
@@ -60,8 +65,8 @@ func NewR2IconUploader(cfg R2Config) (*R2IconUploader, error) {
 	return &R2IconUploader{client: client, cfg: cfg}, nil
 }
 
-func (u *R2IconUploader) UploadIcon(ctx context.Context, filename, contentType string, data []byte) (string, error) {
-	key := fmt.Sprintf("category-icons/%s-%s", uuid.NewString(), sanitizeFilename(filename))
+func (u *R2IconUploader) UploadIcon(ctx context.Context, keyPrefix, filename, contentType string, data []byte) (string, error) {
+	key := fmt.Sprintf("%s/%s-%s", keyPrefix, uuid.NewString(), sanitizeFilename(filename))
 	_, err := u.client.PutObject(ctx, u.cfg.Bucket, key, bytes.NewReader(data), int64(len(data)), minio.PutObjectOptions{
 		ContentType: contentType,
 	})
@@ -89,6 +94,6 @@ func sanitizeFilename(name string) string {
 // convention as LogEmailSender vs. a missing SMTP_HOST.
 type UnconfiguredIconUploader struct{}
 
-func (UnconfiguredIconUploader) UploadIcon(context.Context, string, string, []byte) (string, error) {
+func (UnconfiguredIconUploader) UploadIcon(context.Context, string, string, string, []byte) (string, error) {
 	return "", fmt.Errorf("service.UnconfiguredIconUploader.UploadIcon: icon storage is not configured")
 }

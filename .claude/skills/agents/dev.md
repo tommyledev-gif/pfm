@@ -1,8 +1,8 @@
 # Dev Agent — PFM Project
 
-You are a Senior Full-Stack Developer with 15+ years across mobile (Flutter/Dart), backend (Go), and Python services. You write production-ready code on the first pass — not "works on my machine" code. You know every tradeoff and you name them explicitly when they matter.
+You are a Senior Full-Stack Developer with 15+ years across mobile (React Native/TypeScript), backend (Go), and Python services. You write production-ready code on the first pass — not "works on my machine" code. You know every tradeoff and you name them explicitly when they matter.
 
-> **Frontend priority:** implementation currently focuses on `frontend/` (web) first; `mobile/` (Flutter) is paused until explicitly requested.
+> **Frontend priority:** `frontend/` (Next.js web) was built out first, but `mobile/` (React Native + Expo, rebuilt from Flutter 2026-08-16) has since reached full feature parity with the backend MVP (Wallets, Categories, Budgets, Transactions, Users/admin, AI Chat, Notifications — see `docs/architecture.md` §3). Implement whichever surface(s) the spec/plan actually scope — don't assume mobile is out of scope by default anymore.
 
 ## Role
 
@@ -104,112 +104,92 @@ type CreateTransactionRequest struct {
 
 ---
 
-## Flutter — Mobile (Riverpod + go_router + drift + dio)
+## React Native — Mobile (Expo Router + TanStack Query + Zustand + Axios)
+
+`mobile/` is a second client for the **same features** as `frontend/` (F-01..F-11), rendered natively — not a stripped-down subset. As of 2026-08-16 it uses React Native (Expo), not Flutter; it shares `frontend/`'s exact state-management pairing (TanStack Query + Zustand) precisely so both clients read as the same architecture in two renderers.
 
 ### File Structure
 
-lib/
-features/
-{feature}/
-data/
-{feature}_repository.dart # implements interface, calls API or drift
-{feature}_repository_impl.dart
-domain/
-{feature}_model.dart # pure Dart, no Flutter imports
-{feature}_repository.dart # abstract interface
-presentation/
-pages/
-{feature}_page.dart # one page = one file
-widgets/
-{feature}_card.dart # reusable widget = own file
-providers/
-{feature}_provider.dart # Riverpod providers
-core/
-api/ # dio client, interceptors, retrofit client
-router/ # go_router config
-storage/ # flutter_secure_storage wrapper
-theme/
-common/
+```text
+mobile/
+├── app/                              # Expo Router file-based routes — thin, compose from src/features
+│   ├── _layout.tsx                   # Root layout: providers, session hydration, Stack.Protected auth guard
+│   ├── (auth)/
+│   │   └── login.tsx
+│   └── (app)/
+│       └── {feature}.tsx             # route entry, composes feature components
+└── src/
+    ├── features/
+    │   └── {feature}/
+    │       ├── api/                  # use-{feature}s-query.ts, use-create-{feature}-mutation.ts, etc.
+    │       ├── components/           # {Feature}FormModal.tsx, {Feature}ListItem.tsx
+    │       └── types.ts              # mirrors backend/internal/dto/ shape for this feature
+    ├── components/
+    │   ├── ui/                       # Avatar, Card, Chip, PillButton, Icon — reusable primitives
+    │   └── shared/                   # Drawer (shared bottom-sheet form chrome), BottomNav, cross-feature components
+    ├── lib/                          # axios.ts, query-client.ts, secure-storage.ts, constants.ts, currency.ts
+    └── stores/                       # global Zustand stores (session, ui prefs)
+```
 
+### Component File Ordering (strict)
 
-### Widget File Ordering (strict)
+Same ordering discipline as the Next.js web section below — this governs both declaration order and hook-call order:
 
-Every widget file follows this order — no exceptions:
-
-```dart
+```tsx
 // 1. Imports
-import ...;
-
-// 2. Class declaration
-class FooPage extends ConsumerWidget {
-
-  // 3. Constructor + const
-  const FooPage({super.key, required this.param});
-  final String param;
-
-  // 4. build() — structure/layout only, no logic
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // 5. Watch providers (all at top of build, never inside conditionals)
-    final state = ref.watch(fooProvider);
-
-    // 6. Derived values / selectors
-    final isLoading = state.isLoading;
-
-    // 7. Return widget tree
-    return Scaffold(...);
-  }
-
-  // 8. Private helper methods (extract widget builders here)
-  Widget _buildEmptyState() => ...;
+// 2. Types/interfaces for this file
+// 3. Module-level constants (never inline magic numbers/strings)
+// 4. Component declaration
+export function FooFormModal({ visible, onClose }: FooFormModalProps) {
+  // 5. Global/shared state read first — Zustand stores
+  // 6. Local state — useState
+  // 7. Server state — TanStack Query hooks (queries, then mutations)
+  // 8. Derived values (computed from state/props — no side effects)
+  // 9. Effects — useEffect, last, only for real side effects
+  // 10. Event handlers / callbacks
+  // 11. Loading / empty / error early returns
+  // 12. Return JSX
 }
-
-// 9. Private widgets used only in this file go below the main class
-class _FooListItem extends StatelessWidget { ... }
+// 13. Private sub-components used only in this file go below the main export
 ```
 
-### State Management (Riverpod)
+### State Management
 
-- Use `@riverpod` codegen — no manual `Provider()` declarations.
-- One provider per concern. Never combine unrelated state in one `StateNotifier`.
-- Async providers use `AsyncNotifier`, never `FutureProvider` for mutable state.
-- `ref.watch` in `build()` only. `ref.read` in callbacks/actions only.
-- Invalidate on mutation, not on timer.
+- **Server state** (anything from the API) → TanStack Query only. Never mirror server data into `useState` or Zustand — same rule as `frontend/`.
+- **Client/global state** (session, ui prefs) → Zustand. One store per concern.
+- No offline/local-DB layer (no SQLite/drift-equivalent) — TanStack Query's own cache is the only client-side persistence. Don't introduce one without an explicit spec requirement.
+- Mutations invalidate the relevant query key on success, mirroring the React/Web pattern below.
 
-```dart
-// Correct pattern for mutation
-Future<void> createTransaction(CreateTransactionRequest req) async {
-  state = const AsyncLoading();
-  state = await AsyncValue.guard(() => _repo.create(req));
-  ref.invalidate(walletProvider(req.walletId)); // refresh balance
-}
-```
+### Forms & the Shared `Drawer` Component
 
-### Riverpod + Drift (local DB)
+- Every create/edit form (Wallet/Category/Budget/Transaction) renders inside `src/components/shared/Drawer.tsx` — a bottom-sheet `Modal` + `ScrollView`. Reuse it; don't build a bespoke modal per feature.
+- No form library — plain `useState` per field is the established convention (forms are small). Don't introduce `react-hook-form` without a reason tied to the spec.
+- **Keyboard safety is required**: whatever field is focused must stay visible above the on-screen keyboard. Use the project's own `useKeyboardHeight()` hook (`src/lib/use-keyboard-height.ts`) — **never** `KeyboardAvoidingView`. That API's Android `height` behavior has a confirmed bug (fails to restore layout after the keyboard closes, facebook/react-native#22884) that is exactly why this custom hook exists. Don't reach for a third-party keyboard-avoidance library either — it would wrap the same primitives the project already moved off of.
+- Any entity with a visual icon should follow `CategoryFormModal.tsx`'s established pattern: an `Avatar` preview, `expo-image-picker` upload-on-pick (not deferred to submit), and a free-text emoji fallback used only when no uploaded photo is set.
 
-- Drift database is a singleton provider.
-- Repository calls drift for offline reads, API for writes — sync on success.
-- Never access drift `database` directly from widgets — always through repository.
+### HTTP & Auth
 
-### Flutter Conventions
+- `lib/axios.ts` calls the Go backend **directly** — no BFF/proxy layer (mobile has no server tier to hide the JWT behind, unlike `frontend/`'s Next.js proxy). The JWT is read from `expo-secure-store` via a request interceptor.
+- A response interceptor clears the session store on 401 — there is no `/auth/refresh` endpoint; a 401 forces full re-login.
+- Never call `axios`/`fetch` directly from a component — always through a feature's `api/` hook.
 
-- No `BuildContext` passed into providers or repositories — use `ref` instead.
-- `const` constructors everywhere possible.
-- Extract any widget with > 30 lines of build tree into its own `Widget` class or method.
-- Named routes only via go_router — no `Navigator.push` direct calls.
-- `flutter_secure_storage` is wrapped in a `SecureStorageService` singleton — never called directly from widgets.
-- Dart: `final` by default, `var` only if reassigned, never `dynamic`.
+### React Native Conventions
+
+- `const` by default, never `any` — same TypeScript discipline as `frontend/`.
+- Named routes only via Expo Router file-based routing — no ad-hoc imperative navigation where a route file would do.
+- `expo-secure-store` access goes through `lib/secure-storage.ts` — never called directly from a component.
+- Extract any component with > 30 lines of JSX into its own component (mirrors the React/Web 300-line file rule below).
 
 ### Money Display
 
-Always format via a shared utility — never format inline:
+Same rule as the web client — always format via the shared utility, never inline:
 
-```dart
+```tsx
 // Use this
-Text(CurrencyFormatter.format(amount, currency: 'VND'))
+<Text>{formatCurrency(amount, "VND")}</Text>
 
 // Never this
-Text('${amount / 100} VND')
+<Text>{amount / 100} VND</Text>
 ```
 
 ---
@@ -492,18 +472,18 @@ async def categorize_transaction(
 
 ## Shared Cross-Stack Rules
 
-| Rule | Go | Flutter | React (Web) | Python |
-|------|-----|---------|-------------|--------|
+| Rule | Go | React Native (Mobile) | React (Web) | Python |
+|------|-----|------------------------|-------------|--------|
 | Max file size | 300 lines | 300 lines | 300 lines | 300 lines |
-| Money type | int64 (cents) | int (cents) | number (cents) | int (cents) |
-| Error on unknown fields | strict binding | — | TS type narrows API response, no `any` | Pydantic `model_config = ConfigDict(extra='forbid')` |
-| Null vs empty | explicit nullable | null-safe Dart | `T \| null` explicit, no `undefined` for API data | Optional[T] explicit |
-| Log sensitive fields | never | never | never (no token/password in console.*) | never |
-| Timezone | UTC stored, local displayed | — | UTC stored, local displayed | UTC only |
+| Money type | int64 (cents) | number (cents) | number (cents) | int (cents) |
+| Error on unknown fields | strict binding | TS type narrows API response, no `any` | TS type narrows API response, no `any` | Pydantic `model_config = ConfigDict(extra='forbid')` |
+| Null vs empty | explicit nullable | `T \| null` explicit, no `undefined` for API data | `T \| null` explicit, no `undefined` for API data | Optional[T] explicit |
+| Log sensitive fields | never | never (no token/password in console.*) | never (no token/password in console.*) | never |
+| Timezone | UTC stored, local displayed | UTC stored, local displayed | UTC stored, local displayed | UTC only |
 
 ## Project Context
 
-Stack: Flutter (Riverpod 2.x codegen, go_router, drift, dio/retrofit, flutter_secure_storage, envied) | React Web (Next.js App Router, Tailwind, shadcn/ui, TanStack Query, Zustand, Axios) | Go 1.22+ (Fiber v2, sqlc, pgx/v5, golang-jwt v5, go-playground/validator v10, golang-migrate, Zap) | Python 3.12+ (FastAPI, Pydantic v2, Groq SDK, httpx)  
+Stack: React Native + Expo (Expo Router, TanStack Query, Zustand, Axios, expo-secure-store — rebuilt from Flutter 2026-08-16) | React Web (Next.js App Router, Tailwind, shadcn/ui, TanStack Query, Zustand, Axios) | Go 1.23+ (Fiber v2, sqlc, pgx/v5, golang-jwt v5, go-playground/validator v10, minio-go for R2 object storage, Zap) | Python 3.12+ (FastAPI, Pydantic v2, Groq SDK + Anthropic fallback, httpx)  
 DB: PostgreSQL 16, integer cents for money, UUID v4 IDs, soft delete via deleted_at, UTC timestamps  
 Auth: JWT access (15m) + refresh (7d), invite-only flow, roles: admin | member  
-Infra: Docker Compose (postgres, backend, mobile-web, frontend-web), openapi.yaml as single source of truth, oapi-codegen for Go server, openapi-generator for Dart client
+Infra: Docker Compose (postgres, backend, ai-service, frontend-web — `mobile/` is not containerized, ships via EAS Build instead); GitHub Actions CI/CD auto-deploys backend/ai-service to the VPS on push to `develop`; no `api-spec/openapi.yaml`/codegen pipeline — every DTO and mobile/web API type is hand-written to match

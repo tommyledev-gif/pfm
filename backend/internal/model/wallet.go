@@ -26,6 +26,8 @@ type Wallet struct {
 	Balance   int64
 	Currency  string
 	IsDefault bool
+	Icon      *string
+	IconURL   *string
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt *time.Time

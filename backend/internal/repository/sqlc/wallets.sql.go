@@ -7,9 +7,9 @@ import (
 )
 
 const createWallet = `-- name: CreateWallet :one
-INSERT INTO wallets (user_id, name, type, balance, currency, is_default)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, user_id, name, type, balance, currency, is_default, created_at, updated_at, deleted_at
+INSERT INTO wallets (user_id, name, type, balance, currency, is_default, icon, icon_url)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, user_id, name, type, balance, currency, is_default, created_at, updated_at, deleted_at, icon, icon_url
 `
 
 type CreateWalletParams struct {
@@ -19,14 +19,16 @@ type CreateWalletParams struct {
 	Balance   int64
 	Currency  string
 	IsDefault bool
+	Icon      *string
+	IconURL   *string
 }
 
 func (q *Queries) CreateWallet(ctx context.Context, arg CreateWalletParams) (Wallet, error) {
-	row := q.db.QueryRow(ctx, createWallet, arg.UserID, arg.Name, arg.Type, arg.Balance, arg.Currency, arg.IsDefault)
+	row := q.db.QueryRow(ctx, createWallet, arg.UserID, arg.Name, arg.Type, arg.Balance, arg.Currency, arg.IsDefault, arg.Icon, arg.IconURL)
 	var i Wallet
 	err := row.Scan(
 		&i.ID, &i.UserID, &i.Name, &i.Type, &i.Balance, &i.Currency,
-		&i.IsDefault, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
+		&i.IsDefault, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.Icon, &i.IconURL,
 	)
 	return i, err
 }
@@ -58,7 +60,7 @@ func (q *Queries) ClearDefaultWallet(ctx context.Context, userID uuid.UUID) erro
 }
 
 const listWalletsByUser = `-- name: ListWalletsByUser :many
-SELECT id, user_id, name, type, balance, currency, is_default, created_at, updated_at, deleted_at FROM wallets
+SELECT id, user_id, name, type, balance, currency, is_default, created_at, updated_at, deleted_at, icon, icon_url FROM wallets
 WHERE user_id = $1
   AND deleted_at IS NULL
 ORDER BY is_default DESC, created_at ASC
@@ -76,7 +78,7 @@ func (q *Queries) ListWalletsByUser(ctx context.Context, userID uuid.UUID) ([]Wa
 		var i Wallet
 		if err := rows.Scan(
 			&i.ID, &i.UserID, &i.Name, &i.Type, &i.Balance, &i.Currency,
-			&i.IsDefault, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
+			&i.IsDefault, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.Icon, &i.IconURL,
 		); err != nil {
 			return nil, err
 		}
@@ -89,7 +91,7 @@ func (q *Queries) ListWalletsByUser(ctx context.Context, userID uuid.UUID) ([]Wa
 }
 
 const getWalletByID = `-- name: GetWalletByID :one
-SELECT id, user_id, name, type, balance, currency, is_default, created_at, updated_at, deleted_at FROM wallets
+SELECT id, user_id, name, type, balance, currency, is_default, created_at, updated_at, deleted_at, icon, icon_url FROM wallets
 WHERE id = $1
   AND deleted_at IS NULL
 LIMIT 1
@@ -101,7 +103,7 @@ func (q *Queries) GetWalletByID(ctx context.Context, id uuid.UUID) (Wallet, erro
 	var i Wallet
 	err := row.Scan(
 		&i.ID, &i.UserID, &i.Name, &i.Type, &i.Balance, &i.Currency,
-		&i.IsDefault, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
+		&i.IsDefault, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.Icon, &i.IconURL,
 	)
 	return i, err
 }
@@ -109,30 +111,35 @@ func (q *Queries) GetWalletByID(ctx context.Context, id uuid.UUID) (Wallet, erro
 const updateWallet = `-- name: UpdateWallet :one
 UPDATE wallets
 SET
-    name       = COALESCE($3, name),
-    type       = COALESCE($4, type),
-    currency   = COALESCE($5, currency),
-    updated_at = NOW()
+    name             = COALESCE($3, name),
+    type             = COALESCE($4, type),
+    currency         = COALESCE($5, currency),
+    icon             = COALESCE($6, icon),
+    icon_url         = CASE WHEN $7::bool THEN $8 ELSE icon_url END,
+    updated_at       = NOW()
 WHERE id = $1
   AND user_id = $2
   AND deleted_at IS NULL
-RETURNING id, user_id, name, type, balance, currency, is_default, created_at, updated_at, deleted_at
+RETURNING id, user_id, name, type, balance, currency, is_default, created_at, updated_at, deleted_at, icon, icon_url
 `
 
 type UpdateWalletParams struct {
-	ID       uuid.UUID
-	UserID   uuid.UUID
-	Name     *string
-	Type     *string
-	Currency *string
+	ID              uuid.UUID
+	UserID          uuid.UUID
+	Name            *string
+	Type            *string
+	Currency        *string
+	Icon            *string
+	IconURLProvided bool
+	IconURL         *string
 }
 
 func (q *Queries) UpdateWallet(ctx context.Context, arg UpdateWalletParams) (Wallet, error) {
-	row := q.db.QueryRow(ctx, updateWallet, arg.ID, arg.UserID, arg.Name, arg.Type, arg.Currency)
+	row := q.db.QueryRow(ctx, updateWallet, arg.ID, arg.UserID, arg.Name, arg.Type, arg.Currency, arg.Icon, arg.IconURLProvided, arg.IconURL)
 	var i Wallet
 	err := row.Scan(
 		&i.ID, &i.UserID, &i.Name, &i.Type, &i.Balance, &i.Currency,
-		&i.IsDefault, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
+		&i.IsDefault, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.Icon, &i.IconURL,
 	)
 	return i, err
 }
@@ -143,7 +150,7 @@ SET is_default = true, updated_at = NOW()
 WHERE id = $1
   AND user_id = $2
   AND deleted_at IS NULL
-RETURNING id, user_id, name, type, balance, currency, is_default, created_at, updated_at, deleted_at
+RETURNING id, user_id, name, type, balance, currency, is_default, created_at, updated_at, deleted_at, icon, icon_url
 `
 
 func (q *Queries) SetDefaultWallet(ctx context.Context, id uuid.UUID, userID uuid.UUID) (Wallet, error) {
@@ -151,7 +158,7 @@ func (q *Queries) SetDefaultWallet(ctx context.Context, id uuid.UUID, userID uui
 	var i Wallet
 	err := row.Scan(
 		&i.ID, &i.UserID, &i.Name, &i.Type, &i.Balance, &i.Currency,
-		&i.IsDefault, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
+		&i.IsDefault, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.Icon, &i.IconURL,
 	)
 	return i, err
 }
@@ -162,7 +169,7 @@ SET balance = balance - $2, updated_at = NOW()
 WHERE id = $1
   AND deleted_at IS NULL
   AND balance >= $2
-RETURNING id, user_id, name, type, balance, currency, is_default, created_at, updated_at, deleted_at
+RETURNING id, user_id, name, type, balance, currency, is_default, created_at, updated_at, deleted_at, icon, icon_url
 `
 
 type DecrementWalletBalanceIfSufficientParams struct {
@@ -179,7 +186,7 @@ func (q *Queries) DecrementWalletBalanceIfSufficient(ctx context.Context, arg De
 	var i Wallet
 	err := row.Scan(
 		&i.ID, &i.UserID, &i.Name, &i.Type, &i.Balance, &i.Currency,
-		&i.IsDefault, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
+		&i.IsDefault, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.Icon, &i.IconURL,
 	)
 	return i, err
 }
@@ -189,7 +196,7 @@ UPDATE wallets
 SET balance = balance + $2, updated_at = NOW()
 WHERE id = $1
   AND deleted_at IS NULL
-RETURNING id, user_id, name, type, balance, currency, is_default, created_at, updated_at, deleted_at
+RETURNING id, user_id, name, type, balance, currency, is_default, created_at, updated_at, deleted_at, icon, icon_url
 `
 
 type AdjustWalletBalanceParams struct {
@@ -205,7 +212,7 @@ func (q *Queries) AdjustWalletBalance(ctx context.Context, arg AdjustWalletBalan
 	var i Wallet
 	err := row.Scan(
 		&i.ID, &i.UserID, &i.Name, &i.Type, &i.Balance, &i.Currency,
-		&i.IsDefault, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
+		&i.IsDefault, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.Icon, &i.IconURL,
 	)
 	return i, err
 }

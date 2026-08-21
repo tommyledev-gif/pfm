@@ -1,16 +1,20 @@
 import { useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 
+import { Avatar } from "@/components/ui/Avatar";
 import { Drawer } from "@/components/shared/Drawer";
 import { PillButton } from "@/components/ui/PillButton";
 import { TrashIcon } from "@/components/ui/Icon";
 import { getErrorMessage } from "@/lib/axios";
+import { colorForCategory } from "@/lib/category-color";
 import { toCents, toMajorUnits } from "@/lib/currency";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useCreateBudgetMutation } from "@/features/budgets/api/use-create-budget-mutation";
 import { useUpdateBudgetMutation } from "@/features/budgets/api/use-update-budget-mutation";
 import { useDeleteBudgetMutation } from "@/features/budgets/api/use-delete-budget-mutation";
+import { useUploadBudgetIconMutation } from "@/features/budgets/api/use-upload-budget-icon-mutation";
 import { Budget } from "@/features/budgets/types";
 import { WalletCurrency } from "@/lib/constants";
 
@@ -26,14 +30,20 @@ interface NewBudgetModalProps {
 // Insights → Budgets tab "+ New budget" action (README), extended to also
 // handle editing an existing budget's limit (tap a BudgetCard) — kept as one
 // Modal sheet rather than two near-identical ones.
+// Icon picker mirrors CategoryFormModal.tsx's pattern exactly
+// (specs/wallet-budget-icons/spec.md US-03/US-04) — independent of the
+// selected Category's own icon.
 export function NewBudgetModal({ visible, onClose, currency, editingBudget }: NewBudgetModalProps) {
   const isEditing = Boolean(editingBudget);
   const categories = useCategoriesQuery("expense");
   const createBudget = useCreateBudgetMutation();
   const updateBudget = useUpdateBudgetMutation();
   const deleteBudget = useDeleteBudgetMutation();
+  const uploadIcon = useUploadBudgetIconMutation();
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
+  const [icon, setIcon] = useState("");
+  const [iconUrl, setIconUrl] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (!visible) return;
@@ -41,21 +51,50 @@ export function NewBudgetModal({ visible, onClose, currency, editingBudget }: Ne
       setCategoryId(editingBudget.category_id);
       const existingLimit = editingBudget.limits.find((l) => l.currency === currency);
       setAmount(existingLimit ? String(toMajorUnits(existingLimit.amount_limit)) : "");
+      setIcon(editingBudget.icon ?? "");
+      setIconUrl(editingBudget.icon_url ?? undefined);
     } else {
       setCategoryId(null);
       setAmount("");
+      setIcon("");
+      setIconUrl(undefined);
     }
   }, [visible, editingBudget, currency]);
 
   const mutation = isEditing ? updateBudget : createBudget;
 
+  const pickIcon = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) return;
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.8,
+    });
+    if (result.canceled) return;
+
+    const asset = result.assets[0];
+    const mimeType = asset.mimeType ?? "image/jpeg";
+    const name = asset.fileName ?? `icon.${mimeType.split("/")[1] ?? "jpg"}`;
+    uploadIcon.mutate(
+      { uri: asset.uri, name, mimeType },
+      { onSuccess: (data) => setIconUrl(data.icon_url) },
+    );
+  };
+
   const submit = () => {
     if (!categoryId || !amount) return;
     const limits = { [currency]: toCents(Number(amount)) };
     if (isEditing && editingBudget) {
-      updateBudget.mutate({ id: editingBudget.id, body: { limits } }, { onSuccess: onClose });
+      updateBudget.mutate(
+        { id: editingBudget.id, body: { limits, icon: icon || undefined, icon_url: iconUrl } },
+        { onSuccess: onClose },
+      );
     } else {
-      createBudget.mutate({ category_id: categoryId, limits }, { onSuccess: onClose });
+      createBudget.mutate(
+        { category_id: categoryId, limits, icon: icon || undefined, icon_url: iconUrl },
+        { onSuccess: onClose },
+      );
     }
   };
 
@@ -71,11 +110,36 @@ export function NewBudgetModal({ visible, onClose, currency, editingBudget }: Ne
     ]);
   };
 
-  const activeError = mutation.isError ? mutation.error : deleteBudget.isError ? deleteBudget.error : null;
+  const activeError = mutation.isError
+    ? mutation.error
+    : deleteBudget.isError
+      ? deleteBudget.error
+      : uploadIcon.isError
+        ? uploadIcon.error
+        : null;
 
   return (
     <Drawer visible={visible} onClose={onClose}>
       <Text style={styles.title}>{isEditing ? "Edit budget" : "New budget"}</Text>
+
+      <View style={styles.iconPickerRow}>
+        <View style={styles.iconPreview}>
+          {uploadIcon.isPending ? (
+            <ActivityIndicator color={colors.textPrimary} />
+          ) : (
+            <Avatar
+              name={editingBudget?.category_name ?? "?"}
+              color={editingBudget ? colorForCategory(editingBudget.category_id) : colors.lavender}
+              size={56}
+              icon={icon}
+              iconUrl={iconUrl}
+            />
+          )}
+        </View>
+        <Pressable onPress={pickIcon} disabled={uploadIcon.isPending} hitSlop={8}>
+          <Text style={styles.changePhoto}>{iconUrl ? "Change photo" : "Upload photo"}</Text>
+        </Pressable>
+      </View>
 
       <Text style={styles.label}>Category</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
@@ -91,6 +155,15 @@ export function NewBudgetModal({ visible, onClose, currency, editingBudget }: Ne
           </Pressable>
         ))}
       </ScrollView>
+
+      <Text style={styles.label}>Emoji icon (used when no photo is set)</Text>
+      <TextInput
+        value={icon}
+        onChangeText={setIcon}
+        placeholder="e.g. 💸"
+        placeholderTextColor={colors.textMuted}
+        style={styles.input}
+      />
 
       <Text style={styles.label}>Monthly limit ({currency})</Text>
       <TextInput
@@ -129,6 +202,9 @@ export function NewBudgetModal({ visible, onClose, currency, editingBudget }: Ne
 
 const styles = StyleSheet.create({
   title: { ...typography.title, color: colors.textPrimary },
+  iconPickerRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  iconPreview: { width: 56, height: 56, alignItems: "center", justifyContent: "center" },
+  changePhoto: { ...typography.label, color: colors.green },
   label: { ...typography.caption, color: colors.textSecondary },
   categoryRow: { gap: spacing.sm },
   categoryChip: {

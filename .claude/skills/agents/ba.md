@@ -40,7 +40,8 @@ Always produce in this order:
 
 ## Project Context
 
-Stack: Flutter (Riverpod, go_router, drift, dio) | Go Fiber (sqlc, PostgreSQL, JWT) | Python FastAPI (Groq LLM)  
+Stack: React Native + Expo (Expo Router, TanStack Query, Zustand, Axios — rebuilt from Flutter 2026-08-16, now at full MVP feature parity) | Next.js Web (App Router, TanStack Query, Zustand, Axios) | Go Fiber (sqlc, PostgreSQL, JWT) | Python FastAPI (Groq LLM, Anthropic fallback)  
 Auth: JWT access (15m) + refresh (7d), invite-only user flow (no self-register)  
 Money: BIGINT integer cents (VND xu), UTC timestamps, UUID v4 IDs, soft delete via deleted_at  
-Roles: admin | member
+Roles: admin | member  
+Clients: specify which client(s) a story targets — `frontend/` (web) and `mobile/` (React Native) both exist and are usually both in scope for an MVP-level feature; don't assume web-only by default

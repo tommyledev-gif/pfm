@@ -48,6 +48,8 @@ type Budget struct {
 	StartDate     time.Time
 	Limits        []BudgetLimit
 	OverallStatus BudgetStatus
+	Icon          *string
+	IconURL       *string
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 	DeletedAt     *time.Time

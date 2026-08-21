@@ -32,6 +32,7 @@ Software Requirement Specification (SRS)
   - [UXR-01: Clarity](#uxr-01-clarity)
   - [UXR-02: Fast Onboarding](#uxr-02-fast-onboarding)
   - [UXR-03: Immediate Feedback](#uxr-03-immediate-feedback)
+  - [UXR-04: Keyboard-Safe Input](#uxr-04-keyboard-safe-input)
 - [5. Business Flows (BF)](#5-business-flows-bf)
   - [BF-01: Main Business Flow – End-to-End User Journey](#bf-01-main-business-flow-end-to-end-user-journey)
   - [BF-02: Supporting BF – Wallet Management](#bf-02-supporting-bf-wallet-management)
@@ -191,6 +192,8 @@ The System shall allow Users to **create and manage one or more Wallets** repres
 Each wallet shall store basic information such as Wallet **name**, **type**, and **current balance**.  
 Wallets are used as the main source or destination for all financial transactions.
 
+Each Wallet shall optionally support a visual icon (an emoji/short label, or an uploaded photo) for quick recognition in lists, consistent with the icon support already provided by Category Management (FR-03). *(Not yet implemented — see SDS §12.1 Known Issues Log, Item 3.)*
+
 ## FR-02: Transaction Management {#fr-02-transaction-management}
 
 The System shall allow Users to **record financial Transactions**, including **both income and expense Transactions**.
@@ -204,11 +207,15 @@ The System shall allow Users to **classify Transactions into User-defined Catego
 
 Categories are used to organize Transactions and support budgeting and reporting features.
 
+Each Category shall support a visual icon: a free-text emoji/short label, or an uploaded photo that the User can replace or remove after upload. The uploaded photo, when set, takes display precedence over the emoji/text.
+
 ## FR-04: Budget Tracking {#fr-04-budget-tracking}
 
 The System shall allow Users to **define a Budget for each Category** within **a specific period** (e.g. monthly).
 
 The System shall track actual spending against the defined Budget and indicate whether the User is within or exceeding the Budget.
+
+Each Budget shall optionally support its own visual icon (independent of its Category's icon), for quick recognition in the Budget list. *(Not yet implemented — see SDS §12.1 Known Issues Log, Item 3.)*
 
 ## FR-05: Financial Goal Tracking {#fr-05-financial-goal-tracking}
 
@@ -276,6 +283,8 @@ The System shall **operate reliably during normal usage** and handle common User
 
 User data should remain consistent and accurate even when the application is restarted or temporarily unavailable.
 
+Error responses shall accurately reflect the real failure condition — correct HTTP status and a matching error code — including routing-level failures (not-found, method-not-allowed). A User or operator must never see a generic internal-error response for a condition that is not actually an internal error, since that hides the real cause from both diagnosis and the client's own handling logic.
+
 # 4. User Experience Requirements (UXR) {#4-user-experience-requirements-uxr}
 
 ## UXR-01: Clarity {#uxr-01-clarity}
@@ -295,6 +304,12 @@ A first-time User should be able to create a Wallet and record the first Transac
 The System shall **provide clear and immediate feedback for User actions**.
 
 After adding or editing data, Users should instantly see updated balances, budgets, or progress indicators.
+
+## UXR-04: Keyboard-Safe Input {#uxr-04-keyboard-safe-input}
+
+The System shall ensure that whichever field a User is actively typing into **remains visible above the on-screen keyboard**, on both iOS and Android, in every form (Wallet, Category, Budget, Transaction, AI Chat).
+
+A User should never have to guess what they typed because the keyboard is covering the input.
 
 # 5. Business Flows (BF) {#5-business-flows-bf}
 

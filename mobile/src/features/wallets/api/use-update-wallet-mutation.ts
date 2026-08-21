@@ -10,6 +10,8 @@ export interface UpdateWalletRequest {
   name?: string;
   type?: WalletType;
   currency?: WalletCurrency;
+  icon?: string;
+  icon_url?: string;
 }
 
 export function useUpdateWalletMutation() {

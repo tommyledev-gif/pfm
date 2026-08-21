@@ -2,13 +2,33 @@ package handler
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/go-playground/validator/v10"
 
 	"github.com/example/pfm/backend/internal/common"
+	"github.com/example/pfm/backend/internal/dto"
 )
 
 var validate = validator.New()
+
+func init() {
+	// Lets `validate:"omitempty,max=N"` on a dto.OptionalString field
+	// validate its inner Value exactly like a plain *string would —
+	// "absent" (Set=false) and "explicit null" (Value=nil) both extract to a
+	// nil interface, which omitempty treats as empty and skips further rules,
+	// same as it already does for a nil *string
+	// (specs/wallet-budget-icons/plan.md Finding #1: OptionalString exists so
+	// the *service* layer can still tell those two cases apart — validator
+	// intentionally does not need to).
+	validate.RegisterCustomTypeFunc(func(field reflect.Value) interface{} {
+		opt, ok := field.Interface().(dto.OptionalString)
+		if !ok || !opt.Set || opt.Value == nil {
+			return nil
+		}
+		return *opt.Value
+	}, dto.OptionalString{})
+}
 
 // fieldError is one entry in a 400 response's `details` array — every
 // failing field is reported at once, not just the first (implementation-checklist:

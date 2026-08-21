@@ -17,6 +17,8 @@ type WalletResponse struct {
 	Balance   int64     `json:"balance"`
 	Currency  string    `json:"currency"`
 	IsDefault bool      `json:"is_default"`
+	Icon      *string   `json:"icon"`
+	IconURL   *string   `json:"icon_url"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -29,6 +31,8 @@ func NewWalletResponse(w *model.Wallet) WalletResponse {
 		Balance:   w.Balance,
 		Currency:  w.Currency,
 		IsDefault: w.IsDefault,
+		Icon:      w.Icon,
+		IconURL:   w.IconURL,
 		CreatedAt: w.CreatedAt,
 		UpdatedAt: w.UpdatedAt,
 	}

@@ -151,6 +151,8 @@ func (f *fakeWalletRepo) CreateWallet(_ context.Context, _ pgx.Tx, arg repositor
 		Balance:   arg.Balance,
 		Currency:  arg.Currency,
 		IsDefault: arg.IsDefault,
+		Icon:      arg.Icon,
+		IconURL:   arg.IconURL,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -207,6 +209,16 @@ func (f *fakeWalletRepo) UpdateWallet(_ context.Context, arg repository.UpdateWa
 	}
 	if arg.Currency != nil {
 		w.Currency = *arg.Currency
+	}
+	if arg.Icon != nil {
+		w.Icon = arg.Icon
+	}
+	// IconURL is only ever applied when IconURLProvided is true — a nil
+	// IconURL with IconURLProvided=true means "clear the photo", not "leave
+	// it alone" (dto.OptionalString / specs/wallet-budget-icons/plan.md
+	// Finding #1), mirroring the real CASE-based SQL exactly.
+	if arg.IconURLProvided {
+		w.IconURL = arg.IconURL
 	}
 	w.UpdatedAt = time.Now().UTC()
 	cp := *w

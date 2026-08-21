@@ -89,6 +89,19 @@ var CategoryIconAllowedContentTypes = map[string]bool{
 	"image/svg+xml": true,
 }
 
+// Icon upload object-storage key prefixes (service.IconUploader) — one per
+// entity so Category/Wallet/Budget uploads land in distinctly namespaced R2
+// keys despite sharing one uploader implementation
+// (specs/wallet-budget-icons/plan.md Finding #5). Wallet/Budget reuse
+// CategoryIconMaxUploadBytes/CategoryIconAllowedContentTypes as-is — a
+// per-entity rename was considered and deliberately deferred (same plan.md
+// finding) since the limits are identical across all three today.
+const (
+	CategoryIconKeyPrefix = "category-icons"
+	WalletIconKeyPrefix   = "wallet-icons"
+	BudgetIconKeyPrefix   = "budget-icons"
+)
+
 // Budgets (F-05).
 const (
 	// BudgetPeriodMonthly is the only accepted `period` value in MVP

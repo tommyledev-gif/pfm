@@ -1,6 +1,6 @@
 -- name: CreateBudget :one
-INSERT INTO budgets (user_id, category_id, period, start_date)
-VALUES ($1, $2, $3, $4)
+INSERT INTO budgets (user_id, category_id, period, start_date, icon, icon_url)
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING *;
 
 -- name: InsertBudgetLimit :exec
@@ -50,15 +50,25 @@ SELECT EXISTS (
       AND deleted_at IS NULL
 ) AS "exists";
 
--- name: TouchBudgetUpdatedAt :exec
--- Bumps updated_at when only the child budget_limits rows changed (US-04
--- step 5) — scoped by id + user_id as a redundant ownership guard, though
--- the caller must already have verified ownership via GetBudgetByID first.
+-- name: UpdateBudgetFields :one
+-- Updates a Budget's icon/icon_url (independent of `limits`, which has its
+-- own full-replace path via ReplaceBudgetLimits) and always bumps
+-- updated_at — supersedes the narrower TouchBudgetUpdatedAt this replaced,
+-- since every Update now needs an updated_at bump regardless of which
+-- fields changed. Scoped by id + user_id as a redundant ownership guard,
+-- though the caller must already have verified ownership via GetBudgetByID
+-- first. icon_url uses the same presence-flag CASE as UpdateWallet
+-- (specs/wallet-budget-icons/plan.md Finding #1) — not COALESCE, so an
+-- explicit `null` can actually clear a previously set photo.
 UPDATE budgets
-SET updated_at = NOW()
+SET
+    icon             = COALESCE(sqlc.narg('icon'), icon),
+    icon_url         = CASE WHEN sqlc.arg('icon_url_provided')::bool THEN sqlc.narg('icon_url') ELSE icon_url END,
+    updated_at       = NOW()
 WHERE id = $1
   AND user_id = $2
-  AND deleted_at IS NULL;
+  AND deleted_at IS NULL
+RETURNING *;
 
 -- name: SoftDeleteBudget :one
 UPDATE budgets

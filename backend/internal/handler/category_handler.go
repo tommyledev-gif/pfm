@@ -174,7 +174,7 @@ func (h *CategoryHandler) UploadIcon(c *fiber.Ctx) error {
 		return response.Error(c, h.logger, common.NewInvalidInputError("could not read uploaded file"))
 	}
 
-	iconURL, err := h.iconUploader.UploadIcon(c.Context(), fileHeader.Filename, contentType, data)
+	iconURL, err := h.iconUploader.UploadIcon(c.Context(), common.CategoryIconKeyPrefix, fileHeader.Filename, contentType, data)
 	if err != nil {
 		h.logger.Error("icon upload failed", zap.Error(err))
 		if _, unconfigured := h.iconUploader.(service.UnconfiguredIconUploader); unconfigured {

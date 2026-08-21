@@ -1,6 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { Avatar } from "@/components/ui/Avatar";
 import { ChevronRightIcon } from "@/components/ui/Icon";
+import { colorForCategory } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
@@ -18,6 +20,7 @@ export function WalletListItem({ wallet, onPress }: { wallet: Wallet; onPress: (
 
   return (
     <Pressable style={styles.row} onPress={onPress}>
+      <Avatar name={wallet.name} color={colorForCategory(wallet.id)} size={40} icon={wallet.icon} iconUrl={wallet.icon_url} />
       <View style={styles.info}>
         <View style={styles.titleRow}>
           <Text style={styles.name}>{wallet.name}</Text>
