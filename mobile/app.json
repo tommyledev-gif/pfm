@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "PFM",
+    "name": "Budgest",
     "slug": "pfm-mobile",
     "scheme": "pfm",
     "version": "1.0.0",
@@ -12,7 +12,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#050B15",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -31,8 +31,16 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "PFM accesses your photos so you can set a custom category icon.",
+          "photosPermission": "Budgest accesses your photos so you can set a custom category icon.",
           "cameraPermission": false
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#050B15",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 220
         }
       ]
     ],

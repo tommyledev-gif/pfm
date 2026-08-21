@@ -10,7 +10,7 @@ export default function LoginScreen() {
       <StatusBar style="light" />
       <View style={styles.header}>
         <SparkleIcon size={28} />
-        <Text style={styles.title}>PFM</Text>
+        <Text style={styles.title}>Budgest</Text>
         <Text style={styles.subtitle}>Log in to manage your money</Text>
       </View>
       <LoginForm />

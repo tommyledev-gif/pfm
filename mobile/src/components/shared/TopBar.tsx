@@ -15,7 +15,7 @@ export function TopBar({ userName }: { userName: string }) {
 
   return (
     <View style={styles.row}>
-      <Text style={styles.logo}>PFM</Text>
+      <Text style={styles.logo}>Budgest</Text>
       <View style={styles.actions}>
         <Pressable onPress={() => router.push("/notifications")} style={styles.bellButton} hitSlop={8}>
           <BellIcon size={22} color={colors.textPrimary} />
