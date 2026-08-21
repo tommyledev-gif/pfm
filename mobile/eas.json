@@ -10,13 +10,13 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://api.app.example.com/api/v1"
+        "EXPO_PUBLIC_API_BASE_URL": "https://app.example.com/api/v1"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://api.app.example.com/api/v1"
+        "EXPO_PUBLIC_API_BASE_URL": "https://app.example.com/api/v1"
       }
     }
   },
