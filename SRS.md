@@ -21,6 +21,7 @@ Software Requirement Specification (SRS)
   - [FR-07: Financial Reporting](#fr-07-financial-reporting)
   - [FR-08: Data Overview Dashboard](#fr-08-data-overview-dashboard)
   - [FR-09: AI Chat Assistance](#fr-09-ai-chat-assistance)
+  - [FR-10: AI-Assisted Budget Setup](#fr-10-ai-assisted-budget-setup)
 - [3. Non-Functional Requirements (NFR)](#3-non-functional-requirements-nfr)
   - [NFR-01: Performance](#nfr-01-performance)
   - [NFR-02: Availability](#nfr-02-availability)
@@ -44,6 +45,7 @@ Software Requirement Specification (SRS)
   - [BF-08: Supporting BF – Reporting and Dashboard](#bf-08-supporting-bf-reporting-and-dashboard)
   - [BF-09: Supporting BF – Notification Handling](#bf-09-supporting-bf-notification-handling)
   - [BF-10: Supporting BF – AI Chat Assistant](#bf-10-supporting-bf-ai-chat-assistant)
+  - [BF-11: Supporting BF – AI Budget Setup Wizard](#bf-11-supporting-bf-ai-budget-setup-wizard)
 - [6. Features and User Stories (US)](#6-features-and-user-stories-us)
   - [Feature-01: User Management](#feature-01-user-management)
     - [US-01: Register a User [MVP]](#us-01-register-a-user-mvp)
@@ -103,6 +105,12 @@ Software Requirement Specification (SRS)
     - [US-02: Edit a Transaction via Chat [MVP]](#us-02-edit-a-transaction-via-chat-mvp)
     - [US-03: Query Spending via Chat [MVP]](#us-03-query-spending-via-chat-mvp)
     - [US-04: General Financial Advice [Post-MVP]](#us-04-general-financial-advice-post-mvp)
+  - [Feature-13: AI Budget Setup Wizard](#feature-13-ai-budget-setup-wizard)
+    - [US-01: Start the Wizard from a Quick Action [Release 1]](#us-01-start-the-wizard-from-a-quick-action-release-1)
+    - [US-02: Start the Wizard from a Chat Message [Release 1]](#us-02-start-the-wizard-from-a-chat-message-release-1)
+    - [US-03: Select Categories and Spending Preferences [Release 1]](#us-03-select-categories-and-spending-preferences-release-1)
+    - [US-04: Review the AI-Proposed Budget Allocation [Release 1]](#us-04-review-the-ai-proposed-budget-allocation-release-1)
+    - [US-05: Confirm and Create Budgets in Bulk [Release 1]](#us-05-confirm-and-create-budgets-in-bulk-release-1)
 - [Feature-level Release (Overview)](#feature-level-release-overview)
 
 # 1. Introduction – Personal Finance Management (PFM) {#1-introduction-personal-finance-management-pfm}
@@ -248,6 +256,12 @@ The dashboard may include current balances, recent Transactions, Budget status, 
 The System shall provide a conversational (chat-based) interface that allows Users to **create, edit, and query Transactions using natural-language messages**, as an alternative to manual form entry.
 
 The AI shall resolve messages against the User's own Wallets and Categories, and shall require **explicit User confirmation** before any Transaction is created or modified. The AI shall not bypass the validation and ownership rules enforced by Transaction Management (FR-02).
+
+## FR-10: AI-Assisted Budget Setup {#fr-10-ai-assisted-budget-setup}
+
+The System shall let Users set up or replace their Budgets (FR-04) for a period through a guided, AI-assisted flow — entering income and selecting Categories and desired spending levels — instead of creating each Budget one at a time.
+
+Based on the User's income and per-Category preferences, the AI shall propose a spending allocation across the selected Categories, following a fixed, rule-based allocation formula rather than free-form generation, and shall present it for the User's review and adjustment before anything is saved. Creating the proposed Budgets shall require **explicit User confirmation** and shall replace the User's existing Budgets for the current period atomically, through the same validation and ownership rules enforced by Budget Tracking (FR-04).
 
 # 3. Non-Functional Requirements (NFR) {#3-non-functional-requirements-nfr}
 
@@ -407,6 +421,16 @@ This flow describes how Users interact with the System through natural-language 
 3. For a proposed create/edit action, the System **shows a confirmation card**; the User **approves or cancels** it.  
 4. Upon approval, the System **creates or updates the Transaction** through the standard Transaction Management flow (FR-02).  
 5. The User **reviews the resulting Transaction** from the standard Transaction list.
+
+## BF-11: Supporting BF – AI Budget Setup Wizard {#bf-11-supporting-bf-ai-budget-setup-wizard}
+
+This flow describes how Users set up their Budgets through the AI-assisted wizard instead of the manual Budget Management flow (BF-04).
+
+1. The User **opens the Budget Setup wizard**, either from a quick action or by asking the AI Chat Assistant to help plan a Budget.  
+2. The User **enters their income for the period and selects which Categories to budget for**, along with a desired spending level for each.  
+3. The System **proposes a spending allocation** across the selected Categories and **shows it to the User for review**.  
+4. The User **adjusts individual amounts if desired**, then **confirms**.  
+5. The System **creates the proposed Budgets**, replacing any existing Budgets for the User, through the standard Budget Management flow (FR-04).
 
 # 6. Features and User Stories (US) {#6-features-and-user-stories-us}
 
@@ -737,6 +761,109 @@ The User Stories of this feature are described below.
 *I want to ask the AI for general personal-finance guidance*  
 *so that I get direction on managing my spending, based on my own recorded data.*
 
+## Feature-13: AI Budget Setup Wizard {#feature-13-ai-budget-setup-wizard}
+
+Lets a User set up or replace their Budgets (Feature-05) for a period through a guided flow inside the AI Chat surface, instead of creating each Budget one at a time. The User provides income and, for each Category they want to budget for, a desired spending level; the System proposes a concrete spending allocation the User can review and adjust before anything is saved. All AI-proposed Budgets require **explicit User confirmation**, and creating them goes through the same rules as manual Budget Management (Feature-05).  
+The User Stories of this feature are described below.
+
+### US-01: Start the Wizard from a Quick Action [Release 1] {#us-01-start-the-wizard-from-a-quick-action-release-1}
+
+*As a User*  
+*I want to open the Budget Setup wizard directly from the AI Chat screen*  
+*so that I can set up my Budgets without first describing what I want in a chat message.*
+
+  **Background**:  
+    **Given** the User is logged in  
+     And the User has at least one Wallet
+
+  **Scenario: Open the wizard and see it pre-filled with existing budgets**  
+    **Given** the User already has a Budget for Category "Food"  
+    **When** the User taps the "Set up Budget" quick action on the AI Chat screen  
+    **Then** the System opens the Budget Setup wizard  
+     And Category "Food" is pre-selected, showing its current Budget amount  
+     And no chat message is recorded for opening the wizard this way
+
+### US-02: Start the Wizard from a Chat Message [Release 1] {#us-02-start-the-wizard-from-a-chat-message-release-1}
+
+*As a User*  
+*I want to ask the AI, in my own words, to help me plan my Budgets*  
+*so that I can start the wizard the same way I already talk to the AI about my transactions.*
+
+  **Scenario: Open the wizard from a natural-language request**  
+    **Given** the User is on the "AI Chat" screen  
+    **When** the User sends the message "giúp tôi set budget"  
+    **Then** the System recognizes the request as a Budget-setup intent  
+     And the System replies with a tappable card instead of plain text  
+    **When** the User taps the card  
+    **Then** the System opens the Budget Setup wizard  
+     And the chat message and the AI's reply are recorded as usual
+
+### US-03: Select Categories and Spending Preferences [Release 1] {#us-03-select-categories-and-spending-preferences-release-1}
+
+*As a User*  
+*I want to enter my income and choose which Categories to budget for, with how much I want to spend on each*  
+*so that the System has enough information to propose a sensible allocation.*
+
+  **Scenario: Provide income, categories, and spending levels**  
+    **Given** the User is in the wizard  
+    **When** the User enters an income amount for the period  
+     And the User selects one or more Categories to budget for  
+     And the User sets a spending level for each selected Category (e.g. "Little", "Normal", "A lot", or "Let the AI decide")  
+    **Then** the System accepts the input and proceeds to propose an allocation
+
+  **Scenario: Reject when no Category is selected**  
+    **When** the User proceeds without selecting any Category  
+    **Then** the System does not proceed  
+     And the System shows validation error "Please select at least one category"
+
+  **Scenario: Reject when income is not greater than zero**  
+    **When** the User enters an income amount of 0  
+    **Then** the System does not proceed  
+     And the System shows validation error "Income must be greater than 0"
+
+### US-04: Review the AI-Proposed Budget Allocation [Release 1] {#us-04-review-the-ai-proposed-budget-allocation-release-1}
+
+*As a User*  
+*I want to see how the System proposes to split my income across my chosen Categories, and adjust any amount*  
+*so that the final Budgets match my own judgment, not just the System's suggestion.*
+
+  **Scenario: Review a proposal and adjust an amount**  
+    **Given** the System has proposed an allocation for the User's selected Categories  
+    **When** the User views the proposal  
+    **Then** the System shows, for each Category, a proposed amount and its share of the User's income  
+     And the System shows the portion of income left unallocated  
+    **When** the User changes the proposed amount for one Category  
+    **Then** the System updates the unallocated portion accordingly  
+     And does not need to contact the AI again to reflect the change
+
+### US-05: Confirm and Create Budgets in Bulk [Release 1] {#us-05-confirm-and-create-budgets-in-bulk-release-1}
+
+*As a User*  
+*I want to confirm the reviewed allocation and have all of my Budgets created at once*  
+*so that I don't have to repeat the same steps once per Category.*
+
+  **Background**:  
+    **Given** the User has reviewed a proposed allocation for Categories "Food" and "Transport"  
+     And the User already has an existing Budget for Category "Shopping"
+
+  **Scenario: Confirm and replace existing budgets**  
+    **When** the User taps "Confirm and Create Budgets"  
+    **Then** the System creates a Budget for "Food" and a Budget for "Transport" per the reviewed amounts  
+     And the System removes the User's existing Budget for "Shopping", since it was not part of this wizard run  
+     And the System shows a success message with the number of Budgets created
+
+  **Scenario: Do not save anything when the User dismisses the wizard**  
+    **Given** the User is at any step of the wizard  
+    **When** the User dismisses the wizard instead of confirming  
+    **Then** the System does not create or change any Budget  
+     And the System does not create any Category that was only being considered
+
+  **Scenario: Reject confirmation when a selected category no longer exists**  
+    **Given** one of the reviewed Categories was deleted after the proposal was shown  
+    **When** the User taps "Confirm and Create Budgets"  
+    **Then** the System does not create any Budget from this confirmation  
+     And the System shows error "Category no longer exists"
+
 # Feature-level Release (Overview) {#feature-level-release-overview}
 
 The following table shows how the complete product scope defined in the SRS is delivered incrementally.
@@ -757,4 +884,5 @@ The MVP includes eight core features to ensure a usable and valuable first relea
 | 10 | **Notification Handling** | ✔ | ✔ | ✔ | User feedback and engagement |
 | 11 | **Data Overview Dashboard** |  | ✔ | ✔ | High-level financial insights |
 | 12 | **AI Chat Assistant** |  | ✔ | ✔ | Conversational transaction entry/edit/query; depends on stable Transaction Management (F-06); all AI-proposed writes require explicit User confirmation |
+| 13 | **AI Budget Setup Wizard** |  | ✔ | ✔ | Guided Budget setup via AI Chat; depends on Budget Management (F-05) and AI Chat Assistant (Feature-12); all AI-proposed Budgets require explicit User confirmation |
 

@@ -1,6 +1,6 @@
 # PFM — Architecture Design
 
-_Last updated: 2026-08-21_
+_Last updated: 2026-08-22_
 _Updated by: /renew-docs_
 
 > Source of truth: generated from the actual codebase (`docker-compose.yml`, `backend/go.mod`, `backend/cmd/server/routes.go`, `backend/db/migrations/`, `mobile/package.json`, `frontend/package.json`, `.github/workflows/*`), not from initial design intent. This file replaces the previous `docs/architecture_design.md`, which had drifted from actual code.
@@ -8,6 +8,8 @@ _Updated by: /renew-docs_
 > **2026-08-16: `mobile/` was rebuilt from scratch as React Native (Expo), replacing the previous Flutter app** (deleted by the user). Same-day, later in this session, the full screen set was implemented against `mobile/design_handoff_pfm_app/` (Home, Transactions, Insights, AI Chat, Notifications, Profile) — see §3, no longer scaffold-only.
 >
 > **2026-08-21 update:** significant drift since the above — `mobile/` gained full CRUD feature screens for Wallets, Categories, Budgets, Users (admin), on top of what was previously entry-point-only rows; Category icons can now be an uploaded photo (Cloudflare R2 via `minio-go`), not just emoji text; invite emails are sent via real SMTP; four GitHub Actions workflows now build/test/deploy the backend, AI service, and gate PRs; mobile ships as an EAS-built `.apk`. See §3, §5 (renumbered), §9 (CI/CD, new), and `SDS.md` §12.1 Known Issues Log for a defect found while verifying this update (production VPS lagging behind the `develop` HEAD it should auto-deploy from).
+>
+> **2026-08-22 update:** drift here spans commits from later on 2026-08-21 through 2026-08-22 (the prior doc pass was written early on 08-21, per its own now-stale Known Issues about wallet/budget icons and the Drawer keyboard bug). Confirmed by commit timestamps (`git log --date=format:...`), not assumed: (1) later on **2026-08-21**, one commit (`5d4718e`, 14:37) bundled three features together — session refresh (`POST /api/v1/auth/refresh`, `specs/mobile-session-refresh/`, rotates a refresh token before revoking the old one; mobile's `axios.ts`/`session-store.ts` do both a proactive scheduled refresh and a reactive single-retry-on-401, de-duplicated across concurrent requests), a floating Debug Console (`specs/mobile-debug-console/`), and per-screen Loading Skeletons (`specs/mobile-loading-skeletons/`) — the latter two are user-requested, non-SRS, and deliberately built with zero new native dependencies; (2) also 2026-08-21: Wallet/Budget icon uploads shipped (`5bbb85d`/`f7487dc`, `specs/wallet-budget-icons/`) — migrations `013_wallets_icon.sql`/`014_budgets_icon.sql` plus `POST /wallets/icon` and `POST /budgets/icon`, closing the gap §12.1 Known Issues previously flagged; the mobile app was also renamed to **"Budgest"** (`ed677b7`, 16:13) with a new icon/logo; (3) on **2026-08-22**, the Drawer keyboard-covering-input bug got its real fix (`686043a`, 11:34 — `useKeyboardHeight` hook + Android `softwareKeyboardLayoutMode: resize`, replacing a broken `KeyboardAvoidingView`; an earlier same-day-08-21 attempt in `ff77d11` hadn't fully solved it), and a fifth GitHub Actions workflow, `add-ssh-key.yml` (`2fd2d87`, 09:09), was added. See §2, §3, §7, §9.
 
 ---
 
@@ -76,11 +78,14 @@ There is no `dto`-generation step and no `api-spec/openapi.yaml` — every handl
 | Method | Path | Auth | Role | Handler |
 |---|---|---|---|---|
 | GET | `/activate` | No | – | `handler.ActivatePageHandler` — self-contained HTML activation form, served at the backend's own domain (not under `/api/v1`) because `frontend/` has no production deployment for the invite email's link to land on; the form POSTs client-side to the row below |
+| GET | `/api/v1/health` | No | – | Inline handler in `routes.go` — deploy-verification probe used by CI/CD after a VPS deploy; no DB call, just proves the process is up |
 | POST | `/api/v1/auth/activate` | No | – | `AuthHandler.Activate` |
 | POST | `/api/v1/auth/login` | No (`LoginRateLimiter`) | – | `AuthHandler.Login` |
 | POST | `/api/v1/auth/logout` | No | – | `AuthHandler.Logout` |
+| POST | `/api/v1/auth/refresh` | No | – | `AuthHandler.Refresh` — **new since 2026-08-21** (`specs/mobile-session-refresh/spec.md` US-01/US-02); rotates the refresh token (new pair minted before the old one is revoked); no rate limiter, same reasoning as `/auth/logout` — the refresh token itself is the credential, no password-guessing surface |
 | POST | `/api/v1/admin/users/invite` | Yes | admin | `UserHandler.InviteUser` (+ `InviteRateLimiter`) |
 | GET | `/api/v1/admin/users` | Yes | admin | `UserHandler.ListUsers` |
+| POST | `/api/v1/wallets/icon` | Yes | any | `WalletHandler.UploadIcon` — **new since 2026-08-21** (`specs/wallet-budget-icons/spec.md` US-01), standalone upload step before the wallet exists, same convention as categories' icon upload |
 | POST | `/api/v1/wallets/` | Yes | any | `WalletHandler.CreateWallet` |
 | GET | `/api/v1/wallets/` | Yes | any | `WalletHandler.ListWallets` |
 | GET | `/api/v1/wallets/:id` | Yes | any | `WalletHandler.GetWallet` |
@@ -92,6 +97,7 @@ There is no `dto`-generation step and no `api-spec/openapi.yaml` — every handl
 | GET | `/api/v1/categories/:id` | Yes | any | `CategoryHandler.GetCategory` |
 | PATCH | `/api/v1/categories/:id` | Yes | any | `CategoryHandler.UpdateCategory` |
 | DELETE | `/api/v1/categories/:id` | Yes | any | `CategoryHandler.DeleteCategory` |
+| POST | `/api/v1/budgets/icon` | Yes | any | `BudgetHandler.UploadIcon` — **new since 2026-08-21** (`specs/wallet-budget-icons/spec.md` US-03), same standalone-upload convention |
 | POST | `/api/v1/budgets/` | Yes | any | `BudgetHandler.CreateBudget` |
 | GET | `/api/v1/budgets/` | Yes | any | `BudgetHandler.ListBudgets` |
 | GET | `/api/v1/budgets/:id` | Yes | any | `BudgetHandler.GetBudget` |
@@ -126,8 +132,10 @@ Every group except `/admin/*` requires only `JWTAuth`, no `RequireRole` gate —
 | 010 | `transactions_idempotency_key` | additive `idempotency_key` column + partial unique index on `transactions` |
 | 011 | `chat_messages` | `chat_messages` table (Feature-12 AI Chat) |
 | 012 | `categories_icon_url` | additive `icon_url` column on `categories` — an uploaded-photo alternative to the existing emoji `icon` text field, used when a client uploads via `POST /categories/icon` |
+| 013 | `wallets_icon` | additive `icon` (emoji/text) + `icon_url` (uploaded photo) columns on `wallets` — **new since 2026-08-21**, closes the gap noted below |
+| 014 | `budgets_icon` | additive `icon` + `icon_url` columns on `budgets`, independent of the linked Category's own icon — **new since 2026-08-21** |
 
-No `pgvector` extension is enabled anywhere in the actual migrations (unlike the superseded `architecture_design.md`, which described it as already enabled). No equivalent `icon_url` column exists yet on `wallets` or `budgets` — see `SDS.md` §12.1 Known Issues Log, Item 3, for that planned (not yet spec'd) extension.
+No `pgvector` extension is enabled anywhere in the actual migrations (unlike the superseded `architecture_design.md`, which described it as already enabled). `wallets` and `budgets` now carry the same `icon`/`icon_url` precedence convention as `categories` (icon_url takes display precedence when both are set) — as of 2026-08-21 this was a gap (`SDS.md` §12.1 Known Issues Log, Item 3); migrations 013/014 plus `POST /wallets/icon`/`POST /budgets/icon` (§2 routes) closed it.
 
 **Key tables:** `users`, `revoked_tokens`, `wallets`, `categories`, `budgets` + `budget_limits`, `transactions`, `notifications`, `chat_messages`.
 
@@ -143,17 +151,23 @@ No `pgvector` extension is enabled anywhere in the actual migrations (unlike the
 
 - **Home** (`app/(app)/index.tsx`) — hero balance card (sum of wallets sharing the default wallet's currency), horizontal wallet cards, recent transactions
 - **Transactions** (`app/(app)/transactions.tsx`) — filter chips (All/Income/Expense), cursor-paginated infinite list, create/edit via `TransactionFormModal` (`src/features/transactions/`)
-- **Wallets** (`app/(app)/wallets.tsx`) — list + create/edit/set-default via `WalletFormModal` (`src/features/wallets/`); no icon/photo field yet (SDS §12.1 Known Issues Log, Item 3)
+- **Wallets** (`app/(app)/wallets.tsx`) — list + create/edit/set-default via `WalletFormModal` (`src/features/wallets/`); photo upload/replace via `expo-image-picker` + `POST /wallets/icon` (`use-upload-wallet-icon-mutation.ts`) shipped 2026-08-21 (`specs/wallet-budget-icons/`), closing the gap the 2026-08-21 pass of this doc had flagged
 - **Categories** (`app/(app)/categories.tsx`) — list + create/edit/delete via `CategoryFormModal` (`src/features/categories/`), including photo upload/replace via `expo-image-picker` + `POST /categories/icon` (`use-upload-category-icon-mutation.ts`)
-- **Insights** (`app/(app)/insights.tsx`) — Spending sub-tab (stat cards + clickable SVG donut chart + legend, `src/components/shared/DonutChart.tsx`) and Budgets sub-tab (stacked Budget-vs-Actual bars + create/edit via `NewBudgetModal`/`src/features/budgets/`); no icon/photo field yet (SDS §12.1 Known Issues Log, Item 3)
+- **Insights** (`app/(app)/insights.tsx`) — Spending sub-tab (stat cards + clickable SVG donut chart + legend, `src/components/shared/DonutChart.tsx`) and Budgets sub-tab (stacked Budget-vs-Actual bars + create/edit via `NewBudgetModal`/`src/features/budgets/`); Budget photo upload via `use-upload-budget-icon-mutation.ts` + `POST /budgets/icon` shipped 2026-08-21 alongside Wallets, same spec
 - **Users** (`app/(app)/users.tsx`, admin only) — list + `InviteUserModal` (`src/features/users/`), the mobile UI for F-01's admin-invite flow
 - **AI Chat** (`app/(app)/ai-chat.tsx`) — chat thread against `POST /ai/chat`, renders a `TransactionActionCard` for parsed transactions, confirms via the existing `POST /transactions` (reusing its `idempotency_key`); also supports editing a proposed transaction (`EditTransactionModal`) and editing/retrying a sent message (`EditMessageModal`)
 - **Notifications** (`app/(app)/notifications.tsx`) — full-screen overlay from the Home bell, day-grouped, unread-only toggle
 - **Profile** (`app/(app)/profile.tsx`) — stat cards + navigation rows into the screens above + logout; no rows are inert placeholders anymore
 
-Every create/edit form (Wallet/Category/Budget/Transaction) shares one bottom-sheet chrome — `src/components/shared/Drawer.tsx` — introduced in `455bfb1` alongside these screens. It currently has no keyboard-avoidance logic (SDS §3.2 UI/UX Principles, §12.1 Known Issues Log Item 2).
+Every create/edit form (Wallet/Category/Budget/Transaction) shares one bottom-sheet chrome — `src/components/shared/Drawer.tsx` — introduced in `455bfb1` alongside these screens. **Fixed 2026-08-22 (`686043a`):** it previously had no working keyboard-avoidance logic (SDS §3.2 UI/UX Principles, §12.1 Known Issues Log Item 2 — a `KeyboardAvoidingView` attempt failed to restore layout once the keyboard closed). It now uses a custom `useKeyboardHeight()` hook (`src/lib/use-keyboard-height.ts`, sourced from OS keyboard-visibility events) to pad the ScrollView's `contentContainerStyle` by the live keyboard height, combined with `android.softwareKeyboardLayoutMode: "resize"` in `app.json` (Android otherwise ignores `adjustResize` above targetSdk 35).
 
-Auth (`app/(auth)/login.tsx` + `src/features/auth/`) was also completed as a prerequisite — the screens above need a real session. There is no `GET /users/me` endpoint and the JWT's `AccessClaims` carry only `user_id`/`role` (`backend/internal/service/token_service.go`) — Profile's name/email come from the email typed at login, persisted client-side (`src/stores/session-store.ts`), not re-verified server-side.
+Auth (`app/(auth)/login.tsx` + `src/features/auth/`) was also completed as a prerequisite — the screens above need a real session. There is no `GET /users/me` endpoint and the JWT's `AccessClaims` carry only `user_id`/`role` (`backend/internal/service/token_service.go`) — Profile's name/email come from the email typed at login, persisted client-side (`src/stores/session-store.ts`), not re-verified server-side. **Session refresh, added 2026-08-21** (commit `5d4718e`, `specs/mobile-session-refresh/`): `session-store.ts` schedules a proactive refresh ahead of access-token expiry (`lib/refresh-scheduler.ts`) and `lib/axios.ts`'s response interceptor retries exactly once on a 401 via `refreshSession()`, both paths sharing one in-flight `POST /auth/refresh` call so concurrent requests never fire duplicate refreshes; any refresh failure force-clears the session. There is still no rate limiter on `/auth/refresh` (§7).
+
+Two further mobile-only, non-SRS features shipped 2026-08-21 (same commit, `5d4718e`, as the session-refresh work above) as explicit user requests (not tied to any numbered F-xx feature):
+- **Debug Console** (`specs/mobile-debug-console/`) — a draggable floating bubble (`src/components/debug/DebugBubble.tsx`, built on core `PanResponder`/`Animated.ValueXY`, no new gesture/animation library) mounted globally in the root layout; tapping it opens a fullscreen log viewer (`DebugLogViewer.tsx`) backed by an in-memory 500-entry ring buffer (`src/stores/debug-log-store.ts`) of navigation changes, API request/response/error activity, and uncaught JS errors. Ships in every build (including release `.apk`), not just `__DEV__`, since that EAS-built `.apk` is the only build QA actually tests on.
+- **Loading Skeletons** (`specs/mobile-loading-skeletons/`) — replaced bare `<ActivityIndicator>` spinners with content-shaped placeholders on Home, Transactions, Insights, Categories, and Users, via one shared `SkeletonBlock` primitive (`src/components/ui/SkeletonBlock.tsx`, pulsed with React Native's built-in `Animated` API) composed per-screen (`WalletCardSkeleton`, `TransactionRowSkeleton`, `BudgetCardSkeleton`, `CategoryListItemSkeleton`, `UserListItemSkeleton`, `SpendingTabSkeleton`). No new dependency, mirroring the Debug Console's same no-new-native-dependency stance. UI-only — no query/DTO/API change.
+
+The app was also renamed from its working title to **"Budgest"** (`mobile/app.json` `expo.name`, Android package remains `com.example.pfm`) with a new icon/logo/splash screen, and picked up `expo-splash-screen` (`~31.0.13`) as a dependency + config plugin.
 
 A `BottomNav` (`src/components/shared/BottomNav.tsx`) is a floating, blurred (`expo-blur`) pill overlaid in `app/(app)/_layout.tsx` — not expo-router's native tab bar, since the design's raised center button (always opens AI Chat) and floating shape don't map onto a standard tab bar. `react-native-svg` was added for the donut chart and the hand-drawn icon set (`src/components/ui/Icon.tsx` — no icon font/library, matching the design handoff's own "minimal inline SVG" approach).
 
@@ -187,22 +201,28 @@ mobile/
     │   ├── users/                  — admin list/invite hooks, InviteUserModal.tsx, UserListItem.tsx
     │   └── ai-chat/                — send-message hook, ChatBubble/TransactionActionCard/EditMessageModal/EditTransactionModal
     ├── components/
-    │   ├── ui/                    — Avatar, Card, Chip, PillButton, PillTag, ProgressBar, Icon (hand-drawn SVG set)
+    │   ├── ui/                    — Avatar, Card, Chip, PillButton, PillTag, ProgressBar, Icon (hand-drawn SVG set), SkeletonBlock (new)
+    │   ├── debug/                  — DebugBubble, DebugLogViewer (new, mobile-debug-console)
     │   └── shared/                 — Drawer (shared bottom-sheet form chrome), BottomNav, Screen, TopBar, WalletCard,
     │                                  TransactionRow, BudgetCard, DonutChart, NewBudgetModal, Date/SingleDatePickerModal,
     │                                  TypingIndicator
     ├── lib/
-    │   ├── axios.ts               — direct-to-backend client (no BFF — see below), JWT interceptor, 401 handling
+    │   ├── axios.ts               — direct-to-backend client (no BFF — see below), JWT interceptor, 401-retry-once via refreshSession()
+    │   ├── api-envelope.ts        — unwrap()/getErrorMessage()/getErrorCode() (extracted out of axios.ts, no session-store dependency)
+    │   ├── refresh-scheduler.ts   — schedules/cancels the proactive pre-expiry refresh timer (new, mobile-session-refresh)
     │   ├── query-client.ts        — TanStack QueryClient singleton
     │   ├── secure-storage.ts      — expo-secure-store wrapper
     │   ├── constants.ts           — mirrors backend/internal/common/constants.go
     │   ├── currency.ts            — ported verbatim from frontend/src/lib/currency.ts
     │   ├── config.ts               — env-driven config (EXPO_PUBLIC_API_BASE_URL — see EAS profiles, §9)
     │   ├── category-color.ts      — deterministic color assignment for categories without a photo
-    │   ├── format-date.ts
-    │   └── use-keyboard-height.ts  — custom keyboard-height hook (see §3 note above and SDS §3.2/§12.1)
+    │   ├── date-range.ts, format-date.ts, number-to-words-vi.ts
+    │   ├── redact.ts              — strips sensitive fields before they hit the Debug Console's log store
+    │   ├── global-error-logger.ts — feeds uncaught JS errors into the Debug Console's ring buffer
+    │   └── use-keyboard-height.ts  — custom keyboard-height hook (see §3 note above and SDS §3.2/§12.1 — now fixed)
     └── stores/
-        └── session-store.ts       — global Zustand store (accessToken/refreshToken/isHydrated)
+        ├── session-store.ts       — global Zustand store (accessToken/refreshToken/email/isHydrated), owns refreshSession()
+        └── debug-log-store.ts     — in-memory 500-entry ring buffer for the Debug Console (new)
 ```
 
 ### Why this stack (deliberate departure from the old Flutter choices)
@@ -228,7 +248,8 @@ mobile/
 | `axios` | `^1.19.0` | HTTP client |
 | `react-native-svg` | `15.12.1` (pinned) | Donut chart segments + the hand-drawn icon set (no icon font/library) |
 | `expo-blur` | `~15.0.8` | `BlurView` behind the floating bottom-nav pill |
-| `expo-image-picker` | `~17.0.11` | Category icon photo picking (`CategoryFormModal.tsx`) — device library only, uploads immediately on pick via `POST /categories/icon` |
+| `expo-image-picker` | `~17.0.11` | Icon photo picking, now used by Category, Wallet, and Budget forms (as of 2026-08-21) — device library only, uploads immediately on pick via `POST /{categories,wallets,budgets}/icon` |
+| `expo-splash-screen` | `~31.0.13` | **New 2026-08-21** — custom splash image/background color, added with the "Budgest" rename |
 | `react-native-calendars` | `^1.1314.0` | Date pickers (`DateRangePickerModal`/`SingleDatePickerModal`) — Transaction date, report date-range filters |
 | `@react-native-async-storage/async-storage` | `2.2.0` | Peer dependency pulled in by another package (not directly used for app persistence — `expo-secure-store` remains the only session store) |
 
@@ -347,7 +368,7 @@ Backend → validate input (handler) → verify Wallet/Category ownership + type
 
 ## 7. Security Design
 
-- **Auth:** `golang-jwt/jwt v5` access token (short TTL) + refresh token; logout revokes via the `revoked_tokens` table (`003_revoked_tokens.sql`). No `/auth/refresh` endpoint exists yet.
+- **Auth:** `golang-jwt/jwt v5` access token (short TTL) + refresh token; logout revokes via the `revoked_tokens` table (`003_revoked_tokens.sql`). `POST /auth/refresh` (new since 2026-08-21, `specs/mobile-session-refresh/spec.md`) rotates the refresh token: `AuthService.Refresh` parses the presented token unverified for `jti`/`subject`/`expiresAt`, rejects if expired or already revoked (`revokedRepo.IsRevoked`), then mints a new access+refresh pair *before* revoking the old `jti` — a mid-request failure leaves the old token merely still-valid for the remainder of its own TTL, never the caller with nothing.
 - **Authorization:** every non-admin route group requires only `JWTAuth`; ownership (`user_id = caller`) is checked in the service layer per resource — no `RequireRole` gate on wallets/categories/budgets/transactions/reports/notifications.
 - **Rate limiting:** Fiber's built-in `limiter` middleware (`backend/internal/middleware/rate_limit.go`), two concrete uses today — `LoginRateLimiter` (keyed by IP) and `InviteRateLimiter` (keyed by the authenticated caller's user ID). No rate limit exists yet on any other route.
 - **Password hashing:** bcrypt (`golang.org/x/crypto`).
@@ -374,6 +395,8 @@ Backend → validate input (handler) → verify Wallet/Category ownership + type
 | AI Service | Implemented (Feature-12 US-01 only); Groq primary / Anthropic fallback via tool/function calling | Budget-conscious (`docs/features.md` §6); prose-described JSON schemas proved unreliable in live testing | Only the create-transaction-via-chat slice exists — edit/query/advice intents are unspecced |
 | Category icon storage | Cloudflare R2 via `minio-go` (S3-compatible) | Lighter than `aws-sdk-go-v2` for a single-bucket, single-operation use case | Both `EmailSender` and `IconUploader` degrade to a no-op/log fallback when unconfigured, so a missing `R2_*`/`SMTP_*` env var fails one request, not the whole boot — but it also means a misconfigured VPS fails *silently* per-request rather than at deploy time |
 | Mobile distribution | EAS Build → internal `.apk` (`mobile/eas.json`) | CLAUDE.md: no App Store/Play Store submission, test builds only | `submit.production` block exists but unused; `preview`/`production` profiles both point at the same hardcoded production API URL (`https://api.example.com/api/v1`) — no staging API target |
+| Refresh token rotation | New pair minted before the old `jti` is revoked | `specs/mobile-session-refresh/spec.md` Edge Case #1 | A mid-request crash leaves the old token merely still-valid for its remaining TTL, rather than the caller stranded with zero valid credentials |
+| Mobile Debug Console / Loading Skeletons | Built on RN core (`PanResponder`/`Animated`) only, zero new native deps | Both were ad-hoc user requests, not SRS features; a new native module would force a fresh EAS build given the SDK-54 pinning constraints (`mobile/AGENTS.md`) | Less polished than `react-native-reanimated`/`react-native-gesture-handler` would give, but avoids reopening the SDK-compatibility exercise from §3 |
 
 ---
 
@@ -387,6 +410,7 @@ Four GitHub Actions workflows exist under `.github/workflows/` — none of this 
 | `backend-test.yml` | Called by `ci-pr.yml` and `deploy-backend.yml` (`workflow_call`) | `go vet` + `go test` for `backend/` — single source of truth so a broken build can't reach either caller |
 | `deploy-backend.yml` | Push to `develop` touching `backend/**` (path-filtered — a mobile/frontend-only push never rebuilds the API), or manual `workflow_dispatch` | Runs `backend-test.yml` → builds and pushes a Docker image to Docker Hub → Trivy vulnerability scan → syncs deploy files and SSHes into the VPS to redeploy |
 | `deploy-ai-service.yml` | Push to `develop` touching `ai-service/**` (same path-filter pattern) | Equivalent build/deploy pipeline for the Python AI Service |
+| `add-ssh-key.yml` | **New since 2026-08-21** | Registers/rotates the SSH key used by `deploy-backend.yml`/`deploy-ai-service.yml` to reach the VPS from a personal machine (commit `2fd2d87` "feat: ssh key from personal machine") |
 
 **Operational implication (see `SDS.md` §12.1 Known Issues Log):** this pipeline is what *should* keep the VPS's backend in sync with `develop` automatically. A production symptom that only makes sense against an older backend build (e.g. a 405 on a route added in a recent commit) means either this workflow's run for that commit failed, was skipped, or hasn't fired yet — check the Actions run history before assuming a code fix is needed.
 
@@ -407,3 +431,7 @@ Four GitHub Actions workflows exist under `.github/workflows/` — none of this 
 | S-RPT-* (or equivalent) | Financial Reporting | `specs/financial-reporting/spec.md` |
 | S-NOT-* | Notification Handling | `specs/notification-handling/spec.md` |
 | S-AI-* | AI Chat — Create Transaction (Release 1) | `specs/ai-chat-assistant/spec.md` — implemented (backend + web); mobile has no chat screen yet (§3) |
+| S-REF-* | Mobile Session Refresh (not an SRS-numbered F-xx feature) | `specs/mobile-session-refresh/spec.md` — implemented, mobile + backend (§2, §3, §7) |
+| — | Wallet & Budget Icon Upload (not an SRS-numbered F-xx feature) | `specs/wallet-budget-icons/spec.md` — implemented, mobile + backend (§2, §3) |
+| — | Mobile Debug Console (not an SRS-numbered F-xx feature, explicit user request) | `specs/mobile-debug-console/spec.md` — implemented, mobile-only (§3) |
+| — | Mobile Loading Skeletons (not an SRS-numbered F-xx feature, explicit user request) | `specs/mobile-loading-skeletons/spec.md` — implemented, mobile-only, UI-only change (§3) |

@@ -1,9 +1,11 @@
 # PFM — Features Status & Roadmap
 
-_Last updated: 2026-08-21_
+_Last updated: 2026-08-22_
 _Updated by: /renew-features_
 
-> Clarification answers this run: **Priority = Ổn định MVP + fix bug** (stabilize MVP, fix the 3 confirmed defects found this session before expanding scope); **next feature scope = full-stack** (Wallet/Budget icon support touches migration + backend DTO + mobile UI at once); **preference = enhancement before new feature** (finish icon parity + fix the 3 known bugs before starting Financial Goal/Dashboard); **constraint** = AI Service currently runs `openai/gpt-oss-120b` via Groq's free tier — works well, user is watching it but it's not expected to bind at the current 20–100 user scale, so no urgent action needed there.
+> Clarification answers this run: user explicitly named the next feature — **AI Budget Setup Wizard** (F-13, drafted in `docs/ai-chat-budget-recommendation.md`) — and asked directly for `SRS.md`/`SDS.md` updates followed by `/renew-features` → `/renew-docs` → `/cook-ba` → `/cook-plan` in one pass. That's a more specific answer than the 5 standing clarification questions this command normally asks, so this run skips re-asking them and records the equivalent assumptions instead: **priority = new feature** (B), scope = **full-stack, mobile-first** (per the feature doc's own "Clients: `mobile/` primary; `frontend/` follow-up" line), **enhancement vs. new = new feature** (B), no new hard constraints beyond the existing Groq free-tier note below (carried over, unchanged).
+>
+> Prior run's answers (2026-08-21, still relevant context): **Priority = Ổn định MVP + fix bug** (stabilize MVP, fix the 3 confirmed defects found that session before expanding scope); **next feature scope = full-stack** (Wallet/Budget icon support touches migration + backend DTO + mobile UI at once); **preference = enhancement before new feature** (finish icon parity + fix the 3 known bugs before starting Financial Goal/Dashboard); **constraint** = AI Service currently runs `openai/gpt-oss-120b` via Groq's free tier — works well, user is watching it but it's not expected to bind at the current 20–100 user scale, so no urgent action needed there.
 
 ---
 
@@ -33,6 +35,9 @@ _Updated by: /renew-features_
 **Documented this session, no code needed:**
 - **CI/CD (GitHub Actions) and EAS Build** — `.github/workflows/{ci-pr,backend-test,deploy-backend,deploy-ai-service}.yml` auto-test/build/deploy on push to `develop`; `mobile/eas.json` builds an internal `.apk`. Neither was documented before this run's `/renew-docs`. No spec needed (infra, not a product feature) but worth knowing when debugging "why isn't my change live" questions.
 
+**In progress this session (2026-08-22):**
+- **AI Budget Setup Wizard (F-13, Feature-13)** — new Release 1 feature, drafted end-to-end by the user in `docs/ai-chat-budget-recommendation.md` before this run. `SRS.md` (FR-10, BF-11, Feature-13/US-01–05) and `SDS.md` (§2 domain model notes, §3.2 UI principle, §4.6 scenario index, §5.13, §6 API index/spec/traceability, §7 threat model, §9 design decisions) updated to match. BA pass (`specs/ai-budget-wizard/spec.md`) and plan (`plan.md`) follow immediately in this same run — see §3 below.
+
 **SRS items chưa spec (chưa bắt đầu ở bất kỳ layer nào):**
 - **Financial Goal (F-08)** — Release 1.
 - **Investment Portfolio (F-09)** — Release 2.
@@ -59,14 +64,24 @@ _Updated by: /renew-features_
 | 12 | AI Chat Assistant — US-01 Create via Chat | FR-09 / Feature-12 | ✓ | ✓ | ✓ | ✓ | DONE |
 | — | AI Chat Assistant — US-02/03/04 (Edit/Query/Advice) | FR-09 / Feature-12 | ✗ | ✗ | ✗ | ✗ | BACKLOG (Release 1) — not yet specced |
 | — | Wallet/Budget icon & photo support | (SDS §12.1 Known Issues Log Item 3) | ✓ | ✓ | ✗ | ✓ | DONE (2026-08-21) — mobile only, `frontend/` parity deferred |
+| 13 | AI Budget Setup Wizard | FR-10 / Feature-13 | 🔶 in progress | ✗ | ✗ | ✗ | SPEC_IN_PROGRESS (2026-08-22) — `SRS.md`/`SDS.md` updated, `specs/ai-budget-wizard/` being written this run |
 
 ---
 
 ## 3. Recommended Next Features
 
-> User direction this run: stabilize MVP and fix known bugs first, enhancement before new scope, full-stack when the next feature does land. That reorders what was previously "next sprint" — Financial Goal moves down, the 3 confirmed defects + Wallet/Budget icon parity move up.
+> User direction this run (2026-08-22): explicitly named **AI Budget Setup Wizard (F-13)** as the next feature, superseding the prior run's "stabilize MVP first" ordering for this one item — the user chose to spec/plan it now rather than wait behind FEAT-QC/Financial Goal. Everything else below from the 2026-08-21 run (the 3 confirmed defects, Wallet/Budget icon parity — already shipped) stays as prior context.
 
 ### 🔥 High Priority (next sprint)
+
+#### [FEAT-13] AI Budget Setup Wizard (Release 1) — 🔶 spec in progress (2026-08-22)
+- **Type:** New Feature
+- **SRS ref:** FR-10, Feature-13, BF-11 (all added this run)
+- **Rationale:** User-requested directly, with a full feature draft already provided (`docs/ai-chat-budget-recommendation.md`) — a guided, AI-assisted flow to set up multiple Budgets at once (income + per-category spending preference → proposed allocation → bulk create), instead of the one-at-a-time manual flow in Budget Management (F-05).
+- **Scope:** Full-stack, mobile-first — `mobile/` is the primary client per the feature draft; `frontend/` (web) parity is an explicit follow-up, not in this pass.
+- **Dependencies:** Budget Management (F-05, done — this feature's `POST /budgets/bulk` reuses its validation/ownership rules), AI Chat Assistant (Feature-12, done — reuses its AI Service client and chat-message plumbing for the natural-language trigger).
+- **Rough complexity:** L (3 new backend endpoints across 2 services — Go backend + Python AI service — plus a 4-step mobile wizard UI).
+- **Status:** `SRS.md`/`SDS.md` updated this run. `specs/ai-budget-wizard/spec.md` and `plan.md` are being written immediately after this doc, same session — no open clarifying questions blocking BA, since the user's own draft doc already resolved most of them (see that spec's own Open Questions section for what remains, e.g. rule-based vs. LLM-based proposal generation, which the draft already assumes rule-based for MVP).
 
 #### [FEAT-BUG-01] Verify/fix production deployment gap (Category icon upload + `/activate`)
 - **Type:** Bug Fix

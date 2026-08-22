@@ -59,6 +59,8 @@ Software Design Specification (SDS)
   - [11. Feature-11: Data Overview Dashboard](#11-feature-11-data-overview-dashboard)
   - [12. Feature-12: AI Chat Assistant](#12-feature-12-ai-chat-assistant)
     - [1. US-12-01: Create a Transaction via Chat](#1-us-12-01-create-a-transaction-via-chat)
+  - [13. Feature-13: AI Budget Setup Wizard](#13-feature-13-ai-budget-setup-wizard)
+    - [1. US-13-01: Set Up Budgets via Wizard](#1-us-13-01-set-up-budgets-via-wizard)
 - [6. API Design](#6-api-design)
   - [1. API Design Standards](#1-api-design-standards)
   - [2. API Index](#2-api-index)
@@ -71,6 +73,9 @@ Software Design Specification (SDS)
     - [6. `POST /transactions`](#6-post-transactions)
     - [7. `PUT /transactions/{id}`](#7-put-transactionsid)
     - [8. `POST /ai/chat`](#8-post-aichat)
+    - [9. `GET /ai/budget-wizard/prefill`](#9-get-aibudget-wizardprefill)
+    - [10. `POST /ai/budget-proposals`](#10-post-aibudget-proposals)
+    - [11. `POST /budgets/bulk`](#11-post-budgetsbulk)
   - [4. API  → User Story Traceability](#4-api-user-story-traceability)
 - [7. Security Design](#7-security-design)
   - [1. Authentication](#1-authentication)
@@ -167,6 +172,8 @@ Key attributes: `id`, `user_id`, `category_id`, `limits` (a non-empty set of `(c
 
 > **Resolved** (was previously an open question): SRS (Feature-05, BF-01 step 5) originally framed a Budget as scoped to *both* a Wallet and a Category. BA clarification (see `specs/budget-management/spec.md`) settled this as **Category-only, aggregated across all Wallets** — the better product model for a personal-finance budgeting feature, not just the path of least schema change. `SRS.md` BF-01/BF-04 wording has been updated to match. A direct consequence of dropping the Wallet scope is that a Category's Transactions can span Wallets of different currencies, so a Budget can no longer hold one blended `amount_limit` — it instead holds independent per-currency limits, each tracked (spent/remaining/status) separately; a currency with real spend but no corresponding limit entry is simply not tracked by that Budget. See `specs/budget-management/spec.md` for full detail.
 
+A Budget may also be created **in bulk**, as a full replacement of a User's existing Budgets, via the AI Budget Setup Wizard (SRS Feature-13, §5.13 below) — this reuses the exact same validation and ownership rules as an individual `POST /budgets` call, just applied to a batch inside one DB transaction, not a separate write path.
+
 ### 5. Transaction {#5-transaction}
 
 A single income or expense event. Always belongs to exactly one Wallet and one Category, and to the User who owns that Wallet.
@@ -200,6 +207,8 @@ Key attributes: `id`, `user_id`, `type`, `title`, `body`, `is_read`, `created_at
 A single message exchanged between a User and the AI Chat Assistant (SRS Feature-12), either from the User or the assistant. When a message results in a created/updated Transaction, it links back to the affected Transaction(s) for audit/traceability — the AI never writes to the database directly; it only proposes actions that a User must confirm through the standard Transaction Management flow (FR-02).
 
 Key attributes: `id`, `user_id`, `conversation_id`, `role` (user/assistant), `content`, `intent`, `transaction_ids` (nullable array, set once confirmed), `created_at`.
+
+An assistant ChatMessage may also carry an `action_type` of `"budget_wizard"` (SRS Feature-13) instead of a Transaction proposal — a tappable card that opens the Budget Setup wizard rather than something the User confirms inline in the thread. This shares the table/columns above; it does not need its own domain object.
 
 > **Schema note:** realizing this feature also requires two small additions to existing MVP tables, not new domain concepts: (1) `categories.description` (nullable) so the AI can disambiguate between similarly-named Categories, and (2) an idempotency mechanism for `POST /transactions` (e.g. a unique `idempotency_key` column or a dedicated keys table) so a duplicate confirm-tap from the chat UI cannot create a duplicate Transaction. Exact shape to be finalized at `/cook-plan` time.
 
@@ -311,6 +320,7 @@ Note: derived figures such as Wallet `balance` or Budget "spent so far" are **co
 
 * **Keyboard-safe forms** — whichever field a User is actively typing into must stay visible above the on-screen keyboard, on both iOS and Android, in every bottom-sheet form (Wallet/Category/Budget/Transaction — all built on the shared `Drawer` component). Do not reach for `KeyboardAvoidingView` or a wrapping third-party scroll library by default: the project already hit and worked around a confirmed Android bug where `KeyboardAvoidingView`'s `height` behavior fails to restore layout after the keyboard closes (facebook/react-native#22884), and replaced it with a custom `useKeyboardHeight()` hook (`mobile/src/lib/use-keyboard-height.ts`) already used by the AI Chat screen. New keyboard-safety work should extend that hook's usage (e.g. into `Drawer.tsx`) rather than introduce a second, inconsistent approach — see §12.1 Known Issues Log, Item 2.
 * **Consistent icon/photo picking** — any entity that supports a visual icon (Category today; Wallet and Budget planned) should reuse the same interaction pattern established by `CategoryFormModal.tsx`: an `Avatar` preview, an immediate upload-on-pick via `expo-image-picker` (not deferred to form submit), and a free-text emoji fallback used only when no uploaded photo is set.
+* **Multi-step guided flows** — a flow that collects several pieces of input before a single confirmed write (e.g. the AI Budget Setup Wizard, §5.13) is presented as one dismissible, full-screen sequence with a visible progress indicator; dismissing at any step discards all in-progress input — nothing is saved until the final explicit confirmation.
 
 # 4. Architecture Design {#4-architecture-design}
 
@@ -441,6 +451,7 @@ These scenarios represent the Scenarios (+1 View) of the “4+1 Views” Model.
 | S-RPT-01 | Feature-07: Financial Reporting | **US-07-01 View the Summary Report** | ✔ | Insight & feedback loop |
 | S-NOT-01 | Feature-10: Notification Handling | **US-10-01 View the list of Notifications** | ✔ | User awareness |
 | S-CHAT-01 | Feature-12: AI Chat Assistant | **US-12-01 Create a Transaction via Chat** |  | Reuses Transaction Management write path; Release 1 |
+| S-BWZ-01 | Feature-13: AI Budget Setup Wizard | **US-13-01 Set Up Budgets via Wizard** |  | Reuses Budget Management's write path; Release 1 |
 
 ## 7. Architecture Principles {#7-architecture-principles}
 
@@ -584,6 +595,54 @@ Main Flow
 * For `create_transaction` / `edit_transaction`, the client renders a confirmation card; nothing is persisted until the User confirms.  
 * On confirmation, the client calls the existing `POST /transactions` (or `PUT /transactions/{id}`) endpoint, using the pre-generated idempotency key to guard against duplicate confirms.
 
+## 13. Feature-13: AI Budget Setup Wizard {#13-feature-13-ai-budget-setup-wizard}
+
+### 1. US-13-01: Set Up Budgets via Wizard {#1-us-13-01-set-up-budgets-via-wizard}
+
+**Goal:** Let an authenticated User set up or replace their Budgets for a period by providing income and per-Category spending preferences, reviewing a proposed allocation, and confirming a single bulk create — instead of creating each Budget individually through Feature-05.
+
+**Preconditions**:
+
+* User is authenticated.
+* User has at least one Wallet (used to resolve the default currency for the wizard).
+
+**Client:** `mobile/` only for this release (React Native) — the same clients-first pattern Feature-12 used (mobile shipped before web); `frontend/` (web) parity is a follow-up, not scoped here.
+
+**Layers Involved**:
+
+* ChatHandler (existing, extended) → new `BudgetWizardPrefill`/`BudgetProposals` handler methods
+* AI Service client (internal REST call, reuses the existing Groq-primary/Anthropic-fallback client — no new provider) for the allocation proposal and, only when the User describes a Category in free text, for suggesting a Category name
+* CategoryRepository, BudgetRepository (context injection: the User's own Categories/Budgets, never another User's)
+* BudgetHandler → BudgetService (existing, extended with a bulk create/replace method) — only invoked after User confirmation
+
+**APIs Involved:**
+
+Endpoint: `GET /ai/budget-wizard/prefill`
+
+Success Response: default currency, the User's visible Categories, the User's existing Budgets
+
+Error Responses: 401 UNAUTHENTICATED
+
+Endpoint: `POST /ai/budget-proposals`
+
+Success Response: a proposed amount and share of income per Category, plus the unallocated remainder
+
+Error Responses: 400 INVALID_INPUT · 403 CATEGORY_ACCESS_DENIED (no 502 — this endpoint makes no AI Service call at all, see §9 Design Decisions)
+
+Endpoint: `POST /budgets/bulk`
+
+Success Response: the count and list of created Budgets
+
+Error Responses: 400 INVALID_INPUT · 404 CATEGORY_NOT_FOUND · 403 CATEGORY_ACCESS_DENIED · 422 DUPLICATE_CATEGORY_IN_REQUEST
+
+Main Flow
+
+* User opens the wizard (quick action or AI Chat card) and the client loads prefill data.
+* User enters income and, for each chosen Category, a spending preference.
+* Service computes a proposed amount per Category in-process using a **fixed, rule-based allocation** — not free-form LLM generation, and no call to the AI Service at all for this step (see `specs/ai-budget-wizard/plan.md` Finding #6) — so the same input always produces the same proposal, with no dependency on AI Service uptime.
+* User reviews and may adjust any proposed amount, purely client-side (no further AI call).
+* On confirmation, the client calls `POST /budgets/bulk`, which **re-validates that every Category ID belongs to the requesting User** before writing, then atomically replaces the User's existing Budgets with the confirmed set, inside one DB transaction.
+
    # 
 
 # 6. API Design {#6-api-design}
@@ -614,6 +673,9 @@ Main Flow
 | API-TRX-03 | `GET /transactions/{id}` | Transaction Management |
 | API-TRX-04 | `PUT /transactions/{id}` | Transaction Management |
 | API-CHAT-01 | `POST /ai/chat` | AI Chat Assistant |
+| API-BWZ-01 | `GET /ai/budget-wizard/prefill` | AI Budget Setup Wizard |
+| API-BWZ-02 | `POST /ai/budget-proposals` | AI Budget Setup Wizard |
+| API-BUD-06 | `POST /budgets/bulk` | Budget Management / AI Budget Setup Wizard |
 
 ## 3. API Specification {#3-api-specification}
 
@@ -645,6 +707,24 @@ Main Flow
 | ----- | ----- | ----- |
 | Controller receives message and validates input. Service loads the User's own Wallets/Categories as context, calls the AI Service, then re-validates ownership of every ID the AI Service returns before responding. No Transaction is written by this endpoint. | message intent actions[] | 400: INVALID_INPUT 502: AI_SERVICE_UNAVAILABLE |
 
+### 9. `GET /ai/budget-wizard/prefill` {#9-get-aibudget-wizardprefill}
+
+| Main Flow | Success Response | Error Responses |
+| ----- | ----- | ----- |
+| Controller loads the caller's visible Categories and existing Budgets. No AI Service call, no chat message recorded. | default_currency categories[] existing_budgets[] | 401: UNAUTHENTICATED |
+
+### 10. `POST /ai/budget-proposals` {#10-post-aibudget-proposals}
+
+| Main Flow | Success Response | Error Responses |
+| ----- | ----- | ----- |
+| Controller validates input, re-validates every Category ID belongs to the caller, then computes a rule-based allocation across the selected Categories entirely in-process (no AI Service call). No Budget is written by this endpoint. | proposals[] (per-Category amount + share) unallocated_amount | 400: INVALID_INPUT 403: CATEGORY_ACCESS_DENIED |
+
+### 11. `POST /budgets/bulk` {#11-post-budgetsbulk}
+
+| Main Flow | Success Response | Error Responses |
+| ----- | ----- | ----- |
+| Controller validates input. Service re-validates ownership of every Category ID, then atomically replaces the caller's existing Budgets with the submitted set inside one DB transaction. | created_count budgets[] | 400: INVALID_INPUT 404: CATEGORY_NOT_FOUND 403: CATEGORY_ACCESS_DENIED 422: DUPLICATE_CATEGORY_IN_REQUEST |
+
 ## 4. API  → User Story Traceability {#4-api-user-story-traceability}
 
 | API | Feature | US |
@@ -653,6 +733,9 @@ Main Flow
 | `PUT /transactions/{id}` | Transaction Management | US-12-02 (AI Chat edit flow) |
 | `POST /ai/chat` | AI Chat Assistant | US-12-01, US-12-02, US-12-03 |
 | `POST /transactions` | Transaction Management | US-06-01 |
+| `GET /ai/budget-wizard/prefill` | AI Budget Setup Wizard | US-13-01 |
+| `POST /ai/budget-proposals` | AI Budget Setup Wizard | US-13-01 |
+| `POST /budgets/bulk` | Budget Management / AI Budget Setup Wizard | US-13-01 |
 
 # 7. Security Design {#7-security-design}
 
@@ -666,11 +749,14 @@ Users can only access data they own, for example: Wallet, Transaction, Category.
 
 For AI Chat Assistant (Feature-12): the AI Service is treated as **untrusted input** with respect to authorization, even though it runs on the internal Docker network — the Go Backend must re-validate that every Wallet/Category ID the AI Service returns actually belongs to the requesting User before it is shown to the client or used in any write.
 
+The same untrusted-input treatment applies to AI Budget Setup Wizard (Feature-13): every Category ID used in `POST /ai/budget-proposals` and `POST /budgets/bulk` is re-validated for ownership before use, identical to Feature-12's rule for `POST /ai/chat`.
+
 ## 3. Threat Modeling {#3-threat-modeling}
 
 * **AI hallucinated ownership** — the AI Service could return a Wallet/Category ID belonging to a different User (model error, not necessarily malicious). Mitigated by mandatory ownership re-validation in `ChatService` before the response leaves the Backend (see §6.3 `POST /ai/chat`).  
 * **Duplicate transaction from double-confirm** — a repeated tap on the chat confirmation card must not create two Transactions. Mitigated by an idempotency key pre-generated per proposed action (see Domain Model §11 ChatMessage, schema note).  
-* **AI Service unavailability** — Groq/Anthropic outage must degrade to a clear retryable error on `POST /ai/chat`, never a crash or a silently-dropped write.
+* **AI Service unavailability** — Groq/Anthropic outage must degrade to a clear retryable error on `POST /ai/chat`, never a crash or a silently-dropped write.  
+* **Bulk budget replace race** — two devices submitting the AI Budget Setup Wizard for the same User concurrently could otherwise interleave into an inconsistent set of Budgets. Mitigated by locking the User's existing Budget rows before replacing them, inside one transaction, so the two requests serialize instead of interleaving (full design in `specs/ai-budget-wizard/plan.md`).
 
    # 
 
@@ -692,7 +778,8 @@ For AI Chat Assistant (Feature-12): the AI Service is treated as **untrusted inp
 * Monolith chosen for early simplicity and clarity.  
 * Design allows future evolution without rewriting fundamentals.  
 * AI Chat Assistant (Feature-12) reuses the existing AI Service (Python/FastAPI, Groq SDK primary + Anthropic SDK fallback per CLAUDE.md tech stack) — no new LLM provider or client is introduced. Complexity-based model routing within the AI Service (e.g. a fast/cheap model for simple single-item extraction vs. a stronger model for multi-item or edit/query intents) is an AI Service implementation detail to be finalized at `/cook-plan` time, not a fixed choice baked into this SDS.  
-* Client surface for Feature-12 was `frontend/` (web) first, matching the project's original implementation priority; `mobile/` (React Native, not Flutter — rebuilt 2026-08-16) has since shipped its own AI Chat screen and reached feature parity for this flow.
+* Client surface for Feature-12 was `frontend/` (web) first, matching the project's original implementation priority; `mobile/` (React Native, not Flutter — rebuilt 2026-08-16) has since shipped its own AI Chat screen and reached feature parity for this flow.  
+* AI Budget Setup Wizard (Feature-13) computes its proposed allocation with a fixed, rule-based formula (income × preference weight, category baselines) **inside the Go Backend itself** — not a free-form LLM call, and not even a call to the AI Service, since the computation is pure deterministic arithmetic with nothing an LLM adds (`specs/ai-budget-wizard/plan.md` Finding #6). The AI Service is only involved in one narrow, optional sub-step: suggesting a name for a Category the User described but that doesn't exist yet. Full formula in `specs/ai-budget-wizard/spec.md`.
 
   # 
 
