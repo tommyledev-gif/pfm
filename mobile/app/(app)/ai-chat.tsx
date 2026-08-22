@@ -59,6 +59,9 @@ const EDIT_LONG_PRESS_MS = 500;
 // input bar's own bottom must sit to clear it when the keyboard is closed.
 const NAV_CLEARANCE = 120;
 
+// Small gap between the input bar and the top of the keyboard once open.
+const KEYBOARD_GAP = spacing.sm;
+
 export default function AiChatScreen() {
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<ChatMessage>>(null);
@@ -282,7 +285,12 @@ export default function AiChatScreen() {
       <View
         style={[
           styles.inputBar,
-          { marginBottom: keyboardVisible ? spacing.sm : insets.bottom + NAV_CLEARANCE },
+          // keyboardHeight is reserved in full, not just a nudge — Android's
+          // windowSoftInputMode=resize (app.json) is a no-op once the app
+          // opts into edge-to-edge (Expo's default here), so the window
+          // never actually shrinks around the keyboard; without reserving
+          // the real height ourselves the bar stays hidden behind it.
+          { marginBottom: keyboardVisible ? keyboardHeight + KEYBOARD_GAP : insets.bottom + NAV_CLEARANCE },
         ]}
       >
         <TextInput

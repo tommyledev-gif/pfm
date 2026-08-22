@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
+import { Drawer } from "@/components/shared/Drawer";
 import { PillButton } from "@/components/ui/PillButton";
 import { getErrorMessage } from "@/lib/axios";
 import { colors, radii, spacing, typography } from "@/lib/theme";
@@ -35,67 +36,51 @@ export function InviteUserModal({ visible, onClose }: InviteUserModalProps) {
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View style={styles.sheet}>
-          <Text style={styles.title}>Invite member</Text>
-          <Text style={styles.description}>An activation email with a sign-up link is sent to this address.</Text>
+    <Drawer visible={visible} onClose={onClose}>
+      <Text style={styles.title}>Invite member</Text>
+      <Text style={styles.description}>An activation email with a sign-up link is sent to this address.</Text>
 
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            value={email}
-            onChangeText={setEmail}
-            placeholder="name@example.com"
-            placeholderTextColor={colors.textMuted}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            style={styles.input}
-          />
+      <Text style={styles.label}>Email</Text>
+      <TextInput
+        value={email}
+        onChangeText={setEmail}
+        placeholder="name@example.com"
+        placeholderTextColor={colors.textMuted}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        style={styles.input}
+      />
 
-          <Text style={styles.label}>Role</Text>
-          <View style={styles.chipRow}>
-            {USER_ROLES.map((r) => (
-              <Pressable
-                key={r}
-                onPress={() => setRole(r)}
-                style={[styles.chip, role === r && styles.chipActive]}
-              >
-                <Text style={[styles.chipLabel, role === r && styles.chipLabelActive]}>
-                  {r === "admin" ? "Admin" : "Member"}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          {inviteUser.isError ? (
-            <Text style={styles.error}>{getErrorMessage(inviteUser.error, "Could not send the invite")}</Text>
-          ) : null}
-
-          <View style={styles.actions}>
-            <PillButton label="Cancel" variant="outline" onPress={onClose} style={styles.flexButton} />
-            <PillButton
-              label="Send invite"
-              onPress={submit}
-              loading={inviteUser.isPending}
-              disabled={!email.trim()}
-              style={styles.flexButton}
-            />
-          </View>
-        </View>
+      <Text style={styles.label}>Role</Text>
+      <View style={styles.chipRow}>
+        {USER_ROLES.map((r) => (
+          <Pressable key={r} onPress={() => setRole(r)} style={[styles.chip, role === r && styles.chipActive]}>
+            <Text style={[styles.chipLabel, role === r && styles.chipLabelActive]}>
+              {r === "admin" ? "Admin" : "Member"}
+            </Text>
+          </Pressable>
+        ))}
       </View>
-    </Modal>
+
+      {inviteUser.isError ? (
+        <Text style={styles.error}>{getErrorMessage(inviteUser.error, "Could not send the invite")}</Text>
+      ) : null}
+
+      <View style={styles.actions}>
+        <PillButton label="Cancel" variant="outline" onPress={onClose} style={styles.flexButton} />
+        <PillButton
+          label="Send invite"
+          onPress={submit}
+          loading={inviteUser.isPending}
+          disabled={!email.trim()}
+          style={styles.flexButton}
+        />
+      </View>
+    </Drawer>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radii.hero,
-    borderTopRightRadius: radii.hero,
-    padding: spacing.xl,
-    gap: spacing.md,
-  },
   title: { ...typography.title, color: colors.textPrimary },
   description: { ...typography.caption, color: colors.textSecondary },
   label: { ...typography.caption, color: colors.textSecondary },
