@@ -63,7 +63,7 @@ _Updated by: /renew-docs_
 
 **Not yet installed:** any form library — every Drawer-based form (Wallet/Category/Budget/Transaction) is plain `useState`, small enough not to need `react-hook-form`. No offline/local-DB layer (the old Flutter stack listed `drift` as intended but never adopted it; TanStack Query's cache is still the only client persistence).
 
-**Distribution:** EAS Build (`mobile/eas.json`, CLI `>= 12.0.0`) — a `preview` profile (`buildType: apk`, internal distribution) and a `production` profile (`autoIncrement: true`), both hardcoded to `EXPO_PUBLIC_API_BASE_URL=https://app.example.com/api/v1` (no separate staging target). Matches CLAUDE.md's "no App Store/Play Store — `.apk`/`.ipa` test builds only" constraint.
+**Distribution:** EAS Build (`mobile/eas.json`, CLI `>= 12.0.0`) — a `preview` profile (`buildType: apk`, internal distribution) and a `production` profile (`autoIncrement: true`), both hardcoded to `EXPO_PUBLIC_API_BASE_URL=https://api.example.com/api/v1` (no separate staging target). Matches CLAUDE.md's "no App Store/Play Store — `.apk`/`.ipa` test builds only" constraint.
 
 **No `GET /users/me` endpoint exists** — the JWT's `AccessClaims` carry only `user_id`/`role`, no name/email (`backend/internal/service/token_service.go`). Profile's displayed name/email come from the email typed at login, persisted via `expo-secure-store` alongside the tokens (`src/stores/session-store.ts`) — not re-verified against the server on each load.
 

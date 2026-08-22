@@ -373,7 +373,7 @@ Backend → validate input (handler) → verify Wallet/Category ownership + type
 | Mobile framework | React Native (Expo) | User-directed change 2026-08-16, replacing Flutter — no further rationale recorded | Zero code reuse from the old Flutter app; TanStack Query/Zustand pairing does reuse the web client's mental model |
 | AI Service | Implemented (Feature-12 US-01 only); Groq primary / Anthropic fallback via tool/function calling | Budget-conscious (`docs/features.md` §6); prose-described JSON schemas proved unreliable in live testing | Only the create-transaction-via-chat slice exists — edit/query/advice intents are unspecced |
 | Category icon storage | Cloudflare R2 via `minio-go` (S3-compatible) | Lighter than `aws-sdk-go-v2` for a single-bucket, single-operation use case | Both `EmailSender` and `IconUploader` degrade to a no-op/log fallback when unconfigured, so a missing `R2_*`/`SMTP_*` env var fails one request, not the whole boot — but it also means a misconfigured VPS fails *silently* per-request rather than at deploy time |
-| Mobile distribution | EAS Build → internal `.apk` (`mobile/eas.json`) | CLAUDE.md: no App Store/Play Store submission, test builds only | `submit.production` block exists but unused; `preview`/`production` profiles both point at the same hardcoded production API URL (`https://app.example.com/api/v1`) — no staging API target |
+| Mobile distribution | EAS Build → internal `.apk` (`mobile/eas.json`) | CLAUDE.md: no App Store/Play Store submission, test builds only | `submit.production` block exists but unused; `preview`/`production` profiles both point at the same hardcoded production API URL (`https://api.example.com/api/v1`) — no staging API target |
 
 ---
 
