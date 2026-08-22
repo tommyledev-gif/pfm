@@ -5,6 +5,7 @@ import * as ImagePicker from "expo-image-picker";
 import { Avatar } from "@/components/ui/Avatar";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Drawer } from "@/components/shared/Drawer";
+import { EmojiPickerInput } from "@/components/ui/EmojiPickerInput";
 import { FieldError } from "@/components/ui/FieldError";
 import { PillButton } from "@/components/ui/PillButton";
 import { TrashIcon } from "@/components/ui/Icon";
@@ -143,13 +144,7 @@ export function CategoryFormModal({ visible, onClose, editingCategory }: Categor
         {submitAttempted ? <FieldError message={errors.name} /> : null}
 
         <Text style={styles.label}>Biểu tượng emoji (dùng khi chưa có ảnh)</Text>
-        <TextInput
-          value={icon}
-          onChangeText={setIcon}
-          placeholder="vd: 🛒"
-          placeholderTextColor={colors.textMuted}
-          style={styles.input}
-        />
+        <EmojiPickerInput value={icon} onChange={setIcon} placeholder="vd: 🛒" />
 
         <Text style={styles.label}>Loại{isEditing ? " (khóa sau khi tạo)" : ""}</Text>
         <View style={styles.chipRow}>

@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 
 import { AmountInput } from "@/components/ui/AmountInput";
 import { Avatar } from "@/components/ui/Avatar";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Drawer } from "@/components/shared/Drawer";
+import { EmojiPickerInput } from "@/components/ui/EmojiPickerInput";
 import { FieldError } from "@/components/ui/FieldError";
 import { PillButton } from "@/components/ui/PillButton";
 import { TrashIcon } from "@/components/ui/Icon";
@@ -21,7 +22,7 @@ import { useUploadBudgetIconMutation } from "@/features/budgets/api/use-upload-b
 import { Budget } from "@/features/budgets/types";
 import { WalletCurrency } from "@/lib/constants";
 
-interface NewBudgetModalProps {
+interface BudgetFormModalProps {
   visible: boolean;
   onClose: () => void;
   currency: WalletCurrency;
@@ -32,11 +33,14 @@ interface NewBudgetModalProps {
 
 // Insights → Budgets tab "+ New budget" action (README), extended to also
 // handle editing an existing budget's limit (tap a BudgetCard) — kept as one
-// Modal sheet rather than two near-identical ones.
+// Modal sheet rather than two near-identical ones. Moved here from
+// components/shared/NewBudgetModal.tsx to match the feature-scoped
+// CategoryFormModal/WalletFormModal convention (it's only ever used by
+// BudgetsTab.tsx, so "shared" never applied).
 // Icon picker mirrors CategoryFormModal.tsx's pattern exactly
 // (specs/wallet-budget-icons/spec.md US-03/US-04) — independent of the
 // selected Category's own icon.
-export function NewBudgetModal({ visible, onClose, currency, editingBudget }: NewBudgetModalProps) {
+export function BudgetFormModal({ visible, onClose, currency, editingBudget }: BudgetFormModalProps) {
   const isEditing = Boolean(editingBudget);
   const categories = useCategoriesQuery("expense");
   const createBudget = useCreateBudgetMutation();
@@ -161,13 +165,7 @@ export function NewBudgetModal({ visible, onClose, currency, editingBudget }: Ne
         {submitAttempted ? <FieldError message={errors.category} /> : null}
 
         <Text style={styles.label}>Biểu tượng emoji (dùng khi chưa có ảnh)</Text>
-        <TextInput
-          value={icon}
-          onChangeText={setIcon}
-          placeholder="vd: 💸"
-          placeholderTextColor={colors.textMuted}
-          style={styles.input}
-        />
+        <EmojiPickerInput value={icon} onChange={setIcon} placeholder="vd: 💸" />
 
         <Text style={styles.label}>Hạn mức hàng tháng ({currency})</Text>
         <AmountInput value={amount} onChangeText={setAmount} />
@@ -229,16 +227,6 @@ const styles = StyleSheet.create({
   categoryChipActive: { backgroundColor: colors.green, borderColor: colors.green },
   categoryChipLabel: { ...typography.caption, color: colors.textSecondary },
   categoryChipLabelActive: { color: colors.onGreen },
-  input: {
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    borderRadius: radii.listCard,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: 12,
-    color: colors.textPrimary,
-    ...typography.body,
-  },
   error: { color: colors.peach, ...typography.caption },
   actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
   flexButton: { flex: 1 },

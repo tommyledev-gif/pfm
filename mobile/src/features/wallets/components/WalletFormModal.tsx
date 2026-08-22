@@ -5,6 +5,7 @@ import * as ImagePicker from "expo-image-picker";
 import { AmountInput } from "@/components/ui/AmountInput";
 import { Avatar } from "@/components/ui/Avatar";
 import { Drawer } from "@/components/shared/Drawer";
+import { EmojiPickerInput } from "@/components/ui/EmojiPickerInput";
 import { FieldError } from "@/components/ui/FieldError";
 import { PillButton } from "@/components/ui/PillButton";
 import { getErrorMessage } from "@/lib/axios";
@@ -142,13 +143,7 @@ export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormM
       {submitAttempted ? <FieldError message={errors.name} /> : null}
 
       <Text style={styles.label}>Biểu tượng emoji (dùng khi chưa có ảnh)</Text>
-      <TextInput
-        value={icon}
-        onChangeText={setIcon}
-        placeholder="vd: 💵"
-        placeholderTextColor={colors.textMuted}
-        style={styles.input}
-      />
+      <EmojiPickerInput value={icon} onChange={setIcon} placeholder="vd: 💵" />
 
       <Text style={styles.label}>Loại</Text>
       <View style={styles.chipRow}>

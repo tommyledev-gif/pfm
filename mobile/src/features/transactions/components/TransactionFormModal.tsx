@@ -160,11 +160,6 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
         <AmountInput value={amount} onChangeText={setAmount} />
         {submitAttempted ? <FieldError message={errors.amount} /> : null}
 
-        <Text style={styles.label}>Ngày</Text>
-        <Pressable style={styles.input} onPress={() => setDatePickerOpen(true)}>
-          <Text style={{ color: colors.textPrimary, ...typography.body }}>{formatDateShort(occurredAt)}</Text>
-        </Pressable>
-
         <Text style={styles.label}>Ghi chú (không bắt buộc)</Text>
         <TextInput
           value={note}
@@ -174,6 +169,11 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
           maxLength={TRANSACTION_NOTE_MAX_LENGTH}
           style={styles.input}
         />
+
+        <Text style={styles.label}>Ngày</Text>
+        <Pressable style={styles.input} onPress={() => setDatePickerOpen(true)}>
+          <Text style={{ color: colors.textPrimary, ...typography.body }}>{formatDateShort(occurredAt)}</Text>
+        </Pressable>
 
         {activeError ? <Text style={styles.error}>{getErrorMessage(activeError, "Không thể lưu giao dịch")}</Text> : null}
 

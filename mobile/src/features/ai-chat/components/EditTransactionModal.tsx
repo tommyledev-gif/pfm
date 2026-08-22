@@ -108,6 +108,17 @@ export function EditTransactionModal({ visible, payload, onClose, onSave }: Edit
       </View>
 
       <View style={styles.fieldGroup}>
+        <Text style={styles.label}>Ghi chú (không bắt buộc)</Text>
+        <TextInput
+          value={note}
+          onChangeText={setNote}
+          placeholder="vd: Cà phê với bạn"
+          placeholderTextColor={colors.textMuted}
+          style={styles.input}
+        />
+      </View>
+
+      <View style={styles.fieldGroup}>
         <Text style={styles.label}>Danh mục</Text>
         <View style={styles.chipRow}>
           {(categories.data ?? []).map((c) => (
@@ -153,17 +164,6 @@ export function EditTransactionModal({ visible, payload, onClose, onSave }: Edit
             todayTextColor: colors.green,
           }}
           style={styles.calendar}
-        />
-      </View>
-
-      <View style={styles.fieldGroup}>
-        <Text style={styles.label}>Ghi chú (không bắt buộc)</Text>
-        <TextInput
-          value={note}
-          onChangeText={setNote}
-          placeholder="vd: Cà phê với bạn"
-          placeholderTextColor={colors.textMuted}
-          style={styles.input}
         />
       </View>
 

@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { PlusIcon } from "@/components/ui/Icon";
 import { BudgetCard } from "@/components/shared/BudgetCard";
-import { NewBudgetModal } from "@/components/shared/NewBudgetModal";
+import { BudgetFormModal } from "@/features/budgets/components/BudgetFormModal";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { WalletCurrency } from "@/lib/constants";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
@@ -77,7 +77,7 @@ export function BudgetsTab() {
         )}
       </ScrollView>
 
-      <NewBudgetModal
+      <BudgetFormModal
         visible={modalOpen}
         onClose={() => setModalOpen(false)}
         currency={currency}
