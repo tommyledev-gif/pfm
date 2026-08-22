@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Animated, FlatList, Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SendIcon, SparkleIcon } from "@/components/ui/Icon";
 import { Screen } from "@/components/shared/Screen";
 import { TypingIndicator } from "@/components/shared/TypingIndicator";
 import { ChatBubble } from "@/features/ai-chat/components/ChatBubble";
+import { EditHistoryDialog } from "@/features/ai-chat/components/EditHistoryDialog";
 import { EditMessageModal } from "@/features/ai-chat/components/EditMessageModal";
 import { EditTransactionModal } from "@/features/ai-chat/components/EditTransactionModal";
 import { TransactionActionCard } from "@/features/ai-chat/components/TransactionActionCard";
+import { TransactionCardActionsModal } from "@/features/ai-chat/components/TransactionCardActionsModal";
 import { TransactionFormModal } from "@/features/transactions/components/TransactionFormModal";
 import { getErrorCode } from "@/lib/axios";
 import { colors, radii, spacing, typography } from "@/lib/theme";
@@ -17,7 +19,7 @@ import { useCategoriesQuery } from "@/features/categories/api/use-categories-que
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useSendChatMessageMutation } from "@/features/ai-chat/api/use-send-chat-message-mutation";
 import { useCreateTransactionMutation } from "@/features/transactions/api/use-create-transaction-mutation";
-import { ChatMessage, TransactionActionPayload } from "@/features/ai-chat/types";
+import { ChatMessage, EditHistoryEntry, TransactionActionPayload } from "@/features/ai-chat/types";
 import { useChatStore } from "@/stores/chat-store";
 
 // A per-session counter would collide with ids from a previous session now
@@ -54,6 +56,26 @@ const MIN_TYPING_MS = 1300;
 // making the gesture never fire at all.
 const EDIT_LONG_PRESS_MS = 500;
 
+// When the keyboard is open, a plain tap on a transaction card area is
+// expected to just dismiss the keyboard (standard behavior everywhere
+// else in the app) — a 500ms hold would fire the edit modal mid-dismiss,
+// stealing that gesture. Requiring a deliberately longer hold here means a
+// quick tap-to-dismiss never accidentally opens the modal, while a genuine
+// hold still gets there (dismissing the keyboard first, then opening once
+// the input bar has settled back into its closed-keyboard position — see
+// handleCardLongPress below).
+const EDIT_LONG_PRESS_KEYBOARD_MS = 2000;
+
+// How long the "go to original" highlight ring stays at full opacity
+// before fading, and how long the fade itself takes.
+const HIGHLIGHT_HOLD_MS = 3000;
+const HIGHLIGHT_FADE_MS = 600;
+
+// Gives the input bar's margin time to settle back to its closed-keyboard
+// value (see useKeyboardHeight's hide-event handler) before a modal opens
+// on top of it, so the sheet doesn't visibly jump as the keyboard closes.
+const KEYBOARD_DISMISS_SETTLE_MS = 280;
+
 // BottomNav (components/shared/BottomNav.tsx) floats at insets.bottom + 16,
 // standing 64px tall — this is how far above the screen's bottom edge the
 // input bar's own bottom must sit to clear it when the keyboard is closed.
@@ -71,16 +93,26 @@ export default function AiChatScreen() {
   const thread = useChatStore((s) => s.thread);
   const addMessage = useChatStore((s) => s.addMessage);
   const updateMessage = useChatStore((s) => s.updateMessage);
+  const removeMessage = useChatStore((s) => s.removeMessage);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [manualEntryOpen, setManualEntryOpen] = useState(false);
-  // Two different long-press targets need two different editors: a plain
-  // chat bubble (user text, or an actionless assistant reply) opens a text
-  // editor, while an assistant bubble carrying a transaction proposal opens
-  // the structured form instead — see the renderItem long-press dispatch.
+  // Three different long-press targets need three different follow-ups: a
+  // plain chat bubble (user text, or an actionless assistant reply) opens a
+  // text editor; a fresh/never-corrected transaction proposal opens the
+  // structured form directly; a corrective card (one that itself replaced
+  // an earlier proposal) opens a small menu instead, since "go to original"
+  // is now also on offer there — see the renderItem long-press dispatch.
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
   const [editingActionMessage, setEditingActionMessage] = useState<ChatMessage | null>(null);
+  const [cardActionsMessage, setCardActionsMessage] = useState<ChatMessage | null>(null);
+  const [historyMessage, setHistoryMessage] = useState<ChatMessage | null>(null);
+  // Drives the fading border ring drawn around the message "go to original"
+  // scrolled back to — a single shared Animated.Value since only one ring
+  // is ever showing at a time.
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const highlightOpacity = useRef(new Animated.Value(0)).current;
   // Drives the input bar's own margin directly off the measured keyboard
   // height — see use-keyboard-height.ts for why this isn't
   // KeyboardAvoidingView. BottomNav (app/(app)/_layout.tsx) hides itself on
@@ -123,13 +155,15 @@ export default function AiChatScreen() {
       if (elapsed < MIN_TYPING_MS) {
         await new Promise((resolve) => setTimeout(resolve, MIN_TYPING_MS - elapsed));
       }
+      const action = response.actions[0];
       return {
         id: nextId(),
         role: "assistant",
         text: response.message,
-        action: response.actions[0],
+        action,
         intent: response.intent === "ambiguous" ? "ambiguous" : undefined,
         edited,
+        editHistory: action ? [{ payload: action.payload, timestamp: Date.now(), source: "created" }] : undefined,
       };
     } catch (err) {
       const code = getErrorCode(err);
@@ -181,21 +215,71 @@ export default function AiChatScreen() {
   };
 
   // Editing an assistant's proposed transaction never calls the AI again —
-  // the user is directly supplying the corrected fields — so this just
-  // constructs a new action with a fresh idempotency_key (the original came
-  // from the AI Service; this one never did) and appends it, marking the
-  // stale original superseded the same way editUserMessage does.
+  // the user is directly supplying the corrected fields. What happens next
+  // depends on whether target was already confirmed:
+  //   - not confirmed: nothing is saved yet, so it's safe to just mutate
+  //     target in place and append this snapshot to its editHistory. No new
+  //     message, no supersede — the card stays exactly where it was.
+  //   - confirmed: a real transaction already exists for target, so its
+  //     payload can't be silently rewritten. A new corrective message is
+  //     appended instead (fresh idempotency_key — the original came from
+  //     the AI Service or a prior manual edit, this one never did), target
+  //     is marked superseded (its card stops rendering — see renderItem),
+  //     and originalMessageId links the new card back to target so "go to
+  //     original" and "delete this" both know what to do.
   const editAction = (target: ChatMessage, payload: TransactionActionPayload) => {
+    const timestamp = Date.now();
+    const priorHistory: EditHistoryEntry[] =
+      target.editHistory ?? (target.action ? [{ payload: target.action.payload, timestamp, source: "created" }] : []);
+    const editHistory = [...priorHistory, { payload, timestamp, source: "edited" as const }];
+
     if (!target.confirmed) {
-      updateMessage(target.id, { superseded: true });
+      updateMessage(target.id, {
+        action: { ...target.action!, payload, idempotency_key: uuidv4() },
+        edited: true,
+        editHistory,
+      });
+      return;
     }
+
+    updateMessage(target.id, { superseded: true });
     addMessage({
       id: nextId(),
       role: "assistant",
       text: "Đây là giao dịch đã được chỉnh sửa.",
       action: { type: "create_transaction", payload, idempotency_key: uuidv4(), confidence: 1 },
       edited: true,
+      originalMessageId: target.id,
+      editHistory,
     });
+  };
+
+  // "Delete this" on a corrective card — the correction was never
+  // confirmed/saved, so there's nothing to delete server-side. Just drop
+  // the corrective message and bring the original's card back.
+  const deleteCorrection = (message: ChatMessage) => {
+    removeMessage(message.id);
+    if (message.originalMessageId) {
+      updateMessage(message.originalMessageId, { superseded: false });
+    }
+  };
+
+  // Scrolls the thread back to the message a corrective card replaced and
+  // rings it with a fading border so it's obvious which one just got
+  // navigated to. viewPosition centers it rather than pinning it to the
+  // very top edge, which can land partly under the header.
+  const goToOriginal = (message: ChatMessage) => {
+    const originalId = message.originalMessageId;
+    if (!originalId) return;
+    const index = thread.findIndex((m) => m.id === originalId);
+    if (index === -1) return;
+    listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.3 });
+    setHighlightedId(originalId);
+    highlightOpacity.setValue(1);
+    Animated.sequence([
+      Animated.delay(HIGHLIGHT_HOLD_MS),
+      Animated.timing(highlightOpacity, { toValue: 0, duration: HIGHLIGHT_FADE_MS, useNativeDriver: true }),
+    ]).start(() => setHighlightedId(null));
   };
 
   const confirmAction = (message: ChatMessage) => {
@@ -209,6 +293,36 @@ export default function AiChatScreen() {
         onSettled: () => setConfirmingId(null),
       },
     );
+  };
+
+  // Long-press dispatch, factored out of renderItem's onLongPress so the
+  // keyboard-open path (below) can delay it without duplicating the
+  // decision tree.
+  const openLongPressTarget = (item: ChatMessage) => {
+    if (item.action) {
+      if (item.originalMessageId) {
+        setCardActionsMessage(item);
+      } else {
+        setEditingActionMessage(item);
+      }
+    } else if (item.role === "assistant" && item.intent === "ambiguous") {
+      return;
+    } else {
+      setEditingMessage(item);
+    }
+  };
+
+  // When the keyboard is open, treat the hold as "dismiss the keyboard,
+  // then act" rather than acting immediately underneath it — see
+  // EDIT_LONG_PRESS_KEYBOARD_MS above for why the hold itself is already
+  // longer in that case.
+  const handleCardLongPress = (item: ChatMessage) => {
+    if (keyboardVisible) {
+      Keyboard.dismiss();
+      setTimeout(() => openLongPressTarget(item), KEYBOARD_DISMISS_SETTLE_MS);
+    } else {
+      openLongPressTarget(item);
+    }
   };
 
   return (
@@ -226,27 +340,27 @@ export default function AiChatScreen() {
         keyExtractor={(m) => m.id}
         contentContainerStyle={styles.thread}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+        onScrollToIndexFailed={({ index }) =>
+          setTimeout(() => listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.3 }), 100)
+        }
         renderItem={({ item }) => (
           <Pressable
-            onLongPress={() => {
-              // The AI's own clarifying question (rare now — only a missing
-              // amount or a non-transaction message) has nothing for the
-              // user to "correct" the way an edit modal implies, unlike a
-              // transaction proposal (always editable) or a user's own
-              // message (item 16 — don't let ambiguous AI questions be
-              // held-and-edited like ordinary text).
-              if (item.action) {
-                setEditingActionMessage(item);
-              } else if (item.role === "assistant" && item.intent === "ambiguous") {
-                return;
-              } else {
-                setEditingMessage(item);
-              }
-            }}
-            delayLongPress={EDIT_LONG_PRESS_MS}
+            // The AI's own clarifying question (rare now — only a missing
+            // amount or a non-transaction message) has nothing for the
+            // user to "correct" the way an edit modal implies, unlike a
+            // transaction proposal (always editable) or a user's own
+            // message — don't let ambiguous AI questions be held-and-edited
+            // like ordinary text. See openLongPressTarget for the rest of
+            // the dispatch.
+            onLongPress={() => handleCardLongPress(item)}
+            delayLongPress={keyboardVisible ? EDIT_LONG_PRESS_KEYBOARD_MS : EDIT_LONG_PRESS_MS}
           >
-            <ChatBubble role={item.role} text={item.text}>
-              {item.action ? (
+            <ChatBubble
+              role={item.role}
+              text={item.text}
+              highlightOpacity={highlightedId === item.id ? highlightOpacity : undefined}
+            >
+              {item.action && !item.superseded ? (
                 <TransactionActionCard
                   action={item.action}
                   walletName={walletById.get(item.action.payload.wallet_id)?.name ?? "Ví"}
@@ -258,7 +372,8 @@ export default function AiChatScreen() {
                   saving={confirmingId === item.id}
                   onConfirm={() => confirmAction(item)}
                   edited={item.edited}
-                  superseded={item.superseded}
+                  onPressHistory={item.editHistory ? () => setHistoryMessage(item) : undefined}
+                  onDelete={item.originalMessageId && !item.confirmed ? () => deleteCorrection(item) : undefined}
                 />
               ) : item.offerManualEntry ? (
                 <Pressable style={styles.manualEntryButton} onPress={() => setManualEntryOpen(true)}>
@@ -333,6 +448,30 @@ export default function AiChatScreen() {
         setEditingActionMessage(null);
         if (target) editAction(target, payload);
       }}
+    />
+
+    <TransactionCardActionsModal
+      visible={Boolean(cardActionsMessage)}
+      onCancel={() => setCardActionsMessage(null)}
+      onEdit={() => {
+        const target = cardActionsMessage;
+        setCardActionsMessage(null);
+        if (target) setEditingActionMessage(target);
+      }}
+      onGoToOriginal={() => {
+        const target = cardActionsMessage;
+        setCardActionsMessage(null);
+        if (target) goToOriginal(target);
+      }}
+    />
+
+    <EditHistoryDialog
+      visible={Boolean(historyMessage)}
+      history={historyMessage?.editHistory ?? []}
+      currency={
+        historyMessage?.action ? walletById.get(historyMessage.action.payload.wallet_id)?.currency ?? "VND" : "VND"
+      }
+      onClose={() => setHistoryMessage(null)}
     />
 
     <TransactionFormModal visible={manualEntryOpen} onClose={() => setManualEntryOpen(false)} />

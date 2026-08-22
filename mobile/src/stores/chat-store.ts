@@ -15,6 +15,7 @@ interface ChatState {
   thread: ChatMessage[];
   addMessage: (message: ChatMessage) => void;
   updateMessage: (id: string, patch: Partial<ChatMessage>) => void;
+  removeMessage: (id: string) => void;
   clear: () => void;
 }
 
@@ -25,6 +26,7 @@ export const useChatStore = create<ChatState>()(
       addMessage: (message) => set((state) => ({ thread: [...state.thread, message] })),
       updateMessage: (id, patch) =>
         set((state) => ({ thread: state.thread.map((m) => (m.id === id ? { ...m, ...patch } : m)) })),
+      removeMessage: (id) => set((state) => ({ thread: state.thread.filter((m) => m.id !== id) })),
       clear: () => set({ thread: [] }),
     }),
     {

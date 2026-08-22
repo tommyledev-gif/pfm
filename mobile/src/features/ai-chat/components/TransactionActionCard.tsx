@@ -3,13 +3,13 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AmountRevealPopup } from "@/components/ui/AmountRevealPopup";
 import { Avatar } from "@/components/ui/Avatar";
-import { CalendarIcon, CheckIcon, EditIcon } from "@/components/ui/Icon";
+import { CalendarIcon, CheckIcon, EditIcon, TrashIcon } from "@/components/ui/Icon";
 import { PillButton } from "@/components/ui/PillButton";
 import { PillTag } from "@/components/ui/PillTag";
 import { colorForCategory } from "@/lib/category-color";
 import { formatCurrencyTruncated } from "@/lib/currency";
 import { formatDateShort } from "@/lib/format-date";
-import { colors, spacing, typography } from "@/lib/theme";
+import { colors, radii, spacing, typography } from "@/lib/theme";
 import { ChatAction } from "@/features/ai-chat/types";
 
 interface TransactionActionCardProps {
@@ -22,13 +22,15 @@ interface TransactionActionCardProps {
   confirmed: boolean;
   saving: boolean;
   onConfirm: () => void;
-  // edited: this proposal is itself the corrected replacement for an
-  // earlier one — badged so it doesn't read as a brand-new AI guess.
-  // superseded: the OPPOSITE direction — a corrected replacement for THIS
-  // card now exists further down the thread, so its own Confirm button is
-  // withdrawn to avoid saving the stale version by mistake.
+  // This proposal has been edited at least once (in place or via a
+  // correction chain) — badged so it doesn't read as a brand-new AI guess.
+  // Tapping the badge opens the edit-history dialog (onPressHistory).
   edited?: boolean;
-  superseded?: boolean;
+  onPressHistory?: () => void;
+  // Only set for a corrective message (originalMessageId is set on the
+  // message) that hasn't been confirmed yet — discards the correction and
+  // restores the original's card instead of saving it.
+  onDelete?: () => void;
 }
 
 // Renders inside an AI assistant chat bubble once a transaction has been
@@ -50,7 +52,8 @@ export function TransactionActionCard({
   saving,
   onConfirm,
   edited,
-  superseded,
+  onPressHistory,
+  onDelete,
 }: TransactionActionCardProps) {
   const { payload } = action;
   const isIncome = payload.type === "income";
@@ -70,12 +73,12 @@ export function TransactionActionCard({
   );
 
   return (
-    <View style={[styles.card, superseded && !confirmed ? styles.supersededCard : null]}>
+    <View style={styles.card}>
       {edited ? (
-        <View style={styles.editedBadge}>
+        <Pressable style={styles.editedBadge} onPress={onPressHistory} disabled={!onPressHistory}>
           <EditIcon size={12} color={colors.lavender} />
           <Text style={styles.editedLabel}>Đã sửa</Text>
-        </View>
+        </Pressable>
       ) : null}
 
       {confirmed ? (
@@ -109,11 +112,14 @@ export function TransactionActionCard({
             <PillTag label={categoryName} />
             <PillTag label={walletName} />
           </View>
-          {superseded ? (
-            <Text style={styles.supersededNote}>Đã sửa — xem đề xuất mới bên dưới</Text>
-          ) : (
+          <View style={styles.actionRow}>
             <PillButton label="Xác nhận & Lưu" onPress={onConfirm} loading={saving} style={styles.confirmButton} />
-          )}
+            {onDelete ? (
+              <Pressable style={styles.deleteButton} onPress={onDelete} disabled={saving}>
+                <TrashIcon size={16} />
+              </Pressable>
+            ) : null}
+          </View>
         </>
       )}
 
@@ -129,7 +135,6 @@ export function TransactionActionCard({
 
 const styles = StyleSheet.create({
   card: { gap: spacing.md, marginTop: spacing.sm },
-  supersededCard: { opacity: 0.55 },
   editedBadge: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start" },
   editedLabel: { ...typography.tiny, color: colors.lavender },
   compactRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
@@ -141,6 +146,15 @@ const styles = StyleSheet.create({
   dateRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   dateLabel: { ...typography.tiny, color: colors.textSecondary },
   tagRow: { flexDirection: "row", gap: spacing.sm },
-  confirmButton: { width: "100%" },
-  supersededNote: { ...typography.caption, color: colors.textMuted, fontStyle: "italic" },
+  actionRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  confirmButton: { flex: 1 },
+  deleteButton: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });
