@@ -18,6 +18,10 @@ type ChatIntent string
 const (
 	ChatIntentCreateTransaction ChatIntent = "create_transaction"
 	ChatIntentAmbiguous         ChatIntent = "ambiguous"
+	// ChatIntentBudgetWizard backs F-13 AI Budget Setup Wizard's chat trigger
+	// (specs/ai-budget-wizard/spec.md US-02) — mutually exclusive with
+	// ChatIntentCreateTransaction for the same message.
+	ChatIntentBudgetWizard ChatIntent = "budget_wizard"
 )
 
 // ChatMessage is the domain representation of the chat_messages table. Zero

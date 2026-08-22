@@ -12,15 +12,17 @@ interface PillButtonProps {
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
+  testID?: string;
 }
 
 // The design's recurring "black pill on neon green" action button (hero
 // card's Add Transaction, chat's Confirm & Save, etc.) — one component so
 // every screen renders the exact same pill shape/colors.
-export function PillButton({ label, icon, onPress, variant = "solid", disabled, loading, style, textStyle }: PillButtonProps) {
+export function PillButton({ label, icon, onPress, variant = "solid", disabled, loading, style, textStyle, testID }: PillButtonProps) {
   const isOutline = variant === "outline";
   return (
     <Pressable
+      testID={testID}
       onPress={onPress}
       disabled={disabled || loading}
       style={({ pressed }) => [

@@ -86,3 +86,31 @@ RETURNING *;
 -- a cross-repository query exception.
 SELECT DISTINCT user_id FROM budgets
 WHERE deleted_at IS NULL;
+
+-- name: LockBudgetsByUser :many
+-- Backs F-13 AI Budget Wizard's bulk-replace race guard
+-- (specs/ai-budget-wizard/spec.md S-BWZ-27, plan.md Finding #5) — takes a row
+-- lock on every one of the caller's non-deleted Budgets inside
+-- BudgetService.BulkReplaceBudgets's transaction, so two concurrent wizard
+-- submissions serialize rather than interleave.
+SELECT * FROM budgets
+WHERE user_id = $1
+  AND deleted_at IS NULL
+FOR UPDATE;
+
+-- name: SoftDeleteBudgetsByUser :exec
+-- Replaces every one of the caller's active Budgets in one statement — the
+-- bulk-replace's "full replace, not a merge" semantics
+-- (specs/ai-budget-wizard/spec.md Edge Cases #1, plan.md Finding #5). Always
+-- called after LockBudgetsByUser inside the same transaction.
+UPDATE budgets
+SET deleted_at = NOW()
+WHERE user_id = $1
+  AND deleted_at IS NULL;
+
+-- name: DeleteBudgetLimitsByBudgetIDs :exec
+-- Batched budget_limits cleanup for the bulk-replace endpoint
+-- (specs/ai-budget-wizard/plan.md Finding #10) — one statement instead of a
+-- per-Budget DeleteBudgetLimits loop, called on the IDs LockBudgetsByUser
+-- just returned, before SoftDeleteBudgetsByUser.
+DELETE FROM budget_limits WHERE budget_id = ANY(sqlc.arg(budget_ids)::uuid[]);

@@ -14,7 +14,7 @@ import (
 // (/api/v1). Auth/rate-limit middleware ordering matters: JWTAuth must run
 // before RequireRole (role comes from the token) and before
 // InviteRateLimiter (keyed by the caller's user ID from that same token).
-func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, chatHandler *handler.ChatHandler, tokens *service.TokenService, logger *zap.Logger) {
+func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, chatHandler *handler.ChatHandler, budgetWizardHandler *handler.BudgetWizardHandler, tokens *service.TokenService, logger *zap.Logger) {
 	// Serves the invite-activation form at the backend's own domain — see
 	// handler.ActivatePageHandler doc comment for why this lives here instead
 	// of on the (currently undeployed) frontend/ Next.js app.
@@ -75,6 +75,10 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	// image before a budget exists yet (the create form), same convention as
 	// categories.Post("/icon") (specs/wallet-budget-icons/spec.md US-03).
 	budgets.Post("/icon", budgetHandler.UploadIcon)
+	// F-13 AI Budget Setup Wizard's bulk-create (specs/ai-budget-wizard/spec.md
+	// US-05) — joins the existing budgets group, JWTAuth only, same as every
+	// other /budgets/* endpoint (plan.md Finding #4).
+	budgets.Post("/bulk", budgetHandler.BulkCreateBudgets)
 	budgets.Post("/", budgetHandler.CreateBudget)
 	budgets.Get("/", budgetHandler.ListBudgets)
 	budgets.Get("/:id", budgetHandler.GetBudget)
@@ -114,4 +118,12 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	// no separate route.
 	ai := v1.Group("/ai", middleware.JWTAuth(tokens, logger), middleware.AIChatRateLimiter(logger))
 	ai.Post("/chat", chatHandler.Chat)
+
+	// F-13 AI Budget Setup Wizard (specs/ai-budget-wizard/plan.md Finding #4)
+	// — share the /ai group's rate limiter for URL-namespace consistency,
+	// even though Prefill/Proposals never actually call the AI Service;
+	// only SuggestCategoryName does (Finding #6/#11).
+	ai.Get("/budget-wizard/prefill", budgetWizardHandler.Prefill)
+	ai.Post("/budget-proposals", budgetWizardHandler.Proposals)
+	ai.Post("/suggest-category-name", budgetWizardHandler.SuggestCategoryName)
 }

@@ -1,8 +1,20 @@
-// Shared date/time formatters — Transactions rows show a time, Notifications
+// Shared date/time formatters — Transactions rows show a date, Notifications
 // group by day label ("Today"/"Yesterday"/date). Kept here so no screen
 // hand-rolls its own Date math.
 export function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
+// dd/mm/yyyy, in the device's local timezone (not UTC-anchored like
+// formatDateShort below) — occurred_at is a real TIMESTAMPTZ with actual
+// time-of-day, so its calendar date should read the same as the wall-clock
+// day the user experienced it on, same convention formatTime already uses.
+export function formatDateDMY(iso: string): string {
+  const date = new Date(iso);
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
 }
 
 export function formatDateRange(fromIso: string, toIso: string): string {

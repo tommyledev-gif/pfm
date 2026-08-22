@@ -65,9 +65,11 @@ type AIProposedTransaction struct {
 	Confidence float64
 }
 
-// AIExtractResponse.Intent is "create_transaction" or "ambiguous" for this
-// cut's scope (spec.md Resolved design decision #2) — the Python service
-// never returns edit_transaction/query_spending/general_advice here.
+// AIExtractResponse.Intent is "create_transaction" or "ambiguous" for
+// Feature-12's original scope (spec.md Resolved design decision #2), plus
+// "budget_wizard" (specs/ai-budget-wizard/spec.md US-02, BWZ-T13) — the
+// Python service never returns edit_transaction/query_spending/
+// general_advice here.
 type AIExtractResponse struct {
 	Intent       string
 	Transactions []AIProposedTransaction

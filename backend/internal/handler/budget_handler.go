@@ -144,6 +144,44 @@ func (h *BudgetHandler) DeleteBudget(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, "budget deleted successfully", nil)
 }
 
+// BulkCreateBudgets handles POST /budgets/bulk (specs/ai-budget-wizard/spec.md
+// US-05) — the 20-item cap and duplicate-category_id check both run here,
+// at handler level, before any service call (plan.md Business Rules): a
+// generic `max` validator tag would produce 400 INVALID_INPUT, but this
+// endpoint's contract requires the distinct 422 TOO_MANY_BUDGETS/
+// DUPLICATE_CATEGORY_IN_REQUEST codes instead.
+func (h *BudgetHandler) BulkCreateBudgets(c *fiber.Ctx) error {
+	var req dto.BulkCreateBudgetsRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, h.logger, common.NewInvalidInputError("malformed request body"))
+	}
+	if err := validate.Struct(req); err != nil {
+		return response.Error(c, h.logger, newValidationError(err))
+	}
+	if len(req.Budgets) > common.BudgetWizardMaxItems {
+		return response.Error(c, h.logger, common.ErrTooManyBudgets)
+	}
+	seen := make(map[uuid.UUID]bool, len(req.Budgets))
+	for _, b := range req.Budgets {
+		if seen[b.CategoryID] {
+			return response.Error(c, h.logger, common.ErrDuplicateCategoryInRequest)
+		}
+		seen[b.CategoryID] = true
+	}
+
+	userID, err := callerUUID(c)
+	if err != nil {
+		return response.Error(c, h.logger, common.ErrUnauthenticated)
+	}
+
+	budgets, err := h.budgetService.BulkReplaceBudgets(c.Context(), userID, req.Budgets)
+	if err != nil {
+		return response.Error(c, h.logger, err)
+	}
+
+	return response.Success(c, fiber.StatusCreated, "budgets created successfully", dto.NewBulkCreateBudgetsResponse(budgets))
+}
+
 // UploadIcon handles POST /budgets/icon (multipart, field "file") — mirrors
 // CategoryHandler.UploadIcon/WalletHandler.UploadIcon exactly
 // (specs/wallet-budget-icons/spec.md US-03), a standalone upload step so a

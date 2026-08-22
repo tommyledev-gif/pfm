@@ -168,6 +168,67 @@ const (
 	VNDToCentsFactor = 100
 )
 
+// AI Budget Setup Wizard (F-13, specs/ai-budget-wizard). All allocation math
+// runs in-process (budgetproposal.Compute) — no LLM/network call for this
+// step (plan.md Finding #6).
+const (
+	// BudgetWizardMaxItems is the 20-Budget-per-request cap shared by
+	// POST /ai/budget-proposals' preferences and POST /budgets/bulk's budgets
+	// (spec.md S-BWZ-10/S-BWZ-25).
+	BudgetWizardMaxItems = 20
+	// BudgetWizardMinAmountPerCategory is the floor every proposed amount is
+	// clamped up to, scaling other amounts down if needed to make room
+	// (spec.md US-04 Main Flow step 3).
+	BudgetWizardMinAmountPerCategory int64 = 50_000
+	// BudgetWizardMaxShareOfIncome is the per-Category ceiling (50% of
+	// income), lifted entirely when only one Category was selected
+	// (spec.md S-BWZ-14).
+	BudgetWizardMaxShareOfIncome = 0.5
+	// BudgetWizardWeightedPoolShare is the share of income available to
+	// weighted (non-ai_decides) Categories before ai_decides baselines are
+	// subtracted (spec.md US-04 Main Flow step 3: "90% of income − sum of
+	// ai_decides baselines").
+	BudgetWizardWeightedPoolShare = 0.9
+	// BudgetWizardMinUnallocatedShare is the floor the remainder must never
+	// go below — shown to the User as "unallocated", never silently
+	// distributed (spec.md US-04 Main Flow step 3 / S-BWZ-19).
+	BudgetWizardMinUnallocatedShare = 0.1
+)
+
+// BudgetWizardPreferenceWeights maps a spending_preference to its fixed
+// weight (spec.md US-04 Main Flow step 3) — "ai_decides" is deliberately
+// absent here, it uses BudgetWizardCategoryBaselines instead.
+var BudgetWizardPreferenceWeights = map[string]float64{
+	"very_little": 0.4,
+	"little":      0.7,
+	"normal":      1.0,
+	"a_lot":       1.5,
+	"priority":    2.0,
+}
+
+// BudgetWizardCategoryBaselines is the fixed baseline share of income per
+// Category-name pattern used for "ai_decides" (spec.md US-04 Main Flow step
+// 3) — matched case-insensitively against a substring of the Category's
+// name; BudgetWizardDefaultBaseline applies when nothing matches. Order is
+// insignificant since matches are keyword-based, not positional.
+var BudgetWizardCategoryBaselines = map[string]float64{
+	"food":      0.25,
+	"ăn":        0.25,
+	"transport": 0.10,
+	"di chuyển": 0.10,
+	"housing":   0.15,
+	"nhà":       0.15,
+	"bill":      0.15,
+	"hóa đơn":   0.15,
+	"saving":    0.20,
+	"tiết kiệm": 0.20,
+}
+
+// BudgetWizardDefaultBaseline is the "ai_decides" baseline for a Category
+// name that matches none of BudgetWizardCategoryBaselines' patterns
+// (spec.md US-04 Main Flow step 3: "unmatched ≈ 5%").
+const BudgetWizardDefaultBaseline = 0.05
+
 // SupportedCurrencies is the same {VND, USD} allow-list as Wallet's currency
 // (WalletDefaultCurrency above), but expressed as a real Go-side lookup — not
 // just a struct-tag oneof — because `limits` map-KEY validation cannot be

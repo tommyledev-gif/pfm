@@ -97,6 +97,12 @@ type BudgetRepo interface {
 	// NotificationService.EvaluateBudgets, which loops this list and reuses
 	// this repo's own per-user methods above rather than a new global query.
 	ListDistinctUserIDsWithActiveBudgets(ctx context.Context) ([]uuid.UUID, error)
+	// LockBudgetsByUser/SoftDeleteBudgetsByUser/DeleteBudgetLimitsByBudgetIDs
+	// were added by specs/ai-budget-wizard/plan.md Finding #5/#10 — back
+	// BudgetService.BulkReplaceBudgets's atomic full-replace (F-13).
+	LockBudgetsByUser(ctx context.Context, tx pgx.Tx, userID uuid.UUID) ([]*model.Budget, error)
+	SoftDeleteBudgetsByUser(ctx context.Context, tx pgx.Tx, userID uuid.UUID) error
+	DeleteBudgetLimitsByBudgetIDs(ctx context.Context, tx pgx.Tx, budgetIDs []uuid.UUID) error
 }
 
 // TransactionRepo is the repository contract TransactionService depends on
@@ -136,6 +142,16 @@ type AIServiceClient interface {
 	Extract(ctx context.Context, req AIExtractRequest) (*AIExtractResponse, error)
 }
 
+// AIBudgetClient is the contract BudgetWizardService depends on for the one
+// AI-Service-backed call this feature makes — SuggestCategoryName only
+// (specs/ai-budget-wizard/plan.md Finding #6). The allocation-proposal math
+// itself never leaves the Go Backend, so it has no place in this interface.
+// A real HTTP implementation lives in ai_budget_client.go; tests substitute
+// a fake.
+type AIBudgetClient interface {
+	SuggestCategoryName(ctx context.Context, description string) (*AISuggestCategoryNameResponse, error)
+}
+
 // ReportRepo is the repository contract ReportService depends on (F-07).
 // *repository.ReportRepository satisfies this structurally; tests substitute
 // an in-memory fake, same convention as WalletRepo/CategoryRepo/BudgetRepo/
@@ -172,4 +188,5 @@ var (
 	_ ReportRepo       = (*repository.ReportRepository)(nil)
 	_ NotificationRepo = (*repository.NotificationRepository)(nil)
 	_ ChatRepo         = (*repository.ChatRepository)(nil)
+	_ AIBudgetClient   = (*httpAIBudgetClient)(nil)
 )

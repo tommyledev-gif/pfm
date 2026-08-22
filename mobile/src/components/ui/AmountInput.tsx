@@ -7,6 +7,7 @@ interface AmountInputProps {
   onChangeText: (value: string) => void;
   placeholder?: string;
   style?: TextInputProps["style"];
+  testID?: string;
 }
 
 function sanitizeToNumericString(raw: string): string {
@@ -39,9 +40,10 @@ function formatWithThousands(clean: string): string {
 // couldn't, which is what read as "amounts always get rounded" (toCents'
 // own Math.round was never the bug; there was just never a decimal point
 // to round).
-export function AmountInput({ value, onChangeText, placeholder = "0", style }: AmountInputProps) {
+export function AmountInput({ value, onChangeText, placeholder = "0", style, testID }: AmountInputProps) {
   return (
     <TextInput
+      testID={testID}
       value={formatWithThousands(value)}
       onChangeText={(text) => onChangeText(sanitizeToNumericString(text))}
       placeholder={placeholder}

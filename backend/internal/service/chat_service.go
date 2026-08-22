@@ -101,6 +101,16 @@ func (s *ChatService) Chat(ctx context.Context, userID uuid.UUID, req dto.ChatRe
 		return nil, common.ErrAIServiceUnavailable
 	}
 
+	// F-13 AI Budget Setup Wizard's chat trigger (specs/ai-budget-wizard/spec.md
+	// US-02) — mutually exclusive with create_transaction for the same
+	// message (Edge Cases #3), so this branch returns before any Transaction
+	// resolution runs. Never includes actions[] — the wizard itself has no
+	// server-side proposal to attach here; the client opens it and lazily
+	// calls GET /ai/budget-wizard/prefill (US-01) once tapped.
+	if extractResp.Intent == string(model.ChatIntentBudgetWizard) {
+		return s.respondBudgetWizard(ctx, userID, conversationID)
+	}
+
 	actions, sawWalletDrop := s.resolveActions(userID, wallets, categories, extractResp.Transactions)
 	if len(actions) == 0 {
 		message := "Mình chưa hiểu giao dịch này, bạn mô tả rõ hơn giúp mình nhé?"

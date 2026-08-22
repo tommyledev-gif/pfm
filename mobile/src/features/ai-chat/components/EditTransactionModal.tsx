@@ -18,14 +18,23 @@ interface EditTransactionModalProps {
   payload: TransactionActionPayload | null;
   onClose: () => void;
   onSave: (payload: TransactionActionPayload) => void;
+  // True when target is already confirmed (a real Transaction exists) —
+  // ai-chat.tsx's editAction then PATCHes that Transaction in place, and
+  // backend/internal/dto/transaction_request.go's UpdateTransactionRequest
+  // structurally excludes wallet_id/type (an update can't move money between
+  // wallets or flip income↔expense). Locking these two pickers here keeps
+  // the form honest about what an edit can actually change, instead of
+  // silently dropping a wallet/type change the user thinks they made.
+  lockWalletAndType?: boolean;
 }
 
 // Lets the user correct a proposal the AI got wrong (wrong category, wrong
-// date, wrong amount, …) before confirming it — opened via a 500ms long-press
-// on an assistant chat bubble that carries a transaction action (see
-// ai-chat.tsx). Saving never mutates the original proposal in place; the
-// caller appends a new, "Edited"-badged message instead so the thread stays
-// an honest record of what the AI actually proposed at the time.
+// date, wrong amount, …) — opened via a 500ms long-press on an assistant
+// chat bubble that carries a transaction action (see ai-chat.tsx). Editing
+// an unconfirmed proposal mutates it in place before it's ever saved;
+// editing an already-confirmed one PATCHes the real Transaction record in
+// place — either way this same modal is reused, only the caller's `onSave`
+// handler and this component's `lockWalletAndType` prop differ.
 //
 // Built on the shared Drawer (single ScrollView, keyboard-safe padding) like
 // every other form sheet in the app — this modal used to roll its own bare
@@ -33,7 +42,7 @@ interface EditTransactionModalProps {
 // offenders behind the "keyboard covers the input" reports. The Save/Cancel
 // row now scrolls with the rest of the fields rather than staying pinned,
 // matching how every other Drawer-based form already behaves.
-export function EditTransactionModal({ visible, payload, onClose, onSave }: EditTransactionModalProps) {
+export function EditTransactionModal({ visible, payload, onClose, onSave, lockWalletAndType }: EditTransactionModalProps) {
   const [type, setType] = useState<TransactionType>("expense");
   const [amount, setAmount] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
@@ -93,13 +102,19 @@ export function EditTransactionModal({ visible, payload, onClose, onSave }: Edit
         <Text style={styles.label}>Loại</Text>
         <View style={styles.chipRow}>
           {TRANSACTION_TYPES.map((t) => (
-            <Pressable key={t} onPress={() => setType(t)} style={[styles.chip, type === t && styles.chipActive]}>
+            <Pressable
+              key={t}
+              onPress={() => !lockWalletAndType && setType(t)}
+              disabled={lockWalletAndType}
+              style={[styles.chip, type === t && styles.chipActive, lockWalletAndType && styles.chipDisabled]}
+            >
               <Text style={[styles.chipLabel, type === t && styles.chipLabelActive]}>
                 {t === "expense" ? "Chi" : "Thu"}
               </Text>
             </Pressable>
           ))}
         </View>
+        {lockWalletAndType ? <Text style={styles.lockedHint}>Không thể đổi loại giao dịch đã lưu</Text> : null}
       </View>
 
       <View style={styles.fieldGroup}>
@@ -139,8 +154,9 @@ export function EditTransactionModal({ visible, payload, onClose, onSave }: Edit
           {(wallets.data ?? []).map((w) => (
             <Pressable
               key={w.id}
-              onPress={() => setWalletId(w.id)}
-              style={[styles.chip, walletId === w.id && styles.chipActive]}
+              onPress={() => !lockWalletAndType && setWalletId(w.id)}
+              disabled={lockWalletAndType}
+              style={[styles.chip, walletId === w.id && styles.chipActive, lockWalletAndType && styles.chipDisabled]}
             >
               <Text style={[styles.chipLabel, walletId === w.id && styles.chipLabelActive]}>{w.name}</Text>
             </Pressable>
@@ -189,8 +205,10 @@ const styles = StyleSheet.create({
     borderColor: colors.surfaceBorder,
   },
   chipActive: { backgroundColor: colors.green, borderColor: colors.green },
+  chipDisabled: { opacity: 0.4 },
   chipLabel: { ...typography.caption, color: colors.textSecondary },
   chipLabelActive: { color: colors.onGreen },
+  lockedHint: { ...typography.tiny, color: colors.textMuted },
   input: {
     backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,

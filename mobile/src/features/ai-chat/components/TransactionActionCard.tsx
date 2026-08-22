@@ -3,13 +3,13 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AmountRevealPopup } from "@/components/ui/AmountRevealPopup";
 import { Avatar } from "@/components/ui/Avatar";
-import { CalendarIcon, CheckIcon, EditIcon, TrashIcon } from "@/components/ui/Icon";
+import { CalendarIcon, CheckIcon, EditIcon } from "@/components/ui/Icon";
 import { PillButton } from "@/components/ui/PillButton";
 import { PillTag } from "@/components/ui/PillTag";
 import { colorForCategory } from "@/lib/category-color";
 import { formatCurrencyTruncated } from "@/lib/currency";
 import { formatDateShort } from "@/lib/format-date";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { colors, spacing, typography } from "@/lib/theme";
 import { ChatAction } from "@/features/ai-chat/types";
 
 interface TransactionActionCardProps {
@@ -27,10 +27,6 @@ interface TransactionActionCardProps {
   // Tapping the badge opens the edit-history dialog (onPressHistory).
   edited?: boolean;
   onPressHistory?: () => void;
-  // Only set for a corrective message (originalMessageId is set on the
-  // message) that hasn't been confirmed yet — discards the correction and
-  // restores the original's card instead of saving it.
-  onDelete?: () => void;
 }
 
 // Renders inside an AI assistant chat bubble once a transaction has been
@@ -53,7 +49,6 @@ export function TransactionActionCard({
   onConfirm,
   edited,
   onPressHistory,
-  onDelete,
 }: TransactionActionCardProps) {
   const { payload } = action;
   const isIncome = payload.type === "income";
@@ -114,11 +109,6 @@ export function TransactionActionCard({
           </View>
           <View style={styles.actionRow}>
             <PillButton label="Xác nhận & Lưu" onPress={onConfirm} loading={saving} style={styles.confirmButton} />
-            {onDelete ? (
-              <Pressable style={styles.deleteButton} onPress={onDelete} disabled={saving}>
-                <TrashIcon size={16} />
-              </Pressable>
-            ) : null}
           </View>
         </>
       )}
@@ -148,13 +138,4 @@ const styles = StyleSheet.create({
   tagRow: { flexDirection: "row", gap: spacing.sm },
   actionRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   confirmButton: { flex: 1 },
-  deleteButton: {
-    width: 44,
-    height: 44,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    alignItems: "center",
-    justifyContent: "center",
-  },
 });

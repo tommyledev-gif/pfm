@@ -69,5 +69,8 @@ class ProposedTransaction(BaseModel):
 class ExtractResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    intent: Literal["create_transaction", "ambiguous"]
+    # "budget_wizard" backs specs/ai-budget-wizard/spec.md US-02 — mutually
+    # exclusive with "create_transaction" for the same message (Edge Cases
+    # #3): when intent is "budget_wizard", transactions is always empty.
+    intent: Literal["create_transaction", "ambiguous", "budget_wizard"]
     transactions: list[ProposedTransaction] = Field(default_factory=list)

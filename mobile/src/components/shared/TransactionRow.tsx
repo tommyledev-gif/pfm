@@ -5,7 +5,7 @@ import { AmountRevealPopup } from "@/components/ui/AmountRevealPopup";
 import { Avatar } from "@/components/ui/Avatar";
 import { colorForCategory } from "@/lib/category-color";
 import { formatCurrencyTruncated } from "@/lib/currency";
-import { formatTime } from "@/lib/format-date";
+import { formatDateDMY } from "@/lib/format-date";
 import { colors, spacing, typography } from "@/lib/theme";
 import { Transaction } from "@/features/transactions/types";
 
@@ -56,7 +56,7 @@ export function TransactionRow({
           {isIncome ? "+" : "-"}
           {formatCurrencyTruncated(transaction.amount, currency)}
         </Text>
-        <Text style={styles.time}>{formatTime(transaction.occurred_at)}</Text>
+        <Text style={styles.time}>{formatDateDMY(transaction.occurred_at)}</Text>
       </Pressable>
 
       <AmountRevealPopup

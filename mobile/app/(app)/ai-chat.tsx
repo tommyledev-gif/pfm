@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, FlatList, Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { FlatList, Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SendIcon, SparkleIcon } from "@/components/ui/Icon";
 import { Screen } from "@/components/shared/Screen";
 import { TypingIndicator } from "@/components/shared/TypingIndicator";
+import { BudgetWizardCard } from "@/features/ai-chat/components/BudgetWizardCard";
 import { ChatBubble } from "@/features/ai-chat/components/ChatBubble";
 import { EditHistoryDialog } from "@/features/ai-chat/components/EditHistoryDialog";
 import { EditMessageModal } from "@/features/ai-chat/components/EditMessageModal";
 import { EditTransactionModal } from "@/features/ai-chat/components/EditTransactionModal";
 import { TransactionActionCard } from "@/features/ai-chat/components/TransactionActionCard";
-import { TransactionCardActionsModal } from "@/features/ai-chat/components/TransactionCardActionsModal";
+import { BudgetWizardModal } from "@/features/budget-wizard/components/BudgetWizardModal";
 import { TransactionFormModal } from "@/features/transactions/components/TransactionFormModal";
 import { getErrorCode } from "@/lib/axios";
 import { colors, radii, spacing, typography } from "@/lib/theme";
@@ -19,6 +20,7 @@ import { useCategoriesQuery } from "@/features/categories/api/use-categories-que
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useSendChatMessageMutation } from "@/features/ai-chat/api/use-send-chat-message-mutation";
 import { useCreateTransactionMutation } from "@/features/transactions/api/use-create-transaction-mutation";
+import { useUpdateTransactionMutation } from "@/features/transactions/api/use-update-transaction-mutation";
 import { ChatMessage, EditHistoryEntry, TransactionActionPayload } from "@/features/ai-chat/types";
 import { useChatStore } from "@/stores/chat-store";
 
@@ -66,11 +68,6 @@ const EDIT_LONG_PRESS_MS = 500;
 // handleCardLongPress below).
 const EDIT_LONG_PRESS_KEYBOARD_MS = 2000;
 
-// How long the "go to original" highlight ring stays at full opacity
-// before fading, and how long the fade itself takes.
-const HIGHLIGHT_HOLD_MS = 3000;
-const HIGHLIGHT_FADE_MS = 600;
-
 // Gives the input bar's margin time to settle back to its closed-keyboard
 // value (see useKeyboardHeight's hide-event handler) before a modal opens
 // on top of it, so the sheet doesn't visibly jump as the keyboard closes.
@@ -93,26 +90,23 @@ export default function AiChatScreen() {
   const thread = useChatStore((s) => s.thread);
   const addMessage = useChatStore((s) => s.addMessage);
   const updateMessage = useChatStore((s) => s.updateMessage);
-  const removeMessage = useChatStore((s) => s.removeMessage);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [manualEntryOpen, setManualEntryOpen] = useState(false);
-  // Three different long-press targets need three different follow-ups: a
-  // plain chat bubble (user text, or an actionless assistant reply) opens a
-  // text editor; a fresh/never-corrected transaction proposal opens the
-  // structured form directly; a corrective card (one that itself replaced
-  // an earlier proposal) opens a small menu instead, since "go to original"
-  // is now also on offer there — see the renderItem long-press dispatch.
+  // A plain chat bubble (user text, or an actionless assistant reply) opens
+  // a text editor; any transaction proposal — confirmed or not — opens the
+  // structured form directly (editAction below decides whether that PATCHes
+  // a real Transaction or just mutates the still-unconfirmed proposal).
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
   const [editingActionMessage, setEditingActionMessage] = useState<ChatMessage | null>(null);
-  const [cardActionsMessage, setCardActionsMessage] = useState<ChatMessage | null>(null);
   const [historyMessage, setHistoryMessage] = useState<ChatMessage | null>(null);
-  // Drives the fading border ring drawn around the message "go to original"
-  // scrolled back to — a single shared Animated.Value since only one ring
-  // is ever showing at a time.
-  const [highlightedId, setHighlightedId] = useState<string | null>(null);
-  const highlightOpacity = useRef(new Animated.Value(0)).current;
+  // F-13 AI Budget Setup Wizard (specs/ai-budget-wizard) — budgetWizardOriginMessageId
+  // is null for the quick-action-chip entry point (US-01) and set to the
+  // tapped card's id for the chat-trigger entry point (US-02), so onCompleted
+  // knows which card (if any) to flip into its read-only "submitted" state.
+  const [budgetWizardOpen, setBudgetWizardOpen] = useState(false);
+  const [budgetWizardOriginMessageId, setBudgetWizardOriginMessageId] = useState<string | null>(null);
   // Drives the input bar's own margin directly off the measured keyboard
   // height — see use-keyboard-height.ts for why this isn't
   // KeyboardAvoidingView. BottomNav (app/(app)/_layout.tsx) hides itself on
@@ -136,6 +130,7 @@ export default function AiChatScreen() {
   const categories = useCategoriesQuery();
   const sendMessage = useSendChatMessageMutation();
   const createTransaction = useCreateTransactionMutation();
+  const updateTransaction = useUpdateTransactionMutation();
 
   const walletById = useMemo(() => new Map(wallets.data?.map((w) => [w.id, w])), [wallets.data]);
   const categoryById = useMemo(() => new Map(categories.data?.map((c) => [c.id, c])), [categories.data]);
@@ -162,6 +157,7 @@ export default function AiChatScreen() {
         text: response.message,
         action,
         intent: response.intent === "ambiguous" ? "ambiguous" : undefined,
+        actionType: response.action_type,
         edited,
         editHistory: action ? [{ payload: action.payload, timestamp: Date.now(), source: "created" }] : undefined,
       };
@@ -215,71 +211,48 @@ export default function AiChatScreen() {
   };
 
   // Editing an assistant's proposed transaction never calls the AI again —
-  // the user is directly supplying the corrected fields. What happens next
-  // depends on whether target was already confirmed:
-  //   - not confirmed: nothing is saved yet, so it's safe to just mutate
-  //     target in place and append this snapshot to its editHistory. No new
-  //     message, no supersede — the card stays exactly where it was.
-  //   - confirmed: a real transaction already exists for target, so its
-  //     payload can't be silently rewritten. A new corrective message is
-  //     appended instead (fresh idempotency_key — the original came from
-  //     the AI Service or a prior manual edit, this one never did), target
-  //     is marked superseded (its card stops rendering — see renderItem),
-  //     and originalMessageId links the new card back to target so "go to
-  //     original" and "delete this" both know what to do.
+  // the user is directly supplying the corrected fields. Either way this
+  // mutates `target` itself in place and appends the new snapshot to its
+  // editHistory — no new message is ever created for an edit:
+  //   - not confirmed: nothing is saved yet, so a plain local update is
+  //     enough; a fresh idempotency_key is generated since the one on
+  //     record may already have been used by a prior failed attempt.
+  //   - confirmed: a real Transaction already exists (target.transactionId,
+  //     set by confirmAction below) — PATCH it directly. This must never
+  //     fall back to POST /transactions; doing so would silently create a
+  //     second, duplicate Transaction while leaving the original one
+  //     orphaned in the backend (the bug this replaced).
   const editAction = (target: ChatMessage, payload: TransactionActionPayload) => {
     const timestamp = Date.now();
     const priorHistory: EditHistoryEntry[] =
       target.editHistory ?? (target.action ? [{ payload: target.action.payload, timestamp, source: "created" }] : []);
     const editHistory = [...priorHistory, { payload, timestamp, source: "edited" as const }];
 
-    if (!target.confirmed) {
-      updateMessage(target.id, {
-        action: { ...target.action!, payload, idempotency_key: uuidv4() },
-        edited: true,
-        editHistory,
-      });
+    if (target.confirmed && target.transactionId) {
+      updateTransaction.mutate(
+        {
+          id: target.transactionId,
+          body: {
+            amount: payload.amount,
+            category_id: payload.category_id,
+            occurred_at: payload.occurred_at,
+            note: payload.note ?? undefined,
+          },
+        },
+        {
+          onSuccess: () => {
+            updateMessage(target.id, { action: { ...target.action!, payload }, edited: true, editHistory });
+          },
+        },
+      );
       return;
     }
 
-    updateMessage(target.id, { superseded: true });
-    addMessage({
-      id: nextId(),
-      role: "assistant",
-      text: "Đây là giao dịch đã được chỉnh sửa.",
-      action: { type: "create_transaction", payload, idempotency_key: uuidv4(), confidence: 1 },
+    updateMessage(target.id, {
+      action: { ...target.action!, payload, idempotency_key: uuidv4() },
       edited: true,
-      originalMessageId: target.id,
       editHistory,
     });
-  };
-
-  // "Delete this" on a corrective card — the correction was never
-  // confirmed/saved, so there's nothing to delete server-side. Just drop
-  // the corrective message and bring the original's card back.
-  const deleteCorrection = (message: ChatMessage) => {
-    removeMessage(message.id);
-    if (message.originalMessageId) {
-      updateMessage(message.originalMessageId, { superseded: false });
-    }
-  };
-
-  // Scrolls the thread back to the message a corrective card replaced and
-  // rings it with a fading border so it's obvious which one just got
-  // navigated to. viewPosition centers it rather than pinning it to the
-  // very top edge, which can land partly under the header.
-  const goToOriginal = (message: ChatMessage) => {
-    const originalId = message.originalMessageId;
-    if (!originalId) return;
-    const index = thread.findIndex((m) => m.id === originalId);
-    if (index === -1) return;
-    listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.3 });
-    setHighlightedId(originalId);
-    highlightOpacity.setValue(1);
-    Animated.sequence([
-      Animated.delay(HIGHLIGHT_HOLD_MS),
-      Animated.timing(highlightOpacity, { toValue: 0, duration: HIGHLIGHT_FADE_MS, useNativeDriver: true }),
-    ]).start(() => setHighlightedId(null));
   };
 
   const confirmAction = (message: ChatMessage) => {
@@ -289,7 +262,7 @@ export default function AiChatScreen() {
     createTransaction.mutate(
       { ...payload, note: payload.note ?? undefined, idempotency_key },
       {
-        onSuccess: () => updateMessage(message.id, { confirmed: true }),
+        onSuccess: (transaction) => updateMessage(message.id, { confirmed: true, transactionId: transaction.id }),
         onSettled: () => setConfirmingId(null),
       },
     );
@@ -300,12 +273,10 @@ export default function AiChatScreen() {
   // decision tree.
   const openLongPressTarget = (item: ChatMessage) => {
     if (item.action) {
-      if (item.originalMessageId) {
-        setCardActionsMessage(item);
-      } else {
-        setEditingActionMessage(item);
-      }
-    } else if (item.role === "assistant" && item.intent === "ambiguous") {
+      setEditingActionMessage(item);
+    } else if (item.role === "assistant" && (item.intent === "ambiguous" || item.actionType === "budget_wizard")) {
+      // Nothing to "correct" on the AI's own question, or on a budget-wizard
+      // card — same reasoning as the ambiguous-intent case above.
       return;
     } else {
       setEditingMessage(item);
@@ -355,11 +326,7 @@ export default function AiChatScreen() {
             onLongPress={() => handleCardLongPress(item)}
             delayLongPress={keyboardVisible ? EDIT_LONG_PRESS_KEYBOARD_MS : EDIT_LONG_PRESS_MS}
           >
-            <ChatBubble
-              role={item.role}
-              text={item.text}
-              highlightOpacity={highlightedId === item.id ? highlightOpacity : undefined}
-            >
+            <ChatBubble role={item.role} text={item.text}>
               {item.action && !item.superseded ? (
                 <TransactionActionCard
                   action={item.action}
@@ -373,7 +340,15 @@ export default function AiChatScreen() {
                   onConfirm={() => confirmAction(item)}
                   edited={item.edited}
                   onPressHistory={item.editHistory ? () => setHistoryMessage(item) : undefined}
-                  onDelete={item.originalMessageId && !item.confirmed ? () => deleteCorrection(item) : undefined}
+                />
+              ) : item.actionType === "budget_wizard" ? (
+                <BudgetWizardCard
+                  submitted={Boolean(item.budgetWizardSubmitted)}
+                  createdCount={item.budgetWizardCreatedCount}
+                  onPress={() => {
+                    setBudgetWizardOriginMessageId(item.id);
+                    setBudgetWizardOpen(true);
+                  }}
                 />
               ) : item.offerManualEntry ? (
                 <Pressable style={styles.manualEntryButton} onPress={() => setManualEntryOpen(true)}>
@@ -396,6 +371,22 @@ export default function AiChatScreen() {
           ) : null
         }
       />
+
+      {!keyboardVisible ? (
+        <View style={styles.quickActionRow}>
+          <Pressable
+            testID="btn-open-budget-wizard"
+            style={styles.quickActionChip}
+            onPress={() => {
+              setBudgetWizardOriginMessageId(null);
+              setBudgetWizardOpen(true);
+            }}
+          >
+            <SparkleIcon size={14} />
+            <Text style={styles.quickActionLabel}>Lập ngân sách</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       <View
         style={[
@@ -442,26 +433,12 @@ export default function AiChatScreen() {
     <EditTransactionModal
       visible={Boolean(editingActionMessage)}
       payload={editingActionMessage?.action?.payload ?? null}
+      lockWalletAndType={Boolean(editingActionMessage?.confirmed)}
       onClose={() => setEditingActionMessage(null)}
       onSave={(payload) => {
         const target = editingActionMessage;
         setEditingActionMessage(null);
         if (target) editAction(target, payload);
-      }}
-    />
-
-    <TransactionCardActionsModal
-      visible={Boolean(cardActionsMessage)}
-      onCancel={() => setCardActionsMessage(null)}
-      onEdit={() => {
-        const target = cardActionsMessage;
-        setCardActionsMessage(null);
-        if (target) setEditingActionMessage(target);
-      }}
-      onGoToOriginal={() => {
-        const target = cardActionsMessage;
-        setCardActionsMessage(null);
-        if (target) goToOriginal(target);
       }}
     />
 
@@ -475,6 +452,16 @@ export default function AiChatScreen() {
     />
 
     <TransactionFormModal visible={manualEntryOpen} onClose={() => setManualEntryOpen(false)} />
+
+    <BudgetWizardModal
+      visible={budgetWizardOpen}
+      onClose={() => setBudgetWizardOpen(false)}
+      onCompleted={(createdCount) => {
+        if (budgetWizardOriginMessageId) {
+          updateMessage(budgetWizardOriginMessageId, { budgetWizardSubmitted: true, budgetWizardCreatedCount: createdCount });
+        }
+      }}
+    />
     </Screen>
   );
 }
@@ -496,6 +483,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.green,
   },
   manualEntryLabel: { ...typography.label, color: colors.onGreen },
+  quickActionRow: { marginHorizontal: spacing.xl, flexDirection: "row" },
+  quickActionChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    marginBottom: spacing.sm,
+  },
+  quickActionLabel: { ...typography.caption, color: colors.textPrimary },
   inputBar: {
     marginHorizontal: spacing.xl,
     flexDirection: "row",

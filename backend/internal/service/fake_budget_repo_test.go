@@ -205,6 +205,53 @@ func (f *fakeBudgetRepo) ListDistinctUserIDsWithActiveBudgets(_ context.Context)
 	return userIDs, nil
 }
 
+// LockBudgetsByUser backs BulkReplaceBudgets (specs/ai-budget-wizard) — the
+// fake ignores locking semantics (single-goroutine tests) and just returns
+// every one of userID's non-deleted Budgets, same scoping as
+// ListBudgetsByUser.
+func (f *fakeBudgetRepo) LockBudgetsByUser(_ context.Context, _ pgx.Tx, userID uuid.UUID) ([]*model.Budget, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	var out []*model.Budget
+	for _, b := range f.budgets {
+		if b.DeletedAt == nil && b.UserID == userID {
+			cp := *b
+			out = append(out, &cp)
+		}
+	}
+	return out, nil
+}
+
+// SoftDeleteBudgetsByUser backs BulkReplaceBudgets.
+func (f *fakeBudgetRepo) SoftDeleteBudgetsByUser(_ context.Context, _ pgx.Tx, userID uuid.UUID) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	now := time.Now().UTC()
+	for _, b := range f.budgets {
+		if b.DeletedAt == nil && b.UserID == userID {
+			b.DeletedAt = &now
+		}
+	}
+	return nil
+}
+
+// DeleteBudgetLimitsByBudgetIDs backs BulkReplaceBudgets — the fake clears
+// the in-memory Limits slice for each targeted Budget, mirroring the real
+// batched DELETE.
+func (f *fakeBudgetRepo) DeleteBudgetLimitsByBudgetIDs(_ context.Context, _ pgx.Tx, budgetIDs []uuid.UUID) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	for _, id := range budgetIDs {
+		if b, ok := f.budgets[id]; ok {
+			b.Limits = nil
+		}
+	}
+	return nil
+}
+
 // seedSpend stages the SpentByUserCurrentPeriod result a test wants —
 // BudgetService tests that need a non-zero spent figure call this before
 // exercising ListBudgets/GetBudget/UpdateBudget.

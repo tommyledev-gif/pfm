@@ -30,12 +30,15 @@ type ChatActionResponse struct {
 }
 
 // ChatResponse is the body of POST /ai/chat's 200 response. Intent is
-// "create_transaction" or "ambiguous" for this cut (spec.md Resolved design
-// decision #2) — Actions is always an empty (not null) slice when there is
-// nothing to confirm.
+// "create_transaction", "ambiguous", or (specs/ai-budget-wizard/spec.md US-02)
+// "budget_wizard" — Actions is always an empty (not null) slice when there is
+// nothing to confirm. ActionType is only set for "budget_wizard" (nil
+// otherwise) — the client uses it to decide whether to render a tappable
+// budget-wizard card instead of the usual Transaction action cards.
 type ChatResponse struct {
 	Message        string               `json:"message"`
 	Intent         string               `json:"intent"`
 	Actions        []ChatActionResponse `json:"actions"`
 	ConversationID uuid.UUID            `json:"conversation_id"`
+	ActionType     *string              `json:"action_type,omitempty"`
 }

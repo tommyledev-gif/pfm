@@ -14,24 +14,29 @@ interface EditHistoryDialogProps {
 
 // Opened by tapping the "Đã sửa" badge on a TransactionActionCard —
 // read-only trace of every snapshot a proposal has gone through (created +
-// every edit, oldest first), so "khi nào sửa gì" is always answerable
-// instead of only the current fields being visible.
+// every edit). `history` itself is stored oldest-first (so each entry's
+// index is a stable "edit number"), but the most recent change is what a
+// user checking "did my edit actually save?" cares about first, so this
+// renders newest-first — only the display order is reversed, not the
+// underlying array or its "Lần sửa N" numbering.
 export function EditHistoryDialog({ visible, history, currency, onClose }: EditHistoryDialogProps) {
+  const newestFirst = history
+    .map((entry, index) => ({ entry, label: entry.source === "created" ? "Tạo đề xuất" : `Lần sửa ${index}` }))
+    .reverse();
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable onPress={() => {}} style={styles.card}>
           <Text style={styles.title}>Lịch sử chỉnh sửa</Text>
           <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
-            {history.map((entry, index) => {
+            {newestFirst.map(({ entry, label }, index) => {
               const isIncome = entry.payload.type === "income";
               const date = new Date(entry.timestamp);
               return (
                 <View key={`${entry.timestamp}_${index}`} style={styles.row}>
                   <View style={styles.rowHeader}>
-                    <Text style={styles.rowLabel}>
-                      {entry.source === "created" ? "Tạo đề xuất" : `Lần sửa ${index}`}
-                    </Text>
+                    <Text style={styles.rowLabel}>{label}</Text>
                     <Text style={styles.rowTime}>
                       {date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })}
                       {" · "}

@@ -24,9 +24,13 @@ export interface ChatAction {
 
 export interface ChatResponse {
   message: string;
-  intent: "create_transaction" | "ambiguous";
+  intent: "create_transaction" | "ambiguous" | "budget_wizard";
   actions: ChatAction[];
   conversation_id: string;
+  // Set only when intent === "budget_wizard" (specs/ai-budget-wizard/spec.md
+  // US-02) — the client renders a tappable BudgetWizardCard instead of the
+  // usual Transaction action cards.
+  action_type?: "budget_wizard";
 }
 
 // One snapshot of a transaction proposal's fields at a point in time —
@@ -47,24 +51,22 @@ export interface ChatMessage {
   text: string;
   action?: ChatAction;
   confirmed?: boolean;
-  // An unconfirmed proposal is mutated in place on edit (nothing is saved
-  // yet, so nothing else needs to change) — editHistory below is what
-  // records that trail. Only a proposal that was already confirmed (a real
-  // transaction already exists) gets a new corrective message appended
-  // instead, since the saved record can't be mutated this way; that new
-  // message carries originalMessageId pointing back at the root proposal it
-  // corrects, and the root's card stops rendering (see ai-chat.tsx) in favor
-  // of this one.
-  edited?: boolean; // this message has been edited at least once (in place or via a correction chain)
-  superseded?: boolean; // a corrective replacement for this message now exists further down the thread — its card is hidden
-  // Only set on a corrective message (the confirmed-original-edit path).
-  // Points at the root message of the correction chain — "Go to original"
-  // scrolls/highlights that message.
-  originalMessageId?: string;
-  // Full snapshot trail for this proposal, oldest first. Seeded with a
-  // "created" entry when the action message is first added; every edit
-  // (in place or corrective) appends an "edited" entry, carried forward
-  // across a correction chain so the trail is never lost.
+  // The real backend Transaction id, set once `confirmed` becomes true
+  // (ai-chat.tsx's confirmAction). Editing a confirmed proposal PATCHes this
+  // id in place (ai-chat.tsx's editAction) — it must never spawn a second
+  // POST /transactions call, which would silently create a duplicate
+  // transaction while leaving the original one orphaned.
+  transactionId?: string;
+  // Every edit — whether the proposal is still unconfirmed or already
+  // confirmed — mutates this same message in place; editHistory below
+  // records the trail. There is no more "corrective message" chain: editing
+  // an already-confirmed proposal PATCHes the real transaction instead of
+  // creating a new message/transaction (see ai-chat.tsx's editAction).
+  edited?: boolean; // this message has been edited at least once
+  superseded?: boolean; // editUserMessage marked this stale reply's card hidden after its user message was corrected
+  // Full snapshot trail for this proposal, oldest first (rendered newest
+  // first by EditHistoryDialog). Seeded with a "created" entry when the
+  // action message is first added; every edit appends an "edited" entry.
   editHistory?: EditHistoryEntry[];
   // Copied from ChatResponse.intent for an assistant reply with no action —
   // the now-rare true clarifying question (missing amount / not a
@@ -80,4 +82,12 @@ export interface ChatMessage {
   // error string, since the user was already mid-flow trying to log
   // something.
   offerManualEntry?: boolean;
+  // specs/ai-budget-wizard/spec.md US-02 — set on an assistant reply carrying
+  // action_type: "budget_wizard"; renders BudgetWizardCard instead of a plain
+  // bubble. budgetWizardSubmitted/budgetWizardCreatedCount are client-side
+  // state only (US-02 Edge Cases #2, never persisted) — a reopened app
+  // always shows the card as tappable again.
+  actionType?: "budget_wizard";
+  budgetWizardSubmitted?: boolean;
+  budgetWizardCreatedCount?: number;
 }

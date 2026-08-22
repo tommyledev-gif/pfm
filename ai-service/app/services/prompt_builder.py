@@ -45,6 +45,11 @@ LUÔN dùng chúng để hiểu ngữ cảnh. Ví dụ: tin nhắn trước nói
 hãy hiểu đây là số tiền cho giao dịch mua cà phê đó, không phải một giao dịch mới không rõ nội dung.
 
 Quy tắc bắt buộc:
+0. KIỂM TRA TRƯỚC TIÊN: nếu tin nhắn là một yêu cầu lập/thiết lập/phân bổ NGÂN SÁCH (budget) tổng thể — chứ không \
+phải ghi nhận MỘT giao dịch cụ thể — hãy trả về intent = "budget_wizard" và để transactions rỗng, KHÔNG cố gắng \
+trích xuất giao dịch. Dấu hiệu nhận biết: "set budget", "lập ngân sách", "thiết lập ngân sách", "phân bổ ngân sách", \
+"lên kế hoạch chi tiêu", "giúp tôi quản lý ngân sách", "chia thu nhập ra các khoản", hoặc các câu tương tự yêu cầu \
+trợ giúp lập kế hoạch chi tiêu tổng thể thay vì ghi một khoản thu/chi cụ thể đã xảy ra.
 1. Luôn trả về đúng schema JSON đã cho — không trả lời văn bản thuần.
 2. amount_vnd LUÔN LUÔN là số nguyên đơn vị VND thông thường (không phải xu/cents) — quy đổi các cách viết tắt sau: \
 "k" hoặc "nghìn" hoặc "ngàn" hoặc "ngìn" = nghìn đồng (ví dụ "30k" = 30000, "5 nghìn" = 5000); "m" hoặc "tr" hoặc \
@@ -66,7 +71,8 @@ lịch sử hội thoại, và các gợi ý tín hiệu ngôn ngữ ở quy t�
 không chắc chắn 100%. Phản ánh sự không chắc chắn đó qua confidence (quy tắc 10), không phải bằng cách từ chối đoán.
 10. confidence phải phản ánh trung thực mức độ chắc chắn — đặt dưới 0.6 nếu danh mục hoặc loại thu/chi không rõ ràng, \
 kể cả khi bạn vẫn đưa ra một lựa chọn đoán tốt nhất theo quy tắc 9.
-11. Chỉ trả về intent = "create_transaction" hoặc intent = "ambiguous" — không có giá trị nào khác được hỗ trợ.
+11. Chỉ trả về intent = "create_transaction", intent = "ambiguous", hoặc intent = "budget_wizard" (quy tắc 0) — \
+không có giá trị nào khác được hỗ trợ.
 12. Gợi ý nhận diện THU (income) — các từ/cụm sau thường là dấu hiệu THU: "nhận", "được nhận", "thu", "thu được", \
 "kiếm được", "lương", "thưởng", "bonus", "hoa hồng", "tiền bán", "bán được", "khách trả", "người ta trả", "hoàn \
 tiền", "refund", "cashback", "chuyển khoản vào", "nhận chuyển khoản", "bố/mẹ/người yêu/bạn chuyển", "tiền vào", \
