@@ -49,6 +49,7 @@ func main() {
 	reportRepo := repository.NewReportRepository(queries)
 	notificationRepo := repository.NewNotificationRepository(queries)
 	chatRepo := repository.NewChatRepository(queries)
+	chatThreadRepo := repository.NewChatThreadRepository(queries)
 
 	tokenService := service.NewTokenService(cfg.JWTSecret)
 	emailSender := newEmailSender(cfg, logger)
@@ -63,6 +64,7 @@ func main() {
 	notificationService := service.NewNotificationService(notificationRepo, budgetRepo, logger)
 	aiServiceClient := service.NewHTTPAIServiceClient(cfg.AIServiceURL)
 	chatService := service.NewChatService(chatRepo, walletRepo, categoryRepo, aiServiceClient, logger)
+	chatThreadService := service.NewChatThreadService(chatThreadRepo)
 	aiBudgetClient := service.NewHTTPAIBudgetClient(cfg.AIServiceURL)
 	budgetWizardService := service.NewBudgetWizardService(budgetRepo, categoryRepo, walletRepo, aiBudgetClient, logger)
 
@@ -74,7 +76,7 @@ func main() {
 	transactionHandler := handler.NewTransactionHandler(transactionService, logger)
 	reportHandler := handler.NewReportHandler(reportService, logger)
 	notificationHandler := handler.NewNotificationHandler(notificationService, logger)
-	chatHandler := handler.NewChatHandler(chatService, logger)
+	chatHandler := handler.NewChatHandler(chatService, chatThreadService, logger)
 	budgetWizardHandler := handler.NewBudgetWizardHandler(budgetWizardService, logger)
 
 	app := fiber.New(fiber.Config{

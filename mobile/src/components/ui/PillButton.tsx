@@ -7,6 +7,13 @@ interface PillButtonProps {
   label?: string;
   icon?: ReactNode;
   onPress?: () => void;
+  // Lets a caller (e.g. TransactionActionCard's Confirm button) react to a
+  // long-press the same way its enclosing card does — without this, holding
+  // directly on the button never bubbles up to an ancestor Pressable's own
+  // onLongPress, since RN's gesture responder system hands the touch to the
+  // innermost touchable and never passes long-press gestures back up.
+  onLongPress?: () => void;
+  delayLongPress?: number;
   variant?: "solid" | "outline";
   disabled?: boolean;
   loading?: boolean;
@@ -18,12 +25,26 @@ interface PillButtonProps {
 // The design's recurring "black pill on neon green" action button (hero
 // card's Add Transaction, chat's Confirm & Save, etc.) — one component so
 // every screen renders the exact same pill shape/colors.
-export function PillButton({ label, icon, onPress, variant = "solid", disabled, loading, style, textStyle, testID }: PillButtonProps) {
+export function PillButton({
+  label,
+  icon,
+  onPress,
+  onLongPress,
+  delayLongPress,
+  variant = "solid",
+  disabled,
+  loading,
+  style,
+  textStyle,
+  testID,
+}: PillButtonProps) {
   const isOutline = variant === "outline";
   return (
     <Pressable
       testID={testID}
       onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={delayLongPress}
       disabled={disabled || loading}
       style={({ pressed }) => [
         styles.base,

@@ -135,6 +135,15 @@ type ChatRepo interface {
 	ListRecentMessagesByConversation(ctx context.Context, conversationID uuid.UUID, limit int32) ([]*model.ChatMessage, error)
 }
 
+// ChatThreadRepo is the repository contract ChatThreadService depends on —
+// the client-rendered chat UI cache (chat_thread_messages), distinct from
+// ChatRepo's chat_messages (raw AI-context log only, never read back by a
+// client). *repository.ChatThreadRepository satisfies this structurally.
+type ChatThreadRepo interface {
+	UpsertMessage(ctx context.Context, arg repository.UpsertChatThreadMessageParams) error
+	ListByUser(ctx context.Context, userID uuid.UUID) ([]repository.ChatThreadRow, error)
+}
+
 // AIServiceClient is the contract ChatService depends on for talking to the
 // Python AI Service (specs/ai-chat-assistant/plan.md AI-T10). A real HTTP
 // implementation lives in ai_service_client.go; tests substitute a fake.

@@ -2,16 +2,17 @@ import { useMemo, useState } from "react";
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
+import { Avatar } from "@/components/ui/Avatar";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
-import { PlusIcon } from "@/components/ui/Icon";
+import { LiquidCircle } from "@/components/shared/LiquidCircle";
 import { Screen } from "@/components/shared/Screen";
 import { TopBar } from "@/components/shared/TopBar";
 import { TransactionRow } from "@/components/shared/TransactionRow";
 import { WalletCard } from "@/components/shared/WalletCard";
 import { colorForCategory } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
-import { currentPeriodRange, monthLabel, monthRange } from "@/lib/date-range";
+import { currentPeriodRange, monthRange, previousPeriodLabel, previousPeriodRange } from "@/lib/date-range";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { primaryCurrency } from "@/features/wallets/wallet-totals";
@@ -68,10 +69,16 @@ export default function HomeScreen() {
 
   const periodRange = useMemo(() => currentPeriodRange(homePeriod), [homePeriod]);
   const periodSummary = useReportSummaryQuery(periodRange);
+  // Top Categories always reflects the calendar month, independent of the
+  // Week/Month/Year snapshot selector above (a "top categories this week"
+  // list would mostly be empty/noisy) — same range this screen already used
+  // before the trend badge existed.
   const thisMonthRange = useMemo(() => monthRange(0), []);
-  const lastMonthRange = useMemo(() => monthRange(1), []);
   const thisMonthSummary = useReportSummaryQuery(thisMonthRange);
-  const lastMonthSummary = useReportSummaryQuery(lastMonthRange);
+  // Trend badge, by contrast, DOES track the selected period — "more/less
+  // than last week" only makes sense while Week is selected.
+  const previousRange = useMemo(() => previousPeriodRange(homePeriod), [homePeriod]);
+  const previousPeriodSummary = useReportSummaryQuery(previousRange);
 
   // The report's own currency is the source of truth for the whole snapshot
   // (matches SpendingTab.tsx's `totals[0]` convention) — fall back to the
@@ -80,6 +87,8 @@ export default function HomeScreen() {
   const currency =
     periodSummary.data?.totals[0]?.currency ?? (wallets.data ? primaryCurrency(wallets.data) : undefined) ?? "VND";
   const periodSpent = periodSummary.data?.totals[0]?.total_expense ?? 0;
+  const previousPeriodSpent = previousPeriodSummary.data?.totals[0]?.total_expense ?? 0;
+  const spentDelta = periodSpent - previousPeriodSpent;
   const budgetSnapshot = budgets.data ? budgetTotals(budgets.data, currency) : null;
   const isOverBudget = Boolean(budgetSnapshot && periodSpent > budgetSnapshot.limit);
 
@@ -108,67 +117,78 @@ export default function HomeScreen() {
           </View>
 
           <Card style={styles.snapshotCard} radius={radii.hero}>
-            <View style={styles.snapshotRow}>
-              <View style={styles.snapshotItem}>
-                <Text style={styles.snapshotLabel}>Ngân sách còn lại (tháng này)</Text>
-                <Text style={styles.snapshotValue}>
-                  {budgetSnapshot ? formatCurrency(budgetSnapshot.remaining, currency) : "—"}
-                </Text>
-              </View>
-              <View style={styles.snapshotItem}>
-                <Text style={styles.snapshotLabel}>Đã chi</Text>
-                <Text style={styles.snapshotValue}>{formatCurrency(periodSpent, currency)}</Text>
-              </View>
-            </View>
-            {budgetSnapshot ? (
-              <Text style={[styles.snapshotStatus, { color: isOverBudget ? colors.peach : colors.green }]}>
-                {isOverBudget ? "Vượt ngân sách" : "Trong ngân sách"}
+            {/* In-flow and right-aligned, not absolutely pinned to the
+                corner — the trend text's length varies with the amount and
+                a fixed absolute overlay collided with the categories column
+                below it for any but the shortest amounts. */}
+            <View
+              style={[
+                styles.trendBadge,
+                spentDelta > 0 ? styles.trendBadgeNegative : styles.trendBadgePositive,
+              ]}
+            >
+              <Text
+                style={[styles.trendBadgeLabel, { color: spentDelta > 0 ? colors.peach : colors.green }]}
+                numberOfLines={1}
+              >
+                {spentDelta > 0 ? "Nhiều hơn " : spentDelta < 0 ? "Ít hơn " : "Bằng "}
+                {formatCurrency(Math.abs(spentDelta), currency)} so với {previousPeriodLabel(homePeriod)}
               </Text>
-            ) : null}
-          </Card>
-
-          <Pressable style={styles.addButton} onPress={() => router.push("/ai-chat")}>
-            <PlusIcon size={18} color={colors.green} />
-            <Text style={styles.addButtonLabel}>Thêm giao dịch</Text>
-          </Pressable>
-
-          <Card style={styles.compareCard}>
-            <Text style={styles.sectionTitle}>So sánh chi tiêu</Text>
-            <View style={styles.compareRow}>
-              <View style={styles.compareItem}>
-                <Text style={styles.compareLabel}>{monthLabel(1)}</Text>
-                <Text style={styles.compareValue}>
-                  {formatCurrency(lastMonthSummary.data?.totals[0]?.total_expense ?? 0, currency)}
+            </View>
+            <View style={styles.snapshotRow}>
+              <View style={styles.snapshotLeft}>
+                <LiquidCircle
+                  size={132}
+                  progress={budgetSnapshot && budgetSnapshot.limit > 0 ? periodSpent / budgetSnapshot.limit : 0}
+                  topLabel="Đã chi"
+                  topValue={formatCurrency(periodSpent, currency)}
+                />
+                <Text style={styles.snapshotRemaining}>
+                  Còn lại:{" "}
+                  <Text style={styles.snapshotRemainingValue}>
+                    {budgetSnapshot ? formatCurrency(budgetSnapshot.remaining, currency) : "—"}
+                  </Text>
                 </Text>
+                {budgetSnapshot ? (
+                  <Text style={[styles.snapshotStatus, { color: isOverBudget ? colors.peach : colors.green }]}>
+                    {isOverBudget ? "Vượt ngân sách" : "Trong ngân sách"}
+                  </Text>
+                ) : null}
               </View>
-              <View style={styles.compareItem}>
-                <Text style={styles.compareLabel}>{monthLabel(0)}</Text>
-                <Text style={styles.compareValue}>
-                  {formatCurrency(thisMonthSummary.data?.totals[0]?.total_expense ?? 0, currency)}
-                </Text>
-              </View>
+
+              {topCategories.length > 0 ? (
+                <View style={styles.snapshotRight}>
+                  <View style={styles.compactHeaderRow}>
+                    <Text style={styles.compactSectionTitle} numberOfLines={1}>
+                      Chi nhiều nhất
+                    </Text>
+                    <Pressable onPress={() => router.push("/insights")} hitSlop={8}>
+                      <Text style={styles.compactSeeAll} numberOfLines={1}>
+                        Xem tất cả
+                      </Text>
+                    </Pressable>
+                  </View>
+                  {topCategories.map((c) => (
+                    <View key={c.category_id} style={styles.categoryRow}>
+                      <Avatar
+                        name={c.category_name}
+                        color={colorForCategory(c.category_id)}
+                        size={24}
+                        icon={categoryById.get(c.category_id)?.icon}
+                        iconUrl={categoryById.get(c.category_id)?.icon_url}
+                      />
+                      <Text style={styles.categoryName} numberOfLines={1}>
+                        {c.category_name}
+                      </Text>
+                      <Text style={styles.categoryAmount} numberOfLines={1}>
+                        {formatCurrency(c.amount, currency)}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
             </View>
           </Card>
-
-          {topCategories.length > 0 ? (
-            <Card style={styles.compareCard}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionTitle}>Chi nhiều nhất tháng này</Text>
-                <Pressable onPress={() => router.push("/insights")} hitSlop={8}>
-                  <Text style={styles.seeAll}>Xem tất cả</Text>
-                </Pressable>
-              </View>
-              {topCategories.map((c) => (
-                <View key={c.category_id} style={styles.categoryRow}>
-                  <View style={[styles.categoryDot, { backgroundColor: colorForCategory(c.category_id) }]} />
-                  <Text style={styles.categoryName} numberOfLines={1}>
-                    {c.category_name}
-                  </Text>
-                  <Text style={styles.categoryAmount}>{formatCurrency(c.amount, currency)}</Text>
-                </View>
-              ))}
-            </Card>
-          ) : null}
 
           {pendingConfirmations.length > 0 ? (
             <View style={styles.section}>
@@ -254,10 +274,28 @@ const styles = StyleSheet.create({
   section: { gap: spacing.sm },
   periodRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
   snapshotCard: { gap: spacing.md },
-  snapshotRow: { flexDirection: "row", gap: spacing.lg },
-  snapshotItem: { flex: 1, gap: 2 },
-  snapshotLabel: { ...typography.caption, color: colors.textSecondary },
-  snapshotValue: { ...typography.title, color: colors.textPrimary },
+  // Translucent tinted pill (same convention as profile.tsx's logout row),
+  // not a solid fill — a loud solid-color block read as jarring against the
+  // rest of this dark, low-saturation card.
+  trendBadge: {
+    alignSelf: "flex-end",
+    maxWidth: "100%",
+    paddingVertical: 6,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+  },
+  trendBadgeNegative: { backgroundColor: "rgba(255,158,150,0.12)", borderColor: "rgba(255,158,150,0.35)" },
+  trendBadgePositive: { backgroundColor: "rgba(133,255,51,0.1)", borderColor: "rgba(133,255,51,0.3)" },
+  trendBadgeLabel: { ...typography.tiny },
+  snapshotRow: { flexDirection: "row", gap: spacing.lg, alignItems: "flex-start" },
+  snapshotLeft: { alignItems: "center", gap: spacing.xs },
+  snapshotRight: { flex: 1, gap: 2, minWidth: 0 },
+  compactHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.xs },
+  compactSectionTitle: { ...typography.label, color: colors.textPrimary, flexShrink: 1 },
+  compactSeeAll: { ...typography.tiny, color: colors.green, flexShrink: 0 },
+  snapshotRemaining: { ...typography.caption, color: colors.textSecondary },
+  snapshotRemainingValue: { ...typography.label, color: colors.textPrimary },
   snapshotStatus: { ...typography.label },
   addButton: {
     flexDirection: "row",
@@ -271,15 +309,9 @@ const styles = StyleSheet.create({
     borderColor: colors.surfaceBorder,
   },
   addButtonLabel: { ...typography.body, color: colors.green },
-  compareCard: { gap: spacing.sm },
-  compareRow: { flexDirection: "row", gap: spacing.lg },
-  compareItem: { flex: 1, gap: 2 },
-  compareLabel: { ...typography.caption, color: colors.textSecondary },
-  compareValue: { ...typography.cardTitle, color: colors.textPrimary },
-  categoryRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.xs },
-  categoryDot: { width: 8, height: 8, borderRadius: radii.pill },
-  categoryName: { flex: 1, ...typography.body, color: colors.textPrimary },
-  categoryAmount: { ...typography.caption, color: colors.textSecondary },
+  categoryRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingVertical: spacing.xs },
+  categoryName: { flex: 1, ...typography.caption, color: colors.textPrimary },
+  categoryAmount: { ...typography.tiny, color: colors.textSecondary },
   pendingRow: {
     flexDirection: "row",
     alignItems: "center",

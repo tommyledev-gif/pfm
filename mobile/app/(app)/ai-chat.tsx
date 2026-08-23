@@ -19,6 +19,7 @@ import { useKeyboardHeight } from "@/lib/use-keyboard-height";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useSendChatMessageMutation } from "@/features/ai-chat/api/use-send-chat-message-mutation";
+import { useChatThreadQuery } from "@/features/ai-chat/api/use-chat-thread-sync";
 import { useCreateTransactionMutation } from "@/features/transactions/api/use-create-transaction-mutation";
 import { useUpdateTransactionMutation } from "@/features/transactions/api/use-update-transaction-mutation";
 import { ChatMessage, EditHistoryEntry, TransactionActionPayload } from "@/features/ai-chat/types";
@@ -90,6 +91,7 @@ export default function AiChatScreen() {
   const thread = useChatStore((s) => s.thread);
   const addMessage = useChatStore((s) => s.addMessage);
   const updateMessage = useChatStore((s) => s.updateMessage);
+  const hydrateThread = useChatStore((s) => s.hydrateThread);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
@@ -125,6 +127,17 @@ export default function AiChatScreen() {
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Restores the synced thread from the server exactly once, only when the
+  // local (AsyncStorage-persisted) thread is empty — i.e. after a logout,
+  // reinstall, or new device wiped it (chat-store.ts's own debounced
+  // autosave is what put it on the server in the first place). Once
+  // hydrateThread sets a non-empty thread, `enabled` flips false and this
+  // never refetches for the rest of the session.
+  const threadQuery = useChatThreadQuery(thread.length === 0);
+  useEffect(() => {
+    if (threadQuery.data?.length) hydrateThread(threadQuery.data);
+  }, [threadQuery.data, hydrateThread]);
 
   const wallets = useWalletsQuery();
   const categories = useCategoriesQuery();
@@ -340,6 +353,8 @@ export default function AiChatScreen() {
                   onConfirm={() => confirmAction(item)}
                   edited={item.edited}
                   onPressHistory={item.editHistory ? () => setHistoryMessage(item) : undefined}
+                  onLongPress={() => handleCardLongPress(item)}
+                  longPressDelay={keyboardVisible ? EDIT_LONG_PRESS_KEYBOARD_MS : EDIT_LONG_PRESS_MS}
                 />
               ) : item.actionType === "budget_wizard" ? (
                 <BudgetWizardCard

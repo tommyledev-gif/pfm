@@ -32,6 +32,8 @@ const SETTINGS_ROWS = [
   { label: "Help & Support", Icon: HelpIcon, href: null },
 ];
 
+const LOGOUT_FLUSH_TIMEOUT_MS = 4000;
+
 function displayNameFromEmail(email: string | null): string {
   if (!email) return "Member";
   const local = email.split("@")[0] ?? email;
@@ -50,7 +52,21 @@ export default function ProfileScreen() {
   const netWorth = wallets.data ? totalBalance(wallets.data) : null;
   const primaryTotal = summary.data?.totals[0];
 
-  const logout = () => {
+  // Gives chat-store.ts's debounced autosave one last chance to land on the
+  // server before clearChat() wipes the local copy — capped at
+  // LOGOUT_FLUSH_TIMEOUT_MS so a flaky/offline network never makes tapping
+  // "Log out" feel stuck (apiClient's own request timeout is 15s, far too
+  // long to block a logout button on).
+  const logout = async () => {
+    try {
+      await Promise.race([
+        useChatStore.getState().flushSync(),
+        new Promise((resolve) => setTimeout(resolve, LOGOUT_FLUSH_TIMEOUT_MS)),
+      ]);
+    } catch {
+      // Best-effort — proceed with logout either way; the next login
+      // restores whatever the server last had via GET /ai/chat/thread.
+    }
     clearChat();
     clearSession();
   };

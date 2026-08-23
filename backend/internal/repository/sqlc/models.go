@@ -140,3 +140,17 @@ type ChatMessage struct {
 	TransactionIDs []uuid.UUID
 	CreatedAt      time.Time
 }
+
+// ChatThreadMessage mirrors the chat_thread_messages table exactly
+// (015_chat_thread_sync.sql). Payload is opaque JSON text — the backend
+// never inspects its fields, only stores/returns it verbatim by
+// (UserID, ClientMessageID). No DeletedAt: a UI cache, not a financial
+// record, same precedent as ChatMessage/Notification.
+type ChatThreadMessage struct {
+	ID              uuid.UUID
+	UserID          uuid.UUID
+	ClientMessageID string
+	Payload         string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}

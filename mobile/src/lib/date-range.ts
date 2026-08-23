@@ -29,6 +29,32 @@ export function currentPeriodRange(period: HomePeriod, now: Date = new Date()): 
   return { from: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`, to };
 }
 
+// The full period immediately preceding currentPeriodRange's selection —
+// last calendar week/month/year (never prorated to "same number of days
+// elapsed so far", same convention as monthRange's own full-calendar-month
+// comparison) — used by Home's trend badge to compare against whichever
+// period tab (Week/Month/Year) is currently selected.
+export function previousPeriodRange(period: HomePeriod, now: Date = new Date()): { from: string; to: string } {
+  if (period === "week") {
+    const thisWeekStart = startOfWeek(now);
+    const prevStart = new Date(thisWeekStart);
+    prevStart.setDate(prevStart.getDate() - 7);
+    const prevEnd = new Date(thisWeekStart);
+    prevEnd.setDate(prevEnd.getDate() - 1);
+    return { from: toDateOnly(prevStart), to: toDateOnly(prevEnd) };
+  }
+  if (period === "year") {
+    return { from: `${now.getFullYear() - 1}-01-01`, to: `${now.getFullYear() - 1}-12-31` };
+  }
+  return monthRange(1, now);
+}
+
+export function previousPeriodLabel(period: HomePeriod): string {
+  if (period === "week") return "tuần trước";
+  if (period === "year") return "năm trước";
+  return "tháng trước";
+}
+
 // A full calendar month N months back from `now` (0 = this month, 1 = last
 // month, ...) — used by the fixed month-over-month comparison block, which
 // is independent of the Week/Month/Year snapshot selector above.

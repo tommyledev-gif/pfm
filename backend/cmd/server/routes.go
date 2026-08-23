@@ -118,6 +118,14 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	// no separate route.
 	ai := v1.Group("/ai", middleware.JWTAuth(tokens, logger), middleware.AIChatRateLimiter(logger))
 	ai.Post("/chat", chatHandler.Chat)
+	// Client-rendered chat thread cache (mobile chat-store.ts) — restores the
+	// full chat UI (action cards, confirmed state, edit history) after local
+	// AsyncStorage is cleared (logout, reinstall, new device). Neither
+	// endpoint calls the AI Service; grouped here anyway for URL-namespace
+	// consistency with every other /ai/* route (same reasoning as the budget
+	// wizard's Prefill/Proposals below).
+	ai.Get("/chat/thread", chatHandler.GetThread)
+	ai.Post("/chat/thread/sync", chatHandler.SyncThread)
 
 	// F-13 AI Budget Setup Wizard (specs/ai-budget-wizard/plan.md Finding #4)
 	// — share the /ai group's rate limiter for URL-namespace consistency,
