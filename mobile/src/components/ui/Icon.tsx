@@ -226,6 +226,15 @@ export function LogOutIcon({ size, color = "#FF9E96", strokeWidth = 2 }: IconPro
   );
 }
 
+export function SearchIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
+  return (
+    <Svg {...base(size)} fill="none">
+      <Circle cx="10.5" cy="10.5" r="6.5" stroke={color} strokeWidth={strokeWidth} />
+      <Line x1="15.3" y1="15.3" x2="20" y2="20" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 export function EyeIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">

@@ -141,15 +141,18 @@ WHERE t.user_id = $1
   AND t.deleted_at IS NULL
   AND ($3::uuid IS NULL OR t.wallet_id = $3)
   AND ($4::uuid IS NULL OR t.category_id = $4)
-  AND ($5::text IS NULL OR t.type = $5)
-  AND ($6::timestamptz IS NULL OR t.occurred_at >= $6)
-  AND ($7::timestamptz IS NULL OR t.occurred_at <= $7)
+  AND ($5::uuid[] IS NULL OR t.category_id = ANY($5::uuid[]))
+  AND ($6::text IS NULL OR t.type = $6)
+  AND ($7::timestamptz IS NULL OR t.occurred_at >= $7)
+  AND ($8::timestamptz IS NULL OR t.occurred_at <= $8)
+  AND ($9::text IS NULL OR t.note ILIKE '%' || $9 || '%' ESCAPE '\')
   AND (
-    $8::timestamptz IS NULL
-    OR t.occurred_at < $8
-    OR (t.occurred_at = $8 AND t.id < $9)
+    $10::timestamptz IS NULL
+    OR t.occurred_at < $10
+    OR (t.occurred_at = $10 AND t.created_at < $11)
+    OR (t.occurred_at = $10 AND t.created_at = $11 AND t.id < $12)
   )
-ORDER BY t.occurred_at DESC, t.id DESC
+ORDER BY t.occurred_at DESC, t.created_at DESC, t.id DESC
 LIMIT $2
 `
 
@@ -158,10 +161,13 @@ type ListTransactionsByUserParams struct {
 	Limit            int32
 	WalletID         *uuid.UUID
 	CategoryID       *uuid.UUID
+	CategoryIDs      []uuid.UUID
 	Type             *string
 	FromTs           *time.Time
 	ToTs             *time.Time
+	Search           *string
 	CursorOccurredAt *time.Time
+	CursorCreatedAt  *time.Time
 	CursorID         *uuid.UUID
 }
 
@@ -181,13 +187,14 @@ type ListTransactionsByUserRow struct {
 	CategoryName string
 }
 
-// ListTransactionsByUser is cursor-paginated on occurred_at, not created_at
-// (specs/transaction-management/spec.md Edge Cases US-02 #1) — deliberately
-// different from ListUsers' created_at-keyed cursor.
+// ListTransactionsByUser is cursor-paginated on (occurred_at, created_at, id)
+// — occurred_at is the primary sort key (specs/transaction-management/
+// spec.md Edge Cases US-02 #1), created_at breaks ties for same-day
+// transactions, id breaks any remaining tie.
 func (q *Queries) ListTransactionsByUser(ctx context.Context, arg ListTransactionsByUserParams) ([]ListTransactionsByUserRow, error) {
 	rows, err := q.db.Query(ctx, listTransactionsByUser,
-		arg.UserID, arg.Limit, arg.WalletID, arg.CategoryID, arg.Type,
-		arg.FromTs, arg.ToTs, arg.CursorOccurredAt, arg.CursorID,
+		arg.UserID, arg.Limit, arg.WalletID, arg.CategoryID, arg.CategoryIDs, arg.Type,
+		arg.FromTs, arg.ToTs, arg.Search, arg.CursorOccurredAt, arg.CursorCreatedAt, arg.CursorID,
 	)
 	if err != nil {
 		return nil, err

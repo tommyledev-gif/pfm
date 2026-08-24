@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { Chip } from "@/components/ui/Chip";
-import { CalendarIcon, PlusIcon } from "@/components/ui/Icon";
+import { CalendarIcon, PlusIcon, SearchIcon, TagIcon } from "@/components/ui/Icon";
 import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
 import { Screen } from "@/components/shared/Screen";
 import { TransactionRow } from "@/components/shared/TransactionRow";
@@ -13,9 +13,11 @@ import { useTransactionsQuery } from "@/features/transactions/api/use-transactio
 import { Transaction } from "@/features/transactions/types";
 import { TransactionFormModal } from "@/features/transactions/components/TransactionFormModal";
 import { TransactionRowSkeleton } from "@/features/transactions/components/TransactionRowSkeleton";
+import { CategoryFilterModal } from "@/features/transactions/components/CategoryFilterModal";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 
 const LIST_SKELETON_COUNT = 6;
+const SEARCH_DEBOUNCE_MS = 400;
 
 const FILTERS: { label: string; value: TransactionType | undefined }[] = [
   { label: "Tất cả", value: undefined },
@@ -27,11 +29,29 @@ export default function TransactionsScreen() {
   const [filter, setFilter] = useState<TransactionType | undefined>(undefined);
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [categoryIds, setCategoryIds] = useState<string[]>([]);
+  const [categoryFilterOpen, setCategoryFilterOpen] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const wallets = useWalletsQuery();
   const categories = useCategoriesQuery();
-  const transactions = useTransactionsQuery({ type: filter, from: dateRange.from, to: dateRange.to });
+
+  // Debounced so every keystroke doesn't fire a new request — same 400ms
+  // convention as other search-as-you-type inputs in this codebase.
+  useEffect(() => {
+    const handle = setTimeout(() => setSearch(searchInput.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(handle);
+  }, [searchInput]);
+
+  const transactions = useTransactionsQuery({
+    type: filter,
+    from: dateRange.from,
+    to: dateRange.to,
+    category_ids: categoryIds.length > 0 ? categoryIds.join(",") : undefined,
+    search: search || undefined,
+  });
 
   const walletCurrencyMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -43,6 +63,7 @@ export default function TransactionsScreen() {
 
   const items = transactions.data?.pages.flatMap((page) => page.data) ?? [];
   const hasDateFilter = Boolean(dateRange.from);
+  const hasCategoryFilter = categoryIds.length > 0;
 
   return (
     <Screen>
@@ -59,33 +80,60 @@ export default function TransactionsScreen() {
           <View style={styles.header}>
             <View style={styles.headerRow}>
               <Text style={styles.title}>Giao dịch</Text>
-              <View style={styles.headerActions}>
-                <Pressable
-                  style={[styles.dateButton, hasDateFilter && styles.dateButtonActive]}
-                  onPress={() => setPickerOpen(true)}
-                >
-                  <CalendarIcon size={16} color={hasDateFilter ? colors.onGreen : colors.textSecondary} />
-                  <Text style={[styles.dateButtonLabel, hasDateFilter && styles.dateButtonLabelActive]}>
-                    {hasDateFilter ? `${dateRange.from} – ${dateRange.to}` : "Khoảng thời gian"}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={styles.addButton}
-                  onPress={() => {
-                    setEditingTransaction(null);
-                    setFormOpen(true);
-                  }}
-                  hitSlop={8}
-                >
-                  <PlusIcon size={16} color={colors.onGreen} />
-                </Pressable>
-              </View>
+              <Pressable
+                style={styles.addButton}
+                onPress={() => {
+                  setEditingTransaction(null);
+                  setFormOpen(true);
+                }}
+                hitSlop={8}
+              >
+                <PlusIcon size={16} color={colors.onGreen} />
+              </Pressable>
             </View>
+
+            <View style={styles.searchRow}>
+              <SearchIcon size={16} color={colors.textSecondary} />
+              <TextInput
+                value={searchInput}
+                onChangeText={setSearchInput}
+                placeholder="Tìm theo ghi chú..."
+                placeholderTextColor={colors.textMuted}
+                style={styles.searchInput}
+              />
+              {searchInput ? (
+                <Pressable onPress={() => setSearchInput("")} hitSlop={8}>
+                  <Text style={styles.clearSearch}>✕</Text>
+                </Pressable>
+              ) : null}
+            </View>
+
             <View style={styles.chipRow}>
               {FILTERS.map((f) => (
                 <Chip key={f.label} label={f.label} active={filter === f.value} onPress={() => setFilter(f.value)} />
               ))}
             </View>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+              <Pressable
+                style={[styles.filterButton, hasDateFilter && styles.filterButtonActive]}
+                onPress={() => setPickerOpen(true)}
+              >
+                <CalendarIcon size={16} color={hasDateFilter ? colors.onGreen : colors.textSecondary} />
+                <Text style={[styles.filterButtonLabel, hasDateFilter && styles.filterButtonLabelActive]}>
+                  {hasDateFilter ? `${dateRange.from} – ${dateRange.to}` : "Khoảng thời gian"}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.filterButton, hasCategoryFilter && styles.filterButtonActive]}
+                onPress={() => setCategoryFilterOpen(true)}
+              >
+                <TagIcon size={16} color={hasCategoryFilter ? colors.onGreen : colors.textSecondary} />
+                <Text style={[styles.filterButtonLabel, hasCategoryFilter && styles.filterButtonLabelActive]}>
+                  {hasCategoryFilter ? `Danh mục (${categoryIds.length})` : "Danh mục"}
+                </Text>
+              </Pressable>
+            </ScrollView>
           </View>
         }
         renderItem={({ item }) => (
@@ -126,6 +174,14 @@ export default function TransactionsScreen() {
         onApply={setDateRange}
       />
 
+      <CategoryFilterModal
+        visible={categoryFilterOpen}
+        onClose={() => setCategoryFilterOpen(false)}
+        categories={categories.data ?? []}
+        selectedIds={categoryIds}
+        onApply={setCategoryIds}
+      />
+
       <TransactionFormModal
         visible={formOpen}
         onClose={() => setFormOpen(false)}
@@ -140,9 +196,22 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: 140, gap: spacing.md },
   header: { gap: spacing.md },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   title: { ...typography.title, color: colors.textPrimary },
-  dateButton: {
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+  },
+  searchInput: { flex: 1, ...typography.body, color: colors.textPrimary, padding: 0 },
+  clearSearch: { ...typography.body, color: colors.textSecondary },
+  filterRow: { flexDirection: "row", gap: spacing.sm },
+  filterButton: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
@@ -153,9 +222,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
   },
-  dateButtonActive: { backgroundColor: colors.lavender, borderColor: colors.lavender },
-  dateButtonLabel: { ...typography.tiny, color: colors.textSecondary },
-  dateButtonLabelActive: { color: colors.onGreen },
+  filterButtonActive: { backgroundColor: colors.lavender, borderColor: colors.lavender },
+  filterButtonLabel: { ...typography.tiny, color: colors.textSecondary },
+  filterButtonLabelActive: { color: colors.onGreen },
   addButton: {
     width: 36,
     height: 36,

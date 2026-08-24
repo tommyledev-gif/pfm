@@ -151,31 +151,39 @@ func (r *TransactionRepository) GetTransactionByID(ctx context.Context, id uuid.
 }
 
 // ListTransactionsFilter carries US-02's optional query filters — every
-// pointer field left nil is a no-op AND clause at the SQL layer.
+// pointer field left nil (and CategoryIDs left nil/empty) is a no-op AND
+// clause at the SQL layer.
 type ListTransactionsFilter struct {
 	WalletID         *uuid.UUID
 	CategoryID       *uuid.UUID
+	CategoryIDs      []uuid.UUID
 	Type             *string
 	From             *time.Time
 	To               *time.Time
+	Search           *string
 	CursorOccurredAt *time.Time
+	CursorCreatedAt  *time.Time
 	CursorID         *uuid.UUID
 	Limit            int32
 }
 
-// ListTransactionsByUser is cursor-paginated on occurred_at, not created_at
-// (spec.md Edge Cases US-02 #1) — see service/cursor.go's
-// encodeTransactionCursor/decodeTransactionCursor pair.
+// ListTransactionsByUser is cursor-paginated on (occurred_at, created_at, id)
+// (spec.md Edge Cases US-02 #1, plus a created_at tie-break for same-day
+// transactions) — see service/cursor.go's encodeTransactionCursor/
+// decodeTransactionCursor pair.
 func (r *TransactionRepository) ListTransactionsByUser(ctx context.Context, userID uuid.UUID, filter ListTransactionsFilter) ([]*model.Transaction, error) {
 	rows, err := r.q.ListTransactionsByUser(ctx, sqlc.ListTransactionsByUserParams{
 		UserID:           userID,
 		Limit:            filter.Limit,
 		WalletID:         filter.WalletID,
 		CategoryID:       filter.CategoryID,
+		CategoryIDs:      filter.CategoryIDs,
 		Type:             filter.Type,
 		FromTs:           filter.From,
 		ToTs:             filter.To,
+		Search:           filter.Search,
 		CursorOccurredAt: filter.CursorOccurredAt,
+		CursorCreatedAt:  filter.CursorCreatedAt,
 		CursorID:         filter.CursorID,
 	})
 	if err != nil {

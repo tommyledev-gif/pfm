@@ -25,9 +25,15 @@ export interface ListTransactionsResult {
 export interface ListTransactionsFilters {
   wallet_id?: string;
   category_id?: string;
+  // Comma-separated category UUIDs — backs the Transactions screen's
+  // multi-select category filter (backend/internal/dto.ListTransactionsQuery.
+  // CategoryIDs). Additive with category_id; callers send one or the other.
+  category_ids?: string;
   type?: TransactionType;
   from?: string;
   to?: string;
+  // ILIKE substring match against a transaction's note.
+  search?: string;
   limit?: number;
 }
 

@@ -58,9 +58,22 @@ func (r UpdateTransactionRequest) HasUpdates() bool {
 type ListTransactionsQuery struct {
 	WalletID   string `query:"wallet_id" validate:"omitempty,uuid4"`
 	CategoryID string `query:"category_id" validate:"omitempty,uuid4"`
-	Type       string `query:"type" validate:"omitempty,oneof=income expense"`
-	From       string `query:"from"`
-	To         string `query:"to"`
-	Cursor     string `query:"cursor"`
-	Limit      int    `query:"limit" validate:"omitempty,min=1,max=100"`
+	// CategoryIDs is a comma-separated list of category UUIDs for the
+	// Transactions screen's multi-select category filter — additive with
+	// CategoryID (a caller sends one or the other in practice). Each entry is
+	// parsed/validated as a UUID and ownership-checked in
+	// TransactionService.ListTransactions, same as CategoryID; the struct tag
+	// can't express "comma-separated uuid4 list" so that validation happens
+	// there, not here.
+	CategoryIDs string `query:"category_ids"`
+	Type        string `query:"type" validate:"omitempty,oneof=income expense"`
+	From        string `query:"from"`
+	To          string `query:"to"`
+	// Search is an ILIKE substring match against a transaction's note (its
+	// only free-text field) — max=200 is generous headroom over
+	// common.TransactionNoteMaxLength (500) purely to bound query size, not a
+	// meaningful UX limit.
+	Search string `query:"search" validate:"omitempty,max=200"`
+	Cursor string `query:"cursor"`
+	Limit  int    `query:"limit" validate:"omitempty,min=1,max=100"`
 }

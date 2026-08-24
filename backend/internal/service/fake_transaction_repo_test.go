@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -178,6 +179,18 @@ func (f *fakeTransactionRepo) ListTransactionsByUser(_ context.Context, userID u
 		if filter.CategoryID != nil && t.CategoryID != *filter.CategoryID {
 			continue
 		}
+		if len(filter.CategoryIDs) > 0 {
+			matched := false
+			for _, id := range filter.CategoryIDs {
+				if t.CategoryID == id {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
+		}
 		if filter.Type != nil && string(t.Type) != *filter.Type {
 			continue
 		}
@@ -187,9 +200,26 @@ func (f *fakeTransactionRepo) ListTransactionsByUser(_ context.Context, userID u
 		if filter.To != nil && t.OccurredAt.After(*filter.To) {
 			continue
 		}
+		if filter.Search != nil {
+			note := ""
+			if t.Note != nil {
+				note = *t.Note
+			}
+			if !strings.Contains(strings.ToLower(note), strings.ToLower(*filter.Search)) {
+				continue
+			}
+		}
 		if filter.CursorOccurredAt != nil {
-			cursorTs := *filter.CursorOccurredAt
-			if !(t.OccurredAt.Before(cursorTs) || (t.OccurredAt.Equal(cursorTs) && filter.CursorID != nil && t.ID.String() < filter.CursorID.String())) {
+			cursorOccurredAt := *filter.CursorOccurredAt
+			cursorCreatedAt := time.Time{}
+			if filter.CursorCreatedAt != nil {
+				cursorCreatedAt = *filter.CursorCreatedAt
+			}
+			before := t.OccurredAt.Before(cursorOccurredAt)
+			tie1 := t.OccurredAt.Equal(cursorOccurredAt) && t.CreatedAt.Before(cursorCreatedAt)
+			tie2 := t.OccurredAt.Equal(cursorOccurredAt) && t.CreatedAt.Equal(cursorCreatedAt) &&
+				filter.CursorID != nil && t.ID.String() < filter.CursorID.String()
+			if !(before || tie1 || tie2) {
 				continue
 			}
 		}
@@ -199,6 +229,9 @@ func (f *fakeTransactionRepo) ListTransactionsByUser(_ context.Context, userID u
 	sort.Slice(out, func(i, j int) bool {
 		if !out[i].OccurredAt.Equal(out[j].OccurredAt) {
 			return out[i].OccurredAt.After(out[j].OccurredAt)
+		}
+		if !out[i].CreatedAt.Equal(out[j].CreatedAt) {
+			return out[i].CreatedAt.After(out[j].CreatedAt)
 		}
 		return out[i].ID.String() > out[j].ID.String()
 	})

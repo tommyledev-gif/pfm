@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -11,6 +12,12 @@ import (
 	"github.com/example/pfm/backend/internal/model"
 	"github.com/example/pfm/backend/internal/repository"
 )
+
+// likeEscaper escapes ILIKE's own wildcard characters (and its escape
+// character) in a caller-supplied search term, so a note literally containing
+// "%" or "_" (e.g. "commission 10%") is matched as text, not as a wildcard —
+// paired with the `ESCAPE '\'` clause in ListTransactionsByUser.
+var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 
 // ListTransactions implements US-02 — strictly scoped to the caller
 // (CLAUDE.md user isolation rule), cursor-paginated on occurred_at (not
@@ -39,6 +46,27 @@ func (s *TransactionService) ListTransactions(ctx context.Context, userID uuid.U
 		}
 		filter.CategoryID = &categoryID
 	}
+	if q.CategoryIDs != "" {
+		parts := strings.Split(q.CategoryIDs, ",")
+		categoryIDs := make([]uuid.UUID, 0, len(parts))
+		for _, part := range parts {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			categoryID, err := uuid.Parse(part)
+			if err != nil {
+				return nil, nil, common.NewInvalidInputError("category_ids must be a comma-separated list of valid UUIDs")
+			}
+			if _, err := s.getVisibleCategory(ctx, userID, categoryID); err != nil {
+				return nil, nil, err
+			}
+			categoryIDs = append(categoryIDs, categoryID)
+		}
+		if len(categoryIDs) > 0 {
+			filter.CategoryIDs = categoryIDs
+		}
+	}
 	if q.Type != "" {
 		filter.Type = &q.Type
 	}
@@ -59,13 +87,18 @@ func (s *TransactionService) ListTransactions(ctx context.Context, userID uuid.U
 	if filter.From != nil && filter.To != nil && filter.From.After(*filter.To) {
 		return nil, nil, common.NewInvalidInputError("from must not be after to")
 	}
+	if search := strings.TrimSpace(q.Search); search != "" {
+		escaped := likeEscaper.Replace(search)
+		filter.Search = &escaped
+	}
 	if q.Cursor != "" {
-		id, occurredAt, err := decodeTransactionCursor(q.Cursor)
+		id, occurredAt, createdAt, err := decodeTransactionCursor(q.Cursor)
 		if err != nil {
 			return nil, nil, common.NewInvalidInputError("cursor is invalid")
 		}
 		filter.CursorID = &id
 		filter.CursorOccurredAt = &occurredAt
+		filter.CursorCreatedAt = &createdAt
 	}
 
 	limit := q.Limit
@@ -91,7 +124,7 @@ func (s *TransactionService) ListTransactions(ctx context.Context, userID uuid.U
 	var nextCursor *string
 	if hasMore && len(transactions) > 0 {
 		last := transactions[len(transactions)-1]
-		c, err := encodeTransactionCursor(last.ID, last.OccurredAt)
+		c, err := encodeTransactionCursor(last.ID, last.OccurredAt, last.CreatedAt)
 		if err != nil {
 			return nil, nil, fmt.Errorf("service.ListTransactions: %w", err)
 		}

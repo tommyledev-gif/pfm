@@ -45,9 +45,18 @@ WHERE t.id = $1
 LIMIT 1;
 
 -- name: ListTransactionsByUser :many
--- Cursor-paginated on occurred_at (not created_at — spec.md Edge Cases US-02
--- #1) with a matching id tie-break for equal timestamps. Every filter is an
--- optional sqlc.narg — a NULL narg leaves that AND clause a no-op.
+-- Cursor-paginated on (occurred_at, created_at, id) — occurred_at DESC
+-- primary (spec.md Edge Cases US-02 #1), created_at DESC as the tie-break for
+-- same-day transactions ("the actual moment the user approved it," not just
+-- insertion id order), id DESC as the final tie-break for equal created_at.
+-- Every filter is an optional sqlc.narg — a NULL narg leaves that AND clause
+-- a no-op. category_ids is additive with category_id (both may be sent; in
+-- practice callers send one or the other) — nil/empty slice is a no-op,
+-- mirroring budget_limits' ANY(::uuid[]) precedent (db/queries/budgets.sql).
+-- search is an ILIKE substring match against note only (the sole free-text
+-- field on a transaction), with literal % / _ / \ pre-escaped by the caller
+-- and matched via ESCAPE '\' so a note containing those characters can't be
+-- misread as a wildcard.
 SELECT
     t.id, t.user_id, t.wallet_id, t.category_id, t.amount, t.type, t.note,
     t.occurred_at, t.created_at, t.updated_at, t.deleted_at,
@@ -59,15 +68,22 @@ WHERE t.user_id = $1
   AND t.deleted_at IS NULL
   AND (sqlc.narg('wallet_id')::uuid IS NULL OR t.wallet_id = sqlc.narg('wallet_id'))
   AND (sqlc.narg('category_id')::uuid IS NULL OR t.category_id = sqlc.narg('category_id'))
+  AND (sqlc.narg('category_ids')::uuid[] IS NULL OR t.category_id = ANY(sqlc.narg('category_ids')::uuid[]))
   AND (sqlc.narg('type')::text IS NULL OR t.type = sqlc.narg('type'))
   AND (sqlc.narg('from_ts')::timestamptz IS NULL OR t.occurred_at >= sqlc.narg('from_ts'))
   AND (sqlc.narg('to_ts')::timestamptz IS NULL OR t.occurred_at <= sqlc.narg('to_ts'))
+  AND (sqlc.narg('search')::text IS NULL OR t.note ILIKE '%' || sqlc.narg('search') || '%' ESCAPE '\')
   AND (
     sqlc.narg('cursor_occurred_at')::timestamptz IS NULL
     OR t.occurred_at < sqlc.narg('cursor_occurred_at')
-    OR (t.occurred_at = sqlc.narg('cursor_occurred_at') AND t.id < sqlc.narg('cursor_id'))
+    OR (t.occurred_at = sqlc.narg('cursor_occurred_at') AND t.created_at < sqlc.narg('cursor_created_at'))
+    OR (
+      t.occurred_at = sqlc.narg('cursor_occurred_at')
+      AND t.created_at = sqlc.narg('cursor_created_at')
+      AND t.id < sqlc.narg('cursor_id')
+    )
   )
-ORDER BY t.occurred_at DESC, t.id DESC
+ORDER BY t.occurred_at DESC, t.created_at DESC, t.id DESC
 LIMIT $2;
 
 -- name: UpdateTransaction :one
