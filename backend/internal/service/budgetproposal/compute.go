@@ -55,78 +55,63 @@ type Result struct {
 // it represents a fixed needs-based share rather than an explicit priority
 // choice from the User.
 func rankForOrdering(preference string) float64 {
-	if w, ok := common.BudgetWizardPreferenceWeights[preference]; ok {
+	if w, ok := common.BudgetWizardPreferenceTargetShare[preference]; ok {
 		return w
 	}
-	return common.BudgetWizardPreferenceWeights["normal"]
+	return common.BudgetWizardPreferenceTargetShare["normal"]
 }
 
 // Compute runs the fixed allocation formula. income must be > 0 (guaranteed
 // by dto.BudgetProposalsRequest's validator tags) and items must be
 // non-empty.
+//
+// Revised 2026-08-24 (spec.md US-04 Main Flow step 3): every Category's raw
+// amount is its own ABSOLUTE target share of income (preference share or
+// ai_decides baseline) — Categories never split a shared pool proportionally
+// against each other, so two Categories set to the same preference each get
+// their own share, not an even split of what's left. The old relative-weight
+// design degenerated to an even split whenever every selected Category
+// shared one preference, which read as "my preference had no effect."
 func Compute(income int64, items []Input) Result {
 	n := len(items)
 	amounts := make([]float64, n)
 	isAIDecides := make([]bool, n)
 
-	// Step 1/2: weight lookup for explicit preferences, baseline-pattern
-	// lookup for "ai_decides" — spec.md US-04 Main Flow step 3, bullets 1-2.
-	weights := make([]float64, n)
-	baselines := make([]float64, n)
-	var sumBaselines float64
+	// Step 1: assign each Category its own raw target amount — a fixed
+	// share of income for explicit preferences, a baseline-pattern share for
+	// "ai_decides" — spec.md US-04 Main Flow step 3, bullets 1-2.
+	var sumTargets float64
 	for i, item := range items {
 		if item.SpendingPreference == "ai_decides" {
 			isAIDecides[i] = true
-			baselines[i] = categoryBaseline(item.CategoryName) * float64(income)
-			sumBaselines += baselines[i]
+			amounts[i] = categoryBaseline(item.CategoryName) * float64(income)
 		} else {
-			weights[i] = common.BudgetWizardPreferenceWeights[item.SpendingPreference]
+			amounts[i] = common.BudgetWizardPreferenceTargetShare[item.SpendingPreference] * float64(income)
 		}
+		sumTargets += amounts[i]
 	}
 
-	// Step 3 guardrail: if ai_decides baselines alone exceed 90% of income,
-	// scale them down proportionally (spec.md S-BWZ-19).
+	// Step 2 guardrail: if every raw target combined exceeds 90% of income,
+	// scale ALL of them down by the same proportional factor — never
+	// unevenly, and never only the ai_decides subset (spec.md S-BWZ-19).
 	weightedPool := common.BudgetWizardWeightedPoolShare * float64(income)
-	if sumBaselines > weightedPool {
-		factor := weightedPool / sumBaselines
-		for i := range items {
-			if isAIDecides[i] {
-				baselines[i] *= factor
-			}
-		}
-		sumBaselines = weightedPool
-	}
-
-	// Step 3: weighted Categories split what's left of the 90% pool,
-	// proportional to weight.
-	remainingPool := weightedPool - sumBaselines
-	if remainingPool < 0 {
-		remainingPool = 0
-	}
-	var sumWeights float64
-	for i := range items {
-		if !isAIDecides[i] {
-			sumWeights += weights[i]
-		}
-	}
-	for i := range items {
-		if isAIDecides[i] {
-			amounts[i] = baselines[i]
-		} else if sumWeights > 0 {
-			amounts[i] = remainingPool * (weights[i] / sumWeights)
-		}
-	}
-
-	// Step 4a: maximum-per-Category ceiling — lifted entirely for a single
-	// selected Category (spec.md S-BWZ-14). Excess removed here becomes
-	// unallocated, never redistributed to other Categories (same "never
-	// silently distributed" principle applied to the remainder itself).
-	if n > 1 {
-		ceiling := common.BudgetWizardMaxShareOfIncome * float64(income)
+	if sumTargets > weightedPool {
+		factor := weightedPool / sumTargets
 		for i := range amounts {
-			if amounts[i] > ceiling {
-				amounts[i] = ceiling
-			}
+			amounts[i] *= factor
+		}
+	}
+
+	// Step 3: maximum-per-Category ceiling — a defensive cap; no preference
+	// tier or ai_decides baseline reaches it on its own, so this never
+	// triggers in practice under the current tier/baseline values (spec.md
+	// S-BWZ-14 revision). Excess removed here becomes unallocated, never
+	// redistributed to other Categories (same "never silently distributed"
+	// principle applied to the remainder itself).
+	ceiling := common.BudgetWizardMaxShareOfIncome * float64(income)
+	for i := range amounts {
+		if amounts[i] > ceiling {
+			amounts[i] = ceiling
 		}
 	}
 

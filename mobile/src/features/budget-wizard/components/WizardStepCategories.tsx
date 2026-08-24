@@ -80,7 +80,11 @@ export function WizardStepCategories({
       <Text style={styles.title}>Chọn danh mục</Text>
       <Text style={styles.subtitle}>Chọn các danh mục bạn muốn lập ngân sách (tối đa {MAX_SELECTABLE}).</Text>
 
-      <ScrollView style={styles.categoryScroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.categoryScroll}
+        contentContainerStyle={styles.categoryScrollContent}
+        showsVerticalScrollIndicator
+      >
         <View style={styles.chipWrap}>
           {categories.map((c) => {
             const selected = selectedIds.has(c.id);
@@ -161,11 +165,19 @@ export function WizardStepCategories({
 }
 
 const styles = StyleSheet.create({
-  container: { gap: spacing.md },
+  container: { flex: 1, gap: spacing.md },
   title: { ...typography.title, color: colors.textPrimary },
   subtitle: { ...typography.caption, color: colors.textSecondary },
   label: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm },
-  categoryScroll: { maxHeight: 220 },
+  // flex:1, not a fixed maxHeight — this is the only ScrollView in this
+  // step (BudgetWizardModal renders full-screen, no outer ScrollView
+  // wrapping it), so it owns the gesture outright and genuinely scrolls
+  // instead of silently clipping content past a fixed height. Two same-
+  // direction ScrollViews nested inside each other (the old Drawer's own
+  // outer ScrollView + this one) meant the outer one always won the scroll
+  // gesture, making this list look frozen at whatever ~3 chips fit in 220px.
+  categoryScroll: { flex: 1 },
+  categoryScrollContent: { paddingBottom: spacing.sm },
   chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   chip: {
     flexDirection: "row",

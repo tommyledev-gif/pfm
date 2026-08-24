@@ -23,6 +23,11 @@ export function useSubmitBudgetWizard() {
     period: BudgetWizardPeriod,
     currency: WalletCurrency,
     customCategories: PendingCustomCategory[],
+    // Budgets outside this wizard run's own Category picker (e.g. a
+    // non-expense Category, spec.md US-03 Edge Cases #1) that must be
+    // re-submitted unchanged — US-05's bulk-create replaces the caller's
+    // *entire* active Budget set, so anything omitted here gets deleted.
+    preservedBudgets: BulkBudgetItem[] = [],
   ): Promise<number> => {
     setIsSubmitting(true);
     setError(null);
@@ -33,11 +38,14 @@ export function useSubmitBudgetWizard() {
         resolvedIds.set(pending.clientId, created.id);
       }
 
-      const budgets: BulkBudgetItem[] = selections.map((s) => ({
-        category_id: resolvedIds.get(s.categoryId) ?? s.categoryId,
-        period,
-        limits: [{ currency, amount_limit: amounts[s.categoryId] ?? 0 }],
-      }));
+      const budgets: BulkBudgetItem[] = [
+        ...selections.map((s) => ({
+          category_id: resolvedIds.get(s.categoryId) ?? s.categoryId,
+          period,
+          limits: [{ currency, amount_limit: amounts[s.categoryId] ?? 0 }],
+        })),
+        ...preservedBudgets,
+      ];
 
       const result = await bulkCreate.mutateAsync({ budgets });
       return result.created_count;

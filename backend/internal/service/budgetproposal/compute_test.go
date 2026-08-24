@@ -30,25 +30,41 @@ func TestCompute_MixedWeightedAndAIDecides(t *testing.T) {
 	}
 }
 
-// S-BWZ-14: a single selected Category's ceiling lift — may reach up to
-// ~90% of income, well above the normal 50% cap.
-func TestCompute_SingleCategoryCeilingLift(t *testing.T) {
+// S-BWZ-14 (revised 2026-08-24): a single selected Category gets exactly its
+// own absolute target share of income — selecting only one Category no
+// longer inflates its amount, since shares are absolute and independent of
+// how many Categories are selected (replaces the old relative-weight
+// design's "ceiling lifted for a single Category" side effect).
+func TestCompute_SingleCategoryUsesOwnTargetShare(t *testing.T) {
 	income := int64(10_000_000)
 	result := Compute(income, []Input{
-		{CategoryID: "food", CategoryName: "Food", SpendingPreference: "normal"},
+		{CategoryID: "food", CategoryName: "Food", SpendingPreference: "priority"},
 	})
 
 	if len(result.Entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(result.Entries))
 	}
 	amount := result.Entries[0].Amount
-	fiftyPercent := income / 2
-	if amount <= fiftyPercent {
-		t.Fatalf("expected the single category's amount to exceed the normal 50%% cap (%d), got %d", fiftyPercent, amount)
+	expected := int64(float64(income) * 0.30) // priority's target share
+	if amount != expected {
+		t.Fatalf("expected the single category's amount to equal its own target share (%d), got %d", expected, amount)
 	}
-	ninetyPercent := income * 9 / 10
-	if amount > ninetyPercent {
-		t.Fatalf("expected the single category's amount to stay at or below ~90%% of income (%d), got %d", ninetyPercent, amount)
+}
+
+// Two Categories sharing the same preference each get their own absolute
+// share, not an even split of a shared pool — the bug this formula replaced.
+func TestCompute_SamePreferenceCategoriesDoNotSplitAPool(t *testing.T) {
+	income := int64(10_000_000)
+	result := Compute(income, []Input{
+		{CategoryID: "food", CategoryName: "Food", SpendingPreference: "very_little"},
+		{CategoryID: "cafe", CategoryName: "Cafe", SpendingPreference: "very_little"},
+	})
+
+	expected := int64(float64(income) * 0.05) // very_little's target share, each
+	for _, e := range result.Entries {
+		if e.Amount != expected {
+			t.Fatalf("expected %q to get its own %d share, got %d", e.CategoryName, expected, e.Amount)
+		}
 	}
 }
 

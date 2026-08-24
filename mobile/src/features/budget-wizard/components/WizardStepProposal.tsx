@@ -73,7 +73,7 @@ export function WizardStepProposal({
         </Text>
       ) : null}
 
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator>
         {selections.map((s) => {
           const amount = amounts[s.categoryId] ?? 0;
           const percent = income > 0 ? Math.min(1, Math.max(0, amount / income)) : 0;
@@ -102,10 +102,17 @@ export function WizardStepProposal({
         })}
       </ScrollView>
 
-      <View style={styles.unallocatedRow}>
-        <Text style={styles.unallocatedLabel}>Chưa phân bổ</Text>
-        <Text style={[styles.unallocatedAmount, unallocated < 0 && styles.unallocatedNegative]}>
-          {formatCurrency(unallocated, currency)}
+      <View style={styles.unallocatedBlock}>
+        <View style={styles.unallocatedRow}>
+          <Text style={styles.unallocatedLabel}>Chưa có ngân sách</Text>
+          <Text style={[styles.unallocatedAmount, unallocated < 0 && styles.unallocatedNegative]}>
+            {formatCurrency(unallocated, currency)}
+          </Text>
+        </View>
+        <Text style={styles.unallocatedHint}>
+          {unallocated < 0
+            ? "Tổng số tiền đã phân bổ vượt quá thu nhập — hãy giảm bớt ở một vài danh mục."
+            : "Phần thu nhập bạn chưa gán cho danh mục nào ở trên — không phải lỗi, bạn có thể để trống cho các khoản chi tự do."}
         </Text>
       </View>
 
@@ -128,12 +135,16 @@ export function WizardStepProposal({
 }
 
 const styles = StyleSheet.create({
-  container: { gap: spacing.md },
+  container: { flex: 1, gap: spacing.md },
   center: { paddingVertical: spacing.xxl, alignItems: "center" },
   title: { ...typography.title, color: colors.textPrimary },
   subtitle: { ...typography.caption, color: colors.textSecondary },
   notice: { ...typography.caption, color: colors.peach },
-  scroll: { maxHeight: 340 },
+  // flex:1, not a fixed maxHeight — see WizardStepCategories.tsx's
+  // categoryScroll comment for why a fixed height nested inside the old
+  // Drawer's own ScrollView made this list look capped at ~3 rows.
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: spacing.sm },
   row: { gap: spacing.xs, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.surfaceBorder },
   rowHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   categoryName: { flex: 1, ...typography.body, color: colors.textPrimary },
@@ -142,16 +153,17 @@ const styles = StyleSheet.create({
   barFill: { height: "100%", backgroundColor: colors.green, borderRadius: 3 },
   amountInput: { marginTop: 4 },
   reasoning: { ...typography.tiny, color: colors.textMuted },
-  unallocatedRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  unallocatedBlock: {
+    gap: spacing.xs,
     paddingVertical: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: colors.surfaceBorder,
   },
+  unallocatedRow: { flexDirection: "row", justifyContent: "space-between" },
   unallocatedLabel: { ...typography.body, color: colors.textSecondary },
   unallocatedAmount: { ...typography.body, color: colors.textPrimary },
   unallocatedNegative: { color: colors.peach },
+  unallocatedHint: { ...typography.tiny, color: colors.textMuted },
   error: { color: colors.peach, ...typography.caption },
   actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
   flexButton: { flex: 1 },

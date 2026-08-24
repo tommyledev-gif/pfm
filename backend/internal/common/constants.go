@@ -181,29 +181,43 @@ const (
 	// (spec.md US-04 Main Flow step 3).
 	BudgetWizardMinAmountPerCategory int64 = 50_000
 	// BudgetWizardMaxShareOfIncome is the per-Category ceiling (50% of
-	// income), lifted entirely when only one Category was selected
-	// (spec.md S-BWZ-14).
+	// income) — a defensive cap only; no preference tier or ai_decides
+	// baseline reaches it on its own (spec.md S-BWZ-14 revision, 2026-08-24:
+	// the old "lifted for a single Category" exception was a side effect of
+	// the previous relative-weight formula, not a deliberate design goal —
+	// see BudgetWizardPreferenceTargetShare below).
 	BudgetWizardMaxShareOfIncome = 0.5
-	// BudgetWizardWeightedPoolShare is the share of income available to
-	// weighted (non-ai_decides) Categories before ai_decides baselines are
-	// subtracted (spec.md US-04 Main Flow step 3: "90% of income − sum of
-	// ai_decides baselines").
+	// BudgetWizardWeightedPoolShare is the ceiling every Category's *raw*
+	// target amount (preference share or ai_decides baseline) is
+	// proportionally scaled down to fit under, combined, before any
+	// per-Category floor/ceiling clamp runs (spec.md US-04 Main Flow step 3:
+	// "if the sum of every raw amount exceeds 90% of income, all of them are
+	// scaled down by the same proportional factor").
 	BudgetWizardWeightedPoolShare = 0.9
 	// BudgetWizardMinUnallocatedShare is the floor the remainder must never
-	// go below — shown to the User as "unallocated", never silently
-	// distributed (spec.md US-04 Main Flow step 3 / S-BWZ-19).
+	// go below — shown to the User as "Chưa có ngân sách" (not yet
+	// budgeted), never silently distributed (spec.md US-04 Main Flow step 3
+	// / S-BWZ-19).
 	BudgetWizardMinUnallocatedShare = 0.1
 )
 
-// BudgetWizardPreferenceWeights maps a spending_preference to its fixed
-// weight (spec.md US-04 Main Flow step 3) — "ai_decides" is deliberately
-// absent here, it uses BudgetWizardCategoryBaselines instead.
-var BudgetWizardPreferenceWeights = map[string]float64{
-	"very_little": 0.4,
-	"little":      0.7,
-	"normal":      1.0,
-	"a_lot":       1.5,
-	"priority":    2.0,
+// BudgetWizardPreferenceTargetShare maps a spending_preference to its fixed,
+// ABSOLUTE target share of income (spec.md US-04 Main Flow step 3, revised
+// 2026-08-24) — "ai_decides" is deliberately absent here, it uses
+// BudgetWizardCategoryBaselines instead. Each Category gets its own share
+// independent of what else is selected: two Categories both set to
+// "very_little" each get 5% of income, not an even split of a shared pool
+// (the previous BudgetWizardPreferenceWeights design's relative weights only
+// meant something when compared against sibling Categories' weights, which
+// silently degenerated to an even split whenever every selected Category
+// shared the same preference — reported as confusing/incorrect and replaced
+// here).
+var BudgetWizardPreferenceTargetShare = map[string]float64{
+	"very_little": 0.05,
+	"little":      0.10,
+	"normal":      0.15,
+	"a_lot":       0.22,
+	"priority":    0.30,
 }
 
 // BudgetWizardCategoryBaselines is the fixed baseline share of income per
