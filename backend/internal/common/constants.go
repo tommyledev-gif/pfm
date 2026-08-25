@@ -243,6 +243,24 @@ var BudgetWizardCategoryBaselines = map[string]float64{
 // (spec.md US-04 Main Flow step 3: "unmatched ≈ 5%").
 const BudgetWizardDefaultBaseline = 0.05
 
+// BudgetWizardSavingsCategoryNamePatterns is how BudgetWizardService.Proposals
+// recognizes a "savings" Category — case-insensitive substring match against
+// a Category's name, same technique as categoryBaseline's keyword matching.
+// Matches the seeded system Category's name (017_seed_savings_category.sql)
+// but also a user's own differently-cased "tiết kiệm"/"Savings" Category, so
+// the default-savings injection never double-proposes one the user already
+// selected under a slightly different name.
+var BudgetWizardSavingsCategoryNamePatterns = []string{"tiết kiệm", "saving"}
+
+// BudgetWizardDefaultSavingsShare is the fixed share of income the wizard
+// proposes for Savings by default, when the user didn't already select a
+// Savings Category themselves — every user should see a savings line even if
+// they never thought to pick one (product decision, not spec-derived).
+// Matches BudgetWizardCategoryBaselines["tiết kiệm"]'s own ai_decides value,
+// so a user-selected Savings Category and an auto-injected one land on the
+// same share.
+const BudgetWizardDefaultSavingsShare = 0.20
+
 // SupportedCurrencies is the same {VND, USD} allow-list as Wallet's currency
 // (WalletDefaultCurrency above), but expressed as a real Go-side lookup — not
 // just a struct-tag oneof — because `limits` map-KEY validation cannot be

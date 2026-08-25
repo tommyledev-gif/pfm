@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { LiquidCircle } from "@/components/shared/LiquidCircle";
 import { Screen } from "@/components/shared/Screen";
+import { SnapshotCardSkeleton } from "@/components/shared/SnapshotCardSkeleton";
 import { TopBar } from "@/components/shared/TopBar";
 import { TransactionRow } from "@/components/shared/TransactionRow";
 import { WalletCard } from "@/components/shared/WalletCard";
@@ -99,6 +100,11 @@ export default function HomeScreen() {
 
   const recentTransactions = recent.data?.pages[0]?.data.slice(0, 4) ?? [];
 
+  // Every input this Card renders defaults to 0/[] before its own query
+  // resolves — without this, the very first render showed "Đã chi 0 ₫" and
+  // an empty categories column instead of a loading state.
+  const snapshotLoading = wallets.isLoading || periodSummary.isLoading || thisMonthSummary.isLoading || budgets.isLoading;
+
   return (
     <Screen>
       <FlatList
@@ -117,77 +123,83 @@ export default function HomeScreen() {
           </View>
 
           <Card style={styles.snapshotCard} radius={radii.hero}>
-            {/* In-flow and right-aligned, not absolutely pinned to the
-                corner — the trend text's length varies with the amount and
-                a fixed absolute overlay collided with the categories column
-                below it for any but the shortest amounts. */}
-            <View
-              style={[
-                styles.trendBadge,
-                spentDelta > 0 ? styles.trendBadgeNegative : styles.trendBadgePositive,
-              ]}
-            >
-              <Text
-                style={[styles.trendBadgeLabel, { color: spentDelta > 0 ? colors.peach : colors.green }]}
-                numberOfLines={1}
-              >
-                {spentDelta > 0 ? "Nhiều hơn " : spentDelta < 0 ? "Ít hơn " : "Bằng "}
-                {formatCurrency(Math.abs(spentDelta), currency)} so với {previousPeriodLabel(homePeriod)}
-              </Text>
-            </View>
-            <View style={styles.snapshotRow}>
-              <View style={styles.snapshotLeft}>
-                <LiquidCircle
-                  size={132}
-                  progress={budgetSnapshot && budgetSnapshot.limit > 0 ? periodSpent / budgetSnapshot.limit : 0}
-                  topLabel="Đã chi"
-                  topValue={formatCurrency(periodSpent, currency)}
-                />
-                <Text style={styles.snapshotRemaining}>
-                  Còn lại:{" "}
-                  <Text style={styles.snapshotRemainingValue}>
-                    {budgetSnapshot ? formatCurrency(budgetSnapshot.remaining, currency) : "—"}
+            {snapshotLoading ? (
+              <SnapshotCardSkeleton />
+            ) : (
+              <>
+                {/* In-flow and right-aligned, not absolutely pinned to the
+                    corner — the trend text's length varies with the amount and
+                    a fixed absolute overlay collided with the categories column
+                    below it for any but the shortest amounts. */}
+                <View
+                  style={[
+                    styles.trendBadge,
+                    spentDelta > 0 ? styles.trendBadgeNegative : styles.trendBadgePositive,
+                  ]}
+                >
+                  <Text
+                    style={[styles.trendBadgeLabel, { color: spentDelta > 0 ? colors.peach : colors.green }]}
+                    numberOfLines={1}
+                  >
+                    {spentDelta > 0 ? "Nhiều hơn " : spentDelta < 0 ? "Ít hơn " : "Bằng "}
+                    {formatCurrency(Math.abs(spentDelta), currency)} so với {previousPeriodLabel(homePeriod)}
                   </Text>
-                </Text>
-                {budgetSnapshot ? (
-                  <Text style={[styles.snapshotStatus, { color: isOverBudget ? colors.peach : colors.green }]}>
-                    {isOverBudget ? "Vượt ngân sách" : "Trong ngân sách"}
-                  </Text>
-                ) : null}
-              </View>
-
-              {topCategories.length > 0 ? (
-                <View style={styles.snapshotRight}>
-                  <View style={styles.compactHeaderRow}>
-                    <Text style={styles.compactSectionTitle} numberOfLines={1}>
-                      Chi nhiều nhất
-                    </Text>
-                    <Pressable onPress={() => router.push("/insights")} hitSlop={8}>
-                      <Text style={styles.compactSeeAll} numberOfLines={1}>
-                        Xem tất cả
-                      </Text>
-                    </Pressable>
-                  </View>
-                  {topCategories.map((c) => (
-                    <View key={c.category_id} style={styles.categoryRow}>
-                      <Avatar
-                        name={c.category_name}
-                        color={colorForCategory(c.category_id)}
-                        size={24}
-                        icon={categoryById.get(c.category_id)?.icon}
-                        iconUrl={categoryById.get(c.category_id)?.icon_url}
-                      />
-                      <Text style={styles.categoryName} numberOfLines={1}>
-                        {c.category_name}
-                      </Text>
-                      <Text style={styles.categoryAmount} numberOfLines={1}>
-                        {formatCurrency(c.amount, currency)}
-                      </Text>
-                    </View>
-                  ))}
                 </View>
-              ) : null}
-            </View>
+                <View style={styles.snapshotRow}>
+                  <View style={styles.snapshotLeft}>
+                    <LiquidCircle
+                      size={132}
+                      progress={budgetSnapshot && budgetSnapshot.limit > 0 ? periodSpent / budgetSnapshot.limit : 0}
+                      topLabel="Đã chi"
+                      topValue={formatCurrency(periodSpent, currency)}
+                    />
+                    <Text style={styles.snapshotRemaining}>
+                      Còn lại:{" "}
+                      <Text style={styles.snapshotRemainingValue}>
+                        {budgetSnapshot ? formatCurrency(budgetSnapshot.remaining, currency) : "—"}
+                      </Text>
+                    </Text>
+                    {budgetSnapshot ? (
+                      <Text style={[styles.snapshotStatus, { color: isOverBudget ? colors.peach : colors.green }]}>
+                        {isOverBudget ? "Vượt ngân sách" : "Trong ngân sách"}
+                      </Text>
+                    ) : null}
+                  </View>
+
+                  {topCategories.length > 0 ? (
+                    <View style={styles.snapshotRight}>
+                      <View style={styles.compactHeaderRow}>
+                        <Text style={styles.compactSectionTitle} numberOfLines={1}>
+                          Chi nhiều nhất
+                        </Text>
+                        <Pressable onPress={() => router.push("/insights")} hitSlop={8}>
+                          <Text style={styles.compactSeeAll} numberOfLines={1}>
+                            Xem tất cả
+                          </Text>
+                        </Pressable>
+                      </View>
+                      {topCategories.map((c) => (
+                        <View key={c.category_id} style={styles.categoryRow}>
+                          <Avatar
+                            name={c.category_name}
+                            color={colorForCategory(c.category_id)}
+                            size={24}
+                            icon={categoryById.get(c.category_id)?.icon}
+                            iconUrl={categoryById.get(c.category_id)?.icon_url}
+                          />
+                          <Text style={styles.categoryName} numberOfLines={1}>
+                            {c.category_name}
+                          </Text>
+                          <Text style={styles.categoryAmount} numberOfLines={1}>
+                            {formatCurrency(c.amount, currency)}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
+                </View>
+              </>
+            )}
           </Card>
 
           {pendingConfirmations.length > 0 ? (

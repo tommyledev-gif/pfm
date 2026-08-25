@@ -27,13 +27,6 @@ interface TransactionActionCardProps {
   // Tapping the badge opens the edit-history dialog (onPressHistory).
   edited?: boolean;
   onPressHistory?: () => void;
-  // Forwarded onto the Confirm button itself — ai-chat.tsx's enclosing
-  // Pressable never sees a long-press that lands on this button, since it's
-  // already an interactive Pressable of its own (see PillButton's doc
-  // comment). Without this, holding directly on "Xác nhận & Lưu" silently
-  // did nothing instead of opening the edit modal.
-  onLongPress?: () => void;
-  longPressDelay?: number;
 }
 
 // Renders inside an AI assistant chat bubble once a transaction has been
@@ -56,8 +49,6 @@ export function TransactionActionCard({
   onConfirm,
   edited,
   onPressHistory,
-  onLongPress,
-  longPressDelay,
 }: TransactionActionCardProps) {
   const { payload } = action;
   const isIncome = payload.type === "income";
@@ -120,8 +111,6 @@ export function TransactionActionCard({
             <PillButton
               label="Xác nhận & Lưu"
               onPress={onConfirm}
-              onLongPress={onLongPress}
-              delayLongPress={longPressDelay}
               loading={saving}
               style={styles.confirmButton}
             />

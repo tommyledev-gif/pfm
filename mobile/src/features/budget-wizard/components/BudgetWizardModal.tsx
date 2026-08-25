@@ -99,9 +99,10 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
 
           {step === 4 ? (
             <WizardStepProposal
-              selections={wizard.selections}
+              selections={wizard.proposalSelections}
               amounts={wizard.amounts}
               onChangeAmount={(id, cents) => wizard.setAmounts((prev) => ({ ...prev, [id]: cents }))}
+              onRemove={wizard.removeProposalEntry}
               reasoningByCategoryId={wizard.reasoningByCategoryId}
               income={wizard.incomeCents}
               currency={wizard.currency}

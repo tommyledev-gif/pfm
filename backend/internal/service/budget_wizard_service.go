@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -115,7 +116,7 @@ func (s *BudgetWizardService) Proposals(ctx context.Context, userID uuid.UUID, r
 
 	result := budgetproposal.Compute(req.Income, inputs)
 
-	entries := make([]dto.ProposalEntry, 0, len(result.Entries))
+	entries := make([]dto.ProposalEntry, 0, len(result.Entries)+1)
 	for _, e := range result.Entries {
 		categoryID, err := uuid.Parse(e.CategoryID)
 		if err != nil {
@@ -130,12 +131,93 @@ func (s *BudgetWizardService) Proposals(ctx context.Context, userID uuid.UUID, r
 		})
 	}
 
+	unallocatedAmount := result.UnallocatedAmount
+	unallocatedPercent := result.UnallocatedPercent
+	savingsEntry, err := s.defaultSavingsEntry(ctx, userID, req.Income, req.Preferences, unallocatedAmount)
+	if err != nil {
+		return nil, fmt.Errorf("service.Proposals: %w", err)
+	}
+	if savingsEntry != nil {
+		entries = append(entries, *savingsEntry)
+		unallocatedAmount -= savingsEntry.ProposedAmount
+		unallocatedPercent = 0
+		if req.Income > 0 {
+			unallocatedPercent = float64(unallocatedAmount) / float64(req.Income)
+		}
+	}
+
 	return &dto.BudgetProposalsResponse{
 		Proposals:          entries,
-		UnallocatedAmount:  result.UnallocatedAmount,
-		UnallocatedPercent: result.UnallocatedPercent,
+		UnallocatedAmount:  unallocatedAmount,
+		UnallocatedPercent: unallocatedPercent,
 		ScaledDownNotice:   result.ScaledDown,
 	}, nil
+}
+
+// defaultSavingsEntry implements this feature's "always propose a Savings
+// budget" product decision (not spec-derived — see
+// common.BudgetWizardDefaultSavingsShare): every wizard run gets a Savings
+// line even if the user never thought to select one themselves. Returns nil
+// (no entry, request unchanged) when the user already selected a
+// savings-named Category — budgetproposal.Compute already priced that one in
+// — or when no savings Category is visible to the user (e.g. the
+// 017_seed_savings_category.sql seed hasn't run), or when the unallocated
+// pool left after Compute can't cover even the minimum per-Category amount.
+// Deliberately funds itself out of the unallocated remainder rather than
+// displacing the user's own chosen Categories' amounts.
+func (s *BudgetWizardService) defaultSavingsEntry(ctx context.Context, userID uuid.UUID, income int64, preferences []dto.BudgetPreference, unallocatedAmount int64) (*dto.ProposalEntry, error) {
+	for _, pref := range preferences {
+		if isSavingsCategoryName(pref.CategoryName) {
+			return nil, nil
+		}
+	}
+
+	expenseType := string(model.CategoryTypeExpense)
+	categories, err := s.categoryRepo.ListCategoriesForUser(ctx, userID, &expenseType)
+	if err != nil {
+		return nil, fmt.Errorf("defaultSavingsEntry: %w", err)
+	}
+	var savingsCategory *model.Category
+	for _, c := range categories {
+		if isSavingsCategoryName(c.Name) {
+			savingsCategory = c
+			if c.IsSystem() {
+				break // prefer the seeded system Category over a same-named user one
+			}
+		}
+	}
+	if savingsCategory == nil {
+		return nil, nil
+	}
+
+	amount := int64(common.BudgetWizardDefaultSavingsShare * float64(income))
+	if amount > unallocatedAmount {
+		amount = unallocatedAmount
+	}
+	if amount < common.BudgetWizardMinAmountPerCategory {
+		return nil, nil
+	}
+
+	return &dto.ProposalEntry{
+		CategoryID:      savingsCategory.ID,
+		CategoryName:    savingsCategory.Name,
+		ProposedAmount:  amount,
+		PercentOfIncome: float64(amount) / float64(income),
+		Reasoning:       "Mặc định trích một phần thu nhập cho tiết kiệm — bạn có thể chỉnh hoặc xóa ở bước tiếp theo.",
+	}, nil
+}
+
+// isSavingsCategoryName matches common.BudgetWizardSavingsCategoryNamePatterns
+// case-insensitively against a substring of name, same technique as
+// budgetproposal.categoryBaseline's keyword matching.
+func isSavingsCategoryName(name string) bool {
+	lower := strings.ToLower(name)
+	for _, pattern := range common.BudgetWizardSavingsCategoryNamePatterns {
+		if strings.Contains(lower, pattern) {
+			return true
+		}
+	}
+	return false
 }
 
 // SuggestCategoryName implements US-03's Step 2B / US-05's internal-helper

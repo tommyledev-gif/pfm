@@ -1,6 +1,7 @@
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AmountInput } from "@/components/ui/AmountInput";
+import { TrashIcon } from "@/components/ui/Icon";
 import { PillButton } from "@/components/ui/PillButton";
 import { getErrorMessage } from "@/lib/axios";
 import { formatCurrency, toCents, toMajorUnits } from "@/lib/currency";
@@ -12,6 +13,7 @@ interface WizardStepProposalProps {
   selections: WizardSelection[];
   amounts: Record<string, number>;
   onChangeAmount: (categoryId: string, amountCents: number) => void;
+  onRemove: (categoryId: string) => void;
   reasoningByCategoryId: Record<string, string>;
   income: number;
   currency: WalletCurrency;
@@ -32,6 +34,7 @@ export function WizardStepProposal({
   selections,
   amounts,
   onChangeAmount,
+  onRemove,
   reasoningByCategoryId,
   income,
   currency,
@@ -74,6 +77,7 @@ export function WizardStepProposal({
       ) : null}
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator>
+        {selections.length === 0 ? <Text style={styles.empty}>Bạn đã bỏ hết danh mục — hãy quay lại để chọn ít nhất một.</Text> : null}
         {selections.map((s) => {
           const amount = amounts[s.categoryId] ?? 0;
           const percent = income > 0 ? Math.min(1, Math.max(0, amount / income)) : 0;
@@ -84,6 +88,14 @@ export function WizardStepProposal({
                   {s.categoryName}
                 </Text>
                 <Text style={styles.percentLabel}>{Math.round(percent * 100)}%</Text>
+                <Pressable
+                  onPress={() => onRemove(s.categoryId)}
+                  hitSlop={8}
+                  style={styles.removeButton}
+                  testID="btn-wizard-remove-proposal"
+                >
+                  <TrashIcon size={16} />
+                </Pressable>
               </View>
               <View style={styles.barTrack}>
                 <View style={[styles.barFill, { width: `${percent * 100}%` }]} />
@@ -126,6 +138,7 @@ export function WizardStepProposal({
           label="Xác nhận và Tạo Ngân sách"
           onPress={onConfirm}
           loading={confirming}
+          disabled={selections.length === 0}
           style={styles.flexButton}
           testID="btn-wizard-confirm-submit"
         />
@@ -146,9 +159,11 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: spacing.sm },
   row: { gap: spacing.xs, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.surfaceBorder },
-  rowHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  rowHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.sm },
   categoryName: { flex: 1, ...typography.body, color: colors.textPrimary },
   percentLabel: { ...typography.caption, color: colors.textSecondary },
+  removeButton: { padding: 2 },
+  empty: { ...typography.caption, color: colors.textSecondary, textAlign: "center", paddingVertical: spacing.lg },
   barTrack: { height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.08)", overflow: "hidden" },
   barFill: { height: "100%", backgroundColor: colors.green, borderRadius: 3 },
   amountInput: { marginTop: 4 },

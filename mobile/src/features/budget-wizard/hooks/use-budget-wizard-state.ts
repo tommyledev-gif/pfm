@@ -28,6 +28,13 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
   const [preferences, setPreferences] = useState<Record<string, SpendingPreference>>({});
   const [amounts, setAmounts] = useState<Record<string, number>>({});
   const [reasoningByCategoryId, setReasoningByCategoryId] = useState<Record<string, string>>({});
+  // Entries POST /ai/budget-proposals returns for a Category the user never
+  // selected in step 2 (currently just the backend's own default-injected
+  // Savings proposal, backend/internal/service/budget_wizard_service.go's
+  // defaultSavingsEntry) — `selections` itself is only ever derived from
+  // selectedIds/customCategories, so without tracking these separately
+  // step 4 would silently drop that entry's amount/reasoning on the floor.
+  const [extraProposalEntries, setExtraProposalEntries] = useState<WizardSelection[]>([]);
   const [scaledDownNotice, setScaledDownNotice] = useState(false);
   const [createdCount, setCreatedCount] = useState<number | null>(null);
   const prefilledRef = useRef(false);
@@ -73,6 +80,7 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
       setPreferences({});
       setAmounts({});
       setReasoningByCategoryId({});
+      setExtraProposalEntries([]);
       setScaledDownNotice(false);
       setCreatedCount(null);
     }
@@ -99,6 +107,13 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
     }));
     return [...real, ...pending];
   }, [categories, selectedIds, customCategories, preferences]);
+
+  // What step 4 actually renders/submits — `selections` plus any backend-
+  // injected entry (see extraProposalEntries above) the user hasn't removed.
+  const proposalSelections: WizardSelection[] = useMemo(
+    () => [...selections, ...extraProposalEntries],
+    [selections, extraProposalEntries],
+  );
 
   const toggleCategory = (id: string) => {
     setSelectedIds((prev) => {
@@ -144,6 +159,7 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
       for (const c of customCategories) evenAmounts[c.clientId] = share;
       setAmounts(evenAmounts);
       setReasoningByCategoryId({});
+      setExtraProposalEntries([]);
       setScaledDownNotice(false);
       setStep(4);
       return;
@@ -155,9 +171,18 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
         onSuccess: (data) => {
           const newAmounts: Record<string, number> = {};
           const newReasoning: Record<string, string> = {};
+          const selectedCategoryIds = new Set(realPreferences.map((p) => p.category_id));
+          const extras: WizardSelection[] = [];
           for (const p of data.proposals) {
             newAmounts[p.category_id] = p.proposed_amount;
             newReasoning[p.category_id] = p.reasoning;
+            // A proposal for a Category not in what step 2/3 selected — the
+            // backend's own default-injected Savings entry (see
+            // defaultSavingsEntry server-side) — needs to be tracked
+            // separately so step 4 actually renders/submits it too.
+            if (!selectedCategoryIds.has(p.category_id)) {
+              extras.push({ categoryId: p.category_id, categoryName: p.category_name, isPending: false, preference: "normal" });
+            }
           }
           if (customCategories.length > 0) {
             const share = Math.max(0, Math.floor(data.unallocated_amount / customCategories.length));
@@ -165,6 +190,7 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
           }
           setAmounts(newAmounts);
           setReasoningByCategoryId(newReasoning);
+          setExtraProposalEntries(extras);
           setScaledDownNotice(data.scaled_down_notice);
           setStep(4);
         },
@@ -172,9 +198,27 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
     );
   };
 
+  // Step 4 (spec.md US-04/US-05 revision) lets the user drop a proposed
+  // budget entirely before confirming — a real selection goes back through
+  // toggleCategory/removeCustomCategory so it stays excluded if the user
+  // steps back to re-review step 2/3; a backend-injected extra (Savings) is
+  // never in selectedIds/customCategories to begin with, so it's just
+  // dropped from extraProposalEntries directly.
+  const removeProposalEntry = (categoryId: string) => {
+    if (extraProposalEntries.some((e) => e.categoryId === categoryId)) {
+      setExtraProposalEntries((prev) => prev.filter((e) => e.categoryId !== categoryId));
+      return;
+    }
+    if (customCategories.some((c) => c.clientId === categoryId)) {
+      removeCustomCategory(categoryId);
+      return;
+    }
+    toggleCategory(categoryId);
+  };
+
   const handleConfirm = async () => {
     try {
-      const count = await submit(selections, amounts, period, currency, customCategories, preservedBudgets);
+      const count = await submit(proposalSelections, amounts, period, currency, customCategories, preservedBudgets);
       setCreatedCount(count);
       setStep(5);
     } catch {
@@ -211,6 +255,8 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
     createdCount,
     categories,
     selections,
+    proposalSelections,
+    removeProposalEntry,
     toggleCategory,
     addCustomCategory,
     removeCustomCategory,
