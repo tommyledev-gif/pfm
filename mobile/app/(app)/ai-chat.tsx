@@ -10,6 +10,7 @@ import { ChatBubble } from "@/features/ai-chat/components/ChatBubble";
 import { EditHistoryDialog } from "@/features/ai-chat/components/EditHistoryDialog";
 import { EditMessageModal } from "@/features/ai-chat/components/EditMessageModal";
 import { EditTransactionModal } from "@/features/ai-chat/components/EditTransactionModal";
+import { SwipeableMessageRow } from "@/features/ai-chat/components/SwipeableMessageRow";
 import { TransactionActionCard } from "@/features/ai-chat/components/TransactionActionCard";
 import { BudgetWizardModal } from "@/features/budget-wizard/components/BudgetWizardModal";
 import { TransactionFormModal } from "@/features/transactions/components/TransactionFormModal";
@@ -47,27 +48,6 @@ function uuidv4(): string {
 // README: "typing indicator (~1.3s)" — so even a fast API response holds the
 // dots for a beat before the reply appears.
 const MIN_TYPING_MS = 1300;
-
-// Holding a bubble for this long opens the edit modal directly (skips an
-// intermediate "Edit" affordance — a modal is simpler than expanding the
-// bubble in place and reuses the same growing-textarea/keyboard handling).
-// Deliberately close to the OS-standard long-press timing (~500ms on both
-// iOS and Android), not a longer custom value: FlatList's own scroll
-// responder can claim the touch the moment it sees a few pixels of finger
-// drift, and holding a phone perfectly still for multiple seconds is
-// unrealistic — a 2000ms delay was tried first and reliably lost that race,
-// making the gesture never fire at all.
-const EDIT_LONG_PRESS_MS = 500;
-
-// When the keyboard is open, a plain tap on a transaction card area is
-// expected to just dismiss the keyboard (standard behavior everywhere
-// else in the app) — a 500ms hold would fire the edit modal mid-dismiss,
-// stealing that gesture. Requiring a deliberately longer hold here means a
-// quick tap-to-dismiss never accidentally opens the modal, while a genuine
-// hold still gets there (dismissing the keyboard first, then opening once
-// the input bar has settled back into its closed-keyboard position — see
-// handleCardLongPress below).
-const EDIT_LONG_PRESS_KEYBOARD_MS = 2000;
 
 // Gives the input bar's margin time to settle back to its closed-keyboard
 // value (see useKeyboardHeight's hide-event handler) before a modal opens
@@ -281,31 +261,33 @@ export default function AiChatScreen() {
     );
   };
 
-  // Long-press dispatch, factored out of renderItem's onLongPress so the
-  // keyboard-open path (below) can delay it without duplicating the
+  // Swipe-to-edit dispatch (SwipeableMessageRow's onTriggerEdit), factored
+  // out so the keyboard-open path below can delay it without duplicating the
   // decision tree.
-  const openLongPressTarget = (item: ChatMessage) => {
+  const openEditTarget = (item: ChatMessage) => {
     if (item.action) {
       setEditingActionMessage(item);
     } else if (item.role === "assistant" && (item.intent === "ambiguous" || item.actionType === "budget_wizard")) {
       // Nothing to "correct" on the AI's own question, or on a budget-wizard
-      // card — same reasoning as the ambiguous-intent case above.
+      // card — same reasoning as the ambiguous-intent case above. In
+      // practice SwipeableMessageRow's own `disabled` prop already stops the
+      // gesture from firing for these, this is just defense in depth.
       return;
     } else {
       setEditingMessage(item);
     }
   };
 
-  // When the keyboard is open, treat the hold as "dismiss the keyboard,
-  // then act" rather than acting immediately underneath it — see
-  // EDIT_LONG_PRESS_KEYBOARD_MS above for why the hold itself is already
-  // longer in that case.
-  const handleCardLongPress = (item: ChatMessage) => {
+  // If the keyboard happens to be open while the user swipes a bubble above
+  // it, dismiss it first and let the input bar's margin settle back to its
+  // closed-keyboard position before the modal opens on top — avoids the
+  // sheet visibly jumping as the keyboard closes underneath it.
+  const handleEditTrigger = (item: ChatMessage) => {
     if (keyboardVisible) {
       Keyboard.dismiss();
-      setTimeout(() => openLongPressTarget(item), KEYBOARD_DISMISS_SETTLE_MS);
+      setTimeout(() => openEditTarget(item), KEYBOARD_DISMISS_SETTLE_MS);
     } else {
-      openLongPressTarget(item);
+      openEditTarget(item);
     }
   };
 
@@ -328,16 +310,21 @@ export default function AiChatScreen() {
           setTimeout(() => listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.3 }), 100)
         }
         renderItem={({ item }) => (
-          <Pressable
+          <SwipeableMessageRow
+            // README: user bubbles are right-aligned, assistant bubbles
+            // left-aligned (ChatBubble.tsx) — swipe away from whichever edge
+            // the bubble already sits on, Messenger's own swipe-to-reply
+            // convention (see SwipeableMessageRow's doc comment).
+            direction={item.role === "user" ? "left" : "right"}
             // The AI's own clarifying question (rare now — only a missing
-            // amount or a non-transaction message) has nothing for the
-            // user to "correct" the way an edit modal implies, unlike a
+            // amount or a non-transaction message) has nothing for the user
+            // to "correct" the way an edit modal implies, unlike a
             // transaction proposal (always editable) or a user's own
-            // message — don't let ambiguous AI questions be held-and-edited
-            // like ordinary text. See openLongPressTarget for the rest of
-            // the dispatch.
-            onLongPress={() => handleCardLongPress(item)}
-            delayLongPress={keyboardVisible ? EDIT_LONG_PRESS_KEYBOARD_MS : EDIT_LONG_PRESS_MS}
+            // message — don't let ambiguous AI questions or a budget-wizard
+            // card be swiped-to-edit like ordinary text. See openEditTarget
+            // for the rest of the dispatch.
+            disabled={item.role === "assistant" && (item.intent === "ambiguous" || item.actionType === "budget_wizard")}
+            onTriggerEdit={() => handleEditTrigger(item)}
           >
             <ChatBubble role={item.role} text={item.text}>
               {item.action && !item.superseded ? (
@@ -353,8 +340,6 @@ export default function AiChatScreen() {
                   onConfirm={() => confirmAction(item)}
                   edited={item.edited}
                   onPressHistory={item.editHistory ? () => setHistoryMessage(item) : undefined}
-                  onLongPress={() => handleCardLongPress(item)}
-                  longPressDelay={keyboardVisible ? EDIT_LONG_PRESS_KEYBOARD_MS : EDIT_LONG_PRESS_MS}
                 />
               ) : item.actionType === "budget_wizard" ? (
                 <BudgetWizardCard
@@ -371,7 +356,7 @@ export default function AiChatScreen() {
                 </Pressable>
               ) : null}
             </ChatBubble>
-          </Pressable>
+          </SwipeableMessageRow>
         )}
         ListEmptyComponent={
           <Text style={styles.hint}>

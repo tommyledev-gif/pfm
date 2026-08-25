@@ -26,7 +26,7 @@ export function WizardStepPreferences({ selections, onChangePreference, onNext, 
       <Text style={styles.title}>Mức độ chi tiêu</Text>
       <Text style={styles.subtitle}>Cho mỗi danh mục, chọn mức độ chi tiêu mong muốn.</Text>
 
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator>
         {selections.map((s) => (
           <View key={s.categoryId} style={styles.row}>
             <Text style={styles.categoryName} numberOfLines={1}>
@@ -59,10 +59,14 @@ export function WizardStepPreferences({ selections, onChangePreference, onNext, 
 }
 
 const styles = StyleSheet.create({
-  container: { gap: spacing.md },
+  container: { flex: 1, gap: spacing.md },
   title: { ...typography.title, color: colors.textPrimary },
   subtitle: { ...typography.caption, color: colors.textSecondary },
-  scroll: { maxHeight: 340 },
+  // flex:1, not a fixed maxHeight — see WizardStepCategories.tsx's
+  // categoryScroll comment for why a fixed height nested inside the old
+  // Drawer's own ScrollView made this list look capped at ~3 rows.
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: spacing.sm },
   row: { gap: spacing.sm, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.surfaceBorder },
   categoryName: { ...typography.body, color: colors.textPrimary },
   chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
