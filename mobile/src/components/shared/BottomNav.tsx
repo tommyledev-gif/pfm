@@ -17,10 +17,17 @@ const TABS = [
 
 const PILL_HEIGHT = 64;
 const BALL_SIZE = 48;
-const AURA_SIZE = 56;
+const AURA_OUTER = 78;
+const AURA_MID = 60;
+const AURA_CORE = 44;
 const BALL_TOP = -(BALL_SIZE / 2);
-const AURA_TOP = (PILL_HEIGHT - AURA_SIZE) / 2;
-const AURA_LEFT_OFFSET = (BALL_SIZE - AURA_SIZE) / 2;
+// Aura's vertical center must land on the same y as the ball's center
+// (the bar's top edge, y=0) — not the bar's own vertical middle. Centering
+// it there also means the bar's `overflow: hidden` clips away exactly the
+// top half of the circle for free, leaving a socket that's flat across the
+// top and rounded only on the bottom, instead of a full stray circle.
+const AURA_TOP = -(AURA_OUTER / 2);
+const AURA_LEFT_OFFSET = (BALL_SIZE - AURA_OUTER) / 2;
 const INACTIVE_COLOR = "rgba(255,255,255,0.5)";
 
 // Floating pill bottom nav — mobile/design_handoff_pfm_app/README.md
@@ -114,10 +121,14 @@ export function BottomNav() {
         <Animated.View
           pointerEvents="none"
           style={[
-            styles.aura,
+            styles.auraOuter,
             { left: AURA_LEFT_OFFSET, top: AURA_TOP, transform: [{ translateX: ballX }] },
           ]}
-        />
+        >
+          <View style={styles.auraMid}>
+            <View style={styles.auraCore} />
+          </View>
+        </Animated.View>
         {TABS.map(({ href, Icon }, index) => (
           <Pressable
             key={href}
@@ -165,12 +176,31 @@ const styles = StyleSheet.create({
     backgroundColor: colors.navBg,
   },
   tab: { flex: 1, alignItems: "center", justifyContent: "center" },
-  aura: {
+  // Three concentric circles fake a radial-gradient "hollow socket" behind
+  // the ball (no gradient dependency in this project) — each ring darker
+  // and smaller than the last, centered via plain flex nesting.
+  auraOuter: {
     position: "absolute",
-    width: AURA_SIZE,
-    height: AURA_SIZE,
-    borderRadius: AURA_SIZE / 2,
-    backgroundColor: "rgba(0,0,0,0.38)",
+    width: AURA_OUTER,
+    height: AURA_OUTER,
+    borderRadius: AURA_OUTER / 2,
+    backgroundColor: "rgba(0,0,0,0.22)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  auraMid: {
+    width: AURA_MID,
+    height: AURA_MID,
+    borderRadius: AURA_MID / 2,
+    backgroundColor: "rgba(0,0,0,0.42)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  auraCore: {
+    width: AURA_CORE,
+    height: AURA_CORE,
+    borderRadius: AURA_CORE / 2,
+    backgroundColor: "rgba(0,0,0,0.65)",
   },
   ball: {
     position: "absolute",
