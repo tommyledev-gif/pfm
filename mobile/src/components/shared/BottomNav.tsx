@@ -153,7 +153,6 @@ const styles = StyleSheet.create({
     left: 20,
     right: 20,
     height: PILL_HEIGHT,
-    alignItems: "center",
   },
   pill: {
     flexDirection: "row",
@@ -175,6 +174,7 @@ const styles = StyleSheet.create({
   },
   ball: {
     position: "absolute",
+    left: 0,
     top: BALL_TOP,
     width: BALL_SIZE,
     height: BALL_SIZE,
