@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BarChartIcon, HomeIcon, ListIcon, SparkleIcon, UserIcon } from "@/components/ui/Icon";
-import { colors } from "@/lib/theme";
+import { colors, radii } from "@/lib/theme";
 
 const TABS = [
   { href: "/", Icon: HomeIcon },
@@ -30,13 +30,15 @@ const AURA_TOP = -(AURA_OUTER / 2);
 const AURA_LEFT_OFFSET = (BALL_SIZE - AURA_OUTER) / 2;
 const INACTIVE_COLOR = "rgba(255,255,255,0.5)";
 
-// Floating pill bottom nav — mobile/design_handoff_pfm_app/README.md
-// "Design tokens" (nav) + "Interactions summary". Built as an
-// absolutely-positioned overlay in app/(app)/_layout.tsx rather than
-// expo-router's native Tabs bar, since the floating pill shape doesn't map
-// onto a standard tab bar. AI Chat is a regular tab like the rest — the
-// green ball elevates over whichever tab is active instead of a
-// permanently-raised button.
+// Bottom nav — mobile/design_handoff_pfm_app/README.md "Design tokens" (nav)
+// + "Interactions summary". The bar itself sits flush against the screen's
+// bottom/left/right edges; only the active tab's green ball (plus its dark
+// "socket" cutout) floats above the bar, the same way it always has. Built
+// as an absolutely-positioned overlay in app/(app)/_layout.tsx rather than
+// expo-router's native Tabs bar, since the floating ball doesn't map onto a
+// standard tab bar. AI Chat is a regular tab like the rest — the green ball
+// elevates over whichever tab is active instead of a permanently-raised
+// button.
 //
 // ballX is the single source of truth for both the ball and the aura
 // (dark cutout) behind it — they read the same Animated.Value, offset by a
@@ -116,8 +118,8 @@ export function BottomNav() {
   const ballScaleY = squish.interpolate({ inputRange: [0, 1], outputRange: [1, 0.85] });
 
   return (
-    <View style={[styles.wrapper, { bottom: insets.bottom + 16 }]} pointerEvents="box-none">
-      <BlurView intensity={40} tint="dark" style={styles.pill}>
+    <View style={[styles.wrapper, { height: PILL_HEIGHT + insets.bottom }]} pointerEvents="box-none">
+      <BlurView intensity={40} tint="dark" style={[styles.pill, { paddingBottom: insets.bottom }]}>
         <Animated.View
           pointerEvents="none"
           style={[
@@ -129,19 +131,21 @@ export function BottomNav() {
             <View style={styles.auraCore} />
           </View>
         </Animated.View>
-        {TABS.map(({ href, Icon }, index) => (
-          <Pressable
-            key={href}
-            onLayout={handleTabLayout(index)}
-            onPress={() => router.replace(href)}
-            style={styles.tab}
-            hitSlop={8}
-          >
-            <Animated.View style={{ opacity: rowOpacities[index] }}>
-              <Icon size={22} color={INACTIVE_COLOR} />
-            </Animated.View>
-          </Pressable>
-        ))}
+        <View style={styles.tabRow}>
+          {TABS.map(({ href, Icon }, index) => (
+            <Pressable
+              key={href}
+              onLayout={handleTabLayout(index)}
+              onPress={() => router.replace(href)}
+              style={styles.tab}
+              hitSlop={8}
+            >
+              <Animated.View style={{ opacity: rowOpacities[index] }}>
+                <Icon size={22} color={INACTIVE_COLOR} />
+              </Animated.View>
+            </Pressable>
+          ))}
+        </View>
       </BlurView>
       <Animated.View
         pointerEvents="none"
@@ -161,20 +165,25 @@ export function BottomNav() {
 const styles = StyleSheet.create({
   wrapper: {
     position: "absolute",
-    left: 20,
-    right: 20,
-    height: PILL_HEIGHT,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
+  // Flush against the screen's bottom/left/right edges now, not a floating
+  // margined pill — only the top corners stay rounded. paddingBottom (set
+  // inline to insets.bottom) extends the bar's own background into the
+  // safe-area strip below the tabs instead of leaving it transparent.
   pill: {
-    flexDirection: "row",
     width: "100%",
-    height: PILL_HEIGHT,
-    borderRadius: PILL_HEIGHT / 2,
+    // borderTopLeftRadius: radii.hero,
+    // borderTopRightRadius: radii.hero,
     borderWidth: 1,
+    borderBottomWidth: 0,
     borderColor: colors.navBorder,
     overflow: "hidden",
     backgroundColor: colors.navBg,
   },
+  tabRow: { flexDirection: "row", width: "100%", height: PILL_HEIGHT },
   tab: { flex: 1, alignItems: "center", justifyContent: "center" },
   // Three concentric circles fake a radial-gradient "hollow socket" behind
   // the ball (no gradient dependency in this project) — each ring darker

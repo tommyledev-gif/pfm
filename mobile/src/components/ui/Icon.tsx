@@ -244,6 +244,23 @@ export function EyeIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
   );
 }
 
+export function SortIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
+  return (
+    <Svg {...base(size)} fill="none">
+      <Path d="M7 4v16M7 20l-3.5-3.5M7 20l3.5-3.5" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M17 20V4M17 4l-3.5 3.5M17 4l3.5 3.5" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function CloseIcon({ size, color = "#06130A", strokeWidth = 2.2 }: IconProps) {
+  return (
+    <Svg {...base(size)} fill="none">
+      <Path d="M5.5 5.5 18.5 18.5M18.5 5.5 5.5 18.5" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 export function EyeOffIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">

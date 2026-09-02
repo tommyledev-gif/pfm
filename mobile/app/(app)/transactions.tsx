@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { Chip } from "@/components/ui/Chip";
-import { CalendarIcon, PlusIcon, SearchIcon, TagIcon } from "@/components/ui/Icon";
+import { CalendarIcon, PlusIcon, SearchIcon, SortIcon, TagIcon } from "@/components/ui/Icon";
 import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
 import { Screen } from "@/components/shared/Screen";
 import { TransactionRow } from "@/components/shared/TransactionRow";
@@ -14,6 +14,8 @@ import { Transaction } from "@/features/transactions/types";
 import { TransactionFormModal } from "@/features/transactions/components/TransactionFormModal";
 import { TransactionRowSkeleton } from "@/features/transactions/components/TransactionRowSkeleton";
 import { CategoryFilterModal } from "@/features/transactions/components/CategoryFilterModal";
+import { SortDrawerModal } from "@/features/transactions/components/SortDrawerModal";
+import { sortTransactions, SortKey } from "@/features/transactions/sort";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 
 const LIST_SKELETON_COUNT = 6;
@@ -31,6 +33,8 @@ export default function TransactionsScreen() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [categoryIds, setCategoryIds] = useState<string[]>([]);
   const [categoryFilterOpen, setCategoryFilterOpen] = useState(false);
+  const [sortKeys, setSortKeys] = useState<SortKey[]>([]);
+  const [sortDrawerOpen, setSortDrawerOpen] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -61,7 +65,10 @@ export default function TransactionsScreen() {
 
   const categoryById = useMemo(() => new Map(categories.data?.map((c) => [c.id, c])), [categories.data]);
 
-  const items = transactions.data?.pages.flatMap((page) => page.data) ?? [];
+  const sortedItems = useMemo(() => {
+    const items = transactions.data?.pages.flatMap((page) => page.data) ?? [];
+    return sortTransactions(items, sortKeys);
+  }, [transactions.data, sortKeys]);
   const hasDateFilter = Boolean(dateRange.from);
   const hasCategoryFilter = categoryIds.length > 0;
 
@@ -70,7 +77,7 @@ export default function TransactionsScreen() {
       <FlatList
         style={styles.screen}
         contentContainerStyle={styles.content}
-        data={items}
+        data={sortedItems}
         keyExtractor={(t) => t.id}
         onEndReachedThreshold={0.4}
         onEndReached={() => {
@@ -133,6 +140,20 @@ export default function TransactionsScreen() {
                   {hasCategoryFilter ? `Danh mục (${categoryIds.length})` : "Danh mục"}
                 </Text>
               </Pressable>
+              <Pressable
+                style={[styles.filterButton, sortKeys.length > 0 && styles.filterButtonActive]}
+                onPress={() => setSortDrawerOpen(true)}
+              >
+                <SortIcon size={16} color={sortKeys.length > 0 ? colors.onGreen : colors.textSecondary} />
+                <Text style={[styles.filterButtonLabel, sortKeys.length > 0 && styles.filterButtonLabelActive]}>
+                  Sắp xếp
+                </Text>
+                {sortKeys.length > 0 ? (
+                  <View style={styles.sortBadge}>
+                    <Text style={styles.sortBadgeText}>{sortKeys.length}</Text>
+                  </View>
+                ) : null}
+              </Pressable>
             </ScrollView>
           </View>
         }
@@ -182,6 +203,13 @@ export default function TransactionsScreen() {
         onApply={setCategoryIds}
       />
 
+      <SortDrawerModal
+        visible={sortDrawerOpen}
+        onClose={() => setSortDrawerOpen(false)}
+        selected={sortKeys}
+        onApply={setSortKeys}
+      />
+
       <TransactionFormModal
         visible={formOpen}
         onClose={() => setFormOpen(false)}
@@ -212,6 +240,7 @@ const styles = StyleSheet.create({
   clearSearch: { ...typography.body, color: colors.textSecondary },
   filterRow: { flexDirection: "row", gap: spacing.sm },
   filterButton: {
+    position: "relative",
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
@@ -225,6 +254,21 @@ const styles = StyleSheet.create({
   filterButtonActive: { backgroundColor: colors.lavender, borderColor: colors.lavender },
   filterButtonLabel: { ...typography.tiny, color: colors.textSecondary },
   filterButtonLabelActive: { color: colors.onGreen },
+  sortBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    minWidth: 16,
+    height: 16,
+    borderRadius: radii.pill,
+    paddingHorizontal: 3,
+    backgroundColor: colors.green,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: colors.bgApp,
+  },
+  sortBadgeText: { fontSize: 10, fontWeight: "700", color: colors.onGreen },
   addButton: {
     width: 36,
     height: 36,

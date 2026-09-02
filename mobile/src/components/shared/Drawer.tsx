@@ -1,5 +1,5 @@
-import { ReactNode, useEffect } from "react";
-import { BackHandler, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ReactNode, useEffect, useRef, useState } from "react";
+import { Animated, BackHandler, Dimensions, Pressable, ScrollView, StyleSheet, View } from "react-native";
 
 import { colors, radii, spacing } from "@/lib/theme";
 import { useKeyboardHeight } from "@/lib/use-keyboard-height";
@@ -52,8 +52,38 @@ interface DrawerProps {
 // completely different part of the tree, so a plain in-tree zIndex can't
 // guarantee it stays under the sheet. useSheetStore's open/close instead
 // tells the layout to hide BottomNav entirely while any Drawer is visible.
+// Slide-up distance just needs to clear the screen entirely, not match the
+// sheet's actual (variable, content-dependent) height — translating by the
+// full window height guarantees the sheet starts below the visible area
+// regardless of device size or how tall `children` ends up being.
+const OFFSCREEN_Y = Dimensions.get("window").height;
+
 export function Drawer({ visible, onClose, children }: DrawerProps) {
   const keyboardHeight = useKeyboardHeight();
+  // Kept mounted for the duration of the close animation — flipping
+  // straight to `if (!visible) return null` would unmount mid-slide-down
+  // and make the sheet vanish instantly instead of animating out.
+  const [rendered, setRendered] = useState(visible);
+  const translateY = useRef(new Animated.Value(visible ? 0 : OFFSCREEN_Y)).current;
+  const backdropOpacity = useRef(new Animated.Value(visible ? 1 : 0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      setRendered(true);
+      Animated.parallel([
+        Animated.timing(backdropOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 20, mass: 0.9, stiffness: 200 }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(backdropOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: OFFSCREEN_Y, duration: 220, useNativeDriver: true }),
+      ]).start(({ finished }) => {
+        if (finished) setRendered(false);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
 
   useEffect(() => {
     if (!visible) return;
@@ -69,22 +99,24 @@ export function Drawer({ visible, onClose, children }: DrawerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
-  if (!visible) return null;
+  if (!rendered) return null;
 
   return (
-    <View style={styles.overlay}>
+    <Animated.View style={[styles.overlay, { opacity: backdropOpacity }]}>
       <Pressable style={[styles.backdrop, { paddingBottom: keyboardHeight }]} onPress={onClose}>
-        <Pressable onPress={() => {}} style={styles.sheetTouchArea}>
-          <ScrollView
-            contentContainerStyle={styles.sheet}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            {children}
-          </ScrollView>
-        </Pressable>
+        <Animated.View style={[styles.sheetTouchArea, { transform: [{ translateY }] }]}>
+          <Pressable onPress={() => {}}>
+            <ScrollView
+              contentContainerStyle={styles.sheet}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              {children}
+            </ScrollView>
+          </Pressable>
+        </Animated.View>
       </Pressable>
-    </View>
+    </Animated.View>
   );
 }
 

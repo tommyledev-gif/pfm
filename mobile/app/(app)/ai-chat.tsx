@@ -54,10 +54,12 @@ const MIN_TYPING_MS = 1300;
 // on top of it, so the sheet doesn't visibly jump as the keyboard closes.
 const KEYBOARD_DISMISS_SETTLE_MS = 280;
 
-// BottomNav (components/shared/BottomNav.tsx) floats at insets.bottom + 16,
-// standing 64px tall — this is how far above the screen's bottom edge the
-// input bar's own bottom must sit to clear it when the keyboard is closed.
-const NAV_CLEARANCE = 120;
+// BottomNav (components/shared/BottomNav.tsx) sits flush at insets.bottom,
+// standing 64px tall, with its active-tab ball floating another 24px above
+// that — this is how far above the screen's bottom edge (on top of
+// insets.bottom) the input bar's own bottom must sit to clear the ball when
+// the keyboard is closed.
+const NAV_CLEARANCE = 104;
 
 // Small gap between the input bar and the top of the keyboard once open.
 const KEYBOARD_GAP = spacing.sm;

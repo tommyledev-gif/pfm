@@ -3,12 +3,14 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { CalendarIcon } from "@/components/ui/Icon";
 import { Card } from "@/components/ui/Card";
+import { CategoryPickerDrawer } from "@/components/shared/CategoryPickerDrawer";
 import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
 import { DonutChart, DonutLegendRow } from "@/components/shared/DonutChart";
 import { colorForCategory } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
 import { formatDateRange } from "@/lib/format-date";
 import { colors, radii, spacing, typography } from "@/lib/theme";
+import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary-query";
 import { SpendingTabSkeleton } from "@/features/reports/components/SpendingTabSkeleton";
@@ -22,7 +24,9 @@ export function SpendingTab() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const summary = useReportSummaryQuery(dateRange);
   const categories = useCategoriesQuery();
+  const budgets = useBudgetsQuery();
   const [selected, setSelected] = useState<string | null>(null);
+  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
 
   if (summary.isLoading) {
     return <SpendingTabSkeleton />;
@@ -48,6 +52,15 @@ export function SpendingTab() {
     }));
 
   const totalExpense = segments.reduce((sum, s) => sum + s.amount, 0);
+
+  // The report's own backend default window is the current month, and
+  // budgets are monthly-only — a custom date range has no corresponding
+  // budget period, so the "/budget" half of the center label only makes
+  // sense while viewing that default window.
+  const isDefaultRange = !dateRange.from && !dateRange.to;
+  const budgetTotal = isDefaultRange
+    ? (budgets.data ?? []).reduce((sum, b) => sum + (b.limits.find((l) => l.currency === currency)?.amount_limit ?? 0), 0)
+    : null;
 
   return (
     <View style={styles.container}>
@@ -77,7 +90,11 @@ export function SpendingTab() {
           currency={currency}
           selected={selected}
           onToggle={(key) => setSelected((prev) => (prev === key ? null : key))}
+          budgetTotal={budgetTotal}
         />
+        {!isDefaultRange ? (
+          <Text style={styles.budgetHint}>Ngân sách chỉ áp dụng cho tháng hiện tại</Text>
+        ) : null}
       </Card>
 
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -92,6 +109,7 @@ export function SpendingTab() {
               percentage={totalExpense > 0 ? (seg.amount / totalExpense) * 100 : 0}
               selected={selected === seg.key}
               onPress={() => setSelected((prev) => (prev === seg.key ? null : seg.key))}
+              onHoldCategory={() => setCategoryPickerOpen(true)}
             />
           ))
         )}
@@ -103,6 +121,13 @@ export function SpendingTab() {
         from={dateRange.from}
         to={dateRange.to}
         onApply={setDateRange}
+      />
+
+      <CategoryPickerDrawer
+        visible={categoryPickerOpen}
+        onClose={() => setCategoryPickerOpen(false)}
+        categories={segments.map((s) => ({ id: s.key, name: s.label, icon: s.icon, iconUrl: s.iconUrl, color: s.color }))}
+        onSelect={(id) => setSelected((prev) => (prev === id ? null : id))}
       />
     </View>
   );
@@ -127,6 +152,7 @@ const styles = StyleSheet.create({
   statCard: { flex: 1, gap: spacing.xs },
   statLabel: { ...typography.caption, color: colors.textSecondary },
   statValue: { ...typography.cardTitle },
-  donutCard: { alignItems: "center", paddingVertical: spacing.xl },
+  donutCard: { alignItems: "center", paddingVertical: spacing.xl, gap: spacing.sm },
+  budgetHint: { ...typography.tiny, color: colors.textMuted, textAlign: "center" },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
 });

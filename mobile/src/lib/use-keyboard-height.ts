@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { Keyboard, LayoutAnimation, Platform, UIManager } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Keyboard, LayoutAnimation, Platform, UIManager, useWindowDimensions } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Pre-Fabric Android silently no-ops LayoutAnimation without this opt-in;
 // guarded since the API isn't guaranteed present under the new architecture.
@@ -20,22 +21,47 @@ const HIDE_EVENT = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide
 // native#22884 and friends), which is exactly the "stuck pushed up after
 // closing the keyboard" symptom this replaced.
 export function useKeyboardHeight(): number {
-  const [height, setHeight] = useState(0);
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const [rawHeight, setRawHeight] = useState(0);
+  // Some real Android devices (softwareKeyboardLayoutMode: "resize" in
+  // app.json) DO shrink the window when the keyboard opens — RN reports the
+  // shrink through useWindowDimensions the moment it happens — despite RN
+  // 0.81's edge-to-edge default suggesting otherwise. Manually adding the
+  // full raw keyboard height on top of a window the OS already shrank
+  // double-counts it, leaving a dead gap between the input bar and the
+  // keyboard exactly one keyboard-height tall. windowBeforeKeyboard freezes
+  // the last known keyboard-hidden window height so the shrink amount can be
+  // measured and subtracted back out.
+  const windowBeforeKeyboard = useRef(windowHeight);
+
+  useEffect(() => {
+    if (rawHeight === 0) windowBeforeKeyboard.current = windowHeight;
+  }, [windowHeight, rawHeight]);
 
   useEffect(() => {
     const showSub = Keyboard.addListener(SHOW_EVENT, (e) => {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setHeight(e.endCoordinates.height);
+      const raw = e.endCoordinates.height;
+      // RN 0.81 forces edge-to-edge on Android, so on devices where the
+      // window truly never resizes, this event's height is measured from
+      // the true physical bottom of the display — i.e. it includes the nav
+      // bar, not just the keyboard surface above it. iOS's keyboardWillShow
+      // height is already correct (it visually covers the home-indicator
+      // area).
+      setRawHeight(Platform.OS === "android" ? Math.max(raw - insets.bottom, 0) : raw);
     });
     const hideSub = Keyboard.addListener(HIDE_EVENT, () => {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setHeight(0);
+      setRawHeight(0);
     });
     return () => {
       showSub.remove();
       hideSub.remove();
     };
-  }, []);
+  }, [insets.bottom]);
 
-  return height;
+  if (Platform.OS !== "android" || rawHeight === 0) return rawHeight;
+  const alreadyShrunk = Math.max(windowBeforeKeyboard.current - windowHeight, 0);
+  return Math.max(rawHeight - alreadyShrunk, 0);
 }

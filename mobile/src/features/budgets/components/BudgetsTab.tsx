@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { PlusIcon } from "@/components/ui/Icon";
 import { BudgetCard } from "@/components/shared/BudgetCard";
+import { CategoryPickerDrawer } from "@/components/shared/CategoryPickerDrawer";
 import { BudgetFormModal } from "@/features/budgets/components/BudgetFormModal";
+import { colorForCategory } from "@/lib/category-color";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { WalletCurrency } from "@/lib/constants";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
@@ -18,7 +20,9 @@ const CARD_SKELETON_COUNT = 3;
 // Insights → Budgets tab — README: "+ New budget" top-right action, list of
 // budget cards, each showing Budget vs Actual stacked bars scaled to the
 // largest limit across all budgets. Tapping a card opens the same modal in
-// edit mode.
+// edit mode; holding one 2s opens a category picker that scrolls to and
+// highlights the matching card (same hold-to-pick affordance as the
+// Spending tab's donut legend rows).
 export function BudgetsTab() {
   const budgets = useBudgetsQuery();
   const wallets = useWalletsQuery();
@@ -26,7 +30,12 @@ export function BudgetsTab() {
   const categoryById = new Map(categories.data?.map((c) => [c.id, c]));
   const [modalOpen, setModalOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [highlightedBudgetId, setHighlightedBudgetId] = useState<string | null>(null);
   const currency: WalletCurrency = (wallets.data ? primaryCurrency(wallets.data) : undefined) ?? "VND";
+
+  const scrollRef = useRef<ScrollView>(null);
+  const rowOffsets = useRef<Record<string, number>>({});
 
   if (budgets.isLoading) {
     return (
@@ -42,6 +51,24 @@ export function BudgetsTab() {
     budget.limits.map((limit) => ({ budget, limit })),
   );
   const maxLimit = Math.max(1, ...rows.map((r) => r.limit.amount_limit));
+
+  const pickerCategories = Array.from(new Map(rows.map(({ budget }) => [budget.category_id, budget])).values()).map(
+    (budget) => ({
+      id: budget.category_id,
+      name: budget.category_name,
+      icon: budget.icon ?? categoryById.get(budget.category_id)?.icon,
+      iconUrl: budget.icon_url ?? categoryById.get(budget.category_id)?.icon_url,
+      color: colorForCategory(budget.category_id),
+    }),
+  );
+
+  const focusCategory = (categoryId: string) => {
+    const row = rows.find((r) => r.budget.category_id === categoryId);
+    if (!row) return;
+    setHighlightedBudgetId(row.budget.id);
+    const y = rowOffsets.current[row.budget.id];
+    if (y !== undefined) scrollRef.current?.scrollTo({ y: Math.max(y - spacing.md, 0), animated: true });
+  };
 
   return (
     <View style={styles.container}>
@@ -59,20 +86,31 @@ export function BudgetsTab() {
         </Pressable>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
+      <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
         {rows.length === 0 ? (
           <Text style={styles.empty}>No budgets yet — tap &ldquo;New budget&rdquo; to create one.</Text>
         ) : (
           rows.map(({ budget, limit }) => (
-            <Pressable
+            <View
               key={`${budget.id}-${limit.currency}`}
-              onPress={() => {
-                setEditingBudget(budget);
-                setModalOpen(true);
+              onLayout={(e) => {
+                rowOffsets.current[budget.id] = e.nativeEvent.layout.y;
               }}
             >
-              <BudgetCard budget={budget} limit={limit} maxLimit={maxLimit} category={categoryById.get(budget.category_id)} />
-            </Pressable>
+              <BudgetCard
+                budget={budget}
+                limit={limit}
+                maxLimit={maxLimit}
+                category={categoryById.get(budget.category_id)}
+                highlighted={highlightedBudgetId === budget.id}
+                onPress={() => {
+                  setHighlightedBudgetId(null);
+                  setEditingBudget(budget);
+                  setModalOpen(true);
+                }}
+                onHold={() => setPickerOpen(true)}
+              />
+            </View>
           ))
         )}
       </ScrollView>
@@ -82,6 +120,13 @@ export function BudgetsTab() {
         onClose={() => setModalOpen(false)}
         currency={currency}
         editingBudget={editingBudget}
+      />
+
+      <CategoryPickerDrawer
+        visible={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        categories={pickerCategories}
+        onSelect={focusCategory}
       />
     </View>
   );
