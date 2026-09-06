@@ -1,8 +1,6 @@
 # Reduces the build context sent to the Docker daemon and keeps ops/docs
-# artifacts out of the image. The final binary only needs go.mod/go.sum,
-# cmd/, internal/ — db/ (sqlc source + migrations) and the deploy scripts
-# are not read at build or run time (migrations run via the postgres
-# container's docker-entrypoint-initdb.d mount, not from inside this image).
+# artifacts out of the image. The binaries need go.mod/go.sum, cmd/,
+# internal/ — plus db/, see below.
 .git
 .gitignore
 *.md
@@ -11,7 +9,18 @@
 .env.prod
 .env.prod.example
 
-db/
+# db/ USED TO BE EXCLUDED HERE, on the reasoning that "migrations run via the
+# postgres container's docker-entrypoint-initdb.d mount, not from inside this
+# image". That stopped being true when cmd/migrate started applying
+# migrations on deploy: db/migrations/*.sql are now compiled into that binary
+# with go:embed (db/migrations.go), so excluding db/ removed the whole `db`
+# Go package from the build context and broke the image build with
+# "no required module provides package .../backend/db".
+#
+# db/queries/ stays excluded — those .sql files are sqlc *source*, read only
+# by the sqlc generator on a developer's machine; the generated Go it
+# produces lives in internal/repository/sqlc/ and is committed.
+db/queries/
 
 deploy.sh
 docker-compose.yml
