@@ -5,7 +5,13 @@
 -- updated and never deleted, soft or hard (spec.md Context #2). That is a
 -- stricter guarantee than the "soft delete only" rule the financial tables
 -- follow — an audit trail that can be edited or removed isn't one.
-CREATE TABLE transaction_audit_logs (
+-- IF NOT EXISTS throughout: this project has no migration runner, so a
+-- migration added after a dev volume was already initialized has to be
+-- applied by hand (`psql < 018_...sql`) — and the person doing that has no
+-- way to know whether it already ran. Making it re-runnable turns a
+-- half-remembered "did I apply this one?" into a harmless no-op instead of
+-- an error that looks like a real failure.
+CREATE TABLE IF NOT EXISTS transaction_audit_logs (
     id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     transaction_id UUID NOT NULL REFERENCES transactions(id),
     -- Denormalized from the parent Transaction's own user_id (which is itself
@@ -24,9 +30,9 @@ CREATE TABLE transaction_audit_logs (
 
 -- Serves the list endpoint's ORDER BY created_at DESC, id DESC keyset
 -- pagination (reuses the existing generic {id, created_at} cursor helper).
-CREATE INDEX idx_transaction_audit_logs_user_created_at
+CREATE INDEX IF NOT EXISTS idx_transaction_audit_logs_user_created_at
     ON transaction_audit_logs (user_id, created_at DESC, id DESC);
 
 -- Serves the optional ?transaction_id= filter (one Transaction's own history).
-CREATE INDEX idx_transaction_audit_logs_transaction_id
+CREATE INDEX IF NOT EXISTS idx_transaction_audit_logs_transaction_id
     ON transaction_audit_logs (transaction_id);

@@ -41,7 +41,7 @@ export function SegmentedTabs<T extends string>({ options, value, onChange, styl
             <Text style={[styles.label, active && styles.labelActive]} numberOfLines={1}>
               {option.label}
             </Text>
-            {option.trailing}
+            {/* {option.trailing} */}
           </Pressable>
         );
       })}

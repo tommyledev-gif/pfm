@@ -34,16 +34,23 @@ interface DonutChartProps {
 const STROKE_WIDTH = 22;
 const TOOLTIP_WIDTH = 130;
 const TOOLTIP_HEIGHT = 48;
+// Clearance between the ring's inner edge and the tooltip, so the callout
+// reads as pointing at the arc rather than touching it.
+const TOOLTIP_GAP = 10;
 
 function polarToPoint(cx: number, cy: number, r: number, angleDeg: number) {
   const rad = ((angleDeg - 90) * Math.PI) / 180;
   return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
 }
 
-// Gentle continuous up/down float while a tooltip is shown, so it reads as a
-// live callout rather than a static label — stops and resets the moment the
+// Gentle continuous float while a tooltip is shown, so it reads as a live
+// callout rather than a static label — stops and resets the moment the
 // selection is cleared or moves to a different segment.
-function useFloat(active: boolean) {
+//
+// `direction` is +1 when the tooltip sits below its arc and -1 when above,
+// so the drift always moves *away* from the segment. Floating the wrong way
+// would nudge the callout back over the very arc it was just moved off.
+function useFloat(active: boolean, direction: number) {
   const translateY = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (!active) {
@@ -52,13 +59,13 @@ function useFloat(active: boolean) {
     }
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(translateY, { toValue: -4, duration: 700, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: 4 * direction, duration: 700, useNativeDriver: true }),
         Animated.timing(translateY, { toValue: 0, duration: 700, useNativeDriver: true }),
       ]),
     );
     loop.start();
     return () => loop.stop();
-  }, [active, translateY]);
+  }, [active, direction, translateY]);
   return translateY;
 }
 
@@ -97,17 +104,36 @@ export function DonutChart({
   const centerLabel = active ? active.label : defaultLabel;
   const centerAmount = active ? active.amount : total;
 
-  const tooltipFloat = useFloat(Boolean(activeArc));
-
+  // Tooltip placement. The anchor is the midpoint of the selected arc, taken
+  // on the ring's centerline (`radius`) rather than outside it, then the
+  // callout is flipped to whichever vertical side leaves that arc visible:
+  // a segment in the donut's top half gets its tooltip *below* the ring, one
+  // in the bottom half gets it *above*. Both land in the donut's empty
+  // middle, clear of the center amount.
+  //
+  // It used to be centered on the anchor (`point.y - TOOLTIP_HEIGHT / 2`),
+  // which meant the callout sat squarely on top of the one segment it was
+  // describing — worst for the top of the chart, where clamping to the box
+  // pinned it directly over the arc.
   let tooltipPos: { left: number; top: number } | null = null;
+  let tooltipFloatDirection = -1;
   if (activeArc) {
     const angleDeg = ((activeArc.offset + activeArc.length / 2) / circumference) * 360;
-    const point = polarToPoint(size / 2, size / 2, radius + STROKE_WIDTH, angleDeg);
+    const point = polarToPoint(size / 2, size / 2, radius, angleDeg);
+    const inUpperHalf = point.y < size / 2;
+    tooltipFloatDirection = inUpperHalf ? 1 : -1;
+
+    const top = inUpperHalf
+      ? point.y + STROKE_WIDTH / 2 + TOOLTIP_GAP
+      : point.y - STROKE_WIDTH / 2 - TOOLTIP_GAP - TOOLTIP_HEIGHT;
+
     tooltipPos = {
       left: Math.min(Math.max(point.x - TOOLTIP_WIDTH / 2, 0), size - TOOLTIP_WIDTH),
-      top: Math.min(Math.max(point.y - TOOLTIP_HEIGHT / 2, 0), size - TOOLTIP_HEIGHT),
+      top: Math.min(Math.max(top, 0), size - TOOLTIP_HEIGHT),
     };
   }
+
+  const tooltipFloat = useFloat(Boolean(activeArc), tooltipFloatDirection);
 
   return (
     <View style={styles.wrapper}>

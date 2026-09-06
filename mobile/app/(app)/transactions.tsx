@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, SectionList, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { CalendarIcon, PlusIcon, SearchIcon, SortIcon, TagIcon } from "@/components/ui/Icon";
+import { CalendarIcon, ChevronRightIcon, PlusIcon, SearchIcon, SortIcon, TagIcon } from "@/components/ui/Icon";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
 import { Screen } from "@/components/shared/Screen";
@@ -29,14 +29,25 @@ interface DaySection {
   key: string;
   dayLabel: string;
   dateLabel: string;
+  // Emptied while the day is collapsed — SectionList still renders the
+  // header (with its totals), just none of the rows.
   data: Transaction[];
-  // undefined once the day mixes currencies (a multi-wallet day) — a
-  // subtotal that silently added VND cents to USD cents would be exactly
+  // Full row count regardless of collapse, so a collapsed day can still say
+  // how much it is hiding.
+  count: number;
+  // Income and expense are kept apart rather than netted: a day with both
+  // reads as "+2.000.000 / -350.000", which is the actual question being
+  // asked of a day header, where a single net figure hides half of it.
+  //
+  // Both go undefined once the day mixes currencies (a multi-wallet day) —
+  // a subtotal that silently added VND cents to USD cents would be exactly
   // the "never sum incompatible currencies" bug wallet-totals.ts/
-  // budget-totals.ts both already guard against, so this omits the
-  // subtotal entirely rather than risk it.
-  net: number | undefined;
+  // budget-totals.ts both already guard against, so this omits the totals
+  // entirely rather than risk it.
+  income: number | undefined;
+  expense: number | undefined;
   currency: string | undefined;
+  collapsed: boolean;
 }
 
 type TypeFilterValue = "all" | TransactionType;
@@ -53,6 +64,11 @@ export default function TransactionsScreen() {
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  // Day keys (YYYY-MM-DD) the user has folded away. Session-local and
+  // deliberately not persisted — collapsing is a "get this out of my way
+  // while I look at something else" gesture, not a setting. Keys that stop
+  // matching after a filter change are simply never looked up again.
+  const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set());
   const wallets = useWalletsQuery();
   const categories = useCategoriesQuery();
 
@@ -97,9 +113,22 @@ export default function TransactionsScreen() {
   const sections: DaySection[] = useMemo(() => {
     if (hasAmountSort) {
       return sortedItems.length > 0
-        ? [{ key: "all", dayLabel: "", dateLabel: "", data: sortedItems, net: undefined, currency: undefined }]
+        ? [
+            {
+              key: "all",
+              dayLabel: "",
+              dateLabel: "",
+              data: sortedItems,
+              count: sortedItems.length,
+              income: undefined,
+              expense: undefined,
+              currency: undefined,
+              collapsed: false,
+            },
+          ]
         : [];
     }
+
     const groups: DaySection[] = [];
     for (const item of sortedItems) {
       const dayKey = item.occurred_at.slice(0, 10);
@@ -110,28 +139,46 @@ export default function TransactionsScreen() {
           dayLabel: dayLabelVi(item.occurred_at),
           dateLabel: formatDateViShort(item.occurred_at),
           data: [],
-          net: 0,
+          count: 0,
+          income: 0,
+          expense: 0,
           currency: undefined,
+          collapsed: collapsedDays.has(dayKey),
         };
         groups.push(group);
       }
+
       const itemCurrency = walletCurrencyMap.get(item.wallet_id);
-      if (group.net !== undefined) {
-        if (!itemCurrency) {
-          group.net = undefined;
-        } else if (group.data.length === 0) {
-          group.currency = itemCurrency;
-          group.net = item.type === "income" ? item.amount : -item.amount;
-        } else if (itemCurrency !== group.currency) {
-          group.net = undefined;
+      const runningIncome = group.income;
+      const runningExpense = group.expense;
+      if (runningIncome !== undefined && runningExpense !== undefined) {
+        if (!itemCurrency || (group.count > 0 && itemCurrency !== group.currency)) {
+          group.income = undefined;
+          group.expense = undefined;
         } else {
-          group.net += item.type === "income" ? item.amount : -item.amount;
+          if (group.count === 0) group.currency = itemCurrency;
+          group.income = item.type === "income" ? runningIncome + item.amount : runningIncome;
+          group.expense = item.type === "expense" ? runningExpense + item.amount : runningExpense;
         }
       }
+
+      group.count += 1;
       group.data.push(item);
     }
-    return groups;
-  }, [sortedItems, hasAmountSort, walletCurrencyMap]);
+
+    // Rows are dropped only after every total has been accumulated, so a
+    // collapsed day still shows what it's hiding — the whole point of being
+    // able to collapse it.
+    return groups.map((group) => (group.collapsed ? { ...group, data: [] } : group));
+  }, [sortedItems, hasAmountSort, walletCurrencyMap, collapsedDays]);
+
+  const toggleDay = (dayKey: string) =>
+    setCollapsedDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(dayKey)) next.delete(dayKey);
+      else next.add(dayKey);
+      return next;
+    });
 
   const now = new Date();
   const currentMonthLabel = `Tháng ${now.getMonth() + 1}, ${now.getFullYear()}`;
@@ -141,6 +188,24 @@ export default function TransactionsScreen() {
   const headerTotal = headerSummary.data?.totals[0];
 
   const typeFilterValue: TypeFilterValue = filter ?? "all";
+  // The header total follows whichever tab is active: on Thu nhập it's the
+  // income figure (green, the positive register used for income everywhere
+  // else in the app), otherwise the expense figure in the danger red. The
+  // "Tất cả" tab keeps showing expense — it's the number people open this
+  // screen to check.
+  const headerAmount = headerTotal
+    ? typeFilterValue === "income"
+      ? {
+          label: "Tổng thu",
+          text: `+${formatCurrency(headerTotal.total_income, headerTotal.currency)}`,
+          color: colors.green,
+        }
+      : {
+          label: "Tổng chi",
+          text: formatCurrency(-headerTotal.total_expense, headerTotal.currency),
+          color: colors.peach,
+        }
+    : null;
   const typeOptions = [
     {
       value: "all" as TypeFilterValue,
@@ -201,7 +266,12 @@ export default function TransactionsScreen() {
             </View>
             <Text style={styles.subtitle} numberOfLines={1}>
               {periodLabel}
-              {headerTotal ? ` • Tổng chi: ${formatCurrency(-headerTotal.total_expense, headerTotal.currency)}` : ""}
+              {headerAmount ? (
+                <Text>
+                  {` • ${headerAmount.label}: `}
+                  <Text style={[styles.subtitleAmount, { color: headerAmount.color }]}>{headerAmount.text}</Text>
+                </Text>
+              ) : null}
             </Text>
 
             <View style={styles.searchRow}>
@@ -264,19 +334,31 @@ export default function TransactionsScreen() {
         }
         renderSectionHeader={({ section }) =>
           section.dayLabel ? (
-            <View style={styles.dayHeader}>
+            <Pressable style={styles.dayHeader} onPress={() => toggleDay(section.key)} hitSlop={6}>
               <View style={styles.dayHeaderLeft}>
+                <View style={[styles.dayChevron, !section.collapsed && styles.dayChevronOpen]}>
+                  <ChevronRightIcon size={14} color={colors.textMuted} />
+                </View>
                 <Text style={styles.dayHeaderTitle}>{section.dayLabel}</Text>
                 <Text style={styles.dayHeaderDivider}>•</Text>
-                <Text style={styles.dayHeaderDate}>{section.dateLabel}</Text>
-              </View>
-              {section.net !== undefined ? (
-                <Text style={[styles.daySubtotal, { color: section.net >= 0 ? colors.green : colors.peach }]}>
-                  {section.net >= 0 ? "+" : "-"}
-                  {formatCurrency(Math.abs(section.net), section.currency)}
+                <Text style={styles.dayHeaderDate} numberOfLines={1}>
+                  {section.dateLabel}
                 </Text>
-              ) : null}
-            </View>
+                {section.collapsed ? <Text style={styles.dayCount}>({section.count})</Text> : null}
+              </View>
+              <View style={styles.dayTotals}>
+                {section.income ? (
+                  <Text style={[styles.daySubtotal, { color: colors.green }]} numberOfLines={1}>
+                    +{formatCurrency(section.income, section.currency)}
+                  </Text>
+                ) : null}
+                {section.expense ? (
+                  <Text style={[styles.daySubtotal, { color: colors.peach }]} numberOfLines={1}>
+                    -{formatCurrency(section.expense, section.currency)}
+                  </Text>
+                ) : null}
+              </View>
+            </Pressable>
           ) : null
         }
         renderItem={({ item }) => (
@@ -358,6 +440,7 @@ const styles = StyleSheet.create({
   },
   countBadgeLabel: { ...typography.tiny, color: colors.green, fontWeight: "700" },
   subtitle: { ...typography.caption, color: colors.textSecondary },
+  subtitleAmount: { fontWeight: "700" },
   segmentTrailing: { ...typography.tiny, color: colors.textMuted, fontWeight: "700" },
   searchRow: {
     flexDirection: "row",
@@ -419,9 +502,15 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xs,
   },
   dayHeaderLeft: { flexDirection: "row", alignItems: "center", gap: spacing.xs, flexShrink: 1 },
+  // Points right while collapsed, down while open — the standard disclosure
+  // affordance, rotated rather than shipping a second chevron icon.
+  dayChevron: { width: 16, alignItems: "center", justifyContent: "center" },
+  dayChevronOpen: { transform: [{ rotate: "90deg" }] },
   dayHeaderTitle: { ...typography.label, color: colors.textPrimary },
   dayHeaderDivider: { ...typography.tiny, color: colors.textMuted },
-  dayHeaderDate: { ...typography.tiny, color: colors.textMuted },
+  dayHeaderDate: { ...typography.tiny, color: colors.textMuted, flexShrink: 1 },
+  dayCount: { ...typography.tiny, color: colors.textMuted },
+  dayTotals: { alignItems: "flex-end", flexShrink: 0 },
   daySubtotal: { ...typography.label, fontWeight: "700" },
   loader: { marginVertical: spacing.lg },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },

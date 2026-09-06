@@ -25,7 +25,15 @@ services:
       - ./backend/db/migrations/013_wallets_icon.sql:/docker-entrypoint-initdb.d/12_wallets_icon.sql:ro
       - ./backend/db/migrations/014_budgets_icon.sql:/docker-entrypoint-initdb.d/13_budgets_icon.sql:ro
       - ./infra/postgres/init/seed_dev_admin.sh:/docker-entrypoint-initdb.d/14_seed_dev_admin.sh:ro
-      - ./backend/db/migrations/018_transaction_audit_logs.sql:/docker-entrypoint-initdb.d/15_transaction_audit_logs.sql:ro
+      # 015-018 were missing from this list entirely — the mounts had drifted
+      # behind backend/db/migrations/, so even a genuinely fresh volume came
+      # up without chat_thread_messages (015) or transaction_audit_logs (018)
+      # and 500'd on /ai/chat/thread and /transactions/audit-logs. These run
+      # after the seed script only because nothing here depends on it.
+      - ./backend/db/migrations/015_chat_thread_sync.sql:/docker-entrypoint-initdb.d/15_chat_thread_sync.sql:ro
+      - ./backend/db/migrations/016_transactions_created_at_sort_index.sql:/docker-entrypoint-initdb.d/16_transactions_created_at_sort_index.sql:ro
+      - ./backend/db/migrations/017_seed_savings_category.sql:/docker-entrypoint-initdb.d/17_seed_savings_category.sql:ro
+      - ./backend/db/migrations/018_transaction_audit_logs.sql:/docker-entrypoint-initdb.d/18_transaction_audit_logs.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
