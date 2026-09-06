@@ -5,7 +5,7 @@ import { PlusIcon } from "@/components/ui/Icon";
 import { BudgetCard } from "@/components/shared/BudgetCard";
 import { CategoryPickerDrawer } from "@/components/shared/CategoryPickerDrawer";
 import { BudgetFormModal } from "@/features/budgets/components/BudgetFormModal";
-import { colorForCategory } from "@/lib/category-color";
+import { buildCategoryColorMap } from "@/lib/category-color";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { WalletCurrency } from "@/lib/constants";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
@@ -52,13 +52,18 @@ export function BudgetsTab() {
   );
   const maxLimit = Math.max(1, ...rows.map((r) => r.limit.amount_limit));
 
+  // Same collision-free assignment the Spending tab's donut uses — a list of
+  // budget cards is exactly the "several categories on screen together"
+  // case where a plain per-id hash can paint two of them identically.
+  const budgetColors = buildCategoryColorMap(rows.map(({ budget }) => budget.category_id));
+
   const pickerCategories = Array.from(new Map(rows.map(({ budget }) => [budget.category_id, budget])).values()).map(
     (budget) => ({
       id: budget.category_id,
       name: budget.category_name,
       icon: budget.icon ?? categoryById.get(budget.category_id)?.icon,
       iconUrl: budget.icon_url ?? categoryById.get(budget.category_id)?.icon_url,
-      color: colorForCategory(budget.category_id),
+      color: budgetColors.get(budget.category_id) ?? colors.lavender,
     }),
   );
 
@@ -101,6 +106,7 @@ export function BudgetsTab() {
                 budget={budget}
                 limit={limit}
                 maxLimit={maxLimit}
+                color={budgetColors.get(budget.category_id)}
                 category={categoryById.get(budget.category_id)}
                 highlighted={highlightedBudgetId === budget.id}
                 onPress={() => {

@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { checkBudgetLimit } from "@/features/budgets/check-budget-limit";
 import { apiClient, unwrap } from "@/lib/axios";
 import { CreateTransactionRequest, Transaction } from "@/features/transactions/types";
 
@@ -13,11 +14,14 @@ export function useCreateTransactionMutation() {
       );
       return unwrap(res.data);
     },
-    onSuccess: () => {
+    onSuccess: async (transaction) => {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["wallets"] });
-      queryClient.invalidateQueries({ queryKey: ["budgets"] });
       queryClient.invalidateQueries({ queryKey: ["report-summary"] });
+      // Refetches budgets itself (fresher than a bare invalidate, see that
+      // helper's doc comment) and updates the ["budgets"] cache as a
+      // side effect — no separate invalidateQueries(["budgets"]) needed.
+      await checkBudgetLimit(queryClient, transaction);
     },
   });
 }

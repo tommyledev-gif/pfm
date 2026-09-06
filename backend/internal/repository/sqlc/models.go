@@ -154,3 +154,19 @@ type ChatThreadMessage struct {
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }
+
+// TransactionAuditLog mirrors the transaction_audit_logs table exactly
+// (018_transaction_audit_logs.sql, specs/transaction-audit-log). Before/After
+// are raw JSONB bytes — nil for the SQL NULL that a create (no before) or a
+// delete (no after) legitimately has. No UpdatedAt/DeletedAt: append-only,
+// never updated and never deleted, a stricter guarantee than the soft-delete
+// rule the financial tables follow.
+type TransactionAuditLog struct {
+	ID            uuid.UUID
+	TransactionID uuid.UUID
+	UserID        uuid.UUID
+	Action        string
+	Before        []byte
+	After         []byte
+	CreatedAt     time.Time
+}

@@ -22,9 +22,23 @@ interface PillButtonProps {
   testID?: string;
 }
 
-// The design's recurring "black pill on neon green" action button (hero
-// card's Add Transaction, chat's Confirm & Save, etc.) — one component so
-// every screen renders the exact same pill shape/colors.
+// The app's one action-button primitive (form Save/Create, chat's Confirm &
+// Save, dialog confirms) — one component so every screen renders the exact
+// same pill shape/colors.
+//
+// The primary (solid) variant is neon-green-filled with near-black text, NOT
+// the reverse. It used to be the reverse — a near-black (`colors.onGreen`,
+// #06130A) pill with green text — which came from the design handoff's hero
+// card, where the button genuinely sat *on* a neon-green surface. Every
+// other use site is a dark surface (`colors.surface` #12161F inside a
+// Drawer, a chat bubble, a dialog card), where a near-black fill was almost
+// invisible: the primary action read as a disabled/ghost element. Green fill
+// also matches every other primary affordance already in the app (chat send
+// button, the `+` add buttons, the active SegmentedTabs tab).
+//
+// The secondary (outline) variant gets a faint filled background rather than
+// full transparency for the same reason — a border-only shape on a dark
+// sheet reads as decoration, not as a tappable button.
 export function PillButton({
   label,
   icon,
@@ -55,7 +69,7 @@ export function PillButton({
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={isOutline ? colors.green : colors.onGreen} />
+        <ActivityIndicator color={isOutline ? colors.textPrimary : colors.onGreen} />
       ) : (
         <>
           {icon}
@@ -78,11 +92,15 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 20,
   },
-  solid: { backgroundColor: colors.onGreen },
-  outline: { backgroundColor: "transparent", borderWidth: 1, borderColor: colors.surfaceBorder },
+  solid: { backgroundColor: colors.green },
+  outline: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+  },
   pressed: { opacity: 0.85 },
-  disabled: { opacity: 0.5 },
-  label: { ...typography.body },
-  solidLabel: { color: colors.green },
+  disabled: { opacity: 0.4 },
+  label: { ...typography.body, fontWeight: "700" },
+  solidLabel: { color: colors.onGreen },
   outlineLabel: { color: colors.textPrimary },
 });

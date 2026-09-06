@@ -25,7 +25,7 @@ interface CategoryFormModalProps {
   editingCategory?: Category | null;
 }
 
-// Profile → Categories management: create/edit form. `icon` is a free-text
+// Settings → Categories management: create/edit form. `icon` is a free-text
 // emoji/label string on the backend (max 32 chars, not an enum) — presented
 // as a plain text field, used only when no uploaded photo (`icon_url`) is
 // set. `type` can't change after creation (UpdateCategoryRequest doesn't

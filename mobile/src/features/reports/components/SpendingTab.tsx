@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { CategoryPickerDrawer } from "@/components/shared/CategoryPickerDrawer";
 import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
 import { DonutChart, DonutLegendRow } from "@/components/shared/DonutChart";
-import { colorForCategory } from "@/lib/category-color";
+import { buildCategoryColorMap } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
 import { formatDateRange } from "@/lib/format-date";
 import { colors, radii, spacing, typography } from "@/lib/theme";
@@ -40,16 +40,19 @@ export function SpendingTab() {
   const currency = primaryTotal?.currency ?? "VND";
 
   const categoryById = new Map(categories.data?.map((c) => [c.id, c]));
-  const segments = by_category
-    .filter((c) => c.type === "expense" && c.currency === currency)
-    .map((c) => ({
-      key: c.category_id,
-      label: c.category_name,
-      amount: c.amount,
-      color: colorForCategory(c.category_id),
-      icon: categoryById.get(c.category_id)?.icon,
-      iconUrl: categoryById.get(c.category_id)?.icon_url,
-    }));
+  const expenseCategories = by_category.filter((c) => c.type === "expense" && c.currency === currency);
+  // Collision-free within this chart: two categories side by side in the
+  // donut/legend must never be painted the same color (a plain per-id hash
+  // could, and did — Shopping and Food landed on the same slot).
+  const segmentColors = buildCategoryColorMap(expenseCategories.map((c) => c.category_id));
+  const segments = expenseCategories.map((c) => ({
+    key: c.category_id,
+    label: c.category_name,
+    amount: c.amount,
+    color: segmentColors.get(c.category_id) ?? colors.lavender,
+    icon: categoryById.get(c.category_id)?.icon,
+    iconUrl: categoryById.get(c.category_id)?.icon_url,
+  }));
 
   const totalExpense = segments.reduce((sum, s) => sum + s.amount, 0);
 

@@ -34,6 +34,15 @@ type fakeTransactionRepo struct {
 	// (specs/ai-chat-assistant/plan.md — the field is never exposed in any
 	// response, only used to look the row back up).
 	idempotencyIndex map[string]uuid.UUID
+	// auditLogs records every InsertAuditLog call, in order — lets tests
+	// assert both that a successful mutation wrote exactly one entry and that
+	// a rejected one wrote none (specs/transaction-audit-log/spec.md
+	// S-TAL-05/S-TAL-06). Appended to unconditionally: this fake has no
+	// transaction semantics to roll back with, so a test asserting the
+	// "rolled back" case must assert on an error path that returns before
+	// the audit write is reached at all, which is where the real service
+	// places it too.
+	auditLogs []repository.InsertAuditLogParams
 }
 
 func newFakeTransactionRepo() *fakeTransactionRepo {
@@ -42,6 +51,26 @@ func newFakeTransactionRepo() *fakeTransactionRepo {
 		wallets:          make(map[uuid.UUID]*model.Wallet),
 		idempotencyIndex: make(map[string]uuid.UUID),
 	}
+}
+
+func (f *fakeTransactionRepo) InsertAuditLog(_ context.Context, _ pgx.Tx, arg repository.InsertAuditLogParams) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.auditLogs = append(f.auditLogs, arg)
+	return nil
+}
+
+// auditLogsFor returns the entries recorded for one transaction, in order.
+func (f *fakeTransactionRepo) auditLogsFor(transactionID uuid.UUID) []repository.InsertAuditLogParams {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []repository.InsertAuditLogParams
+	for _, entry := range f.auditLogs {
+		if entry.TransactionID == transactionID {
+			out = append(out, entry)
+		}
+	}
+	return out
 }
 
 // seedWallet stages a wallet balance this fake's balance-mutation methods

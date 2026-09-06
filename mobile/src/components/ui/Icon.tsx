@@ -261,6 +261,35 @@ export function CloseIcon({ size, color = "#06130A", strokeWidth = 2.2 }: IconPr
   );
 }
 
+export function HistoryIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
+  return (
+    <Svg {...base(size)} fill="none">
+      <Path
+        d="M3 12a9 9 0 1 0 2.6-6.3M3 4v4.5h4.5"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path d="M12 8v4.5l3 2" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function CodeIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
+  return (
+    <Svg {...base(size)} fill="none">
+      <Path
+        d="M8.5 8 4.5 12l4 4M15.5 8l4 4-4 4M13.5 6.5l-3 11"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
 export function EyeOffIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">

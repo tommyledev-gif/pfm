@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { apiClient, unwrap } from "@/lib/axios";
+import { SNAPSHOT_STALE_TIME_MS } from "@/lib/query-client";
 import { Wallet } from "@/features/wallets/types";
 
 // Backend wraps list responses one level deeper than a single-object
@@ -16,5 +17,6 @@ export function useWalletsQuery() {
       const res = await apiClient.get<{ success: boolean; message: string; data?: { data: Wallet[] } }>("/wallets/");
       return unwrap(res.data).data;
     },
+    staleTime: SNAPSHOT_STALE_TIME_MS,
   });
 }

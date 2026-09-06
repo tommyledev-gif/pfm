@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import { refreshTokenRequest } from "@/features/auth/api/use-refresh-mutation";
+import { roleFromAccessToken, type UserRole } from "@/lib/jwt";
 import { queryClient } from "@/lib/query-client";
 import { cancelScheduledRefresh, remainingDelayMs, scheduleRefresh } from "@/lib/refresh-scheduler";
 import { secureStorage } from "@/lib/secure-storage";
@@ -32,6 +33,12 @@ interface SessionState {
   accessToken: string | null;
   refreshToken: string | null;
   email: string | null;
+  // Derived from the access token's own claims, never stored separately —
+  // the login/refresh responses don't carry it and there's no GET /users/me
+  // (see lib/jwt.ts). Kept in the store rather than decoded at each call
+  // site so a screen can select it like any other session field. null means
+  // "unknown" and is treated as the least-privileged case by every consumer.
+  role: UserRole | null;
   isHydrated: boolean;
   hydrate: () => Promise<void>;
   setTokens: (accessToken: string, refreshToken: string, email: string) => Promise<void>;
@@ -47,6 +54,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   accessToken: null,
   refreshToken: null,
   email: null,
+  role: null,
   isHydrated: false,
 
   async hydrate() {
@@ -56,7 +64,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       secureStorage.getItem(SECURE_STORE_EMAIL_KEY),
       secureStorage.getItem(SECURE_STORE_ISSUED_AT_KEY),
     ]);
-    set({ accessToken, refreshToken, email, isHydrated: true });
+    set({ accessToken, refreshToken, email, role: roleFromAccessToken(accessToken), isHydrated: true });
 
     if (!accessToken) return;
     // No stored issuedAt (e.g. a session persisted before this feature
@@ -82,7 +90,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     // before the first refetch overwrites it. Cleared before the session
     // state flips so no protected screen can mount against stale data.
     queryClient.clear();
-    set({ accessToken, refreshToken, email });
+    set({ accessToken, refreshToken, email, role: roleFromAccessToken(accessToken) });
 
     // Every new pair (login, activate, or a rotation) reschedules the next
     // proactive refresh from scratch — never stacked with a prior pending
@@ -101,7 +109,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       secureStorage.removeItem(SECURE_STORE_ISSUED_AT_KEY),
     ]);
     queryClient.clear();
-    set({ accessToken: null, refreshToken: null, email: null });
+    set({ accessToken: null, refreshToken: null, email: null, role: null });
   },
 
   refreshSession() {

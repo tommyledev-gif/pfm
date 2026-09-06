@@ -21,6 +21,7 @@ export function BudgetCard({
   limit,
   maxLimit,
   category,
+  color,
   onPress,
   onHold,
   highlighted,
@@ -29,12 +30,17 @@ export function BudgetCard({
   limit: BudgetLimit;
   maxLimit: number;
   category?: Category;
+  // Supplied by a caller rendering several budgets together (BudgetsTab),
+  // which assigns colors from one collision-free map so no two cards in the
+  // list share a color. Falls back to the plain per-id hash when this card
+  // is rendered on its own.
+  color?: string;
   onPress: () => void;
   onHold: () => void;
   highlighted?: boolean;
 }) {
   const isOver = limit.status === "exceeded";
-  const categoryColor = colorForCategory(budget.category_id);
+  const categoryColor = color ?? colorForCategory(budget.category_id);
   const actualColor = isOver ? colors.peach : categoryColor;
   const spentPct = limit.amount_limit > 0 ? Math.round((limit.spent / limit.amount_limit) * 100) : 0;
   const { progress, start, cancel } = useHoldProgress();

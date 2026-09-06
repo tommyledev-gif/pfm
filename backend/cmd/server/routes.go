@@ -14,7 +14,7 @@ import (
 // (/api/v1). Auth/rate-limit middleware ordering matters: JWTAuth must run
 // before RequireRole (role comes from the token) and before
 // InviteRateLimiter (keyed by the caller's user ID from that same token).
-func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, chatHandler *handler.ChatHandler, budgetWizardHandler *handler.BudgetWizardHandler, tokens *service.TokenService, logger *zap.Logger) {
+func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, auditLogHandler *handler.AuditLogHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, chatHandler *handler.ChatHandler, budgetWizardHandler *handler.BudgetWizardHandler, tokens *service.TokenService, logger *zap.Logger) {
 	// Serves the invite-activation form at the backend's own domain — see
 	// handler.ActivatePageHandler doc comment for why this lives here instead
 	// of on the (currently undeployed) frontend/ Next.js app.
@@ -91,6 +91,11 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	transactions := v1.Group("/transactions", middleware.JWTAuth(tokens, logger))
 	transactions.Post("/", transactionHandler.CreateTransaction)
 	transactions.Get("/", transactionHandler.ListTransactions)
+	// ⚠️ Registered BEFORE GET /:id on purpose (specs/transaction-audit-log/
+	// plan.md Finding #8) — Fiber matches in registration order, so with
+	// /:id first this literal path would bind :id="audit-logs" and 400 on the
+	// UUID parse instead of ever reaching the audit-log handler.
+	transactions.Get("/audit-logs", auditLogHandler.ListAuditLogs)
 	transactions.Get("/:id", transactionHandler.GetTransaction)
 	transactions.Patch("/:id", transactionHandler.UpdateTransaction)
 	transactions.Delete("/:id", transactionHandler.DeleteTransaction)

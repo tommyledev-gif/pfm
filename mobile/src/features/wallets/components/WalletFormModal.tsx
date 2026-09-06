@@ -30,7 +30,7 @@ interface WalletFormModalProps {
   editingWallet?: Wallet | null;
 }
 
-// Profile → Wallets management: create/edit form. Currency can't be changed
+// Settings → Wallets management: create/edit form. Currency can't be changed
 // after creation (backend 409s with CURRENCY_LOCKED), so the currency picker
 // is disabled once editing; balance similarly has no update path at all
 // (UpdateWalletRequest carries no `balance` field) — only shown on create.

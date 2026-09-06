@@ -12,7 +12,7 @@ const TABS = [
   { href: "/transactions", Icon: ListIcon },
   { href: "/ai-chat", Icon: SparkleIcon },
   { href: "/insights", Icon: BarChartIcon },
-  { href: "/profile", Icon: UserIcon },
+  { href: "/settings", Icon: UserIcon },
 ] as const;
 
 const PILL_HEIGHT = 64;

@@ -7,7 +7,7 @@ import { useNotificationsQuery } from "@/features/notifications/api/use-notifica
 import { colors, spacing, typography } from "@/lib/theme";
 
 // Home screen's header: wordmark + bell (unread dot, opens Notifications) +
-// avatar (opens Profile) — mobile/design_handoff_pfm_app/README.md "Home".
+// avatar (opens Settings) — mobile/design_handoff_pfm_app/README.md "Home".
 export function TopBar({ userName }: { userName: string }) {
   const router = useRouter();
   const unread = useNotificationsQuery(true);
@@ -21,7 +21,7 @@ export function TopBar({ userName }: { userName: string }) {
           <BellIcon size={22} color={colors.textPrimary} />
           {hasUnread ? <View style={styles.dot} /> : null}
         </Pressable>
-        <Pressable onPress={() => router.push("/profile")} hitSlop={8}>
+        <Pressable onPress={() => router.push("/settings")} hitSlop={8}>
           <Avatar name={userName} size={36} />
         </Pressable>
       </View>

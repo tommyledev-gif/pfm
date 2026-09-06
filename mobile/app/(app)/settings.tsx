@@ -5,7 +5,9 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Card } from "@/components/ui/Card";
 import {
   ChevronRightIcon,
+  CodeIcon,
   HelpIcon,
+  HistoryIcon,
   LogOutIcon,
   ShieldIcon,
   TagIcon,
@@ -24,12 +26,21 @@ import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary
 // Security/Help & Support have no mobile screens yet — out of the design
 // handoff's scope (it maps them as entry points only). Wallets/Categories/
 // Household Members now navigate to real management screens.
+//
+// `adminOnly` rows are filtered out entirely (not disabled) for a member —
+// Household Members is the mobile UI for F-01's invite/list flow, whose
+// endpoints live under /admin/* behind `RequireRole("admin")`, so a member
+// tapping it would only ever land on a screen whose every request 403s.
+// The server-side gate remains the actual authorization boundary; this is
+// just not advertising a door the user can't open.
 const SETTINGS_ROWS = [
-  { label: "Wallets", Icon: WalletIcon, href: "/wallets" as const },
-  { label: "Categories", Icon: TagIcon, href: "/categories" as const },
-  { label: "Household Members", Icon: UsersIcon, href: "/users" as const },
-  { label: "Security", Icon: ShieldIcon, href: null },
-  { label: "Help & Support", Icon: HelpIcon, href: null },
+  { label: "Wallets", Icon: WalletIcon, href: "/wallets" as const, adminOnly: false },
+  { label: "Categories", Icon: TagIcon, href: "/categories" as const, adminOnly: false },
+  { label: "Household Members", Icon: UsersIcon, href: "/users" as const, adminOnly: true },
+  { label: "Nhật ký giao dịch", Icon: HistoryIcon, href: "/audit-log" as const, adminOnly: false },
+  { label: "Security", Icon: ShieldIcon, href: null, adminOnly: false },
+  { label: "Help & Support", Icon: HelpIcon, href: null, adminOnly: false },
+  { label: "Developer", Icon: CodeIcon, href: "/developer" as const, adminOnly: false },
 ];
 
 const LOGOUT_FLUSH_TIMEOUT_MS = 4000;
@@ -40,9 +51,10 @@ function displayNameFromEmail(email: string | null): string {
   return local.charAt(0).toUpperCase() + local.slice(1);
 }
 
-export default function ProfileScreen() {
+export default function SettingsScreen() {
   const router = useRouter();
   const email = useSessionStore((s) => s.email);
+  const role = useSessionStore((s) => s.role);
   const clearSession = useSessionStore((s) => s.clear);
   const clearChat = useChatStore((s) => s.clear);
   const wallets = useWalletsQuery();
@@ -102,7 +114,7 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.settingsGroup}>
-        {SETTINGS_ROWS.map(({ label, Icon, href }) => (
+        {SETTINGS_ROWS.filter((row) => !row.adminOnly || role === "admin").map(({ label, Icon, href }) => (
           <Pressable key={label} style={styles.row} onPress={href ? () => router.push(href) : undefined} disabled={!href}>
             <Icon size={20} color={colors.textSecondary} />
             <Text style={styles.rowLabel}>{label}</Text>

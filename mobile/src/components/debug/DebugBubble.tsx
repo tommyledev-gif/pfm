@@ -4,6 +4,7 @@ import { useSafeAreaInsets, type EdgeInsets } from "react-native-safe-area-conte
 
 import { colors, radii } from "@/lib/theme";
 import { DebugLogViewer } from "@/components/debug/DebugLogViewer";
+import { useUiPrefsStore } from "@/stores/ui-prefs-store";
 
 const BUBBLE_SIZE = 48;
 const DEFAULT_BOTTOM_OFFSET = 140; // clears the bottom nav bar
@@ -32,6 +33,7 @@ function clamp(value: number, min: number, max: number): number {
 export function DebugBubble() {
   const insets = useSafeAreaInsets();
   const [viewerOpen, setViewerOpen] = useState(false);
+  const bubbleVisible = useUiPrefsStore((s) => s.debugBubbleVisible);
 
   const position = useRef(defaultPosition(insets));
   const pan = useRef(new Animated.ValueXY(position.current)).current;
@@ -68,6 +70,11 @@ export function DebugBubble() {
       },
     }),
   ).current;
+
+  // Hidden by the Developer screen's toggle — logging (axios.ts, global-
+  // error-logger.ts, NavigationLogger) keeps running regardless, see this
+  // component's own doc comment above and ui-prefs-store.ts's field comment.
+  if (!bubbleVisible) return null;
 
   return (
     <>

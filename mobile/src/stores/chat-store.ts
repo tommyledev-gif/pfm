@@ -9,7 +9,7 @@ import { ChatMessage } from "@/features/ai-chat/types";
 // on Android can't hold a growing thread of messages + transaction action
 // payloads) so the conversation, including confirm/action cards, survives
 // app restarts, not just in-session navigation. Still cleared on logout
-// (see profile.tsx) since it contains another user's financial context —
+// (see settings.tsx) since it contains another user's financial context —
 // GET /ai/chat/thread (use-chat-thread-sync.ts) restores it from the server
 // on the next login, since every mutation here also debounce-syncs to the
 // same backend cache (SYNC_DEBOUNCE_MS below).
@@ -30,7 +30,7 @@ function scheduleSync(getThread: () => ChatMessage[]) {
     const thread = getThread();
     if (!thread.length) return;
     // Best-effort — a failed sync (offline, expired session) just leaves the
-    // next mutation to reschedule it; profile.tsx's logout flush gets one
+    // next mutation to reschedule it; settings.tsx's logout flush gets one
     // more attempt before the local copy is wiped.
     syncChatThreadRequest(thread).catch(() => {});
   }, SYNC_DEBOUNCE_MS);
@@ -47,7 +47,7 @@ interface ChatState {
   // local change that needs re-syncing.
   hydrateThread: (messages: ChatMessage[]) => void;
   clear: () => void;
-  // Best-effort immediate flush — profile.tsx awaits this (capped by its own
+  // Best-effort immediate flush — settings.tsx awaits this (capped by its own
   // short timeout) before logout clears the local copy, so the last few
   // seconds of activity still sitting in the debounce timer aren't lost.
   flushSync: () => Promise<void>;

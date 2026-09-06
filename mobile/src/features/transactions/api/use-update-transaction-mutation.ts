@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { checkBudgetLimit } from "@/features/budgets/check-budget-limit";
 import { apiClient, unwrap } from "@/lib/axios";
 import { Transaction, UpdateTransactionRequest } from "@/features/transactions/types";
 
@@ -21,11 +22,11 @@ export function useUpdateTransactionMutation() {
       );
       return unwrap(res.data);
     },
-    onSuccess: () => {
+    onSuccess: async (transaction) => {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["wallets"] });
-      queryClient.invalidateQueries({ queryKey: ["budgets"] });
       queryClient.invalidateQueries({ queryKey: ["report-summary"] });
+      await checkBudgetLimit(queryClient, transaction);
     },
   });
 }

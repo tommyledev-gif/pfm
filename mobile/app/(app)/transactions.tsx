@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, SectionList, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { Chip } from "@/components/ui/Chip";
 import { CalendarIcon, PlusIcon, SearchIcon, SortIcon, TagIcon } from "@/components/ui/Icon";
+import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
 import { Screen } from "@/components/shared/Screen";
 import { TransactionRow } from "@/components/shared/TransactionRow";
+import { formatCurrency, formatCurrencyCompact } from "@/lib/currency";
+import { dayLabelVi, formatDateViShort } from "@/lib/format-date";
+import { monthRange } from "@/lib/date-range";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { TransactionType } from "@/lib/constants";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
@@ -15,17 +18,28 @@ import { TransactionFormModal } from "@/features/transactions/components/Transac
 import { TransactionRowSkeleton } from "@/features/transactions/components/TransactionRowSkeleton";
 import { CategoryFilterModal } from "@/features/transactions/components/CategoryFilterModal";
 import { SortDrawerModal } from "@/features/transactions/components/SortDrawerModal";
-import { sortTransactions, SortKey } from "@/features/transactions/sort";
+import { sortTransactions, SORT_OPTIONS, SortKey } from "@/features/transactions/sort";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
+import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary-query";
 
 const LIST_SKELETON_COUNT = 6;
 const SEARCH_DEBOUNCE_MS = 400;
 
-const FILTERS: { label: string; value: TransactionType | undefined }[] = [
-  { label: "Tất cả", value: undefined },
-  { label: "Thu", value: "income" },
-  { label: "Chi", value: "expense" },
-];
+interface DaySection {
+  key: string;
+  dayLabel: string;
+  dateLabel: string;
+  data: Transaction[];
+  // undefined once the day mixes currencies (a multi-wallet day) — a
+  // subtotal that silently added VND cents to USD cents would be exactly
+  // the "never sum incompatible currencies" bug wallet-totals.ts/
+  // budget-totals.ts both already guard against, so this omits the
+  // subtotal entirely rather than risk it.
+  net: number | undefined;
+  currency: string | undefined;
+}
+
+type TypeFilterValue = "all" | TransactionType;
 
 export default function TransactionsScreen() {
   const [filter, setFilter] = useState<TransactionType | undefined>(undefined);
@@ -72,13 +86,95 @@ export default function TransactionsScreen() {
   const hasDateFilter = Boolean(dateRange.from);
   const hasCategoryFilter = categoryIds.length > 0;
 
+  // Grouping by calendar day only reads as a real "day subtotal" list when
+  // the effective order is already chronological — an amount sort
+  // ("Số tiền cao nhất/thấp nhất") interleaves dates arbitrarily, which would
+  // turn day-grouping into dozens of jumbled single-item sections instead of
+  // the clean date-grouped list this screen otherwise renders. Falls back to
+  // one ungrouped section (day header hidden) in that case.
+  const hasAmountSort = sortKeys.some((key) => SORT_OPTIONS.find((o) => o.key === key)?.group === "amount");
+
+  const sections: DaySection[] = useMemo(() => {
+    if (hasAmountSort) {
+      return sortedItems.length > 0
+        ? [{ key: "all", dayLabel: "", dateLabel: "", data: sortedItems, net: undefined, currency: undefined }]
+        : [];
+    }
+    const groups: DaySection[] = [];
+    for (const item of sortedItems) {
+      const dayKey = item.occurred_at.slice(0, 10);
+      let group = groups.find((g) => g.key === dayKey);
+      if (!group) {
+        group = {
+          key: dayKey,
+          dayLabel: dayLabelVi(item.occurred_at),
+          dateLabel: formatDateViShort(item.occurred_at),
+          data: [],
+          net: 0,
+          currency: undefined,
+        };
+        groups.push(group);
+      }
+      const itemCurrency = walletCurrencyMap.get(item.wallet_id);
+      if (group.net !== undefined) {
+        if (!itemCurrency) {
+          group.net = undefined;
+        } else if (group.data.length === 0) {
+          group.currency = itemCurrency;
+          group.net = item.type === "income" ? item.amount : -item.amount;
+        } else if (itemCurrency !== group.currency) {
+          group.net = undefined;
+        } else {
+          group.net += item.type === "income" ? item.amount : -item.amount;
+        }
+      }
+      group.data.push(item);
+    }
+    return groups;
+  }, [sortedItems, hasAmountSort, walletCurrencyMap]);
+
+  const now = new Date();
+  const currentMonthLabel = `Tháng ${now.getMonth() + 1}, ${now.getFullYear()}`;
+  const periodLabel = hasDateFilter ? `${dateRange.from} – ${dateRange.to}` : currentMonthLabel;
+  const headerRange = hasDateFilter ? { from: dateRange.from, to: dateRange.to } : monthRange(0);
+  const headerSummary = useReportSummaryQuery(headerRange);
+  const headerTotal = headerSummary.data?.totals[0];
+
+  const typeFilterValue: TypeFilterValue = filter ?? "all";
+  const typeOptions = [
+    {
+      value: "all" as TypeFilterValue,
+      label: "Tất cả",
+      trailing: <Text style={styles.segmentTrailing}>{sortedItems.length}</Text>,
+    },
+    {
+      value: "expense" as TypeFilterValue,
+      label: "Chi tiêu",
+      trailing: headerTotal ? (
+        <Text style={[styles.segmentTrailing, { color: colors.peach }]}>
+          {formatCurrencyCompact(-headerTotal.total_expense, headerTotal.currency)}
+        </Text>
+      ) : undefined,
+    },
+    {
+      value: "income" as TypeFilterValue,
+      label: "Thu nhập",
+      trailing: headerTotal ? (
+        <Text style={[styles.segmentTrailing, { color: colors.green }]}>
+          +{formatCurrencyCompact(headerTotal.total_income, headerTotal.currency)}
+        </Text>
+      ) : undefined,
+    },
+  ];
+
   return (
     <Screen>
-      <FlatList
+      <SectionList
         style={styles.screen}
         contentContainerStyle={styles.content}
-        data={sortedItems}
+        sections={sections}
         keyExtractor={(t) => t.id}
+        stickySectionHeadersEnabled={false}
         onEndReachedThreshold={0.4}
         onEndReached={() => {
           if (transactions.hasNextPage && !transactions.isFetchingNextPage) transactions.fetchNextPage();
@@ -86,7 +182,12 @@ export default function TransactionsScreen() {
         ListHeaderComponent={
           <View style={styles.header}>
             <View style={styles.headerRow}>
-              <Text style={styles.title}>Giao dịch</Text>
+              <View style={styles.titleRow}>
+                <Text style={styles.title}>Giao dịch</Text>
+                <View style={styles.countBadge}>
+                  <Text style={styles.countBadgeLabel}>{sortedItems.length} mục</Text>
+                </View>
+              </View>
               <Pressable
                 style={styles.addButton}
                 onPress={() => {
@@ -98,6 +199,10 @@ export default function TransactionsScreen() {
                 <PlusIcon size={16} color={colors.onGreen} />
               </Pressable>
             </View>
+            <Text style={styles.subtitle} numberOfLines={1}>
+              {periodLabel}
+              {headerTotal ? ` • Tổng chi: ${formatCurrency(-headerTotal.total_expense, headerTotal.currency)}` : ""}
+            </Text>
 
             <View style={styles.searchRow}>
               <SearchIcon size={16} color={colors.textSecondary} />
@@ -115,11 +220,11 @@ export default function TransactionsScreen() {
               ) : null}
             </View>
 
-            <View style={styles.chipRow}>
-              {FILTERS.map((f) => (
-                <Chip key={f.label} label={f.label} active={filter === f.value} onPress={() => setFilter(f.value)} />
-              ))}
-            </View>
+            <SegmentedTabs
+              options={typeOptions}
+              value={typeFilterValue}
+              onChange={(value) => setFilter(value === "all" ? undefined : value)}
+            />
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
               <Pressable
@@ -156,6 +261,23 @@ export default function TransactionsScreen() {
               </Pressable>
             </ScrollView>
           </View>
+        }
+        renderSectionHeader={({ section }) =>
+          section.dayLabel ? (
+            <View style={styles.dayHeader}>
+              <View style={styles.dayHeaderLeft}>
+                <Text style={styles.dayHeaderTitle}>{section.dayLabel}</Text>
+                <Text style={styles.dayHeaderDivider}>•</Text>
+                <Text style={styles.dayHeaderDate}>{section.dateLabel}</Text>
+              </View>
+              {section.net !== undefined ? (
+                <Text style={[styles.daySubtotal, { color: section.net >= 0 ? colors.green : colors.peach }]}>
+                  {section.net >= 0 ? "+" : "-"}
+                  {formatCurrency(Math.abs(section.net), section.currency)}
+                </Text>
+              ) : null}
+            </View>
+          ) : null
         }
         renderItem={({ item }) => (
           <Pressable
@@ -224,7 +346,19 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: 140, gap: spacing.md },
   header: { gap: spacing.md },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   title: { ...typography.title, color: colors.textPrimary },
+  countBadge: {
+    paddingVertical: 2,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: "rgba(133,255,51,0.3)",
+  },
+  countBadgeLabel: { ...typography.tiny, color: colors.green, fontWeight: "700" },
+  subtitle: { ...typography.caption, color: colors.textSecondary },
+  segmentTrailing: { ...typography.tiny, color: colors.textMuted, fontWeight: "700" },
   searchRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -277,7 +411,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  chipRow: { flexDirection: "row", gap: spacing.sm },
+  dayHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xs,
+  },
+  dayHeaderLeft: { flexDirection: "row", alignItems: "center", gap: spacing.xs, flexShrink: 1 },
+  dayHeaderTitle: { ...typography.label, color: colors.textPrimary },
+  dayHeaderDivider: { ...typography.tiny, color: colors.textMuted },
+  dayHeaderDate: { ...typography.tiny, color: colors.textMuted },
+  daySubtotal: { ...typography.label, fontWeight: "700" },
   loader: { marginVertical: spacing.lg },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
 });

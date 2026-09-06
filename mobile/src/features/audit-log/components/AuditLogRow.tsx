@@ -1,0 +1,136 @@
+import { StyleSheet, Text, View } from "react-native";
+
+import { formatCurrency } from "@/lib/currency";
+import { formatDateShort, formatTime } from "@/lib/format-date";
+import { colors, radii, spacing, typography } from "@/lib/theme";
+import { AuditAction, AuditLogEntry, AuditSnapshot } from "@/features/audit-log/types";
+
+const ACTION_LABEL: Record<AuditAction, string> = {
+  create: "Tạo",
+  update: "Sửa",
+  delete: "Xóa",
+};
+
+const ACTION_COLOR: Record<AuditAction, string> = {
+  create: colors.green,
+  update: colors.mustard,
+  delete: colors.peach,
+};
+
+const FIELD_LABEL: Record<string, string> = {
+  amount: "Số tiền",
+  category_id: "Danh mục",
+  occurred_at: "Ngày",
+  note: "Ghi chú",
+  wallet_id: "Ví",
+  type: "Loại",
+};
+
+interface AuditLogRowProps {
+  entry: AuditLogEntry;
+  // Resolved by the screen from its own categories/wallets caches, so a
+  // category or wallet that has since been renamed (or soft-deleted) still
+  // renders a name rather than a bare UUID — the audit entry itself only
+  // ever stores ids (spec.md US-02 Edge Cases #1).
+  resolveCategoryName: (id: string) => string;
+  resolveWalletName: (id: string) => string;
+  currency: string;
+}
+
+// One line per changed field, e.g. "Số tiền: 200.000 ₫ → 300.000 ₫". For a
+// create/delete (a full snapshot rather than a diff) it renders the snapshot
+// as a compact summary line instead of a list of arrows.
+export function AuditLogRow({ entry, resolveCategoryName, resolveWalletName, currency }: AuditLogRowProps) {
+  const formatValue = (field: string, value: unknown): string => {
+    if (value === null || value === undefined) return "—";
+    switch (field) {
+      case "amount":
+        return formatCurrency(Number(value), currency);
+      case "category_id":
+        return resolveCategoryName(String(value));
+      case "wallet_id":
+        return resolveWalletName(String(value));
+      case "occurred_at":
+        return formatDateShort(String(value));
+      case "type":
+        return value === "income" ? "Thu" : "Chi";
+      default:
+        return String(value);
+    }
+  };
+
+  const snapshotSummary = (snapshot: AuditSnapshot): string => {
+    const parts: string[] = [];
+    if (snapshot.amount !== undefined) parts.push(formatValue("amount", snapshot.amount));
+    if (snapshot.category_id) parts.push(formatValue("category_id", snapshot.category_id));
+    if (snapshot.wallet_id) parts.push(formatValue("wallet_id", snapshot.wallet_id));
+    return parts.join(" · ");
+  };
+
+  const changedFields =
+    entry.action === "update" && entry.before && entry.after
+      ? Object.keys(entry.after).filter((key) => key in (entry.before ?? {}))
+      : [];
+
+  const snapshot = entry.action === "delete" ? entry.before : entry.after;
+
+  return (
+    <View style={styles.row}>
+      <View style={styles.headerRow}>
+        <View style={[styles.actionBadge, { borderColor: `${ACTION_COLOR[entry.action]}55` }]}>
+          <Text style={[styles.actionLabel, { color: ACTION_COLOR[entry.action] }]}>
+            {ACTION_LABEL[entry.action]}
+          </Text>
+        </View>
+        <Text style={styles.time}>{formatTime(entry.created_at)}</Text>
+      </View>
+
+      {entry.action === "update" ? (
+        <View style={styles.changeList}>
+          {changedFields.length === 0 ? (
+            <Text style={styles.changeLine}>Không có thay đổi được ghi nhận</Text>
+          ) : (
+            changedFields.map((field) => (
+              <Text key={field} style={styles.changeLine} numberOfLines={2}>
+                <Text style={styles.fieldLabel}>{FIELD_LABEL[field] ?? field}: </Text>
+                {formatValue(field, (entry.before as Record<string, unknown>)?.[field])}
+                {"  →  "}
+                <Text style={styles.newValue}>
+                  {formatValue(field, (entry.after as Record<string, unknown>)?.[field])}
+                </Text>
+              </Text>
+            ))
+          )}
+        </View>
+      ) : (
+        <Text style={styles.changeLine} numberOfLines={2}>
+          {snapshot ? snapshotSummary(snapshot) : "—"}
+        </Text>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  row: {
+    gap: spacing.sm,
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    borderRadius: radii.listCard,
+  },
+  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  actionBadge: {
+    paddingVertical: 2,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+  },
+  actionLabel: { ...typography.tiny, fontWeight: "700" },
+  time: { ...typography.tiny, color: colors.textMuted },
+  changeList: { gap: 2 },
+  changeLine: { ...typography.caption, color: colors.textSecondary },
+  fieldLabel: { color: colors.textMuted },
+  newValue: { color: colors.textPrimary, fontWeight: "700" },
+});

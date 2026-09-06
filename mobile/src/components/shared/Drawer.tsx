@@ -67,9 +67,37 @@ export function Drawer({ visible, onClose, children }: DrawerProps) {
   const translateY = useRef(new Animated.Value(visible ? 0 : OFFSCREEN_Y)).current;
   const backdropOpacity = useRef(new Animated.Value(visible ? 1 : 0)).current;
 
+  // Rendering in-tree (rather than through <Modal>, see the note above) has
+  // one consequence the original version missed: an absolutely-positioned
+  // child fills its parent's *padding box*, not the window. Mounted from a
+  // screen that pads its own root — Insights does (`paddingHorizontal:
+  // spacing.xl` on the Screen, `paddingBottom: 140` on the tab body) — the
+  // "full-screen" overlay was inset on all four sides, so the sheet floated
+  // as a rounded card in the middle of the screen and read as a dialog
+  // rather than a bottom sheet. Transactions, which mounts its Drawer as a
+  // direct child of an unpadded Screen, looked correct by luck.
+  //
+  // Fix: measure a zero-size anchor pinned at the parent's content origin,
+  // then offset the overlay by the negative of those window coordinates and
+  // give it explicit window dimensions — so the sheet reaches the real
+  // screen edges no matter how padded (or nested) its host happens to be.
+  const anchorRef = useRef<View>(null);
+  const [origin, setOrigin] = useState({ x: 0, y: 0 });
+  const windowSize = Dimensions.get("window");
+
+  const measureAnchor = () => {
+    anchorRef.current?.measureInWindow((x, y) => {
+      setOrigin((prev) => (prev.x === x && prev.y === y ? prev : { x, y }));
+    });
+  };
+
   useEffect(() => {
     if (visible) {
       setRendered(true);
+      // Belt-and-braces alongside the anchor's own onLayout: an anchor that
+      // was already laid out (reopening the same sheet without remounting)
+      // won't necessarily fire onLayout again.
+      requestAnimationFrame(measureAnchor);
       Animated.parallel([
         Animated.timing(backdropOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
         Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 20, mass: 0.9, stiffness: 200 }),
@@ -102,26 +130,38 @@ export function Drawer({ visible, onClose, children }: DrawerProps) {
   if (!rendered) return null;
 
   return (
-    <Animated.View style={[styles.overlay, { opacity: backdropOpacity }]}>
-      <Pressable style={[styles.backdrop, { paddingBottom: keyboardHeight }]} onPress={onClose}>
-        <Animated.View style={[styles.sheetTouchArea, { transform: [{ translateY }] }]}>
-          <Pressable onPress={() => {}}>
-            <ScrollView
-              contentContainerStyle={styles.sheet}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              {children}
-            </ScrollView>
-          </Pressable>
-        </Animated.View>
-      </Pressable>
-    </Animated.View>
+    <>
+      {/* Zero-size, never-moved probe at the host's content origin — the
+          overlay below is positioned relative to what this measures. */}
+      <View ref={anchorRef} onLayout={measureAnchor} pointerEvents="none" style={styles.anchor} />
+      <Animated.View
+        style={[
+          styles.overlay,
+          { left: -origin.x, top: -origin.y, width: windowSize.width, height: windowSize.height },
+          { opacity: backdropOpacity },
+        ]}
+      >
+        <Pressable style={[styles.backdrop, { paddingBottom: keyboardHeight }]} onPress={onClose}>
+          <Animated.View style={[styles.sheetTouchArea, { transform: [{ translateY }] }]}>
+            <Pressable onPress={() => {}}>
+              <ScrollView
+                contentContainerStyle={styles.sheet}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                {children}
+              </ScrollView>
+            </Pressable>
+          </Animated.View>
+        </Pressable>
+      </Animated.View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFillObject, zIndex: 1000, elevation: 1000 },
+  anchor: { position: "absolute", left: 0, top: 0, width: 0, height: 0 },
+  overlay: { position: "absolute", zIndex: 1000, elevation: 1000 },
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
   sheetTouchArea: { maxHeight: "90%" },
   sheet: {

@@ -6,6 +6,7 @@ import { Stack } from "expo-router";
 
 import { DebugBubble } from "@/components/debug/DebugBubble";
 import { NavigationLogger } from "@/components/debug/NavigationLogger";
+import { Toast } from "@/components/shared/Toast";
 import { installGlobalErrorLogger } from "@/lib/global-error-logger";
 import { queryClient } from "@/lib/query-client";
 import { useSessionStore } from "@/stores/session-store";
@@ -54,6 +55,7 @@ export default function RootLayout() {
             specs/mobile-debug-console/spec.md decision #4. */}
         <NavigationLogger />
         <DebugBubble />
+        <Toast />
       </QueryClientProvider>
     </SafeAreaProvider>
   );

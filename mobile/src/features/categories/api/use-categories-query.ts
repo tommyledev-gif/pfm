@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { apiClient, unwrap } from "@/lib/axios";
+import { SNAPSHOT_STALE_TIME_MS } from "@/lib/query-client";
 import { Category } from "@/features/categories/types";
 import { CategoryType } from "@/lib/constants";
 
@@ -16,5 +17,6 @@ export function useCategoriesQuery(type?: CategoryType) {
       );
       return unwrap(res.data).data;
     },
+    staleTime: SNAPSHOT_STALE_TIME_MS,
   });
 }

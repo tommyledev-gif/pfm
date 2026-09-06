@@ -50,3 +50,26 @@ export function dayLabel(iso: string): string {
   if (diffDays === 1) return "Yesterday";
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: diffDays > 300 ? "numeric" : undefined });
 }
+
+// Vietnamese counterpart of dayLabel — Transactions' date-grouped list uses
+// this one (that screen is fully translated, see project memory on the
+// Vietnamese-copy sweep), not the English dayLabel above, which notifications
+// screen still uses pending its own translation pass.
+// "06 Th09, 2026" — the date-group header format Transactions' day sections
+// use alongside dayLabelVi's "Hôm nay"/"Hôm qua"/full-date label.
+export function formatDateViShort(iso: string): string {
+  const date = new Date(iso);
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${day} Th${month}, ${date.getFullYear()}`;
+}
+
+export function dayLabelVi(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diffDays = Math.round((startOf(now) - startOf(date)) / 86_400_000);
+  if (diffDays === 0) return "Hôm nay";
+  if (diffDays === 1) return "Hôm qua";
+  return formatDateDMY(iso);
+}

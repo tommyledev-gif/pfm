@@ -46,6 +46,7 @@ func main() {
 	categoryRepo := repository.NewCategoryRepository(queries, pool)
 	budgetRepo := repository.NewBudgetRepository(queries, pool)
 	transactionRepo := repository.NewTransactionRepository(queries, pool)
+	auditLogRepo := repository.NewAuditLogRepository(queries)
 	reportRepo := repository.NewReportRepository(queries)
 	notificationRepo := repository.NewNotificationRepository(queries)
 	chatRepo := repository.NewChatRepository(queries)
@@ -60,6 +61,7 @@ func main() {
 	categoryService := service.NewCategoryService(categoryRepo, logger)
 	budgetService := service.NewBudgetService(budgetRepo, logger)
 	transactionService := service.NewTransactionService(transactionRepo, walletRepo, categoryRepo, logger)
+	auditLogService := service.NewAuditLogService(auditLogRepo, transactionRepo, logger)
 	reportService := service.NewReportService(reportRepo, walletRepo, categoryRepo, logger)
 	notificationService := service.NewNotificationService(notificationRepo, budgetRepo, logger)
 	aiServiceClient := service.NewHTTPAIServiceClient(cfg.AIServiceURL)
@@ -74,6 +76,7 @@ func main() {
 	categoryHandler := handler.NewCategoryHandler(categoryService, iconUploader, logger)
 	budgetHandler := handler.NewBudgetHandler(budgetService, iconUploader, logger)
 	transactionHandler := handler.NewTransactionHandler(transactionService, logger)
+	auditLogHandler := handler.NewAuditLogHandler(auditLogService, logger)
 	reportHandler := handler.NewReportHandler(reportService, logger)
 	notificationHandler := handler.NewNotificationHandler(notificationService, logger)
 	chatHandler := handler.NewChatHandler(chatService, chatThreadService, logger)
@@ -89,7 +92,7 @@ func main() {
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 		AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 	}))
-	registerRoutes(app, userHandler, authHandler, walletHandler, categoryHandler, budgetHandler, transactionHandler, reportHandler, notificationHandler, chatHandler, budgetWizardHandler, tokenService, logger)
+	registerRoutes(app, userHandler, authHandler, walletHandler, categoryHandler, budgetHandler, transactionHandler, auditLogHandler, reportHandler, notificationHandler, chatHandler, budgetWizardHandler, tokenService, logger)
 
 	go func() {
 		if err := app.Listen(":" + cfg.Port); err != nil {

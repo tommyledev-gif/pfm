@@ -136,6 +136,15 @@ func (s *TransactionService) createTransactionTx(ctx context.Context, userID uui
 		return nil, 0, fmt.Errorf("service.CreateTransaction: %w", err)
 	}
 
+	// Same transaction as the balance mutation and the insert above
+	// (specs/transaction-audit-log/spec.md Context #1). A replayed create
+	// (wasReplay=true) never reaches here — CreateTransaction returns before
+	// opening this transaction at all — so a replay correctly writes no
+	// second entry for a Transaction that was not written again.
+	if err := s.writeAuditLog(ctx, tx, userID, transaction.ID, model.AuditActionCreate, nil, auditSnapshot(transaction)); err != nil {
+		return nil, 0, err
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return nil, 0, fmt.Errorf("service.CreateTransaction: %w", err)
 	}

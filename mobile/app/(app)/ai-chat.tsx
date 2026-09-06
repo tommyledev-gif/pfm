@@ -14,7 +14,7 @@ import { SwipeableMessageRow } from "@/features/ai-chat/components/SwipeableMess
 import { TransactionActionCard } from "@/features/ai-chat/components/TransactionActionCard";
 import { BudgetWizardModal } from "@/features/budget-wizard/components/BudgetWizardModal";
 import { TransactionFormModal } from "@/features/transactions/components/TransactionFormModal";
-import { getErrorCode } from "@/lib/axios";
+import { getErrorCode, getErrorMessage } from "@/lib/axios";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { useKeyboardHeight } from "@/lib/use-keyboard-height";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
@@ -25,6 +25,7 @@ import { useCreateTransactionMutation } from "@/features/transactions/api/use-cr
 import { useUpdateTransactionMutation } from "@/features/transactions/api/use-update-transaction-mutation";
 import { ChatMessage, EditHistoryEntry, TransactionActionPayload } from "@/features/ai-chat/types";
 import { useChatStore } from "@/stores/chat-store";
+import { useToastStore } from "@/stores/toast-store";
 
 // A per-session counter would collide with ids from a previous session now
 // that chat-store.ts persists the thread to disk (e.g. a fresh "msg_1" after
@@ -258,6 +259,11 @@ export default function AiChatScreen() {
       { ...payload, note: payload.note ?? undefined, idempotency_key },
       {
         onSuccess: (transaction) => updateMessage(message.id, { confirmed: true, transactionId: transaction.id }),
+        onError: (error) => {
+          if (getErrorCode(error) === "INSUFFICIENT_BALANCE") {
+            useToastStore.getState().show(getErrorMessage(error, "Số dư không đủ"), "error");
+          }
+        },
         onSettled: () => setConfirmingId(null),
       },
     );
@@ -307,6 +313,14 @@ export default function AiChatScreen() {
         data={thread}
         keyExtractor={(m) => m.id}
         contentContainerStyle={styles.thread}
+        // FlatList's default keyboardShouldPersistTaps="never" eats the
+        // first touch on any row below a focused TextInput just to dismiss
+        // the keyboard — SwipeableMessageRow's own PanResponder never even
+        // sees that first gesture, so swipe-to-edit silently did nothing
+        // while the keyboard was open. "handled" lets the touch reach the
+        // row's PanResponder immediately; the keyboard still dismisses via
+        // handleEditTrigger's own Keyboard.dismiss() once the swipe fires.
+        keyboardShouldPersistTaps="handled"
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
         onScrollToIndexFailed={({ index }) =>
           setTimeout(() => listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.3 }), 100)

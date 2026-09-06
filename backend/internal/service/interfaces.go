@@ -121,6 +121,20 @@ type TransactionRepo interface {
 	GetTransactionByID(ctx context.Context, id uuid.UUID) (*model.Transaction, error)
 	UpdateTransaction(ctx context.Context, tx pgx.Tx, arg repository.UpdateTransactionParams) (*model.Transaction, error)
 	SoftDeleteTransaction(ctx context.Context, tx pgx.Tx, id, userID uuid.UUID) (*model.Transaction, error)
+	// InsertAuditLog was added by specs/transaction-audit-log/plan.md — it
+	// lives on this interface, not on AuditLogRepo below, because it is only
+	// ever called from inside TransactionService's own already-open pgx.Tx
+	// (the same one carrying the balance mutation and the row write).
+	InsertAuditLog(ctx context.Context, tx pgx.Tx, arg repository.InsertAuditLogParams) error
+}
+
+// AuditLogRepo is the read-side repository contract AuditLogService depends
+// on (specs/transaction-audit-log/spec.md US-02). Append-only by
+// construction: there is deliberately no update/delete method here.
+// *repository.AuditLogRepository satisfies this structurally.
+type AuditLogRepo interface {
+	ListAuditLogsByUser(ctx context.Context, userID uuid.UUID, filter repository.ListAuditLogsFilter) ([]*model.AuditLog, error)
+	CountAuditLogs(ctx context.Context, userID uuid.UUID, transactionID *uuid.UUID) (int64, error)
 }
 
 // ChatRepo is the repository contract ChatService depends on (Feature-12 AI
@@ -194,6 +208,7 @@ var (
 	_ CategoryRepo     = (*repository.CategoryRepository)(nil)
 	_ BudgetRepo       = (*repository.BudgetRepository)(nil)
 	_ TransactionRepo  = (*repository.TransactionRepository)(nil)
+	_ AuditLogRepo     = (*repository.AuditLogRepository)(nil)
 	_ ReportRepo       = (*repository.ReportRepository)(nil)
 	_ NotificationRepo = (*repository.NotificationRepository)(nil)
 	_ ChatRepo         = (*repository.ChatRepository)(nil)

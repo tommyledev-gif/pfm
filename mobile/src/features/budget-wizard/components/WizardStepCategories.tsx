@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
+import { EmojiPickerInput } from "@/components/ui/EmojiPickerInput";
 import { FieldError } from "@/components/ui/FieldError";
 import { PillButton } from "@/components/ui/PillButton";
 import { TrashIcon } from "@/components/ui/Icon";
@@ -40,6 +41,9 @@ export function WizardStepCategories({
   const [description, setDescription] = useState("");
   const [suggestion, setSuggestion] = useState<{ suggested_name: string; icon: string; type: string } | null>(null);
   const [editableName, setEditableName] = useState("");
+  // The AI's suggested emoji is a starting point, not a verdict — the user
+  // can swap it in the review dialog before the category is added.
+  const [editableIcon, setEditableIcon] = useState("");
   const suggestMutation = useSuggestCategoryNameMutation();
 
   const totalSelected = selectedIds.size + customCategories.length;
@@ -51,7 +55,13 @@ export function WizardStepCategories({
     if (!trimmed || atCap) return;
     suggestMutation.mutate(
       { description: trimmed },
-      { onSuccess: (data) => { setSuggestion(data); setEditableName(data.suggested_name); } },
+      {
+        onSuccess: (data) => {
+          setSuggestion(data);
+          setEditableName(data.suggested_name);
+          setEditableIcon(data.icon);
+        },
+      },
     );
   };
 
@@ -61,17 +71,19 @@ export function WizardStepCategories({
       clientId: `pending_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       description,
       name: editableName.trim() || suggestion.suggested_name,
-      icon: suggestion.icon,
+      icon: editableIcon || suggestion.icon,
       type: suggestion.type as PendingCustomCategory["type"],
     });
     setDescription("");
     setSuggestion(null);
     setEditableName("");
+    setEditableIcon("");
   };
 
   const discardSuggestion = () => {
     setSuggestion(null);
     setEditableName("");
+    setEditableIcon("");
     setDescription("");
   };
 
@@ -140,26 +152,51 @@ export function WizardStepCategories({
         <Text style={styles.error}>{getErrorMessage(suggestMutation.error, "Không thể gợi ý tên danh mục")}</Text>
       ) : null}
 
-      {suggestion ? (
-        <View style={styles.suggestionCard}>
-          <Text style={styles.label}>Tên danh mục đề xuất</Text>
-          <TextInput value={editableName} onChangeText={setEditableName} style={styles.suggestInput} />
-          <View style={styles.suggestionActions}>
-            <PillButton label="Loại bỏ" variant="outline" onPress={discardSuggestion} style={styles.flexButton} />
-            <PillButton
-              label="Xác nhận"
-              onPress={confirmSuggestion}
-              style={styles.flexButton}
-              testID="btn-wizard-confirm-category"
-            />
-          </View>
-        </View>
-      ) : null}
-
       <View style={styles.actions}>
         <PillButton label="Quay lại" variant="outline" onPress={onBack} style={styles.flexButton} />
         <PillButton label="Tiếp tục" onPress={onNext} style={styles.flexButton} />
       </View>
+
+      {/* Review step for an AI suggestion — a centered floating dialog
+          (same chrome as ConfirmDialog), not the inline card this replaced.
+          Inline, it appeared below the input as just another block of the
+          step's own scrolling content: easy to miss, and it pushed the
+          Back/Continue buttons around as it opened and closed. A modal also
+          makes "you must accept or discard this before continuing" explicit
+          rather than implied. */}
+      <Modal visible={Boolean(suggestion)} transparent animationType="fade" onRequestClose={discardSuggestion}>
+        <Pressable style={styles.dialogBackdrop} onPress={discardSuggestion}>
+          <Pressable onPress={() => {}} style={styles.dialogCard}>
+            <Text style={styles.dialogTitle}>Danh mục đề xuất</Text>
+            <Text style={styles.dialogSubtitle} numberOfLines={2}>
+              Từ mô tả: “{description.trim()}”
+            </Text>
+
+            <Text style={styles.label}>Tên danh mục</Text>
+            <TextInput
+              value={editableName}
+              onChangeText={setEditableName}
+              placeholder="Tên danh mục"
+              placeholderTextColor={colors.textMuted}
+              style={styles.dialogInput}
+              testID="input-wizard-category-name"
+            />
+
+            <Text style={styles.label}>Biểu tượng</Text>
+            <EmojiPickerInput value={editableIcon} onChange={setEditableIcon} placeholder="Chọn biểu tượng" />
+
+            <View style={styles.suggestionActions}>
+              <PillButton label="Loại bỏ" variant="outline" onPress={discardSuggestion} style={styles.flexButton} />
+              <PillButton
+                label="Xác nhận"
+                onPress={confirmSuggestion}
+                style={styles.flexButton}
+                testID="btn-wizard-confirm-category"
+              />
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -207,16 +244,52 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     ...typography.body,
   },
+  // Green fill + dark label, matching PillButton's primary variant — this
+  // used to be a near-black fill (colors.onGreen) with green text, which on
+  // the wizard's dark sheet read as a disabled control rather than the
+  // step's one AI action.
   suggestButton: {
     paddingHorizontal: spacing.lg,
     borderRadius: radii.listCard,
-    backgroundColor: colors.onGreen,
+    backgroundColor: colors.green,
     alignItems: "center",
     justifyContent: "center",
   },
-  suggestButtonLabel: { ...typography.label, color: colors.green },
-  suggestionCard: { gap: spacing.sm, padding: spacing.md, borderRadius: radii.listCard, backgroundColor: "rgba(255,255,255,0.04)" },
-  suggestionActions: { flexDirection: "row", gap: spacing.sm },
+  suggestButtonLabel: { ...typography.label, color: colors.onGreen },
+  dialogBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.xl,
+  },
+  dialogCard: {
+    width: "100%",
+    maxWidth: 360,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    borderRadius: radii.hero,
+    padding: spacing.xl,
+    gap: spacing.sm,
+  },
+  dialogTitle: { ...typography.title, color: colors.textPrimary },
+  dialogSubtitle: { ...typography.caption, color: colors.textSecondary },
+  // Its own style rather than reusing suggestInput: that one carries
+  // `flex: 1` for the horizontal row it belongs to, and inheriting it here
+  // (inside a column-direction dialog card) stretched the field vertically
+  // and collapsed the visible text line — the "I can't see what I type" bug.
+  dialogInput: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    borderRadius: radii.listCard,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 12,
+    color: colors.textPrimary,
+    ...typography.body,
+  },
+  suggestionActions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md },
   error: { color: colors.peach, ...typography.caption },
   actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.lg },
   flexButton: { flex: 1 },

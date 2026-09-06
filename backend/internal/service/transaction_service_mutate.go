@@ -116,6 +116,14 @@ func (s *TransactionService) updateTransactionTx(ctx context.Context, userID, tr
 		return nil, nil, fmt.Errorf("service.UpdateTransaction: %w", err)
 	}
 
+	// Records only the fields this PATCH actually supplied, in the same
+	// transaction as the row update above (specs/transaction-audit-log/
+	// spec.md US-01, Context #1/#4).
+	auditBefore, auditAfter := auditUpdateDiff(existing, req, occurredAt)
+	if err := s.writeAuditLog(ctx, tx, userID, transactionID, model.AuditActionUpdate, auditBefore, auditAfter); err != nil {
+		return nil, nil, err
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return nil, nil, fmt.Errorf("service.UpdateTransaction: %w", err)
 	}
@@ -151,6 +159,14 @@ func (s *TransactionService) DeleteTransaction(ctx context.Context, userID, tran
 			return nil, common.ErrTransactionNotFound
 		}
 		return nil, fmt.Errorf("service.DeleteTransaction: %w", err)
+	}
+
+	// Full snapshot as it stood at deletion time, in the same transaction as
+	// the balance reversal and the soft-delete (specs/transaction-audit-log/
+	// spec.md S-TAL-04) — the row itself survives (soft delete), but this is
+	// what makes "what exactly did I delete, and when" answerable.
+	if err := s.writeAuditLog(ctx, tx, userID, transactionID, model.AuditActionDelete, auditSnapshot(existing), nil); err != nil {
+		return nil, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {

@@ -9,7 +9,7 @@ interface ChatThreadMessageWire {
 }
 
 // Plain async functions, not just hook exports — stores/chat-store.ts's own
-// debounced autosave and profile.tsx's best-effort logout flush both run
+// debounced autosave and settings.tsx's best-effort logout flush both run
 // outside any React component, so they call these directly (same precedent
 // as features/auth/api/use-refresh-mutation.ts's refreshTokenRequest).
 

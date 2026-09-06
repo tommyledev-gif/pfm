@@ -4,7 +4,8 @@ import { useRouter } from "expo-router";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { Card } from "@/components/ui/Card";
-import { Chip } from "@/components/ui/Chip";
+import { CheckIcon, HistoryIcon, PlusIcon } from "@/components/ui/Icon";
+import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { LiquidCircle } from "@/components/shared/LiquidCircle";
 import { Screen } from "@/components/shared/Screen";
 import { SnapshotCardSkeleton } from "@/components/shared/SnapshotCardSkeleton";
@@ -55,9 +56,18 @@ export default function HomeScreen() {
   // snapshot on every render and re-render again to check, forever
   // ("Maximum update depth exceeded" — reproduced live on the Home screen).
   const thread = useChatStore((s) => s.thread);
-  const pendingConfirmations = useMemo(
+  const allPendingConfirmations = useMemo(
     () => thread.filter((m) => m.action && !m.confirmed && !m.superseded),
     [thread],
+  );
+  // "Bỏ qua" only hides the banner for the session, it never mutates
+  // chat-store — a message dropping off this set (edited, confirmed, or a
+  // fresh one arriving) means there's something new to review, so the
+  // dismissal for that id no longer applies.
+  const [dismissedPendingIds, setDismissedPendingIds] = useState<Set<string>>(new Set());
+  const pendingConfirmations = useMemo(
+    () => allPendingConfirmations.filter((m) => !dismissedPendingIds.has(m.id)),
+    [allPendingConfirmations, dismissedPendingIds],
   );
 
   const walletCurrencyMap = useMemo(() => {
@@ -116,11 +126,12 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <TopBar userName="Me" />
 
-          <View style={styles.periodRow}>
-            {PERIODS.map((p) => (
-              <Chip key={p.value} label={p.label} active={homePeriod === p.value} onPress={() => setHomePeriod(p.value)} />
-            ))}
-          </View>
+          <SegmentedTabs
+            style={styles.periodRow}
+            options={PERIODS}
+            value={homePeriod}
+            onChange={setHomePeriod}
+          />
 
           <Card style={styles.snapshotCard} radius={radii.hero}>
             {snapshotLoading ? (
@@ -204,27 +215,61 @@ export default function HomeScreen() {
 
           {pendingConfirmations.length > 0 ? (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Chờ xác nhận</Text>
+              <View style={styles.sectionHeaderRow}>
+                <View style={styles.sectionTitleRow}>
+                  <Text style={styles.sectionTitleUppercase}>Chờ xác nhận</Text>
+                  <View style={styles.pendingCountBadge}>
+                    <Text style={styles.pendingCountBadgeLabel}>{pendingConfirmations.length}</Text>
+                  </View>
+                </View>
+                <Pressable
+                  onPress={() => setDismissedPendingIds((prev) => new Set([...prev, ...pendingConfirmations.map((m) => m.id)]))}
+                  hitSlop={8}
+                >
+                  <Text style={styles.sectionAction}>Bỏ qua</Text>
+                </Pressable>
+              </View>
               {pendingConfirmations.map((m) => (
                 <Pressable key={m.id} style={styles.pendingRow} onPress={() => router.push("/ai-chat")}>
-                  <Text style={styles.pendingLabel} numberOfLines={1}>
-                    {m.action?.payload.note || categoryById.get(m.action?.payload.category_id ?? "")?.name || "Giao dịch"}
-                  </Text>
+                  <View style={styles.pendingIconTile}>
+                    <HistoryIcon size={18} color={colors.mustard} />
+                  </View>
+                  <View style={styles.pendingTextCol}>
+                    <Text style={styles.pendingLabel} numberOfLines={1}>
+                      {m.action?.payload.note || categoryById.get(m.action?.payload.category_id ?? "")?.name || "Giao dịch"}
+                    </Text>
+                    <Text style={styles.pendingHint} numberOfLines={1}>
+                      Chạm để duyệt mục {m.action?.payload.type === "income" ? "thu" : "chi"}
+                    </Text>
+                  </View>
                   <Text
                     style={[
                       styles.pendingAmount,
                       { color: m.action?.payload.type === "income" ? colors.green : colors.peach },
                     ]}
+                    numberOfLines={1}
                   >
                     {formatCurrency(m.action?.payload.amount ?? 0, currency)}
                   </Text>
+                  <View style={styles.pendingCheckButton}>
+                    <CheckIcon size={16} color={colors.onGreen} />
+                  </View>
                 </Pressable>
               ))}
             </View>
           ) : null}
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Ví của bạn</Text>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.sectionTitleRow}>
+                <Text style={styles.sectionTitleUppercase}>Ví của bạn</Text>
+                <Text style={styles.sectionCountHint}>{wallets.data?.length ?? 0} nguồn tiền</Text>
+              </View>
+              <Pressable onPress={() => router.push("/wallets")} hitSlop={8} style={styles.addWalletAction}>
+                <PlusIcon size={12} color={colors.green} />
+                <Text style={styles.sectionAction}>Thêm ví</Text>
+              </Pressable>
+            </View>
             {wallets.isLoading ? (
               <View style={[styles.walletRow, styles.walletRowStatic]}>
                 {Array.from({ length: WALLET_SKELETON_COUNT }).map((_, i) => (
@@ -241,9 +286,9 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Giao dịch gần đây</Text>
+            <Text style={styles.sectionTitleUppercase}>Giao dịch gần đây</Text>
             <Pressable onPress={() => router.push("/transactions")} hitSlop={8}>
-              <Text style={styles.seeAll}>Xem tất cả</Text>
+              <Text style={styles.sectionAction}>Xem tất cả →</Text>
             </Pressable>
           </View>
         </View>
@@ -324,23 +369,66 @@ const styles = StyleSheet.create({
   categoryRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingVertical: spacing.xs },
   categoryName: { flex: 1, ...typography.caption, color: colors.textPrimary },
   categoryAmount: { ...typography.tiny, color: colors.textSecondary },
+  sectionHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.xs },
+  sectionTitleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  // Uppercase + letter-spacing label, muted rather than full-white — the
+  // section-title register the design reference uses for "CHỜ XÁC NHẬN" /
+  // "VÍ CỦA BẠN" / "GIAO DỊCH GẦN ĐÂY", distinct from a card's own
+  // full-weight title (styles.compactSectionTitle above).
+  sectionTitleUppercase: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  sectionCountHint: { ...typography.tiny, color: colors.textMuted },
+  sectionAction: { ...typography.caption, color: colors.green },
+  addWalletAction: { flexDirection: "row", alignItems: "center", gap: 4 },
+  pendingCountBadge: {
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 5,
+    borderRadius: radii.pill,
+    backgroundColor: colors.mustard,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pendingCountBadgeLabel: { fontSize: 10, fontWeight: "800", color: colors.onGreen },
   pendingRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
+    padding: spacing.md,
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.surfaceBorder,
+    // A gold outline (not the neutral surfaceBorder every other card uses)
+    // is this row's own visual cue that it's awaiting action, not just
+    // another list item.
+    borderColor: "rgba(242,201,76,0.4)",
     borderRadius: radii.listCard,
   },
-  pendingLabel: { flex: 1, ...typography.body, color: colors.textPrimary },
-  pendingAmount: { ...typography.body },
-  sectionTitle: { ...typography.cardTitle, color: colors.textPrimary },
-  sectionHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  seeAll: { ...typography.caption, color: colors.green },
+  pendingIconTile: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.listCard - 2,
+    backgroundColor: "rgba(242,201,76,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(242,201,76,0.3)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pendingTextCol: { flex: 1, minWidth: 0, gap: 2 },
+  pendingLabel: { ...typography.body, color: colors.textPrimary },
+  pendingHint: { ...typography.tiny, color: colors.textSecondary },
+  pendingAmount: { ...typography.body, fontWeight: "700" },
+  pendingCheckButton: {
+    width: 28,
+    height: 28,
+    borderRadius: radii.pill,
+    backgroundColor: colors.green,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   walletRow: { gap: spacing.md, paddingBottom: spacing.xs },
   walletRowStatic: { flexDirection: "row" },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },

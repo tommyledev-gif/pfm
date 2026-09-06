@@ -12,6 +12,12 @@ export type HomePeriod = "week" | "month" | "year";
 interface UiPrefsState {
   homePeriod: HomePeriod;
   setHomePeriod: (period: HomePeriod) => void;
+  // Developer screen's "Show debug bubble" toggle (settings.tsx → Developer
+  // row). Only hides DebugBubble's own draggable UI — logging itself
+  // (axios.ts's interceptors, global-error-logger.ts, NavigationLogger) runs
+  // independently of this flag and is never affected by it.
+  debugBubbleVisible: boolean;
+  setDebugBubbleVisible: (visible: boolean) => void;
 }
 
 export const useUiPrefsStore = create<UiPrefsState>()(
@@ -19,6 +25,8 @@ export const useUiPrefsStore = create<UiPrefsState>()(
     (set) => ({
       homePeriod: "month",
       setHomePeriod: (period) => set({ homePeriod: period }),
+      debugBubbleVisible: true,
+      setDebugBubbleVisible: (visible) => set({ debugBubbleVisible: visible }),
     }),
     {
       name: "pfm_ui_prefs",

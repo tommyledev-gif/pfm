@@ -7,7 +7,7 @@ export const SECURE_STORE_ACCESS_TOKEN_KEY = "pfm_access_token";
 export const SECURE_STORE_REFRESH_TOKEN_KEY = "pfm_refresh_token";
 // There is no GET /users/me endpoint and the JWT's AccessClaims only carry
 // user_id/role (backend/internal/service/token_service.go) — no name/email.
-// The login email is captured client-side and persisted here so Profile has
+// The login email is captured client-side and persisted here so Settings has
 // something to display; it is not re-verified against the server.
 export const SECURE_STORE_EMAIL_KEY = "pfm_user_email";
 // Device-local timestamp (ms since epoch) of when the current token pair was
