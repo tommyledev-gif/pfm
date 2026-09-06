@@ -141,6 +141,29 @@ No `pgvector` extension is enabled anywhere in the actual migrations (unlike the
 
 ⚠️ **Operational gotcha, hit live in this session:** `docker-entrypoint-initdb.d/*` scripts only run once, on a genuinely empty Postgres volume. A long-running dev volume that predates a migration file being added will silently never pick it up — `009_notifications.sql` had to be applied by hand (`psql < 009_notifications.sql`) against an already-initialized volume from 2026-08-02. This is the concrete failure mode behind the "no automated apply-on-boot" gap already noted in §8's Decisions table — not hypothetical.
 
+⚠️ **Same gotcha, second occurrence (2026-09-06) — this time in production, and worse:** `015`–`018` were never applied to the VPS, so `/ai/chat/thread`, `/ai/chat/thread/sync`, `/transactions/audit-logs` **and `POST /transactions`** all returned 500 `SQLSTATE 42P01 (relation does not exist)` while CI/CD reported a fully green deploy. Two compounding causes, both now fixed:
+> 1. **`backend/docker-compose.yml` (the production compose) only mounted `001`–`014`** — the mount list had drifted behind `backend/db/migrations/`, so even wiping the volume would not have created `chat_thread_messages` or `transaction_audit_logs`. The root `docker-compose.yml` (dev) had drifted identically.
+> 2. **`backend/deploy.sh` has no migration step at all** — it pulls images, runs `docker compose up -d`, and runs the idempotent admin seed. Nothing applies SQL. And `backend-test.yml`/`ci-pr.yml` compile Go and run unit tests against in-memory fakes with no Postgres anywhere, so a missing table cannot fail CI.
+>
+> **Why `POST /transactions` broke too, not just the two new endpoints:** the Transaction Audit Log write is deliberately inside the same DB transaction as the wallet-balance mutation and the row insert (`specs/transaction-audit-log/spec.md` Context #1), so a missing `transaction_audit_logs` table fails the whole create rather than silently skipping history. Correct by design, but it means an unapplied migration escalates from "one feature is broken" to "the core write path is broken" — a strong argument for the migration runner below.
+>
+> **Fixed the same day — migrations are now applied automatically:** `backend/cmd/migrate` (a one-shot binary, same pattern as the existing `cmd/seed`) keeps a `schema_migrations` ledger — `filename` PK + sha256 `checksum` + `applied_at` — and applies only pending files, each inside its own transaction together with its own ledger insert, so a migration is never applied-but-unrecorded or recorded-but-unapplied. `backend/deploy.sh` runs it right after `docker compose up -d` and before `cmd/seed`; a failure exits non-zero and (with the workflow's `script_stop: true`) fails the deploy, which is the point — a half-migrated schema stops the release instead of surfacing as runtime 500s.
+>
+> The `.sql` files are compiled into the binary with `go:embed` (`backend/db/migrations.go`, which is why that package sits at `backend/db/` — `go:embed` cannot reach upward out of its own package), so the deployed image carries exactly the schema its server binary expects; there is no volume mount, synced host directory, or working-directory assumption in the apply path. `002_seed_admin.sql` stays excluded via `db.SkippedMigrations`, matching both compose files' initdb mount lists (it carries a placeholder password hash). `backend/db/migrations_test.go` fails the build if the embed pattern ever drifts from the directory, since a broken pattern would otherwise report "schema up to date" against an empty set.
+>
+> **No operator step is needed to adopt an existing environment.** On its first run (ledger empty), a migration that fails with a duplicate-object SQLSTATE — `42P07` table/index, `42701` column, `42710`, `42P06`, `42723`, `42P16` — is recorded as applied instead of aborting, because that error *is* the proof it already ran; genuinely missing migrations still apply normally. Adoption is permitted on that first run only: once the ledger is populated, the same error is a real failure and fails the deploy. A `-baseline` flag remains as an escape hatch for the case adoption cannot infer (a migration written entirely with `IF NOT EXISTS` raises no error to detect, so on a database where it never ran it would be recorded as applied without its objects existing).
+>
+> Its one limitation, logged per adopted file so it can be eyeballed once: adoption infers "already applied" from the first colliding statement, so a file left genuinely *half*-applied (initdb runs each file without a wrapping transaction, so a mid-file crash could do that) would be adopted as complete.
+>
+> **Making every migration re-runnable was part of this**, since the runner now executes pending files on every deploy and the adopt path only covers duplicate-*object* errors:
+> - `006_seed_categories.sql` had a bare `INSERT` of the 10 system categories. `idx_categories_owner_name_type_unique` is `NULLS NOT DISTINCT`, so system rows really do collide — a second run would have raised `23505 unique_violation`, which is deliberately *not* adoptable, and aborted the deploy. It now carries the same `ON CONFLICT ... DO NOTHING` clause `017` already used.
+> - `016_transactions_created_at_sort_index.sql`'s bare `DROP INDEX` became `DROP INDEX IF EXISTS` (a re-run against an already-dropped index raises `42704 undefined_object`, also not adoptable).
+> - `018_transaction_audit_logs.sql` uses `IF NOT EXISTS` throughout.
+>
+> The `docker-entrypoint-initdb.d` mounts are kept as-is for genuinely fresh volumes; the runner then finds nothing pending.
+>
+> `golang-migrate` remains listed in CLAUDE.md's stack but is still not used — this runner is ~150 lines with no new dependency, and adopting `golang-migrate` would mean renaming every migration to its `NNN_name.up.sql` convention.
+
 ---
 
 ## 3. Mobile Architecture (React Native + Expo, `mobile/`)

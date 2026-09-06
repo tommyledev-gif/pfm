@@ -9,6 +9,10 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o /out/server ./cmd/server
 RUN CGO_ENABLED=0 GOOS=linux go build -o /out/seed ./cmd/seed
+# db/migrations/*.sql are compiled into this binary via go:embed (see
+# backend/db/migrations.go), so the image carries the exact schema the
+# server binary expects — no volume mount, no synced host directory.
+RUN CGO_ENABLED=0 GOOS=linux go build -o /out/migrate ./cmd/migrate
 
 FROM alpine:3.20
 RUN apk add --no-cache ca-certificates
@@ -24,6 +28,7 @@ RUN find /tmp/local-dev-ca -name '*.crt' -exec cp {} /usr/local/share/ca-certifi
 WORKDIR /app
 COPY --from=builder /out/server ./server
 COPY --from=builder /out/seed ./seed
+COPY --from=builder /out/migrate ./migrate
 
 EXPOSE 8080
 ENTRYPOINT ["./server"]

@@ -36,6 +36,19 @@ services:
       - ./db/migrations/012_categories_icon_url.sql:/docker-entrypoint-initdb.d/11_categories_icon_url.sql:ro
       - ./db/migrations/013_wallets_icon.sql:/docker-entrypoint-initdb.d/12_wallets_icon.sql:ro
       - ./db/migrations/014_budgets_icon.sql:/docker-entrypoint-initdb.d/13_budgets_icon.sql:ro
+      # 015-018 were missing from this list entirely, so even a freshly
+      # initialized volume came up without chat_thread_messages (015) or
+      # transaction_audit_logs (018) — /ai/chat/thread, /ai/chat/thread/sync,
+      # /transactions/audit-logs and (since the audit write is inside the
+      # create transaction) POST /transactions all 500'd on SQLSTATE 42P01.
+      #
+      # ⚠️ Mounting them here only helps a *fresh* volume: initdb scripts run
+      # once, on first initialization. An already-running environment still
+      # needs these applied by hand — see the note in deploy.sh.
+      - ./db/migrations/015_chat_thread_sync.sql:/docker-entrypoint-initdb.d/14_chat_thread_sync.sql:ro
+      - ./db/migrations/016_transactions_created_at_sort_index.sql:/docker-entrypoint-initdb.d/15_transactions_created_at_sort_index.sql:ro
+      - ./db/migrations/017_seed_savings_category.sql:/docker-entrypoint-initdb.d/16_seed_savings_category.sql:ro
+      - ./db/migrations/018_transaction_audit_logs.sql:/docker-entrypoint-initdb.d/17_transaction_audit_logs.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s

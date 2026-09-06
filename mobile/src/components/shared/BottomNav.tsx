@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, LayoutChangeEvent, Pressable, StyleSheet, View } from "react-native";
+import { Animated, Easing, LayoutChangeEvent, Pressable, StyleSheet, View } from "react-native";
 import { BlurView } from "expo-blur";
 import { useRouter, usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -29,6 +29,10 @@ const BALL_TOP = -(BALL_SIZE / 2);
 const AURA_TOP = -(AURA_OUTER / 2);
 const AURA_LEFT_OFFSET = (BALL_SIZE - AURA_OUTER) / 2;
 const INACTIVE_COLOR = "rgba(255,255,255,0.5)";
+// Idle float: the ball drifts this many px above its resting spot and back,
+// forever. Kept tiny (and slow) so it reads as "alive", not as motion.
+const BOB_DISTANCE = 4;
+const BOB_DURATION = 1600;
 
 // Bottom nav — mobile/design_handoff_pfm_app/README.md "Design tokens" (nav)
 // + "Interactions summary". The bar itself sits flush against the screen's
@@ -58,7 +62,32 @@ export function BottomNav() {
   const ballX = useRef(new Animated.Value(0)).current;
   const squish = useRef(new Animated.Value(0)).current;
   const iconOpacity = useRef(new Animated.Value(1)).current;
+  const bob = useRef(new Animated.Value(0)).current;
   const rowOpacities = useRef(TABS.map((_, i) => new Animated.Value(i === Math.max(activeIndex, 0) ? 0 : 1))).current;
+
+  // Idle up/down float, independent of every other animation on the ball:
+  // it drives translateY only, while ballX/squish own translateX and scale,
+  // so a tab switch mid-float neither interrupts nor is interrupted by it.
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(bob, {
+          toValue: 1,
+          duration: BOB_DURATION,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(bob, {
+          toValue: 0,
+          duration: BOB_DURATION,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
 
   const fadeRowIcons = (prevIndex: number, nextIndex: number) => {
     if (prevIndex !== -1 && prevIndex !== nextIndex) {
@@ -116,6 +145,7 @@ export function BottomNav() {
 
   const ballScaleX = squish.interpolate({ inputRange: [0, 1], outputRange: [1, 1.22] });
   const ballScaleY = squish.interpolate({ inputRange: [0, 1], outputRange: [1, 0.85] });
+  const ballBobY = bob.interpolate({ inputRange: [0, 1], outputRange: [0, -BOB_DISTANCE] });
 
   return (
     <View style={[styles.wrapper, { height: PILL_HEIGHT + insets.bottom }]} pointerEvents="box-none">
@@ -151,7 +181,14 @@ export function BottomNav() {
         pointerEvents="none"
         style={[
           styles.ball,
-          { transform: [{ translateX: ballX }, { scaleX: ballScaleX }, { scaleY: ballScaleY }] },
+          {
+            transform: [
+              { translateX: ballX },
+              { translateY: ballBobY },
+              { scaleX: ballScaleX },
+              { scaleY: ballScaleY },
+            ],
+          },
         ]}
       >
         <Animated.View style={{ opacity: iconOpacity }}>
