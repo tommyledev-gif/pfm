@@ -99,18 +99,6 @@ export default function AiChatScreen() {
   const keyboardHeight = useKeyboardHeight();
   const keyboardVisible = keyboardHeight > 0;
 
-  // onContentSizeChange (below) only fires once the FlatList has *laid out*
-  // content, which can race the screen mount for a thread restored from
-  // chat-store's persisted state — a screen re-entered mid-conversation must
-  // land on the last message immediately, not wherever the initial layout
-  // happens to leave the scroll offset.
-  useEffect(() => {
-    if (!thread.length) return;
-    const timer = setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 0);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // Restores the synced thread from the server exactly once, only when the
   // local (AsyncStorage-persisted) thread is empty — i.e. after a logout,
   // reinstall, or new device wiped it (chat-store.ts's own debounced
@@ -127,6 +115,12 @@ export default function AiChatScreen() {
   const sendMessage = useSendChatMessageMutation();
   const createTransaction = useCreateTransactionMutation();
   const updateTransaction = useUpdateTransactionMutation();
+
+  // The list renders inverted (see the FlatList below), so the newest message
+  // has to come first in the data. Reversed here rather than in chat-store so
+  // every other consumer of the thread — the autosave, the edit lookups —
+  // keeps reading it in natural order.
+  const invertedThread = useMemo(() => [...thread].reverse(), [thread]);
 
   const walletById = useMemo(() => new Map(wallets.data?.map((w) => [w.id, w])), [wallets.data]);
   const categoryById = useMemo(() => new Map(categories.data?.map((c) => [c.id, c])), [categories.data]);
@@ -177,6 +171,10 @@ export default function AiChatScreen() {
     if (!text || sending) return;
     setInput("");
     addMessage({ id: nextId(), role: "user", text });
+    // Offset 0 is the newest message on an inverted list — exact, no
+    // measurement. Only needed for the case where the user had scrolled up
+    // into history before sending; otherwise they are already there.
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
     setSending(true);
     addMessage(await requestAssistantReply(text));
     setSending(false);
@@ -304,13 +302,25 @@ export default function AiChatScreen() {
     <View style={styles.screen}>
       <View style={styles.header}>
         <SparkleIcon size={20} />
-        <Text style={styles.headerTitle}>Noctis AI</Text>
+        <Text style={styles.headerTitle}>Budgest AI</Text>
       </View>
 
       <FlatList
         ref={listRef}
+        // Inverted, so "the bottom" is scroll offset 0 — a fixed point that
+        // needs no measurement at all. Chasing the bottom with scrollToEnd
+        // never held: FlatList derives content height from the rows it has
+        // actually measured and estimates the rest, and the viewport itself
+        // keeps changing under it (safe-area insets resolve a frame after
+        // mount, a bubble carrying a TransactionActionCard grows in a later
+        // pass). Every one of those left the list a little short of the end,
+        // which is exactly the "still have to scroll down a bit" report.
+        // Inverting deletes the problem rather than papering over it: the
+        // newest message is pinned at offset 0 on arrival and stays pinned as
+        // new ones push the older content away.
+        inverted
         style={styles.list}
-        data={thread}
+        data={invertedThread}
         keyExtractor={(m) => m.id}
         contentContainerStyle={styles.thread}
         // FlatList's default keyboardShouldPersistTaps="never" eats the
@@ -321,10 +331,6 @@ export default function AiChatScreen() {
         // row's PanResponder immediately; the keyboard still dismisses via
         // handleEditTrigger's own Keyboard.dismiss() once the swipe fires.
         keyboardShouldPersistTaps="handled"
-        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
-        onScrollToIndexFailed={({ index }) =>
-          setTimeout(() => listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.3 }), 100)
-        }
         renderItem={({ item }) => (
           <SwipeableMessageRow
             // README: user bubbles are right-aligned, assistant bubbles
@@ -374,12 +380,18 @@ export default function AiChatScreen() {
             </ChatBubble>
           </SwipeableMessageRow>
         )}
+        // No counter-transform on either of these: VirtualizedList already
+        // composes its own inversion style onto the header/empty slots, so
+        // adding a second scaleY would cancel it out and render them upside
+        // down.
         ListEmptyComponent={
           <Text style={styles.hint}>
             Cho mình biết bạn đã chi hay thu gì — vd: &ldquo;Cà phê 50k tiền mặt&rdquo; — mình sẽ soạn sẵn giao dịch cho bạn.
           </Text>
         }
-        ListFooterComponent={
+        // Header, not footer: on an inverted list the header is what renders
+        // at the visual bottom, which is where the typing dots belong.
+        ListHeaderComponent={
           sending ? (
             <View style={styles.typingRow}>
               <TypingIndicator />
@@ -487,7 +499,10 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, paddingVertical: spacing.lg },
   headerTitle: { ...typography.cardTitle, color: colors.textPrimary },
   list: { flex: 1 },
-  thread: { paddingHorizontal: spacing.xl, gap: spacing.md, paddingBottom: spacing.md, flexGrow: 1 },
+  // paddingVertical, not paddingBottom: `inverted` mirrors the content
+  // container, so a bottom-only pad would end up above the oldest message
+  // instead of below the newest one.
+  thread: { paddingHorizontal: spacing.xl, gap: spacing.md, paddingVertical: spacing.md, flexGrow: 1 },
   hint: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xxl },
   typingRow: { alignItems: "flex-start" },
   manualEntryButton: {

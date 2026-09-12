@@ -32,7 +32,7 @@ interface BudgetFormModalProps {
 }
 
 // Insights → Budgets tab "+ New budget" action (README), extended to also
-// handle editing an existing budget's limit (tap a BudgetCard) — kept as one
+// handle editing an existing budget's limit (tap a BudgetListRow) — kept as one
 // Modal sheet rather than two near-identical ones. Moved here from
 // components/shared/NewBudgetModal.tsx to match the feature-scoped
 // CategoryFormModal/WalletFormModal convention (it's only ever used by

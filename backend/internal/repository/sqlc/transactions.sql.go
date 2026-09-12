@@ -219,6 +219,46 @@ func (q *Queries) ListTransactionsByUser(ctx context.Context, arg ListTransactio
 	return items, nil
 }
 
+const countTransactionsByUser = `-- name: CountTransactionsByUser :one
+SELECT COUNT(*)::bigint
+FROM transactions t
+JOIN wallets w ON w.id = t.wallet_id
+JOIN categories c ON c.id = t.category_id
+WHERE t.user_id = $1
+  AND t.deleted_at IS NULL
+  AND ($2::uuid IS NULL OR t.wallet_id = $2)
+  AND ($3::uuid IS NULL OR t.category_id = $3)
+  AND ($4::uuid[] IS NULL OR t.category_id = ANY($4::uuid[]))
+  AND ($5::text IS NULL OR t.type = $5)
+  AND ($6::timestamptz IS NULL OR t.occurred_at >= $6)
+  AND ($7::timestamptz IS NULL OR t.occurred_at <= $7)
+  AND ($8::text IS NULL OR t.note ILIKE '%' || $8 || '%' ESCAPE '\')
+`
+
+type CountTransactionsByUserParams struct {
+	UserID      uuid.UUID
+	WalletID    *uuid.UUID
+	CategoryID  *uuid.UUID
+	CategoryIDs []uuid.UUID
+	Type        *string
+	FromTs      *time.Time
+	ToTs        *time.Time
+	Search      *string
+}
+
+// CountTransactionsByUser is ListTransactionsByUser's WHERE clause without the
+// cursor predicate or the LIMIT — the size of the whole filtered set, for the
+// list response's `total`.
+func (q *Queries) CountTransactionsByUser(ctx context.Context, arg CountTransactionsByUserParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countTransactionsByUser,
+		arg.UserID, arg.WalletID, arg.CategoryID, arg.CategoryIDs, arg.Type,
+		arg.FromTs, arg.ToTs, arg.Search,
+	)
+	var total int64
+	err := row.Scan(&total)
+	return total, err
+}
+
 const updateTransaction = `-- name: UpdateTransaction :one
 UPDATE transactions
 SET

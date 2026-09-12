@@ -20,6 +20,10 @@ export interface Transaction {
 export interface ListTransactionsResult {
   data: Transaction[];
   next_cursor: string | null;
+  // Rows matching the request's filters in full — present on the first page
+  // only, null on any cursor-fetched page (the figure can't change while
+  // paging through the same filters). Backend: dto.ListTransactionsResponse.
+  total: number | null;
 }
 
 export interface CreateTransactionRequest {

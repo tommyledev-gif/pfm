@@ -72,12 +72,13 @@ func (h *TransactionHandler) ListTransactions(c *fiber.Ctx) error {
 		return response.Error(c, h.logger, common.ErrUnauthenticated)
 	}
 
-	transactions, nextCursor, err := h.transactionService.ListTransactions(c.Context(), userID, q)
+	result, err := h.transactionService.ListTransactions(c.Context(), userID, q)
 	if err != nil {
 		return response.Error(c, h.logger, err)
 	}
 
-	return response.Success(c, fiber.StatusOK, "transactions retrieved successfully", dto.NewListTransactionsResponse(transactions, nextCursor))
+	return response.Success(c, fiber.StatusOK, "transactions retrieved successfully",
+		dto.NewListTransactionsResponse(result.Transactions, result.NextCursor, result.Total))
 }
 
 // GetTransaction handles GET /transactions/:id.

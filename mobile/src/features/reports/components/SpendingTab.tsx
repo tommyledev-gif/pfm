@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { CalendarIcon } from "@/components/ui/Icon";
 import { Card } from "@/components/ui/Card";
 import { CategoryPickerDrawer } from "@/components/shared/CategoryPickerDrawer";
 import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
-import { DonutChart, DonutLegendRow } from "@/components/shared/DonutChart";
+import { DonutChart } from "@/components/shared/DonutChart";
+import { DonutLegendRow } from "@/components/shared/DonutLegendRow";
+import { CategoryTransactionsDialog } from "@/features/reports/components/CategoryTransactionsDialog";
 import { buildCategoryColorMap } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
 import { formatDateRange } from "@/lib/format-date";
@@ -19,7 +21,16 @@ import { SpendingTabSkeleton } from "@/features/reports/components/SpendingTabSk
 // cards, donut ("By Category" default), legend list with progress bars.
 // The date-range label is now a pressable filter (matching Transactions'
 // picker) rather than a static echo of the backend's default window.
-export function SpendingTab() {
+interface SpendingTabProps {
+  // Set when the screen was opened from a budget notification — selects that
+  // category's donut segment on arrival, which is what shows its tooltip.
+  focusCategoryId?: string;
+  // Changes on every navigation so re-focusing the same category works even
+  // after the user has deselected it. See notifications.tsx's push site.
+  focusNonce?: string;
+}
+
+export function SpendingTab({ focusCategoryId, focusNonce }: SpendingTabProps = {}) {
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
   const [pickerOpen, setPickerOpen] = useState(false);
   const summary = useReportSummaryQuery(dateRange);
@@ -27,6 +38,16 @@ export function SpendingTab() {
   const budgets = useBudgetsQuery();
   const [selected, setSelected] = useState<string | null>(null);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
+  // Which segment the tooltip's "Xem giao dịch" link drilled into. Held
+  // separately from `selected` so closing the dialog leaves the chart's own
+  // highlight exactly where the user left it.
+  const [detailCategoryId, setDetailCategoryId] = useState<string | null>(null);
+
+  // Both deps are plain strings, so this can't re-fire on identity alone — the
+  // trap that made useCategoryPicker loop.
+  useEffect(() => {
+    if (focusCategoryId) setSelected(focusCategoryId);
+  }, [focusCategoryId, focusNonce]);
 
   if (summary.isLoading) {
     return <SpendingTabSkeleton />;
@@ -55,6 +76,7 @@ export function SpendingTab() {
   }));
 
   const totalExpense = segments.reduce((sum, s) => sum + s.amount, 0);
+  const detailSegment = segments.find((s) => s.key === detailCategoryId);
 
   // The report's own backend default window is the current month, and
   // budgets are monthly-only — a custom date range has no corresponding
@@ -94,6 +116,7 @@ export function SpendingTab() {
           selected={selected}
           onToggle={(key) => setSelected((prev) => (prev === key ? null : key))}
           budgetTotal={budgetTotal}
+          onPressDetails={setDetailCategoryId}
         />
         {!isDefaultRange ? (
           <Text style={styles.budgetHint}>Ngân sách chỉ áp dụng cho tháng hiện tại</Text>
@@ -124,6 +147,23 @@ export function SpendingTab() {
         from={dateRange.from}
         to={dateRange.to}
         onApply={setDateRange}
+      />
+
+      <CategoryTransactionsDialog
+        visible={Boolean(detailCategoryId)}
+        onClose={() => setDetailCategoryId(null)}
+        categoryId={detailCategoryId}
+        categoryName={detailSegment?.label ?? ""}
+        color={detailSegment?.color ?? colors.lavender}
+        icon={detailSegment?.icon}
+        iconUrl={detailSegment?.iconUrl}
+        // `range`, not `dateRange` — the backend's resolved window, so the
+        // rows cover exactly the period the donut was drawn from even when
+        // the user has applied no filter of their own.
+        from={range.from}
+        to={range.to}
+        currency={currency}
+        total={detailSegment?.amount ?? 0}
       />
 
       <CategoryPickerDrawer

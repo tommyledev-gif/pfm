@@ -2,10 +2,7 @@ import { useEffect, useRef } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Circle, G } from "react-native-svg";
 
-import { Avatar } from "@/components/ui/Avatar";
-import { ProgressBar } from "@/components/ui/ProgressBar";
 import { formatCurrency, formatCurrencyCompact } from "@/lib/currency";
-import { useHoldProgress } from "@/lib/use-hold-progress";
 import { colors, typography } from "@/lib/theme";
 
 export interface DonutSegment {
@@ -29,11 +26,20 @@ interface DonutChartProps {
   // the "/budget" half (e.g. a custom date range that doesn't correspond to
   // a monthly budget period — see SpendingTab's isDefaultRange).
   budgetTotal?: number | null;
+  // Turns the tooltip into a drill-down: when supplied, the callout grows a
+  // tappable "Xem giao dịch" link under the amount that hands the segment key
+  // back so the host can open its own transactions dialog for that category
+  // over the same period the chart is drawn for.
+  onPressDetails?: (key: string) => void;
 }
 
 const STROKE_WIDTH = 22;
 const TOOLTIP_WIDTH = 130;
 const TOOLTIP_HEIGHT = 48;
+// The drill-down link adds a third line, and the tooltip's own placement math
+// (flip above/below the arc, then clamp inside the chart box) needs the real
+// height to keep the callout off the segment it describes.
+const TOOLTIP_HEIGHT_WITH_LINK = 74;
 // Clearance between the ring's inner edge and the tooltip, so the callout
 // reads as pointing at the arc rather than touching it.
 const TOOLTIP_GAP = 10;
@@ -86,7 +92,9 @@ export function DonutChart({
   selected,
   onToggle,
   budgetTotal = null,
+  onPressDetails,
 }: DonutChartProps) {
+  const tooltipHeight = onPressDetails ? TOOLTIP_HEIGHT_WITH_LINK : TOOLTIP_HEIGHT;
   const radius = (size - STROKE_WIDTH) / 2;
   const circumference = 2 * Math.PI * radius;
   const total = segments.reduce((sum, s) => sum + s.amount, 0);
@@ -125,11 +133,11 @@ export function DonutChart({
 
     const top = inUpperHalf
       ? point.y + STROKE_WIDTH / 2 + TOOLTIP_GAP
-      : point.y - STROKE_WIDTH / 2 - TOOLTIP_GAP - TOOLTIP_HEIGHT;
+      : point.y - STROKE_WIDTH / 2 - TOOLTIP_GAP - tooltipHeight;
 
     tooltipPos = {
       left: Math.min(Math.max(point.x - TOOLTIP_WIDTH / 2, 0), size - TOOLTIP_WIDTH),
-      top: Math.min(Math.max(top, 0), size - TOOLTIP_HEIGHT),
+      top: Math.min(Math.max(top, 0), size - tooltipHeight),
     };
   }
 
@@ -173,9 +181,15 @@ export function DonutChart({
         ) : null}
       </View>
       {activeArc && tooltipPos ? (
+        // box-none, not none: the callout itself must stay transparent to
+        // touches so the arc underneath is still tappable, while the link
+        // inside it receives its own.
         <Animated.View
-          pointerEvents="none"
-          style={[styles.tooltip, { left: tooltipPos.left, top: tooltipPos.top, transform: [{ translateY: tooltipFloat }] }]}
+          pointerEvents={onPressDetails ? "box-none" : "none"}
+          style={[
+            styles.tooltip,
+            { minHeight: tooltipHeight, left: tooltipPos.left, top: tooltipPos.top, transform: [{ translateY: tooltipFloat }] },
+          ]}
         >
           <Text style={styles.tooltipTitle} numberOfLines={1}>
             {activeArc.label}
@@ -183,58 +197,14 @@ export function DonutChart({
           <Text style={styles.tooltipValue}>
             {formatCurrency(activeArc.amount, currency)} · {total > 0 ? Math.round((activeArc.amount / total) * 100) : 0}%
           </Text>
+          {onPressDetails ? (
+            <Pressable onPress={() => onPressDetails(activeArc.key)} hitSlop={8} testID="btn-donut-tooltip-details">
+              <Text style={styles.tooltipLink}>Xem giao dịch</Text>
+            </Pressable>
+          ) : null}
         </Animated.View>
       ) : null}
     </View>
-  );
-}
-
-// Legend row is a separate component so it can live in a normal ScrollView
-// list below the chart and still drive/reflect the same selection. Also
-// doubles as a 2s-hold target (onHoldCategory) that opens a category picker
-// drawer — the label eases toward the primary accent color while held so the
-// user understands the row is holdable.
-export function DonutLegendRow({
-  segment,
-  percentage,
-  currency,
-  selected,
-  onPress,
-  onHoldCategory,
-}: {
-  segment: DonutSegment;
-  percentage: number;
-  currency: string;
-  selected: boolean;
-  onPress: () => void;
-  onHoldCategory?: (key: string) => void;
-}) {
-  const { progress, start, cancel } = useHoldProgress();
-  const nameColor = progress.interpolate({ inputRange: [0, 1], outputRange: [colors.textPrimary, colors.green] });
-
-  return (
-    <Pressable
-      onPress={onPress}
-      onPressIn={start}
-      onPressOut={cancel}
-      onLongPress={() => {
-        cancel();
-        onHoldCategory?.(segment.key);
-      }}
-      delayLongPress={2000}
-      style={[legendStyles.row, selected && legendStyles.rowSelected]}
-    >
-      <View style={legendStyles.headRow}>
-        <Avatar name={segment.label} color={segment.color} size={22} icon={segment.icon} iconUrl={segment.iconUrl} />
-        <Animated.Text style={[legendStyles.name, { color: nameColor }]} numberOfLines={1}>
-          {segment.label}
-        </Animated.Text>
-        <Text style={legendStyles.value}>
-          {formatCurrency(segment.amount, currency)} · {percentage.toFixed(0)}%
-        </Text>
-      </View>
-      <ProgressBar progress={percentage / 100} color={segment.color} height={4} />
-    </Pressable>
   );
 }
 
@@ -248,7 +218,6 @@ const styles = StyleSheet.create({
   tooltip: {
     position: "absolute",
     width: TOOLTIP_WIDTH,
-    minHeight: TOOLTIP_HEIGHT,
     borderRadius: 12,
     paddingVertical: 6,
     paddingHorizontal: 10,
@@ -266,12 +235,11 @@ const styles = StyleSheet.create({
   },
   tooltipTitle: { ...typography.caption, color: colors.textPrimary },
   tooltipValue: { ...typography.tiny, color: colors.textSecondary },
-});
-
-const legendStyles = StyleSheet.create({
-  row: { gap: 6, paddingVertical: 8 },
-  rowSelected: { opacity: 1 },
-  headRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  name: { flex: 1, ...typography.label },
-  value: { ...typography.tiny, color: colors.textSecondary },
+  tooltipLink: {
+    ...typography.tiny,
+    color: colors.green,
+    textDecorationLine: "underline",
+    textDecorationColor: colors.green,
+    marginTop: 2,
+  },
 });

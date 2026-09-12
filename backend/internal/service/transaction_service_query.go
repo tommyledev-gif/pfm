@@ -19,30 +19,40 @@ import (
 // paired with the `ESCAPE '\'` clause in ListTransactionsByUser.
 var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 
+// ListTransactionsResult is what ListTransactions hands back — plain values
+// rather than a DTO, matching UserService.ListUsers's convention, grouped into
+// a struct because a fourth bare return value stopped being readable.
+type ListTransactionsResult struct {
+	Transactions []*model.Transaction
+	NextCursor   *string
+	// Total rows matching the filters, or nil on any page but the first —
+	// see the CountTransactionsByUser call below.
+	Total *int64
+}
+
 // ListTransactions implements US-02 — strictly scoped to the caller
 // (CLAUDE.md user isolation rule), cursor-paginated on occurred_at (not
-// created_at, spec.md Edge Cases US-02 #1). Returns plain values rather than
-// a DTO, matching UserService.ListUsers's convention.
-func (s *TransactionService) ListTransactions(ctx context.Context, userID uuid.UUID, q dto.ListTransactionsQuery) ([]*model.Transaction, *string, error) {
+// created_at, spec.md Edge Cases US-02 #1).
+func (s *TransactionService) ListTransactions(ctx context.Context, userID uuid.UUID, q dto.ListTransactionsQuery) (ListTransactionsResult, error) {
 	filter := repository.ListTransactionsFilter{}
 
 	if q.WalletID != "" {
 		walletID, err := uuid.Parse(q.WalletID)
 		if err != nil {
-			return nil, nil, common.NewInvalidInputError("wallet_id must be a valid UUID")
+			return ListTransactionsResult{}, common.NewInvalidInputError("wallet_id must be a valid UUID")
 		}
 		if _, err := s.getOwnedWallet(ctx, userID, walletID); err != nil {
-			return nil, nil, err
+			return ListTransactionsResult{}, err
 		}
 		filter.WalletID = &walletID
 	}
 	if q.CategoryID != "" {
 		categoryID, err := uuid.Parse(q.CategoryID)
 		if err != nil {
-			return nil, nil, common.NewInvalidInputError("category_id must be a valid UUID")
+			return ListTransactionsResult{}, common.NewInvalidInputError("category_id must be a valid UUID")
 		}
 		if _, err := s.getVisibleCategory(ctx, userID, categoryID); err != nil {
-			return nil, nil, err
+			return ListTransactionsResult{}, err
 		}
 		filter.CategoryID = &categoryID
 	}
@@ -56,10 +66,10 @@ func (s *TransactionService) ListTransactions(ctx context.Context, userID uuid.U
 			}
 			categoryID, err := uuid.Parse(part)
 			if err != nil {
-				return nil, nil, common.NewInvalidInputError("category_ids must be a comma-separated list of valid UUIDs")
+				return ListTransactionsResult{}, common.NewInvalidInputError("category_ids must be a comma-separated list of valid UUIDs")
 			}
 			if _, err := s.getVisibleCategory(ctx, userID, categoryID); err != nil {
-				return nil, nil, err
+				return ListTransactionsResult{}, err
 			}
 			categoryIDs = append(categoryIDs, categoryID)
 		}
@@ -73,19 +83,19 @@ func (s *TransactionService) ListTransactions(ctx context.Context, userID uuid.U
 	if q.From != "" {
 		from, err := parseFlexibleTimestamp(q.From)
 		if err != nil {
-			return nil, nil, common.NewInvalidInputError("from must be a valid date or timestamp")
+			return ListTransactionsResult{}, common.NewInvalidInputError("from must be a valid date or timestamp")
 		}
 		filter.From = &from
 	}
 	if q.To != "" {
 		to, err := parseFlexibleTimestamp(q.To)
 		if err != nil {
-			return nil, nil, common.NewInvalidInputError("to must be a valid date or timestamp")
+			return ListTransactionsResult{}, common.NewInvalidInputError("to must be a valid date or timestamp")
 		}
 		filter.To = &to
 	}
 	if filter.From != nil && filter.To != nil && filter.From.After(*filter.To) {
-		return nil, nil, common.NewInvalidInputError("from must not be after to")
+		return ListTransactionsResult{}, common.NewInvalidInputError("from must not be after to")
 	}
 	if search := strings.TrimSpace(q.Search); search != "" {
 		escaped := likeEscaper.Replace(search)
@@ -94,7 +104,7 @@ func (s *TransactionService) ListTransactions(ctx context.Context, userID uuid.U
 	if q.Cursor != "" {
 		id, occurredAt, createdAt, err := decodeTransactionCursor(q.Cursor)
 		if err != nil {
-			return nil, nil, common.NewInvalidInputError("cursor is invalid")
+			return ListTransactionsResult{}, common.NewInvalidInputError("cursor is invalid")
 		}
 		filter.CursorID = &id
 		filter.CursorOccurredAt = &occurredAt
@@ -105,15 +115,14 @@ func (s *TransactionService) ListTransactions(ctx context.Context, userID uuid.U
 	if limit == 0 {
 		limit = common.DefaultListLimit
 	}
-	// Fetch one extra row to know whether a next page exists, without a
-	// separate COUNT-based lookahead query (same convention as
-	// UserService.ListUsers) — this endpoint has no `total` field at all
-	// (spec.md Response Shape), so no CountUsers-equivalent call is needed.
+	// Fetch one extra row to know whether a next page exists (same convention
+	// as UserService.ListUsers) — cheaper than deriving hasMore from `total`,
+	// and it keeps paging correct even on the pages that skip the count.
 	filter.Limit = int32(limit + 1)
 
 	transactions, err := s.repo.ListTransactionsByUser(ctx, userID, filter)
 	if err != nil {
-		return nil, nil, fmt.Errorf("service.ListTransactions: %w", err)
+		return ListTransactionsResult{}, fmt.Errorf("service.ListTransactions: %w", err)
 	}
 
 	hasMore := len(transactions) > limit
@@ -126,12 +135,25 @@ func (s *TransactionService) ListTransactions(ctx context.Context, userID uuid.U
 		last := transactions[len(transactions)-1]
 		c, err := encodeTransactionCursor(last.ID, last.OccurredAt, last.CreatedAt)
 		if err != nil {
-			return nil, nil, fmt.Errorf("service.ListTransactions: %w", err)
+			return ListTransactionsResult{}, fmt.Errorf("service.ListTransactions: %w", err)
 		}
 		nextCursor = &c
 	}
 
-	return transactions, nextCursor, nil
+	// Counted on the first page only. The number describes the filters, which
+	// don't change as the client pages through them, so re-running a COUNT for
+	// every scroll-triggered fetch would buy nothing — the client holds the
+	// value it got with page one.
+	var total *int64
+	if q.Cursor == "" {
+		count, err := s.repo.CountTransactionsByUser(ctx, userID, filter)
+		if err != nil {
+			return ListTransactionsResult{}, fmt.Errorf("service.ListTransactions: %w", err)
+		}
+		total = &count
+	}
+
+	return ListTransactionsResult{Transactions: transactions, NextCursor: nextCursor, Total: total}, nil
 }
 
 // GetTransaction implements US-03 — distinguishes "belongs to someone else"

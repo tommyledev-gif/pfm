@@ -86,6 +86,31 @@ WHERE t.user_id = $1
 ORDER BY t.occurred_at DESC, t.created_at DESC, t.id DESC
 LIMIT $2;
 
+-- name: CountTransactionsByUser :one
+-- Total rows matching the same filters ListTransactionsByUser applies, minus
+-- the cursor clause (a cursor narrows the page, not the result set) and the
+-- LIMIT. Backs the Transactions screen's "N mục" header badge, which needs
+-- the size of the whole filtered set — the page it renders is capped at
+-- common.DefaultListLimit, so counting what was fetched reported a constant
+-- 20 no matter which filters were on.
+--
+-- The wallets/categories JOINs are kept even though no column from either is
+-- selected: both are INNER JOINs, so dropping them would silently widen the
+-- count relative to the list whenever a row's wallet or category is missing.
+SELECT COUNT(*)::bigint
+FROM transactions t
+JOIN wallets w ON w.id = t.wallet_id
+JOIN categories c ON c.id = t.category_id
+WHERE t.user_id = $1
+  AND t.deleted_at IS NULL
+  AND (sqlc.narg('wallet_id')::uuid IS NULL OR t.wallet_id = sqlc.narg('wallet_id'))
+  AND (sqlc.narg('category_id')::uuid IS NULL OR t.category_id = sqlc.narg('category_id'))
+  AND (sqlc.narg('category_ids')::uuid[] IS NULL OR t.category_id = ANY(sqlc.narg('category_ids')::uuid[]))
+  AND (sqlc.narg('type')::text IS NULL OR t.type = sqlc.narg('type'))
+  AND (sqlc.narg('from_ts')::timestamptz IS NULL OR t.occurred_at >= sqlc.narg('from_ts'))
+  AND (sqlc.narg('to_ts')::timestamptz IS NULL OR t.occurred_at <= sqlc.narg('to_ts'))
+  AND (sqlc.narg('search')::text IS NULL OR t.note ILIKE '%' || sqlc.narg('search') || '%' ESCAPE '\');
+
 -- name: UpdateTransaction :one
 -- Partial update via COALESCE, same convention as UpdateWallet/UpdateCategory.
 -- wallet_id and type are never columns this query can touch — they aren't

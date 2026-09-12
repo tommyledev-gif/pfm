@@ -3,14 +3,17 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Calendar, DateData } from "react-native-calendars";
 
 import { AmountInput } from "@/components/ui/AmountInput";
+import { CategorySelectField } from "@/components/shared/CategorySelectField";
 import { Drawer } from "@/components/shared/Drawer";
-import { PillButton } from "@/components/ui/PillButton";
+import { DrawerHeader } from "@/components/shared/DrawerHeader";
+import { CALENDAR_THEME } from "@/lib/calendar-theme";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { toCents, toMajorUnits } from "@/lib/currency";
 import { formatDateShort } from "@/lib/format-date";
 import { TRANSACTION_TYPES, TransactionType } from "@/lib/constants";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
+import { useCategoryPicker } from "@/features/categories/components/use-category-picker";
 import { TransactionActionPayload } from "@/features/ai-chat/types";
 
 interface EditTransactionModalProps {
@@ -74,6 +77,12 @@ export function EditTransactionModal({ visible, payload, onClose, onSave, lockWa
     setCategoryId(categories.data[0]?.id ?? null);
   }, [type, categoryId, categories.data]);
 
+  const categoryPicker = useCategoryPicker({
+    categories: categories.data ?? [],
+    selectedIds: categoryId ? [categoryId] : [],
+    onApply: (ids) => setCategoryId(ids[0] ?? null),
+  });
+
   const markedDates = useMemo(
     () => (occurredAt ? { [occurredAt]: { selected: true, selectedColor: colors.green, selectedTextColor: colors.onGreen } } : {}),
     [occurredAt],
@@ -95,8 +104,14 @@ export function EditTransactionModal({ visible, payload, onClose, onSave, lockWa
   };
 
   return (
-    <Drawer visible={visible} onClose={onClose}>
-      <Text style={styles.title}>Sửa giao dịch</Text>
+    <Drawer visible={visible} onClose={onClose} child={categoryPicker.child}>
+      <DrawerHeader
+        title="Sửa giao dịch"
+        actions={[
+          { label: "Hủy", onPress: onClose, variant: "secondary" },
+          { label: "Lưu", onPress: submit, disabled: !canSave },
+        ]}
+      />
 
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>Loại</Text>
@@ -135,17 +150,7 @@ export function EditTransactionModal({ visible, payload, onClose, onSave, lockWa
 
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>Danh mục</Text>
-        <View style={styles.chipRow}>
-          {(categories.data ?? []).map((c) => (
-            <Pressable
-              key={c.id}
-              onPress={() => setCategoryId(c.id)}
-              style={[styles.chip, categoryId === c.id && styles.chipActive]}
-            >
-              <Text style={[styles.chipLabel, categoryId === c.id && styles.chipLabelActive]}>{c.name}</Text>
-            </Pressable>
-          ))}
-        </View>
+        <CategorySelectField categories={categoryPicker.selected} onPress={categoryPicker.open} />
       </View>
 
       <View style={styles.fieldGroup}>
@@ -170,29 +175,15 @@ export function EditTransactionModal({ visible, payload, onClose, onSave, lockWa
           current={occurredAt || undefined}
           markedDates={markedDates}
           onDayPress={(day: DateData) => setOccurredAt(day.dateString)}
-          theme={{
-            calendarBackground: "transparent",
-            monthTextColor: colors.textPrimary,
-            arrowColor: colors.textPrimary,
-            dayTextColor: colors.textPrimary,
-            textDisabledColor: colors.textMuted,
-            textSectionTitleColor: colors.textSecondary,
-            todayTextColor: colors.green,
-          }}
+          theme={CALENDAR_THEME}
           style={styles.calendar}
         />
-      </View>
-
-      <View style={styles.actions}>
-        <PillButton label="Hủy" variant="outline" onPress={onClose} style={styles.flexButton} />
-        <PillButton label="Lưu" onPress={submit} disabled={!canSave} style={styles.flexButton} />
       </View>
     </Drawer>
   );
 }
 
 const styles = StyleSheet.create({
-  title: { ...typography.title, color: colors.textPrimary },
   fieldGroup: { gap: spacing.xs },
   label: { ...typography.caption, color: colors.textSecondary },
   chipRow: { flexDirection: "row", gap: spacing.sm, flexWrap: "wrap" },
@@ -220,6 +211,4 @@ const styles = StyleSheet.create({
     ...typography.body,
   },
   calendar: { borderRadius: radii.listCard },
-  actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
-  flexButton: { flex: 1 },
 });

@@ -59,19 +59,26 @@ func NewTransactionResponseWithBalance(t *model.Transaction, walletBalance *int6
 }
 
 // ListTransactionsResponse's NextCursor mirrors dto.PaginationResponse's
-// NextCursor (F-01) in shape, but is not that same type — this endpoint
-// deliberately has no Total field (spec.md Response Shape defines only
-// `data`/`next_cursor`; a COUNT query over a table that can grow large is
-// unnecessary here, unlike the bounded admin user list).
+// NextCursor (F-01) in shape, but is not that same type.
+//
+// Total is how many rows match the request's filters in full, and is present
+// on the first page only — null on any cursor-fetched page, since the figure
+// can't change as the client pages through the same filters. It was
+// deliberately absent originally (spec.md Response Shape defines only
+// `data`/`next_cursor`, and a COUNT over a growing table looked unnecessary),
+// but the Transactions screen's header badge has no other way to say how many
+// transactions a filter actually matched: counting the rows it received only
+// ever reported the page size.
 type ListTransactionsResponse struct {
 	Data       []TransactionResponse `json:"data"`
 	NextCursor *string               `json:"next_cursor"`
+	Total      *int64                `json:"total"`
 }
 
-func NewListTransactionsResponse(transactions []*model.Transaction, nextCursor *string) ListTransactionsResponse {
+func NewListTransactionsResponse(transactions []*model.Transaction, nextCursor *string, total *int64) ListTransactionsResponse {
 	items := make([]TransactionResponse, 0, len(transactions))
 	for _, t := range transactions {
 		items = append(items, NewTransactionResponse(t))
 	}
-	return ListTransactionsResponse{Data: items, NextCursor: nextCursor}
+	return ListTransactionsResponse{Data: items, NextCursor: nextCursor, Total: total}
 }

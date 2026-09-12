@@ -1,14 +1,39 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { Animated, BackHandler, Dimensions, Pressable, ScrollView, StyleSheet, View } from "react-native";
 
+import { DrawerChildPanel } from "@/components/shared/DrawerChildPanel";
 import { colors, radii, spacing } from "@/lib/theme";
 import { useKeyboardHeight } from "@/lib/use-keyboard-height";
 import { useSheetStore } from "@/stores/sheet-store";
+
+// A secondary panel that slides in from the right *over* an already-open
+// Drawer — for a step that needs the full sheet to itself (searching a long
+// category list, say) but must not lose the half-filled form underneath it.
+// Modelled on the same pattern native filter sheets use: the parent stays
+// mounted and untouched, and the panel slides back out to reveal it.
+//
+// Declared as a prop on Drawer rather than as a component the caller nests in
+// `children` because it has to render *outside* the sheet's ScrollView (an
+// absolutely-positioned child of a scrolling content container would scroll
+// with it), and Drawer is the only thing that knows the overlay's real window
+// geometry — see the anchor-measuring note below.
+export interface DrawerChild {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  children: ReactNode;
+  // Rendered pinned below the panel body rather than after it, so the
+  // confirm/reset actions stay reachable no matter how long the list is.
+  footer?: ReactNode;
+}
 
 interface DrawerProps {
   visible: boolean;
   onClose: () => void;
   children: ReactNode;
+  // Pinned below the sheet's scrolling body, same rationale as DrawerChild's.
+  footer?: ReactNode;
+  child?: DrawerChild;
 }
 
 // Reusable bottom-sheet chrome shared by every form/picker modal (Wallet/
@@ -58,7 +83,7 @@ interface DrawerProps {
 // regardless of device size or how tall `children` ends up being.
 const OFFSCREEN_Y = Dimensions.get("window").height;
 
-export function Drawer({ visible, onClose, children }: DrawerProps) {
+export function Drawer({ visible, onClose, children, footer, child }: DrawerProps) {
   const keyboardHeight = useKeyboardHeight();
   // Kept mounted for the duration of the close animation — flipping
   // straight to `if (!visible) return null` would unmount mid-slide-down
@@ -113,11 +138,21 @@ export function Drawer({ visible, onClose, children }: DrawerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
+  // `child` is read through a ref inside the back handler so the subscription
+  // doesn't have to be torn down and rebuilt every time the child panel opens
+  // or closes.
+  const childRef = useRef(child);
+  childRef.current = child;
+
   useEffect(() => {
     if (!visible) return;
     useSheetStore.getState().open();
     const backSub = BackHandler.addEventListener("hardwareBackPress", () => {
-      onClose();
+      // Back closes the child panel first when one is open — dismissing the
+      // whole sheet from inside a sub-step would throw away the parent form.
+      const openChild = childRef.current;
+      if (openChild?.visible) openChild.onClose();
+      else onClose();
       return true;
     });
     return () => {
@@ -143,17 +178,23 @@ export function Drawer({ visible, onClose, children }: DrawerProps) {
       >
         <Pressable style={[styles.backdrop, { paddingBottom: keyboardHeight }]} onPress={onClose}>
           <Animated.View style={[styles.sheetTouchArea, { transform: [{ translateY }] }]}>
-            <Pressable onPress={() => {}}>
+            <Pressable onPress={() => {}} style={styles.sheetSurface}>
               <ScrollView
+                // flexShrink so a pinned footer can claim its space out of the
+                // scroll area once the sheet hits its 90% cap, rather than
+                // being pushed off the bottom of the screen by it.
+                style={styles.sheetScroll}
                 contentContainerStyle={styles.sheet}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
               >
                 {children}
               </ScrollView>
+              {footer ? <View style={styles.footer}>{footer}</View> : null}
             </Pressable>
           </Animated.View>
         </Pressable>
+        {child ? <DrawerChildPanel {...child} width={windowSize.width} bottomInset={keyboardHeight} /> : null}
       </Animated.View>
     </>
   );
@@ -164,11 +205,25 @@ const styles = StyleSheet.create({
   overlay: { position: "absolute", zIndex: 1000, elevation: 1000 },
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
   sheetTouchArea: { maxHeight: "90%" },
-  sheet: {
+  // The surface (background + rounded top) moved off the ScrollView's content
+  // container and onto this wrapper once a pinned footer joined it — the
+  // footer sits outside the scroll view and would otherwise have had to
+  // re-declare the same background to avoid showing the backdrop through it.
+  sheetSurface: {
+    flexShrink: 1,
     backgroundColor: colors.surface,
     borderTopLeftRadius: radii.hero,
     borderTopRightRadius: radii.hero,
-    padding: spacing.xl,
-    gap: spacing.md,
+    overflow: "hidden",
+  },
+  sheetScroll: { flexGrow: 0, flexShrink: 1 },
+  sheet: { padding: spacing.xl, gap: spacing.md },
+  footer: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xl,
+    gap: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.surfaceBorder,
   },
 });

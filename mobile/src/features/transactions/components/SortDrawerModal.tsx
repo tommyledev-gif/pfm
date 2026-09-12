@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Drawer } from "@/components/shared/Drawer";
-import { PillButton } from "@/components/ui/PillButton";
+import { DrawerHeader } from "@/components/shared/DrawerHeader";
 import { colors, radii, spacing, typography } from "@/lib/theme";
-import { SORT_OPTIONS, SortKey } from "@/features/transactions/sort";
+import { DEFAULT_SORT_KEY, SORT_OPTIONS, SortKey } from "@/features/transactions/sort";
 
 interface SortDrawerModalProps {
   visible: boolean;
@@ -20,16 +20,22 @@ interface SortDrawerModalProps {
 export function SortDrawerModal({ visible, onClose, selected, onApply }: SortDrawerModalProps) {
   const [order, setOrder] = useState<SortKey[]>([]);
 
+  // An empty `selected` doesn't mean "unsorted" — it means the list is on the
+  // backend's own occurred_at DESC order, which is exactly DEFAULT_SORT_KEY.
+  // Opening on a blank checklist made the drawer claim no rule was in effect
+  // while the list plainly was sorted.
   useEffect(() => {
     if (!visible) return;
-    setOrder(selected);
+    setOrder(selected.length > 0 ? selected : [DEFAULT_SORT_KEY]);
   }, [visible, selected]);
 
   const toggle = (key: SortKey) => {
     setOrder((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   };
 
-  const clear = () => setOrder([]);
+  // Back to the implicit default rather than to nothing at all — "no keys" is
+  // not a state this list can actually be in.
+  const clear = () => setOrder([DEFAULT_SORT_KEY]);
 
   const apply = () => {
     onApply(order);
@@ -38,7 +44,13 @@ export function SortDrawerModal({ visible, onClose, selected, onApply }: SortDra
 
   return (
     <Drawer visible={visible} onClose={onClose}>
-      <Text style={styles.title}>Sắp xếp</Text>
+      <DrawerHeader
+        title="Sắp xếp"
+        actions={[
+          { label: "Đặt lại", onPress: clear, variant: "secondary" },
+          { label: "Áp dụng", onPress: apply },
+        ]}
+      />
       <View style={styles.section}>
         {SORT_OPTIONS.map((opt) => {
           // Same field, opposite direction (recent/oldest, highest/lowest) —
@@ -63,17 +75,11 @@ export function SortDrawerModal({ visible, onClose, selected, onApply }: SortDra
           );
         })}
       </View>
-
-      <View style={styles.actions}>
-        <PillButton label="Xóa sắp xếp" variant="outline" onPress={clear} style={styles.flexButton} />
-        <PillButton label="Áp dụng" onPress={apply} style={styles.flexButton} />
-      </View>
     </Drawer>
   );
 }
 
 const styles = StyleSheet.create({
-  title: { ...typography.title, color: colors.textPrimary },
   section: { gap: spacing.xs },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: spacing.sm },
   rowDisabled: { opacity: 0.4 },
@@ -90,6 +96,4 @@ const styles = StyleSheet.create({
   },
   badgeActive: { backgroundColor: colors.green, borderColor: colors.green },
   badgeText: { ...typography.tiny, color: colors.onGreen, fontWeight: "700" },
-  actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
-  flexButton: { flex: 1 },
 });

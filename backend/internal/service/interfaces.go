@@ -118,6 +118,7 @@ type TransactionRepo interface {
 	DecrementWalletBalanceIfSufficient(ctx context.Context, tx pgx.Tx, walletID uuid.UUID, amount int64) (*model.Wallet, error)
 	AdjustWalletBalance(ctx context.Context, tx pgx.Tx, walletID uuid.UUID, delta int64) (*model.Wallet, error)
 	ListTransactionsByUser(ctx context.Context, userID uuid.UUID, filter repository.ListTransactionsFilter) ([]*model.Transaction, error)
+	CountTransactionsByUser(ctx context.Context, userID uuid.UUID, filter repository.ListTransactionsFilter) (int64, error)
 	GetTransactionByID(ctx context.Context, id uuid.UUID) (*model.Transaction, error)
 	UpdateTransaction(ctx context.Context, tx pgx.Tx, arg repository.UpdateTransactionParams) (*model.Transaction, error)
 	SoftDeleteTransaction(ctx context.Context, tx pgx.Tx, id, userID uuid.UUID) (*model.Transaction, error)

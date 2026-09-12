@@ -1,13 +1,14 @@
-import { useState } from "react";
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useMemo, useState } from "react";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { EmojiPickerInput } from "@/components/ui/EmojiPickerInput";
 import { FieldError } from "@/components/ui/FieldError";
 import { PillButton } from "@/components/ui/PillButton";
-import { TrashIcon } from "@/components/ui/Icon";
+import { SearchIcon, TrashIcon } from "@/components/ui/Icon";
 import { getErrorMessage } from "@/lib/axios";
+import { matchesSearch } from "@/lib/search-text";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { useSuggestCategoryNameMutation } from "@/features/budget-wizard/api/use-suggest-category-name-mutation";
+import { SuggestedCategoryDialog } from "@/features/budget-wizard/components/SuggestedCategoryDialog";
 import { PendingCustomCategory } from "@/features/budget-wizard/types";
 import { Category } from "@/features/categories/types";
 
@@ -38,6 +39,7 @@ export function WizardStepCategories({
   onNext,
   onBack,
 }: WizardStepCategoriesProps) {
+  const [search, setSearch] = useState("");
   const [description, setDescription] = useState("");
   const [suggestion, setSuggestion] = useState<{ suggested_name: string; icon: string; type: string } | null>(null);
   const [editableName, setEditableName] = useState("");
@@ -45,6 +47,15 @@ export function WizardStepCategories({
   // can swap it in the review dialog before the category is added.
   const [editableIcon, setEditableIcon] = useState("");
   const suggestMutation = useSuggestCategoryNameMutation();
+
+  // Filtering only narrows what's *shown* — selections made under a previous
+  // query stay selected (and stay counted toward the cap) even once they're
+  // filtered out of view, so typing in this box can never silently drop a
+  // category the user already picked.
+  const visibleCategories = useMemo(
+    () => categories.filter((c) => matchesSearch(c.name, search)),
+    [categories, search],
+  );
 
   const totalSelected = selectedIds.size + customCategories.length;
   const atCap = totalSelected >= MAX_SELECTABLE;
@@ -92,13 +103,30 @@ export function WizardStepCategories({
       <Text style={styles.title}>Chọn danh mục</Text>
       <Text style={styles.subtitle}>Chọn các danh mục bạn muốn lập ngân sách (tối đa {MAX_SELECTABLE}).</Text>
 
+      <View style={styles.searchRow}>
+        <SearchIcon size={16} color={colors.textSecondary} />
+        <TextInput
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Tìm danh mục..."
+          placeholderTextColor={colors.textMuted}
+          style={styles.searchInput}
+          testID="input-wizard-category-search"
+        />
+        {search ? (
+          <Pressable onPress={() => setSearch("")} hitSlop={8}>
+            <Text style={styles.clearSearch}>✕</Text>
+          </Pressable>
+        ) : null}
+      </View>
+
       <ScrollView
         style={styles.categoryScroll}
         contentContainerStyle={styles.categoryScrollContent}
         showsVerticalScrollIndicator
       >
         <View style={styles.chipWrap}>
-          {categories.map((c) => {
+          {visibleCategories.map((c) => {
             const selected = selectedIds.has(c.id);
             const disabled = !selected && atCap;
             return (
@@ -116,6 +144,9 @@ export function WizardStepCategories({
               </Pressable>
             );
           })}
+          {visibleCategories.length === 0 && search ? (
+            <Text style={styles.noResults}>Không tìm thấy danh mục phù hợp.</Text>
+          ) : null}
           {customCategories.map((c) => (
             <View key={c.clientId} style={[styles.chip, styles.chipActive, styles.chipPending]}>
               <Text style={styles.chipLabelActive}>
@@ -157,46 +188,16 @@ export function WizardStepCategories({
         <PillButton label="Tiếp tục" onPress={onNext} style={styles.flexButton} />
       </View>
 
-      {/* Review step for an AI suggestion — a centered floating dialog
-          (same chrome as ConfirmDialog), not the inline card this replaced.
-          Inline, it appeared below the input as just another block of the
-          step's own scrolling content: easy to miss, and it pushed the
-          Back/Continue buttons around as it opened and closed. A modal also
-          makes "you must accept or discard this before continuing" explicit
-          rather than implied. */}
-      <Modal visible={Boolean(suggestion)} transparent animationType="fade" onRequestClose={discardSuggestion}>
-        <Pressable style={styles.dialogBackdrop} onPress={discardSuggestion}>
-          <Pressable onPress={() => {}} style={styles.dialogCard}>
-            <Text style={styles.dialogTitle}>Danh mục đề xuất</Text>
-            <Text style={styles.dialogSubtitle} numberOfLines={2}>
-              Từ mô tả: “{description.trim()}”
-            </Text>
-
-            <Text style={styles.label}>Tên danh mục</Text>
-            <TextInput
-              value={editableName}
-              onChangeText={setEditableName}
-              placeholder="Tên danh mục"
-              placeholderTextColor={colors.textMuted}
-              style={styles.dialogInput}
-              testID="input-wizard-category-name"
-            />
-
-            <Text style={styles.label}>Biểu tượng</Text>
-            <EmojiPickerInput value={editableIcon} onChange={setEditableIcon} placeholder="Chọn biểu tượng" />
-
-            <View style={styles.suggestionActions}>
-              <PillButton label="Loại bỏ" variant="outline" onPress={discardSuggestion} style={styles.flexButton} />
-              <PillButton
-                label="Xác nhận"
-                onPress={confirmSuggestion}
-                style={styles.flexButton}
-                testID="btn-wizard-confirm-category"
-              />
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <SuggestedCategoryDialog
+        visible={Boolean(suggestion)}
+        description={description}
+        name={editableName}
+        onChangeName={setEditableName}
+        icon={editableIcon}
+        onChangeIcon={setEditableIcon}
+        onConfirm={confirmSuggestion}
+        onDiscard={discardSuggestion}
+      />
     </View>
   );
 }
@@ -216,6 +217,19 @@ const styles = StyleSheet.create({
   categoryScroll: { flex: 1 },
   categoryScrollContent: { paddingBottom: spacing.sm },
   chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radii.pill,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+  },
+  searchInput: { flex: 1, paddingVertical: 10, color: colors.textPrimary, ...typography.body },
+  clearSearch: { ...typography.body, color: colors.textSecondary },
+  noResults: { ...typography.caption, color: colors.textMuted, paddingVertical: spacing.sm },
   chip: {
     flexDirection: "row",
     alignItems: "center",
@@ -256,40 +270,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   suggestButtonLabel: { ...typography.label, color: colors.onGreen },
-  dialogBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: spacing.xl,
-  },
-  dialogCard: {
-    width: "100%",
-    maxWidth: 360,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    borderRadius: radii.hero,
-    padding: spacing.xl,
-    gap: spacing.sm,
-  },
-  dialogTitle: { ...typography.title, color: colors.textPrimary },
-  dialogSubtitle: { ...typography.caption, color: colors.textSecondary },
-  // Its own style rather than reusing suggestInput: that one carries
-  // `flex: 1` for the horizontal row it belongs to, and inheriting it here
-  // (inside a column-direction dialog card) stretched the field vertically
-  // and collapsed the visible text line — the "I can't see what I type" bug.
-  dialogInput: {
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    borderRadius: radii.listCard,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: 12,
-    color: colors.textPrimary,
-    ...typography.body,
-  },
-  suggestionActions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md },
   error: { color: colors.peach, ...typography.caption },
   actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.lg },
   flexButton: { flex: 1 },

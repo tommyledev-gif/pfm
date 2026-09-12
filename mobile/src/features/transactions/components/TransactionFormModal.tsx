@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { AmountInput } from "@/components/ui/AmountInput";
+import { CategorySelectField } from "@/components/shared/CategorySelectField";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Drawer } from "@/components/shared/Drawer";
+import { DrawerHeader } from "@/components/shared/DrawerHeader";
 import { FieldError } from "@/components/ui/FieldError";
 import { PillButton } from "@/components/ui/PillButton";
 import { TrashIcon } from "@/components/ui/Icon";
@@ -15,6 +17,7 @@ import { colors, radii, spacing, typography } from "@/lib/theme";
 import { TRANSACTION_NOTE_MAX_LENGTH, TRANSACTION_TYPES, TransactionType } from "@/lib/constants";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
+import { useCategoryPicker } from "@/features/categories/components/use-category-picker";
 import { useCreateTransactionMutation } from "@/features/transactions/api/use-create-transaction-mutation";
 import { useUpdateTransactionMutation } from "@/features/transactions/api/use-update-transaction-mutation";
 import { useDeleteTransactionMutation } from "@/features/transactions/api/use-delete-transaction-mutation";
@@ -102,12 +105,34 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
     }
   };
 
+  const categoryPicker = useCategoryPicker({
+    categories: categories.data ?? [],
+    selectedIds: categoryId ? [categoryId] : [],
+    onApply: (ids) => setCategoryId(ids[0] ?? null),
+  });
+
   const activeError = mutation.isError ? mutation.error : deleteTransaction.isError ? deleteTransaction.error : null;
 
   return (
     <>
-      <Drawer visible={visible} onClose={onClose}>
-        <Text style={styles.title}>{isEditing ? "Sửa giao dịch" : "Giao dịch mới"}</Text>
+      <Drawer
+        visible={visible}
+        onClose={onClose}
+        child={categoryPicker.child}
+        footer={
+          <View style={styles.actions}>
+            <PillButton label="Hủy" variant="outline" onPress={onClose} style={styles.flexButton} />
+            <PillButton
+              label={isEditing ? "Lưu" : "Tạo"}
+              onPress={submit}
+              loading={mutation.isPending}
+              disabled={submitAttempted && hasErrors}
+              style={styles.flexButton}
+            />
+          </View>
+        }
+      >
+        <DrawerHeader title={isEditing ? "Sửa giao dịch" : "Giao dịch mới"} />
 
         <Text style={styles.label}>Ví{isEditing ? " (khóa sau khi tạo)" : ""}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
@@ -143,17 +168,7 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
         </View>
 
         <Text style={styles.label}>Danh mục</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-          {categories.data?.map((c) => (
-            <Pressable
-              key={c.id}
-              onPress={() => setCategoryId(c.id)}
-              style={[styles.chip, categoryId === c.id && styles.chipActive]}
-            >
-              <Text style={[styles.chipLabel, categoryId === c.id && styles.chipLabelActive]}>{c.name}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
+        <CategorySelectField categories={categoryPicker.selected} onPress={categoryPicker.open} />
         {submitAttempted ? <FieldError message={errors.category} /> : null}
 
         <Text style={styles.label}>Số tiền</Text>
@@ -176,17 +191,6 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
         </Pressable>
 
         {activeError ? <Text style={styles.error}>{getErrorMessage(activeError, "Không thể lưu giao dịch")}</Text> : null}
-
-        <View style={styles.actions}>
-          <PillButton label="Hủy" variant="outline" onPress={onClose} style={styles.flexButton} />
-          <PillButton
-            label={isEditing ? "Lưu" : "Tạo"}
-            onPress={submit}
-            loading={mutation.isPending}
-            disabled={submitAttempted && hasErrors}
-            style={styles.flexButton}
-          />
-        </View>
 
         {isEditing ? (
           <Pressable style={styles.deleteRow} onPress={() => setConfirmDeleteOpen(true)} disabled={deleteTransaction.isPending}>
@@ -219,7 +223,6 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
 }
 
 const styles = StyleSheet.create({
-  title: { ...typography.title, color: colors.textPrimary },
   label: { ...typography.caption, color: colors.textSecondary },
   chipRow: { flexDirection: "row", gap: spacing.sm },
   chip: {

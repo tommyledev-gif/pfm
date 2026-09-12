@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Avatar } from "@/components/ui/Avatar";
 import { CheckIcon } from "@/components/ui/Icon";
 import { Drawer } from "@/components/shared/Drawer";
-import { PillButton } from "@/components/ui/PillButton";
+import { DrawerHeader } from "@/components/shared/DrawerHeader";
 import { colorForCategory } from "@/lib/category-color";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { Category } from "@/features/categories/types";
@@ -52,7 +52,13 @@ export function CategoryFilterModal({ visible, onClose, categories, selectedIds,
 
   return (
     <Drawer visible={visible} onClose={onClose}>
-      <Text style={styles.title}>Danh mục</Text>
+      <DrawerHeader
+        title="Danh mục"
+        actions={[
+          { label: "Xóa lọc", onPress: clear, variant: "secondary", disabled: selected.size === 0 },
+          { label: "Áp dụng", onPress: apply },
+        ]}
+      />
 
       {expenseCategories.length > 0 ? (
         <View style={styles.section}>
@@ -71,11 +77,6 @@ export function CategoryFilterModal({ visible, onClose, categories, selectedIds,
           ))}
         </View>
       ) : null}
-
-      <View style={styles.actions}>
-        <PillButton label="Xóa lọc" variant="outline" onPress={clear} style={styles.flexButton} />
-        <PillButton label="Áp dụng" onPress={apply} style={styles.flexButton} />
-      </View>
     </Drawer>
   );
 }
@@ -101,7 +102,6 @@ function CategoryRow({ category, active, onPress }: { category: Category; active
 }
 
 const styles = StyleSheet.create({
-  title: { ...typography.title, color: colors.textPrimary },
   section: { gap: spacing.xs },
   sectionLabel: { ...typography.caption, color: colors.textSecondary },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.xs },
@@ -116,6 +116,4 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   checkboxActive: { backgroundColor: colors.green, borderColor: colors.green },
-  actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
-  flexButton: { flex: 1 },
 });

@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { Calendar, DateData } from "react-native-calendars";
 import { MarkingProps } from "react-native-calendars/src/calendar/day/marking";
 
+import { CALENDAR_THEME } from "@/lib/calendar-theme";
 import { Drawer } from "@/components/shared/Drawer";
 import { PillButton } from "@/components/ui/PillButton";
 import { colors, radii, spacing, typography } from "@/lib/theme";
@@ -18,7 +19,7 @@ interface DateRangePickerModalProps {
 function buildMarkedDates(start: string | null, end: string | null): Record<string, MarkingProps> {
   if (!start) return {};
   if (!end || end === start) {
-    return { [start]: { startingDay: true, endingDay: true, color: colors.lavender, textColor: colors.onGreen } };
+    return { [start]: { startingDay: true, endingDay: true, color: colors.green, textColor: colors.onGreen } };
   }
 
   const marked: Record<string, MarkingProps> = {};
@@ -74,31 +75,22 @@ export function DateRangePickerModal({ visible, onClose, from, to, onApply }: Da
 
   return (
     <Drawer visible={visible} onClose={onClose}>
-      <Text style={styles.title}>Date range</Text>
+      <Text style={styles.title}>Khoảng thời gian</Text>
       <Text style={styles.subtitle}>
-        {start ? `${start}${end && end !== start ? `  –  ${end}` : ""}` : "Select a start date"}
+        {start ? `${start}${end && end !== start ? `  –  ${end}` : ""}` : "Chọn ngày bắt đầu"}
       </Text>
 
       <Calendar
         markingType="period"
         markedDates={markedDates}
         onDayPress={onDayPress}
-        theme={{
-          calendarBackground: "transparent",
-          monthTextColor: colors.textPrimary,
-          textMonthFontWeight: "700",
-          arrowColor: colors.textPrimary,
-          dayTextColor: colors.textPrimary,
-          textDisabledColor: colors.textMuted,
-          textSectionTitleColor: colors.textSecondary,
-          todayTextColor: colors.green,
-        }}
+        theme={CALENDAR_THEME}
         style={styles.calendar}
       />
 
       <View style={styles.actions}>
-        <PillButton label="Clear" variant="outline" onPress={clear} style={styles.flexButton} />
-        <PillButton label="Apply" onPress={apply} disabled={!start} style={styles.flexButton} />
+        <PillButton label="Xóa lọc" variant="outline" onPress={clear} style={styles.flexButton} />
+        <PillButton label="Áp dụng" onPress={apply} disabled={!start} style={styles.flexButton} />
       </View>
     </Drawer>
   );

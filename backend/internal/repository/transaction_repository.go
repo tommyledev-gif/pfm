@@ -210,6 +210,27 @@ func (r *TransactionRepository) ListTransactionsByUser(ctx context.Context, user
 	return transactions, nil
 }
 
+// CountTransactionsByUser returns how many rows match `filter` in total,
+// ignoring its cursor/limit fields — those describe one page, not the result
+// set. Called alongside ListTransactionsByUser for the first page only (see
+// TransactionService.ListTransactions).
+func (r *TransactionRepository) CountTransactionsByUser(ctx context.Context, userID uuid.UUID, filter ListTransactionsFilter) (int64, error) {
+	total, err := r.q.CountTransactionsByUser(ctx, sqlc.CountTransactionsByUserParams{
+		UserID:      userID,
+		WalletID:    filter.WalletID,
+		CategoryID:  filter.CategoryID,
+		CategoryIDs: filter.CategoryIDs,
+		Type:        filter.Type,
+		FromTs:      filter.From,
+		ToTs:        filter.To,
+		Search:      filter.Search,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("repository.CountTransactionsByUser: %w", err)
+	}
+	return total, nil
+}
+
 type UpdateTransactionParams struct {
 	ID         uuid.UUID
 	UserID     uuid.UUID

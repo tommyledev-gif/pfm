@@ -271,6 +271,24 @@ func (f *fakeTransactionRepo) ListTransactionsByUser(_ context.Context, userID u
 	return out, nil
 }
 
+// CountTransactionsByUser mirrors the real query's relationship to
+// ListTransactionsByUser — the same filters with the cursor and limit
+// stripped — by delegating rather than restating the filter logic, so the two
+// can't drift apart in the fake the way they could in hand-copied code.
+func (f *fakeTransactionRepo) CountTransactionsByUser(ctx context.Context, userID uuid.UUID, filter repository.ListTransactionsFilter) (int64, error) {
+	unpaged := filter
+	unpaged.CursorOccurredAt = nil
+	unpaged.CursorCreatedAt = nil
+	unpaged.CursorID = nil
+	unpaged.Limit = 0
+
+	rows, err := f.ListTransactionsByUser(ctx, userID, unpaged)
+	if err != nil {
+		return 0, err
+	}
+	return int64(len(rows)), nil
+}
+
 func (f *fakeTransactionRepo) UpdateTransaction(_ context.Context, _ pgx.Tx, arg repository.UpdateTransactionParams) (*model.Transaction, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

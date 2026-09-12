@@ -1,40 +1,36 @@
 import { StyleSheet, View } from "react-native";
 
-import { Card } from "@/components/ui/Card";
 import { SkeletonBlock } from "@/components/ui/SkeletonBlock";
-import { spacing } from "@/lib/theme";
+import { colors, spacing } from "@/lib/theme";
 
-// Mirrors BudgetCard's own StyleSheet (28px avatar circle, two bar rows with
-// a 46px label column and a 76px value column).
+// Mirrors BudgetListRow's own StyleSheet (36px icon tile, name + headline
+// figure, one full-width bar, then the caption/amounts pair).
 export function BudgetCardSkeleton() {
   return (
-    <Card style={styles.card}>
-      <View style={styles.headerRow}>
-        <View style={styles.nameRow}>
-          <SkeletonBlock width={28} height={28} borderRadius={14} />
-          <SkeletonBlock width={100} height={17} />
-        </View>
-        <SkeletonBlock width={70} height={12} />
+    <View style={styles.row}>
+      <View style={styles.headRow}>
+        <SkeletonBlock width={36} height={36} borderRadius={18} />
+        <SkeletonBlock width={110} height={17} />
+        <View style={styles.spacer} />
+        <SkeletonBlock width={90} height={17} />
       </View>
-
-      <View style={styles.barRow}>
-        <SkeletonBlock width={46} height={11} />
-        <SkeletonBlock width="100%" height={10} style={styles.barTrack} />
-        <SkeletonBlock width={76} height={11} />
+      <SkeletonBlock width="100%" height={8} borderRadius={4} />
+      <View style={styles.footRow}>
+        <SkeletonBlock width={120} height={12} />
+        <SkeletonBlock width={140} height={12} />
       </View>
-      <View style={styles.barRow}>
-        <SkeletonBlock width={46} height={11} />
-        <SkeletonBlock width="100%" height={10} style={styles.barTrack} />
-        <SkeletonBlock width={76} height={11} />
-      </View>
-    </Card>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { gap: spacing.md },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  nameRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  barRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  barTrack: { flex: 1 },
+  row: {
+    gap: spacing.sm,
+    paddingVertical: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.surfaceBorder,
+  },
+  headRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  spacer: { flex: 1 },
+  footRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
 });

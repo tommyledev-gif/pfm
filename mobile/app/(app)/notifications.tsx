@@ -9,12 +9,38 @@ import { dayLabel } from "@/lib/format-date";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { useNotificationsQuery } from "@/features/notifications/api/use-notifications-query";
 import { useMarkNotificationReadMutation } from "@/features/notifications/api/use-mark-notification-read-mutation";
+import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
+import { Notification } from "@/features/notifications/types";
 
 export default function NotificationsScreen() {
   const router = useRouter();
   const [unreadOnly, setUnreadOnly] = useState(false);
   const notifications = useNotificationsQuery(unreadOnly);
   const markRead = useMarkNotificationReadMutation();
+  // A notification names the Budget it was raised for, but Insights selects by
+  // category — this is the hop between the two. Budgets are already cached by
+  // Home/Insights in practice, so this rarely costs a request.
+  const budgets = useBudgetsQuery();
+
+  const categoryIdByBudgetId = useMemo(
+    () => new Map((budgets.data ?? []).map((b) => [b.id, b.category_id])),
+    [budgets.data],
+  );
+
+  // Tapping a budget alert marks it read and opens Insights' Spending tab with
+  // that budget's category selected, which is what pops its donut tooltip.
+  // `focusedAt` is a nonce: expo-router keeps params across pushes, so without
+  // something changing every time, re-tapping the same notification after
+  // deselecting the segment would hand Insights an unchanged param and do
+  // nothing.
+  const openNotification = (item: Notification) => {
+    if (!item.is_read) markRead.mutate(item.id);
+
+    const categoryId = item.related_budget_id ? categoryIdByBudgetId.get(item.related_budget_id) : undefined;
+    if (!categoryId) return;
+
+    router.push({ pathname: "/insights", params: { categoryId, focusedAt: String(Date.now()) } });
+  };
 
   const sections = useMemo(() => {
     const grouped: { title: string; data: NonNullable<typeof notifications.data>["data"] }[] = [];
@@ -52,7 +78,7 @@ export default function NotificationsScreen() {
           contentContainerStyle={styles.list}
           renderSectionHeader={({ section }) => <Text style={styles.sectionHeader}>{section.title}</Text>}
           renderItem={({ item }) => (
-            <Pressable onPress={() => !item.is_read && markRead.mutate(item.id)}>
+            <Pressable onPress={() => openNotification(item)}>
               <NotificationRow notification={item} />
             </Pressable>
           )}

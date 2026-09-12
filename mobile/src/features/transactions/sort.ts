@@ -7,6 +7,17 @@ import { Transaction } from "@/features/transactions/types";
 export type SortKey = "recent" | "oldest" | "highest" | "lowest";
 export type SortGroup = "date" | "amount";
 
+// What the list is already ordered by when the user has chosen nothing —
+// ListTransactionsByUser's own ORDER BY (occurred_at DESC) expressed as a
+// SortKey. The sort drawer opens with this pre-selected so it shows the order
+// actually in effect instead of an empty checklist, and the Transactions
+// screen treats "only this key" as "no custom sort" for its filter pill.
+export const DEFAULT_SORT_KEY: SortKey = "recent";
+
+export function isDefaultSort(keys: SortKey[]): boolean {
+  return keys.length === 0 || (keys.length === 1 && keys[0] === DEFAULT_SORT_KEY);
+}
+
 export const SORT_OPTIONS: { key: SortKey; label: string; group: SortGroup }[] = [
   { key: "recent", label: "Mới nhất trước", group: "date" },
   { key: "oldest", label: "Cũ nhất trước", group: "date" },

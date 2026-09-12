@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useLocalSearchParams } from "expo-router";
 
 import { Screen } from "@/components/shared/Screen";
 import { colors, spacing, typography } from "@/lib/theme";
@@ -11,6 +12,15 @@ type SubTab = (typeof SUB_TABS)[number];
 
 export default function InsightsScreen() {
   const [tab, setTab] = useState<SubTab>("Spending");
+  // Deep link from a budget notification (app/(app)/notifications.tsx): force
+  // the Spending tab and hand the category down so its donut segment opens
+  // selected. `focusedAt` is the nonce that lets the same category be focused
+  // twice in a row — see the comment at the push site.
+  const { categoryId, focusedAt } = useLocalSearchParams<{ categoryId?: string; focusedAt?: string }>();
+
+  useEffect(() => {
+    if (categoryId) setTab("Spending");
+  }, [categoryId, focusedAt]);
 
   return (
     <Screen style={styles.screen}>
@@ -25,7 +35,9 @@ export default function InsightsScreen() {
         ))}
       </View>
 
-      <View style={styles.body}>{tab === "Spending" ? <SpendingTab /> : <BudgetsTab />}</View>
+      <View style={styles.body}>
+        {tab === "Spending" ? <SpendingTab focusCategoryId={categoryId} focusNonce={focusedAt} /> : <BudgetsTab />}
+      </View>
     </Screen>
   );
 }
