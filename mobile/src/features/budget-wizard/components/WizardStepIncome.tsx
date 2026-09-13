@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AmountPromptModal } from "@/components/ui/AmountPromptModal";
-import { FixedCostsModal } from "@/features/budget-wizard/components/FixedCostsModal";
 import { MoneyField } from "@/features/budget-wizard/components/MoneyField";
 import {
   DEFAULT_SAVINGS_PCT,
@@ -20,7 +19,6 @@ import {
   mergeFixedCosts,
   parseFixedCosts,
   summarizeFixedCosts,
-  totalFixedCosts,
 } from "@/features/budget-wizard/fixed-costs";
 import { formatCurrency } from "@/lib/currency";
 import { colors, radii, spacing, typography } from "@/lib/theme";
@@ -39,7 +37,7 @@ interface WizardStepIncomeProps {
   onChangeFixed: (v: number) => void;
   onChangeSavingsChoice: (c: SavingsChoice) => void;
   onChangeCycleStartDay: (v: number) => void;
-  onChangeFixedCosts: (result: { items: FixedCostItem[]; text: string; suggested: FixedCostItem[] }) => void;
+  onOpenFixedCosts: () => void;
   onNext: () => void;
 }
 
@@ -74,11 +72,10 @@ export function WizardStepIncome({
   onChangeFixed,
   onChangeSavingsChoice,
   onChangeCycleStartDay,
-  onChangeFixedCosts,
+  onOpenFixedCosts,
   onNext,
 }: WizardStepIncomeProps) {
   const [savingsPromptOpen, setSavingsPromptOpen] = useState(false);
-  const [fixedCostsOpen, setFixedCostsOpen] = useState(false);
 
   const savings = savingsAmount(savingsChoice, income);
   const disposable = disposableXu(income, fixed, savings);
@@ -122,7 +119,7 @@ export function WizardStepIncome({
           // and realises they do not know the total.
           action={{
             label: breakdown.length > 0 ? `${breakdown.length} khoản ✎` : "Tôi không nhớ tổng →",
-            onPress: () => setFixedCostsOpen(true),
+            onPress: onOpenFixedCosts,
             testID: "btn-wizard-fixed-costs",
           }}
         />
@@ -233,18 +230,6 @@ export function WizardStepIncome({
         }}
       />
 
-      <FixedCostsModal
-        visible={fixedCostsOpen}
-        currency={currency}
-        initialText={fixedCostsText}
-        initialSuggested={fixedCostsSuggested}
-        onClose={() => setFixedCostsOpen(false)}
-        onConfirm={(result) => {
-          onChangeFixedCosts(result);
-          onChangeFixed(totalFixedCosts(result.items));
-          setFixedCostsOpen(false);
-        }}
-      />
     </View>
   );
 }

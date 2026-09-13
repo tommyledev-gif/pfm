@@ -7,6 +7,12 @@ import { BudgetProgressBar } from "@/features/budgets/components/BudgetProgressB
 
 interface BudgetMonthSummaryProps {
   pace: MonthPace;
+  /** What the elapsed share is a share OF. The card is reused under a date
+   *  filter, where "% của tháng" would describe a window nobody selected. */
+  periodNoun?: string;
+  /** Hidden under a filter: "còn 0 ngày" is what a single-day window would
+   *  honestly report, and it reads as a fault rather than a fact. */
+  showDaysLeft?: boolean;
   totalLimit: number;
   totalSpent: number;
   currency: string;
@@ -16,7 +22,14 @@ interface BudgetMonthSummaryProps {
 // money is still unspent — above a bar that puts it against how much of the
 // month is actually left. The month-pace tick is the whole point: "4.973.000
 // left" means something very different on the 5th than on the 25th.
-export function BudgetMonthSummary({ pace, totalLimit, totalSpent, currency }: BudgetMonthSummaryProps) {
+export function BudgetMonthSummary({
+  pace,
+  periodNoun = "tháng",
+  showDaysLeft = true,
+  totalLimit,
+  totalSpent,
+  currency,
+}: BudgetMonthSummaryProps) {
   const remaining = totalLimit - totalSpent;
   const ratio = totalLimit > 0 ? totalSpent / totalLimit : 0;
   const over = remaining < 0;
@@ -25,7 +38,7 @@ export function BudgetMonthSummary({ pace, totalLimit, totalSpent, currency }: B
     <View style={styles.container}>
       <View style={styles.headRow}>
         <Text style={styles.month}>{pace.label}</Text>
-        <Text style={styles.daysLeft}>còn {pace.daysLeft} ngày</Text>
+        {showDaysLeft ? <Text style={styles.daysLeft}>còn {pace.daysLeft} ngày</Text> : null}
       </View>
 
       <Text style={styles.amountRow} numberOfLines={1}>
@@ -38,7 +51,7 @@ export function BudgetMonthSummary({ pace, totalLimit, totalSpent, currency }: B
 
       <BudgetProgressBar ratio={ratio} pace={pace.elapsed} color={over ? colors.peach : colors.green} height={10} />
 
-      <Text style={styles.paceLabel}>{Math.round(pace.elapsed * 100)}% của tháng đã trôi qua</Text>
+      <Text style={styles.paceLabel}>{Math.round(pace.elapsed * 100)}% của {periodNoun} đã trôi qua</Text>
     </View>
   );
 }

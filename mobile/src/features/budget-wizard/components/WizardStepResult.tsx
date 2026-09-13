@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { BarSegment, SegmentedBar } from "@/components/shared/SegmentedBar";
 import { EditAmountModal } from "@/features/budget-wizard/components/EditAmountModal";
+import { AddBudgetRowModal, AddBudgetRowResult } from "@/features/budget-wizard/components/AddBudgetRowModal";
 import { ProposalRow } from "@/features/budget-wizard/components/ProposalRow";
+import { Category } from "@/features/categories/types";
 import { daysInCycle, perDayXu } from "@/features/budget-wizard/budget-math";
 import { BudgetProposalsResponse, ProposalEntry } from "@/features/budget-wizard/types";
 import { colorForCategory } from "@/lib/category-color";
@@ -21,9 +23,20 @@ interface WizardStepResultProps {
   submitting: boolean;
   error: string | null;
   onEditAmount: (categoryId: string, amountXu: number) => void;
+  /** Ids of rows the user added by hand — the only removable ones. */
+  addedIds: string[];
+  categories: Category[];
+  addRowOpen: boolean;
+  onOpenAddRow: () => void;
+  onCloseAddRow: () => void;
+  onAddRow: (entry: AddBudgetRowResult) => void;
+  onRemoveRow: (categoryId: string) => void;
   onRetry: () => void;
   onSubmit: () => void;
 }
+
+/** The catch-all bucket. Always rendered last — see `orderedProposals`. */
+const CATCH_ALL_KEY = "other";
 
 /**
  * Screen 3 — the proposal, stated as an estimate.
@@ -44,10 +57,33 @@ export function WizardStepResult({
   submitting,
   error,
   onEditAmount,
+  addedIds,
+  categories,
+  addRowOpen,
+  onOpenAddRow,
+  onCloseAddRow,
+  onAddRow,
+  onRemoveRow,
   onRetry,
   onSubmit,
 }: WizardStepResultProps) {
   const [editing, setEditing] = useState<ProposalEntry | null>(null);
+
+  /**
+   * "Chi khác" sinks to the bottom, whatever order the server sent.
+   *
+   * It is the bucket for everything that did not get its own line, so reading it
+   * between two real categories invites treating it as one — and it is the row
+   * most likely to be raided, precisely because nobody can say what is in it.
+   * Last is where a remainder belongs. Rows the user added stay in the order
+   * they added them, just above it.
+   */
+  const orderedProposals = useMemo(() => {
+    const rows = result?.proposals ?? [];
+    const catchAll = rows.filter((p) => p.system_key === CATCH_ALL_KEY);
+    const rest = rows.filter((p) => p.system_key !== CATCH_ALL_KEY);
+    return [...rest, ...catchAll];
+  }, [result?.proposals]);
 
   if (loading) {
     return (
@@ -103,14 +139,23 @@ export function WizardStepResult({
         <SegmentedBar segments={segments} />
 
         <View style={styles.rows}>
-          {result.proposals.map((entry) => (
+          {orderedProposals.map((entry) => (
             <ProposalRow
               key={entry.category_id}
               entry={entry}
               currency={currency}
               onPress={() => setEditing(entry)}
+              onRemove={addedIds.includes(entry.category_id) ? () => onRemoveRow(entry.category_id) : undefined}
             />
           ))}
+
+          {/* Under the last row, including the catch-all: the presets cap at six
+              categories on purpose, and this is the way past that for the one or
+              two things a particular person really does track separately. */}
+          <Pressable testID="btn-wizard-add-row" onPress={onOpenAddRow} style={styles.addRow}>
+            <Text style={styles.addRowLabel}>+ Thêm danh mục</Text>
+            <Text style={styles.addRowHint}>lấy từ dự phòng</Text>
+          </Pressable>
         </View>
 
         {result.unallocated_amount > 0 ? (
@@ -153,6 +198,16 @@ export function WizardStepResult({
         <Text style={styles.primaryLabel}>{submitting ? "Đang lưu…" : "Bắt đầu dùng"}</Text>
       </Pressable>
 
+      <AddBudgetRowModal
+        visible={addRowOpen}
+        currency={currency}
+        buffer={result.unallocated_amount}
+        categories={categories}
+        usedCategoryIds={result.proposals.map((p) => p.category_id)}
+        onClose={onCloseAddRow}
+        onConfirm={onAddRow}
+      />
+
       <EditAmountModal
         visible={editing !== null}
         categoryName={editing?.category_name ?? ""}
@@ -186,6 +241,17 @@ const styles = StyleSheet.create({
   headlineLabel: { ...typography.caption, color: colors.textSecondary },
   headlineValue: { ...typography.hero, fontSize: 26, color: colors.textPrimary },
   rows: { gap: 2 },
+  addRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: spacing.sm,
+    marginTop: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: colors.surfaceBorder,
+  },
+  addRowLabel: { ...typography.label, color: colors.green },
+  addRowHint: { ...typography.tiny, color: colors.textMuted },
   bufferRow: {
     flexDirection: "row",
     justifyContent: "space-between",

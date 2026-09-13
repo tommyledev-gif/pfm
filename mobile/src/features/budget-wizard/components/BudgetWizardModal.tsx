@@ -5,6 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, spacing } from "@/lib/theme";
 import { useSheetStore } from "@/stores/sheet-store";
 import { BUDGET_WIZARD_TOTAL_STEPS, useBudgetWizardState } from "@/features/budget-wizard/hooks/use-budget-wizard-state";
+import { FixedCostsModal } from "@/features/budget-wizard/components/FixedCostsModal";
 import { WizardProgressHeader } from "@/features/budget-wizard/components/WizardProgressHeader";
 import { WizardStepIncome } from "@/features/budget-wizard/components/WizardStepIncome";
 import { WizardStepProfile } from "@/features/budget-wizard/components/WizardStepProfile";
@@ -83,7 +84,7 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
               onChangeFixed={wizard.setFixed}
               onChangeSavingsChoice={wizard.setSavingsChoice}
               onChangeCycleStartDay={wizard.setCycleStartDay}
-              onChangeFixedCosts={wizard.setFixedCosts}
+              onOpenFixedCosts={wizard.openFixedCosts}
               onNext={wizard.goToProfile}
             />
           ) : null}
@@ -101,6 +102,13 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
               submitting={wizard.submitting}
               error={wizard.error}
               onEditAmount={wizard.editAmount}
+              addedIds={wizard.addedIds}
+              categories={wizard.availableCategories}
+              addRowOpen={wizard.addRowOpen}
+              onOpenAddRow={wizard.openAddRow}
+              onCloseAddRow={wizard.closeAddRow}
+              onAddRow={wizard.addProposalRow}
+              onRemoveRow={wizard.removeProposalRow}
               onRetry={wizard.retryProposal}
               onSubmit={wizard.submit}
             />
@@ -109,6 +117,18 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
           {step > BUDGET_WIZARD_TOTAL_STEPS ? <WizardStepSuccess createdCount={wizard.createdCount} onDone={onClose} /> : null}
         </View>
       </SafeAreaView>
+
+      {/* Sibling of the SafeAreaView, not a child of the step: it has to cover
+          the progress header as well, and a panel rendered inside the step body
+          would leave that strip showing above it. */}
+      <FixedCostsModal
+        visible={wizard.fixedCostsOpen}
+        currency={wizard.currency}
+        initialText={wizard.fixedCostsText}
+        initialSuggested={wizard.fixedCostsSuggested}
+        onClose={wizard.closeFixedCosts}
+        onConfirm={wizard.applyFixedCosts}
+      />
     </View>
   );
 }

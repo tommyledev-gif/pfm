@@ -78,3 +78,16 @@ export function formatCurrencyTruncated(amountCents: number, currency: string = 
   const suffix = full.slice(lastDigitIndex + 1);
   return `${full.slice(0, cutIndex + 1)}…${suffix}`;
 }
+
+// Per-day figures round DOWN to the nearest 1.000đ (100.000 xu).
+//
+// "còn 12.347đ" is arithmetic output; "còn 12.000đ" is something you can decide
+// against while standing at a counter. Down, never nearest: rounding up would
+// hand out money the budget does not have, and being a few hundred đồng
+// pessimistic costs nothing.
+const PER_DAY_ROUNDING_XU = 100_000;
+
+export function floorToPerDayStep(amountCents: number): number {
+  if (amountCents <= 0) return 0;
+  return Math.floor(amountCents / PER_DAY_ROUNDING_XU) * PER_DAY_ROUNDING_XU;
+}

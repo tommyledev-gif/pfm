@@ -16,11 +16,25 @@ export default function InsightsScreen() {
   // the Spending tab and hand the category down so its donut segment opens
   // selected. `focusedAt` is the nonce that lets the same category be focused
   // twice in a row — see the comment at the push site.
-  const { categoryId, focusedAt } = useLocalSearchParams<{ categoryId?: string; focusedAt?: string }>();
+  //
+  // Home's "sắp vượt" list deep-links the other way: it forces the Budgets tab
+  // and hands over the exact day it was showing, so tapping a budget there lands
+  // on the same window rather than on the whole month.
+  const { categoryId, focusedAt, tab: tabParam, from, to } = useLocalSearchParams<{
+    categoryId?: string;
+    focusedAt?: string;
+    tab?: string;
+    from?: string;
+    to?: string;
+  }>();
 
   useEffect(() => {
     if (categoryId) setTab("Spending");
   }, [categoryId, focusedAt]);
+
+  useEffect(() => {
+    if (tabParam === "Budgets") setTab("Budgets");
+  }, [tabParam, from, to]);
 
   return (
     <Screen style={styles.screen}>
@@ -36,7 +50,11 @@ export default function InsightsScreen() {
       </View>
 
       <View style={styles.body}>
-        {tab === "Spending" ? <SpendingTab focusCategoryId={categoryId} focusNonce={focusedAt} /> : <BudgetsTab />}
+        {tab === "Spending" ? (
+          <SpendingTab focusCategoryId={categoryId} focusNonce={focusedAt} />
+        ) : (
+          <BudgetsTab initialRange={from || to ? { from, to } : undefined} rangeNonce={`${from ?? ""}-${to ?? ""}`} />
+        )}
       </View>
     </Screen>
   );

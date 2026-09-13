@@ -17,7 +17,7 @@ import { BudgetWizardModal } from "@/features/budget-wizard/components/BudgetWiz
 import { TransactionFormModal } from "@/features/transactions/components/TransactionFormModal";
 import { getErrorCode, getErrorMessage } from "@/lib/axios";
 import { colors, radii, spacing, typography } from "@/lib/theme";
-import { useKeyboardHeight } from "@/lib/use-keyboard-height";
+import { useKeyboardHeight, useKeyboardVisible } from "@/lib/use-keyboard-height";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useSendChatMessageMutation } from "@/features/ai-chat/api/use-send-chat-message-mutation";
@@ -98,7 +98,11 @@ export default function AiChatScreen() {
   // KeyboardAvoidingView. BottomNav (app/(app)/_layout.tsx) hides itself on
   // the same signal, so the input only needs nav clearance while it's closed.
   const keyboardHeight = useKeyboardHeight();
-  const keyboardVisible = keyboardHeight > 0;
+  // ⚠️ From the keyboard events, NOT from `keyboardHeight > 0`. The height is
+  // what is left to pad AFTER the OS has resized the window, so on a device that
+  // resizes it is legitimately 0 while the keyboard is wide open — and the quick
+  // -action row and bottom nav would then stay on screen underneath it.
+  const keyboardVisible = useKeyboardVisible();
 
   // Restores the synced thread from the server exactly once, only when the
   // local (AsyncStorage-persisted) thread is empty — i.e. after a logout,
@@ -417,11 +421,12 @@ export default function AiChatScreen() {
       <View
         style={[
           styles.inputBar,
-          // keyboardHeight is reserved in full, not just a nudge — Android's
-          // windowSoftInputMode=resize (app.json) is a no-op once the app
-          // opts into edge-to-edge (Expo's default here), so the window
-          // never actually shrinks around the keyboard; without reserving
-          // the real height ourselves the bar stays hidden behind it.
+          // keyboardHeight is what still needs reserving after the OS has had
+          // its say: on a device whose window really does shrink around the
+          // keyboard it comes back ~0 and only KEYBOARD_GAP is added, while on
+          // one that does not shrink it is the full height. Adding the raw
+          // keyboard height unconditionally is what left a dead gap a whole
+          // keyboard tall between this bar and the keyboard.
           { marginBottom: keyboardVisible ? keyboardHeight + KEYBOARD_GAP : insets.bottom + NAV_CLEARANCE },
         ]}
       >

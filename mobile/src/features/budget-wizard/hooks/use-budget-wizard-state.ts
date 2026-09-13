@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useBudgetProposalsMutation } from "@/features/budget-wizard/api/use-budget-proposals-mutation";
 import { useBudgetWizardPrefillQuery } from "@/features/budget-wizard/api/use-budget-wizard-prefill-query";
 import { useBulkCreateBudgetsMutation } from "@/features/budget-wizard/api/use-bulk-create-budgets-mutation";
+import { useCreateCategoryMutation } from "@/features/categories/api/use-create-category-mutation";
+import { AddBudgetRowResult } from "@/features/budget-wizard/components/AddBudgetRowModal";
 import {
   DEFAULT_SAVINGS_CHOICE,
   SavingsChoice,
@@ -10,7 +12,7 @@ import {
   savingsAmount,
   validateIncomeStep,
 } from "@/features/budget-wizard/budget-math";
-import { FixedCostItem } from "@/features/budget-wizard/fixed-costs";
+import { FixedCostItem, totalFixedCosts } from "@/features/budget-wizard/fixed-costs";
 import {
   BudgetProposalsResponse,
   CategoryIntentRequest,
@@ -56,16 +58,31 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
   // where the user left off instead of asking them to describe everything again.
   const [fixedCostsText, setFixedCostsText] = useState("");
   const [fixedCostsSuggested, setFixedCostsSuggested] = useState<FixedCostItem[]>([]);
+  // Owned here rather than inside the step so the panel can render as a sibling
+  // of the whole wizard and cover its progress header too — a full-screen sheet
+  // that leaves the step chrome showing reads as a layer that failed to open.
+  const [fixedCostsOpen, setFixedCostsOpen] = useState(false);
+  const [addRowOpen, setAddRowOpen] = useState(false);
   const [cycleStartDay, setCycleStartDay] = useState(1);
   const [preset, setPreset] = useState<PresetKey | null>(null);
 
   const [result, setResult] = useState<BudgetProposalsResponse | null>(null);
+  // Rows the user added by hand on the result screen — the only ones that may
+  // be removed again. A preset row left at zero is still information; a row the
+  // user invented and then thought better of has nothing to say.
+  const [addedIds, setAddedIds] = useState<string[]>([]);
+  // Categories that do not exist yet, keyed by the placeholder id their row
+  // carries. ⚠️ NOT created here: the wizard writes nothing before the final
+  // confirmation, so a user who backs out leaves no stray category behind.
+  // submit() creates them first and swaps the placeholders for real ids.
+  const [pendingCategories, setPendingCategories] = useState<Record<string, string>>({});
   const [createdCount, setCreatedCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const prefill = useBudgetWizardPrefillQuery(visible);
   const proposals = useBudgetProposalsMutation();
   const bulkCreate = useBulkCreateBudgetsMutation();
+  const createCategory = useCreateCategoryMutation();
 
   const currency = prefill.data?.currency ?? "VND";
   const savings = savingsAmount(savingsChoice, income);
@@ -85,9 +102,13 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
     );
     setFixedCostsText("");
     setFixedCostsSuggested([]);
+    setFixedCostsOpen(false);
+    setAddRowOpen(false);
     setCycleStartDay(prefill.data?.cycle_start_day ?? 1);
     setPreset(null);
     setResult(null);
+    setAddedIds([]);
+    setPendingCategories({});
     setCreatedCount(null);
     setError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -221,13 +242,83 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
     });
   }, []);
 
+  /**
+   * Append a row the user asked for.
+   *
+   * Funded entirely out of the buffer, like every other manual change: nothing
+   * the allocator produced is touched. Picking a category that is already on
+   * the plan updates that row instead of adding a second one — two rows for one
+   * category would both be written as budgets and the later one would silently
+   * win server-side.
+   */
+  const addProposalRow = useCallback((entry: AddBudgetRowResult) => {
+    const tempId = entry.categoryId ?? `new:${Date.now()}`;
+    if (!entry.categoryId) {
+      setPendingCategories((prev) => ({ ...prev, [tempId]: entry.name }));
+    }
+
+    setResult((prev) => {
+      if (!prev) return prev;
+      const existing = prev.proposals.find((p) => p.category_id === tempId);
+      const proposalsNext: ProposalEntry[] = existing
+        ? prev.proposals.map((p) =>
+            p.category_id === tempId
+              ? { ...p, amount_min: entry.amountXu, amount_max: entry.amountXu, source: "manual", locked: true }
+              : p,
+          )
+        : [
+            ...prev.proposals,
+            {
+              category_id: tempId,
+              category_name: entry.name,
+              amount_min: entry.amountXu,
+              amount_max: entry.amountXu,
+              source: "manual" as const,
+              locked: true,
+              confidence: 1,
+            },
+          ];
+      const allocated = proposalsNext.reduce((sum, p) => sum + p.amount_max, 0);
+      return { ...prev, proposals: proposalsNext, unallocated_amount: prev.disposable - allocated };
+    });
+
+    if (!entry.categoryId) setAddedIds((prev) => [...prev, tempId]);
+    else setAddedIds((prev) => (prev.includes(tempId) ? prev : [...prev, tempId]));
+    setAddRowOpen(false);
+  }, []);
+
+  const removeProposalRow = useCallback((categoryId: string) => {
+    setResult((prev) => {
+      if (!prev) return prev;
+      const proposalsNext = prev.proposals.filter((p) => p.category_id !== categoryId);
+      const allocated = proposalsNext.reduce((sum, p) => sum + p.amount_max, 0);
+      return { ...prev, proposals: proposalsNext, unallocated_amount: prev.disposable - allocated };
+    });
+    setAddedIds((prev) => prev.filter((id) => id !== categoryId));
+    setPendingCategories((prev) => {
+      const next = { ...prev };
+      delete next[categoryId];
+      return next;
+    });
+  }, []);
+
   const submit = useCallback(async () => {
     if (!result) return;
     setError(null);
     try {
+      // Categories the user invented are created HERE, at the confirmation, not
+      // when they were typed — dismissing the wizard has to leave the account
+      // exactly as it was found.
+      const idByPlaceholder: Record<string, string> = {};
+      for (const [placeholder, name] of Object.entries(pendingCategories)) {
+        if (!result.proposals.some((p) => p.category_id === placeholder)) continue;
+        const created = await createCategory.mutateAsync({ name, type: "expense" });
+        idByPlaceholder[placeholder] = created.id;
+      }
+
       const data = await bulkCreate.mutateAsync({
         budgets: result.proposals.map((p) => ({
-          category_id: p.category_id,
+          category_id: idByPlaceholder[p.category_id] ?? p.category_id,
           period: "monthly" as const,
           limits: [{ currency, amount_limit: p.amount_max }],
         })),
@@ -238,7 +329,7 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
     } catch (e) {
       setError(getErrorMessage(e, "Chưa lưu được ngân sách, bạn thử lại nhé."));
     }
-  }, [result, bulkCreate, currency, onCompleted]);
+  }, [result, bulkCreate, createCategory, pendingCategories, currency, onCompleted]);
 
   const canLeaveIncomeStep = useMemo(
     () => validateIncomeStep(income, fixed, savings).ok,
@@ -255,9 +346,13 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
     cycleStartDay,
     fixedCostsText,
     fixedCostsSuggested,
+    fixedCostsOpen,
     disposable,
     preset,
     result,
+    addedIds,
+    addRowOpen,
+    availableCategories: prefill.data?.categories ?? [],
     createdCount,
     error,
     loadingProposal: proposals.isPending,
@@ -266,14 +361,25 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
     setFixed,
     setSavingsChoice,
     setCycleStartDay,
-    setFixedCosts: (result: { items: FixedCostItem[]; text: string; suggested: FixedCostItem[] }) => {
+    openFixedCosts: () => setFixedCostsOpen(true),
+    closeFixedCosts: () => setFixedCostsOpen(false),
+    // One action, not three call sites: the breakdown and the total it implies
+    // must never be set separately, or the field can show a total that its own
+    // itemised list does not add up to.
+    applyFixedCosts: (result: { items: FixedCostItem[]; text: string; suggested: FixedCostItem[] }) => {
       setFixedCostsText(result.text);
       setFixedCostsSuggested(result.suggested);
+      setFixed(totalFixedCosts(result.items));
+      setFixedCostsOpen(false);
     },
     goToProfile: () => canLeaveIncomeStep && setStep(2),
     selectPreset,
     retryProposal,
     editAmount,
+    openAddRow: () => setAddRowOpen(true),
+    closeAddRow: () => setAddRowOpen(false),
+    addProposalRow,
+    removeProposalRow,
     submit,
     close: onClose,
   };

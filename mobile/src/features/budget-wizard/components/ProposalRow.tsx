@@ -9,6 +9,9 @@ interface ProposalRowProps {
   entry: ProposalEntry;
   currency: string;
   onPress: () => void;
+  /** Only rows the user added by hand can be taken away again — a preset row
+   *  left alone is still part of the plan the allocator balanced. */
+  onRemove?: () => void;
 }
 
 /**
@@ -21,7 +24,7 @@ interface ProposalRowProps {
  * guess. An honest badge and nothing else beats a confident sentence that means
  * nothing.
  */
-export function ProposalRow({ entry, currency, onPress }: ProposalRowProps) {
+export function ProposalRow({ entry, currency, onPress, onRemove }: ProposalRowProps) {
   const dotColor = colorForCategory(entry.category_id);
 
   return (
@@ -48,6 +51,12 @@ export function ProposalRow({ entry, currency, onPress }: ProposalRowProps) {
           <Text style={styles.band}>từ {formatCurrency(entry.amount_min, currency)}</Text>
         ) : null}
       </View>
+
+      {onRemove ? (
+        <Pressable onPress={onRemove} hitSlop={10} testID={`btn-wizard-remove-row-${entry.category_id}`}>
+          <Text style={styles.remove}>✕</Text>
+        </Pressable>
+      ) : null}
     </Pressable>
   );
 }
@@ -66,4 +75,5 @@ const styles = StyleSheet.create({
   amounts: { alignItems: "flex-end", gap: 1 },
   amount: { ...typography.label, color: colors.textPrimary },
   band: { ...typography.tiny, color: colors.textMuted },
+  remove: { ...typography.body, color: colors.textMuted, paddingLeft: spacing.xs },
 });

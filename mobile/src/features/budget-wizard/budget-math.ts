@@ -11,6 +11,8 @@
 // this file has to change with it, or screen 1 promises a figure screen 3 then
 // contradicts.
 
+import { floorToPerDayStep } from "@/lib/currency";
+
 // ---------------------------------------------------------------------------
 // Constants — all xu. Mirrors common/budget_wizard_v2.go.
 // ---------------------------------------------------------------------------
@@ -36,9 +38,6 @@ export const DEFAULT_SAVINGS_PCT = 10;
  *  already exceed their income, being told to save is noise. */
 export const SAVINGS_PCT_OPTIONS = [0, 5, 10, 20] as const;
 
-/** Per-day figures round down to the nearest 1.000đ. "còn 12.347đ" is noise;
- *  "còn 12.000đ" is something you can decide against at a counter. */
-const PER_DAY_ROUNDING_XU = 100_000;
 
 // ---------------------------------------------------------------------------
 
@@ -100,10 +99,12 @@ export function daysInCycle(cycleStartDay: number, now: Date = new Date()): numb
   return Math.round((end.getTime() - start.getTime()) / 86_400_000);
 }
 
-/** Spendable amount per remaining day, floored to 1.000đ. */
+/** Spendable amount per remaining day, floored to 1.000đ.
+ *  Rounding lives in lib/currency so Home's own daily figure cannot drift from
+ *  this one. */
 export function perDayXu(disposable: number, days: number): number {
   if (disposable <= 0 || days <= 0) return 0;
-  return Math.floor(disposable / days / PER_DAY_ROUNDING_XU) * PER_DAY_ROUNDING_XU;
+  return floorToPerDayStep(disposable / days);
 }
 
 /** The most that may be allocated across all categories. */

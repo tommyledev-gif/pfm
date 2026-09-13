@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { BackHandler, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Drawer } from "@/components/shared/Drawer";
-import { DrawerHeader } from "@/components/shared/DrawerHeader";
 import { AmountInput } from "@/components/ui/AmountInput";
 import {
   FIXED_COST_PROMPTS,
@@ -59,6 +58,15 @@ const nextCustomRowId = () => `custom-${(customRowSeq += 1)}`;
  * Where the two describe the same cost, the TYPED text wins: a suggestion is the
  * app guessing that a cost applies, typed text is the user stating that it does
  * and what it costs.
+ *
+ * ⚠️ FULL SCREEN, not a Drawer bottom sheet — this was the second scrolling bug.
+ * Drawer caps its sheet at 90% of the screen and shrinks a ScrollView inside
+ * that cap through a three-deep flexShrink chain; that holds for a short form
+ * but not for this content, which is a text area plus eight prompt rows plus a
+ * running summary and comfortably exceeds the cap. Everything past the toggle
+ * simply could not be reached. A full-screen panel owning ONE ScrollView has no
+ * cap to fight and no nesting to get wrong — the same shape the wizard's own
+ * steps use.
  */
 export function FixedCostsModal({
   visible,
@@ -91,6 +99,17 @@ export function FixedCostsModal({
     setAskOpen(initialSuggested.length > 0);
   }, [visible, initialText, initialSuggested]);
 
+  // Android's hardware back closes this panel rather than the wizard underneath
+  // it — otherwise back would skip the sheet the user is actually looking at.
+  useEffect(() => {
+    if (!visible) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      onClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [visible, onClose]);
+
   const typed = useMemo(() => parseFixedCosts(text), [text]);
 
   const suggested = useMemo<FixedCostItem[]>(() => {
@@ -122,142 +141,162 @@ export function FixedCostsModal({
 
   const removeCustom = (id: string) => setCustomRows((prev) => prev.filter((r) => r.id !== id));
 
+  if (!visible) return null;
+
   return (
-    <Drawer visible={visible} onClose={onClose}>
-      <DrawerHeader
-        title="Chi phí cố định"
-        actions={[
-          { label: "Huỷ", onPress: onClose, variant: "secondary" },
-          {
-            label: "Dùng số này",
-            onPress: () => onConfirm({ items: merged, text, suggested }),
-            variant: "primary",
-            testID: "btn-wizard-fixed-costs-confirm",
-          },
-        ]}
-      />
-
-      {/* ⚠️ A plain View, NOT a ScrollView. Drawer already wraps its children in
-          one, and nesting a second scroll view of the same orientation inside it
-          leaves the inner one unbounded: it never scrolls, and everything past
-          the sheet's height cap is simply unreachable — which is what happened
-          to the suggestion list and the summary below it. */}
-      <View style={styles.body}>
-        <Text style={styles.label}>Kể ra những khoản cố định của bạn</Text>
-        <TextInput
-          testID="input-wizard-fixed-costs-text"
-          value={text}
-          onChangeText={setText}
-          placeholder={PLACEHOLDER}
-          placeholderTextColor={colors.textMuted}
-          multiline
-          style={styles.textArea}
-        />
-        <Text style={styles.hint}>
-          Viết tự nhiên, cách nhau bằng dấu phẩy. &quot;3m&quot; = 3 triệu, &quot;50k&quot; = 50 nghìn.
-        </Text>
-
-        <Pressable testID="btn-wizard-fixed-costs-ask" onPress={() => setAskOpen((v) => !v)} style={styles.askToggle}>
-          <Text style={styles.askToggleLabel}>
-            {askOpen ? "Ẩn danh sách gợi ý" : "Hoặc để tôi hỏi từng khoản →"}
+    <View style={styles.overlay}>
+      <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
+        <View style={styles.headerRow}>
+          <Pressable onPress={onClose} hitSlop={8}>
+            <Text style={styles.cancelLabel}>Huỷ</Text>
+          </Pressable>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            Chi phí cố định
           </Text>
-        </Pressable>
+          <Pressable
+            testID="btn-wizard-fixed-costs-confirm"
+            onPress={() => onConfirm({ items: merged, text, suggested })}
+            hitSlop={8}
+          >
+            <Text style={styles.confirmLabel}>Dùng số này</Text>
+          </Pressable>
+        </View>
 
-        {askOpen ? (
-          <View style={styles.prompts}>
-            {FIXED_COST_PROMPTS.map((prompt) => {
-              // A prompt the typed text already covers is shown as covered
-              // rather than hidden: rows disappearing while someone types reads
-              // as the app losing their input.
-              const covered =
-                (promptAmounts[prompt.key] ?? 0) === 0 &&
-                typed.some((t) => t.key.includes(prompt.key) || prompt.key.includes(t.key));
-              const value = promptAmounts[prompt.key] ?? 0;
-              return (
-                <View key={prompt.key} style={styles.row}>
-                  <Text style={[styles.rowLabel, covered && styles.rowLabelCovered]} numberOfLines={1}>
-                    {prompt.label}
-                  </Text>
-                  {covered ? (
-                    <Text style={styles.coveredNote}>đã có trong mô tả</Text>
-                  ) : (
-                    <AmountInput
-                      value={value > 0 ? String(toMajorUnits(value)) : ""}
-                      onChangeText={(t) => setPromptAmount(prompt.key, toCents(Number(t) || 0))}
-                      style={styles.rowInput}
-                    />
-                  )}
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          <Text style={styles.label}>Kể ra những khoản cố định của bạn</Text>
+          <TextInput
+            testID="input-wizard-fixed-costs-text"
+            value={text}
+            onChangeText={setText}
+            placeholder={PLACEHOLDER}
+            placeholderTextColor={colors.textMuted}
+            multiline
+            style={styles.textArea}
+          />
+          <Text style={styles.hint}>
+            Viết tự nhiên, cách nhau bằng dấu phẩy. &quot;3m&quot; = 3 triệu, &quot;50k&quot; = 50 nghìn.
+          </Text>
+
+          <Pressable testID="btn-wizard-fixed-costs-ask" onPress={() => setAskOpen((v) => !v)} style={styles.askToggle}>
+            <Text style={styles.askToggleLabel}>
+              {askOpen ? "Ẩn danh sách gợi ý" : "Hoặc để tôi hỏi từng khoản →"}
+            </Text>
+          </Pressable>
+
+          {askOpen ? (
+            <View style={styles.prompts}>
+              {FIXED_COST_PROMPTS.map((prompt) => {
+                // A prompt the typed text already covers is shown as covered
+                // rather than hidden: rows disappearing while someone types
+                // reads as the app losing their input.
+                const covered =
+                  (promptAmounts[prompt.key] ?? 0) === 0 &&
+                  typed.some((t) => t.key.includes(prompt.key) || prompt.key.includes(t.key));
+                const value = promptAmounts[prompt.key] ?? 0;
+                return (
+                  <View key={prompt.key} style={styles.row}>
+                    <Text style={[styles.rowLabel, covered && styles.rowLabelCovered]} numberOfLines={1}>
+                      {prompt.label}
+                    </Text>
+                    {covered ? (
+                      <Text style={styles.coveredNote}>đã có trong mô tả</Text>
+                    ) : (
+                      <AmountInput
+                        value={value > 0 ? String(toMajorUnits(value)) : ""}
+                        onChangeText={(t) => setPromptAmount(prompt.key, toCents(Number(t) || 0))}
+                        style={styles.rowInput}
+                      />
+                    )}
+                  </View>
+                );
+              })}
+
+              {/* Rows for costs the prompt list does not know about — a parking
+                  space, a gym membership, a loan. The list above cannot be
+                  exhaustive without becoming unreadable, so it stays short and
+                  this is the escape hatch. Removable, unlike the prompts: a
+                  prompt left blank is simply unused, but a half-typed custom row
+                  would otherwise be stuck on screen with no way to take it back. */}
+              {customRows.map((row) => (
+                <View key={row.id} style={styles.row}>
+                  <TextInput
+                    value={row.label}
+                    onChangeText={(label) => updateCustom(row.id, { label })}
+                    placeholder="Khoản khác"
+                    placeholderTextColor={colors.textMuted}
+                    style={styles.customLabelInput}
+                  />
+                  <AmountInput
+                    value={row.amountXu > 0 ? String(toMajorUnits(row.amountXu)) : ""}
+                    onChangeText={(t) => updateCustom(row.id, { amountXu: toCents(Number(t) || 0) })}
+                    style={styles.rowInput}
+                  />
+                  <Pressable
+                    onPress={() => removeCustom(row.id)}
+                    hitSlop={8}
+                    testID={`btn-wizard-fixed-costs-remove-${row.id}`}
+                  >
+                    <Text style={styles.removeLabel}>✕</Text>
+                  </Pressable>
                 </View>
-              );
-            })}
+              ))}
 
-            {/* Rows for costs the prompt list does not know about — a parking
-                space, a gym membership, a loan. The list above cannot be
-                exhaustive without becoming unreadable, so it stays short and
-                this is the escape hatch. Removable, unlike the prompts: a prompt
-                left blank is simply unused, but a half-typed custom row would
-                otherwise be stuck on screen with no way to take it back. */}
-            {customRows.map((row) => (
-              <View key={row.id} style={styles.row}>
-                <TextInput
-                  value={row.label}
-                  onChangeText={(label) => updateCustom(row.id, { label })}
-                  placeholder="Khoản khác"
-                  placeholderTextColor={colors.textMuted}
-                  style={styles.customLabelInput}
-                />
-                <AmountInput
-                  value={row.amountXu > 0 ? String(toMajorUnits(row.amountXu)) : ""}
-                  onChangeText={(t) => updateCustom(row.id, { amountXu: toCents(Number(t) || 0) })}
-                  style={styles.rowInput}
-                />
-                <Pressable
-                  onPress={() => removeCustom(row.id)}
-                  hitSlop={8}
-                  testID={`btn-wizard-fixed-costs-remove-${row.id}`}
-                >
-                  <Text style={styles.removeLabel}>✕</Text>
-                </Pressable>
-              </View>
-            ))}
-
-            <Pressable
-              testID="btn-wizard-fixed-costs-add"
-              onPress={() => setCustomRows((prev) => [...prev, { id: nextCustomRowId(), label: "", amountXu: 0 }])}
-              style={styles.addRow}
-            >
-              <Text style={styles.addLabel}>+ Thêm khoản khác</Text>
-            </Pressable>
-          </View>
-        ) : null}
-
-        {merged.length > 0 ? (
-          <View style={styles.summary}>
-            {merged.map((item) => (
-              <View key={`${item.source}-${item.key}`} style={styles.summaryRow}>
-                <Text style={styles.summaryLabel} numberOfLines={1}>
-                  {item.label}
-                </Text>
-                <Text style={styles.summaryValue}>{formatCurrency(item.amountXu, currency)}</Text>
-              </View>
-            ))}
-            <View style={[styles.summaryRow, styles.totalRow]}>
-              <Text style={styles.totalLabel}>Tổng</Text>
-              <Text testID="text-wizard-fixed-costs-total" style={styles.totalValue}>
-                {formatCurrency(total, currency)}
-              </Text>
+              <Pressable
+                testID="btn-wizard-fixed-costs-add"
+                onPress={() => setCustomRows((prev) => [...prev, { id: nextCustomRowId(), label: "", amountXu: 0 }])}
+                style={styles.addRow}
+              >
+                <Text style={styles.addLabel}>+ Thêm khoản khác</Text>
+              </Pressable>
             </View>
-          </View>
-        ) : (
-          <Text style={styles.empty}>Chưa đọc được khoản nào. Bạn viết dạng &quot;điện 300k&quot; nhé.</Text>
-        )}
-      </View>
-    </Drawer>
+          ) : null}
+
+          {merged.length > 0 ? (
+            <View style={styles.summary}>
+              {merged.map((item) => (
+                <View key={`${item.source}-${item.key}`} style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel} numberOfLines={1}>
+                    {item.label}
+                  </Text>
+                  <Text style={styles.summaryValue}>{formatCurrency(item.amountXu, currency)}</Text>
+                </View>
+              ))}
+              <View style={[styles.summaryRow, styles.totalRow]}>
+                <Text style={styles.totalLabel}>Tổng</Text>
+                <Text testID="text-wizard-fixed-costs-total" style={styles.totalValue}>
+                  {formatCurrency(total, currency)}
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <Text style={styles.empty}>Chưa đọc được khoản nào. Bạn viết dạng &quot;điện 300k&quot; nhé.</Text>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  body: { gap: spacing.sm, paddingBottom: spacing.lg },
+  // Above the wizard's own overlay (zIndex 40) so it covers the progress header
+  // too — a panel that leaves the step chrome visible reads as a stuck layer.
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.bgApp, zIndex: 50 },
+  safeArea: { flex: 1 },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.surfaceBorder,
+  },
+  headerTitle: { flex: 1, textAlign: "center", ...typography.cardTitle, color: colors.textPrimary },
+  cancelLabel: { ...typography.body, color: colors.textSecondary },
+  confirmLabel: { ...typography.body, color: colors.green },
+  scroll: { paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: spacing.xxl, gap: spacing.sm },
   label: { ...typography.caption, color: colors.textSecondary },
   textArea: {
     minHeight: 96,

@@ -1,3 +1,4 @@
+import { floorToPerDayStep } from "@/lib/currency";
 import { colors } from "@/lib/theme";
 import { BudgetLimit } from "@/features/budgets/types";
 
@@ -116,4 +117,51 @@ export function budgetRowStatus(limit: BudgetLimit, monthElapsed: number): Budge
     };
   }
   return { state: "on-track", ratio, percent, color: colors.mint, caption: "đúng tiến độ", remaining, over: false };
+}
+
+/**
+ * What is left to spend today, given what the whole period still has.
+ *
+ * ⚠️ `remaining` already has today's spending taken out of it, so this shrinks
+ * as the day goes on — which is the behaviour that makes the number worth
+ * looking at more than once a day. `daysLeftInclusive` counts today, because
+ * today is a day you can still spend on; excluding it inflates every remaining
+ * day by a share of money that is actually already available now.
+ *
+ * Mirrors the moment-of-spend formula the budget spec defines
+ * (`(amount_max - spentThisCycle) / daysLeftInCycle`).
+ */
+export function remainingPerDay(remaining: number, daysLeftInclusive: number): number {
+  if (remaining <= 0 || daysLeftInclusive <= 0) return 0;
+  return floorToPerDayStep(remaining / daysLeftInclusive);
+}
+
+/** Days from today to the end of the month, counting today. */
+export function daysLeftInMonth(now: Date = new Date()): number {
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  return daysInMonth - now.getDate() + 1;
+}
+
+/**
+ * A monthly limit's share of an arbitrary date range.
+ *
+ * Comparing "spent on one day" against a whole month's limit is meaningless —
+ * it would read as 3% used and look like nothing is wrong. Prorating the limit
+ * to the length of the range asks the question the user actually has: was today
+ * heavy for this category, or ordinary.
+ */
+export function proratedLimit(monthlyLimit: number, daysInRange: number, now: Date = new Date()): number {
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  if (daysInRange <= 0 || daysInMonth <= 0) return monthlyLimit;
+  return Math.round((monthlyLimit * daysInRange) / daysInMonth);
+}
+
+/** Whole days covered by an inclusive YYYY-MM-DD range. */
+export function daysInRange(from: string, to: string): number {
+  const [fy, fm, fd] = from.slice(0, 10).split("-").map(Number);
+  const [ty, tm, td] = to.slice(0, 10).split("-").map(Number);
+  const start = new Date(fy, fm - 1, fd);
+  const end = new Date(ty, tm - 1, td);
+  const diff = Math.round((end.getTime() - start.getTime()) / 86_400_000);
+  return Math.max(diff + 1, 1);
 }

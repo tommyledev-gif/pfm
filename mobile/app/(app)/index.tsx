@@ -27,6 +27,12 @@ import { TransactionRowSkeleton } from "@/features/transactions/components/Trans
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { budgetTotals } from "@/features/budgets/budget-totals";
+import {
+  budgetPeriodElapsed,
+  budgetRowStatus,
+  daysLeftInMonth,
+  remainingPerDay,
+} from "@/features/budgets/budget-pace";
 import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary-query";
 import { useUiPrefsStore, HomePeriod } from "@/stores/ui-prefs-store";
 import { useChatStore } from "@/stores/chat-store";
@@ -102,6 +108,51 @@ export default function HomeScreen() {
   const spentDelta = periodSpent - previousPeriodSpent;
   const budgetSnapshot = budgets.data ? budgetTotals(budgets.data, currency) : null;
   const isOverBudget = Boolean(budgetSnapshot && periodSpent > budgetSnapshot.limit);
+  const isDay = homePeriod === "day";
+
+  /**
+   * What is still spendable today.
+   *
+   * ⚠️ `budgetSnapshot.remaining` already has today's spending removed, so this
+   * shrinks through the day — which is the whole reason to look at it more than
+   * once. Today counts as a day you can still spend on, hence the inclusive
+   * count: excluding it would inflate every later day by money that is actually
+   * available right now.
+   *
+   * Same formula as the budget spec's moment-of-spend line and the wizard's
+   * "được chi mỗi ngày", through one shared rounding helper so the three
+   * surfaces can never quote different figures.
+   */
+  const daysLeft = daysLeftInMonth();
+  const remainingToday = budgetSnapshot ? remainingPerDay(budgetSnapshot.remaining, daysLeft) : null;
+  // What today started with: what is left plus what has already gone. Drives the
+  // ring, so a heavy morning visibly fills it.
+  const todayAllowance = remainingToday !== null ? remainingToday + periodSpent : null;
+
+  /**
+   * Budgets running hotter than the month is long, worst first.
+   *
+   * The Ngày tab is for tracking a single day, and the useful thing to see
+   * beside today's number is not what you spend most on in general — it is which
+   * limit is about to stop you. "Chi nhiều nhất" answers a question nobody asks
+   * at 3pm on a Tuesday.
+   */
+  const atRiskBudgets = useMemo(() => {
+    const rows = (budgets.data ?? [])
+      .flatMap((budget) => budget.limits.map((limit) => ({ budget, limit })))
+      .filter(({ limit }) => limit.currency === currency)
+      .map((row) => ({ ...row, status: budgetRowStatus(row.limit, budgetPeriodElapsed(row.budget.start_date)) }))
+      .filter((row) => row.status.state === "over" || row.status.state === "at-risk");
+    return rows.sort((a, b) => b.status.ratio - a.status.ratio).slice(0, TOP_CATEGORIES_COUNT);
+  }, [budgets.data, currency]);
+
+  // Hands the exact window the user is looking at to the Budgets tab, so the
+  // limits there are prorated to the same day rather than to the whole month.
+  const openBudgetsForPeriod = () =>
+    router.push({
+      pathname: "/insights",
+      params: { tab: "Budgets", from: periodRange.from, to: periodRange.to },
+    });
 
   const topCategories = useMemo(() => {
     const expenseCategories = thisMonthSummary.data?.by_category.filter((c) => c.type === "expense") ?? [];
@@ -175,24 +226,87 @@ export default function HomeScreen() {
                   <View style={styles.snapshotLeft}>
                     <LiquidCircle
                       size={132}
-                      progress={budgetSnapshot && budgetSnapshot.limit > 0 ? periodSpent / budgetSnapshot.limit : 0}
-                      topLabel="Đã chi"
+                      // On Ngày the ring is today against today's share, not
+                      // against the month: filling it 3% every day would say
+                      // nothing, and it is the day the tab is about.
+                      progress={
+                        isDay
+                          ? todayAllowance && todayAllowance > 0
+                            ? periodSpent / todayAllowance
+                            : 0
+                          : budgetSnapshot && budgetSnapshot.limit > 0
+                            ? periodSpent / budgetSnapshot.limit
+                            : 0
+                      }
+                      topLabel={isDay ? "Đã chi hôm nay" : "Đã chi"}
                       topValue={formatCurrency(periodSpent, currency)}
                     />
                     <Text style={styles.snapshotRemaining}>
-                      Còn lại:{" "}
-                      <Text style={styles.snapshotRemainingValue}>
-                        {budgetSnapshot ? formatCurrency(budgetSnapshot.remaining, currency) : "—"}
+                      {isDay ? "Hôm nay còn: " : "Còn lại: "}
+                      <Text style={styles.snapshotRemainingValue} testID="text-home-remaining-today">
+                        {isDay
+                          ? remainingToday !== null
+                            ? formatCurrency(remainingToday, currency)
+                            : "—"
+                          : budgetSnapshot
+                            ? formatCurrency(budgetSnapshot.remaining, currency)
+                            : "—"}
                       </Text>
                     </Text>
-                    {budgetSnapshot ? (
+                    {isDay ? (
+                      budgetSnapshot ? (
+                        <Text style={styles.snapshotStatus}>
+                          {/* Stated plainly so the figure is not mistaken for a
+                              hard cap — it is this month's remainder spread over
+                              the days it still has to cover. */}
+                          {daysLeft} ngày còn lại trong tháng
+                        </Text>
+                      ) : null
+                    ) : budgetSnapshot ? (
                       <Text style={[styles.snapshotStatus, { color: isOverBudget ? colors.peach : colors.green }]}>
                         {isOverBudget ? "Vượt ngân sách" : "Trong ngân sách"}
                       </Text>
                     ) : null}
                   </View>
 
-                  {topCategories.length > 0 ? (
+                  {isDay && atRiskBudgets.length > 0 ? (
+                    <View style={styles.snapshotRight}>
+                      <View style={styles.compactHeaderRow}>
+                        <Text style={styles.compactSectionTitle} numberOfLines={1}>
+                          Sắp vượt
+                        </Text>
+                        <Pressable onPress={openBudgetsForPeriod} hitSlop={8}>
+                          <Text style={styles.compactSeeAll} numberOfLines={1}>
+                            Xem tất cả
+                          </Text>
+                        </Pressable>
+                      </View>
+                      {atRiskBudgets.map(({ budget, limit, status }) => (
+                        <Pressable
+                          key={`${budget.id}-${limit.currency}`}
+                          testID={`row-home-at-risk-${budget.category_id}`}
+                          onPress={openBudgetsForPeriod}
+                          style={styles.categoryRow}
+                        >
+                          <Avatar
+                            name={budget.category_name}
+                            color={colorForCategory(budget.category_id)}
+                            size={24}
+                            icon={budget.icon ?? categoryById.get(budget.category_id)?.icon}
+                            iconUrl={budget.icon_url ?? categoryById.get(budget.category_id)?.icon_url}
+                          />
+                          <Text style={styles.categoryName} numberOfLines={1}>
+                            {budget.category_name}
+                          </Text>
+                          {/* Amber and plain-spoken, never red: being close to a
+                              limit is information, not a fault. */}
+                          <Text style={[styles.categoryAmount, { color: status.color }]} numberOfLines={1}>
+                            {status.percent}%
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  ) : topCategories.length > 0 ? (
                     <View style={styles.snapshotRight}>
                       <View style={styles.compactHeaderRow}>
                         <Text style={styles.compactSectionTitle} numberOfLines={1}>

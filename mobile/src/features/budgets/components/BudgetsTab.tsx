@@ -1,20 +1,25 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { PlusIcon } from "@/components/ui/Icon";
+import { CalendarIcon, PlusIcon } from "@/components/ui/Icon";
 import { CategoryPickerDrawer } from "@/components/shared/CategoryPickerDrawer";
+import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
 import { BudgetFormModal } from "@/features/budgets/components/BudgetFormModal";
 import { colorForCategory } from "@/lib/category-color";
+import { formatDateRange } from "@/lib/format-date";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { useRefresh } from "@/lib/use-refresh";
 import { WalletCurrency } from "@/lib/constants";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
+import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary-query";
 import { Budget } from "@/features/budgets/types";
 import {
   budgetPeriodElapsed,
   budgetRowStatus,
   BudgetPaceState,
   currentMonthPace,
+  daysInRange,
+  proratedLimit,
 } from "@/features/budgets/budget-pace";
 import { BudgetCardSkeleton } from "@/features/budgets/components/BudgetCardSkeleton";
 import { BudgetListRow } from "@/features/budgets/components/BudgetListRow";
@@ -43,7 +48,18 @@ type FilterKey = (typeof FILTERS)[number]["key"];
 // The previous version was a flat list of two-bar cards scaled against the
 // largest budget in the list, with no month context at all — see
 // BudgetListRow's own note for why that was the wrong question.
-export function BudgetsTab() {
+interface BudgetsTabProps {
+  /** Opens straight into a date filter — used by Home's "sắp vượt" list, which
+   *  hands over the exact day the user was looking at. */
+  initialRange?: { from?: string; to?: string };
+  /** Changes per navigation so the same day can be re-opened after the user has
+   *  cleared the filter by hand. */
+  rangeNonce?: string;
+}
+
+export function BudgetsTab({ initialRange, rangeNonce }: BudgetsTabProps = {}) {
+  const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>(initialRange ?? {});
+  const [rangePickerOpen, setRangePickerOpen] = useState(false);
   const budgets = useBudgetsQuery();
   const wallets = useWalletsQuery();
   const categories = useCategoriesQuery();
@@ -67,6 +83,51 @@ export function BudgetsTab() {
   // a memo keyed on nothing would go stale across midnight.
   const pace = currentMonthPace();
 
+  // ⚠️ `limit.spent` from the budgets endpoint is ALWAYS the current calendar
+  // month — the backend has no date-range parameter for it. So a filtered view
+  // cannot use it, and per-category spend for the selected range comes from the
+  // reports endpoint instead, compared against a prorated slice of the limit.
+  const rangeActive = Boolean(dateRange.from || dateRange.to);
+  const rangeSummary = useReportSummaryQuery(rangeActive ? dateRange : {});
+
+  useEffect(() => {
+    if (initialRange?.from || initialRange?.to) setDateRange(initialRange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialRange?.from, initialRange?.to, rangeNonce]);
+
+  // The backend resolves an open-ended range for us, so read the window back
+  // from the response rather than guessing what a missing `from` meant.
+  const resolvedRange = rangeSummary.data?.range;
+  const rangeDayCount = useMemo(
+    () => (resolvedRange ? daysInRange(resolvedRange.from, resolvedRange.to) : 1),
+    [resolvedRange],
+  );
+
+  const spentByCategory = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const entry of rangeSummary.data?.by_category ?? []) {
+      if (entry.type !== "expense" || entry.currency !== currency) continue;
+      map.set(entry.category_id, (map.get(entry.category_id) ?? 0) + entry.amount);
+    }
+    return map;
+  }, [rangeSummary.data, currency]);
+
+  // How far through the selected window we are. A window that has already
+  // finished is fully elapsed; one containing right now is however far into it
+  // the clock has got — which for a single day is a fraction of today.
+  const rangeElapsed = useMemo(() => {
+    if (!resolvedRange) return 0;
+    const [fy, fm, fd] = resolvedRange.from.slice(0, 10).split("-").map(Number);
+    const [ty, tm, td] = resolvedRange.to.slice(0, 10).split("-").map(Number);
+    const start = new Date(fy, fm - 1, fd).getTime();
+    const end = new Date(ty, tm - 1, td + 1).getTime();
+    const now = Date.now();
+    if (now >= end) return 1;
+    if (now <= start) return 0;
+    return (now - start) / (end - start);
+  }, [resolvedRange]);
+
+
   const rows = useMemo(() => {
     const all = (budgets.data ?? [])
       .flatMap((budget) => budget.limits.map((limit) => ({ budget, limit })))
@@ -77,8 +138,27 @@ export function BudgetsTab() {
       // figure — the summary card above still speaks for the whole month, but
       // a budget created on the 25th is not 83% through its first period.
       .map((row) => {
-        const periodElapsed = budgetPeriodElapsed(row.budget.start_date);
-        return { ...row, periodElapsed, status: budgetRowStatus(row.limit, periodElapsed) };
+        if (!rangeActive) {
+          const periodElapsed = budgetPeriodElapsed(row.budget.start_date);
+          return { ...row, periodElapsed, limit: row.limit, status: budgetRowStatus(row.limit, periodElapsed) };
+        }
+        // Filtered: the limit is prorated to the range's length and the spend
+        // comes from the report, so "today vs today's share" is a comparison
+        // that actually means something. Against the untouched monthly limit a
+        // heavy day reads as 3% used, which is worse than showing nothing.
+        const spent = spentByCategory.get(row.budget.category_id) ?? 0;
+        const scaledLimit = proratedLimit(row.limit.amount_limit, rangeDayCount);
+        const limit = {
+          ...row.limit,
+          amount_limit: scaledLimit,
+          spent,
+          remaining: scaledLimit - spent,
+          status: (spent > scaledLimit ? "exceeded" : "within") as typeof row.limit.status,
+        };
+        // A finished day is fully elapsed; today is however far through it we
+        // are. Either way the marker answers "should this much be gone by now".
+        const periodElapsed = rangeElapsed;
+        return { ...row, periodElapsed, limit, status: budgetRowStatus(limit, periodElapsed) };
       });
 
     // Worst first: over, then at risk, then on track, then untouched. The
@@ -90,7 +170,7 @@ export function BudgetsTab() {
     // something that changes at midnight every row's tick would freeze at
     // whatever it was when the screen mounted.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [budgets.data, currency, pace.elapsed]);
+  }, [budgets.data, currency, pace.elapsed, rangeActive, rangeDayCount, rangeElapsed, spentByCategory]);
 
   const counts = useMemo(
     () => ({
@@ -160,7 +240,44 @@ export function BudgetsTab() {
         contentContainerStyle={styles.scroll}
         refreshControl={refreshControl}
       >
-        <BudgetMonthSummary pace={pace} totalLimit={totals.limit} totalSpent={totals.spent} currency={currency} />
+        <View style={styles.rangeRow}>
+          <Pressable style={styles.rangeButton} onPress={() => setRangePickerOpen(true)} testID="btn-budgets-range">
+            <CalendarIcon size={14} color={colors.textSecondary} />
+            <Text style={styles.rangeLabel}>
+              {resolvedRange ? formatDateRange(resolvedRange.from, resolvedRange.to) : "Tháng này"}
+            </Text>
+          </Pressable>
+          {rangeActive ? (
+            <Pressable onPress={() => setDateRange({})} hitSlop={8}>
+              <Text style={styles.rangeClear}>Xoá lọc</Text>
+            </Pressable>
+          ) : null}
+        </View>
+
+        {rangeActive ? (
+          // Said out loud rather than left to be inferred from smaller numbers:
+          // the limits on screen are a slice of the monthly figure, not the
+          // monthly figure itself.
+          <Text style={styles.rangeNote}>
+            Hạn mức đã chia theo {rangeDayCount === 1 ? "ngày" : `${rangeDayCount} ngày`} bạn chọn.
+          </Text>
+        ) : null}
+
+        <BudgetMonthSummary
+          // Under a filter the card describes the selected window, not the
+          // month — its own totals already come from the filtered rows, so the
+          // pace and the wording have to follow or the card contradicts itself.
+          pace={
+            rangeActive && resolvedRange
+              ? { elapsed: rangeElapsed, daysLeft: 0, label: formatDateRange(resolvedRange.from, resolvedRange.to) }
+              : pace
+          }
+          periodNoun={rangeActive ? (rangeDayCount === 1 ? "ngày" : "khoảng này") : "tháng"}
+          showDaysLeft={!rangeActive}
+          totalLimit={totals.limit}
+          totalSpent={totals.spent}
+          currency={currency}
+        />
 
         <View style={styles.chipRow}>
           {FILTERS.map((f) => {
@@ -218,6 +335,17 @@ export function BudgetsTab() {
         editingBudget={editingBudget}
       />
 
+      <DateRangePickerModal
+        visible={rangePickerOpen}
+        onClose={() => setRangePickerOpen(false)}
+        from={dateRange.from}
+        to={dateRange.to}
+        onApply={(range) => {
+          setDateRange(range);
+          setRangePickerOpen(false);
+        }}
+      />
+
       <CategoryPickerDrawer
         visible={pickerOpen}
         onClose={() => setPickerOpen(false)}
@@ -234,6 +362,11 @@ const styles = StyleSheet.create({
   // Insights' own tab body already reserves 140px for the bottom nav; this is
   // just enough extra to keep the last row clear of the floating add button.
   scroll: { paddingBottom: 96 },
+  rangeRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
+  rangeButton: { flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingVertical: spacing.sm },
+  rangeLabel: { ...typography.caption, color: colors.textSecondary },
+  rangeClear: { ...typography.caption, color: colors.green },
+  rangeNote: { ...typography.tiny, color: colors.textMuted, paddingBottom: spacing.xs },
   chipRow: { flexDirection: "row", gap: spacing.sm, paddingVertical: spacing.lg },
   chip: {
     paddingVertical: 8,
