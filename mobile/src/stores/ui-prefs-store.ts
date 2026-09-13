@@ -31,17 +31,29 @@ export const useUiPrefsStore = create<UiPrefsState>()(
     {
       name: "pfm_ui_prefs",
       storage: createJSONStorage(() => AsyncStorage),
-      // "week" was replaced by "day". Anyone who had Week selected already has
-      // it on disk, and without this they would rehydrate into a period the
-      // selector no longer offers: no tab highlighted, and a range nothing can
-      // switch away from.
-      version: 1,
-      migrate: (persisted) => {
+      // ⚠️ Changing the default above is NOT enough on its own: a persisted
+      // value always wins over it at rehydration, so every existing install
+      // would keep landing on whatever it last stored. The default only reaches
+      // anyone through a version bump.
+      version: 2,
+      migrate: (persisted, version) => {
         const state = persisted as Partial<UiPrefsState> | undefined;
-        if (state && (state.homePeriod as string) === "week") {
-          return { ...state, homePeriod: "day" as HomePeriod };
-        }
-        return state;
+        if (!state) return state;
+
+        let homePeriod = state.homePeriod as string | undefined;
+
+        // "week" was removed from the selector. Left alone it rehydrates into a
+        // period no tab can represent: nothing highlighted, and a range the user
+        // has no control to switch away from.
+        if (homePeriod === "week") homePeriod = "day";
+
+        // A "month" stored before v2 was the old DEFAULT, not a choice — the
+        // Ngày tab did not exist yet, so nobody could have preferred month over
+        // it. Moving those installs once is what actually makes Ngày the
+        // default; from here on their own selection is remembered again.
+        if (version < 2 && homePeriod === "month") homePeriod = "day";
+
+        return { ...state, homePeriod: (homePeriod ?? "day") as HomePeriod };
       },
     },
   ),

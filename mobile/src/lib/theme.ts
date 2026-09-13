@@ -18,6 +18,9 @@ export const colors = {
   mint: "#7EEBC0",
   peach: "#FF9E96",
   mustard: "#F2C94C",
+  // Same amber as `mustard`, pulled back — for "đang tới gần ngưỡng"
+  // states that share the warning's meaning but not its urgency.
+  mustardSoft: "rgba(242,201,76,0.65)",
   periwinkle: "#9FB3FF",
 
   trackMuted: "rgba(255,255,255,0.22)",

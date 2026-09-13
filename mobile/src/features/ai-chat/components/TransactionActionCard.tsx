@@ -6,11 +6,18 @@ import { Avatar } from "@/components/ui/Avatar";
 import { CalendarIcon, CheckIcon, EditIcon } from "@/components/ui/Icon";
 import { PillButton } from "@/components/ui/PillButton";
 import { PillTag } from "@/components/ui/PillTag";
+import { ProgressBar } from "@/components/ui/ProgressBar";
 import { colorForCategory } from "@/lib/category-color";
 import { formatCurrencyTruncated } from "@/lib/currency";
 import { formatDateShort } from "@/lib/format-date";
 import { colors, spacing, typography } from "@/lib/theme";
 import { ChatAction } from "@/features/ai-chat/types";
+
+// Share of the budget at which the bar stops being neutral and starts
+// leaning amber. Below it the number is just a number; at 80% the next
+// transaction of this size is plausibly the one that crosses the line, which
+// is exactly when it is worth a glance.
+const NEAR_LIMIT_RATIO = 0.8;
 
 interface TransactionActionCardProps {
   action: ChatAction;
@@ -27,6 +34,10 @@ interface TransactionActionCardProps {
   // Tapping the badge opens the edit-history dialog (onPressHistory).
   edited?: boolean;
   onPressHistory?: () => void;
+  /** This category's budget for the transaction's currency, if it has one.
+   *  Both in xu; `spent` is the cycle's spend BEFORE this proposal. */
+  budgetLimit?: number;
+  budgetSpent?: number;
 }
 
 // Renders inside an AI assistant chat bubble once a transaction has been
@@ -49,9 +60,47 @@ export function TransactionActionCard({
   onConfirm,
   edited,
   onPressHistory,
+  budgetLimit,
+  budgetSpent,
 }: TransactionActionCardProps) {
   const { payload } = action;
   const isIncome = payload.type === "income";
+
+  /**
+   * What this proposal would do to the category's budget, shown BEFORE it is
+   * saved.
+   *
+   * ⚠️ This is the point of the whole feature: after the transaction exists the
+   * number is a report, and reports get read monthly. Here it is still a
+   * decision — the user is looking at a Confirm button, and a bar sitting at
+   * 71% (or spilling past full) is the one piece of information that could
+   * change what they press. No extra tap, no extra screen; they were already
+   * looking at this card.
+   *
+   * Only for expenses with a real budget: income does not consume one, and a
+   * category with no budget has no percentage to be at.
+   */
+  const impact =
+    !isIncome && !confirmed && budgetLimit !== undefined && budgetLimit > 0
+      ? (() => {
+          const after = (budgetSpent ?? 0) + payload.amount;
+          const ratio = after / budgetLimit;
+          const over = ratio > 1;
+          return {
+            ratio,
+            percent: Math.round(ratio * 100),
+            // Amber when it would go over, a dimmer amber when it lands close,
+            // neutral when there is still room — never red. Passing a budget is
+            // a fact about a number, and this card is asking a question, not
+            // refusing one. The Confirm button stays fully enabled either way.
+            color: over
+              ? colors.mustard
+              : ratio >= NEAR_LIMIT_RATIO
+                ? colors.mustardSoft
+                : colors.textSecondary,
+          };
+        })()
+      : null;
   const [revealVisible, setRevealVisible] = useState(false);
   const label = payload.note || categoryName;
 
@@ -102,6 +151,29 @@ export function TransactionActionCard({
           <View style={styles.dateRow}>
             <CalendarIcon size={13} color={colors.textSecondary} />
             <Text style={styles.dateLabel}>{formatDateShort(payload.occurred_at)}</Text>
+            {impact ? (
+              // Trailing on the date's own row: it is context for the decision,
+              // not an action, so it sits at the quiet end of a line the user
+              // already scans rather than claiming a row of its own.
+              //
+              // A bar rather than a sentence: how full the budget already is
+              // reads off the shape at a glance, which is all this needs to do
+              // while the user's attention is really on the Confirm button. The
+              // percentage trails it for the one case where the exact number
+              // matters.
+              <View style={styles.impactGroup}>
+                <View style={styles.impactTrack}>
+                  <ProgressBar progress={impact.ratio} color={impact.color} height={4} />
+                </View>
+                <Text
+                  testID="text-chat-budget-after"
+                  style={[styles.impactPercent, { color: impact.color }]}
+                  numberOfLines={1}
+                >
+                  {impact.percent}%
+                </Text>
+              </View>
+            ) : null}
           </View>
           <View style={styles.tagRow}>
             <PillTag label={categoryName} />
@@ -139,6 +211,12 @@ const styles = StyleSheet.create({
   merchant: { flex: 1, ...typography.body, color: colors.textPrimary },
   amount: { ...typography.cardTitle },
   dateRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  impactGroup: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: spacing.sm },
+  // Capped so the bar stays a small trailing indicator on a date row — full
+  // width would read as the row's main content — and floored so a short date
+  // never squeezes it down to a dash.
+  impactTrack: { flex: 1, minWidth: 40, maxWidth: 110 },
+  impactPercent: { ...typography.tiny, minWidth: 30, textAlign: "right" },
   dateLabel: { ...typography.tiny, color: colors.textSecondary },
   tagRow: { flexDirection: "row", gap: spacing.sm },
   actionRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },

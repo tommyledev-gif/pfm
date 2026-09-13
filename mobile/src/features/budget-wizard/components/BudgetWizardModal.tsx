@@ -2,6 +2,8 @@ import { useEffect } from "react";
 import { BackHandler, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { daysInCycle, perDayXu } from "@/features/budget-wizard/budget-math";
+import { formatCurrency } from "@/lib/currency";
 import { colors, spacing } from "@/lib/theme";
 import { useSheetStore } from "@/stores/sheet-store";
 import { BUDGET_WIZARD_TOTAL_STEPS, useBudgetWizardState } from "@/features/budget-wizard/hooks/use-budget-wizard-state";
@@ -51,10 +53,25 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
   if (!visible) return null;
 
   const { step } = wizard;
+  const isSuccess = step > BUDGET_WIZARD_TOTAL_STEPS;
+
+  // The figure the success screen leads with. Derived from the plan the user
+  // just confirmed, so it is the same number screen 3 showed them.
+  const dailyAllowance = wizard.result
+    ? formatCurrency(perDayXu(wizard.result.disposable, daysInCycle(wizard.cycleStartDay)), wizard.currency)
+    : undefined;
 
   return (
     <View style={styles.overlay}>
-      {/* ⚠️ No manual keyboard padding here, deliberately.
+      {/* ⚠️ Success replaces the stepper entirely — it is not rendered inside it.
+          It is a destination, not another screen in the sequence, and leaving it
+          inside the step container makes it inherit the stepper's chrome and
+          whatever transition the steps use, so the landing reads as one more
+          sideways move. */}
+      {isSuccess ? (
+        <WizardStepSuccess createdCount={wizard.createdCount} dailyAllowance={dailyAllowance} onDone={onClose} />
+      ) : (
+      /* ⚠️ No manual keyboard padding here, deliberately.
           Each step owns a ScrollView, and React Native already scrolls a
           focused TextInput into view inside it. app.json also sets
           android.softwareKeyboardLayoutMode: "resize", so the OS shrinks the
@@ -64,11 +81,14 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
           have been — lifting it roughly two keyboard heights and leaving the
           dead gap under it. Drawer.tsx legitimately needs that padding because
           its sheet is bottom-anchored with no scroll-into-view of its own; this
-          full-screen flow does not. */}
+          full-screen flow does not. */
       <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
-        {step <= BUDGET_WIZARD_TOTAL_STEPS ? (
-          <WizardProgressHeader step={step} totalSteps={BUDGET_WIZARD_TOTAL_STEPS} onClose={onClose} />
-        ) : null}
+        <WizardProgressHeader
+          step={step}
+          totalSteps={BUDGET_WIZARD_TOTAL_STEPS}
+          onClose={onClose}
+          onBack={step > 1 ? wizard.goBack : undefined}
+        />
 
         <View style={styles.body}>
           {step === 1 ? (
@@ -114,9 +134,9 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
             />
           ) : null}
 
-          {step > BUDGET_WIZARD_TOTAL_STEPS ? <WizardStepSuccess createdCount={wizard.createdCount} onDone={onClose} /> : null}
         </View>
       </SafeAreaView>
+      )}
 
       {/* Sibling of the SafeAreaView, not a child of the step: it has to cover
           the progress header as well, and a panel rendered inside the step body

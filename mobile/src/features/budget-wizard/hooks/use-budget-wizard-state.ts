@@ -373,6 +373,10 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
       setFixedCostsOpen(false);
     },
     goToProfile: () => canLeaveIncomeStep && setStep(2),
+    // ⚠️ Never below 1, and never back FROM the success screen: a plan has been
+    // written by then, so "back" would offer to re-run a decision that is
+    // already committed.
+    goBack: () => setStep((prev) => Math.max(1, Math.min(prev, BUDGET_WIZARD_TOTAL_STEPS) - 1)),
     selectPreset,
     retryProposal,
     editAmount,

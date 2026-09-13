@@ -18,6 +18,7 @@ import { TransactionFormModal } from "@/features/transactions/components/Transac
 import { getErrorCode, getErrorMessage } from "@/lib/axios";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { useKeyboardHeight, useKeyboardVisible } from "@/lib/use-keyboard-height";
+import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useSendChatMessageMutation } from "@/features/ai-chat/api/use-send-chat-message-mutation";
@@ -117,6 +118,9 @@ export default function AiChatScreen() {
 
   const wallets = useWalletsQuery();
   const categories = useCategoriesQuery();
+  // Read only so an unconfirmed proposal can say what saving it would do to the
+  // category's budget — the card never writes budgets.
+  const budgets = useBudgetsQuery();
   const sendMessage = useSendChatMessageMutation();
   const createTransaction = useCreateTransactionMutation();
   const updateTransaction = useUpdateTransactionMutation();
@@ -129,6 +133,21 @@ export default function AiChatScreen() {
 
   const walletById = useMemo(() => new Map(wallets.data?.map((w) => [w.id, w])), [wallets.data]);
   const categoryById = useMemo(() => new Map(categories.data?.map((c) => [c.id, c])), [categories.data]);
+
+  // Keyed by "categoryId|currency": a budget carries a separate limit per
+  // currency, and a proposal in VND must never be measured against a USD one.
+  const budgetByCategoryCurrency = useMemo(() => {
+    const map = new Map<string, { amount_limit: number; spent: number }>();
+    for (const budget of budgets.data ?? []) {
+      for (const limit of budget.limits) {
+        map.set(`${budget.category_id}|${limit.currency}`, {
+          amount_limit: limit.amount_limit,
+          spent: limit.spent,
+        });
+      }
+    }
+    return map;
+  }, [budgets.data]);
 
   // Shared by both a fresh send and a resend-after-editing-the-user-message
   // flow — same typing-indicator pacing either way, only the resulting
@@ -336,7 +355,17 @@ export default function AiChatScreen() {
         // row's PanResponder immediately; the keyboard still dismisses via
         // handleEditTrigger's own Keyboard.dismiss() once the swipe fires.
         keyboardShouldPersistTaps="handled"
-        renderItem={({ item }) => (
+        renderItem={({ item }) => {
+          // Resolved once per row rather than inline in the JSX: the card needs
+          // the budget for THIS proposal's category in THIS wallet's currency,
+          // and that lookup reads far better as two named values than as a
+          // spread expression buried in a prop list.
+          const rowCurrency = item.action ? walletById.get(item.action.payload.wallet_id)?.currency ?? "VND" : "VND";
+          const rowBudget = item.action
+            ? budgetByCategoryCurrency.get(`${item.action.payload.category_id}|${rowCurrency}`)
+            : undefined;
+
+          return (
           <SwipeableMessageRow
             // README: user bubbles are right-aligned, assistant bubbles
             // left-aligned (ChatBubble.tsx) — swipe away from whichever edge
@@ -354,11 +383,13 @@ export default function AiChatScreen() {
               {item.action && !item.superseded ? (
                 <TransactionActionCard
                   action={item.action}
+                  budgetLimit={rowBudget?.amount_limit}
+                  budgetSpent={rowBudget?.spent}
                   walletName={walletById.get(item.action.payload.wallet_id)?.name ?? "Ví"}
                   categoryName={categoryById.get(item.action.payload.category_id)?.name ?? "Danh mục"}
                   categoryIcon={categoryById.get(item.action.payload.category_id)?.icon}
                   categoryIconUrl={categoryById.get(item.action.payload.category_id)?.icon_url}
-                  currency={walletById.get(item.action.payload.wallet_id)?.currency ?? "VND"}
+                  currency={rowCurrency}
                   confirmed={Boolean(item.confirmed)}
                   saving={confirmingId === item.id}
                   onConfirm={() => confirmAction(item)}
@@ -381,7 +412,8 @@ export default function AiChatScreen() {
               ) : null}
             </ChatBubble>
           </SwipeableMessageRow>
-        )}
+          );
+        }}
         // No counter-transform on either of these: VirtualizedList already
         // composes its own inversion style onto the header/empty slots, so
         // adding a second scaleY would cancel it out and render them upside
