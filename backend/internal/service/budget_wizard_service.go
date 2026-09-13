@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -85,15 +84,20 @@ func zeroSpendStatus(b *model.Budget) {
 	}
 }
 
-// Proposals implements US-04's Main Flow — re-validates every category_id is
-// visible to the caller (system-defined or owned), sequential/gating on the
-// first failure (spec.md S-BWZ-15, plan.md Finding #8), then computes the
-// proposal entirely in-process via budgetproposal.Compute (no AI Service
-// call at all, plan.md Finding #6).
+// Proposals runs the v2 allocation (specs/ai-budget-wizard-v2/spec.md US-01 /
+// US-07).
+//
+// Every category id is re-validated against the caller first, gating on the
+// first failure, then the whole allocation happens in-process through
+// budgetproposal.Compute. There is no AI Service call on this path and there
+// never should be: the calculation is arithmetic, and arithmetic done in Go is
+// free, instant, reproducible, and unaffected by the AI service being down —
+// none of which is true of an LLM, which additionally cannot be trusted to add
+// up.
 func (s *BudgetWizardService) Proposals(ctx context.Context, userID uuid.UUID, req dto.BudgetProposalsRequest) (*dto.BudgetProposalsResponse, error) {
-	inputs := make([]budgetproposal.Input, 0, len(req.Preferences))
-	for _, pref := range req.Preferences {
-		category, err := s.categoryRepo.GetCategoryByID(ctx, pref.CategoryID)
+	intents := make([]budgetproposal.CategoryIntent, 0, len(req.Intents))
+	for _, in := range req.Intents {
+		category, err := s.categoryRepo.GetCategoryByID(ctx, in.CategoryID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return nil, common.ErrCategoryAccessDenied
@@ -107,118 +111,83 @@ func (s *BudgetWizardService) Proposals(ctx context.Context, userID uuid.UUID, r
 			return nil, common.ErrCategoryAccessDenied
 		}
 
-		inputs = append(inputs, budgetproposal.Input{
-			CategoryID:         pref.CategoryID.String(),
-			CategoryName:       pref.CategoryName,
-			SpendingPreference: pref.SpendingPreference,
-		})
-	}
-
-	result := budgetproposal.Compute(req.Income, inputs)
-
-	entries := make([]dto.ProposalEntry, 0, len(result.Entries)+1)
-	for _, e := range result.Entries {
-		categoryID, err := uuid.Parse(e.CategoryID)
-		if err != nil {
-			return nil, fmt.Errorf("service.Proposals: parsing computed category id: %w", err)
+		// The category's key is read from the row we just fetched, never from
+		// the request. The client supplies one for convenience, but trusting it
+		// would let a caller claim any category is any preset line.
+		systemKey := ""
+		if category.SystemKey != nil {
+			systemKey = *category.SystemKey
 		}
-		entries = append(entries, dto.ProposalEntry{
-			CategoryID:      categoryID,
-			CategoryName:    e.CategoryName,
-			ProposedAmount:  e.Amount,
-			PercentOfIncome: e.PercentOfIncome,
-			Reasoning:       e.Reasoning,
+
+		intents = append(intents, budgetproposal.CategoryIntent{
+			CategoryID:   in.CategoryID.String(),
+			CategoryName: category.Name,
+			SystemKey:    systemKey,
+			Source:       budgetproposal.IntentSource(in.Source),
+			AmountMin:    in.AmountMin,
+			AmountMax:    in.AmountMax,
+			Locked:       in.Locked,
 		})
 	}
 
-	unallocatedAmount := result.UnallocatedAmount
-	unallocatedPercent := result.UnallocatedPercent
-	savingsEntry, err := s.defaultSavingsEntry(ctx, userID, req.Income, req.Preferences, unallocatedAmount)
+	result, err := budgetproposal.Compute(budgetproposal.PlanInput{
+		Income:        req.Income,
+		FixedTotal:    req.FixedTotal,
+		SavingsTarget: req.SavingsTarget,
+		Preset:        common.BudgetPresetKey(req.ProfilePreset),
+		Intents:       intents,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("service.Proposals: %w", err)
-	}
-	if savingsEntry != nil {
-		entries = append(entries, *savingsEntry)
-		unallocatedAmount -= savingsEntry.ProposedAmount
-		unallocatedPercent = 0
-		if req.Income > 0 {
-			unallocatedPercent = float64(unallocatedAmount) / float64(req.Income)
+		switch {
+		case errors.Is(err, budgetproposal.ErrDisposableNonPositive):
+			return nil, common.ErrDisposableNonPositive
+		case errors.Is(err, budgetproposal.ErrDisposableTooSmall):
+			return nil, common.ErrDisposableTooSmall
+		case errors.Is(err, budgetproposal.ErrNoIntents):
+			return nil, common.NewInvalidInputError("bạn chọn ít nhất một danh mục nhé")
+		default:
+			return nil, fmt.Errorf("service.Proposals: %w", err)
 		}
+	}
+
+	proposals := make([]dto.ProposalEntry, 0, len(result.Entries))
+	for _, e := range result.Entries {
+		categoryID, parseErr := uuid.Parse(e.CategoryID)
+		if parseErr != nil {
+			return nil, fmt.Errorf("service.Proposals: parsing computed category id: %w", parseErr)
+		}
+		proposals = append(proposals, dto.ProposalEntry{
+			CategoryID:   categoryID,
+			CategoryName: e.CategoryName,
+			SystemKey:    e.SystemKey,
+			AmountMin:    e.AmountMin,
+			AmountMax:    e.AmountMax,
+			Source:       string(e.Source),
+			Locked:       e.Locked,
+			Confidence:   e.Confidence,
+			Evidence:     e.Evidence,
+		})
 	}
 
 	return &dto.BudgetProposalsResponse{
-		Proposals:          entries,
-		UnallocatedAmount:  unallocatedAmount,
-		UnallocatedPercent: unallocatedPercent,
-		ScaledDownNotice:   result.ScaledDown,
+		Disposable:        result.Disposable,
+		Proposals:         proposals,
+		UnallocatedAmount: result.UnallocatedAmount,
+		OverCommitted:     result.OverCommitted,
+		Shortfall:         result.Shortfall,
+		ScaledDown:        result.ScaledDown,
 	}, nil
 }
 
-// defaultSavingsEntry implements this feature's "always propose a Savings
-// budget" product decision (not spec-derived — see
-// common.BudgetWizardDefaultSavingsShare): every wizard run gets a Savings
-// line even if the user never thought to select one themselves. Returns nil
-// (no entry, request unchanged) when the user already selected a
-// savings-named Category — budgetproposal.Compute already priced that one in
-// — or when no savings Category is visible to the user (e.g. the
-// 017_seed_savings_category.sql seed hasn't run), or when the unallocated
-// pool left after Compute can't cover even the minimum per-Category amount.
-// Deliberately funds itself out of the unallocated remainder rather than
-// displacing the user's own chosen Categories' amounts.
-func (s *BudgetWizardService) defaultSavingsEntry(ctx context.Context, userID uuid.UUID, income int64, preferences []dto.BudgetPreference, unallocatedAmount int64) (*dto.ProposalEntry, error) {
-	for _, pref := range preferences {
-		if isSavingsCategoryName(pref.CategoryName) {
-			return nil, nil
-		}
-	}
-
-	expenseType := string(model.CategoryTypeExpense)
-	categories, err := s.categoryRepo.ListCategoriesForUser(ctx, userID, &expenseType)
-	if err != nil {
-		return nil, fmt.Errorf("defaultSavingsEntry: %w", err)
-	}
-	var savingsCategory *model.Category
-	for _, c := range categories {
-		if isSavingsCategoryName(c.Name) {
-			savingsCategory = c
-			if c.IsSystem() {
-				break // prefer the seeded system Category over a same-named user one
-			}
-		}
-	}
-	if savingsCategory == nil {
-		return nil, nil
-	}
-
-	amount := int64(common.BudgetWizardDefaultSavingsShare * float64(income))
-	if amount > unallocatedAmount {
-		amount = unallocatedAmount
-	}
-	if amount < common.BudgetWizardMinAmountPerCategory {
-		return nil, nil
-	}
-
-	return &dto.ProposalEntry{
-		CategoryID:      savingsCategory.ID,
-		CategoryName:    savingsCategory.Name,
-		ProposedAmount:  amount,
-		PercentOfIncome: float64(amount) / float64(income),
-		Reasoning:       "Mặc định trích một phần thu nhập cho tiết kiệm — bạn có thể chỉnh hoặc xóa ở bước tiếp theo.",
-	}, nil
-}
-
-// isSavingsCategoryName matches common.BudgetWizardSavingsCategoryNamePatterns
-// case-insensitively against a substring of name, same technique as
-// budgetproposal.categoryBaseline's keyword matching.
-func isSavingsCategoryName(name string) bool {
-	lower := strings.ToLower(name)
-	for _, pattern := range common.BudgetWizardSavingsCategoryNamePatterns {
-		if strings.Contains(lower, pattern) {
-			return true
-		}
-	}
-	return false
-}
+// NOTE — v1's defaultSavingsEntry and isSavingsCategoryName were deleted here,
+// not moved.
+//
+// v1 injected a "Tiết kiệm" BUDGET row into every proposal, funded from the
+// leftover pool. v2 subtracts savings before disposable is computed
+// (spec.md US-05): money set aside is not money available to spend, and listing
+// it beside the spending categories makes it look like just another line — the
+// one users raid first when something else runs over. It now appears on the
+// result screen as an already-deducted reference figure, outside the donut.
 
 // SuggestCategoryName implements US-03's Step 2B / US-05's internal-helper
 // subsection — the one AI-Service-backed call this feature makes. Ownership

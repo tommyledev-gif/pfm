@@ -13,4 +13,8 @@ export interface Category {
   // icon_url is an uploaded custom image (Cloudflare R2) — takes display
   // priority over `icon`'s free-text emoji when present.
   icon_url: string | null;
+  // system_key is the stable identifier for a system-defined category. null for
+  // a user's own. The budget wizard's presets resolve through this rather than
+  // through `name`, which changes with renames and with language.
+  system_key: string | null;
 }

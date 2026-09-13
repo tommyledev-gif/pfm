@@ -1,277 +1,262 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useBudgetProposalsMutation } from "@/features/budget-wizard/api/use-budget-proposals-mutation";
 import { useBudgetWizardPrefillQuery } from "@/features/budget-wizard/api/use-budget-wizard-prefill-query";
-import { useSubmitBudgetWizard } from "@/features/budget-wizard/api/use-submit-budget-wizard";
+import { useBulkCreateBudgetsMutation } from "@/features/budget-wizard/api/use-bulk-create-budgets-mutation";
 import {
-  BudgetWizardPeriod,
-  BulkBudgetItem,
-  PendingCustomCategory,
-  SpendingPreference,
-  WizardSelection,
+  DEFAULT_SAVINGS_PCT,
+  disposableXu,
+  savingsForPct,
+  validateIncomeStep,
+} from "@/features/budget-wizard/budget-math";
+import {
+  BudgetProposalsResponse,
+  CategoryIntentRequest,
+  PresetKey,
+  ProposalEntry,
 } from "@/features/budget-wizard/types";
-import { WalletCurrency } from "@/lib/constants";
+import { getErrorMessage } from "@/lib/api-envelope";
 
-export const BUDGET_WIZARD_TOTAL_STEPS = 4;
+export const BUDGET_WIZARD_TOTAL_STEPS = 3;
 
-// All of BudgetWizardModal's state, derived values, and step-transition
-// handlers — split into its own hook purely to keep BudgetWizardModal.tsx
-// (the layout/JSX half) under the project's 300-line cap.
-export function useBudgetWizardState(visible: boolean, onClose: () => void, onCompleted?: (createdCount: number) => void) {
+/** Why the wizard could not build a proposal, when the reason is the server's
+ *  state rather than the user's input. Kept separate from ordinary request
+ *  failures because the fix is different: these need a deploy, not a retry. */
+type WizardProblem = "server_outdated" | "categories_unmigrated";
+
+const PROBLEM_MESSAGES: Record<WizardProblem, string> = {
+  server_outdated:
+    "Máy chủ chưa hỗ trợ phiên bản thiết lập ngân sách này. Bạn cập nhật lại máy chủ rồi thử lại nhé.",
+  categories_unmigrated:
+    "Danh mục hệ thống trên máy chủ chưa được cập nhật nên chưa khớp được với các gói gợi ý.",
+};
+
+/**
+ * All of the wizard's state and transitions, kept out of the modal so that file
+ * stays layout only.
+ *
+ * ⚠️ This state is DRAFT INPUT, not a copy of server data — which is why it
+ * lives in useState rather than TanStack Query. The prefill response, the
+ * proposal and the created budgets are all server state and are never copied
+ * into here; what is here is what the user has typed and not yet committed.
+ *
+ * Nothing is written at any step before the final confirmation. Dismissing the
+ * wizard half way leaves budgets, categories and plans exactly as they were.
+ */
+export function useBudgetWizardState(visible: boolean, onClose: () => void, onCompleted?: (count: number) => void) {
   const [step, setStep] = useState(1);
-  const [incomeSubmitAttempted, setIncomeSubmitAttempted] = useState(false);
-  const [categoriesSubmitAttempted, setCategoriesSubmitAttempted] = useState(false);
-  const [period, setPeriod] = useState<BudgetWizardPeriod>("monthly");
-  const [income, setIncome] = useState("");
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [customCategories, setCustomCategories] = useState<PendingCustomCategory[]>([]);
-  const [preferences, setPreferences] = useState<Record<string, SpendingPreference>>({});
-  const [amounts, setAmounts] = useState<Record<string, number>>({});
-  const [reasoningByCategoryId, setReasoningByCategoryId] = useState<Record<string, string>>({});
-  // Entries POST /ai/budget-proposals returns for a Category the user never
-  // selected in step 2 (currently just the backend's own default-injected
-  // Savings proposal, backend/internal/service/budget_wizard_service.go's
-  // defaultSavingsEntry) — `selections` itself is only ever derived from
-  // selectedIds/customCategories, so without tracking these separately
-  // step 4 would silently drop that entry's amount/reasoning on the floor.
-  const [extraProposalEntries, setExtraProposalEntries] = useState<WizardSelection[]>([]);
-  const [scaledDownNotice, setScaledDownNotice] = useState(false);
+
+  // Every amount here is xu.
+  const [income, setIncome] = useState(0);
+  const [fixed, setFixed] = useState(0);
+  const [savingsPct, setSavingsPct] = useState(DEFAULT_SAVINGS_PCT);
+  const [cycleStartDay, setCycleStartDay] = useState(1);
+  const [preset, setPreset] = useState<PresetKey | null>(null);
+
+  const [result, setResult] = useState<BudgetProposalsResponse | null>(null);
   const [createdCount, setCreatedCount] = useState<number | null>(null);
-  const prefilledRef = useRef(false);
+  const [error, setError] = useState<string | null>(null);
 
   const prefill = useBudgetWizardPrefillQuery(visible);
-  const proposalsMutation = useBudgetProposalsMutation();
-  const { submit, isSubmitting, error: submitError } = useSubmitBudgetWizard();
+  const proposals = useBudgetProposalsMutation();
+  const bulkCreate = useBulkCreateBudgetsMutation();
 
-  const currency: WalletCurrency = prefill.data?.currency ?? "VND";
-  // spec.md US-03 Main Flow step 2 (resolved Open Questions #5, 2026-08-24):
-  // the picker offers expense-type Categories only.
-  const categories = useMemo(
-    () => (prefill.data?.categories ?? []).filter((c) => c.type === "expense"),
-    [prefill.data],
-  );
-  // A Budget on a non-expense Category (possible via F-05's own type-agnostic
-  // create flow, before this filter existed) never appears in `selections`
-  // below, so it must be re-submitted unchanged here — otherwise US-05's
-  // full-replace bulk-create would silently soft-delete it just because this
-  // wizard run never offered it for review.
-  const preservedBudgets: BulkBudgetItem[] = useMemo(() => {
-    if (!prefill.data) return [];
-    const expenseIds = new Set(categories.map((c) => c.id));
-    return prefill.data.existing_budgets
-      .filter((b) => !expenseIds.has(b.category_id))
-      .map((b) => ({
-        category_id: b.category_id,
-        period: b.period as BudgetWizardPeriod,
-        limits: b.limits.map((l) => ({ currency: l.currency, amount_limit: l.amount_limit })),
-      }));
-  }, [prefill.data, categories]);
+  const currency = prefill.data?.currency ?? "VND";
+  const savings = savingsForPct(income, savingsPct);
+  const disposable = disposableXu(income, fixed, savings);
 
+  // Reset on every open. A wizard that reopens holding the previous run's
+  // half-finished figures looks like it saved something it did not.
   useEffect(() => {
-    if (!visible) {
-      prefilledRef.current = false;
-      setStep(1);
-      setIncomeSubmitAttempted(false);
-      setCategoriesSubmitAttempted(false);
-      setPeriod("monthly");
-      setIncome("");
-      setSelectedIds(new Set());
-      setCustomCategories([]);
-      setPreferences({});
-      setAmounts({});
-      setReasoningByCategoryId({});
-      setExtraProposalEntries([]);
-      setScaledDownNotice(false);
-      setCreatedCount(null);
-    }
+    if (!visible) return;
+    setStep(1);
+    setIncome(0);
+    setFixed(0);
+    setSavingsPct(prefill.data?.default_savings_pct ?? DEFAULT_SAVINGS_PCT);
+    setCycleStartDay(prefill.data?.cycle_start_day ?? 1);
+    setPreset(null);
+    setResult(null);
+    setCreatedCount(null);
+    setError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
-  // US-01 Main Flow step 4: pre-select every Category with an existing
-  // active Budget, only once per wizard run (not re-applied over the user's
-  // own toggles once they start editing).
-  useEffect(() => {
-    if (!visible || prefilledRef.current || !prefill.data) return;
-    prefilledRef.current = true;
-    setSelectedIds(new Set(prefill.data.existing_budgets.map((b) => b.category_id)));
-  }, [visible, prefill.data]);
+  /**
+   * The categories a preset needs, resolved through system_key against what the
+   * user actually has.
+   *
+   * ⚠️ Every field of the prefill response is read defensively, including ones
+   * the current server always sends. A client must not crash because a field it
+   * expected is absent — and this one did: `prefill.data?.presets.find(...)`
+   * guarded `data` but not `presets`, so a server response without that key
+   * threw "Cannot read property 'find' of undefined" the moment a preset was
+   * tapped. Optional chaining has to cover the whole path, not just its head.
+   *
+   * Returns a `problem` rather than an empty array when it cannot build the
+   * intents, so the caller can say something specific instead of sending a
+   * request that is going to be rejected anyway.
+   */
+  const intentsForPreset = useCallback(
+    (key: PresetKey): { intents: CategoryIntentRequest[]; problem: WizardProblem | null } => {
+      const presets = prefill.data?.presets;
+      // No preset table at all means this app build is talking to a server that
+      // predates the v2 wizard. Nothing downstream can work — POST
+      // /ai/budget-proposals would reject the new payload too — so say that
+      // plainly rather than failing later and more obscurely.
+      if (!presets || presets.length === 0) return { intents: [], problem: "server_outdated" };
 
-  const selections: WizardSelection[] = useMemo(() => {
-    const real = categories
-      .filter((c) => selectedIds.has(c.id))
-      .map((c) => ({ categoryId: c.id, categoryName: c.name, isPending: false, preference: preferences[c.id] ?? "normal" }));
-    const pending = customCategories.map((c) => ({
-      categoryId: c.clientId,
-      categoryName: c.name,
-      isPending: true,
-      preference: preferences[c.clientId] ?? "normal",
-    }));
-    return [...real, ...pending];
-  }, [categories, selectedIds, customCategories, preferences]);
+      const presetDef = presets.find((p) => p.key === key);
+      if (!presetDef?.shares?.length) return { intents: [], problem: "server_outdated" };
 
-  // What step 4 actually renders/submits — `selections` plus any backend-
-  // injected entry (see extraProposalEntries above) the user hasn't removed.
-  const proposalSelections: WizardSelection[] = useMemo(
-    () => [...selections, ...extraProposalEntries],
-    [selections, extraProposalEntries],
+      const categories = prefill.data?.categories ?? [];
+      const intents = presetDef.shares
+        .map((share): CategoryIntentRequest | null => {
+          const match = categories.find((c) => c.system_key === share.system_key);
+          if (!match) return null;
+          return {
+            category_id: match.id,
+            category_name: match.name,
+            system_key: share.system_key,
+            source: "preset" as const,
+            // Zero on purpose: the server owns the allocation. Computing it here
+            // too would mean two implementations of the same formula, free to
+            // drift apart.
+            amount_min: 0,
+            amount_max: 0,
+            locked: false,
+          };
+        })
+        .filter((v): v is CategoryIntentRequest => v !== null);
+
+      // Categories carry no system_key until migration 019 has run, so every
+      // preset line resolves to nothing. Distinct from the case above: the
+      // server is new enough to send presets but its database has not been
+      // migrated.
+      if (intents.length === 0) return { intents, problem: "categories_unmigrated" };
+      return { intents, problem: null };
+    },
+    [prefill.data],
   );
 
-  const toggleCategory = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else if (next.size + customCategories.length < 20) next.add(id);
-      return next;
+  const requestProposal = useCallback(
+    async (intents: CategoryIntentRequest[], chosenPreset: PresetKey) => {
+      setError(null);
+      try {
+        const data = await proposals.mutateAsync({
+          income,
+          fixed_total: fixed,
+          savings_target: savings,
+          currency,
+          period: "monthly",
+          cycle_start_day: cycleStartDay,
+          profile_preset: chosenPreset,
+          intents,
+        });
+        setResult(data);
+      } catch (e) {
+        setResult(null);
+        setError(getErrorMessage(e, "Chưa tính được ngân sách, bạn thử lại nhé."));
+      }
+    },
+    [proposals, income, fixed, savings, currency, cycleStartDay],
+  );
+
+  const selectPreset = useCallback(
+    (key: PresetKey) => {
+      setPreset(key);
+      setStep(3);
+      const { intents, problem } = intentsForPreset(key);
+      if (problem) {
+        setResult(null);
+        setError(PROBLEM_MESSAGES[problem]);
+        return;
+      }
+      void requestProposal(intents, key);
+    },
+    [intentsForPreset, requestProposal],
+  );
+
+  const retryProposal = useCallback(() => {
+    if (!preset) return;
+    const { intents, problem } = intentsForPreset(preset);
+    if (problem) {
+      setResult(null);
+      setError(PROBLEM_MESSAGES[problem]);
+      return;
+    }
+    void requestProposal(intents, preset);
+  }, [preset, intentsForPreset, requestProposal]);
+
+  /**
+   * A hand-edited row.
+   *
+   * ⚠️ Applied locally and ONLY to the row that was edited — the buffer absorbs
+   * the difference and every other row is left untouched. Re-asking the server
+   * would re-run the allocator, which would rebalance rows the user did not
+   * touch: exactly the silent rewrite the edit modal's ceiling exists to
+   * prevent.
+   */
+  const editAmount = useCallback((categoryId: string, amountXu: number) => {
+    setResult((prev) => {
+      if (!prev) return prev;
+      const proposalsNext: ProposalEntry[] = prev.proposals.map((p) =>
+        p.category_id === categoryId
+          ? { ...p, amount_min: amountXu, amount_max: amountXu, source: "manual", locked: true }
+          : p,
+      );
+      const allocated = proposalsNext.reduce((sum, p) => sum + p.amount_max, 0);
+      return { ...prev, proposals: proposalsNext, unallocated_amount: prev.disposable - allocated };
     });
-  };
+  }, []);
 
-  const addCustomCategory = (category: PendingCustomCategory) => {
-    setCustomCategories((prev) => (prev.length + selectedIds.size < 20 ? [...prev, category] : prev));
-  };
-
-  const removeCustomCategory = (clientId: string) => {
-    setCustomCategories((prev) => prev.filter((c) => c.clientId !== clientId));
-  };
-
-  const goToStep3 = () => {
-    setCategoriesSubmitAttempted(true);
-    if (selectedIds.size + customCategories.length === 0) return;
-    setPreferences((prev) => {
-      const next = { ...prev };
-      for (const id of selectedIds) if (!next[id]) next[id] = "normal";
-      for (const c of customCategories) if (!next[c.clientId]) next[c.clientId] = "normal";
-      return next;
-    });
-    setStep(3);
-  };
-
-  const goToStep4 = () => {
-    const incomeCents = Math.round(Number(income) * 100);
-    const realPreferences = selections
-      .filter((s) => !s.isPending)
-      .map((s) => ({ category_id: s.categoryId, category_name: s.categoryName, spending_preference: s.preference }));
-
-    if (realPreferences.length === 0) {
-      // Every selected Category is a still-pending custom one — nothing to
-      // send to POST /ai/budget-proposals (min=1 preferences). Split income
-      // evenly across the pending set instead (Open Questions #2).
-      const share = customCategories.length > 0 ? Math.floor(incomeCents / customCategories.length) : 0;
-      const evenAmounts: Record<string, number> = {};
-      for (const c of customCategories) evenAmounts[c.clientId] = share;
-      setAmounts(evenAmounts);
-      setReasoningByCategoryId({});
-      setExtraProposalEntries([]);
-      setScaledDownNotice(false);
-      setStep(4);
-      return;
-    }
-
-    proposalsMutation.mutate(
-      { income: incomeCents, currency, period, preferences: realPreferences },
-      {
-        onSuccess: (data) => {
-          const newAmounts: Record<string, number> = {};
-          const newReasoning: Record<string, string> = {};
-          const selectedCategoryIds = new Set(realPreferences.map((p) => p.category_id));
-          const extras: WizardSelection[] = [];
-          for (const p of data.proposals) {
-            newAmounts[p.category_id] = p.proposed_amount;
-            newReasoning[p.category_id] = p.reasoning;
-            // A proposal for a Category not in what step 2/3 selected — the
-            // backend's own default-injected Savings entry (see
-            // defaultSavingsEntry server-side) — needs to be tracked
-            // separately so step 4 actually renders/submits it too.
-            if (!selectedCategoryIds.has(p.category_id)) {
-              extras.push({ categoryId: p.category_id, categoryName: p.category_name, isPending: false, preference: "normal" });
-            }
-          }
-          if (customCategories.length > 0) {
-            const share = Math.max(0, Math.floor(data.unallocated_amount / customCategories.length));
-            for (const c of customCategories) newAmounts[c.clientId] = share;
-          }
-          setAmounts(newAmounts);
-          setReasoningByCategoryId(newReasoning);
-          setExtraProposalEntries(extras);
-          setScaledDownNotice(data.scaled_down_notice);
-          setStep(4);
-        },
-      },
-    );
-  };
-
-  // Step 4 (spec.md US-04/US-05 revision) lets the user drop a proposed
-  // budget entirely before confirming — a real selection goes back through
-  // toggleCategory/removeCustomCategory so it stays excluded if the user
-  // steps back to re-review step 2/3; a backend-injected extra (Savings) is
-  // never in selectedIds/customCategories to begin with, so it's just
-  // dropped from extraProposalEntries directly.
-  const removeProposalEntry = (categoryId: string) => {
-    if (extraProposalEntries.some((e) => e.categoryId === categoryId)) {
-      setExtraProposalEntries((prev) => prev.filter((e) => e.categoryId !== categoryId));
-      return;
-    }
-    if (customCategories.some((c) => c.clientId === categoryId)) {
-      removeCustomCategory(categoryId);
-      return;
-    }
-    toggleCategory(categoryId);
-  };
-
-  const handleConfirm = async () => {
+  const submit = useCallback(async () => {
+    if (!result) return;
+    setError(null);
     try {
-      const count = await submit(proposalSelections, amounts, period, currency, customCategories, preservedBudgets);
-      setCreatedCount(count);
-      setStep(5);
-    } catch {
-      // submitError below already surfaces the failure inline on step 4.
+      const data = await bulkCreate.mutateAsync({
+        budgets: result.proposals.map((p) => ({
+          category_id: p.category_id,
+          period: "monthly" as const,
+          limits: [{ currency, amount_limit: p.amount_max }],
+        })),
+      });
+      setCreatedCount(data.created_count);
+      setStep(BUDGET_WIZARD_TOTAL_STEPS + 1);
+      onCompleted?.(data.created_count);
+    } catch (e) {
+      setError(getErrorMessage(e, "Chưa lưu được ngân sách, bạn thử lại nhé."));
     }
-  };
+  }, [result, bulkCreate, currency, onCompleted]);
 
-  const handleDone = () => {
-    if (createdCount !== null) onCompleted?.(createdCount);
-    onClose();
-  };
-
-  const incomeCents = Math.round(Number(income) * 100);
+  const canLeaveIncomeStep = useMemo(
+    () => validateIncomeStep(income, fixed, savings).ok,
+    [income, fixed, savings],
+  );
 
   return {
     step,
-    setStep,
-    incomeSubmitAttempted,
-    categoriesSubmitAttempted,
-    period,
-    setPeriod,
-    income,
-    setIncome,
-    incomeCents,
     currency,
-    selectedIds,
-    customCategories,
-    preferences,
-    setPreferences,
-    amounts,
-    setAmounts,
-    reasoningByCategoryId,
-    scaledDownNotice,
+    income,
+    fixed,
+    savings,
+    savingsPct,
+    cycleStartDay,
+    disposable,
+    preset,
+    result,
     createdCount,
-    categories,
-    selections,
-    proposalSelections,
-    removeProposalEntry,
-    toggleCategory,
-    addCustomCategory,
-    removeCustomCategory,
-    onSubmitIncome: () => {
-      setIncomeSubmitAttempted(true);
-      const value = Number(income);
-      if (!income || !(value > 0) || Math.round(value * 100) > 9_999_999_999) return;
-      setStep(2);
-    },
-    goToStep3,
-    goToStep4,
-    handleConfirm,
-    handleDone,
-    proposalsMutation,
-    isSubmitting,
-    submitError,
+    error,
+    loadingProposal: proposals.isPending,
+    submitting: bulkCreate.isPending,
+    setIncome,
+    setFixed,
+    setSavingsPct,
+    setCycleStartDay,
+    goToProfile: () => canLeaveIncomeStep && setStep(2),
+    selectPreset,
+    retryProposal,
+    editAmount,
+    submit,
+    close: onClose,
   };
 }

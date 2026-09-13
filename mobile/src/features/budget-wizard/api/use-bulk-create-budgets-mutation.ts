@@ -3,8 +3,10 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient, unwrap } from "@/lib/axios";
 import { BulkCreateBudgetsRequest, BulkCreateBudgetsResponse } from "@/features/budget-wizard/types";
 
-// POST /budgets/bulk (specs/ai-budget-wizard/spec.md US-05) — replaces the
-// caller's entire active Budget set, not a merge (Edge Cases #1).
+// POST /budgets/bulk — replaces the caller's entire active budget set in one
+// transaction. A replace, not a merge: the wizard describes a whole plan, and
+// merging it into whatever was there before produces a set the user never
+// reviewed.
 export function useBulkCreateBudgetsMutation() {
   const queryClient = useQueryClient();
   return useMutation({

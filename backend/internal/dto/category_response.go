@@ -20,6 +20,9 @@ type CategoryResponse struct {
 	Type      string     `json:"type"`
 	CreatedAt time.Time  `json:"created_at"`
 	IconURL   *string    `json:"icon_url"`
+	// SystemKey is how the budget wizard's presets find a category. nil for
+	// anything the user created themselves.
+	SystemKey *string `json:"system_key"`
 }
 
 func NewCategoryResponse(c *model.Category) CategoryResponse {
@@ -31,6 +34,7 @@ func NewCategoryResponse(c *model.Category) CategoryResponse {
 		Type:      string(c.Type),
 		CreatedAt: c.CreatedAt,
 		IconURL:   c.IconURL,
+		SystemKey: c.SystemKey,
 	}
 }
 

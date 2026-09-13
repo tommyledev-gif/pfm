@@ -185,13 +185,13 @@ export function TransactionsHeader({
           onPress={onExport}
           testID="btn-export-transactions"
         />
-        <FilterPill
+        {/* <FilterPill
           active={false}
           label={importing ? "Đang đọc…" : "Nhập Excel"}
           icon={UploadIcon}
           onPress={onImport}
           testID="btn-import-transactions"
-        />
+        /> */}
       </ScrollView>
     </View>
   );

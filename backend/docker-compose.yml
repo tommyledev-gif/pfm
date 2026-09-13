@@ -49,6 +49,11 @@ services:
       - ./db/migrations/016_transactions_created_at_sort_index.sql:/docker-entrypoint-initdb.d/15_transactions_created_at_sort_index.sql:ro
       - ./db/migrations/017_seed_savings_category.sql:/docker-entrypoint-initdb.d/16_seed_savings_category.sql:ro
       - ./db/migrations/018_transaction_audit_logs.sql:/docker-entrypoint-initdb.d/17_transaction_audit_logs.sql:ro
+      # F-13.1 Phase 1 (specs/ai-budget-wizard-v2/plan.md BWZ2-T02).
+      # ⚠️ Same caveat as 015-018: a running VPS volume needs these applied
+      # by hand — initdb only fires on first initialization.
+      - ./db/migrations/019_categories_system_key.sql:/docker-entrypoint-initdb.d/18_categories_system_key.sql:ro
+      - ./db/migrations/020_budget_plans.sql:/docker-entrypoint-initdb.d/19_budget_plans.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s

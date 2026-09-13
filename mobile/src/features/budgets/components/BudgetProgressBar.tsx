@@ -14,6 +14,11 @@ interface BudgetProgressBarProps {
 }
 
 const STRIPE_COUNT = 14;
+// Width of the dark seam drawn wherever two coloured sections of the bar meet
+// (spent | remaining, and spent | overspend). Without it the fill bleeds into
+// the track as one continuous ramp and the boundary — the only thing this bar
+// exists to communicate — has to be inferred from a colour change alone.
+const SEAM_WIDTH = 2;
 
 // A budget bar, which the plain ProgressBar can't express: it has to show
 // three things at once — how much is spent, where the month's pace marker
@@ -36,12 +41,24 @@ export function BudgetProgressBar({ ratio, pace, color, height = 8 }: BudgetProg
     <View style={[styles.track, { height, borderRadius: radius }]}>
       <View style={[styles.fill, { width: `${fill * 100}%`, backgroundColor: color, borderRadius: radius }]} />
 
+      {/* The spent | remaining seam. Only drawn while the bar is partly full —
+          at 0% there is nothing to its left and at 100% nothing to its right,
+          and in both cases a floating dark tick reads as a defect. */}
+      {fill > 0 && fill < 1 ? (
+        <View pointerEvents="none" style={[styles.seam, { left: `${fill * 100}%`, marginLeft: -SEAM_WIDTH }]} />
+      ) : null}
+
       {over ? (
         <View style={[styles.overspend, { width: `${overspendShare * 100}%`, borderRadius: radius }]}>
           {Array.from({ length: STRIPE_COUNT }).map((_, i) => (
             <View key={i} style={styles.stripe} />
           ))}
         </View>
+      ) : null}
+
+      {/* The spent | overspend seam, on the hatch's leading edge. */}
+      {over && overspendShare > 0 && overspendShare < 1 ? (
+        <View pointerEvents="none" style={[styles.seam, { right: `${overspendShare * 100}%` }]} />
       ) : null}
 
       {pace !== undefined ? (
@@ -57,6 +74,10 @@ export function BudgetProgressBar({ ratio, pace, color, height = 8 }: BudgetProg
 const styles = StyleSheet.create({
   track: { width: "100%", backgroundColor: colors.trackMuted, overflow: "visible", justifyContent: "center" },
   fill: { position: "absolute", left: 0, top: 0, bottom: 0 },
+  // Painted in the app background rather than left transparent: the track
+  // underneath is a translucent white, so a hole would show the track, not a
+  // gap. This has to be an opaque cut.
+  seam: { position: "absolute", top: 0, bottom: 0, width: SEAM_WIDTH, backgroundColor: colors.bgApp },
   overspend: {
     position: "absolute",
     right: 0,

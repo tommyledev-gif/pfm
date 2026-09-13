@@ -173,5 +173,6 @@ func toCategoryModel(row sqlc.Category) *model.Category {
 		CreatedAt: row.CreatedAt,
 		DeletedAt: row.DeletedAt,
 		IconURL:   row.IconURL,
+		SystemKey: row.SystemKey,
 	}
 }

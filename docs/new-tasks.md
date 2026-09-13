@@ -1150,3 +1150,436 @@ Validation của màn này, viết lại cho khớp đơn vị thật:
 | `income ≤ trần` | `≤ 999_999_999_900` | ≤ 9.999.999.999đ |
 | `fixed + savings < income` | so sánh trong xu | — |
 | `disposable ≥ 6 × MinAmountPerCategory` (E-02) | `≥ 30_000_000` | ≥ 300.000đ |
+
+---
+
+## 21. Notification & Settings — chốt quyết định
+
+_Thêm 2026-09-13. Phần này **override** §13 (notification policy) và **đóng** OQ-12, BS-07, BS-11. E-14 (timezone) được **hoãn có chủ ý** — xem D-09._
+
+### 21.0 Bảng chốt
+
+| # | Vấn đề | Quyết định | Thay thế / đóng |
+|---|---|---|---|
+| D-01 | Có push thật không | **Có.** `expo-notifications` + Expo Push Service. | BS-07 |
+| D-02 | Platform | **Android-only.** iOS ẩn hẳn toggle (không disable), không đăng ký token. | — |
+| D-03 | Build workflow | **Local Gradle build**, không tiêu lượt EAS. Xem §21.1. | — |
+| D-04 | Loại noti mặc định BẬT | `budget_near_limit`, `budget_exceeded` | **§13 dòng "KHÔNG GỬI — mỗi lần vượt budget"** |
+| D-05 | Tần suất noti budget | **Mỗi transaction chạm ngưỡng đều bắn.** Không dedup theo chu kỳ. User tắt ở Settings, hoặc ngay trên push bằng action button. | §13 trần cứng — **bỏ hẳn** |
+| D-06 | Daily digest 8:00 | Giữ **mặc định TẮT** như §13. | — |
+| D-07 | Nơi lưu setting | Server — bảng `user_preferences` mới. | — |
+| D-08 | Nhắc calibration | Select 3 mức, mặc định `frequent` cho `cold`. | **OQ-12 → đóng** |
+| D-09 | Timezone | **Hoãn.** Hardcode `Asia/Ho_Chi_Minh` một chỗ trong Go. Không có UI, không có cột DB. | E-14 vẫn **chưa thoả** |
+| D-10 | Map preset ↔ category | **`categories.system_key`**. | BS-13 (mới, §21.9) |
+| D-11 | Sàn mỗi category | `BudgetWizardMinAmountPerCategory` = **`5_000_000` xu** (= 50.000đ). | `constants.go:182` |
+| D-12 | Plan versioning | **Mọi** budget đều có plan version — kể cả budget user tự tạo ở màn Budgets. Thêm `budget_plans.origin`. | §4.1 |
+| D-13 | Wizard cũ | **Thay tại chỗ toàn bộ**, xoá 4 step cũ. Không chạy song song. | §17 Phase 1 |
+
+---
+
+### 21.1 Build & dev workflow — không tiêu lượt EAS
+
+Nhận định "dev build chỉ build lại khi đổi thư viện native" là **đúng**. Sau khi có dev client trên máy, mọi thay đổi JS/TS vẫn Fast Refresh qua `npx expo start --dev-client` y như Expo Go.
+
+> ⚠️ **`eas build --local` KHÔNG chạy trên Windows.** EAS local build chỉ hỗ trợ macOS/Linux; trên Windows phải qua WSL2. Máy dev của project là Windows 11 → **không dùng đường này.**
+
+**Đường đi thực tế trên Windows:**
+
+| Việc | Lệnh | Tốn lượt EAS |
+|---|---|---|
+| Build dev client lần đầu / sau khi thêm native module | `npx expo run:android` | **0** |
+| Dev hằng ngày | `npx expo start --dev-client` | 0 |
+| APK release để chia sẻ / cài máy khác | `npx expo prebuild` → `cd android && ./gradlew assembleRelease` | **0** |
+| Bản phát hành chính thức | `eas build -p android --profile preview` | 1 |
+
+Yêu cầu môi trường: **Android Studio + Android SDK + JDK 17** (React Native 0.81 / Expo SDK 54).
+`android/` và `ios/` đã nằm trong `mobile/.gitignore` → prebuild không làm bẩn repo, `app.json` vẫn là nguồn sự thật duy nhất của config native (CNG).
+
+**Hệ quả bắt buộc:** kể từ khi thêm `expo-notifications`, **Expo Go không còn dùng để test được nữa** — từ SDK 53 Expo Go bỏ hẳn remote push trên Android. Mọi hướng dẫn test trong repo phải đổi sang dev client.
+
+---
+
+### 21.2 Wiring `expo-notifications`
+
+```bash
+npx expo install expo-notifications expo-device
+```
+
+`app.json` — thêm plugin và trỏ file FCM:
+
+```jsonc
+"android": {
+  "googleServicesFile": "./google-services.json",   // FCM V1 — tạo ở bước Firebase
+  "permissions": ["POST_NOTIFICATIONS"]
+},
+"plugins": [
+  ["expo-notifications", {
+    "icon": "./assets/notification-icon.png",
+    "color": "#85FF33"
+  }]
+]
+```
+
+**Ràng buộc:**
+- `google-services.json` **không commit** — thêm vào `.gitignore`, nạp qua EAS secret khi build EAS. Local build đọc file thật trên máy dev.
+- `getExpoPushTokenAsync({ projectId })` — `projectId` lấy từ `app.json → extra.eas.projectId` (đã có sẵn), **không hardcode**.
+- Android 13+ cần xin quyền runtime: `Notifications.requestPermissionsAsync()`. Xin **đúng lúc user bật toggle đầu tiên**, không xin ở màn login (xin sớm = bị từ chối vĩnh viễn).
+- iOS: `Platform.OS === "ios"` → bỏ qua toàn bộ khối đăng ký, ẩn nhóm toggle (D-02).
+
+---
+
+### 21.3 Bảng `user_push_tokens`
+
+```sql
+-- migration 019
+CREATE TABLE user_push_tokens (
+  id               uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id          uuid NOT NULL REFERENCES users(id),
+  expo_push_token  text NOT NULL UNIQUE,
+  platform         text NOT NULL CHECK (platform IN ('android', 'ios')),
+  device_name      text,
+  last_seen_at     timestamptz NOT NULL DEFAULT now(),
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  revoked_at       timestamptz
+);
+CREATE INDEX idx_push_tokens_user_active ON user_push_tokens (user_id) WHERE revoked_at IS NULL;
+```
+
+**Vòng đời — phải làm đủ 4 nhánh, thiếu nhánh nào là gửi noti cho nhầm người:**
+
+| Sự kiện | Hành động |
+|---|---|
+| Login xong / mở app có session | `POST /api/v1/me/push-tokens` → upsert. `ON CONFLICT (expo_push_token) DO UPDATE SET user_id = EXCLUDED.user_id, revoked_at = NULL, last_seen_at = now()` — **bắt buộc cập nhật `user_id`**: hai người dùng chung một máy thì token không đổi, nếu không ghi đè thì người sau nhận noti của người trước. |
+| Logout | `DELETE /api/v1/me/push-tokens` (body: token hiện tại) → `revoked_at = now()`. Gọi **trước** `clearSession()` trong `settings.tsx`, cùng kiểu best-effort/timeout như `flushSync()` đang làm. |
+| Expo trả `DeviceNotRegistered` | `revoked_at = now()` ngay trong job. Không retry. |
+| Token đổi (OS cấp lại) | `addPushTokenListener` → gọi lại upsert. |
+
+**Không bao giờ log `expo_push_token`** (CLAUDE.md — không log sensitive data). Log `user_id` + số token là đủ.
+
+---
+
+### 21.4 Gửi push — nằm trong job sẵn có
+
+**Hai đường bắn khác nhau, vì D-05 đổi ngữ nghĩa từ "theo chu kỳ" sang "theo transaction":**
+
+| Loại | Bắn ở đâu | Vì sao |
+|---|---|---|
+| `budget_near_limit`, `budget_exceeded` | **Ngay sau khi DB transaction của `CreateTransaction` commit**, trong một goroutine fire-and-forget | D-05 là "mỗi transaction". Đợi job 5 phút thì push về sau khi user đã đóng app và đã quên mình vừa nhập gì — noti mất hết tính actionable, mà vẫn tốn đúng chi phí phiền. |
+| `calibration_day7/14`, `cycle_summary`, `daily_digest` | Job 5 phút sẵn có | Bản chất là theo lịch, không theo hành động. |
+
+Ràng buộc của nhánh fire-and-forget:
+- Chạy **sau** `tx.Commit()`, không nằm trong DB transaction — push fail không được rollback transaction của user.
+- Có `context.WithTimeout` riêng, **không** dùng ctx của HTTP request (request kết thúc trước khi Expo trả lời).
+- Panic trong goroutine phải `recover()` — panic ở đây giết cả process.
+- Job 5 phút giữ vai trò **lưới an toàn**: quét transaction trong 15 phút gần nhất chưa có `notifications` row tương ứng (server restart giữa chừng, goroutine chết) và bắn bù.
+
+```
+backend/internal/service/push/          # client Expo Push API, zero business logic
+  client.go      POST https://exp.host/--/api/v2/push/send, batch <= 100 message
+  receipts.go    poll receipt -> DeviceNotRegistered -> revoke token
+```
+
+`NotificationService` giữ nguyên vai trò: quyết định **có tạo row `notifications` hay không** (nguồn sự thật + dedup). Push chỉ là **hệ quả** của một row vừa được tạo — `created == true` thì mới đẩy sang push queue. Row đã tồn tại (dedup chặn) → không push. Đây là thứ giữ cho in-app list và push không bao giờ lệch nhau.
+
+Thứ tự trong một lần chạy job: `(1) tính trạng thái → (2) insert notification (dedup) → (3) lọc theo user_preferences → (4) lọc token còn sống → (5) gửi batch`.
+Bước (3) đứng **sau** (2) là cố ý: user tắt push vẫn phải thấy thông báo trong app, chỉ là không bị đẩy ra ngoài.
+
+---
+
+### 21.5 Các loại notification & điều kiện bắn
+
+| `type` | Điều kiện | Trần | Mặc định |
+|---|---|---|---|
+| `budget_near_limit` | `ratio >= 0.50` **VÀ** `ratio > periodElapsed + 0.05` | **không trần** — mỗi transaction | **BẬT** |
+| `budget_exceeded` | `spent > amount_limit` | **không trần** — mỗi transaction | **BẬT** |
+| `calibration_day7` | §8.1 — `cold`, >= 5 tx | 1/plan | theo select |
+| `calibration_day14` | §8.1 | 1/plan | theo select |
+| `cycle_summary` | §8.5 | 1/chu kỳ | theo select |
+| `daily_digest` | 08:00 giờ VN | 1/ngày | **TẮT** |
+
+**`budget_near_limit` phải dùng đúng công thức mà UI đang dùng**, không được đặt ngưỡng phẳng 80%:
+
+```
+ratio         = spent / amount_limit
+periodElapsed = share chu kỳ đã trôi qua
+at-risk  <=>  ratio > periodElapsed + PACE_TOLERANCE      // PACE_TOLERANCE = 0.05
+```
+
+Đây là logic của `mobile/src/features/budgets/budget-pace.ts → budgetRowStatus()` — nguồn của chip **"Sắp vượt"** trong `BudgetsTab.tsx`. Nếu push dùng ngưỡng khác thì user nhận push "sắp vượt" rồi mở app thấy chip đếm 0 — mất trust ngay lần đầu.
+
+Điều kiện `ratio >= 0.50` là **guard chống nhiễu đầu chu kỳ** (chính là quy tắc *"dùng ≥ 50% trước khi qua 40% chu kỳ"* của §13, viết lại cho khớp biến): không có nó thì tiêu 12% ngân sách vào ngày 2 đã đủ vượt `elapsed + 0.05` → bắn noti vô nghĩa.
+
+> ⚠️ Logic pace hiện **chỉ tồn tại ở client** (TypeScript). Job chạy ở Go → **phải port sang Go**, và hai bên phải có test cùng bộ case. Đây là việc backend mới, §17 chưa liệt kê.
+
+**Cả hai loại bắn mỗi transaction chạm ngưỡng, không có trần chu kỳ (D-05).** Đây là quyết định sản phẩm, ghi lại nguyên văn đánh đổi để người sau không tưởng là sơ suất:
+
+- §13 gốc cấm điều này, và §16 đặt `notification opt-out sau 30 ngày < 15%` làm chỉ báo churn sớm nhất. Rủi ro thật: user tắt push → mất luôn `calibration_day7/14` → mất phần lõi của v2 (§8).
+- Đánh đổi được chấp nhận vì **quyền tắt nằm ngay trên notification** (§21.5.1), không bắt user đi tìm trong Settings. Một cú chạm để im lặng là thứ giữ cho việc bắn dày không biến thành opt-out toàn bộ.
+- **Bắt buộc đo:** tách metric opt-out theo từng loại, không gộp một số. `notify_budget_*` bị tắt nhiều là kết quả mong đợi của D-05; `calibration_reminder = 'off'` tăng mới là tín hiệu hỏng. Nếu mute-rate của budget vượt **40%** sau 30 ngày → xem lại D-05.
+
+**Chống ngập khay thông báo — bắt buộc, không phải tối ưu:** mọi push của cùng một budget dùng **chung một Android notification id** (`identifier = "budget:" + budgetID`). Android sẽ **thay thế** notification cũ thay vì xếp chồng — user uống 5 ly cafe trong ngày thì thấy một dòng luôn hiện số mới nhất, không phải 5 dòng. Không có cái này thì D-05 làm khay thông báo không dùng được, và đó mới là thứ khiến user tắt.
+
+#### 21.5.1 Action button trên push
+
+```
+☕ Cafe & Giải trí — 980k / 900k
+Vượt 80.000đ. Còn 17 ngày.
+[ Không nhắc mục này ]   [ Tắt loại này ]
+```
+
+Dùng `Notifications.setNotificationCategoryAsync()` với 2 action:
+
+| Action | Tác dụng | Phạm vi |
+|---|---|---|
+| `mute_budget` | Im lặng **budget này**, **hết chu kỳ này** | 1 budget × 1 chu kỳ |
+| `mute_type` | Tắt hẳn loại đó, y như toggle trong Settings | mọi budget, vĩnh viễn |
+
+`mute_budget` cần bảng mới:
+
+```sql
+CREATE TABLE notification_mutes (
+  user_id      uuid NOT NULL REFERENCES users(id),
+  type         text NOT NULL,
+  budget_id    uuid REFERENCES budgets(id),
+  period_start date NOT NULL,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, type, budget_id, period_start)
+);
+```
+
+Hết chu kỳ, `period_start` đổi → mute tự hết hạn, không cần job dọn. Đây là lý do mute gắn vào `period_start` chứ không phải một cột `expires_at`.
+
+**Cách xử lý cú chạm — phải chọn đúng, chỗ này dễ làm hỏng:** xử lý action button **trong background** trên Android cần data-only message + `TaskManager`, dễ gãy và khó debug. Cách chắc chắn hơn: action button **mở app qua deep link** `pfm://preferences?mute=<budgetId>&type=<type>`, app gọi API rồi hiện toast xác nhận *"Đã tắt nhắc Cafe & Giải trí trong tháng này."* Đánh đổi: user phải thấy app mở ra một nhịp, nhưng bù lại luôn có phản hồi rõ ràng là lệnh đã ăn — im lặng mà không biết đã tắt được hay chưa còn tệ hơn.
+
+Job và nhánh fire-and-forget đều phải **lọc `notification_mutes` trước khi gửi push**, nhưng **vẫn tạo row `notifications`** — cùng nguyên tắc với bước (3) ở §21.4: mute là tắt cái bị đẩy ra ngoài, không phải xoá lịch sử trong app.
+
+---
+
+### 21.6 Migration `notifications` (BS-07)
+
+`009_notifications.sql` gắn cứng `CHECK` và dedup index vào `type = 'budget_exceeded'`. Migration 019 phải:
+
+```sql
+ALTER TABLE notifications DROP CONSTRAINT chk_notifications_budget_exceeded_fields;
+ALTER TABLE notifications ADD CONSTRAINT chk_notifications_scoped_fields CHECK (
+    type NOT IN ('budget_exceeded', 'budget_near_limit')
+    OR (related_budget_id IS NOT NULL AND currency IS NOT NULL AND period_start IS NOT NULL)
+);
+ALTER TABLE notifications ADD COLUMN related_plan_id uuid REFERENCES budget_plans(id);
+
+ALTER TABLE notifications ADD COLUMN related_transaction_id uuid REFERENCES transactions(id);
+
+-- D-05: budget noti KHÔNG còn dedup theo chu kỳ nữa, nên index cũ phải bỏ.
+DROP INDEX idx_notifications_budget_exceeded_dedup;
+
+-- Thay bằng dedup theo TRANSACTION: mỗi transaction tối đa 1 noti mỗi loại.
+-- Đây không phải để hạn chế tần suất (D-05 muốn bắn dày) mà để nhánh
+-- fire-and-forget của §21.4 và lưới an toàn của job không bắn hai lần
+-- cho cùng một giao dịch.
+CREATE UNIQUE INDEX idx_notifications_per_transaction
+    ON notifications (related_transaction_id, type)
+    WHERE related_transaction_id IS NOT NULL;
+
+-- Các loại theo lịch vẫn cần dedup theo chu kỳ. NULLS NOT DISTINCT
+-- (PostgreSQL 15+, project chạy 16) là thứ khiến nó hoạt động: không có nó,
+-- related_budget_id NULL của calibration/digest bị coi là khác nhau và dedup
+-- mất tác dụng.
+CREATE UNIQUE INDEX idx_notifications_dedup_scheduled
+    ON notifications (user_id, type, period_start, related_budget_id, currency)
+    NULLS NOT DISTINCT
+    WHERE type IN ('calibration_day7', 'calibration_day14', 'cycle_summary', 'daily_digest');
+```
+
+`CHECK` cũng phải đòi `related_transaction_id` cho hai loại budget — không có nó thì không truy được noti sinh ra từ giao dịch nào, và dedup per-transaction vô hiệu:
+
+```sql
+ALTER TABLE notifications ADD CONSTRAINT chk_notifications_budget_needs_tx CHECK (
+    type NOT IN ('budget_exceeded', 'budget_near_limit') OR related_transaction_id IS NOT NULL
+);
+```
+
+`period_start` đổi nghĩa thành **"ngày mà notification này thuộc về"**: budget → đầu chu kỳ; `calibration_*`/`cycle_summary` → `cycle_start` của plan; `daily_digest` → ngày hôm đó. Phải ghi rõ nghĩa mới này vào comment của cột, nếu không người sau đọc `009` sẽ hiểu sai.
+
+**Copy tiếng Việt:** `buildBudgetExceededNotification()` (`notification_service.go:111`) đang sinh tiếng Anh (*"Budget exceeded: …"*). Dịch luôn khi động vào, cùng chuẩn với phần còn lại của app.
+
+---
+
+### 21.7 `user_preferences` + API
+
+```sql
+-- migration 020
+CREATE TABLE user_preferences (
+  user_id                    uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  notify_budget_near_limit   boolean NOT NULL DEFAULT true,
+  notify_budget_exceeded     boolean NOT NULL DEFAULT true,
+  calibration_reminder       text    NOT NULL DEFAULT 'frequent'
+                                     CHECK (calibration_reminder IN ('frequent', 'cycle_end', 'off')),
+  notify_daily_digest        boolean NOT NULL DEFAULT false,
+  created_at                 timestamptz NOT NULL DEFAULT now(),
+  updated_at                 timestamptz NOT NULL DEFAULT now()
+);
+INSERT INTO user_preferences (user_id) SELECT id FROM users WHERE deleted_at IS NULL;
+```
+
+`POST /api/v1/me/notification-mutes` → body `{ type, budget_id }`; server tự điền `period_start` của chu kỳ hiện tại (không tin client, cùng nguyên tắc §12.6). Đây là đích đến của deep link `pfm://preferences?mute=…` ở §21.5.1.
+
+`GET /api/v1/me/preferences` → không có row thì **trả về default, không 404** (row được tạo lazy ở lần PUT đầu). Như vậy user cũ và user mới đi chung một đường, không phụ thuộc backfill chạy đúng hay không.
+`PUT /api/v1/me/preferences` → partial update, chỉ field nào gửi mới đổi.
+
+**Không có cột `timezone`** — xem D-09. Thêm cột bây giờ là nói dối: backend vẫn tính mọi ranh giới chu kỳ bằng UTC. Giờ VN dùng cho `daily_digest` nằm ở một hằng số Go duy nhất `common.AppTimezone = "Asia/Ho_Chi_Minh"`, để task timezone sau này chỉ phải đổi một chỗ.
+
+---
+
+### 21.8 Màn Settings
+
+Route mới `mobile/app/(app)/preferences.tsx`, vào từ một row mới trong `SETTINGS_ROWS` của `mobile/app/(app)/settings.tsx`:
+
+```ts
+{ label: "Thông báo", Icon: BellIcon, href: "/preferences" as const, adminOnly: false },
+```
+
+```
+Thông báo
+  ├ Sắp vượt ngân sách         [ON]      ← mặc định bật
+  ├ Đã vượt ngân sách          [ON]      ← mặc định bật
+  ├ Nhắc tôi chỉnh ngân sách   [Thường xuyên ▾]   Thường xuyên / Cuối chu kỳ / Không
+  └ Tóm tắt hằng ngày 8:00     [OFF]     ← mặc định tắt
+```
+
+**Quy tắc UI:**
+- `useQuery` + `useMutation` với **optimistic update** — toggle phải nhảy ngay, rollback nếu request fail. Không `useState` giữ bản sao của server state (CLAUDE.md).
+- Bật toggle đầu tiên mà OS chưa cấp quyền → xin quyền; **bị từ chối thì trả toggle về OFF** và hiện dòng hướng dẫn mở Cài đặt hệ thống. Không để toggle ON trong khi OS đang chặn — đó là nói dối user.
+- iOS: ẩn cả nhóm (D-02).
+- `calibration_reminder = 'off'` → job bỏ qua cả `calibration_day7/14` lẫn `cycle_summary` của user đó, nhưng **card trong AI Chat vẫn hiện** (§8.1 nói mỗi mốc = 1 notification + 1 card; tắt là tắt cái bị đẩy ra ngoài, không phải tắt sản phẩm).
+
+- Dưới nhóm toggle, nếu user đang có `notification_mutes` còn hiệu lực → hiện một dòng **"Đang tắt nhắc: Cafe & Giải trí, Mua sắm — [Bật lại]"**. Mute đặt từ push mà không thấy được ở đâu là mute không gỡ được: user sẽ tưởng noti hỏng.
+
+> Các row còn lại của `SETTINGS_ROWS` vẫn đang tiếng Anh (`Wallets`, `Categories`, `Security`…) — nằm trong đợt dịch còn tồn, không thuộc scope task này.
+
+---
+
+### 21.9 BS-13 — preset §5.3 không map được với category đang có
+
+_Blindspot mới, §20 chưa bắt._
+
+System category đang seed **tiếng Anh** (`006_seed_categories.sql`): `Food, Rent, Transport, Utilities, Entertainment, Shopping, Health` + `Tiết kiệm` (`017`).
+Preset §5.3 map **bằng tên tiếng Việt**: `Ăn uống, Di chuyển, Cafe & Giải trí, Mua sắm, Sức khoẻ, Con cái & Học tập, Chi khác`.
+
+→ **Không khớp một dòng nào.** User `cold` chạy wizard sẽ được tạo 6 category mới nằm cạnh 7 category tiếng Anh có sẵn, chi tiêu bị chẻ đôi giữa `Food` và `Ăn uống`, và mọi số của §8 sai từ chu kỳ đầu.
+
+**Quyết định (D-10): thêm `categories.system_key`.**
+
+```sql
+-- migration 021
+ALTER TABLE categories ADD COLUMN system_key text;
+CREATE UNIQUE INDEX idx_categories_system_key
+    ON categories (system_key) WHERE user_id IS NULL AND deleted_at IS NULL;
+```
+
+| `system_key` | `name` (đổi sang tiếng Việt) | Class (§7.2) |
+|---|---|---|
+| `food` | Ăn uống | `essential` |
+| `transport` | Di chuyển | `essential` |
+| `entertainment` | Cafe & Giải trí | `discretion` |
+| `shopping` | Mua sắm | `discretion` |
+| `health` | Sức khoẻ | `essential` |
+| `housing` | Nhà ở | `fixed` |
+| `utilities` | Hoá đơn & Tiện ích | `fixed` |
+| `children_education` | Con cái & Học tập *(mới)* | `essential` |
+| `other` | Chi khác *(mới)* | `discretion` |
+| `savings` | Tiết kiệm | — (trừ trước) |
+| `salary` / `bonus` / `investment` | Lương / Thưởng / Đầu tư | — (income) |
+
+**Ba việc trong cùng migration 021:**
+1. `ADD COLUMN system_key` + gán key cho các row `user_id IS NULL` đang có (match theo tên tiếng Anh hiện tại).
+2. `UPDATE … SET name = '<tiếng Việt>' WHERE user_id IS NULL` — chỉ đụng system category. **Category user tự tạo không bị động tới.**
+3. `INSERT` 2 category mới: `children_education`, `other`.
+
+**Hệ quả kéo theo:**
+- Preset §5.3 map bằng `system_key`, **bỏ hẳn** map-theo-tên.
+- Bug **B1** (`BudgetWizardCategoryBaselines` map-iteration) được giải quyết **triệt để**, không phải bằng cách vá thứ tự keyword: baseline tra theo `system_key`, deterministic tuyệt đối. Keyword matching **chỉ còn** là fallback cho category user tự đặt tên.
+- Phân loại `fixed/essential/discretion` của §7.2 tra theo `system_key` trong một bảng Go. Category user tự tạo (`system_key IS NULL`) → mặc định **`essential`**, không phải `discretion`: thứ tự cắt của §7.2 là `discretion` trước, và cắt nhầm category do chính user đặt ra là sai hướng an toàn.
+- Ghi chú sai ở `constants.go:227` (*"Order is insignificant…"*) phải xoá cùng lúc (BS-10).
+
+---
+
+### 21.10 Plan version cho **mọi** budget, không chỉ budget từ wizard (D-12)
+
+Budget user tự tạo ở `mobile/src/features/budgets/components/BudgetsTab.tsx` cũng phải có plan version, và phải biết được **budget này ra đời từ đâu**.
+
+```sql
+ALTER TABLE budget_plans ADD COLUMN origin text NOT NULL
+    CHECK (origin IN ('wizard', 'manual', 'calibration'));
+```
+
+| `origin` | Sinh ra khi |
+|---|---|
+| `wizard` | Submit wizard (§7 spec v1) |
+| `manual` | Tạo/sửa/xoá budget ở màn Budgets (`BudgetFormModal`) |
+| `calibration` | Xác nhận ở dialog zero-sum §8.3 hoặc tổng kết §8.5 |
+
+**Ràng buộc phải nới:** plan `origin='manual'` không có ngữ cảnh wizard (không income, không savings target).
+
+```sql
+-- thay chk_disposable_positive của §4.1
+ALTER TABLE budget_plans ALTER COLUMN income DROP NOT NULL;
+ALTER TABLE budget_plans ALTER COLUMN disposable DROP NOT NULL;
+ALTER TABLE budget_plans ADD CONSTRAINT chk_disposable_positive
+    CHECK (origin = 'manual' OR (income > 0 AND disposable > 0));
+```
+
+- Plan `manual` **kế thừa** `income/fixed_total/savings_target/disposable` từ plan đang active nếu có (`parent_plan_id`); chỉ để NULL khi user chưa từng chạy wizard.
+- Calibration **xuống cấp có kiểm soát** khi `disposable IS NULL`: pace từng category (§8.2) vẫn chạy đúng vì chỉ cần `amount_max` + `spent`; riêng dòng *"Còn được chi … đ/ngày"* và §10 `Hôm nay còn X` **ẩn đi**, không đoán bừa. Đây là lối để wizard đề nghị đúng lúc: *"Tôi chưa biết thu nhập của bạn — cho tôi 30 giây nhé?"*
+- Mỗi thay đổi → **version mới**, `parent_plan_id` trỏ bản cũ, bản cũ `superseded_at = now()`. Toàn bộ trong **cùng 1 DB transaction** với bulk-replace `budgets` (CLAUDE.md).
+
+**Backfill (migration 022):** với mỗi user đang có budget active → tạo plan `version = 1, origin = 'manual'`, items lấy từ `budget_limits` (`amount_min = amount_max = amount_limit`, `source = 'manual'`, `confidence = 0.3`, `evidence = NULL`), `created_at = MIN(budgets.created_at)`. Không có bước này thì §8 im lặng bỏ qua toàn bộ user hiện tại — calibration không có gì để so.
+
+> **Rủi ro đã biết:** sửa 6 budget liên tiếp ở màn Budgets = 6 version. Chấp nhận ở v2 (audit trail là mục đích, dung lượng không đáng kể). Nếu lịch sử trở nên khó đọc, gộp sau bằng quy tắc: plan `origin='manual'` tạo < 5 phút trước và chưa có calibration xen giữa thì **sửa tại chỗ** thay vì tạo version mới.
+
+---
+
+### 21.11 Thay wizard cũ tại chỗ (D-13)
+
+Xoá, không giữ bản song song:
+
+| Xoá | Thay bằng |
+|---|---|
+| `WizardStepIncomePeriod.tsx` | `WizardStepIncome.tsx` — §5.1 (thu nhập / cố định / để dành / `cycle_start_day`) |
+| `WizardStepCategories.tsx` + `WizardStepPreferences.tsx` | `WizardStepProfile.tsx` — §5.2, **một câu hỏi** |
+| `WizardStepProposal.tsx` | `WizardStepResult.tsx` — §5.4 (donut + dải + badge nguồn) |
+
+Giữ nguyên: `BudgetWizardModal.tsx` (vỏ), `WizardProgressHeader.tsx` (3 chấm thay vì 4), `use-submit-budget-wizard.ts`, `SuggestedCategoryDialog.tsx`.
+`use-budget-wizard-state.ts` viết lại theo state mới (`income/fixed/savings/preset/intents`), **không patch dần** — state cũ mang mô hình 6-tier × N-category đã bị §5.2 loại bỏ.
+
+`WizardStepIncomePeriod.tsx:42` (`Math.round(incomeValue * 100)`) là chỗ duy nhất đang đổi đồng→xu ở client. Màn mới giữ **state bằng xu** từ đầu, chỉ format ra đồng khi hiển thị (§20.4).
+
+---
+
+### 21.12 Ảnh hưởng tới lộ trình §17
+
+§17 Phase 1 và Phase 2 phải bổ sung:
+
+**Phase 1** (thêm vào 3 việc backend của §20.3):
+4. Migration 021 — `categories.system_key` + đổi tên system category + 2 category mới (§21.9). **Chặn toàn bộ §5.3**, phải làm trước mọi thứ khác của wizard.
+5. Port logic pace từ `budget-pace.ts` sang Go (§21.5). Chặn cả `budget_near_limit` lẫn §8.
+6. Migration 022 — `budget_plans.origin` + nới constraint + backfill (§21.10).
+
+**Phase 2** (cùng lô với calibration):
+7. `expo-notifications` + dev client + FCM (§21.1–21.2).
+8. Migration 019/020 — `user_push_tokens`, nới `notifications`, `user_preferences` (§21.3, §21.6, §21.7).
+9. Màn Settings (§21.8).
+10. `push` client + nhánh fire-and-forget sau `CreateTransaction` + lưới an toàn trong job (§21.4).
+11. `notification_mutes` + notification category/action + deep link `pfm://preferences?mute=…` (§21.5.1).
+
+---
+
+### 21.13 Còn mở sau §21
+
+| # | Câu hỏi | Giả định tạm |
+|---|---|---|
+| OQ-14 | Đổi tên system category sang tiếng Việt (§21.9 bước 2) có đụng user đang dùng không? | Không — chỉ `user_id IS NULL`, và `transactions` tham chiếu bằng `category_id`. Nhưng ai đã quen thấy "Food" sẽ thấy tên đổi. Chấp nhận: app đang chuẩn hoá tiếng Việt toàn bộ. |
+| OQ-15 | Firebase project dùng chung hay riêng cho dev/prod? | Một project, hai Android app (`…pfm` và `…pfm.dev`) nếu sau này cần tách. Chốt khi tới bước tạo Firebase. |
+| OQ-16 | `daily_digest` 08:00 — job chạy 5 phút/lần, lấy gì làm mốc "đã gửi hôm nay"? | Dedup index §21.6 với `period_start` = ngày hôm đó theo `common.AppTimezone`. Job chỉ gửi khi giờ VN thuộc [08:00, 08:05). |
+| OQ-17 | E-14 chưa thoả (D-09) — bao giờ làm? | Gộp chung task với `cycle_start_day` (BS-02), vì cả hai sửa đúng một chỗ: cửa sổ chu kỳ. Task riêng, sau Phase 2. |
+| OQ-18 | D-05 bắn mỗi transaction — có trần tuyệt đối nào không (vd. tối đa 10 push/ngày/user)? | **Không đặt trần ở v2.** Notification id dùng chung theo budget (§21.5) đã khiến khay thông báo không ngập, và mute một chạm là van xả. Nếu mute-rate > 40% sau 30 ngày thì xem lại D-05 trước khi thêm trần. |
+| OQ-19 | `budget_near_limit` bắn mỗi transaction: một budget đã at-risk thì **mọi** giao dịch sau đó đều thoả điều kiện | Chấp nhận theo đúng chữ của D-05 — đó chính là "bắn liên tục". Notification id chung khiến nó hiện ra như **một dòng tự cập nhật**, không phải N dòng. Nếu muốn giảm, chèn điều kiện "chỉ bắn khi `ratio` tăng thêm ≥ 5 điểm % so với lần bắn trước" — **chưa áp dụng ở v2**. |

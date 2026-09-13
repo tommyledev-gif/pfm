@@ -1,136 +1,339 @@
 package budgetproposal
 
-import "testing"
+import (
+	"errors"
+	"fmt"
+	"math/rand"
+	"testing"
 
-// S-BWZ-13: mixed weighted + ai_decides happy path — both get a proposed
-// amount, unallocated is shown and is >= 10% of income.
-func TestCompute_MixedWeightedAndAIDecides(t *testing.T) {
-	income := int64(20_000_000)
-	result := Compute(income, []Input{
-		{CategoryID: "food", CategoryName: "Food", SpendingPreference: "a_lot"},
-		{CategoryID: "savings", CategoryName: "Savings", SpendingPreference: "ai_decides"},
-	})
+	"github.com/example/pfm/backend/internal/common"
+)
 
-	if len(result.Entries) != 2 {
-		t.Fatalf("expected 2 entries, got %d", len(result.Entries))
+// Every amount in these tests is xu. `d(n)` writes an amount in đồng, which is
+// how the specs and the UI talk about money, and converts once at the boundary.
+func d(dong int64) int64 { return dong * 100 }
+
+func presetIntents(t *testing.T, key common.BudgetPresetKey) []CategoryIntent {
+	t.Helper()
+	shares, ok := common.PresetByKey(key)
+	if !ok {
+		t.Fatalf("unknown preset %q", key)
 	}
-	var total int64
-	for _, e := range result.Entries {
-		if e.Amount <= 0 {
-			t.Fatalf("expected a positive proposed amount for %q, got %d", e.CategoryName, e.Amount)
-		}
-		total += e.Amount
+	out := make([]CategoryIntent, 0, len(shares))
+	for i, s := range shares {
+		out = append(out, CategoryIntent{
+			// Deliberately NOT in preset order: ResolveIntents has to impose
+			// its own deterministic order, and a test that feeds them already
+			// sorted would never notice if it stopped.
+			CategoryID:   fmt.Sprintf("cat-%02d", len(shares)-i),
+			CategoryName: s.SystemKey,
+			SystemKey:    s.SystemKey,
+			Source:       SourcePreset,
+		})
 	}
-	if result.UnallocatedAmount != income-total {
-		t.Fatalf("unallocated mismatch: got %d, want %d", result.UnallocatedAmount, income-total)
-	}
-	minUnallocated := income / 10
-	if result.UnallocatedAmount < minUnallocated {
-		t.Fatalf("expected unallocated >= 10%% of income (%d), got %d", minUnallocated, result.UnallocatedAmount)
-	}
+	return out
 }
 
-// S-BWZ-14 (revised 2026-08-24): a single selected Category gets exactly its
-// own absolute target share of income — selecting only one Category no
-// longer inflates its amount, since shares are absolute and independent of
-// how many Categories are selected (replaces the old relative-weight
-// design's "ceiling lifted for a single Category" side effect).
-func TestCompute_SingleCategoryUsesOwnTargetShare(t *testing.T) {
-	income := int64(10_000_000)
-	result := Compute(income, []Input{
-		{CategoryID: "food", CategoryName: "Food", SpendingPreference: "priority"},
-	})
-
-	if len(result.Entries) != 1 {
-		t.Fatalf("expected 1 entry, got %d", len(result.Entries))
-	}
-	amount := result.Entries[0].Amount
-	expected := int64(float64(income) * 0.30) // priority's target share
-	if amount != expected {
-		t.Fatalf("expected the single category's amount to equal its own target share (%d), got %d", expected, amount)
-	}
+func basicInput(income, fixed, savings int64, intents []CategoryIntent, preset common.BudgetPresetKey) PlanInput {
+	return PlanInput{Income: income, FixedTotal: fixed, SavingsTarget: savings, Preset: preset, Intents: intents}
 }
 
-// Two Categories sharing the same preference each get their own absolute
-// share, not an even split of a shared pool — the bug this formula replaced.
-func TestCompute_SamePreferenceCategoriesDoNotSplitAPool(t *testing.T) {
-	income := int64(10_000_000)
-	result := Compute(income, []Input{
-		{CategoryID: "food", CategoryName: "Food", SpendingPreference: "very_little"},
-		{CategoryID: "cafe", CategoryName: "Cafe", SpendingPreference: "very_little"},
-	})
+// ---------------------------------------------------------------------------
+// The six invariants. Each is stated in specs/ai-budget-wizard-v2/spec.md US-01
+// and each corresponds to a way the v1 engine was wrong.
+// ---------------------------------------------------------------------------
 
-	expected := int64(float64(income) * 0.05) // very_little's target share, each
-	for _, e := range result.Entries {
-		if e.Amount != expected {
-			t.Fatalf("expected %q to get its own %d share, got %d", e.CategoryName, expected, e.Amount)
-		}
-	}
-}
+// I4 — the one that matters most: allocated + unallocated is EXACTLY disposable.
+// v1 computed in float64 and truncated, so money quietly appeared and vanished.
+func TestComputeSumInvariantExact(t *testing.T) {
+	for _, preset := range []common.BudgetPresetKey{
+		common.BudgetPresetRentedEatingOut,
+		common.BudgetPresetWithFamily,
+		common.BudgetPresetOwnFamily,
+		common.BudgetPresetStudent,
+	} {
+		for _, income := range []int64{d(3_000_000), d(8_000_000), d(12_000_000), d(25_000_000), d(100_000_000)} {
+			fixed := income / 5
+			savings := income / 10
+			res, err := Compute(basicInput(income, fixed, savings, presetIntents(t, preset), preset))
+			if err != nil {
+				t.Fatalf("%s @ %d: %v", preset, income, err)
+			}
 
-// S-BWZ-19: ai_decides baselines that alone exceed 90% of income are scaled
-// down proportionally — the ceiling is never silently exceeded.
-func TestCompute_AIDecidesOverflowScaling(t *testing.T) {
-	income := int64(1_000_000)
-	// "food"+"housing"+"saving" baselines sum to 0.25+0.15+0.20 = 0.60 of
-	// income individually, but stacking enough ai_decides categories whose
-	// baselines exceed 90% combined forces the overflow branch.
-	result := Compute(income, []Input{
-		{CategoryID: "1", CategoryName: "Food", SpendingPreference: "ai_decides"},
-		{CategoryID: "2", CategoryName: "Housing", SpendingPreference: "ai_decides"},
-		{CategoryID: "3", CategoryName: "Saving", SpendingPreference: "ai_decides"},
-		{CategoryID: "4", CategoryName: "Transport", SpendingPreference: "ai_decides"},
-		{CategoryID: "5", CategoryName: "Unmatched One", SpendingPreference: "ai_decides"},
-		{CategoryID: "6", CategoryName: "Unmatched Two", SpendingPreference: "ai_decides"},
-	})
-
-	var total int64
-	for _, e := range result.Entries {
-		total += e.Amount
-	}
-	ninetyPercent := income * 9 / 10
-	if total > ninetyPercent {
-		t.Fatalf("expected ai_decides baselines to be scaled to at most 90%% of income (%d), got total %d", ninetyPercent, total)
-	}
-	minUnallocated := income / 10
-	if result.UnallocatedAmount < minUnallocated {
-		t.Fatalf("expected unallocated >= 10%% of income (%d) after scaling, got %d", minUnallocated, result.UnallocatedAmount)
-	}
-}
-
-// Edge Case #3: a very small income with many selected Categories pushes the
-// total above 90% even after the 50,000-floor clamp — the System must scale
-// down further (lowest-preference first) and flag ScaledDown.
-func TestCompute_SmallIncomeManyCategories_ScalesDown(t *testing.T) {
-	income := int64(300_000) // 6 categories x 50,000 floor alone = 300,000 = 100% of income
-	items := make([]Input, 0, 6)
-	prefs := []string{"very_little", "little", "normal", "a_lot", "priority", "ai_decides"}
-	for i, p := range prefs {
-		items = append(items, Input{CategoryID: string(rune('a' + i)), CategoryName: "Category " + string(rune('A'+i)), SpendingPreference: p})
-	}
-
-	result := Compute(income, items)
-
-	if !result.ScaledDown {
-		t.Fatalf("expected ScaledDown to be true for a small-income/many-category case")
-	}
-	for _, e := range result.Entries {
-		if e.Amount < 0 {
-			t.Fatalf("expected no negative proposed amount, got %d for %q", e.Amount, e.CategoryName)
+			var allocated int64
+			for _, e := range res.Entries {
+				allocated += e.AmountMax
+			}
+			if allocated+res.UnallocatedAmount != res.Disposable {
+				t.Errorf("%s @ %d: allocated(%d) + unallocated(%d) = %d, want disposable %d",
+					preset, income, allocated, res.UnallocatedAmount, allocated+res.UnallocatedAmount, res.Disposable)
+			}
+			if res.UnallocatedAmount < 0 {
+				t.Errorf("%s @ %d: negative buffer %d", preset, income, res.UnallocatedAmount)
+			}
 		}
 	}
 }
 
-// S-BWZ-16 equivalent at the compute layer: every entry always gets a
-// non-empty rule-based reasoning string (never LLM-generated).
-func TestCompute_ReasoningIsAlwaysPopulated(t *testing.T) {
-	result := Compute(5_000_000, []Input{
-		{CategoryID: "1", CategoryName: "Food", SpendingPreference: "normal"},
-		{CategoryID: "2", CategoryName: "Savings", SpendingPreference: "ai_decides"},
-	})
-	for _, e := range result.Entries {
-		if e.Reasoning == "" {
-			t.Fatalf("expected a non-empty reasoning string for %q", e.CategoryName)
+// I1 + I3 — every unlocked amount is a multiple of its own rounding step and
+// never below the floor. This is what stops "3.087.425đ" reaching the screen.
+func TestComputeAmountsAreRoundAndAboveFloor(t *testing.T) {
+	floor := common.BudgetWizardMinAmountPerCategoryXu
+	for _, income := range []int64{d(3_000_000), d(12_000_000), d(100_000_000)} {
+		res, err := Compute(basicInput(income, income/5, income/10,
+			presetIntents(t, common.BudgetPresetRentedEatingOut), common.BudgetPresetRentedEatingOut))
+		if err != nil {
+			t.Fatalf("income %d: %v", income, err)
 		}
+		for _, e := range res.Entries {
+			if e.AmountMax < floor {
+				t.Errorf("income %d: %s below floor: %d", income, e.SystemKey, e.AmountMax)
+			}
+			if step := roundStep(e.AmountMax); e.AmountMax%step != 0 {
+				t.Errorf("income %d: %s = %d is not a multiple of its step %d", income, e.SystemKey, e.AmountMax, step)
+			}
+			if e.AmountMin > e.AmountMax || e.AmountMin <= 0 {
+				t.Errorf("income %d: %s band invalid: %d..%d", income, e.SystemKey, e.AmountMin, e.AmountMax)
+			}
+		}
+	}
+}
+
+// I5 — determinism.
+//
+// ⚠️ This is the regression guard for bug B1. v1 resolved category baselines by
+// iterating a Go map, and Go randomizes map order, so a category matching two
+// keyword patterns got a different budget run to run. The package documented
+// itself as deterministic and was not. 1.000 identical runs is cheap and the
+// failure it catches is otherwise close to invisible.
+func TestComputeIsDeterministic(t *testing.T) {
+	in := basicInput(d(12_000_000), d(2_500_000), d(1_200_000),
+		presetIntents(t, common.BudgetPresetRentedEatingOut), common.BudgetPresetRentedEatingOut)
+
+	first, err := Compute(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 1000; i++ {
+		got, err := Compute(in)
+		if err != nil {
+			t.Fatalf("run %d: %v", i, err)
+		}
+		if len(got.Entries) != len(first.Entries) {
+			t.Fatalf("run %d: entry count drifted", i)
+		}
+		for j := range got.Entries {
+			if got.Entries[j] != first.Entries[j] {
+				t.Fatalf("run %d, entry %d: %+v != %+v", i, j, got.Entries[j], first.Entries[j])
+			}
+		}
+		if got.UnallocatedAmount != first.UnallocatedAmount {
+			t.Fatalf("run %d: buffer drifted", i)
+		}
+	}
+}
+
+// I6 — a locked amount survives scaling and rounding untouched. "Đúng 500k"
+// has to still read 500k when the screen renders.
+func TestComputeLockedAmountsUntouched(t *testing.T) {
+	intents := presetIntents(t, common.BudgetPresetRentedEatingOut)
+	const lockedAmount = 51_700 * 100 // deliberately not on any rounding step
+	intents[0].Source = SourceStated
+	intents[0].AmountMax = lockedAmount
+	intents[0].Locked = true
+
+	res, err := Compute(basicInput(d(12_000_000), d(2_500_000), d(1_200_000), intents, common.BudgetPresetRentedEatingOut))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range res.Entries {
+		if e.Locked {
+			if e.AmountMax != lockedAmount {
+				t.Errorf("locked amount was changed: got %d, want %d", e.AmountMax, lockedAmount)
+			}
+			if e.AmountMin != e.AmountMax {
+				t.Errorf("a locked amount must have no band, got %d..%d", e.AmountMin, e.AmountMax)
+			}
+		}
+	}
+}
+
+// I2 — the fuzz pass. Random incomes and category counts, asserting every
+// invariant at once.
+//
+// ⚠️ The income range runs to the real cap, not to a comfortable round number.
+// Money is xu, so every figure is already 100x its đồng value, and the
+// proportional-scaling step multiplies an amount by an amount: near the cap that
+// intermediate product is ~10^24 against a MaxInt64 of ~9.2x10^18. A fuzz range
+// that stops at a billion never reaches the overflow it is supposed to catch —
+// the naive expression wraps and returns a NEGATIVE budget, silently.
+func TestComputeFuzzInvariants(t *testing.T) {
+	rng := rand.New(rand.NewSource(1))
+	floor := common.BudgetWizardMinAmountPerCategoryXu
+
+	for i := 0; i < 10000; i++ {
+		n := 1 + rng.Intn(20)
+		income := floor*int64(n)*4 + rng.Int63n(common.BudgetWizardIncomeCapXu/2)
+		fixed := rng.Int63n(income / 4)
+		savings := rng.Int63n(income / 4)
+
+		intents := make([]CategoryIntent, n)
+		for j := range intents {
+			intents[j] = CategoryIntent{
+				CategoryID:   fmt.Sprintf("c%04d", rng.Intn(100000)),
+				CategoryName: "x",
+				Source:       SourceStated,
+				AmountMax:    floor + rng.Int63n(income/int64(n)+1),
+			}
+		}
+
+		res, err := Compute(PlanInput{Income: income, FixedTotal: fixed, SavingsTarget: savings, Intents: intents})
+		if err != nil {
+			if errors.Is(err, ErrDisposableNonPositive) || errors.Is(err, ErrDisposableTooSmall) {
+				continue // legitimately refused, not a broken result
+			}
+			t.Fatalf("case %d: %v", i, err)
+		}
+
+		var allocated int64
+		for _, e := range res.Entries {
+			if e.AmountMax <= 0 {
+				t.Fatalf("case %d: non-positive amount %d (income=%d n=%d)", i, e.AmountMax, income, n)
+			}
+			if e.AmountMin <= 0 || e.AmountMin > e.AmountMax {
+				t.Fatalf("case %d: bad band %d..%d", i, e.AmountMin, e.AmountMax)
+			}
+			allocated += e.AmountMax
+		}
+		if allocated+res.UnallocatedAmount != res.Disposable {
+			t.Fatalf("case %d: sum invariant broken: %d + %d != %d", i, allocated, res.UnallocatedAmount, res.Disposable)
+		}
+		if res.UnallocatedAmount < 0 {
+			t.Fatalf("case %d: negative buffer %d (income=%d n=%d)", i, res.UnallocatedAmount, income, n)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Named scenarios from the spec.
+// ---------------------------------------------------------------------------
+
+// S-BWZ2-08.
+func TestComputeRejectsNonPositiveDisposable(t *testing.T) {
+	_, err := Compute(basicInput(d(12_000_000), d(12_000_000), d(1_000_000),
+		presetIntents(t, common.BudgetPresetRentedEatingOut), common.BudgetPresetRentedEatingOut))
+	if !errors.Is(err, ErrDisposableNonPositive) {
+		t.Fatalf("got %v, want ErrDisposableNonPositive", err)
+	}
+}
+
+// S-BWZ2-07 — the user's own pinned figures already exceed what can be
+// allocated. Reported, never silently shrunk: they stated absolutes, and
+// overriding a stated absolute throws away the instruction.
+func TestComputeOverCommittedIsReportedNotScaled(t *testing.T) {
+	intents := []CategoryIntent{
+		{CategoryID: "a", CategoryName: "a", Source: SourceStated, AmountMax: d(5_000_000), Locked: true},
+		{CategoryID: "b", CategoryName: "b", Source: SourceStated, AmountMax: d(5_000_000), Locked: true},
+	}
+	res, err := Compute(PlanInput{Income: d(10_000_000), Intents: intents})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.OverCommitted || res.Shortfall <= 0 {
+		t.Fatalf("expected OverCommitted with a shortfall, got %+v", res)
+	}
+	for _, e := range res.Entries {
+		if e.AmountMax != d(5_000_000) {
+			t.Errorf("a locked amount was reduced: %d", e.AmountMax)
+		}
+	}
+}
+
+// S-BWZ2-05 — ScaledDown must mean "money was actually taken away". v1 set it
+// whenever the reduction loop ran at all, so the UI warned about a scale-down
+// that had not happened.
+func TestComputeScaledDownOnlyWhenSomethingWasReduced(t *testing.T) {
+	intents := []CategoryIntent{
+		{CategoryID: "a", CategoryName: "a", Source: SourceStated, AmountMax: d(1_000_000)},
+		{CategoryID: "b", CategoryName: "b", Source: SourceStated, AmountMax: d(1_000_000)},
+	}
+	res, err := Compute(PlanInput{Income: d(10_000_000), Intents: intents})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.ScaledDown {
+		t.Errorf("nothing needed reducing, but ScaledDown was set")
+	}
+}
+
+// S-BWZ2-09 — the 50%-of-disposable ceiling does not apply when there is only
+// one category. A single-category plan has nothing to be disproportionate to.
+func TestComputeCeilingExemptForSingleCategory(t *testing.T) {
+	res, err := Compute(PlanInput{
+		Income:  d(10_000_000),
+		Intents: []CategoryIntent{{CategoryID: "a", CategoryName: "a", Source: SourceStated, AmountMax: d(9_000_000)}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	half := res.Disposable / 2
+	if res.Entries[0].AmountMax <= half {
+		t.Errorf("single category was capped at %d, expected it to exceed half of disposable (%d)", res.Entries[0].AmountMax, half)
+	}
+}
+
+// Every preset must sum to exactly 88%. A typo here silently changes the budget
+// of every user who picks that profile, and nothing else would catch it.
+func TestPresetSharesSumTo88(t *testing.T) {
+	for _, p := range common.BudgetPresets {
+		var total int64
+		if len(p.Shares) > 6 {
+			t.Errorf("%s has %d categories; the cap is 6", p.Key, len(p.Shares))
+		}
+		for _, s := range p.Shares {
+			total += s.Percent
+		}
+		if total != common.BudgetWizardAllocatableNum {
+			t.Errorf("%s sums to %d%%, want %d%%", p.Key, total, common.BudgetWizardAllocatableNum)
+		}
+	}
+}
+
+// The minimum-disposable constant has to be derived from the floor and the
+// allocatable share, not picked. The spec's original 300.000đ was the floor sum
+// with the 12% buffer forgotten, so the engine was forced to report ScaledDown
+// at the exact figure the spec called sufficient.
+func TestMinViableDisposableCoversSixCategories(t *testing.T) {
+	floor := common.BudgetWizardMinAmountPerCategoryXu
+	allocatable := common.MulDiv(common.BudgetWizardMinViableDisposableXu,
+		common.BudgetWizardAllocatableNum, common.BudgetWizardAllocatableDen)
+	if allocatable < floor*6 {
+		t.Fatalf("min viable disposable %d leaves only %d allocatable, which cannot fund 6 x %d",
+			common.BudgetWizardMinViableDisposableXu, allocatable, floor)
+	}
+}
+
+// Source precedence: a stated amount beats a preset one for the same category,
+// and the winner is taken whole rather than blended. Averaging the two would
+// produce a number nobody chose and quietly discard an explicit instruction.
+func TestResolveIntentsPrecedence(t *testing.T) {
+	out := ResolveIntents([]CategoryIntent{
+		{CategoryID: "a", Source: SourcePreset, AmountMax: d(380_000), Evidence: "preset"},
+		{CategoryID: "a", Source: SourceStated, AmountMax: d(500_000), Evidence: "user"},
+	})
+	if len(out) != 1 {
+		t.Fatalf("expected the duplicate to collapse, got %d entries", len(out))
+	}
+	if out[0].AmountMax != d(500_000) || out[0].Evidence != "user" {
+		t.Errorf("stated source should win whole, got %+v", out[0])
+	}
+}
+
+func TestMulDivDoesNotOverflow(t *testing.T) {
+	// Near the income cap, a*num would overflow int64 outright.
+	a := common.BudgetWizardIncomeCapXu
+	got := common.MulDiv(a, a, a)
+	if got != a {
+		t.Fatalf("MulDiv(a, a, a) = %d, want %d", got, a)
 	}
 }

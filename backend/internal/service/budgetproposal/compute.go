@@ -1,265 +1,191 @@
-// Package budgetproposal implements F-13 AI Budget Setup Wizard's
-// allocation-proposal formula (specs/ai-budget-wizard/spec.md US-04 Main Flow
-// step 3) — a fixed, deterministic, rule-based calculation. No pgx/fiber/
-// network import: this is pure arithmetic over its own inputs, callable
-// directly from BudgetWizardService with no AI Service round-trip
-// (specs/ai-budget-wizard/plan.md Finding #6).
+// Package budgetproposal turns a user's income, commitments and lifestyle
+// answer into a concrete budget per category.
+//
+// Three properties define it, and every one of them was a defect in v1:
+//
+//  1. It is DETERMINISTIC. The same input produces byte-identical output, on
+//     every run, forever. v1 iterated a Go map to match category keywords, and
+//     Go randomizes map order — a category matching two patterns got a
+//     different budget depending on the run.
+//  2. It is INTEGER. Every value is int64 xu end to end, with proportional
+//     division through common.MulDiv. v1 computed in float64 and truncated,
+//     so `sum(entries) + unallocated` did not equal income.
+//  3. It has NO I/O. No database, no network, no clock, no LLM. An LLM cannot
+//     be trusted to do arithmetic and does not need to: this is a formula, and
+//     a formula that runs in-process is free, instant, reproducible, and
+//     unaffected by the AI service being down.
 package budgetproposal
 
 import (
+	"errors"
 	"fmt"
-	"sort"
-	"strings"
 
 	"github.com/example/pfm/backend/internal/common"
 )
 
-// Input is one selected Category's spending preference, the shape
-// BudgetWizardService.Proposals passes in after re-validating category
-// ownership — CategoryID is an opaque string here (already validated
-// upstream as a real uuid.UUID by the caller), never re-parsed by this
-// package.
-type Input struct {
-	CategoryID         string
-	CategoryName       string
-	SpendingPreference string
+var (
+	// ErrDisposableNonPositive — fixed costs plus savings already consume the
+	// whole income. There is nothing to allocate, and proposing a budget
+	// anyway would mean inventing money.
+	ErrDisposableNonPositive = errors.New("budgetproposal: disposable is not positive")
+	// ErrNoIntents — nothing to budget for.
+	ErrNoIntents = errors.New("budgetproposal: no category intents")
+	// ErrDisposableTooSmall — too little money for this many categories to each
+	// clear the minimum. See the note at the check itself for why this is an
+	// error rather than a silently degraded plan.
+	ErrDisposableTooSmall = errors.New("budgetproposal: disposable too small for the category count")
+)
+
+// PlanInput is everything the allocator needs. All amounts are xu.
+type PlanInput struct {
+	Income        int64
+	FixedTotal    int64
+	SavingsTarget int64
+	// Preset fills in amounts for intents that arrive with Source=preset and no
+	// amount of their own. Empty when every intent carries its own figure.
+	Preset  common.BudgetPresetKey
+	Intents []CategoryIntent
 }
 
-// Entry is one Category's computed proposal.
+// Entry is one category's finished proposal.
 type Entry struct {
-	CategoryID      string
-	CategoryName    string
-	Amount          int64
-	PercentOfIncome float64
-	Reasoning       string
+	CategoryID   string
+	CategoryName string
+	SystemKey    string
+	// The band. AmountMax is what becomes budget_limits.amount_limit; AmountMin
+	// exists only for display and for classifying spend (see band.go).
+	AmountMin  int64
+	AmountMax  int64
+	Source     IntentSource
+	Locked     bool
+	Confidence float64
+	// Concrete grounding for the number, or empty. Empty renders as the
+	// confidence badge alone — never as a filler sentence. v1 emitted "AI đề
+	// xuất mức chi tiêu tiêu biểu…" on every row, which carried no information
+	// and made the rows that DID have evidence look identical to the ones that
+	// did not.
+	Evidence string
 }
 
-// Result is Compute's full output — UnallocatedAmount is always shown to the
-// User, never silently redistributed (spec.md US-04 Main Flow step 3).
-// ScaledDown is set only when Edge Case #3 (a very small income with many
-// selected Categories) forced amounts below what their preference alone
-// would have produced, even after the minimum-floor clamp.
+// Result is the finished allocation.
 type Result struct {
-	Entries            []Entry
-	UnallocatedAmount  int64
-	UnallocatedPercent float64
-	ScaledDown         bool
+	Disposable int64
+	Entries    []Entry
+	// Everything not allocated to a category: the buffer, plus rounding
+	// remainder, plus anything a ceiling clipped. It is NOT a category — no
+	// transaction can be filed against it and it never appears in a picker.
+	UnallocatedAmount int64
+	// The user's own fixed amounts already exceed what can be allocated. The
+	// engine reports this instead of scaling them down: they stated absolute
+	// figures, and quietly shrinking a stated figure destroys the instruction.
+	OverCommitted bool
+	Shortfall     int64
+	// True only when at least one xu was actually removed from some category.
+	// v1 set this whenever the reduction loop RAN, so the UI warned about a
+	// scale-down that had not happened.
+	ScaledDown bool
 }
 
-// rankForOrdering assigns a numeric rank used only to decide *which* Category
-// loses budget first when Edge Case #3's final excess-reduction pass has to
-// run (spec.md US-04 Edge Cases #3: "starting from the lowest-preference
-// Category first"). Spec text does not say where "ai_decides" ranks relative
-// to the named weight tiers — implementation-level tie-break, documented
-// here rather than silently guessed: treated as equivalent to "normal", since
-// it represents a fixed needs-based share rather than an explicit priority
-// choice from the User.
-func rankForOrdering(preference string) float64 {
-	if w, ok := common.BudgetWizardPreferenceTargetShare[preference]; ok {
-		return w
+// Compute runs the allocation. The step order is fixed and must not be
+// reordered — quantization in particular has to run last, because rounding a
+// figure and then scaling it produces amounts that are no longer round.
+func Compute(in PlanInput) (Result, error) {
+	disposable := in.Income - in.FixedTotal - in.SavingsTarget
+	if disposable <= 0 {
+		return Result{}, ErrDisposableNonPositive
 	}
-	return common.BudgetWizardPreferenceTargetShare["normal"]
-}
 
-// Compute runs the fixed allocation formula. income must be > 0 (guaranteed
-// by dto.BudgetProposalsRequest's validator tags) and items must be
-// non-empty.
-//
-// Revised 2026-08-24 (spec.md US-04 Main Flow step 3): every Category's raw
-// amount is its own ABSOLUTE target share of income (preference share or
-// ai_decides baseline) — Categories never split a shared pool proportionally
-// against each other, so two Categories set to the same preference each get
-// their own share, not an even split of what's left. The old relative-weight
-// design degenerated to an even split whenever every selected Category
-// shared one preference, which read as "my preference had no effect."
-func Compute(income int64, items []Input) Result {
-	n := len(items)
-	amounts := make([]float64, n)
-	isAIDecides := make([]bool, n)
+	intents := ResolveIntents(in.Intents)
+	if len(intents) == 0 {
+		return Result{}, ErrNoIntents
+	}
 
-	// Step 1: assign each Category its own raw target amount — a fixed
-	// share of income for explicit preferences, a baseline-pattern share for
-	// "ai_decides" — spec.md US-04 Main Flow step 3, bullets 1-2.
-	var sumTargets float64
-	for i, item := range items {
-		if item.SpendingPreference == "ai_decides" {
-			isAIDecides[i] = true
-			amounts[i] = categoryBaseline(item.CategoryName) * float64(income)
-		} else {
-			amounts[i] = common.BudgetWizardPreferenceTargetShare[item.SpendingPreference] * float64(income)
+	n := len(intents)
+	floor := common.BudgetWizardMinAmountPerCategoryXu
+	capAllocatable := common.MulDiv(disposable, common.BudgetWizardAllocatableNum, common.BudgetWizardAllocatableDen)
+
+	// Feasibility, checked up front rather than discovered half way through.
+	//
+	// Every category needs the floor, and only the allocatable share is
+	// available to pay for them. Below that the allocator can only produce a
+	// plan that violates its own rules, so it refuses and says how much is
+	// needed — which the user can act on (earn more, save less, or budget for
+	// fewer categories). Degrading silently would hand back a plan whose
+	// numbers quietly mean nothing.
+	required := common.MulDiv(floor*int64(n), common.BudgetWizardAllocatableDen, common.BudgetWizardAllocatableNum) + 1
+	if capAllocatable < floor*int64(n) {
+		return Result{}, fmt.Errorf("%w: need at least %d xu for %d categories", ErrDisposableTooSmall, required, n)
+	}
+
+	amounts := make([]int64, n)
+	locked := make([]bool, n)
+	for i, it := range intents {
+		locked[i] = it.Locked
+		amt, err := centreAmount(it, in.Preset, disposable)
+		if err != nil {
+			return Result{}, err
 		}
-		sumTargets += amounts[i]
+		amounts[i] = amt
 	}
 
-	// Step 2 guardrail: if every raw target combined exceeds 90% of income,
-	// scale ALL of them down by the same proportional factor — never
-	// unevenly, and never only the ai_decides subset (spec.md S-BWZ-19).
-	weightedPool := common.BudgetWizardWeightedPoolShare * float64(income)
-	if sumTargets > weightedPool {
-		factor := weightedPool / sumTargets
-		for i := range amounts {
-			amounts[i] *= factor
-		}
-	}
+	res := Result{Disposable: disposable}
 
-	// Step 3: maximum-per-Category ceiling — a defensive cap; no preference
-	// tier or ai_decides baseline reaches it on its own, so this never
-	// triggers in practice under the current tier/baseline values (spec.md
-	// S-BWZ-14 revision). Excess removed here becomes unallocated, never
-	// redistributed to other Categories (same "never silently distributed"
-	// principle applied to the remainder itself).
-	ceiling := common.BudgetWizardMaxShareOfIncome * float64(income)
+	// Scale down to fit, touching only what the user did not lock.
+	var sumLocked, sumUnlocked int64
 	for i := range amounts {
-		if amounts[i] > ceiling {
-			amounts[i] = ceiling
+		if locked[i] {
+			sumLocked += amounts[i]
+		} else {
+			sumUnlocked += amounts[i]
 		}
 	}
-
-	// Step 4b: minimum-per-Category floor, raising any amount below it and
-	// shrinking the rest proportionally to make room (spec.md US-04 Main Flow
-	// step 3: "scaling other amounts down if needed to make room").
-	floor := float64(common.BudgetWizardMinAmountPerCategory)
-	applyFloor(amounts, floor)
-
-	// Edge Case #3: a very small income with many selected Categories can
-	// still leave the total above 90% of income even after the floor clamp —
-	// reduce starting from the lowest-preference Category first.
-	scaledDown := enforceUnallocatedFloor(amounts, items, income, floor)
-
-	total := 0.0
-	for _, a := range amounts {
-		total += a
-	}
-	unallocated := float64(income) - total
-
-	entries := make([]Entry, n)
-	for i, item := range items {
-		entries[i] = Entry{
-			CategoryID:      item.CategoryID,
-			CategoryName:    item.CategoryName,
-			Amount:          int64(amounts[i]),
-			PercentOfIncome: safeDiv(amounts[i], float64(income)),
-			Reasoning:       reasoningFor(item, isAIDecides[i]),
-		}
-	}
-
-	return Result{
-		Entries:            entries,
-		UnallocatedAmount:  int64(unallocated),
-		UnallocatedPercent: safeDiv(unallocated, float64(income)),
-		ScaledDown:         scaledDown,
-	}
-}
-
-// applyFloor raises every amount below floor up to it, shrinking the
-// above-floor amounts proportionally to make room. Iterates because raising
-// one entry's floor can itself push another below its own floor once the
-// pool shrinks — converges in at most len(amounts) passes.
-func applyFloor(amounts []float64, floor float64) {
-	fixed := make([]bool, len(amounts))
-	for pass := 0; pass < len(amounts)+1; pass++ {
-		var deficit float64
-		anyBelow := false
-		for i, a := range amounts {
-			if !fixed[i] && a < floor {
-				deficit += floor - a
-				amounts[i] = floor
-				fixed[i] = true
-				anyBelow = true
+	if sumLocked > capAllocatable {
+		res.OverCommitted = true
+		res.Shortfall = sumLocked - capAllocatable
+	} else if sumLocked+sumUnlocked > capAllocatable && sumUnlocked > 0 {
+		room := capAllocatable - sumLocked
+		for i := range amounts {
+			if locked[i] {
+				continue
 			}
-		}
-		if !anyBelow {
-			return
-		}
-
-		var shrinkPool float64
-		for i, a := range amounts {
-			if !fixed[i] {
-				shrinkPool += a
+			scaled := common.MulDiv(amounts[i], room, sumUnlocked)
+			if scaled < amounts[i] {
+				res.ScaledDown = true
 			}
+			amounts[i] = scaled
 		}
-		if shrinkPool <= 0 {
-			return // nothing left to shrink — accept the shortfall as-is
-		}
-		for i, a := range amounts {
-			if !fixed[i] {
-				amounts[i] = a - deficit*(a/shrinkPool)
-			}
-		}
-	}
-}
-
-// enforceUnallocatedFloor keeps the remainder at or above
-// BudgetWizardMinUnallocatedShare of income, reducing amounts starting from
-// the lowest-preference Category first once every other guardrail has
-// already run (spec.md US-04 Edge Cases #3). Never reduces an entry below
-// the minimum floor — if even every entry at its floor still leaves the
-// remainder short, the shortfall is accepted as-is (an extreme
-// small-income-many-categories case with no further room to give).
-func enforceUnallocatedFloor(amounts []float64, items []Input, income int64, floor float64) bool {
-	total := 0.0
-	for _, a := range amounts {
-		total += a
-	}
-	maxAllocatable := (1 - common.BudgetWizardMinUnallocatedShare) * float64(income)
-	excess := total - maxAllocatable
-	if excess <= 0 {
-		return false
 	}
 
-	order := make([]int, len(amounts))
-	for i := range order {
-		order[i] = i
+	ceiling := common.MulDiv(disposable, common.BudgetWizardMaxShareNum, common.BudgetWizardMaxShareDen)
+	if reduced := reconcile(amounts, locked, floor, ceiling, n == 1); reduced > 0 {
+		res.ScaledDown = true
 	}
-	sort.SliceStable(order, func(a, b int) bool {
-		return rankForOrdering(items[order[a]].SpendingPreference) < rankForOrdering(items[order[b]].SpendingPreference)
-	})
 
-	for _, i := range order {
-		if excess <= 0 {
-			break
-		}
-		room := amounts[i] - floor
-		if room <= 0 {
-			continue
-		}
-		take := room
-		if take > excess {
-			take = excess
-		}
-		amounts[i] -= take
-		excess -= take
-	}
-	return true
-}
+	// Rounding runs last, over the settled figures.
+	maxes := quantize(amounts, locked, floor, capAllocatable)
 
-// categoryBaseline matches a Category's name against
-// common.BudgetWizardCategoryBaselines' keyword patterns (case-insensitive
-// substring match), falling back to common.BudgetWizardDefaultBaseline when
-// nothing matches (spec.md US-04 Main Flow step 3: "unmatched ≈ 5%").
-func categoryBaseline(categoryName string) float64 {
-	lower := strings.ToLower(categoryName)
-	for pattern, share := range common.BudgetWizardCategoryBaselines {
-		if strings.Contains(lower, pattern) {
-			return share
+	res.Entries = make([]Entry, n)
+	var allocated int64
+	for i, it := range intents {
+		min := bandFloorFor(maxes[i], it.Source, locked[i], floor)
+		res.Entries[i] = Entry{
+			CategoryID:   it.CategoryID,
+			CategoryName: it.CategoryName,
+			SystemKey:    it.SystemKey,
+			AmountMin:    min,
+			AmountMax:    maxes[i],
+			Source:       it.Source,
+			Locked:       it.Locked,
+			Confidence:   it.Confidence,
+			Evidence:     it.Evidence,
 		}
+		allocated += maxes[i]
 	}
-	return common.BudgetWizardDefaultBaseline
-}
 
-// reasoningFor builds the one-line, rule-based (never LLM-generated)
-// explanation string returned alongside each proposed amount (spec.md
-// US-04 Main Flow step 4).
-func reasoningFor(item Input, isAIDecides bool) string {
-	if isAIDecides {
-		return fmt.Sprintf("AI đề xuất mức chi tiêu tiêu biểu cho danh mục %q dựa trên tỷ lệ ngân sách thông thường.", item.CategoryName)
-	}
-	return fmt.Sprintf("Dựa trên mức độ ưu tiên bạn chọn (%s) cho danh mục %q.", item.SpendingPreference, item.CategoryName)
-}
-
-func safeDiv(a, b float64) float64 {
-	if b == 0 {
-		return 0
-	}
-	return a / b
+	// ⚠️ The invariant this whole package exists to hold: the buffer absorbs
+	// every remainder, so allocated + unallocated is EXACTLY disposable. Not
+	// approximately — exactly. Any drift here is money appearing or vanishing
+	// on the user's screen.
+	res.UnallocatedAmount = disposable - allocated
+	return res, nil
 }

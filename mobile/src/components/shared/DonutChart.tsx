@@ -34,6 +34,13 @@ interface DonutChartProps {
 }
 
 const STROKE_WIDTH = 22;
+// Arc length, in px, carved off the end of every segment so neighbours read as
+// separate blocks instead of one continuous gradient. The gap is a real hole in
+// the stroke — the app background shows through it — which is why it reads as
+// black without painting anything black: a drawn divider would need its own
+// color, and that color would be wrong the moment this chart is placed on a
+// card instead of the screen.
+const SEGMENT_GAP = 4;
 const TOOLTIP_WIDTH = 130;
 const TOOLTIP_HEIGHT = 48;
 // The drill-down link adds a third line, and the tooltip's own placement math
@@ -99,11 +106,21 @@ export function DonutChart({
   const circumference = 2 * Math.PI * radius;
   const total = segments.reduce((sum, s) => sum + s.amount, 0);
 
+  // `full` is the segment's true share of the ring and drives layout (where the
+  // next one starts, where the tooltip points). `length` is what actually gets
+  // stroked — `full` minus the separator gap. Keeping them apart matters: if
+  // the gap were subtracted from the layout too, every segment after the first
+  // would creep backwards and the ring would no longer close.
+  //
+  // A segment shorter than twice the gap keeps its full length. Carving 4px off
+  // a 5px sliver leaves a dot that reads as a rendering fault, and a single
+  // segment has no neighbour to be separated from in the first place.
   let offset = 0;
   const arcs = segments.map((seg) => {
-    const length = total > 0 ? (seg.amount / total) * circumference : 0;
-    const arc = { ...seg, length, offset };
-    offset += length;
+    const full = total > 0 ? (seg.amount / total) * circumference : 0;
+    const gap = segments.length > 1 && full > SEGMENT_GAP * 2 ? SEGMENT_GAP : 0;
+    const arc = { ...seg, full, length: Math.max(full - gap, 0), offset };
+    offset += full;
     return arc;
   });
 
@@ -126,7 +143,9 @@ export function DonutChart({
   let tooltipPos: { left: number; top: number } | null = null;
   let tooltipFloatDirection = -1;
   if (activeArc) {
-    const angleDeg = ((activeArc.offset + activeArc.length / 2) / circumference) * 360;
+    // Anchored on `full`, not `length` — the callout should point at the middle
+    // of the slice the user tapped, not at the middle of the shortened stroke.
+    const angleDeg = ((activeArc.offset + activeArc.full / 2) / circumference) * 360;
     const point = polarToPoint(size / 2, size / 2, radius, angleDeg);
     const inUpperHalf = point.y < size / 2;
     tooltipFloatDirection = inUpperHalf ? 1 : -1;

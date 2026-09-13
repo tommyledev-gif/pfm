@@ -62,6 +62,7 @@ type Category struct {
 	CreatedAt time.Time
 	DeletedAt *time.Time
 	IconURL   *string
+	SystemKey *string
 }
 
 // Budget mirrors the budgets table exactly (007_budgets.sql). Per-currency

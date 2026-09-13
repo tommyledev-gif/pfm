@@ -103,6 +103,21 @@ const (
 	// ErrCodeTooManyBudgets backs POST /budgets/bulk's 422 when the request
 	// exceeds the 20-item cap (specs/ai-budget-wizard/spec.md S-BWZ-25).
 	ErrCodeTooManyBudgets = "TOO_MANY_BUDGETS"
+
+	// F-13.1 AI Budget Setup Wizard v2 (specs/ai-budget-wizard-v2/plan.md
+	// BWZ2-T11).
+	//
+	// ErrCodeDisposableNonPositive — fixed costs plus savings already consume
+	// the whole income, so there is nothing left to budget. Distinct from a
+	// generic INVALID_INPUT because the client has its own screen and message
+	// for it, and because the user can actually act on it.
+	ErrCodeDisposableNonPositive = "DISPOSABLE_NONPOSITIVE"
+	// ErrCodeDisposableTooSmall — there is money, but not enough for this many
+	// categories to each clear the minimum.
+	ErrCodeDisposableTooSmall = "DISPOSABLE_TOO_SMALL"
+	// ErrCodePlanVersionConflict — another device superseded the active plan
+	// between this request reading it and trying to replace it.
+	ErrCodePlanVersionConflict = "PLAN_VERSION_CONFLICT"
 	// ErrCodeMethodNotAllowed/ErrCodeRequestError back response.Error's
 	// *fiber.Error branch (SDS.md §6.1 / §12.1 Known Issues Log Items 1 & 4)
 	// — a routing-level error raised by Fiber itself, before any handler
@@ -167,6 +182,13 @@ var (
 	ErrIconUploadFailed           = &AppError{Code: ErrCodeIconUploadFailed, Status: http.StatusBadGateway, Message: "không thể tải ảnh biểu tượng lên, vui lòng thử lại"}
 	ErrDuplicateCategoryInRequest = &AppError{Code: ErrCodeDuplicateCategoryInRequest, Status: http.StatusUnprocessableEntity, Message: "một danh mục xuất hiện nhiều lần trong yêu cầu"}
 	ErrTooManyBudgets             = &AppError{Code: ErrCodeTooManyBudgets, Status: http.StatusUnprocessableEntity, Message: "chỉ có thể tạo tối đa 20 ngân sách trong một lần"}
+)
+
+// F-13.1 AI Budget Setup Wizard v2.
+var (
+	ErrDisposableNonPositive = &AppError{Code: ErrCodeDisposableNonPositive, Status: http.StatusBadRequest, Message: "chi phí cố định và tiết kiệm đã vượt thu nhập, bạn xem lại giúp nhé"}
+	ErrDisposableTooSmall    = &AppError{Code: ErrCodeDisposableTooSmall, Status: http.StatusBadRequest, Message: "số tiền còn lại quá nhỏ so với số danh mục bạn chọn, bạn bớt vài danh mục nhé"}
+	ErrPlanVersionConflict   = &AppError{Code: ErrCodePlanVersionConflict, Status: http.StatusConflict, Message: "ngân sách vừa được cập nhật ở thiết bị khác, bạn thử lại nhé"}
 )
 
 // NewInvalidInputError builds a 400 INVALID_INPUT error with a field-specific message.

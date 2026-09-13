@@ -1,189 +1,195 @@
 # PFM — Features Status & Roadmap
 
-_Last updated: 2026-08-22_
+_Last updated: 2026-09-13_
 _Updated by: /renew-features_
 
-> Clarification answers this run: user explicitly named the next feature — **AI Budget Setup Wizard** (F-13, drafted in `docs/ai-chat-budget-recommendation.md`) — and asked directly for `SRS.md`/`SDS.md` updates followed by `/renew-features` → `/renew-docs` → `/cook-ba` → `/cook-plan` in one pass. That's a more specific answer than the 5 standing clarification questions this command normally asks, so this run skips re-asking them and records the equivalent assumptions instead: **priority = new feature** (B), scope = **full-stack, mobile-first** (per the feature doc's own "Clients: `mobile/` primary; `frontend/` follow-up" line), **enhancement vs. new = new feature** (B), no new hard constraints beyond the existing Groq free-tier note below (carried over, unchanged).
+> **Clarification answers this run:** the 5 standing questions were **not re-asked**, following the same precedent as the 2026-08-22 run — the user had already answered a far more specific set of ~19 scoping questions immediately before invoking this command, covering push notifications, the Settings screen, budget-plan versioning, category mapping, and wizard replacement strategy. Those answers are recorded as decisions **D-01 … D-13** in `docs/new-tasks.md` §21. Equivalent mapping to the standing questions:
 >
-> Prior run's answers (2026-08-21, still relevant context): **Priority = Ổn định MVP + fix bug** (stabilize MVP, fix the 3 confirmed defects found that session before expanding scope); **next feature scope = full-stack** (Wallet/Budget icon support touches migration + backend DTO + mobile UI at once); **preference = enhancement before new feature** (finish icon parity + fix the 3 known bugs before starting Financial Goal/Dashboard); **constraint** = AI Service currently runs `openai/gpt-oss-120b` via Groq's free tier — works well, user is watching it but it's not expected to bind at the current 20–100 user scale, so no urgent action needed there.
+> - **Q1 Priority direction → (C) AI Features**, specifically the F-13.1 AI Budget Wizard v2 rewrite, with its blocking backend debt (B1–B7, `int64`, `system_key`) pulled in as a prerequisite rather than a separate track.
+> - **Q2 Pain point →** budget v1 is a one-shot guess with no feedback loop; the numbers are wrong for a first-time user and nothing ever corrects them. Named explicitly in `docs/new-tasks.md` §0.
+> - **Q3 Mobile vs Backend → (C) Full-stack**, mobile-first client. `frontend/` (web) parity for F-13.1 is explicitly out of scope (§18).
+> - **Q4 Constraints →** Windows dev machine (no `eas build --local`); EAS free tier 15 builds/month → local Gradle builds; Groq free tier unchanged; Expo pinned to SDK 54; **no App Store/Play Store release** — `.apk` only.
+> - **Q5 Enhancement vs new → (C) Both, ROI-ordered** — F-13.1 replaces an existing shipped feature in place (D-13) rather than being added beside it.
 
 ---
 
 ## 1. Project State Summary
 
-**MVP is fully complete and mobile has reached full feature parity with web** — every screen that was a Profile entry-point-only row as of the last `/renew-docs` (2026-08-16) is now a real CRUD screen (Wallets, Categories, Budgets, Users/admin). Since then, four items were found via code inspection during this session — see `SDS.md` §12.1 Known Issues Log for full root-cause detail; three are now fixed/shipped, one remains a pure deployment-verification step nobody in this session could execute:
+**All MVP features are shipped on backend + mobile + web, and F-13 (AI Budget Setup Wizard v1) shipped on mobile.** The work now on the table is not "add the next feature" — it is **replacing F-13 v1 with v2** (`docs/new-tasks.md`, feature code **F-13.1**), because v1 answers the wrong question for the dominant user.
 
-1. **Production VPS lagging behind `develop`** — category icon upload (`405`) and the `/activate` page (`404`→coerced `500`) both work in code as of commit `fe4f6cc` but the symptoms observed on `api.example.com` match an older deployed build. **Still outstanding** — `deploy-backend.yml` should auto-deploy on push to `develop`; its run history for the current `HEAD` needs checking (`gh` CLI wasn't available this session) before assuming a manual redeploy/`workflow_dispatch` is required.
-2. **Global error handler masks real HTTP statuses — ✅ fixed.** `response.Error()` now special-cases `*fiber.Error`, preserving real routing-error statuses instead of a blanket `500 INTERNAL_ERROR`. New tests in `internal/response/response_test.go`.
-3. **Keyboard covers the focused input in every bottom-sheet form — ✅ fixed.** `Drawer.tsx` now wires in the project's existing `useKeyboardHeight()` hook.
-4. **Wallet/Budget icon support — ✅ shipped** as FEAT-ICON (see §3 below).
+The core finding driving this roadmap: **v1 assumes the user knows their own spending.** The dominant persona (`cold` — no transaction history) does not, so v1's budget is guaranteed wrong, and v1 has no mechanism to ever correct it. v2 replaces the 4-step / 120-decision flow with 3 screens and 2 questions, and adds a **convergence loop** (day 7 → day 14 → end of cycle) that treats the first budget as a hypothesis to be corrected rather than a truth to be enforced.
 
-**Implemented (code + DB + Web + Mobile UI, full CRUD unless noted):**
-- **User Management (F-01)** — invite-only flow, admin invite/list, HTML activation page at `GET /activate` (backend + web `features/users` + mobile `features/users`, `app/(app)/users.tsx`, admin-only)
-- **System Security (F-02)** — JWT login/logout, invite-token activation, rate limiting (backend + web `features/auth` + mobile `features/auth`)
-- **Wallet Management (F-03)** — CRUD, set-default with DB-level uniqueness, **uploaded-photo icon support** (migration `013_wallets_icon.sql`, `POST /wallets/icon`) on top of an emoji `icon` text field (backend + mobile `features/wallets`, `app/(app)/wallets.tsx` — **full CRUD + photo upload now**; web (`frontend/`) has CRUD but not the icon feature, deferred). No `updated_at`/DTO gap remaining — see FEAT-ICON.
-- **Category Management (F-04)** — CRUD, system + user categories, dedup index, **uploaded-photo icon support** (Cloudflare R2 via `minio-go`, migration `012_categories_icon_url.sql`) on top of the existing emoji `icon` text field (backend + web `features/categories` + mobile `features/categories`, `app/(app)/categories.tsx` — **full CRUD + photo upload now, was read-only as of 2026-08-16**). Photo upload currently broken on production per Known Issues Log Item 1 (deployment gap, not a code bug).
-- **Budget Management (F-05)** — per-category budget, per-currency limits, **uploaded-photo icon support independent of its linked Category's own icon** (migration `014_budgets_icon.sql`, `POST /budgets/icon`) (backend + mobile `features/budgets`, Insights → Budgets tab — full CRUD + photo upload; web deferred, same as Wallet).
-- **Transaction Management (F-06)** — CRUD with atomic wallet-balance update (backend + web `features/transactions` + mobile `features/transactions`)
-- **Financial Reporting (F-07)** — summary + by-category totals, filters by date/wallet/category (backend + web `features/reports` + mobile Insights → Spending, incl. donut chart)
-- **Notification Handling (F-10)** — budget-exceeded alerts via background scheduler, list/view/mark-read (backend + web `features/notifications` + mobile bell → full-screen overlay)
-- **AI Chat Assistant (Feature-12) — US-01 "Create a Transaction via Chat" only** (`specs/ai-chat-assistant/spec.md`) — `ai-service/` (FastAPI, Groq primary/Anthropic fallback, currently `openai/gpt-oss-120b` on Groq's free tier — see constraint note above), `chat_handler.go`/`ChatService`, migration `011_chat_messages.sql`, `idempotency_key` on `transactions` (migration `010`), web `features/ai-chat`, mobile `app/(app)/ai-chat.tsx` (also ships `EditTransactionModal`/`EditMessageModal` — these only edit a not-yet-confirmed proposal or resend a sent message, **not** the SRS's separate "edit an existing transaction via `sửa@` prefix" flow; confirmed `chat_service.go` has no `edit_transaction`/`query_spending`/`general_advice` handling, so US-02/03/04 remain fully unbuilt, not partial).
+A parallel finding: `docs/new-tasks.md` §20 and §21.9 audited v2's own spec against the real codebase and found **13 blindspots (BS-01 … BS-13)** where the spec describes a codebase that does not exist — wrong money unit, a `cycle_start_day` axis with no backing query, a column name that does not exist (`transaction_date` vs `occurred_at`), an LLM stack that isn't the one deployed, and a preset table that cannot map to any seeded Category. Three of these **block** everything else and are pulled into Phase 1.
 
-**Shipped this session (specced → planned → implemented, full loop):**
-- **Wallet & Budget icon/photo support** (`specs/wallet-budget-icons/`) — see FEAT-ICON in §3/§4 above for full detail.
+**Implemented (backend + mobile + web unless noted):**
+- **User Management (F-01)** — invite-only, admin invite/list, HTML activation page
+- **System Security (F-02)** — JWT login/logout, invite-token activation, rate limiting, revoked-token table
+- **Wallet Management (F-03)** — CRUD, default-wallet DB uniqueness, emoji + uploaded-photo icons *(web lacks icon upload)*
+- **Category Management (F-04)** — CRUD, system + user categories, dedup index, icon/photo upload via R2
+- **Budget Management (F-05)** — per-category budget, per-currency limits, own icon independent of Category's *(web deferred)*
+- **Transaction Management (F-06)** — CRUD with atomic wallet-balance update, idempotency key, sorting/filtering, **CSV export/import**, **audit log** (`018_transaction_audit_logs.sql`, `app/(app)/audit-log.tsx`)
+- **Financial Reporting (F-07)** — summary + by-category totals, date/wallet/category filters, donut chart on mobile Insights
+- **AI Budget Setup Wizard (F-13 v1)** — `GET /ai/budget-wizard/prefill`, `POST /ai/budget-proposals`, `POST /budgets/bulk`, `budgetproposal` allocation package, 4-step mobile wizard, chat-card + quick-action triggers *(mobile only, by design)*
 
-**Documented this session, no code needed:**
-- **CI/CD (GitHub Actions) and EAS Build** — `.github/workflows/{ci-pr,backend-test,deploy-backend,deploy-ai-service}.yml` auto-test/build/deploy on push to `develop`; `mobile/eas.json` builds an internal `.apk`. Neither was documented before this run's `/renew-docs`. No spec needed (infra, not a product feature) but worth knowing when debugging "why isn't my change live" questions.
+**Partial:**
+- **Notification Handling (F-10)** — in-app list/view/mark-read + a 5-minute background scheduler for `budget_exceeded` only. **No push infrastructure at all** — `expo-notifications` is not installed, and the `notifications` table's `CHECK` constraint and dedup index are hardcoded to `type = 'budget_exceeded'` (`009_notifications.sql:15-30`).
+- **AI Chat Assistant (F-12)** — **US-01 (create via chat) only.** The AI Service's intent enum is `create_transaction | ambiguous | budget_wizard` (`ai-service/app/schemas/extract_schema.py:75`) — US-02 (`sửa@` edit), US-03 (query spending), US-04 (advice) are **unbuilt**, not partial. Mobile's `EditTransactionModal`/`EditMessageModal` edit an unconfirmed proposal, which is a different thing.
+- **Data Overview Dashboard (F-11)** — mobile `app/(app)/index.tsx` is a real home screen (net worth, liquid-fill balance, recent transactions), but there is no F-11 spec and no dedicated dashboard endpoint; it composes existing queries.
 
-**In progress this session (2026-08-22):**
-- **AI Budget Setup Wizard (F-13, Feature-13)** — new Release 1 feature, drafted end-to-end by the user in `docs/ai-chat-budget-recommendation.md` before this run. `SRS.md` (FR-10, BF-11, Feature-13/US-01–05) and `SDS.md` (§2 domain model notes, §3.2 UI principle, §4.6 scenario index, §5.13, §6 API index/spec/traceability, §7 threat model, §9 design decisions) updated to match. BA pass (`specs/ai-budget-wizard/spec.md`) and plan (`plan.md`) follow immediately in this same run — see §3 below.
+**Specced/designed only, no code:**
+- **AI Budget Wizard v2 (F-13.1)** — `docs/new-tasks.md` (1585 lines: 21 sections, 13 decisions, 13 blindspots, 19 open questions). **Not yet in `specs/`** — that is what `/cook-ba` produces next.
 
-**SRS items chưa spec (chưa bắt đầu ở bất kỳ layer nào):**
-- **Financial Goal (F-08)** — Release 1.
-- **Investment Portfolio (F-09)** — Release 2.
-- **Data Overview Dashboard (F-11)** — Release 1.
-- **AI Chat Assistant US-02/US-03/US-04** — Release 1 (Edit/Query/Advice via chat) — each needs its own BA pass.
+**SRS items not started:**
+- **Financial Goal (F-08)** · **Investment Portfolio (F-09)** — no migration, no model, no handler, no UI.
+
+**Shipped outside the SRS** (mobile platform work, each with its own spec): `mobile-debug-console`, `mobile-loading-skeletons`, `mobile-session-refresh`, `transaction-audit-log`, `transaction-export-import`, `wallet-budget-icons`.
 
 ---
 
 ## 2. Feature Status Matrix
 
-| # | Feature | SRS Ref | Spec | Backend | Web | Mobile | Status |
-|---|---------|---------|------|---------|-----|--------|--------|
-| 1 | User Management | Feature-01 | ✓ | ✓ | ✓ | ✓ | DONE |
-| 2 | System Security | Feature-02 | ✓ | ✓ | ✓ | ✓ | DONE |
-| 3 | Wallet Management | FR-01 | ✓ | ✓ | ✓ | ✓ full CRUD + photo upload | DONE (icon/photo shipped 2026-08-21 — FEAT-ICON) |
-| 4 | Category Management | FR-03 | ✓ | ✓ | ✓ | ✓ full CRUD + photo upload | DONE (photo upload blocked on prod — deployment gap, see §1) |
-| 5 | Budget Management | FR-04 | ✓ | ✓ | ✓ | ✓ full CRUD + photo upload | DONE (icon/photo shipped 2026-08-21 — FEAT-ICON) |
-| 6 | Transaction Management | FR-02 | ✓ | ✓ | ✓ | ✓ | DONE |
-| 7 | Financial Reporting | FR-07 | ✓ | ✓ | ✓ | ✓ | DONE |
-| 8 | Financial Goal | FR-05 | ✗ | ✗ | ✗ | ✗ | BACKLOG (Release 1) |
-| 9 | Investment Portfolio | FR-06 | ✗ | ✗ | ✗ | ✗ | BACKLOG (Release 2) |
-| 10 | Notification Handling | Feature-10 | ✓ | ✓ | ✓ | ✓ | DONE |
-| 11 | Data Overview Dashboard | FR-08 | ✗ | ✗ | ✗ | 🔶 Home screen covers some of this informally | BACKLOG (Release 1) |
-| 12 | AI Chat Assistant — US-01 Create via Chat | FR-09 / Feature-12 | ✓ | ✓ | ✓ | ✓ | DONE |
-| — | AI Chat Assistant — US-02/03/04 (Edit/Query/Advice) | FR-09 / Feature-12 | ✗ | ✗ | ✗ | ✗ | BACKLOG (Release 1) — not yet specced |
-| — | Wallet/Budget icon & photo support | (SDS §12.1 Known Issues Log Item 3) | ✓ | ✓ | ✗ | ✓ | DONE (2026-08-21) — mobile only, `frontend/` parity deferred |
-| 13 | AI Budget Setup Wizard | FR-10 / Feature-13 | 🔶 in progress | ✗ | ✗ | ✗ | SPEC_IN_PROGRESS (2026-08-22) — `SRS.md`/`SDS.md` updated, `specs/ai-budget-wizard/` being written this run |
+| # | Feature | SRS Ref | Spec | Backend | Mobile | Web | Status |
+|---|---------|---------|------|---------|--------|-----|--------|
+| F-01 | User Management | Feature-01 | ✓ | ✓ | ✓ | ✓ | **DONE** |
+| F-02 | System Security | Feature-02 | ✓ | ✓ | ✓ | ✓ | **DONE** |
+| F-03 | Wallet Management | FR-01 / Feature-03 | ✓ | ✓ | ✓ | ✓* | **DONE** |
+| F-04 | Category Management | FR-03 / Feature-04 | ✓ | ✓ | ✓ | ✓ | **DONE** |
+| F-05 | Budget Management | FR-04 / Feature-05 | ✓ | ✓ | ✓ | ✓* | **DONE** |
+| F-06 | Transaction Management | FR-02 / Feature-06 | ✓ | ✓ | ✓ | ✓ | **DONE** |
+| F-07 | Financial Reporting | FR-07 / Feature-07 | ✓ | ✓ | ✓ | ✓ | **DONE** |
+| F-10 | Notification Handling | Feature-10 | ✓ | ✓ | ✓ | ✓ | **PARTIAL** — in-app only, no push |
+| F-11 | Data Overview Dashboard | FR-08 / Feature-11 | ✗ | — | ✓ | ✗ | **PARTIAL** — home screen, unspecced |
+| F-12 | AI Chat Assistant | FR-09 / Feature-12 | ✓ | ✓ | ✓ | ✓ | **PARTIAL** — US-01 only |
+| F-13 | AI Budget Wizard **v1** | FR-10 / Feature-13 | ✓ | ✓ | ✓ | ✗ | **DONE** (mobile-only by design) |
+| F-13.1 | AI Budget Wizard **v2** | FR-10 (extends) | ~ | ✗ | ✗ | ✗ | **SPEC_ONLY** — `docs/new-tasks.md`, not in `specs/` |
+| F-08 | Financial Goal | FR-05 / Feature-08 | ✗ | ✗ | ✗ | ✗ | **BACKLOG** |
+| F-09 | Investment Portfolio | FR-06 / Feature-09 | ✗ | ✗ | ✗ | ✗ | **BACKLOG** |
+
+`✓*` = shipped without icon/photo support on web (deferred, see `specs/wallet-budget-icons/`).
+`~` = designed in `docs/new-tasks.md` but not yet a `specs/<feature>/spec.md`.
 
 ---
 
 ## 3. Recommended Next Features
 
-> User direction this run (2026-08-22): explicitly named **AI Budget Setup Wizard (F-13)** as the next feature, superseding the prior run's "stabilize MVP first" ordering for this one item — the user chose to spec/plan it now rather than wait behind FEAT-QC/Financial Goal. Everything else below from the 2026-08-21 run (the 3 confirmed defects, Wallet/Budget icon parity — already shipped) stays as prior context.
-
 ### 🔥 High Priority (next sprint)
 
-#### [FEAT-13] AI Budget Setup Wizard (Release 1) — 🔶 spec in progress (2026-08-22)
-- **Type:** New Feature
-- **SRS ref:** FR-10, Feature-13, BF-11 (all added this run)
-- **Rationale:** User-requested directly, with a full feature draft already provided (`docs/ai-chat-budget-recommendation.md`) — a guided, AI-assisted flow to set up multiple Budgets at once (income + per-category spending preference → proposed allocation → bulk create), instead of the one-at-a-time manual flow in Budget Management (F-05).
-- **Scope:** Full-stack, mobile-first — `mobile/` is the primary client per the feature draft; `frontend/` (web) parity is an explicit follow-up, not in this pass.
-- **Dependencies:** Budget Management (F-05, done — this feature's `POST /budgets/bulk` reuses its validation/ownership rules), AI Chat Assistant (Feature-12, done — reuses its AI Service client and chat-message plumbing for the natural-language trigger).
-- **Rough complexity:** L (3 new backend endpoints across 2 services — Go backend + Python AI service — plus a 4-step mobile wizard UI).
-- **Status:** `SRS.md`/`SDS.md` updated this run. `specs/ai-budget-wizard/spec.md` and `plan.md` are being written immediately after this doc, same session — no open clarifying questions blocking BA, since the user's own draft doc already resolved most of them (see that spec's own Open Questions section for what remains, e.g. rule-based vs. LLM-based proposal generation, which the draft already assumes rule-based for MVP).
-
-#### [FEAT-BUG-01] Verify/fix production deployment gap (Category icon upload + `/activate`)
-- **Type:** Bug Fix
-- **Rationale:** Two features that are fully implemented in code (`fe4f6cc`) are failing on production with symptoms matching a stale deployed build. Blocks real invite-activation and category-photo-upload usage right now.
-- **Scope:** DevOps/CI verification, not new code (unless the workflow run itself reveals a build/test failure)
-- **Dependencies:** None
-- **Rough complexity:** S
-- **Clarifying questions to resolve before BA:** none — this is an operational check, not a spec. Check `deploy-backend.yml`'s run history for `fe4f6cc`/current `HEAD`; re-run via `workflow_dispatch` if it never fired or failed.
-
-#### [FEAT-BUG-02] Fix global error handler swallowing real HTTP statuses — ✅ DONE (2026-08-21)
-- **Type:** Bug Fix
-- **SRS ref:** NFR-06 (updated this session to require accurate error responses)
-- **Resolution:** `response.Error()` now special-cases `*fiber.Error` (Fiber's own 404/405, raised before any handler runs) and preserves the real status + a matching `common.ErrCodeNotFound`/`ErrCodeMethodNotAllowed`/`ErrCodeRequestError`, instead of coercing everything into `500 INTERNAL_ERROR`. New `internal/response/response_test.go` (4 tests) locks in the exact 405 scenario from the original report, plus regression guards that `*common.AppError` and genuinely-unknown errors are unaffected. `go test ./...` passes.
-
-#### [FEAT-BUG-03] Fix keyboard covering focused input in Drawer forms — ✅ DONE (2026-08-21)
-- **Type:** Bug Fix
-- **SRS ref:** UXR-04 (added this session)
-- **Resolution:** `Drawer.tsx` now calls the project's existing `useKeyboardHeight()` hook and pads the `ScrollView`'s content bottom by the live keyboard height — not `KeyboardAvoidingView`, not a third-party library, consistent with why that hook exists. Verified via `tsc --noEmit`, `eslint`, and a full `expo export --platform web` smoke-build. **Not verified on-device/emulator** — none available this session; carry forward to the next mobile on-device verification pass.
-
-#### [FEAT-ICON] Wallet & Budget icon/photo support — ✅ DONE (2026-08-21)
-- **Type:** Enhancement (extends existing Category pattern to two more entities)
-- **SRS ref:** FR-01, FR-04 (both updated this session), SDS §12.1 Known Issues Log Item 3
-- **Resolution:** Specced (`specs/wallet-budget-icons/spec.md`), planned (`plan.md`), and implemented full-stack — migrations `013_wallets_icon.sql`/`014_budgets_icon.sql`, sibling `POST /wallets/icon`/`POST /budgets/icon` endpoints (not a generalized shared route — explicit plan.md assumption, to avoid touching the already-shipped Category endpoint), full DTO/service/repository/handler wiring including a new `dto.OptionalString` type to correctly distinguish "omitted" from "explicit null" for `icon_url` clearing, and mobile form/list/card updates mirroring `CategoryFormModal.tsx`. Verified against a real (throwaway) Postgres instance, not just in-memory fakes.
-- **Deliberately deferred** (flagged in plan.md, needs sign-off): retrofitting Category's own identical "can never clear `icon_url`" bug (same COALESCE-vs-explicit-null root cause discovered while building this); web (`frontend/`) parity (scoped mobile-only).
-
-### 📋 Medium Priority (next 2-3 sprints)
-
-#### [FEAT-QC] Close QC coverage gap on F-03→F-07 and F-10
-- **Type:** Technical Debt / Quality
-- **Rationale:** 6 features (wallet, category, budget, transaction, financial-reporting, notification-handling) have `spec.md` + `plan.md` and backend unit tests, but no formal `test_cases.md` — only `user-management` and `security` have one. Cheap to close.
-- **Scope:** QC only, no code change expected unless gaps are found
-- **Dependencies:** None
-- **Rough complexity:** S (per feature) × 6
-
-#### [FEAT-08] Financial Goal (Release 1)
-- **Type:** New Feature
-- **SRS ref:** FR-05, Feature-08, BF-06
-- **Rationale:** SDS domain model note explicitly says FinancialGoal "depends on stable budgeting and reporting" (both done). Deprioritized below the enhancement/bug-fix items this run per stated user preference.
-- **Scope:** Full-stack
-- **Dependencies:** Budget Management (done), Financial Reporting (done)
-- **Rough complexity:** L
+#### [FEAT-13.1-P1] AI Budget Wizard v2 — Phase 1: engine, blocking migrations, 3-screen cold flow
+- **Type:** New Feature + Technical Debt (inseparable — the debt blocks the feature)
+- **SRS ref:** FR-10, Feature-13 US-03/US-04 (replaced in place)
+- **Rationale:** `cold` is the dominant persona and v1 is wrong for them by construction. Everything else in v2 (calibration, P2 confirm, NL mode) reads from the same engine, so the engine's correctness is a hard prerequisite — and the engine currently computes money in `float64` (B2) and is **non-deterministic** (B1: Go randomizes map iteration, so `"Cafe & Ăn uống"` matches either `"cafe"` or `"ăn uống"` depending on the run, while the code comment claims order is insignificant).
+- **Scope:** Backend + Mobile
+- **Dependencies:** F-04 (Category), F-05 (Budget), F-13 v1 (replaced in place, D-13)
+- **Rough complexity:** **XL**
+- **Blocking sub-items (all must land before the wizard UI is useful):**
+  1. **Migration 021** — `categories.system_key` + rename system Categories to Vietnamese + 2 new Categories (BS-13). Without this the §5.3 preset table maps to **zero** existing Categories and a `cold` user ends up with 6 duplicates beside the 7 English seeds.
+  2. **`budgetproposal` → `int64` xu** + fix **B1–B7** (`compute.go`).
+  3. **Port `budget-pace.ts` → Go** — the at-risk rule exists only in TypeScript today; the notification job runs in Go.
+  4. **`SumExpenseByUserCycle` + `cycle_start_day`** (BS-02) — the only spending window that exists is `date_trunc('month', NOW())` (`transactions.sql:217`); every `đ/ngày` figure is wrong for anyone not paid on the 1st.
+  5. **Fix `occurred_at` / income cap** (BS-03, BS-05) — §6.1's SQL references a column that does not exist; the income cap is off by 100× (`lte=9999999999` xu ≈ 100M đ, not 10B đ).
+  6. **Migration 022** — `budget_plans.origin` + relaxed constraints + backfill for users who already have budgets (D-12).
 - **Clarifying questions to resolve before BA:**
-  - [ ] Goal progress tracked from dedicated "allocation" transactions, or just any transaction tagged to the Goal's category?
-  - [ ] Multiple concurrent Goals per user allowed, or one active Goal at a time?
+  - [ ] Does migration 021's Vietnamese rename of system Categories need a user-facing announcement, or is it silent? (OQ-14 assumes silent.)
+  - [ ] `budget_plans.currency` — confirm one plan covers exactly one currency (the user's primary) and a second-currency wallet simply isn't planned (BS-08 / §20.2).
+  - [ ] Does Phase 1 ship the wizard **without** calibration (i.e. the user gets a better first budget but still no feedback loop), or is P1+P2 one release? Phasing says separate; product value argues together.
+
+#### [FEAT-13.1-P2] AI Budget Wizard v2 — Phase 2: convergence loop + push notifications + Settings
+- **Type:** New Feature
+- **SRS ref:** FR-10 + Feature-10 (Notification Handling, materially extended)
+- **Rationale:** For the `cold` persona this **is** the product, not a follow-up. The first budget is knowingly wrong (§P-01); the day-7 / day-14 / end-of-cycle check-ins are what turn that from a churn reason into a return reason. This phase also finally gives F-10 real push delivery, closing its PARTIAL status.
+- **Scope:** Backend + Mobile + Infra (Firebase/FCM)
+- **Dependencies:** FEAT-13.1-P1 (plan versioning, cycle window, pace-in-Go all come from there)
+- **Rough complexity:** **XL**
+- **Sub-items:** zero-sum funding dialog (§8.3, multi-source per BS-12) · plan versioning chain · `expo-notifications` + dev-client build + FCM credentials · migrations 019/020 (`user_push_tokens`, relaxed `notifications`, `user_preferences`) · `notification_mutes` + push action buttons · `app/(app)/preferences.tsx`
+- **Clarifying questions to resolve before BA:**
+  - [ ] Firebase project: one project with two Android apps (dev/prod), or two projects? (OQ-15)
+  - [ ] Push action button handling — confirm the deep-link approach (`pfm://preferences?mute=…`) over an Android background task, accepting that the app visibly opens for one beat (§21.5.1).
+  - [ ] D-05 fires a push on **every** qualifying transaction. Confirm no absolute daily cap, relying on the shared Android notification id + one-tap mute instead (OQ-18/OQ-19).
+
+### 📋 Medium Priority (next 2–3 sprints)
+
+#### [FEAT-13.1-P3] AI Budget Wizard v2 — Phase 3: `hot` persona one-screen confirm
+- **Type:** New Feature · **Scope:** Backend + Mobile · **Complexity:** M
+- **Rationale:** Can only exist once real users have accumulated ~2 months of history, so it is naturally later. The "thực tế 3 tháng" column beside each proposal is the whole value — it proves the app isn't inventing numbers.
+- **Dependencies:** FEAT-13.1-P1 (income median/lowest queries, §6.1)
+- **Clarifying questions to resolve before BA:**
+  - [ ] Median vs mean for the "actual" column — OQ-11 assumes median with a p40–p75 band. Confirm.
+
+#### [FEAT-TZ] Cycle window + timezone correctness
+- **Type:** Technical Debt · **Scope:** Backend · **Complexity:** M
+- **Rationale:** Every period boundary in the system is **UTC** — `date_trunc('month', NOW())` in SQL, `time.UTC` in `report_service.go:124` and `notification_service.go:126`. For Vietnamese users that means the month rolls over at 07:00 local. This is deliberately **not** part of the wizard (§21 D-09): fixing it changes F-05 and F-07 numbers too, so it needs its own spec and its own regression pass.
+- **Dependencies:** shares its edit site with `cycle_start_day` from FEAT-13.1-P1 — do them together or accept touching the same queries twice.
+- **Clarifying questions to resolve before BA:**
+  - [ ] Per-user timezone (`user_preferences.timezone`) or one app-wide `Asia/Ho_Chi_Minh` constant? (§21 D-09 defers the column deliberately — a stored value the backend ignores would be a lie.)
+  - [ ] Do historical report figures change retroactively when the boundary moves, or is there a cutover date?
+
+#### [FEAT-13.1-P4] AI Budget Wizard v2 — Phase 4: natural-language input mode (P3)
+- **Type:** New Feature · **Scope:** AI Service + Backend + Mobile · **Complexity:** L
+- **Rationale:** Smallest audience, most effort, highest accuracy risk — last by design. **Hard ship gate:** 100-sentence Vietnamese eval set, `amount ≥ 95%`, `freq_count ≥ 90%`, `freq_unit ≥ 90%`. Below the gate this does not ship; "ship and fix later" is explicitly rejected (§15).
+- **Dependencies:** FEAT-13.1-P1 (the normalizer feeds the same allocator)
+- **Clarifying questions to resolve before BA:**
+  - [ ] BS-04: the spec says vLLM `guided_json` + fixed `seed`; the deployed stack is Groq/Anthropic **tool calling** with no `seed`. Confirm the flat, non-`$ref` schema shape — `extract_service.py:70` already records that gpt-oss-20b silently mishandles nested `$ref` schemas under forced `tool_choice`.
+  - [ ] Who builds the 100-sentence eval set, and is it committed to the repo as a fixture?
 
 ### 🔮 Low Priority / Future
 
-#### [FEAT-AI-02] AI Chat — Edit Transaction via Chat (Feature-12 US-02)
-- **Type:** New Feature — depends on FEAT-AI-01 (shipped). Reuses its `POST /ai/chat` proposal flow and `chat_messages` table; needs the "`sửa@` prefix, find existing transaction" resolution logic the current `ChatService` doesn't have at all (confirmed — see §1).
-- **Dependencies:** `PUT /transactions/{id}` (already implemented, named in SDS §6)
-- **Rough complexity:** M
+#### [FEAT-CHAT-EXT] AI Chat US-02 / US-03 — edit + query spending via chat
+- **Type:** New Feature · **Scope:** AI Service + Backend + Mobile · **Complexity:** L
+- **Rationale:** Closes F-12's PARTIAL status. US-03 (query spending) has extra pull now: F-13.1 §10 already computes "hôm nay còn X" at the moment of spend, which is most of a spending-query answer.
+- **Dependencies:** none blocking; intent enum extension in `extract_schema.py`
 
-#### [FEAT-AI-03] AI Chat — Query Spending via Chat (Feature-12 US-03)
-- **Type:** New Feature — read-only, could ship independently of US-02 once FEAT-AI-01's AI Service scaffold exists (it does).
-- **Dependencies:** Financial Reporting (done, likely reused for aggregation)
-- **Rough complexity:** M
-
-#### [FEAT-11] Data Overview Dashboard (Release 1)
-- **Type:** New Feature — aggregates existing data (wallets, budgets, transactions, reports); mobile's Home screen already does an informal version of this (hero balance, wallet cards, recent transactions) but Feature-11 itself has no spec.
-- **Dependencies:** Best done after Financial Goal (F-08) so the dashboard can show goal progress too.
-- **Rough complexity:** M
-
-#### [FEAT-09] Investment Portfolio (Release 2)
-- **Type:** New Feature — advanced, "mature users" per SRS row 9.
-- **Rough complexity:** XL
-
-#### [FEAT-AI-04] AI Chat — General Financial Advice (Feature-12 US-04, Post-MVP)
-- **Type:** New Feature — lowest priority within Feature-12; SRS itself labels this Post-MVP.
-- **Dependencies:** Financial Reporting data
-- **Rough complexity:** M
+#### [FEAT-08] Financial Goal · #### [FEAT-11] Dashboard · #### [FEAT-09] Investment Portfolio
+- **Complexity:** L / M / XL · **Status:** untouched at every layer.
+- F-13.1 §18 notes a natural bridge: the wizard's "Tiết kiệm" line is a Financial Goal in all but name. Deliberately out of v2 scope.
+- F-11 partly exists as mobile's home screen; the work is specifying it, not inventing it.
 
 ---
 
 ## 4. Enhancement Backlog (existing features)
 
-- [ ] [Wallet/Category/Budget/Transaction/Financial Reporting/Notification] No `test_cases.md` yet — see FEAT-QC above
-- [ ] [System Security] `/auth/refresh` endpoint not implemented — 401 forces full re-login; acceptable for MVP but worth an explicit decision before Release 1 (mobile session UX suffers more than web)
-- [x] [Wallet Management] Icon/photo field — shipped as FEAT-ICON (2026-08-21)
-- [x] [Budget Management] Icon/photo field — shipped as FEAT-ICON (2026-08-21)
-- [x] [Mobile] Dedicated Wallets/Categories/Users screens — **shipped** between 2026-08-16 and 2026-08-21 (`455bfb1` → `fe4f6cc`); Profile rows are no longer inert
-- [x] [Transaction Management] `POST /transactions` idempotency key — shipped as part of FEAT-AI-01 (migration `010_transactions_idempotency_key.sql`)
-- [x] [Category Management] Photo upload (R2) — shipped in code (`fe4f6cc`); blocked on production by the deployment gap in FEAT-BUG-01, not a code gap
+- [ ] **[F-10]** `buildBudgetExceededNotification()` emits English copy (*"Budget exceeded: …"*, `notification_service.go:111`) — translate when Phase 2 touches it.
+- [ ] **[F-05]** `budgets.start_date` is stored but **no query uses it** to bound the spending window — mobile compensates client-side in `budgetPeriodElapsed()`, so a budget created on the 25th still counts the whole month's spend. Backend-side narrowing is the real fix.
+- [ ] **[F-05]** `period` is `monthly` everywhere in practice, but `dto.BudgetProposalsRequest` still accepts `weekly`/`quarterly` (BS-06) — remove them so all three sources agree.
+- [ ] **[F-03/F-05]** Web (`frontend/`) has no icon/photo upload for Wallets and Budgets — mobile-only since `specs/wallet-budget-icons/`.
+- [ ] **[F-04]** Category's "can never clear `icon_url`" bug — same root cause as the one fixed for Wallet/Budget, deliberately deferred at the time.
+- [ ] **[F-13.1]** Web parity for the whole wizard — explicitly out of scope in §18, but it is the largest client gap in the product.
+- [ ] **[UI]** Vietnamese sweep still pending on: `wallets.tsx`, `categories.tsx`, `insights.tsx`, `profile.tsx`, notifications screen, auth screens, `BottomNav` labels, `SETTINGS_ROWS` in `settings.tsx`, and scattered `common.NewInvalidInputError("…")` call sites.
 
 ---
 
 ## 5. Technical Debt Items
 
-- [ ] **Migration deployment is manual, not automated** — migrations are mounted directly as `docker-compose.yml` `docker-entrypoint-initdb.d/*` scripts instead of running through `golang-migrate`. Adding a new migration file requires remembering to add a matching compose mount line; no automated apply-on-boot for existing databases. This exact failure mode already bit `009_notifications.sql` once (documented in `docs/architecture.md` §2).
-- [ ] **Global error handler misclassifies routing errors as `INTERNAL_ERROR`** — see FEAT-BUG-02 above; listed here too since it's a systemic reliability issue, not just the one incident that surfaced it.
-- [ ] **`docs/open-ai.md` is a hand-drafted, aspirational OpenAPI sketch, not a generated/enforced contract** — still drifted ahead of code in places. Worth clarifying whether this file should become the real API-first source of truth or be relabeled as a design note.
-- [ ] **No staging API target for mobile EAS builds** — both `preview` and `production` profiles in `mobile/eas.json` point at the same production VPS URL. A broken production deploy is indistinguishable from a broken mobile build during testing.
-- [x] **Rate limit on `POST /ai/chat`** — `AIChatRateLimiter` middleware shipped with FEAT-AI-01; exact threshold still an open question.
+| # | Item | Where | Severity |
+|---|------|-------|----------|
+| TD-01 | `budgetproposal` computes money in `float64` then truncates → `Σ entries + unallocated ≠ income`. Violates the project's own integer-money rule. | `service/budgetproposal/compute.go` (B2) | 🔴 |
+| TD-02 | **Non-deterministic allocation** — `for pattern := range BudgetWizardCategoryBaselines` relies on Go map order; overlapping patterns (`"ăn"`/`"food"`, `"nhà"`/`"tiết kiệm"`) make the same input produce different budgets across runs. The comment above it asserts the opposite. | `common/constants.go:227-239` (B1, BS-10) | 🔴 |
+| TD-03 | `BudgetWizardMinAmountPerCategory = 50_000` is in **xu** → the real floor is **500đ**, not 50.000đ. | `common/constants.go:182` (D-11) | 🔴 |
+| TD-04 | Income cap `lte=9999999999` xu ≈ **100M đ**, while the spec intends 10B đ — blocks any user earning > 100M/month at screen 1. | `dto.BudgetProposalsRequest` (BS-05) | 🟠 |
+| TD-05 | All period boundaries are UTC → the month rolls over at 07:00 for Vietnamese users. | `transactions.sql:217`, `report_service.go:124`, `notification_service.go:126` (BS-09) | 🟠 |
+| TD-06 | `notifications` `CHECK` + dedup index hardcoded to `type='budget_exceeded'` — any new notification type needs a migration first. | `009_notifications.sql:15-30` (BS-07) | 🟠 |
+| TD-07 | `enforceUnallocatedFloor()` returns `true` even when it reduced nothing → `ScaledDown` lies → the UI warns falsely. | `budgetproposal` (B3) | 🟡 |
+| TD-08 | `applyFloor()`/`applyCeiling()` have no convergence proof and no re-check after shrink. | `budgetproposal` (B4) | 🟡 |
+| TD-09 | `reasoningFor()` emits contentless filler (*"AI đề xuất mức chi tiêu tiêu biểu…"*) instead of real evidence. | `budgetproposal` (B7) | 🟡 |
+| TD-10 | **Files over the 300-line limit** (CLAUDE.md, "không có ngoại lệ"): `mobile/app/(app)/ai-chat.tsx` **552**, `mobile/app/(app)/index.tsx` **451**, `backend/internal/service/chat_service.go` **339**, `backend/internal/repository/budget_repository.go` **323**. (sqlc-generated files excluded.) | — | 🟡 |
+| TD-11 | **Stray `mobile/pfm/` scaffold** — a leftover `create-expo-app` directory that produces ~40 unrelated `tsc` errors. Not referenced by anything. | `mobile/pfm/` | 🟡 |
+| TD-12 | Spec v1 §6.3 (weighted pool) contradicts the shipped code (absolute target share) — a dev reading the spec implements the wrong algorithm. | `specs/ai-budget-wizard/spec.md` (B6) | 🟡 |
+| TD-13 | Local `sqlc` CLI rewrites **every** generated file differently from what is committed — regenerating produces an unreviewable diff, so new queries are hand-written instead. Pin the version or accept one deliberate re-gen commit. | `backend/internal/repository/sqlc/` | 🟡 |
+| TD-14 | No API-contract codegen — every backend DTO and every mobile/web type is hand-synced across three directories. `api-spec/openapi.yaml` is referenced by CLAUDE.md but is not a live source of truth. | `api-spec/`, `dto/`, `features/*/types.ts` | 🟡 |
+| TD-15 | Production VPS deployment verification (carried from 2026-08-22, unresolved in-session) — confirm `deploy-backend.yml` has actually run for current `HEAD`. | `.github/workflows/` | 🟡 |
 
 ---
 
 ## 6. AI Service Roadmap
 
-> Independent Python microservice — `ai-service/` implemented for US-01 (`specs/ai-chat-assistant/spec.md`), currently running **`openai/gpt-oss-120b` on Groq's free tier** (user-confirmed this run) — working well, being watched but not expected to bind at the project's current 20–100 user scale. Anthropic remains strictly a fallback, per `CLAUDE.md`.
+**Phase 0 (foundation) — ✅ done.** FastAPI, internal REST from the Go backend, Groq primary + Anthropic fallback, health check, `extract_router` / `budget_router`.
 
-**Phase 0 (foundation):** FastAPI, health check, internal-network reachability from the Go Backend — **done**.
-**Phase 1 (core AI):** Transaction extraction from a chat message (FEAT-AI-01) — **done**, backend + web + mobile.
-**Phase 2 (chatbot):** Edit/Query/General-advice intents (FEAT-AI-02/03/04) — not started at any layer, confirmed via `chat_service.go` inspection this run (mobile's `EditTransactionModal`/`EditMessageModal` only touch the pre-confirm proposal, not this).
-**Phase 3 (insights):** Anomaly detection, spending pattern — not specced, not scoped.
+**Phase 1 (core AI) — ✅ done.** Transaction extraction from Vietnamese natural language via **tool/function calling** (prose-described JSON schemas proved unreliable — `extract_service.py`), plus Category-name suggestion for the wizard. Intent enum today: `create_transaction | ambiguous | budget_wizard`.
 
-**Current phase:** Phase 0/1 complete. Per this run's stated priority (stabilize MVP + fix bugs before new scope), Phase 2 stays deprioritized below FEAT-BUG-01/02/03 and FEAT-ICON.
+**Phase 2 (structured budget extraction) — next, gated.** F-13.1 Phase 4's NL mode (§9): a strict extract-only prompt (**"BẠN CHỈ TRÍCH XUẤT. BẠN KHÔNG TÍNH TOÁN."**), a **flat** tool schema with no nested `$ref` (BS-04), an independent regex cross-check to catch `35k → 350k` mishearings (§9.3), and all arithmetic in Go. **Ship gate: `amount ≥ 95%` on a 100-sentence Vietnamese eval set.**
+
+**Phase 3 (chat parity).** F-12 US-02/US-03 — extend the intent enum to `edit_transaction` and `query_spending`.
+
+**Phase 4 (insights).** Anomaly detection, spending patterns. Per F-13.1 §18, if an LLM ever generates budget reasoning it may **only** see numbers already computed in Go, behind a verifier that rejects any figure not in that set.
+
+**Current phase: 1 complete, 2 designed and gated.**
+**Budget constraint:** Groq free tier, `openai/gpt-oss-120b`. Unchanged and not expected to bind at current scale. All wizard arithmetic is deliberately LLM-free (§P-08), so AI Service downtime degrades NL mode only — never the wizard itself.

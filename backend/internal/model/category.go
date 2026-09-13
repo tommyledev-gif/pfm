@@ -28,6 +28,15 @@ type Category struct {
 	// service.R2IconUploader), distinct from Icon's free-text emoji/label.
 	// When set, clients should prefer it over Icon for display.
 	IconURL *string
+	// SystemKey is the stable identifier for a system-defined category
+	// (migration 019). nil for anything a user created themselves.
+	//
+	// It exists so the budget wizard's presets can resolve to real categories
+	// without going through display names. Name matching broke as soon as the
+	// seeded names (English) and the presets (Vietnamese) had to agree, and it
+	// breaks again whenever a category is renamed. A category's name is for
+	// people; this is for code.
+	SystemKey *string
 }
 
 // IsSystem reports whether this category is a shared, system-defined

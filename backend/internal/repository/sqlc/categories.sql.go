@@ -9,7 +9,7 @@ import (
 const createCategory = `-- name: CreateCategory :one
 INSERT INTO categories (user_id, name, icon, type, icon_url)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, user_id, name, icon, type, created_at, deleted_at, icon_url
+RETURNING id, user_id, name, icon, type, created_at, deleted_at, icon_url, system_key
 `
 
 type CreateCategoryParams struct {
@@ -23,7 +23,7 @@ type CreateCategoryParams struct {
 func (q *Queries) CreateCategory(ctx context.Context, arg CreateCategoryParams) (Category, error) {
 	row := q.db.QueryRow(ctx, createCategory, arg.UserID, arg.Name, arg.Icon, arg.Type, arg.IconURL)
 	var i Category
-	err := row.Scan(&i.ID, &i.UserID, &i.Name, &i.Icon, &i.Type, &i.CreatedAt, &i.DeletedAt, &i.IconURL)
+	err := row.Scan(&i.ID, &i.UserID, &i.Name, &i.Icon, &i.Type, &i.CreatedAt, &i.DeletedAt, &i.IconURL, &i.SystemKey)
 	return i, err
 }
 
@@ -53,7 +53,7 @@ func (q *Queries) NameTypeExists(ctx context.Context, arg NameTypeExistsParams) 
 }
 
 const listCategoriesForUser = `-- name: ListCategoriesForUser :many
-SELECT id, user_id, name, icon, type, created_at, deleted_at, icon_url FROM categories
+SELECT id, user_id, name, icon, type, created_at, deleted_at, icon_url, system_key FROM categories
 WHERE (user_id IS NULL OR user_id = $1)
   AND ($2::text IS NULL OR type = $2)
   AND deleted_at IS NULL
@@ -75,7 +75,7 @@ func (q *Queries) ListCategoriesForUser(ctx context.Context, arg ListCategoriesF
 	var items []Category
 	for rows.Next() {
 		var i Category
-		if err := rows.Scan(&i.ID, &i.UserID, &i.Name, &i.Icon, &i.Type, &i.CreatedAt, &i.DeletedAt, &i.IconURL); err != nil {
+		if err := rows.Scan(&i.ID, &i.UserID, &i.Name, &i.Icon, &i.Type, &i.CreatedAt, &i.DeletedAt, &i.IconURL, &i.SystemKey); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -87,7 +87,7 @@ func (q *Queries) ListCategoriesForUser(ctx context.Context, arg ListCategoriesF
 }
 
 const getCategoryByID = `-- name: GetCategoryByID :one
-SELECT id, user_id, name, icon, type, created_at, deleted_at, icon_url FROM categories
+SELECT id, user_id, name, icon, type, created_at, deleted_at, icon_url, system_key FROM categories
 WHERE id = $1
   AND deleted_at IS NULL
 LIMIT 1
@@ -97,7 +97,7 @@ LIMIT 1
 func (q *Queries) GetCategoryByID(ctx context.Context, id uuid.UUID) (Category, error) {
 	row := q.db.QueryRow(ctx, getCategoryByID, id)
 	var i Category
-	err := row.Scan(&i.ID, &i.UserID, &i.Name, &i.Icon, &i.Type, &i.CreatedAt, &i.DeletedAt, &i.IconURL)
+	err := row.Scan(&i.ID, &i.UserID, &i.Name, &i.Icon, &i.Type, &i.CreatedAt, &i.DeletedAt, &i.IconURL, &i.SystemKey)
 	return i, err
 }
 
@@ -110,7 +110,7 @@ SET
 WHERE id = $1
   AND user_id = $2
   AND deleted_at IS NULL
-RETURNING id, user_id, name, icon, type, created_at, deleted_at, icon_url
+RETURNING id, user_id, name, icon, type, created_at, deleted_at, icon_url, system_key
 `
 
 type UpdateCategoryParams struct {
@@ -124,7 +124,7 @@ type UpdateCategoryParams struct {
 func (q *Queries) UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (Category, error) {
 	row := q.db.QueryRow(ctx, updateCategory, arg.ID, arg.UserID, arg.Name, arg.Icon, arg.IconURL)
 	var i Category
-	err := row.Scan(&i.ID, &i.UserID, &i.Name, &i.Icon, &i.Type, &i.CreatedAt, &i.DeletedAt, &i.IconURL)
+	err := row.Scan(&i.ID, &i.UserID, &i.Name, &i.Icon, &i.Type, &i.CreatedAt, &i.DeletedAt, &i.IconURL, &i.SystemKey)
 	return i, err
 }
 
@@ -134,18 +134,18 @@ SET deleted_at = NOW()
 WHERE id = $1
   AND user_id = $2
   AND deleted_at IS NULL
-RETURNING id, user_id, name, icon, type, created_at, deleted_at, icon_url
+RETURNING id, user_id, name, icon, type, created_at, deleted_at, icon_url, system_key
 `
 
 func (q *Queries) SoftDeleteCategory(ctx context.Context, id uuid.UUID, userID uuid.UUID) (Category, error) {
 	row := q.db.QueryRow(ctx, softDeleteCategory, id, userID)
 	var i Category
-	err := row.Scan(&i.ID, &i.UserID, &i.Name, &i.Icon, &i.Type, &i.CreatedAt, &i.DeletedAt, &i.IconURL)
+	err := row.Scan(&i.ID, &i.UserID, &i.Name, &i.Icon, &i.Type, &i.CreatedAt, &i.DeletedAt, &i.IconURL, &i.SystemKey)
 	return i, err
 }
 
 const lockCategoryByID = `-- name: LockCategoryByID :one
-SELECT id, user_id, name, icon, type, created_at, deleted_at, icon_url FROM categories
+SELECT id, user_id, name, icon, type, created_at, deleted_at, icon_url, system_key FROM categories
 WHERE id = $1
 LIMIT 1
 FOR UPDATE
@@ -156,6 +156,6 @@ FOR UPDATE
 func (q *Queries) LockCategoryByID(ctx context.Context, id uuid.UUID) (Category, error) {
 	row := q.db.QueryRow(ctx, lockCategoryByID, id)
 	var i Category
-	err := row.Scan(&i.ID, &i.UserID, &i.Name, &i.Icon, &i.Type, &i.CreatedAt, &i.DeletedAt, &i.IconURL)
+	err := row.Scan(&i.ID, &i.UserID, &i.Name, &i.Icon, &i.Type, &i.CreatedAt, &i.DeletedAt, &i.IconURL, &i.SystemKey)
 	return i, err
 }

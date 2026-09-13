@@ -1,0 +1,817 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>html{color-scheme:light dark}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>AI Budget Wizard v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+:root{
+  --paper:#f4f6f1; --surface:#ffffff; --surface-2:#ecefe6;
+  --ink:#14180f; --ink-2:#4a5243; --muted:#767f6e; --line:#dde3d6;
+  --accent:#3f7d20; --accent-soft:#e9f4df;
+  --warn:#a3600e; --warn-soft:#fbf0dd;
+  --danger:#9e2a1e; --danger-soft:#fae6e3;
+  --shadow:0 1px 2px rgba(20,24,15,.05), 0 8px 24px rgba(20,24,15,.06);
+
+  --app-bg:#0a0d08; --app-card:#191d16; --app-line:#272d23; --app-line-2:#333a2e;
+  --app-text:#eef2ea; --app-dim:#8b9584; --app-lime:#8fe85c; --app-amber:#f3c94b;
+
+  --c-food:#8fe85c; --c-transport:#4fc3d9; --c-fun:#f3c94b; --c-shop:#c98ae8;
+  --c-health:#e8836a; --c-kids:#7ea6f0; --c-other:#9aa38f;
+
+  --step:1.5rem;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0f120d; --surface:#171b14; --surface-2:#1e2319;
+    --ink:#e9ede5; --ink-2:#b0b9a8; --muted:#7f8a79; --line:#2b3126;
+    --accent:#8fe85c; --accent-soft:#1c2a13;
+    --warn:#e2a44f; --warn-soft:#2d2413;
+    --danger:#e57a68; --danger-soft:#311915;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0f120d; --surface:#171b14; --surface-2:#1e2319;
+  --ink:#e9ede5; --ink-2:#b0b9a8; --muted:#7f8a79; --line:#2b3126;
+  --accent:#8fe85c; --accent-soft:#1c2a13;
+  --warn:#e2a44f; --warn-soft:#2d2413;
+  --danger:#e57a68; --danger-soft:#311915;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1080px; margin:0 auto; padding-inline:20px; padding-block:0}
+
+h1,h2,h3,h4{font-family:Archivo,"Be Vietnam Pro",system-ui,sans-serif; text-wrap:balance; margin:0}
+h1{font-size:clamp(2rem,5vw,3.1rem); font-weight:700; letter-spacing:-.025em; line-height:1.05}
+h2{font-size:clamp(1.35rem,3vw,1.8rem); font-weight:700; letter-spacing:-.018em; line-height:1.15}
+h3{font-size:1.05rem; font-weight:600; letter-spacing:-.008em}
+p{margin:0}
+code,.mono{font-family:"JetBrains Mono",ui-monospace,monospace; font-size:.86em}
+.num{font-variant-numeric:tabular-nums}
+
+.eyebrow{
+  font-family:Archivo,sans-serif; font-size:.7rem; font-weight:600;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--muted);
+}
+
+/* ---------- header ---------- */
+header.top{padding-block:clamp(3rem,8vw,5.5rem) clamp(2rem,5vw,3rem)}
+.lede{font-size:clamp(1.02rem,2vw,1.18rem); color:var(--ink-2); max-width:60ch; margin-top:1.1rem}
+.tagrow{display:flex; flex-wrap:wrap; gap:.5rem; margin-top:1.6rem}
+.tag{
+  font-family:"JetBrains Mono",monospace; font-size:.72rem; font-weight:600;
+  padding:.3rem .6rem; border-radius:4px; background:var(--surface-2); color:var(--ink-2);
+  border:1px solid var(--line);
+}
+.tag.on{background:var(--accent-soft); color:var(--accent); border-color:transparent}
+
+section{padding-block:clamp(2.5rem,6vw,4rem)}
+section + section{border-top:1px solid var(--line)}
+.shead{display:flex; flex-direction:column; gap:.5rem; margin-bottom:2rem; max-width:62ch}
+.shead p{color:var(--ink-2)}
+
+/* ---------- phone ---------- */
+.flow{display:grid; grid-template-columns:repeat(auto-fit,minmax(272px,1fr)); gap:1.5rem}
+.step{display:flex; flex-direction:column; gap:.85rem}
+.stepcap{display:flex; align-items:baseline; gap:.55rem}
+.stepnum{
+  font-family:Archivo,sans-serif; font-weight:700; font-size:.78rem;
+  width:1.45rem; height:1.45rem; flex:none; border-radius:50%;
+  display:grid; place-items:center; background:var(--ink); color:var(--paper);
+}
+.stepcap h3{font-size:.98rem}
+.stepcap span{font-size:.82rem; color:var(--muted)}
+
+.phone{
+  background:var(--app-bg); border:1px solid var(--app-line-2); border-radius:22px;
+  padding:.7rem .7rem 1rem; color:var(--app-text); overflow:hidden;
+  font-size:13.5px; line-height:1.5; box-shadow:var(--shadow);
+}
+.pbar{
+  display:flex; justify-content:space-between; font-size:.66rem; color:var(--app-dim);
+  padding:.15rem .45rem .5rem; font-family:"JetBrains Mono",monospace;
+}
+.ptitle{
+  display:flex; align-items:center; justify-content:center; gap:.4rem;
+  font-family:Archivo,sans-serif; font-weight:600; font-size:.92rem;
+  padding-bottom:.65rem; border-bottom:1px solid var(--app-line);
+}
+.ptitle .sp{color:var(--app-lime)}
+.pbody{padding:.85rem .45rem 0; display:flex; flex-direction:column; gap:.75rem}
+
+.progress{display:flex; gap:.3rem; padding:0 .45rem .6rem}
+.progress i{height:3px; flex:1; border-radius:2px; background:var(--app-line-2)}
+.progress i.on{background:var(--app-lime)}
+
+.field{display:flex; flex-direction:column; gap:.3rem}
+.field label{font-size:.74rem; color:var(--app-dim); letter-spacing:.01em}
+.field .hint{font-size:.68rem; color:#6f7869; line-height:1.4}
+.inp{
+  display:flex; align-items:center; gap:.4rem; background:var(--app-card);
+  border:1px solid var(--app-line); border-radius:10px; padding:.5rem .65rem;
+}
+.inp input{
+  flex:1; min-width:0; background:none; border:0; color:var(--app-text);
+  font:600 1rem/1.3 "JetBrains Mono",monospace; font-variant-numeric:tabular-nums;
+  text-align:right; padding:0; -moz-appearance:textfield;
+}
+.inp input::-webkit-outer-spin-button,.inp input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.inp input:focus{outline:none}
+.inp:focus-within{border-color:var(--app-lime)}
+.inp .unit{font-size:.78rem; color:var(--app-dim); flex:none}
+
+.chips{display:flex; gap:.3rem; flex-wrap:wrap}
+.chip{
+  font:500 .76rem/1 "Be Vietnam Pro",sans-serif; padding:.42rem .6rem; border-radius:999px;
+  background:var(--app-card); border:1px solid var(--app-line); color:var(--app-dim);
+  cursor:pointer; transition:.12s;
+}
+.chip[aria-pressed="true"]{background:var(--app-lime); color:#0a0d08; border-color:var(--app-lime); font-weight:600}
+.chip:focus-visible{outline:2px solid var(--app-lime); outline-offset:2px}
+
+.result{
+  border-top:1px solid var(--app-line); padding-top:.7rem; margin-top:.15rem;
+  display:flex; align-items:flex-end; justify-content:space-between; gap:.6rem;
+}
+.result .lab{font-size:.74rem; color:var(--app-dim)}
+.result .big{font:700 1.32rem/1.1 "JetBrains Mono",monospace; font-variant-numeric:tabular-nums}
+.result .day{font:600 .84rem/1.2 "JetBrains Mono",monospace; color:var(--app-lime); text-align:right; font-variant-numeric:tabular-nums}
+
+.opt{
+  display:flex; align-items:center; gap:.6rem; width:100%; text-align:left;
+  background:var(--app-card); border:1px solid var(--app-line); border-radius:12px;
+  padding:.68rem .7rem; color:var(--app-text); cursor:pointer;
+  font:500 .88rem/1.3 "Be Vietnam Pro",sans-serif; transition:.12s;
+}
+.opt em{font-style:normal; font-size:1.15rem; flex:none}
+.opt[aria-pressed="true"]{border-color:var(--app-lime); background:#16200f}
+.opt:focus-visible{outline:2px solid var(--app-lime); outline-offset:2px}
+.opt .tick{margin-left:auto; color:var(--app-lime); opacity:0; font-weight:700}
+.opt[aria-pressed="true"] .tick{opacity:1}
+
+.notice{
+  background:#141a10; border-left:2px solid var(--app-lime); border-radius:0 8px 8px 0;
+  padding:.55rem .65rem; font-size:.74rem; color:#b9c4b0; line-height:1.45;
+}
+
+.alloc{display:flex; height:7px; border-radius:4px; overflow:hidden; gap:1.5px; background:var(--app-line)}
+.alloc i{display:block}
+.alloc i.buf{background:repeating-linear-gradient(135deg,#2e3529 0 3px,transparent 3px 6px); box-shadow:inset 0 0 0 1px #333a2e}
+
+.rows{display:flex; flex-direction:column; gap:.42rem}
+.row{display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:.5rem}
+.dot{width:7px; height:7px; border-radius:2px; flex:none}
+.row .nm{font-size:.82rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.row .amt{font:600 .84rem/1 "JetBrains Mono",monospace; font-variant-numeric:tabular-nums}
+.row .badge{
+  font-size:.6rem; color:#6f7869; letter-spacing:.06em; display:block; margin-top:1px;
+  font-family:"JetBrains Mono",monospace;
+}
+.row.buffer{border-top:1px dashed var(--app-line-2); padding-top:.45rem; margin-top:.2rem}
+.row.buffer .nm,.row.buffer .amt{color:var(--app-dim)}
+.deducted{display:flex; flex-direction:column; gap:.25rem; border-top:1px solid var(--app-line); padding-top:.55rem; margin-top:.15rem}
+.deducted div{display:flex; justify-content:space-between; font-size:.76rem; color:var(--app-dim)}
+.deducted span.mono{font-variant-numeric:tabular-nums}
+
+.pbtns{display:flex; gap:.5rem; margin-top:.3rem}
+.btn{
+  flex:1; text-align:center; padding:.6rem; border-radius:10px; font:600 .84rem/1 "Be Vietnam Pro",sans-serif;
+  border:1px solid var(--app-line-2); background:transparent; color:var(--app-text);
+}
+.btn.primary{background:var(--app-lime); color:#0a0d08; border-color:var(--app-lime)}
+
+/* chat */
+.bubble-u{
+  background:var(--app-amber); color:#221c05; border-radius:12px 12px 3px 12px;
+  padding:.5rem .7rem; font-size:.85rem; font-weight:500; align-self:flex-end; max-width:86%;
+}
+.bubble-a{
+  background:var(--app-card); border:1px solid var(--app-line); border-radius:12px 12px 12px 3px;
+  padding:.6rem .7rem; align-self:flex-start; width:100%; display:flex; flex-direction:column; gap:.5rem;
+}
+.tx{display:flex; align-items:center; gap:.45rem; font-size:.83rem}
+.tx .ok{color:var(--app-lime); font-weight:700}
+.tx .val{margin-left:auto; color:#f08a72; font-weight:600; font-family:"JetBrains Mono",monospace; font-variant-numeric:tabular-nums}
+.tx .cat{font-size:.66rem; color:var(--app-dim); border:1px solid var(--app-line-2); padding:.08rem .35rem; border-radius:4px}
+.impact{border-top:1px solid var(--app-line); padding-top:.5rem; display:flex; flex-direction:column; gap:.4rem}
+.bline{display:flex; align-items:center; gap:.45rem; font-size:.76rem}
+.meter{flex:1; height:5px; border-radius:3px; background:var(--app-line); overflow:hidden; min-width:40px}
+.meter i{display:block; height:100%; background:var(--app-lime)}
+.meter.warn i{background:var(--app-amber)}
+.bline .r{font-family:"JetBrains Mono",monospace; font-size:.72rem; color:var(--app-dim); white-space:nowrap; font-variant-numeric:tabular-nums}
+.bline .r.amber{color:var(--app-amber)}
+.daily{font-size:.79rem; display:flex; justify-content:space-between; gap:.5rem}
+.daily b{font-family:"JetBrains Mono",monospace; color:var(--app-lime); font-variant-numeric:tabular-nums}
+
+.beforeafter{display:grid; grid-template-columns:repeat(auto-fit,minmax(272px,1fr)); gap:1.5rem}
+
+/* ---------- prose blocks ---------- */
+.callout{
+  background:var(--surface); border:1px solid var(--line); border-radius:12px;
+  padding:1.1rem 1.2rem; display:flex; flex-direction:column; gap:.5rem;
+}
+.callout.warn{background:var(--warn-soft); border-color:transparent}
+.callout.warn .eyebrow{color:var(--warn)}
+.callout p{color:var(--ink-2); font-size:.92rem}
+
+.tablewrap{overflow-x:auto; -webkit-overflow-scrolling:touch}
+table{border-collapse:collapse; width:100%; min-width:560px; font-size:.88rem}
+th{
+  text-align:left; font-family:Archivo,sans-serif; font-weight:600; font-size:.72rem;
+  letter-spacing:.09em; text-transform:uppercase; color:var(--muted);
+  padding:0 .8rem .6rem; border-bottom:1px solid var(--line); white-space:nowrap;
+}
+td{padding:.75rem .8rem; border-bottom:1px solid var(--line); vertical-align:top; color:var(--ink-2)}
+td:first-child{color:var(--ink); font-weight:500}
+tr:last-child td{border-bottom:0}
+
+.risk{position:relative}
+.risk::before{content:""; position:absolute; left:0; top:.75rem; bottom:.75rem; width:3px; border-radius:2px}
+.risk.hi::before{background:var(--danger)}
+.risk.md::before{background:var(--warn)}
+.risk.lo::before{background:var(--accent)}
+.risk{padding-left:1rem !important}
+
+.pill{
+  display:inline-block; font-family:"JetBrains Mono",monospace; font-size:.68rem; font-weight:600;
+  padding:.15rem .45rem; border-radius:4px; white-space:nowrap;
+}
+.pill.hi{background:var(--danger-soft); color:var(--danger)}
+.pill.md{background:var(--warn-soft); color:var(--warn)}
+.pill.lo{background:var(--accent-soft); color:var(--accent)}
+
+.gridcards{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:1rem}
+.card{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:1.05rem 1.1rem}
+.card h4{font-size:.92rem; margin-bottom:.4rem}
+.card p{font-size:.86rem; color:var(--ink-2)}
+.card .k{font-family:"JetBrains Mono",monospace; font-size:.72rem; color:var(--muted); display:block; margin-bottom:.45rem}
+
+.killed{text-decoration:line-through; color:var(--muted)}
+
+footer{padding-block:2.5rem 4rem; color:var(--muted); font-size:.82rem; border-top:1px solid var(--line)}
+
+@media (max-width:460px){
+  .wrap{padding-inline:16px}
+  table{min-width:480px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none !important; animation:none !important}}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <p class="eyebrow">F-13.1 · Phase 1 · mobile</p>
+  <h1>Ngân sách khởi điểm<br>trong 45 giây</h1>
+  <p class="lede">Wizard cũ hỏi tới 120 câu về thói quen chi tiêu — thứ mà người vừa cài app quản lý chi tiêu, theo định nghĩa, chưa biết. Bản v2 hỏi <strong>hai câu</strong>, dựng một giả thuyết rõ ràng là ước lượng, rồi hội tụ nó qua từng chu kỳ.</p>
+  <div class="tagrow">
+    <span class="tag on">3 màn</span>
+    <span class="tag on">2 câu hỏi</span>
+    <span class="tag">int64 xu</span>
+    <span class="tag">làm tròn bậc VND</span>
+    <span class="tag">chu kỳ theo ngày lương</span>
+    <span class="tag">plan versioning</span>
+  </div>
+</header>
+
+<section>
+  <div class="shead">
+    <p class="eyebrow">Mockup tương tác</p>
+    <h2>Luồng chính — persona <span class="mono" style="font-size:.82em">cold</span></h2>
+    <p>Sửa số ở màn 1 hoặc đổi preset ở màn 2 — màn 3 tính lại ngay, đúng bằng thuật toán trong spec (floor về bậc, largest-remainder, buffer 12%). Đây cũng là cách nhanh nhất để kiểm chứng: <strong>số ra có tròn không.</strong></p>
+  </div>
+
+  <div class="flow">
+
+    <!-- SCREEN 1 -->
+    <div class="step">
+      <div class="stepcap"><span class="stepnum">1</span><h3>Tiền vào &amp; tiền đã cam kết</h3></div>
+      <div class="phone">
+        <div class="pbar"><span>20:36</span><span>78%</span></div>
+        <div class="ptitle"><span class="sp">✦</span> Thiết lập ngân sách</div>
+        <div class="progress" style="padding-top:.6rem"><i class="on"></i><i></i><i></i></div>
+        <div class="pbody">
+          <div class="field">
+            <label for="f-income">Thu nhập hàng tháng</label>
+            <div class="inp"><span class="unit">đ</span><input id="f-income" type="number" inputmode="numeric" value="12000000"></div>
+          </div>
+          <div class="field">
+            <label for="f-fixed">Chi phí cố định</label>
+            <div class="inp"><span class="unit">đ</span><input id="f-fixed" type="number" inputmode="numeric" value="2500000"></div>
+            <span class="hint">nhà, điện nước, internet, học phí</span>
+          </div>
+          <div class="field">
+            <label>Muốn để dành</label>
+            <div class="chips" id="f-save" role="group" aria-label="Mức tiết kiệm">
+              <button class="chip" type="button" data-pct="0" aria-pressed="false">Chưa</button>
+              <button class="chip" type="button" data-pct="5" aria-pressed="false">5%</button>
+              <button class="chip" type="button" data-pct="10" aria-pressed="true">10%</button>
+              <button class="chip" type="button" data-pct="20" aria-pressed="false">20%</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="f-day">Lương về ngày</label>
+            <div class="inp"><input id="f-day" type="number" inputmode="numeric" min="1" max="28" value="1" style="text-align:left"><span class="unit">hàng tháng</span></div>
+          </div>
+          <div class="result">
+            <div><div class="lab">Còn được chi</div><div class="big num" id="o-disp">8.300.000đ</div></div>
+            <div class="day" id="o-day">276.000đ<br>mỗi ngày</div>
+          </div>
+          <div class="pbtns"><span class="btn primary">Tiếp →</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCREEN 2 -->
+    <div class="step">
+      <div class="stepcap"><span class="stepnum">2</span><h3>Một câu hỏi user chắc chắn biết</h3></div>
+      <div class="phone">
+        <div class="pbar"><span>20:36</span><span>78%</span></div>
+        <div class="ptitle"><span class="sp">✦</span> Thiết lập ngân sách</div>
+        <div class="progress" style="padding-top:.6rem"><i class="on"></i><i class="on"></i><i></i></div>
+        <div class="pbody">
+          <div>
+            <h3 style="font-size:.95rem; color:var(--app-text)">Bạn đang sống kiểu nào?</h3>
+            <p style="font-size:.76rem; color:var(--app-dim); margin-top:.25rem">Tôi sẽ dựng ngân sách khởi điểm từ đây.</p>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:.45rem" id="f-preset">
+            <button class="opt" type="button" data-p="rent" aria-pressed="true"><em>🏙</em> Ở trọ, đi làm, ăn ngoài <span class="tick">✓</span></button>
+            <button class="opt" type="button" data-p="fam" aria-pressed="false"><em>🏡</em> Ở với gia đình, ăn cơm nhà <span class="tick">✓</span></button>
+            <button class="opt" type="button" data-p="own" aria-pressed="false"><em>👨‍👩‍👧</em> Gia đình riêng, có con nhỏ <span class="tick">✓</span></button>
+            <button class="opt" type="button" data-p="stu" aria-pressed="false"><em>🎓</em> Sinh viên <span class="tick">✓</span></button>
+          </div>
+          <div class="notice" style="border-left-color:var(--app-line-2); color:#79826f">Ô “kể tôi nghe cách bạn tiêu tiền” <strong>ẩn ở Phase 1</strong> — nút chết còn tệ hơn nút không có. Mở ở Phase 4.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCREEN 3 -->
+    <div class="step">
+      <div class="stepcap"><span class="stepnum">3</span><h3>Đề xuất — nói rõ đây là ước lượng</h3></div>
+      <div class="phone">
+        <div class="pbar"><span>20:36</span><span>78%</span></div>
+        <div class="ptitle"><span class="sp">✦</span> Thiết lập ngân sách</div>
+        <div class="progress" style="padding-top:.6rem"><i class="on"></i><i class="on"></i><i class="on"></i></div>
+        <div class="pbody">
+          <div class="notice">Đây là ước lượng — tôi chưa biết thói quen chi tiêu của bạn. Sau 1 tuần tôi sẽ xem số thật và chỉnh lại cùng bạn.</div>
+          <div class="result" style="border-top:0; padding-top:0">
+            <div><div class="lab">Được chi mỗi ngày</div><div class="big num" id="o-day2">276.000đ</div></div>
+          </div>
+          <div class="alloc" id="o-bar"></div>
+          <div class="rows" id="o-rows"></div>
+          <div class="deducted">
+            <div><span>📈 Tiết kiệm</span><span class="mono" id="o-sav">1.200.000đ</span></div>
+            <div><span>🏠 Cố định</span><span class="mono" id="o-fix">2.500.000đ</span></div>
+          </div>
+          <div class="pbtns"><span class="btn">Chỉnh</span><span class="btn primary">Bắt đầu dùng</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="gridcards" style="margin-top:2rem">
+    <div class="card">
+      <span class="k">§US-06</span>
+      <h4>Preset tính trên <em>disposable</em>, không phải lương gộp</h4>
+      <p>Mẫu số là <code>lương − cố định − tiết kiệm</code>. Cách này ổn định hơn nhiều giữa các mức thu nhập, và ép luôn mental model “trừ tiết kiệm trước” vào phần toán thay vì vào lời khuyên.</p>
+    </div>
+    <div class="card">
+      <span class="k">§US-07</span>
+      <h4>Dự phòng 12% không phải một danh mục</h4>
+      <p>Nó là <code>unallocated</code> — không gán transaction vào được, không xuất hiện trong picker. Nó hấp thụ phần lẻ làm tròn và những danh mục preset cố tình bỏ trống.</p>
+    </div>
+    <div class="card">
+      <span class="k">§P-05</span>
+      <h4>Mỗi danh mục là một cơ hội thất bại</h4>
+      <p>Mỗi preset tối đa 6 dòng. 10 dòng nghĩa là gần như chắc chắn có 1 dòng vượt mỗi tháng — user quen với cảnh báo, cảnh báo mất nghĩa, rồi họ tắt thông báo.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="shead">
+    <p class="eyebrow">US-09 · nơi feature thật sự đổi hành vi</p>
+    <h2>Lúc sắp tiêu tiền</h2>
+    <p>Wizard không đổi hành vi ai cả — nó chỉ nạp đạn. Thay đổi xảy ra ở màn chat mà user <em>vốn đã gõ vào rồi</em>. Thêm hai dòng vào response, không tốn thêm thao tác nào của user.</p>
+  </div>
+
+  <div class="beforeafter">
+    <div class="step">
+      <div class="stepcap"><h3 class="killed">Hiện tại</h3><span>chỉ xác nhận</span></div>
+      <div class="phone">
+        <div class="pbody" style="padding-top:.3rem; gap:.5rem">
+          <div class="bubble-u">55k phindi almond coffee in Bamos cafe</div>
+          <div class="bubble-a">
+            <div style="font-size:.82rem">Đã đề xuất 1 giao dịch, vui lòng xác nhận.</div>
+            <div class="tx"><span class="ok">✓</span> phindi almond coffee <span class="val">−55.000đ</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="stepcap"><span class="stepnum">→</span><h3>Sau US-09</h3><span>còn trong hạn mức</span></div>
+      <div class="phone">
+        <div class="pbody" style="padding-top:.3rem; gap:.5rem">
+          <div class="bubble-u">55k phindi almond coffee in Bamos cafe</div>
+          <div class="bubble-a">
+            <div class="tx"><span class="ok">✓</span> phindi almond coffee <span class="cat">Cafe</span> <span class="val">−55.000đ</span></div>
+            <div class="impact">
+              <div class="bline"><span>☕</span><div class="meter"><i style="width:71%"></i></div><span class="r">640k/900k · nay còn 12.000đ</span></div>
+              <div class="daily"><span>💸 Hôm nay còn</span><b>95.000đ</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="stepcap"><span class="stepnum">→</span><h3>Khi đã vượt</h3><span>nêu sự thật, không phán xét</span></div>
+      <div class="phone">
+        <div class="pbody" style="padding-top:.3rem; gap:.5rem">
+          <div class="bubble-u">60k cafe với team</div>
+          <div class="bubble-a">
+            <div class="tx"><span class="ok">✓</span> cafe với team <span class="cat">Cafe</span> <span class="val">−60.000đ</span></div>
+            <div class="impact">
+              <div class="bline"><span>☕</span><div class="meter warn"><i style="width:100%"></i></div><span class="r amber">980k/900k · vượt 80.000đ</span></div>
+              <div class="daily"><span>💸 17 ngày còn lại</span><b>178.000đ/ngày</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout" style="margin-top:1.6rem">
+    <p class="eyebrow">Quy tắc màu — P-07</p>
+    <p>Không có màu đỏ ở bất kỳ trạng thái ngân sách nào, kể cả khi vượt. Đỏ chỉ dành cho lỗi hệ thống. Vượt hạn mức dùng amber, câu chữ nêu con số và bước tiếp theo — không dấu than, không emoji buồn. Shaming làm user tránh mở app, mà app không được mở thì không giúp được gì.</p>
+  </div>
+</section>
+
+<section>
+  <div class="shead">
+    <p class="eyebrow">Phase 2 · vì sao Phase 1 không nên ship một mình</p>
+    <h2>Ngày thứ 7 — AI nhận số của mình sai</h2>
+    <p>Với persona <span class="mono">cold</span>, ngân sách đầu tiên <strong>chắc chắn lệch</strong> — đó là điều kiện của bài toán, không phải lỗi. Giá trị nằm ở tốc độ hội tụ. Màn 3 đã hứa “sau 1 tuần tôi sẽ chỉnh lại cùng bạn”; nếu Phase 2 chưa có thì đó là lời hứa suông, còn tệ hơn không hứa.</p>
+  </div>
+
+  <div class="flow">
+    <div class="step">
+      <div class="stepcap"><span class="stepnum">7</span><h3>Check-in, không phải cảnh báo</h3></div>
+      <div class="phone">
+        <div class="pbody" style="padding-top:.3rem">
+          <div class="bubble-a" style="gap:.65rem">
+            <div style="font-family:Archivo,sans-serif; font-weight:600; font-size:.92rem">7 ngày đầu — tôi xem thử nhé</div>
+            <div style="font-size:.8rem; color:#b9c4b0; line-height:1.5">Bạn đã chi <b class="mono">2.150.000đ</b>. Theo đà này cả tháng khoảng <b class="mono">9.200.000đ</b>, trong khi kế hoạch là <b class="mono">8.300.000đ</b>.</div>
+            <div class="impact" style="border:0; padding:0">
+              <div class="bline"><span style="width:5.2rem; font-size:.76rem">☕ Cafe</span><div class="meter warn"><i style="width:100%"></i></div><span class="r amber">+40%</span></div>
+              <div class="bline"><span style="width:5.2rem; font-size:.76rem">🍜 Ăn uống</span><div class="meter warn"><i style="width:82%"></i></div><span class="r amber">+18%</span></div>
+              <div class="bline"><span style="width:5.2rem; font-size:.76rem">🚗 Di chuyển</span><div class="meter"><i style="width:48%"></i></div><span class="r">đúng nhịp</span></div>
+            </div>
+            <div class="notice">Ngân sách tuần trước là <strong>tôi</strong> ước lượng khi chưa biết thói quen của bạn. Giờ có số thật rồi, chỉnh lại cho sát nhé?</div>
+            <div style="display:flex; flex-direction:column; gap:.35rem">
+              <span class="btn primary">Chỉnh theo thực tế</span>
+              <span class="btn">Giữ kế hoạch, tôi sẽ giảm chi</span>
+              <span class="btn" style="border-color:transparent; color:var(--app-dim)">Để sau</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="stepcap"><span class="stepnum">→</span><h3>Nâng hạn mức phải zero-sum</h3></div>
+      <div class="phone">
+        <div class="pbody" style="padding-top:.3rem">
+          <div class="bubble-a" style="gap:.6rem">
+            <div style="font-family:Archivo,sans-serif; font-weight:600; font-size:.92rem">Chỉnh Cafe &amp; Giải trí</div>
+            <div class="mono" style="font-size:.9rem">1.150.000 → <b style="color:var(--app-lime)">1.450.000</b> <span style="color:var(--app-dim)">(+300.000)</span></div>
+            <div style="font-size:.79rem; color:#b9c4b0">Phải lấy 300.000đ từ đâu đó:</div>
+            <div style="display:flex; flex-direction:column; gap:.4rem">
+              <button class="opt" type="button" aria-pressed="true" style="font-size:.8rem"><em>🛟</em> <span>Dự phòng<br><span style="color:var(--app-dim); font-size:.72rem">1.000.000 → 700.000 · khuyên dùng</span></span> <span class="tick">✓</span></button>
+              <button class="opt" type="button" aria-pressed="false" style="font-size:.8rem"><em>🛍</em> <span>Mua sắm<br><span style="color:var(--app-dim); font-size:.72rem">900.000 → 600.000</span></span> <span class="tick">✓</span></button>
+              <button class="opt" type="button" aria-pressed="false" style="font-size:.8rem"><em>📈</em> <span>Tiết kiệm<br><span style="color:var(--app-amber); font-size:.72rem">⚠ giảm 25% mục tiêu</span></span> <span class="tick">✓</span></button>
+            </div>
+            <div class="pbtns"><span class="btn">Huỷ</span><span class="btn primary">Xác nhận</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="stepcap"><h3>Vì sao bắt buộc zero-sum</h3></div>
+      <div class="callout" style="height:100%">
+        <p class="eyebrow">P-04</p>
+        <p>Nếu AI cứ nâng hạn mức cho khớp thực tế, sau ba chu kỳ ngân sách chỉ còn là tấm gương phản chiếu hành vi — đúng 100% và vô dụng 100%.</p>
+        <p>Nên mọi lần nâng đều phải chỉ ra lấy từ đâu, và nếu nguồn duy nhất còn lại là Tiết kiệm thì bắt buộc hiện cảnh báo. Server phải validate lại toàn bộ ràng buộc này, không tin client.</p>
+        <p style="color:var(--ink)"><strong>Và chỉ đề nghị chỉnh khi lệch cùng chiều ≥ 2 chu kỳ.</strong> Một tháng bất thường không phải xu hướng.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="shead">
+    <p class="eyebrow">Blast radius</p>
+    <h2>Update những gì — và đụng vào ai</h2>
+    <p>Cột bên phải là thứ dễ bị bỏ sót: mỗi thay đổi ở lớp dưới đều có người khác đang đọc cùng con số đó.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Thay đổi</th><th>Lớp</th><th>Ảnh hưởng lan sang</th><th>Rủi ro</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="risk hi">Engine <code>budgetproposal</code>: bỏ <code>float64</code> → <code>int64</code> xu, map baseline → slice có thứ tự</td>
+          <td>backend</td>
+          <td>Toàn bộ số tiền của wizard. Map iteration ngẫu nhiên của Go đang làm cùng input ra khác kết quả — bug này <strong>đang chạy trên production</strong>.</td>
+          <td><span class="pill hi">cao</span></td>
+        </tr>
+        <tr>
+          <td class="risk hi"><code>SumExpenseByUserCycle</code> thay <code>SumExpenseByUserCurrentPeriod</code></td>
+          <td>backend · SQL</td>
+          <td><strong>F-05 budget list, F-07 report, tab Budgets, US-09</strong> — cả bốn phải đọc cùng một window, nếu không hai màn hình sẽ hiện hai con số khác nhau cho cùng một budget.</td>
+          <td><span class="pill hi">cao</span></td>
+        </tr>
+        <tr>
+          <td class="risk md">Migration 019 — <code>categories.system_key</code> + đổi tên sang tiếng Việt + 2 system category mới</td>
+          <td>DB</td>
+          <td>User đang quen “Food” sẽ thấy “Ăn uống”. Transaction không bị ảnh hưởng (FK là <code>category_id</code>). Phải mount vào <em>cả hai</em> compose file — drift 015–018 đừng lặp lại.</td>
+          <td><span class="pill md">vừa</span></td>
+        </tr>
+        <tr>
+          <td class="risk md">Migration 020 — <code>budget_plans</code> + <code>budget_plan_items</code> + backfill</td>
+          <td>DB</td>
+          <td>Mọi user đang có budget phải được backfill thành plan v1 <code>origin=manual</code>, nếu không Phase 2 sẽ bỏ qua toàn bộ user cũ.</td>
+          <td><span class="pill md">vừa</span></td>
+        </tr>
+        <tr>
+          <td class="risk md">Màn Budgets (sửa tay) giờ cũng phải tạo plan version</td>
+          <td>backend · mobile</td>
+          <td>Chỗ này dễ quên nhất. Bỏ sót là plan lệch khỏi enforcement layer, và Phase 2 sẽ calibrate trên số rác.</td>
+          <td><span class="pill md">vừa</span></td>
+        </tr>
+        <tr>
+          <td class="risk lo"><code>POST /transactions</code> trả thêm <code>budget_impact</code> + <code>daily_remaining_total</code></td>
+          <td>API</td>
+          <td>Additive, nullable — client cũ bỏ qua field mới vẫn chạy y nguyên.</td>
+          <td><span class="pill lo">thấp</span></td>
+        </tr>
+        <tr>
+          <td class="risk lo">Wizard Step 3 cũ (6 tier × N danh mục) bị xoá</td>
+          <td>mobile</td>
+          <td>Xoá UI, không xoá data. Không có user nào đang phụ thuộc vào tier đã lưu vì v1 không lưu tier.</td>
+          <td><span class="pill lo">thấp</span></td>
+        </tr>
+        <tr>
+          <td class="risk lo"><code>period</code> khoá cứng <code>monthly</code> server-side</td>
+          <td>API</td>
+          <td>DTO, <code>common.BudgetPeriodMonthly</code> và mobile cuối cùng cũng khớp nhau (BS-06). Weekly/quarterly vốn chưa ai dùng được.</td>
+          <td><span class="pill lo">thấp</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="shead">
+    <p class="eyebrow">Chốt lại</p>
+    <h2>6 việc phải xong trước khi code</h2>
+    <p>Spec Phase 1 hiện tại đã đủ chi tiết để implement. Sáu điểm dưới là những chỗ còn sai hoặc còn hở — hai cái đầu là blocker thật.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>#</th><th>Vấn đề</th><th>Sửa</th><th></th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="risk hi">1</td>
+          <td><strong>Tràn <code>int64</code>.</strong> Đổi sang xu làm mọi số ×100. Phép <code>deficit*a/shrinkPool</code> với income cap ≈ 10¹² cho tích 10²⁴, vượt <code>MaxInt64</code> = 9,22×10¹⁸. Tràn im lặng, ra số âm.</td>
+          <td>Helper <code>mulDiv</code> dùng <code>bits.Mul64</code>/<code>bits.Div64</code> cho <em>mọi</em> phép chia tỉ lệ. Và nới fuzz range của property test lên sát cap — range hiện tại dừng ở 1 tỷ nên chính nó cũng không bắt được.</td>
+          <td><span class="pill hi">blocker</span></td>
+        </tr>
+        <tr>
+          <td class="risk hi">2</td>
+          <td><strong>Timezone.</strong> A-05 để UTC và ghi nhận E-14 chưa thoả. Nhưng user ở UTC+7: ngày lật lúc 7h sáng. Từ 0h–7h, “Hôm nay còn X” đang hiện ngân sách của <em>hôm qua</em> — sai 29% thời gian, trên con số nổi bật nhất của cả feature.</td>
+          <td>Không cần feature timezone đầy đủ. Một hằng số app-level <code>Asia/Ho_Chi_Minh</code> cho mọi biên ngày/chu kỳ; storage vẫn <code>TIMESTAMPTZ</code> UTC. Kéo vào Phase 1.</td>
+          <td><span class="pill hi">blocker</span></td>
+        </tr>
+        <tr>
+          <td class="risk md">3</td>
+          <td><strong>Copy hứa suông.</strong> Màn 3 hứa “sau 1 tuần tôi sẽ chỉnh lại cùng bạn”, nhưng check-in ngày 7 nằm ở Phase 2.</td>
+          <td>Ship Phase 1 + 2 cùng nhau (khuyến nghị), hoặc đổi copy thành “Bạn chỉnh lại bất cứ lúc nào.” Không có đường thứ ba. Open Question #1 do đó là ràng buộc, không phải câu hỏi.</td>
+          <td><span class="pill md">release</span></td>
+        </tr>
+        <tr>
+          <td class="risk md">4</td>
+          <td><strong>Race ở lần submit đầu.</strong> <code>SELECT … FOR UPDATE</code> trên budget rows không serialize được user chưa có budget nào — khoá 0 dòng. Hai device submit cùng lúc → cả hai insert → unique violation → 500.</td>
+          <td>Khoá trên hàng user hoặc <code>pg_advisory_xact_lock</code>, đặt đầu transaction trước mọi thứ khác. Rồi mới supersede → insert.</td>
+          <td><span class="pill md">bug</span></td>
+        </tr>
+        <tr>
+          <td class="risk lo">5</td>
+          <td><strong>Ngưỡng 300.000đ sai số học.</strong> Preset nhỏ nhất có 6 danh mục → cần 6×50.000 = 300.000đ, nhưng <code>capAllocatable</code> chỉ là 88% = 264.000đ. Ngay tại ngưỡng spec cho là “đủ”, engine đã phải <code>ScaledDown</code>.</td>
+          <td><code>ceil(n × floor / 0.88)</code> ≈ 341.000đ → làm tròn lên <strong>350.000đ</strong>.</td>
+          <td><span class="pill lo">hằng số</span></td>
+        </tr>
+        <tr>
+          <td class="risk lo">6</td>
+          <td><strong>Version không có mốc thời gian.</strong> Sửa 6 budget liên tiếp tạo 6 version. Vấn đề không phải số lượng — mà là Phase 2 sẽ không biết version nào có hiệu lực trong khoảng ngày nào để tính <code>pace</code>.</td>
+          <td>Thêm <code>effective_from timestamptz</code> vào <code>budget_plans</code> ngay Phase 1. Rẻ hơn nhiều so với migrate sau khi đã có data thật.</td>
+          <td><span class="pill lo">schema</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn" style="margin-top:1.8rem">
+    <p class="eyebrow">Rủi ro lớn nhất không nằm trong bảng trên</p>
+    <p>Bảng preset ở §US-06 vẫn <strong>không có cơ sở dữ liệu thật</strong> — đó là ước lượng theo bối cảnh Việt Nam. Nó quyết định sai số chu kỳ đầu của toàn bộ user <span class="mono">cold</span>, tức là nhóm đông nhất, và không một test nào bắt được nếu nó sai. Kế hoạch duy nhất hợp lý: ship bảng hiện tại, rồi khi có ~200 user hoàn thành một chu kỳ đầy đủ thì tính lại per-profile từ chính data đó. Đây nên là một task định kỳ, không phải một lần.</p>
+  </div>
+</section>
+
+<footer class="wrap" style="padding-inline:0">
+  Mockup dựng theo <code>specs/ai-budget-wizard/spec-v2.md</code> §US-01…US-09. Số trên màn 3 tính bằng đúng thuật toán trong spec — floor về bậc VND, largest-remainder, buffer 12%, sàn 50.000đ/danh mục.
+</footer>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var XU = 100, FLOOR = 5000000, CAP_NUM = 88, CAP_DEN = 100;
+
+  var PRESETS = {
+    rent: [["food","🍜 Ăn uống",40,"--c-food"],["transport","🚗 Di chuyển",11,"--c-transport"],
+           ["fun","☕ Cafe & Giải trí",14,"--c-fun"],["shop","🛍 Mua sắm",11,"--c-shop"],
+           ["health","💊 Sức khoẻ",4,"--c-health"],["other","⋯ Chi khác",8,"--c-other"]],
+    fam:  [["food","🍜 Ăn uống",26,"--c-food"],["transport","🚗 Di chuyển",12,"--c-transport"],
+           ["fun","☕ Cafe & Giải trí",20,"--c-fun"],["shop","🛍 Mua sắm",17,"--c-shop"],
+           ["health","💊 Sức khoẻ",5,"--c-health"],["other","⋯ Chi khác",8,"--c-other"]],
+    own:  [["food","🍜 Ăn uống",34,"--c-food"],["kids","👶 Con cái & Học tập",20,"--c-kids"],
+           ["transport","🚗 Di chuyển",10,"--c-transport"],["health","💊 Sức khoẻ",8,"--c-health"],
+           ["shop","🛍 Mua sắm",9,"--c-shop"],["other","⋯ Chi khác",7,"--c-other"]],
+    stu:  [["food","🍜 Ăn uống",40,"--c-food"],["fun","☕ Cafe & Giải trí",17,"--c-fun"],
+           ["kids","📚 Học tập",12,"--c-kids"],["transport","🚗 Di chuyển",8,"--c-transport"],
+           ["shop","🛍 Mua sắm",6,"--c-shop"],["other","⋯ Chi khác",5,"--c-other"]]
+  };
+
+  // roundStep, in xu — mirrors the spec's ladder exactly
+  function roundStep(a){
+    if (a < 10000000)   return 500000;    //  <100k đ  -> 5k đ
+    if (a < 100000000)  return 1000000;   //   <1tr đ  -> 10k đ
+    if (a < 1000000000) return 5000000;   //  <10tr đ  -> 50k đ
+    return 10000000;                      //           -> 100k đ
+  }
+
+  function quantize(raw, cap){
+    var n = raw.length, out = [], step = [], rem = [], total = 0, i;
+    for (i = 0; i < n; i++){
+      var s = roundStep(raw[i]);                 // step frozen from the RAW amount
+      step[i] = s;
+      out[i] = Math.floor(raw[i] / s) * s;
+      if (out[i] < FLOOR) out[i] = Math.ceil(FLOOR / s) * s;
+      rem[i] = raw[i] - out[i];
+      total += out[i];
+    }
+    var order = [];
+    for (i = 0; i < n; i++) order.push(i);
+    order.sort(function(a,b){ return rem[b] - rem[a]; });
+    for (var k = 0; k < order.length; k++){
+      i = order[k];
+      if (rem[i] * 2 < step[i]) continue;        // lost less than half a step
+      if (total + step[i] > cap) continue;
+      out[i] += step[i]; total += step[i];
+    }
+    return out;
+  }
+
+  function fmt(xu){
+    var d = Math.round(xu / XU);
+    return d.toLocaleString("vi-VN") + "đ";
+  }
+  function daysInCycle(day){
+    var now = new Date(), y = now.getFullYear(), m = now.getMonth();
+    var start = new Date(y, m, day);
+    if (now.getDate() < day) start = new Date(y, m - 1, day);
+    var end = new Date(start.getFullYear(), start.getMonth() + 1, day);
+    return Math.round((end - start) / 86400000);
+  }
+
+  var el = {
+    income: document.getElementById("f-income"),
+    fixed:  document.getElementById("f-fixed"),
+    day:    document.getElementById("f-day"),
+    save:   document.getElementById("f-save"),
+    preset: document.getElementById("f-preset"),
+    disp:   document.getElementById("o-disp"),
+    dayOut: document.getElementById("o-day"),
+    dayOut2:document.getElementById("o-day2"),
+    bar:    document.getElementById("o-bar"),
+    rows:   document.getElementById("o-rows"),
+    sav:    document.getElementById("o-sav"),
+    fix:    document.getElementById("o-fix")
+  };
+  var savePct = 10, preset = "rent";
+
+  function pressed(group, node){
+    var b = group.querySelectorAll("button");
+    for (var i = 0; i < b.length; i++) b[i].setAttribute("aria-pressed", b[i] === node ? "true" : "false");
+  }
+
+  function render(){
+    var income = Math.max(0, Math.round((parseFloat(el.income.value) || 0) * XU));
+    var fixed  = Math.max(0, Math.round((parseFloat(el.fixed.value)  || 0) * XU));
+    var dayN   = Math.min(28, Math.max(1, parseInt(el.day.value, 10) || 1));
+    var savings = Math.floor(income * savePct / 100);
+    var disposable = income - fixed - savings;
+
+    el.sav.textContent = fmt(savings);
+    el.fix.textContent = fmt(fixed);
+
+    if (disposable <= 0){
+      el.disp.textContent = "—";
+      el.dayOut.innerHTML = "cố định + tiết kiệm<br>đã vượt thu nhập";
+      el.dayOut2.textContent = "—";
+      el.bar.innerHTML = "";
+      el.rows.innerHTML = '<div class="notice" style="border-left-color:var(--app-amber); color:#e2c07a">Chi phí cố định và tiết kiệm đã vượt thu nhập. Bạn xem lại giúp nhé.</div>';
+      return;
+    }
+
+    var days = daysInCycle(dayN);
+    var perDay = Math.floor(disposable / days / 100000) * 100000; // floor to 1.000đ
+    el.disp.textContent = fmt(disposable);
+    el.dayOut.innerHTML = fmt(perDay) + "<br>mỗi ngày";
+    el.dayOut2.textContent = fmt(perDay);
+
+    var defs = PRESETS[preset];
+    var raw = defs.map(function(d){ return Math.floor(disposable * d[2] / 100); });
+    var cap = Math.floor(disposable * CAP_NUM / CAP_DEN);
+    var amts = quantize(raw, cap);
+
+    var allocated = amts.reduce(function(a,b){ return a + b; }, 0);
+    var buffer = disposable - allocated;
+
+    var barHTML = "", rowHTML = "";
+    for (var i = 0; i < defs.length; i++){
+      var pct = (amts[i] / disposable * 100).toFixed(3);
+      barHTML += '<i style="width:' + pct + '%; background:var(' + defs[i][3] + ')"></i>';
+      rowHTML +=
+        '<div class="row">' +
+          '<span class="dot" style="background:var(' + defs[i][3] + ')"></span>' +
+          '<span class="nm">' + defs[i][1] + '<span class="badge">○○○ ước lượng</span></span>' +
+          '<span class="amt">' + fmt(amts[i]) + '</span>' +
+        '</div>';
+    }
+    if (buffer > 0){
+      barHTML += '<i class="buf" style="width:' + (buffer / disposable * 100).toFixed(3) + '%"></i>';
+      rowHTML +=
+        '<div class="row buffer">' +
+          '<span class="dot" style="background:transparent; box-shadow:inset 0 0 0 1px #444c3c"></span>' +
+          '<span class="nm">🛟 Dự phòng<span class="badge">' + (buffer / disposable * 100).toFixed(1) + '% · không phải danh mục</span></span>' +
+          '<span class="amt">' + fmt(buffer) + '</span>' +
+        '</div>';
+    }
+    el.bar.innerHTML = barHTML;
+    el.rows.innerHTML = rowHTML;
+  }
+
+  el.save.addEventListener("click", function(e){
+    var b = e.target.closest("button[data-pct]");
+    if (!b) return;
+    savePct = parseInt(b.getAttribute("data-pct"), 10);
+    pressed(el.save, b); render();
+  });
+  el.preset.addEventListener("click", function(e){
+    var b = e.target.closest("button[data-p]");
+    if (!b) return;
+    preset = b.getAttribute("data-p");
+    pressed(el.preset, b); render();
+  });
+  ["input","change"].forEach(function(ev){
+    el.income.addEventListener(ev, render);
+    el.fixed.addEventListener(ev, render);
+    el.day.addEventListener(ev, render);
+  });
+
+  render();
+})();
+</script>
+
+</body>
+</html>

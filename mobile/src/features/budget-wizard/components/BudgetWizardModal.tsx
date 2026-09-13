@@ -7,34 +7,34 @@ import { useKeyboardHeight } from "@/lib/use-keyboard-height";
 import { useSheetStore } from "@/stores/sheet-store";
 import { BUDGET_WIZARD_TOTAL_STEPS, useBudgetWizardState } from "@/features/budget-wizard/hooks/use-budget-wizard-state";
 import { WizardProgressHeader } from "@/features/budget-wizard/components/WizardProgressHeader";
-import { WizardStepCategories } from "@/features/budget-wizard/components/WizardStepCategories";
-import { WizardStepIncomePeriod } from "@/features/budget-wizard/components/WizardStepIncomePeriod";
-import { WizardStepPreferences } from "@/features/budget-wizard/components/WizardStepPreferences";
-import { WizardStepProposal } from "@/features/budget-wizard/components/WizardStepProposal";
+import { WizardStepIncome } from "@/features/budget-wizard/components/WizardStepIncome";
+import { WizardStepProfile } from "@/features/budget-wizard/components/WizardStepProfile";
+import { WizardStepResult } from "@/features/budget-wizard/components/WizardStepResult";
 import { WizardStepSuccess } from "@/features/budget-wizard/components/WizardStepSuccess";
 
 interface BudgetWizardModalProps {
   visible: boolean;
   onClose: () => void;
-  // Lets the caller (e.g. a budget_wizard chat card) react to a completed
-  // run — spec.md US-05 Main Flow step 6.
   onCompleted?: (createdCount: number) => void;
 }
 
-// Full-screen guided flow (SDS.md §3.2 "multi-step guided flows") — a
-// visible progress indicator across 4 steps, dismissing at any point
-// discards all in-progress state (spec.md feature-level Precondition:
-// nothing is written before the final confirm). State/derived-values/
-// handlers live in useBudgetWizardState — this file is layout only.
+/**
+ * The budget setup flow: three screens, two questions, target under 45 seconds.
+ *
+ * v1 was four steps and asked the user to set a spending level for every
+ * category they picked — up to 120 decisions, each one a guess dressed as data.
+ * This file is layout only; all state and transitions live in
+ * useBudgetWizardState.
+ *
+ * Full-screen rather than a bottom-sheet Drawer, as before: a guided flow with
+ * per-step scrolling needs the whole viewport. That means replicating the two
+ * things Drawer provides for free — hiding the floating BottomNav, and closing
+ * on the Android hardware back button.
+ */
 export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizardModalProps) {
   const wizard = useBudgetWizardState(visible, onClose, onCompleted);
   const keyboardHeight = useKeyboardHeight();
 
-  // Full-screen, not a Drawer bottom-sheet (unlike every other form modal in
-  // this app) — a 4-step guided flow with per-step scrollable lists needs
-  // the whole viewport, not ~90% of it. Replicates the two things Drawer
-  // gave for free: hiding the floating BottomNav (useSheetStore) and closing
-  // on the Android hardware back button.
   useEffect(() => {
     if (!visible) return;
     useSheetStore.getState().open();
@@ -51,7 +51,7 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
 
   if (!visible) return null;
 
-  const step = wizard.step;
+  const { step } = wizard;
 
   return (
     <View style={styles.overlay}>
@@ -62,61 +62,39 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
 
         <View style={styles.body}>
           {step === 1 ? (
-            <WizardStepIncomePeriod
-              period={wizard.period}
-              onChangePeriod={wizard.setPeriod}
-              income={wizard.income}
-              onChangeIncome={wizard.setIncome}
+            <WizardStepIncome
               currency={wizard.currency}
-              submitAttempted={wizard.incomeSubmitAttempted}
-              onDismiss={onClose}
-              onNext={wizard.onSubmitIncome}
+              income={wizard.income}
+              fixed={wizard.fixed}
+              savingsPct={wizard.savingsPct}
+              cycleStartDay={wizard.cycleStartDay}
+              onChangeIncome={wizard.setIncome}
+              onChangeFixed={wizard.setFixed}
+              onChangeSavingsPct={wizard.setSavingsPct}
+              onChangeCycleStartDay={wizard.setCycleStartDay}
+              onNext={wizard.goToProfile}
             />
           ) : null}
 
-          {step === 2 ? (
-            <WizardStepCategories
-              categories={wizard.categories}
-              selectedIds={wizard.selectedIds}
-              onToggleCategory={wizard.toggleCategory}
-              customCategories={wizard.customCategories}
-              onAddCustomCategory={wizard.addCustomCategory}
-              onRemoveCustomCategory={wizard.removeCustomCategory}
-              submitAttempted={wizard.categoriesSubmitAttempted}
-              onNext={wizard.goToStep3}
-              onBack={() => wizard.setStep(1)}
-            />
-          ) : null}
+          {step === 2 ? <WizardStepProfile selected={wizard.preset} onSelect={wizard.selectPreset} /> : null}
 
           {step === 3 ? (
-            <WizardStepPreferences
-              selections={wizard.selections}
-              onChangePreference={(id, pref) => wizard.setPreferences((prev) => ({ ...prev, [id]: pref }))}
-              onNext={wizard.goToStep4}
-              onBack={() => wizard.setStep(2)}
-            />
-          ) : null}
-
-          {step === 4 ? (
-            <WizardStepProposal
-              selections={wizard.proposalSelections}
-              amounts={wizard.amounts}
-              onChangeAmount={(id, cents) => wizard.setAmounts((prev) => ({ ...prev, [id]: cents }))}
-              onRemove={wizard.removeProposalEntry}
-              reasoningByCategoryId={wizard.reasoningByCategoryId}
-              income={wizard.incomeCents}
+            <WizardStepResult
               currency={wizard.currency}
-              isLoading={wizard.proposalsMutation.isPending}
-              loadError={wizard.proposalsMutation.error}
-              scaledDownNotice={wizard.scaledDownNotice}
-              onConfirm={wizard.handleConfirm}
-              confirming={wizard.isSubmitting}
-              confirmError={wizard.submitError}
-              onBack={() => wizard.setStep(3)}
+              cycleStartDay={wizard.cycleStartDay}
+              savings={wizard.savings}
+              fixed={wizard.fixed}
+              result={wizard.result}
+              loading={wizard.loadingProposal}
+              submitting={wizard.submitting}
+              error={wizard.error}
+              onEditAmount={wizard.editAmount}
+              onRetry={wizard.retryProposal}
+              onSubmit={wizard.submit}
             />
           ) : null}
 
-          {step === 5 ? <WizardStepSuccess createdCount={wizard.createdCount} onDone={wizard.handleDone} /> : null}
+          {step > BUDGET_WIZARD_TOTAL_STEPS ? <WizardStepSuccess createdCount={wizard.createdCount} onDone={onClose} /> : null}
         </View>
       </SafeAreaView>
     </View>
@@ -124,7 +102,7 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
 }
 
 const styles = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFillObject, zIndex: 1000, elevation: 1000, backgroundColor: colors.bgApp },
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.bgApp, zIndex: 40 },
   safeArea: { flex: 1 },
-  body: { flex: 1, paddingHorizontal: spacing.xl, paddingBottom: spacing.md },
+  body: { flex: 1, paddingTop: spacing.sm },
 });
