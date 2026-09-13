@@ -62,6 +62,11 @@ func main() {
 	budgetService := service.NewBudgetService(budgetRepo, logger)
 	transactionService := service.NewTransactionService(transactionRepo, walletRepo, categoryRepo, logger)
 	auditLogService := service.NewAuditLogService(auditLogRepo, transactionRepo, logger)
+	transactionExportService := service.NewTransactionExportService(transactionRepo, walletRepo, logger)
+	// Takes transactionService itself, not a repo: every imported row is
+	// written through its CreateTransaction (specs/transaction-export-import/
+	// spec.md Context #4), never by a second insert path.
+	transactionImportService := service.NewTransactionImportService(transactionService, transactionRepo, walletRepo, categoryRepo, tokenService, logger)
 	reportService := service.NewReportService(reportRepo, walletRepo, categoryRepo, logger)
 	notificationService := service.NewNotificationService(notificationRepo, budgetRepo, logger)
 	aiServiceClient := service.NewHTTPAIServiceClient(cfg.AIServiceURL)
@@ -77,6 +82,8 @@ func main() {
 	budgetHandler := handler.NewBudgetHandler(budgetService, iconUploader, logger)
 	transactionHandler := handler.NewTransactionHandler(transactionService, logger)
 	auditLogHandler := handler.NewAuditLogHandler(auditLogService, logger)
+	transactionExportHandler := handler.NewTransactionExportHandler(transactionExportService, logger)
+	transactionImportHandler := handler.NewTransactionImportHandler(transactionImportService, logger)
 	reportHandler := handler.NewReportHandler(reportService, logger)
 	notificationHandler := handler.NewNotificationHandler(notificationService, logger)
 	chatHandler := handler.NewChatHandler(chatService, chatThreadService, logger)
@@ -92,7 +99,7 @@ func main() {
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 		AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 	}))
-	registerRoutes(app, userHandler, authHandler, walletHandler, categoryHandler, budgetHandler, transactionHandler, auditLogHandler, reportHandler, notificationHandler, chatHandler, budgetWizardHandler, tokenService, logger)
+	registerRoutes(app, userHandler, authHandler, walletHandler, categoryHandler, budgetHandler, transactionHandler, transactionExportHandler, transactionImportHandler, auditLogHandler, reportHandler, notificationHandler, chatHandler, budgetWizardHandler, tokenService, logger)
 
 	go func() {
 		if err := app.Listen(":" + cfg.Port); err != nil {

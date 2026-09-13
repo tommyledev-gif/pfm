@@ -14,9 +14,11 @@ export type SwipeDirection = "left" | "right";
 interface SwipeableMessageRowProps {
   children: ReactNode;
   direction: SwipeDirection;
-  // True for the AI's own clarifying question and a budget-wizard card —
-  // nothing there for the user to "correct" (mirrors the old
-  // openLongPressTarget early-return this replaces).
+  // True for any bubble with nothing for the user to "correct" — in practice
+  // every assistant bubble that isn't a transaction proposal. Callers should
+  // pass isEditLocked (features/ai-chat/edit-lock.ts) rather than re-deriving
+  // this, so the gesture and the modal dispatch can never disagree about
+  // which bubbles are editable.
   disabled?: boolean;
   onTriggerEdit: () => void;
 }
@@ -118,7 +120,11 @@ export function SwipeableMessageRow({ children, direction, disabled, onTriggerEd
   };
 
   const release = () => {
-    if (!atMaxRef.current) {
+    // disabled is re-checked here and not only in onMoveShouldSetPanResponder:
+    // a row that becomes locked mid-drag (or any future caller that engages
+    // the responder some other way) must still release into nothing rather
+    // than into an edit modal.
+    if (!atMaxRef.current || disabledRef.current) {
       reset();
       return;
     }

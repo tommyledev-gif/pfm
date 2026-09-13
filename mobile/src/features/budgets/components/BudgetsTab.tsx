@@ -6,10 +6,16 @@ import { CategoryPickerDrawer } from "@/components/shared/CategoryPickerDrawer";
 import { BudgetFormModal } from "@/features/budgets/components/BudgetFormModal";
 import { colorForCategory } from "@/lib/category-color";
 import { colors, radii, spacing, typography } from "@/lib/theme";
+import { useRefresh } from "@/lib/use-refresh";
 import { WalletCurrency } from "@/lib/constants";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { Budget } from "@/features/budgets/types";
-import { budgetRowStatus, BudgetPaceState, currentMonthPace } from "@/features/budgets/budget-pace";
+import {
+  budgetPeriodElapsed,
+  budgetRowStatus,
+  BudgetPaceState,
+  currentMonthPace,
+} from "@/features/budgets/budget-pace";
 import { BudgetCardSkeleton } from "@/features/budgets/components/BudgetCardSkeleton";
 import { BudgetListRow } from "@/features/budgets/components/BudgetListRow";
 import { BudgetMonthSummary } from "@/features/budgets/components/BudgetMonthSummary";
@@ -47,6 +53,11 @@ export function BudgetsTab() {
   const [highlightedBudgetId, setHighlightedBudgetId] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterKey>("all");
 
+  // Wallets and categories are refreshed alongside the budgets themselves:
+  // the primary currency the whole tab is scaled to comes from wallets, and
+  // each row's icon falls back to its linked category's.
+  const { refreshControl } = useRefresh([budgets, wallets, categories]);
+
   const scrollRef = useRef<ScrollView>(null);
   const rowOffsets = useRef<Record<string, number>>({});
 
@@ -62,12 +73,23 @@ export function BudgetsTab() {
       // Only the primary currency's limits belong on one scale — a USD limit
       // listed beside VND ones would make the summary's totals nonsense.
       .filter(({ limit }) => limit.currency === currency)
-      .map((row) => ({ ...row, status: budgetRowStatus(row.limit, pace.elapsed) }));
+      // Each row is paced against its own start_date, not the shared month
+      // figure — the summary card above still speaks for the whole month, but
+      // a budget created on the 25th is not 83% through its first period.
+      .map((row) => {
+        const periodElapsed = budgetPeriodElapsed(row.budget.start_date);
+        return { ...row, periodElapsed, status: budgetRowStatus(row.limit, periodElapsed) };
+      });
 
     // Worst first: over, then at risk, then on track, then untouched. The
     // thing you opened this tab to find should never be below the fold.
     const rank: Record<BudgetPaceState, number> = { over: 0, "at-risk": 1, "on-track": 2, unused: 3 };
     return all.sort((a, b) => rank[a.status.state] - rank[b.status.state] || b.status.ratio - a.status.ratio);
+    // pace.elapsed is a deliberate clock dependency, not a value this memo
+    // reads: budgetPeriodElapsed below calls new Date() itself, so without
+    // something that changes at midnight every row's tick would freeze at
+    // whatever it was when the screen mounted.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [budgets.data, currency, pace.elapsed]);
 
   const counts = useMemo(
@@ -132,7 +154,12 @@ export function BudgetsTab() {
 
   return (
     <View style={styles.container}>
-      <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+      <ScrollView
+        ref={scrollRef}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+        refreshControl={refreshControl}
+      >
         <BudgetMonthSummary pace={pace} totalLimit={totals.limit} totalSpent={totals.spent} currency={currency} />
 
         <View style={styles.chipRow}>
@@ -153,7 +180,7 @@ export function BudgetsTab() {
             {rows.length === 0 ? "Chưa có ngân sách nào — nhấn + để tạo." : "Không có ngân sách nào trong nhóm này."}
           </Text>
         ) : (
-          visibleRows.map(({ budget, limit }) => (
+          visibleRows.map(({ budget, limit, periodElapsed }) => (
             <View
               key={`${budget.id}-${limit.currency}`}
               onLayout={(e) => {
@@ -163,7 +190,7 @@ export function BudgetsTab() {
               <BudgetListRow
                 budget={budget}
                 limit={limit}
-                monthElapsed={pace.elapsed}
+                periodElapsed={periodElapsed}
                 category={categoryById.get(budget.category_id)}
                 highlighted={highlightedBudgetId === budget.id}
                 onPress={() => {

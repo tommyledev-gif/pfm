@@ -16,6 +16,7 @@ import { colorForCategory } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
 import { currentPeriodRange, monthRange, previousPeriodLabel, previousPeriodRange } from "@/lib/date-range";
 import { colors, radii, spacing, typography } from "@/lib/theme";
+import { useRefresh } from "@/lib/use-refresh";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { primaryCurrency } from "@/features/wallets/wallet-totals";
 import { WalletCardSkeleton } from "@/features/wallets/components/WalletCardSkeleton";
@@ -115,6 +116,20 @@ export default function HomeScreen() {
   // an empty categories column instead of a loading state.
   const snapshotLoading = wallets.isLoading || periodSummary.isLoading || thisMonthSummary.isLoading || budgets.isLoading;
 
+  // Home is the widest fan-out of queries in the app — the snapshot alone is
+  // three separate report calls (selected period, this month, previous
+  // period). Refreshing anything less than all of them would leave the trend
+  // badge comparing a fresh number against a stale one.
+  const { refreshControl } = useRefresh([
+    wallets,
+    recent,
+    categories,
+    budgets,
+    periodSummary,
+    thisMonthSummary,
+    previousPeriodSummary,
+  ]);
+
   return (
     <Screen>
       <FlatList
@@ -122,6 +137,7 @@ export default function HomeScreen() {
       contentContainerStyle={styles.content}
       data={recentTransactions}
       keyExtractor={(t) => t.id}
+      refreshControl={refreshControl}
       ListHeaderComponent={
         <View style={styles.header}>
           <TopBar userName="Me" />

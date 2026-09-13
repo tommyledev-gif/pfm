@@ -50,3 +50,12 @@ export type TransactionType = (typeof TRANSACTION_TYPES)[number];
 
 // Mirrors common.TransactionNoteMaxLength.
 export const TRANSACTION_NOTE_MAX_LENGTH = 500;
+
+// Transaction export/import (specs/transaction-export-import). The MIME type
+// mirrors common.TransactionExportContentType; UTI is its iOS equivalent,
+// needed by the share sheet so "Open in Numbers/Excel" appears.
+export const XLSX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+export const XLSX_UTI = "org.openxmlformats.spreadsheetml.sheet";
+// Mirrors common.TransactionImportMaxUploadBytes — checked client-side too so
+// a too-large file fails instantly instead of after a 5MB upload.
+export const IMPORT_MAX_UPLOAD_BYTES = 5 * 1024 * 1024;

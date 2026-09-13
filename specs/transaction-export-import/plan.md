@@ -321,33 +321,39 @@ sequenceDiagram
 
 | Area | Status |
 |------|--------|
-| Spec (`spec.md`) | Done — self-checked; Commit's `skipped` vs `failed` split (Finding #10) has been folded back into `spec.md`'s response shape and Open Questions #6 |
-| Plan (this document) | Done, pending human review — particularly Finding #5 (`import_token` design) and Finding #2 (reusing `CreateTransaction`'s `wasReplay`) |
-| `github.com/xuri/excelize/v2` dependency add | Not started |
-| Backend Export service/handler | Not started |
-| Backend Import Preview/Commit service/handler | Not started |
-| `TokenService` `ImportTokenClaims` addition | Not started |
-| `jwt_auth.go` empty-role hardening | Not started |
-| Mobile feature scaffold | Not started |
+| Spec (`spec.md`) | Done |
+| Plan (this document) | Done |
+| `github.com/xuri/excelize/v2` dependency add | **Done** — pinned `v2.9.0` |
+| Backend Export service/handler | **Done** |
+| Backend Import Preview/Commit service/handler | **Done** |
+| `TokenService` `ImportTokenClaims` addition | **Done** |
+| `jwt_auth.go` empty-role hardening | **Done** |
+| Mobile feature scaffold | **Done** — Export/Import pills on the Transactions screen, `ImportPreviewModal`, three mutation hooks |
+| Tests | **Done** — `transaction_import_service_test.go`, 11 cases; full `go test ./...` green |
+
+### Implementation deltas from this plan
+
+| # | Planned | Built | Why |
+|---|---------|-------|-----|
+| D1 | Constants appended to `backend/internal/common/constants.go` | New file `backend/internal/common/transaction_io.go` | `constants.go` was already 273 lines; the constants plus the money-unit helper pair would have pushed it past CLAUDE.md's 300-line cap. |
+| D2 | `centsToMajorUnitsString`/`majorUnitsStringToCents` in the service layer | `common.CentsToMajorUnits`/`common.MajorUnitsToCents` | Both directions are needed by two different services (export and import); `common/` is where CLAUDE.md puts shared utils. `MajorUnitsToCents` also had to grow real separator handling — a spreadsheet cell can arrive as `1.234.567` (vi-VN), `1,234.56` (en-US) or `80 000 ₫`, and rejecting those as "not a number" would have failed ordinary files. |
+| D3 | `ImportPreviewResponse.valid` as a bespoke shape | One `dto.ImportRow` used for both the response and the JWT payload | The client then renders exactly the rows Commit will attempt — a divergence between "what preview showed" and "what commit wrote" becomes impossible by construction. |
+| D4 | Export via `ListTransactionsByUser` with "no cursor limit" | Same call, `Limit: common.TransactionExportMaxRows` (100k), reversed to ASC in Go | The generated query's `LIMIT $2` is not optional, and an unbounded synchronous export needed *some* ceiling (spec.md Open Questions #3). Sorting in Go avoids a second SQL query differing only in `ORDER BY` — which matters because `sqlc generate` cannot be run in this repo (the local CLI rewrites every committed generated file). |
+| D5 | Export/Import as buttons "near the existing filter row" | Two more pills *inside* that row, plus `useTransactionIO` owning the flow | The row already scrolls horizontally, so this costs no vertical space on the app's tallest header. The hook exists because the buttons must live inside `TransactionsHeader` while the modal must render as a sibling of the list — one state, two render sites. |
+| D6 | — | `Icon.tsx` split into `components/ui/icons/*` behind a barrel; `FilterPill` extracted from `TransactionsHeader.tsx` | Both files crossed the 300-line cap once this feature's icons/pills were added (`Icon.tsx` was already at 307 before it). Every existing `@/components/ui/Icon` import still resolves. |
+| D7 | — | `expo-file-system` added alongside `expo-document-picker`/`expo-sharing` | `Sharing.shareAsync` takes a local file URI, so the downloaded bytes have to be written to the cache directory first. SDK 54's `File`/`Paths` API. |
+| D8 | — | `ImportCommitResponse.failures[]` alongside the three counts | Finding #10 says a failed row is "reported with its row number and the underlying error message"; that needs a list, not just a count. |
 
 ## 7. Open Tasks
 
-| ID | Task | File |
-|----|------|------|
-| TXI-T1 | Add `github.com/xuri/excelize/v2` dependency (Finding #1) | `backend/go.mod`, `go.sum` |
-| TXI-T2 | Add `common.TransactionImportMaxUploadBytes`, `common.TransactionImportTokenTTL` | `backend/internal/common/constants.go` |
-| TXI-T3 | Implement `TransactionExportService.BuildExportWorkbook` (query via existing `ListTransactionsByUser`, write via excelize, major-units conversion helper) | `backend/internal/service/transaction_export_service.go` |
-| TXI-T4 | Implement `transaction_export_handler.go` (`GET /transactions/export`); register **before** the existing `GET /:id` line (Finding #8) | `backend/internal/handler/transaction_export_handler.go`, `backend/cmd/server/routes.go` |
-| TXI-T5 | Implement `dto.ExportTransactionsQuery` | `backend/internal/dto/transaction_export_request.go` |
-| TXI-T6 | Add `TokenService.ImportTokenClaims`, `IssueImportToken`, `ParseImportToken` (Finding #5) | `backend/internal/service/token_service.go` |
-| TXI-T7 | Harden `middleware.JWTAuth` — reject empty/unrecognized `Role` explicitly (Finding #5, defense in depth) | `backend/internal/middleware/jwt_auth.go` |
-| TXI-T8 | Implement `TransactionImportService.PreviewImport` — row parsing/validation loop, name-resolution maps (wallet ambiguous-match check, category never-auto-create), deterministic idempotency-key derivation (Finding #3), duplicate pre-check, token minting | `backend/internal/service/transaction_import_service.go` |
-| TXI-T9 | Implement `TransactionImportService.CommitImport` — token verification, per-row `TransactionService.CreateTransaction` calls (Finding #2), `imported`/`skipped`/`failed` counting (Finding #10) | same file |
-| TXI-T10 | Implement `transaction_import_handler.go` (`Preview`, `Commit`); `Preview`'s multipart handling mirrors `WalletHandler.UploadIcon` (Finding #4) | `backend/internal/handler/transaction_import_handler.go`, `backend/cmd/server/routes.go` |
-| TXI-T11 | Implement `dto.ImportPreviewResponse`, `dto.ImportCommitRequest`, `dto.ImportCommitResponse` | `backend/internal/dto/transaction_import_dto.go` |
-| TXI-T12 | Unit tests: ambiguous wallet name (S-TXI-11), category-not-found reject (S-TXI-12), deterministic key stability across repeat Preview calls on the same file (S-TXI-15), double-commit no-op (S-TXI-22), a fresh balance-race row landing in `failed` not `skipped` (Finding #10) | `backend/internal/service/transaction_import_service_test.go` |
-| TXI-T13 | Mobile: add `expo-document-picker`, `expo-sharing` dependencies | `mobile/package.json` |
-| TXI-T14 | Mobile: `use-export-transactions-mutation.ts` (downloads blob, shares via `expo-sharing`) | `mobile/src/features/transactions/api/use-export-transactions-mutation.ts` |
-| TXI-T15 | Mobile: `use-import-preview-mutation.ts`, `use-import-commit-mutation.ts` | `mobile/src/features/transactions/api/use-import-preview-mutation.ts`, `use-import-commit-mutation.ts` |
-| TXI-T16 | Mobile: `ImportPreviewModal.tsx` (valid/duplicates/errors breakdown, explicit confirm button) | `mobile/src/features/transactions/components/ImportPreviewModal.tsx` |
-| TXI-T17 | Mobile: add Export/Import buttons to `transactions.tsx`'s existing filter row | `mobile/app/(app)/transactions.tsx` |
+| ID | Task | Status |
+|----|------|--------|
+| TXI-T1 … TXI-T17 | — | **All complete.** |
+
+### Remaining, deliberately not done
+
+| # | Item | Note |
+|---|------|------|
+| R1 | Integration tests for S-TXI-01…S-TXI-08 (Export) and S-TXI-09…S-TXI-25 end-to-end over HTTP | This repo has no HTTP-level integration test harness — every existing service test uses in-memory fakes. The service-level tests cover the same scenarios at the layer this codebase actually tests at. |
+| R2 | Product sign-off on spec.md Open Questions #1 (category-not-found → reject vs. auto-create) | Built as **reject**, per the spec's own resolution. A change to auto-create would be localised to `resolveRow` in `transaction_import_validation.go`. |
+| R3 | `frontend/` (Next.js) export/import | Out of scope per this plan's own Frontend-scope line — mobile only. |

@@ -1,8 +1,8 @@
-import { ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { CalendarIcon, IconProps, PlusIcon, SearchIcon, SortIcon, TagIcon } from "@/components/ui/Icon";
+import { CalendarIcon, DownloadIcon, PlusIcon, SearchIcon, SortIcon, TagIcon, UploadIcon } from "@/components/ui/Icon";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
+import { FilterPill } from "@/features/transactions/components/FilterPill";
 import { formatCurrency, formatCurrencyCompact } from "@/lib/currency";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { TransactionType } from "@/lib/constants";
@@ -31,6 +31,14 @@ interface TransactionsHeaderProps {
   hasCustomSort: boolean;
   onOpenSort: () => void;
   onAdd: () => void;
+  // Export/import (specs/transaction-export-import). They sit in the filter
+  // row rather than getting a toolbar of their own: the row already scrolls
+  // horizontally, so two more pills cost no vertical space on a screen whose
+  // header is already the tallest in the app.
+  onExport: () => void;
+  onImport: () => void;
+  exporting: boolean;
+  importing: boolean;
 }
 
 // Everything above the Transactions list — title + matched count, the period
@@ -55,6 +63,10 @@ export function TransactionsHeader({
   hasCustomSort,
   onOpenSort,
   onAdd,
+  onExport,
+  onImport,
+  exporting,
+  importing,
 }: TransactionsHeaderProps) {
   // The summary line's figure follows whichever tab is active: on Thu nhập
   // it's the income figure (green, the positive register used for income
@@ -163,35 +175,25 @@ export function TransactionsHeader({
             </View>
           ) : null}
         </FilterPill>
+        {/* Never "active" — unlike the three pills above these are actions,
+            not filter state, so a filled pill would wrongly read as "an
+            export filter is applied". */}
+        <FilterPill
+          active={false}
+          label={exporting ? "Đang xuất…" : "Xuất Excel"}
+          icon={DownloadIcon}
+          onPress={onExport}
+          testID="btn-export-transactions"
+        />
+        <FilterPill
+          active={false}
+          label={importing ? "Đang đọc…" : "Nhập Excel"}
+          icon={UploadIcon}
+          onPress={onImport}
+          testID="btn-import-transactions"
+        />
       </ScrollView>
     </View>
-  );
-}
-
-// The three filter pills differed only in icon, label and the badge one of
-// them carries, so they share one shape here rather than three near-identical
-// 10-line Pressables.
-function FilterPill({
-  active,
-  label,
-  icon: Icon,
-  onPress,
-  children,
-}: {
-  active: boolean;
-  label: string;
-  icon: (props: IconProps) => ReactNode;
-  onPress: () => void;
-  children?: ReactNode;
-}) {
-  return (
-    <Pressable style={[styles.filterButton, active && styles.filterButtonActive]} onPress={onPress}>
-      <Icon size={16} color={active ? colors.onGreen : colors.textSecondary} />
-      <Text style={[styles.filterButtonLabel, active && styles.filterButtonLabelActive]} numberOfLines={1}>
-        {label}
-      </Text>
-      {children}
-    </Pressable>
   );
 }
 
@@ -226,21 +228,6 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, ...typography.body, color: colors.textPrimary, padding: 0 },
   clearSearch: { ...typography.body, color: colors.textSecondary },
   filterRow: { flexDirection: "row", gap: spacing.sm },
-  filterButton: {
-    position: "relative",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-  },
-  filterButtonActive: { backgroundColor: colors.green, borderColor: colors.green },
-  filterButtonLabel: { ...typography.tiny, color: colors.textSecondary },
-  filterButtonLabelActive: { color: colors.onGreen },
   sortBadge: {
     position: "absolute",
     top: -4,

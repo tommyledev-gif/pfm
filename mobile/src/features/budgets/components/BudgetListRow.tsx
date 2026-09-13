@@ -12,7 +12,10 @@ import { Category } from "@/features/categories/types";
 interface BudgetListRowProps {
   budget: Budget;
   limit: BudgetLimit;
-  monthElapsed: number;
+  // 0..1 share of *this budget's* own period elapsed — not the month's, which
+  // is only the same number for budgets that have been in force since the 1st.
+  // See budgetPeriodElapsed.
+  periodElapsed: number;
   category?: Category;
   onPress: () => void;
   onHold: () => void;
@@ -27,7 +30,7 @@ interface BudgetListRowProps {
 // this screen with; it took a full Card of vertical space per budget, and it
 // never showed whether spending was ahead of the month. This row answers
 // "am I fine" in one glance instead: a single bar scaled to *its own* limit,
-// colored by pace state, with the month's tick drawn on it, the money left (or
+// colored by pace state, with its own period tick drawn on it, the money left (or
 // overspent) called out on the right, and the raw spent/limit pair underneath.
 //
 // Tap-to-edit and the 2s hold that opens the category picker are carried over
@@ -35,13 +38,13 @@ interface BudgetListRowProps {
 export function BudgetListRow({
   budget,
   limit,
-  monthElapsed,
+  periodElapsed,
   category,
   onPress,
   onHold,
   highlighted,
 }: BudgetListRowProps) {
-  const status = budgetRowStatus(limit, monthElapsed);
+  const status = budgetRowStatus(limit, periodElapsed);
   const { progress, start, cancel } = useHoldProgress();
   const nameColor = progress.interpolate({ inputRange: [0, 1], outputRange: [colors.textPrimary, colors.green] });
 
@@ -87,7 +90,7 @@ export function BudgetListRow({
         ratio={status.ratio}
         // A budget with nothing spent yet has no pace to be behind, and the
         // tick on an empty track just reads as noise.
-        pace={status.state === "unused" ? undefined : monthElapsed}
+        pace={status.state === "unused" ? undefined : periodElapsed}
         color={status.color}
       />
 

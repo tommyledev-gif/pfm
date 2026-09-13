@@ -24,6 +24,28 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+// responseType "arraybuffer" (GET /transactions/export is the only caller
+// today) applies to every response, not just the 2xx — so a 4xx JSON error
+// envelope also arrives as binary. Left as-is, getErrorMessage finds no
+// `message` field, so every failure shows the same generic toast, and the
+// debug console renders the body as a useless "{}" (JSON.stringify of an
+// ArrayBuffer). Decoding it back into the envelope here — before the logger
+// or any caller reads it — is what makes such a failure diagnosable.
+//
+// TextDecoder is a global in Expo SDK 54 (expo/src/winter installs it), which
+// matters because the backend's messages are Vietnamese: a byte-wise
+// String.fromCharCode would mangle every accented character.
+function decodeBinaryErrorBody(error: { response?: { data?: unknown } }): void {
+  const data = error.response?.data;
+  if (!error.response || !(data instanceof ArrayBuffer)) return;
+  try {
+    error.response.data = JSON.parse(new TextDecoder().decode(data));
+  } catch {
+    // Not JSON at all — an HTML error page from a proxy, say. Leave the raw
+    // body in place rather than replacing it with a worse guess.
+  }
+}
+
 // A request that has already gone through one refresh-and-retry cycle
 // carries this flag so a second 401 goes straight to clear() instead of
 // looping (specs/mobile-session-refresh/spec.md Edge Case #2).
@@ -60,6 +82,7 @@ apiClient.interceptors.response.use(
     return response;
   },
   async (error) => {
+    decodeBinaryErrorBody(error);
     useDebugLogStore
       .getState()
       .append(

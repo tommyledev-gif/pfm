@@ -12,6 +12,7 @@ import { AuditLogEntry } from "@/features/audit-log/types";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { primaryCurrency } from "@/features/wallets/wallet-totals";
+import { useRefresh } from "@/lib/use-refresh";
 
 interface DaySection {
   key: string;
@@ -34,6 +35,10 @@ export default function AuditLogScreen() {
     [categories.data],
   );
   const walletNameById = useMemo(() => new Map(wallets.data?.map((w) => [w.id, w.name])), [wallets.data]);
+  // The log renders category and wallet *names*, so a refresh that only
+  // refetched the log itself would still show "Danh mục" for a category
+  // created since the screen mounted.
+  const { refreshControl } = useRefresh([auditLogs, categories, wallets]);
   const currency = (wallets.data ? primaryCurrency(wallets.data) : undefined) ?? "VND";
 
   const entries = useMemo(
@@ -84,6 +89,7 @@ export default function AuditLogScreen() {
           contentContainerStyle={styles.list}
           stickySectionHeadersEnabled={false}
           showsVerticalScrollIndicator={false}
+          refreshControl={refreshControl}
           onEndReachedThreshold={0.4}
           onEndReached={() => {
             if (auditLogs.hasNextPage && !auditLogs.isFetchingNextPage) auditLogs.fetchNextPage();

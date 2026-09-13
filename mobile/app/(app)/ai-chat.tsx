@@ -11,6 +11,7 @@ import { EditHistoryDialog } from "@/features/ai-chat/components/EditHistoryDial
 import { EditMessageModal } from "@/features/ai-chat/components/EditMessageModal";
 import { EditTransactionModal } from "@/features/ai-chat/components/EditTransactionModal";
 import { SwipeableMessageRow } from "@/features/ai-chat/components/SwipeableMessageRow";
+import { isEditLocked } from "@/features/ai-chat/edit-lock";
 import { TransactionActionCard } from "@/features/ai-chat/components/TransactionActionCard";
 import { BudgetWizardModal } from "@/features/budget-wizard/components/BudgetWizardModal";
 import { TransactionFormModal } from "@/features/transactions/components/TransactionFormModal";
@@ -273,11 +274,11 @@ export default function AiChatScreen() {
   const openEditTarget = (item: ChatMessage) => {
     if (item.action) {
       setEditingActionMessage(item);
-    } else if (item.role === "assistant" && (item.intent === "ambiguous" || item.actionType === "budget_wizard")) {
-      // Nothing to "correct" on the AI's own question, or on a budget-wizard
-      // card — same reasoning as the ambiguous-intent case above. In
-      // practice SwipeableMessageRow's own `disabled` prop already stops the
-      // gesture from firing for these, this is just defense in depth.
+    } else if (isEditLocked(item)) {
+      // In practice SwipeableMessageRow's own `disabled` prop already stops
+      // the gesture from ever firing for these, so this is defense in depth —
+      // but it is the branch that guarantees no path opens EditMessageModal
+      // on an assistant bubble.
       return;
     } else {
       setEditingMessage(item);
@@ -338,14 +339,11 @@ export default function AiChatScreen() {
             // the bubble already sits on, Messenger's own swipe-to-reply
             // convention (see SwipeableMessageRow's doc comment).
             direction={item.role === "user" ? "left" : "right"}
-            // The AI's own clarifying question (rare now — only a missing
-            // amount or a non-transaction message) has nothing for the user
-            // to "correct" the way an edit modal implies, unlike a
-            // transaction proposal (always editable) or a user's own
-            // message — don't let ambiguous AI questions or a budget-wizard
-            // card be swiped-to-edit like ordinary text. See openEditTarget
-            // for the rest of the dispatch.
-            disabled={item.role === "assistant" && (item.intent === "ambiguous" || item.actionType === "budget_wizard")}
+            // See isEditLocked — only a user's own message or a transaction
+            // proposal is editable; everything the assistant says in prose is
+            // its own words, with nothing for the user to "correct". See
+            // openEditTarget for the rest of the dispatch.
+            disabled={isEditLocked(item)}
             onTriggerEdit={() => handleEditTrigger(item)}
           >
             <ChatBubble role={item.role} text={item.text}>
@@ -449,12 +447,10 @@ export default function AiChatScreen() {
       onSave={(text) => {
         const target = editingMessage;
         setEditingMessage(null);
-        if (!target) return;
-        if (target.role === "user") {
-          editUserMessage(target, text);
-        } else {
-          updateMessage(target.id, { text });
-        }
+        // Only a user message can reach this modal (isEditLocked), so there
+        // is no assistant branch to fall back to — editing an assistant
+        // bubble used to patch its text in place and do nothing else.
+        if (target) editUserMessage(target, text);
       }}
     />
 

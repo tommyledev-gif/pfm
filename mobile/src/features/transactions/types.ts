@@ -60,3 +60,51 @@ export interface UpdateTransactionRequest {
   occurred_at?: string;
   note?: string;
 }
+
+// --- Export / Import (specs/transaction-export-import) ---------------------
+
+// One resolved, validated row from an import preview — mirrors
+// backend/internal/dto.ImportRow exactly.
+//
+// ⚠️ `amount` is integer cents, already converted from the spreadsheet's
+// major-unit Amount column server-side. Render it through formatCurrency like
+// any other amount; never divide by 100 here.
+export interface ImportRow {
+  // 1-based worksheet row number, so a message can name the row the user sees
+  // in Excel.
+  row: number;
+  wallet_id: string;
+  category_id: string;
+  amount: number;
+  type: TransactionType;
+  occurred_at: string;
+  note: string | null;
+  idempotency_key: string;
+}
+
+// A row that will not be imported. Same shape for both buckets — a duplicate
+// is an intentional skip, an error is a data problem.
+export interface ImportRowIssue {
+  row: number;
+  reason: string;
+}
+
+// Response of POST /transactions/import/preview. Nothing is written by this
+// call; `import_token` is the entire server-side state it produces, and it
+// expires in 5 minutes.
+export interface ImportPreview {
+  valid: ImportRow[];
+  duplicates: ImportRowIssue[];
+  errors: ImportRowIssue[];
+  import_token: string;
+}
+
+// Response of POST /transactions/import/commit — `skipped` is a row whose
+// deterministic idempotency key already existed (a re-import or a
+// double-tap), `failed` is anything else (e.g. a balance race since preview).
+export interface ImportResult {
+  imported: number;
+  skipped: number;
+  failed: number;
+  failures: ImportRowIssue[];
+}

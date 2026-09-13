@@ -26,6 +26,44 @@ export function currentMonthPace(now = new Date()): MonthPace {
   };
 }
 
+// How far through the *current period* a single budget is, which is not the
+// same number for every budget on the screen.
+//
+// `start_date` defaults to the day the budget was created (dto/budget_request
+// .go), so a budget added on the 25th has only been in force for the tail of
+// the month. Drawing the month-level tick on it would claim the user is 83%
+// of the way through a limit they set two days ago, which is why every row's
+// divider used to sit at exactly the same x regardless of the budget's own
+// data. The window this measures is therefore
+// [max(start_date, 1st of month) … 1st of next month).
+//
+// ⚠️ The backend's `spent` is still the whole UTC calendar month's expenses in
+// that category (SumExpenseByUserCurrentPeriod), not just the part after
+// start_date — so for a mid-month budget the bar can legitimately look ahead
+// of its own tick. That is the honest reading: it is counting spending from
+// before the budget existed. Narrowing `spent` to the budget's own window is a
+// backend change, out of scope here.
+//
+// Dates are parsed field-by-field rather than through `new Date(string)`,
+// which reads a bare YYYY-MM-DD as UTC midnight and lands on the previous day
+// for anyone east of Greenwich — including every user of this app.
+export function budgetPeriodElapsed(startDate: string, now = new Date()): number {
+  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+  const [year, month, day] = startDate.slice(0, 10).split("-").map(Number);
+  const start = new Date(year, month - 1, day);
+
+  const windowStart = start > periodStart ? start : periodStart;
+  const span = periodEnd.getTime() - windowStart.getTime();
+  // A budget whose start_date is in a future month has no elapsed time yet;
+  // one starting on the last day of the month has a span of ~1 day, not 0.
+  if (span <= 0) return 0;
+
+  const elapsed = (now.getTime() - windowStart.getTime()) / span;
+  return Math.max(0, Math.min(1, elapsed));
+}
+
 // Which of the four buckets a budget is in. The bar color, the caption and the
 // filter chips all read from this one value, so a row can never be amber in
 // the bar and green in the text.

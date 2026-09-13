@@ -14,7 +14,7 @@ import (
 // (/api/v1). Auth/rate-limit middleware ordering matters: JWTAuth must run
 // before RequireRole (role comes from the token) and before
 // InviteRateLimiter (keyed by the caller's user ID from that same token).
-func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, auditLogHandler *handler.AuditLogHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, chatHandler *handler.ChatHandler, budgetWizardHandler *handler.BudgetWizardHandler, tokens *service.TokenService, logger *zap.Logger) {
+func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, transactionExportHandler *handler.TransactionExportHandler, transactionImportHandler *handler.TransactionImportHandler, auditLogHandler *handler.AuditLogHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, chatHandler *handler.ChatHandler, budgetWizardHandler *handler.BudgetWizardHandler, tokens *service.TokenService, logger *zap.Logger) {
 	// Serves the invite-activation form at the backend's own domain — see
 	// handler.ActivatePageHandler doc comment for why this lives here instead
 	// of on the (currently undeployed) frontend/ Next.js app.
@@ -96,6 +96,14 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	// /:id first this literal path would bind :id="audit-logs" and 400 on the
 	// UUID parse instead of ever reaching the audit-log handler.
 	transactions.Get("/audit-logs", auditLogHandler.ListAuditLogs)
+	// Same registration-order rule as /audit-logs above
+	// (specs/transaction-export-import/plan.md Finding #8): every literal-path
+	// GET under /transactions must precede GET /:id, or Fiber binds
+	// :id="export" and 400s on the UUID parse. The two POST /import/* routes
+	// below have no such conflict — there is no POST /:id in this group.
+	transactions.Get("/export", transactionExportHandler.ExportTransactions)
+	transactions.Post("/import/preview", transactionImportHandler.Preview)
+	transactions.Post("/import/commit", transactionImportHandler.Commit)
 	transactions.Get("/:id", transactionHandler.GetTransaction)
 	transactions.Patch("/:id", transactionHandler.UpdateTransaction)
 	transactions.Delete("/:id", transactionHandler.DeleteTransaction)

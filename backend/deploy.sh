@@ -16,6 +16,41 @@ if [ ! -f "$ENV_FILE_PATH" ]; then
   exit 1
 fi
 
+# Refuse to deploy on an env file missing anything docker-compose.yml
+# interpolates *without* a `:-` default. Compose only warns about those and
+# then substitutes an empty string, so the stack comes up looking fine and is
+# entirely broken: a blank POSTGRES_USER/DB yields
+# `postgres://:@pfm-postgres:5432/?sslmode=disable`, the API answers its own
+# health check, and every single query fails with
+# `FATAL: no PostgreSQL user name specified in startup packet` (SQLSTATE
+# 28000). That is not a state worth reaching — fail here, before anything is
+# pulled or recreated.
+#
+# POSTGRES_* are the three that actually go missing in practice. They are
+# compose-level only: the backend container receives the assembled
+# DATABASE_URL and never the parts, so rebuilding this file from
+# `docker inspect pfm-backend-container` silently drops all three (and
+# GROQ_API_KEY/ANTHROPIC_API_KEY, which live on the ai-service container).
+# backend/.env.prod.example is the canonical list to rebuild from.
+#
+# Values are never echoed — only names.
+missing=""
+for var in POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB JWT_SECRET CORS_ALLOWED_ORIGINS APP_BASE_URL; do
+  if ! grep -qE "^[[:space:]]*${var}=.+" "$ENV_FILE_PATH"; then
+    missing="$missing $var"
+  fi
+done
+# Exported by the workflow rather than written into the env file.
+if [ -z "${DOCKER_REGISTRY_USER:-}" ]; then
+  missing="$missing DOCKER_REGISTRY_USER"
+fi
+if [ -n "$missing" ]; then
+  echo "Refusing to deploy — missing or empty in $ENV_FILE_PATH:$missing" >&2
+  echo "These have no default in docker-compose.yml; compose would substitute an empty string." >&2
+  echo "Rebuild the VPS_ENV_PROD secret from backend/.env.prod.example." >&2
+  exit 1
+fi
+
 # `docker compose pull` (no service arg) fetches every service's image
 # concurrently, which is the trigger for a known containerd race
 # (moby/moby#43910, containerd/containerd#4931): a content lease created for

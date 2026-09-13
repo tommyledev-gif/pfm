@@ -12,17 +12,23 @@ import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary
 // with the list under it. Without this the header kept reporting every
 // category's total while the list below showed only the handful the user
 // picked.
+//
+// Returns the underlying query's `refetch` alongside the derived total: the
+// screen's pull-to-refresh has to reach this request too, and it is the one
+// piece of server state on that screen not owned by a query the screen holds
+// a handle to itself.
 export function useFilteredReportTotal(
   range: { from?: string; to?: string },
   categoryIds: string[],
-): ReportTotal | null {
+): { total: ReportTotal | null; refetch: () => Promise<unknown> } {
   const summary = useReportSummaryQuery(range);
   const data = summary.data;
+  const { refetch } = summary;
   // Joined so a caller passing a fresh array literal every render (which every
   // caller does) doesn't defeat the memo.
   const categoryKey = categoryIds.join(",");
 
-  return useMemo(() => {
+  const total = useMemo(() => {
     const summaryTotal = data?.totals[0];
     if (!summaryTotal) return null;
     if (!categoryKey) return summaryTotal;
@@ -47,4 +53,6 @@ export function useFilteredReportTotal(
       net: totals.total_income - totals.total_expense,
     };
   }, [data, categoryKey]);
+
+  return { total, refetch };
 }

@@ -5,10 +5,12 @@ import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
 import { Screen } from "@/components/shared/Screen";
 import { TransactionRow } from "@/components/shared/TransactionRow";
 import { monthRange } from "@/lib/date-range";
+import { useRefresh } from "@/lib/use-refresh";
 import { colors, spacing, typography } from "@/lib/theme";
 import { TransactionType } from "@/lib/constants";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useTransactionsQuery } from "@/features/transactions/api/use-transactions-query";
+import { useTransactionIO } from "@/features/transactions/use-transaction-io";
 import { useFilteredReportTotal } from "@/features/transactions/api/use-filtered-report-total";
 import { Transaction } from "@/features/transactions/types";
 import { buildDaySections } from "@/features/transactions/day-sections";
@@ -117,7 +119,33 @@ export default function TransactionsScreen() {
   const currentMonthLabel = `Tháng ${now.getMonth() + 1}, ${now.getFullYear()}`;
   const dateRangeLabel = hasDateFilter ? `${dateRange.from} – ${dateRange.to}` : null;
   const headerRange = hasDateFilter ? { from: dateRange.from, to: dateRange.to } : monthRange(0);
-  const headerTotal = useFilteredReportTotal(headerRange, categoryIds);
+  const { total: headerTotal, refetch: refetchHeaderTotal } = useFilteredReportTotal(headerRange, categoryIds);
+
+  // Export and import both act on the period the user is currently looking at
+  // — the explicit date filter when there is one, otherwise the same current
+  // month the header already summarises. Falls back to the current month if
+  // a partial range ever reaches here: GET /transactions/export requires both
+  // bounds, and sending an empty one would be a 400 the user can't act on.
+  const currentMonth = monthRange(0);
+  const exportRange = {
+    from: headerRange.from ?? currentMonth.from,
+    to: headerRange.to ?? currentMonth.to,
+  };
+  const transactionIO = useTransactionIO({
+    range: exportRange,
+    currency: headerTotal?.currency ?? "VND",
+  });
+
+  // Everything the screen shows, not just the list: the header's period total
+  // and the "Tất cả" tab count are separate requests, and leaving either
+  // behind on a pull would show a total that disagrees with the rows under it.
+  const { refreshControl } = useRefresh([
+    transactions,
+    allTypesCount,
+    { refetch: refetchHeaderTotal },
+    wallets,
+    categories,
+  ]);
 
   return (
     <Screen>
@@ -127,6 +155,7 @@ export default function TransactionsScreen() {
         sections={sections}
         keyExtractor={(t) => t.id}
         stickySectionHeadersEnabled={false}
+        refreshControl={refreshControl}
         onEndReachedThreshold={0.4}
         onEndReached={() => {
           if (transactions.hasNextPage && !transactions.isFetchingNextPage) transactions.fetchNextPage();
@@ -152,6 +181,10 @@ export default function TransactionsScreen() {
               setEditingTransaction(null);
               setFormOpen(true);
             }}
+            onExport={transactionIO.onExport}
+            onImport={transactionIO.onImport}
+            exporting={transactionIO.exporting}
+            importing={transactionIO.importing}
           />
         }
         renderSectionHeader={({ section }) =>
@@ -215,6 +248,8 @@ export default function TransactionsScreen() {
         onClose={() => setFormOpen(false)}
         editingTransaction={editingTransaction}
       />
+
+      {transactionIO.modal}
     </Screen>
   );
 }

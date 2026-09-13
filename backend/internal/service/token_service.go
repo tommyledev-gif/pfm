@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/example/pfm/backend/internal/common"
+	"github.com/example/pfm/backend/internal/dto"
 	"github.com/example/pfm/backend/internal/model"
 )
 
@@ -25,6 +26,24 @@ type AccessClaims struct {
 // claims — the refresh token itself carries no role, since it's never used
 // for authorization, only to identify itself for revocation at logout.
 type refreshClaims struct {
+	jwt.RegisteredClaims
+}
+
+// ImportTokenClaims is the third, deliberately distinct claims type this
+// service issues (specs/transaction-export-import/spec.md Context #6): the
+// payload of the import_token Preview mints and Commit consumes. It is NOT
+// an access token and is never accepted by JWTAuth — Purpose is what makes
+// that a structural guarantee rather than a naming convention, and
+// ParseImportToken refuses any token whose Purpose isn't
+// common.TransactionImportTokenPurpose.
+//
+// Rows is the entire validated row list rather than a reference to something
+// stored server-side: this feature adds no tables, so the signed, expiring
+// token IS the state (plan.md Finding #6/#7).
+type ImportTokenClaims struct {
+	UserID  string          `json:"user_id"`
+	Purpose string          `json:"purpose"`
+	Rows    []dto.ImportRow `json:"rows"`
 	jwt.RegisteredClaims
 }
 
@@ -113,4 +132,56 @@ func (s *TokenService) ParseRefreshTokenUnverified(tokenString string) (jti stri
 		return "", "", time.Time{}, fmt.Errorf("service.ParseRefreshTokenUnverified: missing jti or exp claim")
 	}
 	return claims.ID, claims.Subject, claims.ExpiresAt.Time, nil
+}
+
+// IssueImportToken mints the short-lived token that carries a previewed
+// import's validated rows through to Commit
+// (specs/transaction-export-import/spec.md Context #6). Reuses the same
+// signing key as the access/refresh pair — there is no second secret to
+// manage — but a structurally different claims type, so the two can never be
+// confused for one another.
+func (s *TokenService) IssueImportToken(userID uuid.UUID, rows []dto.ImportRow) (string, error) {
+	now := time.Now().UTC()
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, ImportTokenClaims{
+		UserID:  userID.String(),
+		Purpose: common.TransactionImportTokenPurpose,
+		Rows:    rows,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   userID.String(),
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(common.TransactionImportTokenTTL)),
+		},
+	})
+	signed, err := token.SignedString(s.signingKey)
+	if err != nil {
+		return "", fmt.Errorf("service.IssueImportToken: %w", err)
+	}
+	return signed, nil
+}
+
+// ParseImportToken verifies signature, expiry and purpose. Called explicitly
+// by TransactionImportService.CommitImport — never by JWTAuth middleware,
+// which only ever calls ParseAccessToken.
+//
+// The purpose check lives here rather than at the call site so there is
+// exactly one place that can decide a token is an import token, and it can
+// never be skipped by a future second caller.
+func (s *TokenService) ParseImportToken(tokenString string) (*ImportTokenClaims, error) {
+	claims := &ImportTokenClaims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
+		return s.signingKey, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("service.ParseImportToken: %w", err)
+	}
+	if !token.Valid {
+		return nil, fmt.Errorf("service.ParseImportToken: token is not valid")
+	}
+	if claims.Purpose != common.TransactionImportTokenPurpose {
+		return nil, fmt.Errorf("service.ParseImportToken: unexpected purpose %q", claims.Purpose)
+	}
+	return claims, nil
 }
