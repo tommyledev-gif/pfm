@@ -1,15 +1,27 @@
+import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
+import { AmountPromptModal } from "@/components/ui/AmountPromptModal";
+import { FixedCostsModal } from "@/features/budget-wizard/components/FixedCostsModal";
 import { MoneyField } from "@/features/budget-wizard/components/MoneyField";
 import {
   DEFAULT_SAVINGS_PCT,
   SAVINGS_PCT_OPTIONS,
+  SavingsChoice,
   daysInCycle,
   disposableXu,
   perDayXu,
-  savingsForPct,
+  roundStepXu,
+  savingsAmount,
   validateIncomeStep,
 } from "@/features/budget-wizard/budget-math";
+import {
+  FixedCostItem,
+  mergeFixedCosts,
+  parseFixedCosts,
+  summarizeFixedCosts,
+  totalFixedCosts,
+} from "@/features/budget-wizard/fixed-costs";
 import { formatCurrency } from "@/lib/currency";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 
@@ -18,12 +30,16 @@ interface WizardStepIncomeProps {
   /** xu. */
   income: number;
   fixed: number;
-  savingsPct: number;
+  savingsChoice: SavingsChoice;
   cycleStartDay: number;
+  /** Whatever the fixed-cost helper produced last time, so it resumes on reopen. */
+  fixedCostsText: string;
+  fixedCostsSuggested: FixedCostItem[];
   onChangeIncome: (v: number) => void;
   onChangeFixed: (v: number) => void;
-  onChangeSavingsPct: (v: number) => void;
+  onChangeSavingsChoice: (c: SavingsChoice) => void;
   onChangeCycleStartDay: (v: number) => void;
+  onChangeFixedCosts: (result: { items: FixedCostItem[]; text: string; suggested: FixedCostItem[] }) => void;
   onNext: () => void;
 }
 
@@ -50,19 +66,33 @@ export function WizardStepIncome({
   currency,
   income,
   fixed,
-  savingsPct,
+  savingsChoice,
   cycleStartDay,
+  fixedCostsText,
+  fixedCostsSuggested,
   onChangeIncome,
   onChangeFixed,
-  onChangeSavingsPct,
+  onChangeSavingsChoice,
   onChangeCycleStartDay,
+  onChangeFixedCosts,
   onNext,
 }: WizardStepIncomeProps) {
-  const savings = savingsForPct(income, savingsPct);
+  const [savingsPromptOpen, setSavingsPromptOpen] = useState(false);
+  const [fixedCostsOpen, setFixedCostsOpen] = useState(false);
+
+  const savings = savingsAmount(savingsChoice, income);
   const disposable = disposableXu(income, fixed, savings);
   const days = daysInCycle(cycleStartDay);
   const perDay = perDayXu(disposable, days);
   const validation = validateIncomeStep(income, fixed, savings);
+
+  // Recomputed from the two things the parent stores rather than kept as a
+  // third: the merge is deterministic, so deriving it here cannot drift out of
+  // step with what the helper itself would show.
+  const breakdown = useMemo(
+    () => mergeFixedCosts(parseFixedCosts(fixedCostsText), fixedCostsSuggested),
+    [fixedCostsText, fixedCostsSuggested],
+  );
 
   return (
     <View style={styles.container}>
@@ -80,10 +110,21 @@ export function WizardStepIncome({
         <MoneyField
           testID="input-wizard-fixed"
           label="Chi phí cố định"
-          hint="nhà, điện nước, internet, học phí"
+          // Once the helper has run, the hint shows what the total is actually
+          // made of instead of describing the category in the abstract — the
+          // fastest way to spot that a cost is missing.
+          hint={breakdown.length > 0 ? summarizeFixedCosts(breakdown) : "nhà, điện nước, internet, học phí"}
           value={fixed}
           onChange={onChangeFixed}
           sliderCeiling={FIXED_SLIDER_CEILING_XU}
+          // Sits on the hint row because it answers the hint: the hint lists
+          // what counts as fixed, and this is for the user who reads that list
+          // and realises they do not know the total.
+          action={{
+            label: breakdown.length > 0 ? `${breakdown.length} khoản ✎` : "Tôi không nhớ tổng →",
+            onPress: () => setFixedCostsOpen(true),
+            testID: "btn-wizard-fixed-costs",
+          }}
         />
 
         <View style={styles.field}>
@@ -93,12 +134,12 @@ export function WizardStepIncome({
           </View>
           <View style={styles.chipRow}>
             {SAVINGS_PCT_OPTIONS.map((pct) => {
-              const active = pct === savingsPct;
+              const active = savingsChoice.kind === "pct" && pct === savingsChoice.pct;
               return (
                 <Pressable
                   key={pct}
                   testID={`chip-wizard-savings-${pct}`}
-                  onPress={() => onChangeSavingsPct(pct)}
+                  onPress={() => onChangeSavingsChoice({ kind: "pct", pct })}
                   style={[styles.chip, active && styles.chipActive]}
                 >
                   <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>
@@ -107,12 +148,25 @@ export function WizardStepIncome({
                 </Pressable>
               );
             })}
+            {/* Last in the row: a flat figure for people saving toward a fixed
+                commitment — a 3tr transfer, a loan repayment — which a
+                percentage cannot express without re-deriving it by hand every
+                time income changes. */}
+            <Pressable
+              testID="chip-wizard-savings-custom"
+              onPress={() => setSavingsPromptOpen(true)}
+              style={[styles.chip, savingsChoice.kind === "amount" && styles.chipActive]}
+            >
+              <Text style={[styles.chipLabel, savingsChoice.kind === "amount" && styles.chipLabelActive]}>
+                {savingsChoice.kind === "amount" ? "Số khác ✎" : "Số khác"}
+              </Text>
+            </Pressable>
           </View>
           {/* 10% is the default rather than the textbook 20%. Someone who has
               never tracked their spending, committing a fifth of their income on
               top of costs they have not measured, breaks the plan in week two —
               and an abandoned plan saves nothing at all. */}
-          {savingsPct === DEFAULT_SAVINGS_PCT ? (
+          {savingsChoice.kind === "pct" && savingsChoice.pct === DEFAULT_SAVINGS_PCT ? (
             <Text style={styles.hint}>Mức dễ giữ được. Tháng sau dư thì mình nâng lên.</Text>
           ) : null}
         </View>
@@ -162,6 +216,35 @@ export function WizardStepIncome({
       >
         <Text style={styles.primaryLabel}>Tiếp →</Text>
       </Pressable>
+
+      <AmountPromptModal
+        visible={savingsPromptOpen}
+        title="Muốn để dành bao nhiêu?"
+        hint="Không quá thu nhập"
+        value={savings}
+        max={income}
+        step={roundStepXu(Math.max(income, 1))}
+        currency={currency}
+        testID="btn-wizard-savings-custom-confirm"
+        onClose={() => setSavingsPromptOpen(false)}
+        onConfirm={(amountXu) => {
+          onChangeSavingsChoice({ kind: "amount", amountXu });
+          setSavingsPromptOpen(false);
+        }}
+      />
+
+      <FixedCostsModal
+        visible={fixedCostsOpen}
+        currency={currency}
+        initialText={fixedCostsText}
+        initialSuggested={fixedCostsSuggested}
+        onClose={() => setFixedCostsOpen(false)}
+        onConfirm={(result) => {
+          onChangeFixedCosts(result);
+          onChangeFixed(totalFixedCosts(result.items));
+          setFixedCostsOpen(false);
+        }}
+      />
     </View>
   );
 }

@@ -3,7 +3,6 @@ import { BackHandler, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { colors, spacing } from "@/lib/theme";
-import { useKeyboardHeight } from "@/lib/use-keyboard-height";
 import { useSheetStore } from "@/stores/sheet-store";
 import { BUDGET_WIZARD_TOTAL_STEPS, useBudgetWizardState } from "@/features/budget-wizard/hooks/use-budget-wizard-state";
 import { WizardProgressHeader } from "@/features/budget-wizard/components/WizardProgressHeader";
@@ -33,7 +32,6 @@ interface BudgetWizardModalProps {
  */
 export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizardModalProps) {
   const wizard = useBudgetWizardState(visible, onClose, onCompleted);
-  const keyboardHeight = useKeyboardHeight();
 
   useEffect(() => {
     if (!visible) return;
@@ -55,7 +53,18 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
 
   return (
     <View style={styles.overlay}>
-      <SafeAreaView edges={["top", "bottom"]} style={[styles.safeArea, { paddingBottom: keyboardHeight }]}>
+      {/* ⚠️ No manual keyboard padding here, deliberately.
+          Each step owns a ScrollView, and React Native already scrolls a
+          focused TextInput into view inside it. app.json also sets
+          android.softwareKeyboardLayoutMode: "resize", so the OS shrinks the
+          window as well. Adding paddingBottom: keyboardHeight on top of those
+          was a THIRD avoidance: the ScrollView got shortened by a full keyboard
+          height, and RN then scrolled the input above where the keyboard would
+          have been — lifting it roughly two keyboard heights and leaving the
+          dead gap under it. Drawer.tsx legitimately needs that padding because
+          its sheet is bottom-anchored with no scroll-into-view of its own; this
+          full-screen flow does not. */}
+      <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
         {step <= BUDGET_WIZARD_TOTAL_STEPS ? (
           <WizardProgressHeader step={step} totalSteps={BUDGET_WIZARD_TOTAL_STEPS} onClose={onClose} />
         ) : null}
@@ -66,12 +75,15 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
               currency={wizard.currency}
               income={wizard.income}
               fixed={wizard.fixed}
-              savingsPct={wizard.savingsPct}
+              savingsChoice={wizard.savingsChoice}
               cycleStartDay={wizard.cycleStartDay}
+              fixedCostsText={wizard.fixedCostsText}
+              fixedCostsSuggested={wizard.fixedCostsSuggested}
               onChangeIncome={wizard.setIncome}
               onChangeFixed={wizard.setFixed}
-              onChangeSavingsPct={wizard.setSavingsPct}
+              onChangeSavingsChoice={wizard.setSavingsChoice}
               onChangeCycleStartDay={wizard.setCycleStartDay}
+              onChangeFixedCosts={wizard.setFixedCosts}
               onNext={wizard.goToProfile}
             />
           ) : null}

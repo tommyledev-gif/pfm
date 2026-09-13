@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AmountInput } from "@/components/ui/AmountInput";
 import { MoneySlider } from "@/components/ui/MoneySlider";
@@ -15,6 +15,9 @@ interface MoneyFieldProps {
   /** Upper bound the slider spans. It grows to fit a typed value larger than
    *  itself, so typing is never capped by the slider's convenience range. */
   sliderCeiling: number;
+  /** Optional helper sitting at the right end of the hint row — for a field
+   *  whose value the user would otherwise have to work out themselves. */
+  action?: { label: string; onPress: () => void; testID?: string };
   testID?: string;
 }
 
@@ -28,7 +31,7 @@ interface MoneyFieldProps {
  * approximate it. So the field is one value with two controls, and neither is
  * the "real" one.
  */
-export function MoneyField({ label, hint, value, onChange, sliderCeiling, testID }: MoneyFieldProps) {
+export function MoneyField({ label, hint, value, onChange, sliderCeiling, action, testID }: MoneyFieldProps) {
   // The slider's span follows the value once it goes past the convenience
   // ceiling — otherwise a user who types 80tr sees the thumb pinned at the
   // right edge and dragging it snaps their figure down to the ceiling.
@@ -53,7 +56,21 @@ export function MoneyField({ label, hint, value, onChange, sliderCeiling, testID
         step={step}
         onChange={onChange}
       />
-      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
+      {/* Hint and helper share one row: the helper is an answer to the hint
+          ("nhà, điện nước…" → "tôi không nhớ tổng"), so separating them onto
+          two lines would break the thought in half. */}
+      {hint || action ? (
+        <View style={styles.footerRow}>
+          <Text style={styles.hint} numberOfLines={2}>
+            {hint ?? ""}
+          </Text>
+          {action ? (
+            <Pressable onPress={action.onPress} testID={action.testID} hitSlop={8}>
+              <Text style={styles.actionLabel}>{action.label}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -62,5 +79,7 @@ const styles = StyleSheet.create({
   field: { gap: spacing.xs },
   label: { ...typography.caption, color: colors.textSecondary },
   input: { textAlign: "right" },
-  hint: { ...typography.tiny, color: colors.textMuted },
+  footerRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.sm },
+  hint: { flex: 1, ...typography.tiny, color: colors.textMuted },
+  actionLabel: { ...typography.tiny, color: colors.green, textAlign: "right" },
 });

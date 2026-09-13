@@ -4,11 +4,13 @@ import { useBudgetProposalsMutation } from "@/features/budget-wizard/api/use-bud
 import { useBudgetWizardPrefillQuery } from "@/features/budget-wizard/api/use-budget-wizard-prefill-query";
 import { useBulkCreateBudgetsMutation } from "@/features/budget-wizard/api/use-bulk-create-budgets-mutation";
 import {
-  DEFAULT_SAVINGS_PCT,
+  DEFAULT_SAVINGS_CHOICE,
+  SavingsChoice,
   disposableXu,
-  savingsForPct,
+  savingsAmount,
   validateIncomeStep,
 } from "@/features/budget-wizard/budget-math";
+import { FixedCostItem } from "@/features/budget-wizard/fixed-costs";
 import {
   BudgetProposalsResponse,
   CategoryIntentRequest,
@@ -49,7 +51,11 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
   // Every amount here is xu.
   const [income, setIncome] = useState(0);
   const [fixed, setFixed] = useState(0);
-  const [savingsPct, setSavingsPct] = useState(DEFAULT_SAVINGS_PCT);
+  const [savingsChoice, setSavingsChoice] = useState<SavingsChoice>(DEFAULT_SAVINGS_CHOICE);
+  // The fixed-cost helper's own working state, kept here so reopening it resumes
+  // where the user left off instead of asking them to describe everything again.
+  const [fixedCostsText, setFixedCostsText] = useState("");
+  const [fixedCostsSuggested, setFixedCostsSuggested] = useState<FixedCostItem[]>([]);
   const [cycleStartDay, setCycleStartDay] = useState(1);
   const [preset, setPreset] = useState<PresetKey | null>(null);
 
@@ -62,7 +68,7 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
   const bulkCreate = useBulkCreateBudgetsMutation();
 
   const currency = prefill.data?.currency ?? "VND";
-  const savings = savingsForPct(income, savingsPct);
+  const savings = savingsAmount(savingsChoice, income);
   const disposable = disposableXu(income, fixed, savings);
 
   // Reset on every open. A wizard that reopens holding the previous run's
@@ -72,7 +78,13 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
     setStep(1);
     setIncome(0);
     setFixed(0);
-    setSavingsPct(prefill.data?.default_savings_pct ?? DEFAULT_SAVINGS_PCT);
+    setSavingsChoice(
+      prefill.data?.default_savings_pct !== undefined
+        ? { kind: "pct", pct: prefill.data.default_savings_pct }
+        : DEFAULT_SAVINGS_CHOICE,
+    );
+    setFixedCostsText("");
+    setFixedCostsSuggested([]);
     setCycleStartDay(prefill.data?.cycle_start_day ?? 1);
     setPreset(null);
     setResult(null);
@@ -239,8 +251,10 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
     income,
     fixed,
     savings,
-    savingsPct,
+    savingsChoice,
     cycleStartDay,
+    fixedCostsText,
+    fixedCostsSuggested,
     disposable,
     preset,
     result,
@@ -250,8 +264,12 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
     submitting: bulkCreate.isPending,
     setIncome,
     setFixed,
-    setSavingsPct,
+    setSavingsChoice,
     setCycleStartDay,
+    setFixedCosts: (result: { items: FixedCostItem[]; text: string; suggested: FixedCostItem[] }) => {
+      setFixedCostsText(result.text);
+      setFixedCostsSuggested(result.suggested);
+    },
     goToProfile: () => canLeaveIncomeStep && setStep(2),
     selectPreset,
     retryProposal,

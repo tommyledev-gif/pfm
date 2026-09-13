@@ -36,7 +36,7 @@ const RECENT_TRANSACTION_SKELETON_COUNT = 4;
 const TOP_CATEGORIES_COUNT = 3;
 
 const PERIODS: { label: string; value: HomePeriod }[] = [
-  { label: "Tuần", value: "week" },
+  { label: "Ngày", value: "day" },
   { label: "Tháng", value: "month" },
   { label: "Năm", value: "year" },
 ];
@@ -82,13 +82,12 @@ export default function HomeScreen() {
   const periodRange = useMemo(() => currentPeriodRange(homePeriod), [homePeriod]);
   const periodSummary = useReportSummaryQuery(periodRange);
   // Top Categories always reflects the calendar month, independent of the
-  // Week/Month/Year snapshot selector above (a "top categories this week"
-  // list would mostly be empty/noisy) — same range this screen already used
-  // before the trend badge existed.
+  // Day/Month/Year snapshot selector above — a "top categories today" list
+  // would usually hold one row or none, which is noise rather than insight.
   const thisMonthRange = useMemo(() => monthRange(0), []);
   const thisMonthSummary = useReportSummaryQuery(thisMonthRange);
-  // Trend badge, by contrast, DOES track the selected period — "more/less
-  // than last week" only makes sense while Week is selected.
+  // The trend badge, by contrast, DOES track the selected period — comparing
+  // against "hôm qua" only means anything while Ngày is the selection.
   const previousRange = useMemo(() => previousPeriodRange(homePeriod), [homePeriod]);
   const previousPeriodSummary = useReportSummaryQuery(previousRange);
 

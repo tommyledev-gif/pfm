@@ -62,6 +62,29 @@ export function savingsForPct(incomeXu: number, pct: number): number {
 }
 
 /**
+ * How much to set aside — either as a share of income or as a flat figure.
+ *
+ * Both forms are needed and neither subsumes the other. A percentage is the
+ * right model for someone thinking in proportions, and it tracks a pay rise on
+ * its own. But plenty of people save toward a fixed commitment — a 3tr monthly
+ * transfer, a loan repayment — and forcing that into a percentage means
+ * recomputing it by hand every time income changes, which is exactly the
+ * arithmetic this screen exists to remove.
+ */
+export type SavingsChoice = { kind: "pct"; pct: number } | { kind: "amount"; amountXu: number };
+
+export function savingsAmount(choice: SavingsChoice, incomeXu: number): number {
+  if (choice.kind === "amount") {
+    // Never more than the income itself — the validator below then reports the
+    // real problem (nothing left to spend) rather than a nonsensical negative.
+    return Math.min(Math.max(choice.amountXu, 0), incomeXu);
+  }
+  return savingsForPct(incomeXu, choice.pct);
+}
+
+export const DEFAULT_SAVINGS_CHOICE: SavingsChoice = { kind: "pct", pct: DEFAULT_SAVINGS_PCT };
+
+/**
  * Length of the spending cycle that contains `now`, in whole days.
  *
  * ⚠️ Never 30. A cycle starting on the 28th runs 31 days into January and 28 or
