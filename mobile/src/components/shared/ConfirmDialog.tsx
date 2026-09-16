@@ -11,6 +11,11 @@ interface ConfirmDialogProps {
   onConfirm: () => void;
   onCancel: () => void;
   loading?: boolean;
+  // "destructive" (default) renders the confirm pill in the same red used by
+  // delete flows; "default" leaves it the app's ordinary solid-green primary
+  // action, for a confirmation that isn't undoing/removing anything (e.g.
+  // WalletListItem's "set as default wallet").
+  tone?: "destructive" | "default";
 }
 
 // Centered destructive-action confirmation — replaces native Alert.alert
@@ -27,7 +32,9 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
   loading,
+  tone = "destructive",
 }: ConfirmDialogProps) {
+  const isDestructive = tone === "destructive";
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <Pressable style={styles.backdrop} onPress={onCancel}>
@@ -40,8 +47,8 @@ export function ConfirmDialog({
               label={confirmLabel}
               onPress={onConfirm}
               loading={loading}
-              style={[styles.flexButton, styles.destructive]}
-              textStyle={styles.destructiveLabel}
+              style={[styles.flexButton, isDestructive && styles.destructive]}
+              textStyle={isDestructive ? styles.destructiveLabel : undefined}
             />
           </View>
         </Pressable>

@@ -5,6 +5,7 @@ import { roleFromAccessToken, type UserRole } from "@/lib/jwt";
 import { queryClient } from "@/lib/query-client";
 import { cancelScheduledRefresh, remainingDelayMs, scheduleRefresh } from "@/lib/refresh-scheduler";
 import { secureStorage } from "@/lib/secure-storage";
+import { useToastStore } from "@/stores/toast-store";
 import {
   SECURE_STORE_ACCESS_TOKEN_KEY,
   SECURE_STORE_EMAIL_KEY,
@@ -127,6 +128,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       })
       .catch(async (err) => {
         await clear();
+        // Only this path (the refresh token itself was rejected — expired or
+        // revoked) counts as a session actually "ending" out from under the
+        // user; an explicit Log out on Settings also calls clear() but
+        // already knows why it's happening, so it doesn't need telling.
+        useToastStore.getState().show("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.", "warning");
         throw err;
       })
       .finally(() => {

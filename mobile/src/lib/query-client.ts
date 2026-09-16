@@ -7,7 +7,19 @@ import { QueryClient } from "@tanstack/react-query";
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
+      // Home alone fires 6 parallel requests the instant it mounts (wallets,
+      // categories, budgets, and 3 report-summary calls) — right at app
+      // launch, before the OS network stack has finished warming up, that
+      // burst can transiently fail. A single retry (~1s later, per TanStack's
+      // default exponential backoff) isn't always enough for that warm-up to
+      // finish, and once a query settles into an error state with no data,
+      // nothing refetches it again until either a manual pull-to-refresh or a
+      // brand-new query key (e.g. switching Home's Ngày/Tháng/Năm tab) comes
+      // along — which is why the snapshot card used to render blank on first
+      // paint and only "come alive" once a different tab forced a fresh
+      // query. More retries with the same backoff gives cold start enough
+      // room to recover on its own.
+      retry: 3,
       staleTime: 30_000,
     },
   },

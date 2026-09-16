@@ -4,11 +4,12 @@ import { useRouter } from "expo-router";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { Card } from "@/components/ui/Card";
-import { CheckIcon, HistoryIcon, PlusIcon } from "@/components/ui/Icon";
+import { CheckIcon, EditIcon, HistoryIcon, PlusIcon, TrashIcon } from "@/components/ui/Icon";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { LiquidCircle } from "@/components/shared/LiquidCircle";
 import { Screen } from "@/components/shared/Screen";
 import { SnapshotCardSkeleton } from "@/components/shared/SnapshotCardSkeleton";
+import { SwipeableRow } from "@/components/shared/SwipeableRow";
 import { TopBar } from "@/components/shared/TopBar";
 import { TransactionRow } from "@/components/shared/TransactionRow";
 import { WalletCard } from "@/components/shared/WalletCard";
@@ -63,6 +64,7 @@ export default function HomeScreen() {
   // snapshot on every render and re-render again to check, forever
   // ("Maximum update depth exceeded" — reproduced live on the Home screen).
   const thread = useChatStore((s) => s.thread);
+  const removeChatMessage = useChatStore((s) => s.removeMessage);
   const allPendingConfirmations = useMemo(
     () => thread.filter((m) => m.action && !m.confirmed && !m.superseded),
     [thread],
@@ -146,6 +148,18 @@ export default function HomeScreen() {
     return rows.sort((a, b) => b.status.ratio - a.status.ratio).slice(0, TOP_CATEGORIES_COUNT);
   }, [budgets.data, currency]);
 
+  // Deep-links into ai-chat.tsx at the exact message the user tapped/swiped,
+  // instead of ai-chat's own default (inverted list lands on the newest
+  // message) — mirrors Insights' own "Home deep-links the other way" pattern
+  // (see insights.tsx). focusedAt is a nonce so tapping the same pending item
+  // twice in a row still re-triggers the scroll even though focusMessageId
+  // didn't change.
+  const goToPendingMessage = (messageId: string, openEdit?: boolean) =>
+    router.push({
+      pathname: "/ai-chat",
+      params: { focusMessageId: messageId, focusedAt: String(Date.now()), ...(openEdit ? { openEdit: "1" } : {}) },
+    });
+
   // Hands the exact window the user is looking at to the Budgets tab, so the
   // limits there are prorated to the same day rather than to the whole month.
   const openBudgetsForPeriod = () =>
@@ -158,6 +172,14 @@ export default function HomeScreen() {
     const expenseCategories = thisMonthSummary.data?.by_category.filter((c) => c.type === "expense") ?? [];
     return [...expenseCategories].sort((a, b) => b.amount - a.amount).slice(0, TOP_CATEGORIES_COUNT);
   }, [thisMonthSummary.data]);
+
+  // Same currency-matched total the donut/legend on Insights' Spending tab
+  // already divides by (SpendingTab.tsx: `seg.amount / totalExpense`) — reused
+  // here so the compact right-panel row can show a percent-of-month-spend
+  // instead of a currency string, which is what actually fits this column's
+  // width (see the icon-only row below).
+  const topCategoriesExpenseTotal =
+    thisMonthSummary.data?.totals.find((t) => t.currency === currency)?.total_expense ?? 0;
 
   const recentTransactions = recent.data?.pages[0]?.data.slice(0, 4) ?? [];
 
@@ -272,7 +294,7 @@ export default function HomeScreen() {
                   {isDay && atRiskBudgets.length > 0 ? (
                     <View style={styles.snapshotRight}>
                       <View style={styles.compactHeaderRow}>
-                        <Text style={styles.compactSectionTitle} numberOfLines={1}>
+                        <Text style={styles.compactSectionTitle} numberOfLines={2}>
                           Sắp vượt
                         </Text>
                         <Pressable onPress={openBudgetsForPeriod} hitSlop={8}>
@@ -295,11 +317,10 @@ export default function HomeScreen() {
                             icon={budget.icon ?? categoryById.get(budget.category_id)?.icon}
                             iconUrl={budget.icon_url ?? categoryById.get(budget.category_id)?.icon_url}
                           />
-                          <Text style={styles.categoryName} numberOfLines={1}>
-                            {budget.category_name}
-                          </Text>
                           {/* Amber and plain-spoken, never red: being close to a
-                              limit is information, not a fault. */}
+                              limit is information, not a fault. Name is dropped —
+                              the icon alone identifies the category in this
+                              compact column, matching the topCategories row below. */}
                           <Text style={[styles.categoryAmount, { color: status.color }]} numberOfLines={1}>
                             {status.percent}%
                           </Text>
@@ -309,7 +330,7 @@ export default function HomeScreen() {
                   ) : topCategories.length > 0 ? (
                     <View style={styles.snapshotRight}>
                       <View style={styles.compactHeaderRow}>
-                        <Text style={styles.compactSectionTitle} numberOfLines={1}>
+                        <Text style={styles.compactSectionTitle} numberOfLines={2}>
                           Chi nhiều nhất
                         </Text>
                         <Pressable onPress={() => router.push("/insights")} hitSlop={8}>
@@ -327,11 +348,10 @@ export default function HomeScreen() {
                             icon={categoryById.get(c.category_id)?.icon}
                             iconUrl={categoryById.get(c.category_id)?.icon_url}
                           />
-                          <Text style={styles.categoryName} numberOfLines={1}>
-                            {c.category_name}
-                          </Text>
                           <Text style={styles.categoryAmount} numberOfLines={1}>
-                            {formatCurrency(c.amount, currency)}
+                            {topCategoriesExpenseTotal > 0
+                              ? `${Math.round((c.amount / topCategoriesExpenseTotal) * 100)}%`
+                              : "0%"}
                           </Text>
                         </View>
                       ))}
@@ -359,31 +379,37 @@ export default function HomeScreen() {
                 </Pressable>
               </View>
               {pendingConfirmations.map((m) => (
-                <Pressable key={m.id} style={styles.pendingRow} onPress={() => router.push("/ai-chat")}>
-                  <View style={styles.pendingIconTile}>
-                    <HistoryIcon size={18} color={colors.mustard} />
-                  </View>
-                  <View style={styles.pendingTextCol}>
-                    <Text style={styles.pendingLabel} numberOfLines={1}>
-                      {m.action?.payload.note || categoryById.get(m.action?.payload.category_id ?? "")?.name || "Giao dịch"}
+                <SwipeableRow
+                  key={m.id}
+                  leftAction={{ Icon: EditIcon, color: colors.green, onTrigger: () => goToPendingMessage(m.id, true) }}
+                  rightAction={{ Icon: TrashIcon, color: colors.peach, onTrigger: () => removeChatMessage(m.id) }}
+                >
+                  <Pressable style={styles.pendingRow} onPress={() => goToPendingMessage(m.id)}>
+                    <View style={styles.pendingIconTile}>
+                      <HistoryIcon size={18} color={colors.mustard} />
+                    </View>
+                    <View style={styles.pendingTextCol}>
+                      <Text style={styles.pendingLabel} numberOfLines={1}>
+                        {m.action?.payload.note || categoryById.get(m.action?.payload.category_id ?? "")?.name || "Giao dịch"}
+                      </Text>
+                      <Text style={styles.pendingHint} numberOfLines={1}>
+                        Chạm để duyệt mục {m.action?.payload.type === "income" ? "thu" : "chi"}
+                      </Text>
+                    </View>
+                    <Text
+                      style={[
+                        styles.pendingAmount,
+                        { color: m.action?.payload.type === "income" ? colors.green : colors.peach },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {formatCurrency(m.action?.payload.amount ?? 0, currency)}
                     </Text>
-                    <Text style={styles.pendingHint} numberOfLines={1}>
-                      Chạm để duyệt mục {m.action?.payload.type === "income" ? "thu" : "chi"}
-                    </Text>
-                  </View>
-                  <Text
-                    style={[
-                      styles.pendingAmount,
-                      { color: m.action?.payload.type === "income" ? colors.green : colors.peach },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {formatCurrency(m.action?.payload.amount ?? 0, currency)}
-                  </Text>
-                  <View style={styles.pendingCheckButton}>
-                    <CheckIcon size={16} color={colors.onGreen} />
-                  </View>
-                </Pressable>
+                    <View style={styles.pendingCheckButton}>
+                      <CheckIcon size={16} color={colors.onGreen} />
+                    </View>
+                  </Pressable>
+                </SwipeableRow>
               ))}
             </View>
           ) : null}
@@ -477,7 +503,7 @@ const styles = StyleSheet.create({
   snapshotRow: { flexDirection: "row", gap: spacing.lg, alignItems: "flex-start" },
   snapshotLeft: { alignItems: "center", gap: spacing.xs },
   snapshotRight: { flex: 1, gap: 2, minWidth: 0 },
-  compactHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.xs },
+  compactHeaderRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.xs },
   compactSectionTitle: { ...typography.label, color: colors.textPrimary, flexShrink: 1 },
   compactSeeAll: { ...typography.tiny, color: colors.green, flexShrink: 0 },
   snapshotRemaining: { ...typography.caption, color: colors.textSecondary },
@@ -495,8 +521,13 @@ const styles = StyleSheet.create({
     borderColor: colors.surfaceBorder,
   },
   addButtonLabel: { ...typography.body, color: colors.green },
-  categoryRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingVertical: spacing.xs },
-  categoryName: { flex: 1, ...typography.caption, color: colors.textPrimary },
+  categoryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+  },
   categoryAmount: { ...typography.tiny, color: colors.textSecondary },
   sectionHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.xs },
   sectionTitleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },

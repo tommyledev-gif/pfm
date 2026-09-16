@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useRef, useState } from "react";
+import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { PillButton } from "@/components/ui/PillButton";
 import { EyeIcon, EyeOffIcon } from "@/components/ui/Icon";
@@ -19,6 +19,12 @@ export function LoginForm() {
   const [password, setPassword] = useState("000000");
   const [showPassword, setShowPassword] = useState(false);
   const login = useLoginMutation();
+  const passwordRef = useRef<TextInput>(null);
+
+  const submit = () => {
+    if (!email || !password) return;
+    login.mutate({ email, password });
+  };
 
   return (
     <View style={styles.form}>
@@ -29,15 +35,30 @@ export function LoginForm() {
         placeholderTextColor={colors.textMuted}
         autoCapitalize="none"
         keyboardType="email-address"
+        // "Next" (rather than the default "return", which does nothing but
+        // insert a newline) both reads as "input done here" and jumps
+        // straight to Password — matches the two-field email→password flow
+        // this form is always used for.
+        returnKeyType="next"
+        onSubmitEditing={() => passwordRef.current?.focus()}
+        blurOnSubmit={false}
         style={styles.input}
       />
       <View style={styles.passwordRow}>
         <TextInput
+          ref={passwordRef}
           value={password}
           onChangeText={setPassword}
           placeholder="Password"
           placeholderTextColor={colors.textMuted}
           secureTextEntry={!showPassword}
+          // "Done" both dismisses the keyboard on submit and, since it's the
+          // last field, doubles as the login action.
+          returnKeyType="done"
+          onSubmitEditing={() => {
+            Keyboard.dismiss();
+            submit();
+          }}
           style={styles.passwordInput}
         />
         <Pressable onPress={() => setShowPassword((v) => !v)} hitSlop={8} style={styles.eyeButton}>
@@ -58,7 +79,7 @@ export function LoginForm() {
         loading={login.isPending}
         variant="outline"
         disabled={!email || !password}
-        onPress={() => login.mutate({ email, password })}
+        onPress={submit}
         style={styles.button}
         textStyle={{color: colors.green}}
       />

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { CalendarIcon } from "@/components/ui/Icon";
+import { AmountRevealPopup } from "@/components/ui/AmountRevealPopup";
 import { Card } from "@/components/ui/Card";
 import { CategoryPickerDrawer } from "@/components/shared/CategoryPickerDrawer";
 import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
@@ -9,7 +10,7 @@ import { DonutChart } from "@/components/shared/DonutChart";
 import { DonutLegendRow } from "@/components/shared/DonutLegendRow";
 import { CategoryTransactionsDialog } from "@/features/reports/components/CategoryTransactionsDialog";
 import { buildCategoryColorMap } from "@/lib/category-color";
-import { formatCurrency } from "@/lib/currency";
+import { formatCurrencyCompact } from "@/lib/currency";
 import { formatDateRange } from "@/lib/format-date";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
@@ -42,6 +43,10 @@ export function SpendingTab({ focusCategoryId, focusNonce }: SpendingTabProps = 
   // separately from `selected` so closing the dialog leaves the chart's own
   // highlight exactly where the user left it.
   const [detailCategoryId, setDetailCategoryId] = useState<string | null>(null);
+  // Long-pressing the compact Thu nhập/Chi tiêu figure reveals the exact
+  // amount — same AmountRevealPopup used by TransactionRow, since the
+  // compact "~7m100k" form is a deliberate approximation (formatCurrencyCompact).
+  const [revealTotal, setRevealTotal] = useState<"income" | "expense" | null>(null);
 
   // Both deps are plain strings, so this can't re-fire on identity alone — the
   // trap that made useCategoryPicker loop.
@@ -53,7 +58,7 @@ export function SpendingTab({ focusCategoryId, focusNonce }: SpendingTabProps = 
     return <SpendingTabSkeleton />;
   }
   if (!summary.data) {
-    return <Text style={styles.empty}>Could not load report.</Text>;
+    return <Text style={styles.empty}>Không thể tải báo cáo.</Text>;
   }
 
   const { range, totals, by_category } = summary.data;
@@ -95,18 +100,22 @@ export function SpendingTab({ focusCategoryId, focusNonce }: SpendingTabProps = 
       </Pressable>
 
       <View style={styles.statRow}>
-        <Card style={styles.statCard}>
-          <Text style={styles.statLabel}>Income</Text>
-          <Text style={[styles.statValue, { color: colors.green }]}>
-            {formatCurrency(primaryTotal?.total_income ?? 0, currency)}
-          </Text>
-        </Card>
-        <Card style={styles.statCard}>
-          <Text style={styles.statLabel}>Expense</Text>
-          <Text style={[styles.statValue, { color: colors.peach }]}>
-            {formatCurrency(primaryTotal?.total_expense ?? 0, currency)}
-          </Text>
-        </Card>
+        <Pressable style={styles.statCard} onLongPress={() => setRevealTotal("income")}>
+          <Card style={styles.statCardInner}>
+            <Text style={styles.statLabel}>Thu nhập</Text>
+            <Text style={[styles.statValue, { color: colors.green }]} numberOfLines={1}>
+              {formatCurrencyCompact(primaryTotal?.total_income ?? 0, currency)}
+            </Text>
+          </Card>
+        </Pressable>
+        <Pressable style={styles.statCard} onLongPress={() => setRevealTotal("expense")}>
+          <Card style={styles.statCardInner}>
+            <Text style={styles.statLabel}>Chi tiêu</Text>
+            <Text style={[styles.statValue, { color: colors.peach }]} numberOfLines={1}>
+              {formatCurrencyCompact(primaryTotal?.total_expense ?? 0, currency)}
+            </Text>
+          </Card>
+        </Pressable>
       </View>
 
       <Card style={styles.donutCard}>
@@ -125,7 +134,7 @@ export function SpendingTab({ focusCategoryId, focusNonce }: SpendingTabProps = 
 
       <ScrollView showsVerticalScrollIndicator={false}>
         {segments.length === 0 ? (
-          <Text style={styles.empty}>No expenses in this period.</Text>
+          <Text style={styles.empty}>Không có khoản chi nào trong khoảng thời gian này.</Text>
         ) : (
           segments.map((seg) => (
             <DonutLegendRow
@@ -172,6 +181,15 @@ export function SpendingTab({ focusCategoryId, focusNonce }: SpendingTabProps = 
         categories={segments.map((s) => ({ id: s.key, name: s.label, icon: s.icon, iconUrl: s.iconUrl, color: s.color }))}
         onSelect={(id) => setSelected((prev) => (prev === id ? null : id))}
       />
+
+      <AmountRevealPopup
+        visible={revealTotal !== null}
+        onClose={() => setRevealTotal(null)}
+        amountCents={
+          revealTotal === "income" ? primaryTotal?.total_income ?? 0 : primaryTotal?.total_expense ?? 0
+        }
+        currency={currency}
+      />
     </View>
   );
 }
@@ -192,7 +210,8 @@ const styles = StyleSheet.create({
   },
   range: { ...typography.caption, color: colors.textSecondary },
   statRow: { flexDirection: "row", gap: spacing.md },
-  statCard: { flex: 1, gap: spacing.xs },
+  statCard: { flex: 1 },
+  statCardInner: { gap: spacing.xs },
   statLabel: { ...typography.caption, color: colors.textSecondary },
   statValue: { ...typography.cardTitle },
   donutCard: { alignItems: "center", paddingVertical: spacing.xl, gap: spacing.sm },

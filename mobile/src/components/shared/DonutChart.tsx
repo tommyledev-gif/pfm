@@ -94,7 +94,7 @@ function useFloat(active: boolean, direction: number) {
 export function DonutChart({
   segments,
   currency,
-  defaultLabel = "By Category",
+  defaultLabel = "Theo danh mục",
   size = 200,
   selected,
   onToggle,
@@ -164,6 +164,17 @@ export function DonutChart({
 
   return (
     <View style={styles.wrapper}>
+      {/* Underneath the Svg, so any tap the arcs themselves don't claim (the
+          hollow center, the gaps between segments, the tooltip's own
+          background) falls through to here instead of doing nothing — README:
+          "clicking a segment or its legend row highlights it... clicking the
+          same one again deselects" was previously the *only* way to clear a
+          selection; this makes every other spot in the chart cancel it too. */}
+      <Pressable
+        style={StyleSheet.absoluteFillObject}
+        disabled={!selected}
+        onPress={() => selected && onToggle(selected)}
+      />
       <Svg width={size} height={size}>
         <G rotation="-90" origin={`${size / 2}, ${size / 2}`}>
           {arcs.map((arc) => (

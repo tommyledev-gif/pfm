@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 
-import { ChevronLeftIcon } from "@/components/ui/Icon";
+import { ChevronLeftIcon, SearchIcon } from "@/components/ui/Icon";
 import { Screen } from "@/components/shared/Screen";
 import { NotificationRow } from "@/features/notifications/components/NotificationRow";
 import { dayLabel } from "@/lib/format-date";
@@ -15,6 +15,7 @@ import { Notification } from "@/features/notifications/types";
 export default function NotificationsScreen() {
   const router = useRouter();
   const [unreadOnly, setUnreadOnly] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
   const notifications = useNotificationsQuery(unreadOnly);
   const markRead = useMarkNotificationReadMutation();
   // A notification names the Budget it was raised for, but Insights selects by
@@ -42,9 +43,21 @@ export default function NotificationsScreen() {
     router.push({ pathname: "/insights", params: { categoryId, focusedAt: String(Date.now()) } });
   };
 
+  // No server-side search endpoint for notifications (unlike Transactions'
+  // own `search` query param) — filtered client-side over the page already
+  // fetched, matching either the title or the body text.
+  const filteredNotifications = useMemo(() => {
+    const query = searchInput.trim().toLowerCase();
+    const all = notifications.data?.data ?? [];
+    if (!query) return all;
+    return all.filter(
+      (n) => n.title.toLowerCase().includes(query) || n.body.toLowerCase().includes(query),
+    );
+  }, [notifications.data, searchInput]);
+
   const sections = useMemo(() => {
     const grouped: { title: string; data: NonNullable<typeof notifications.data>["data"] }[] = [];
-    (notifications.data?.data ?? []).forEach((n) => {
+    filteredNotifications.forEach((n) => {
       const label = dayLabel(n.created_at);
       const section = grouped.find((g) => g.title === label);
       if (section) section.data.push(n);
@@ -52,7 +65,7 @@ export default function NotificationsScreen() {
     });
     return grouped;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notifications.data]);
+  }, [filteredNotifications]);
 
   return (
     <Screen style={styles.screen}>
@@ -60,13 +73,33 @@ export default function NotificationsScreen() {
         <Pressable onPress={() => router.back()} hitSlop={8}>
           <ChevronLeftIcon size={24} />
         </Pressable>
-        <Text style={styles.title}>Notifications</Text>
+        <Text style={styles.title}>Thông báo</Text>
         <Pressable
           onPress={() => setUnreadOnly((v) => !v)}
           style={[styles.toggle, unreadOnly && styles.toggleActive]}
         >
-          <Text style={[styles.toggleLabel, unreadOnly && styles.toggleLabelActive]}>Unread only</Text>
+          <Text style={[styles.toggleLabel, unreadOnly && styles.toggleLabelActive]}>Chưa đọc</Text>
         </Pressable>
+      </View>
+
+      <View style={styles.searchRow}>
+        <SearchIcon size={16} color={colors.textSecondary} />
+        {/* multiline (not a fixed single-line TextInput) so a search term long
+            enough to wrap grows the box downward instead of scrolling
+            sideways inside a one-row field. */}
+        <TextInput
+          value={searchInput}
+          onChangeText={setSearchInput}
+          placeholder="Tìm thông báo..."
+          placeholderTextColor={colors.textMuted}
+          style={styles.searchInput}
+          multiline
+        />
+        {searchInput ? (
+          <Pressable onPress={() => setSearchInput("")} hitSlop={8}>
+            <Text style={styles.clearSearch}>✕</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {notifications.isLoading ? (
@@ -82,7 +115,11 @@ export default function NotificationsScreen() {
               <NotificationRow notification={item} />
             </Pressable>
           )}
-          ListEmptyComponent={<Text style={styles.empty}>No notifications.</Text>}
+          ListEmptyComponent={
+            <Text style={styles.empty}>
+              {searchInput ? "Không tìm thấy thông báo nào." : "Không có thông báo nào."}
+            </Text>
+          }
         />
       )}
     </Screen>
@@ -111,6 +148,26 @@ const styles = StyleSheet.create({
   toggleActive: { backgroundColor: colors.green, borderColor: colors.green },
   toggleLabel: { ...typography.tiny, color: colors.textSecondary },
   toggleLabelActive: { color: colors.onGreen },
+  searchRow: {
+    flexDirection: "row",
+    // flex-start (not center) — once the input grows past one line for a
+    // long search phrase, centering would keep re-centering the icon/clear
+    // button against a taller box instead of pinning them to its first line.
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.md,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radii.listCard,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+  },
+  // maxHeight caps growth at ~4 lines — long enough for any realistic search
+  // phrase without a runaway box swallowing the screen.
+  searchInput: { flex: 1, maxHeight: 96, ...typography.body, color: colors.textPrimary, padding: 0 },
+  clearSearch: { ...typography.body, color: colors.textSecondary },
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
   sectionHeader: { ...typography.caption, color: colors.textMuted, paddingHorizontal: spacing.sm, paddingVertical: spacing.sm },
   loader: { marginTop: spacing.xxl },

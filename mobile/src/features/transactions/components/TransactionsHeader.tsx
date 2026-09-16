@@ -119,7 +119,7 @@ export function TransactionsHeader({
         <View style={styles.titleRow}>
           <Text style={styles.title}>Giao dịch</Text>
           <View style={styles.countBadge}>
-            <Text style={styles.countBadgeLabel}>{matchedCount} mục</Text>
+            <Text style={styles.countBadgeLabel}>{matchedCount} giao dịch</Text>
           </View>
         </View>
         <Pressable style={styles.addButton} onPress={onAdd} hitSlop={8}>

@@ -27,20 +27,38 @@ export function toMajorUnits(amountCents: number): number {
 }
 
 // Shortens an amount past 6 digits (>= 1,000,000 major units) to a
-// "7m5"-style compact form (7,513,211 → "7m5" — 7 whole millions, tenths
-// digit only shown when non-zero) instead of the fully-grouped
-// "7.513.211" — used by DonutChart's center label, which has to fit inside
-// a fixed-diameter circle no matter how large the underlying amount gets.
+// "~7m100k"-style compact form (7,100,000 → "~7m100k" — whole millions plus
+// the remainder rounded to the nearest thousand) instead of the
+// fully-grouped "7.100.000" — used by DonutChart's center label and the
+// Spending tab's Income/Expense stat cards, which have to fit a large amount
+// into a small, fixed-width space. Replaces an earlier single-tenths-digit
+// version ("7m1" for anything from 7.05m to 7.15m) that was too coarse to
+// tell 7.08m and 7.1m apart — the leading "~" says plainly that this is a
+// rounded display value, not the exact figure (long-press callers pair this
+// with AmountRevealPopup for the exact one).
 export function formatCurrencyCompact(amountCents: number, currency: string = "VND"): string {
   const amount = Math.round(amountCents / 100);
   const abs = Math.abs(amount);
   if (abs < 1_000_000) return formatCurrency(amountCents, currency);
 
   const sign = amount < 0 ? "-" : "";
-  const [threshold, suffix] = abs >= 1_000_000_000 ? [1_000_000_000, "b"] : [1_000_000, "m"];
-  const whole = Math.floor(abs / threshold);
-  const tenths = Math.floor((abs % threshold) / (threshold / 10));
-  return `${sign}${whole}${suffix}${tenths ? tenths : ""} ${currencySymbol(currency)}`;
+  const isBillions = abs >= 1_000_000_000;
+  const threshold = isBillions ? 1_000_000_000 : 1_000_000;
+  const suffix = isBillions ? "b" : "m";
+  // The sub-unit is one order of magnitude down from the main one (millions
+  // → thousands, billions → millions) — always rounded, never truncated, so
+  // "999.6k" reads as "1m" rather than a misleadingly-clipped "999k".
+  const subUnit = isBillions ? 1_000_000 : 1_000;
+  const subSuffix = isBillions ? "m" : "k";
+
+  let whole = Math.floor(abs / threshold);
+  let subWhole = Math.round((abs % threshold) / subUnit);
+  if (subWhole * subUnit >= threshold) {
+    whole += 1;
+    subWhole = 0;
+  }
+
+  return `~${sign}${whole}${suffix}${subWhole ? `${subWhole}${subSuffix}` : ""} ${currencySymbol(currency)}`;
 }
 
 function currencySymbol(currency: string): string {

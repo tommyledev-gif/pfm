@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { AmountInput } from "@/components/ui/AmountInput";
 import { CategorySelectField } from "@/components/shared/CategorySelectField";
@@ -11,7 +11,7 @@ import { PillButton } from "@/components/ui/PillButton";
 import { TrashIcon } from "@/components/ui/Icon";
 import { SingleDatePickerModal } from "@/components/shared/SingleDatePickerModal";
 import { getErrorMessage } from "@/lib/axios";
-import { toCents, toMajorUnits } from "@/lib/currency";
+import { formatCurrency, toCents, toMajorUnits } from "@/lib/currency";
 import { formatDateShort } from "@/lib/format-date";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { TRANSACTION_NOTE_MAX_LENGTH, TRANSACTION_TYPES, TransactionType } from "@/lib/constants";
@@ -51,6 +51,11 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  // Bumped every time the sheet opens and remounts (as a `key`) the amount/
+  // note TextInputs below — belt-and-braces alongside the state reset right
+  // under it, so a stale native text-editing state left over from the
+  // previous open can never survive into a fresh "Giao dịch mới".
+  const [formKey, setFormKey] = useState(0);
 
   const createTransaction = useCreateTransactionMutation();
   const updateTransaction = useUpdateTransactionMutation();
@@ -78,6 +83,15 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
     setSubmitAttempted(false);
   }, [visible, editingTransaction, wallets.data]);
 
+  // Separate from the reset above on purpose: that effect also re-runs
+  // whenever `wallets.data` refetches in the background (e.g. right after
+  // creating a transaction invalidates it) — bumping the remount key there
+  // too would yank focus out from under anyone still typing in an open
+  // sheet. This one only fires on the true open transition.
+  useEffect(() => {
+    if (visible) setFormKey((k) => k + 1);
+  }, [visible]);
+
   const amountValue = Number(amount);
   const errors = {
     wallet: !isEditing && !walletId ? "Vui lòng chọn ví" : undefined,
@@ -86,7 +100,20 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
   };
   const hasErrors = Boolean(errors.wallet || errors.category || errors.amount);
 
+  // So the user knows what a create is about to do to the wallet before they
+  // commit to it, not after — the projected figure only shows once a valid
+  // amount is entered, since "→ NaN" before that would just be noise.
+  const selectedWallet = wallets.data?.find((w) => w.id === walletId);
+  const projectedBalance =
+    selectedWallet && amountValue > 0
+      ? selectedWallet.balance + (type === "income" ? toCents(amountValue) : -toCents(amountValue))
+      : null;
+
   const submit = () => {
+    // The amount/note keyboard should never still be up once submit has been
+    // tapped — even a validation failure should leave the field errors
+    // visible, not hidden behind the keyboard.
+    Keyboard.dismiss();
     setSubmitAttempted(true);
     if (hasErrors || !walletId || !categoryId) return;
     if (isEditing && editingTransaction) {
@@ -147,6 +174,14 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
           ))}
         </ScrollView>
         {submitAttempted ? <FieldError message={errors.wallet} /> : null}
+        {selectedWallet ? (
+          <Text style={styles.balanceHint}>
+            Số dư khả dụng: {formatCurrency(selectedWallet.balance, selectedWallet.currency)}
+            {projectedBalance !== null
+              ? ` → ${formatCurrency(projectedBalance, selectedWallet.currency)} sau giao dịch này`
+              : ""}
+          </Text>
+        ) : null}
 
         <Text style={styles.label}>Loại{isEditing ? " (khóa sau khi tạo)" : ""}</Text>
         <View style={styles.chipRow}>
@@ -172,11 +207,12 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
         {submitAttempted ? <FieldError message={errors.category} /> : null}
 
         <Text style={styles.label}>Số tiền</Text>
-        <AmountInput value={amount} onChangeText={setAmount} />
+        <AmountInput key={`amount-${formKey}`} value={amount} onChangeText={setAmount} />
         {submitAttempted ? <FieldError message={errors.amount} /> : null}
 
         <Text style={styles.label}>Ghi chú (không bắt buộc)</Text>
         <TextInput
+          key={`note-${formKey}`}
           value={note}
           onChangeText={setNote}
           placeholder="vd: Ăn trưa"
@@ -224,6 +260,7 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
 
 const styles = StyleSheet.create({
   label: { ...typography.caption, color: colors.textSecondary },
+  balanceHint: { ...typography.tiny, color: colors.textMuted },
   chipRow: { flexDirection: "row", gap: spacing.sm },
   chip: {
     paddingVertical: 8,

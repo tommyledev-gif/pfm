@@ -15,6 +15,13 @@ const TABS = [
   { href: "/settings", Icon: UserIcon },
 ] as const;
 
+// Screens reachable only through Settings' own menu (settings.tsx's
+// SETTINGS_ROWS) but not tabs in their own right — the ball should keep
+// showing Settings as active while on any of these instead of freezing on
+// whichever tab was active before the push, which read as the nav losing
+// track of where you are.
+const SETTINGS_SUB_ROUTES = ["/wallets", "/categories", "/users", "/audit-log", "/developer"];
+
 const PILL_HEIGHT = 64;
 const BALL_SIZE = 48;
 const AURA_OUTER = 78;
@@ -52,7 +59,9 @@ export function BottomNav() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
 
-  const activeIndex = TABS.findIndex((t) => t.href === pathname);
+  const activeIndex = SETTINGS_SUB_ROUTES.includes(pathname)
+    ? TABS.findIndex((t) => t.href === "/settings")
+    : TABS.findIndex((t) => t.href === pathname);
   const [displayIndex, setDisplayIndex] = useState(Math.max(activeIndex, 0));
 
   const tabRects = useRef<{ x: number; width: number }[]>([]);
@@ -166,7 +175,13 @@ export function BottomNav() {
             <Pressable
               key={href}
               onLayout={handleTabLayout(index)}
-              onPress={() => router.replace(href)}
+              // No-op on the tab that's already active — router.replace onto
+              // the same route still remounts the screen underneath, which
+              // was silently wiping Transactions' own filters/sort/search
+              // state every time its own tab was re-tapped.
+              onPress={() => {
+                if (index !== activeIndex) router.replace(href);
+              }}
               style={styles.tab}
               hitSlop={8}
             >

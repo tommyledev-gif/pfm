@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { ChevronRightIcon } from "@/components/ui/Icon";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { colorForCategory } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
 import { colors, radii, spacing, typography } from "@/lib/theme";
@@ -17,34 +19,54 @@ const TYPE_LABEL: Record<Wallet["type"], string> = {
 
 export function WalletListItem({ wallet, onPress }: { wallet: Wallet; onPress: () => void }) {
   const setDefault = useSetDefaultWalletMutation();
+  // Setting a new default silently swapped it under the user with no way to
+  // back out of an accidental tap — a confirm step first, same convention as
+  // CategoryListItem's delete prompt, just non-destructive (tone="default").
+  const [confirmDefaultOpen, setConfirmDefaultOpen] = useState(false);
 
   return (
-    <Pressable style={styles.row} onPress={onPress}>
-      <Avatar name={wallet.name} color={colorForCategory(wallet.id)} size={40} icon={wallet.icon} iconUrl={wallet.icon_url} />
-      <View style={styles.info}>
-        <View style={styles.titleRow}>
-          <Text style={styles.name}>{wallet.name}</Text>
-          {wallet.is_default ? (
-            <View style={styles.badge}>
-              <Text style={styles.badgeLabel}>Default</Text>
-            </View>
-          ) : null}
+    <>
+      <Pressable style={styles.row} onPress={onPress}>
+        <Avatar name={wallet.name} color={colorForCategory(wallet.id)} size={40} icon={wallet.icon} iconUrl={wallet.icon_url} />
+        <View style={styles.info}>
+          <View style={styles.titleRow}>
+            <Text style={styles.name}>{wallet.name}</Text>
+            {wallet.is_default ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeLabel}>Default</Text>
+              </View>
+            ) : null}
+          </View>
+          <Text style={styles.sub}>
+            {TYPE_LABEL[wallet.type]} · {formatCurrency(wallet.balance, wallet.currency)}
+          </Text>
         </View>
-        <Text style={styles.sub}>
-          {TYPE_LABEL[wallet.type]} · {formatCurrency(wallet.balance, wallet.currency)}
-        </Text>
-      </View>
-      {!wallet.is_default ? (
-        <Pressable
-          onPress={() => setDefault.mutate(wallet.id)}
-          disabled={setDefault.isPending}
-          style={styles.defaultButton}
-        >
-          <Text style={styles.defaultButtonLabel}>Set default</Text>
-        </Pressable>
-      ) : null}
-      <ChevronRightIcon size={18} color={colors.textMuted} />
-    </Pressable>
+        {!wallet.is_default ? (
+          <Pressable
+            onPress={() => setConfirmDefaultOpen(true)}
+            disabled={setDefault.isPending}
+            style={styles.defaultButton}
+          >
+            <Text style={styles.defaultButtonLabel}>Set default</Text>
+          </Pressable>
+        ) : null}
+        <ChevronRightIcon size={18} color={colors.textMuted} />
+      </Pressable>
+
+      <ConfirmDialog
+        visible={confirmDefaultOpen}
+        tone="default"
+        title="Đặt ví mặc định?"
+        message={`"${wallet.name}" sẽ trở thành ví mặc định của bạn.`}
+        confirmLabel="Đặt mặc định"
+        onCancel={() => setConfirmDefaultOpen(false)}
+        onConfirm={() => {
+          setConfirmDefaultOpen(false);
+          setDefault.mutate(wallet.id);
+        }}
+        loading={setDefault.isPending}
+      />
+    </>
   );
 }
 

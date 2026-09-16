@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SendIcon, SparkleIcon } from "@/components/ui/Icon";
@@ -105,6 +106,20 @@ export default function AiChatScreen() {
   // -action row and bottom nav would then stay on screen underneath it.
   const keyboardVisible = useKeyboardVisible();
 
+  // Home's "Chờ xác nhận" list deep-links here at a specific message instead
+  // of leaving the (inverted) list at its default newest-message position —
+  // see index.tsx's goToPendingMessage. openEdit additionally opens that
+  // message's TransactionActionCard straight into edit mode, for the
+  // swipe-to-edit gesture on that same row. focusedAt is a nonce so tapping
+  // the same pending item twice in a row re-triggers the scroll even when
+  // focusMessageId hasn't changed (same convention as insights.tsx's
+  // focusedAt).
+  const { focusMessageId, focusedAt, openEdit } = useLocalSearchParams<{
+    focusMessageId?: string;
+    focusedAt?: string;
+    openEdit?: string;
+  }>();
+
   // Restores the synced thread from the server exactly once, only when the
   // local (AsyncStorage-persisted) thread is empty — i.e. after a logout,
   // reinstall, or new device wiped it (chat-store.ts's own debounced
@@ -130,6 +145,25 @@ export default function AiChatScreen() {
   // every other consumer of the thread — the autosave, the edit lookups —
   // keeps reading it in natural order.
   const invertedThread = useMemo(() => [...thread].reverse(), [thread]);
+
+  useEffect(() => {
+    if (!focusMessageId) return;
+    const index = invertedThread.findIndex((m) => m.id === focusMessageId);
+    if (index === -1) return;
+    // A beat for the list to finish its own mount/measure pass — scrollToIndex
+    // on a not-yet-laid-out row is exactly what onScrollToIndexFailed below is
+    // for, but giving it this head start avoids the visible stutter of a
+    // failed attempt on every navigation.
+    const timer = setTimeout(() => {
+      listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+    }, 50);
+    if (openEdit === "1") {
+      const message = thread.find((m) => m.id === focusMessageId);
+      if (message?.action) setEditingActionMessage(message);
+    }
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusMessageId, focusedAt]);
 
   const walletById = useMemo(() => new Map(wallets.data?.map((w) => [w.id, w])), [wallets.data]);
   const categoryById = useMemo(() => new Map(categories.data?.map((c) => [c.id, c])), [categories.data]);
@@ -355,6 +389,15 @@ export default function AiChatScreen() {
         // row's PanResponder immediately; the keyboard still dismisses via
         // handleEditTrigger's own Keyboard.dismiss() once the swipe fires.
         keyboardShouldPersistTaps="handled"
+        // scrollToIndex (the focusMessageId effect above) throws if the
+        // target row hasn't been measured yet — standard RN workaround is to
+        // retry once layout has actually settled rather than estimate an
+        // offset by hand.
+        onScrollToIndexFailed={(info) => {
+          setTimeout(() => {
+            listRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.5 });
+          }, 100);
+        }}
         renderItem={({ item }) => {
           // Resolved once per row rather than inline in the JSX: the card needs
           // the budget for THIS proposal's category in THIS wallet's currency,
