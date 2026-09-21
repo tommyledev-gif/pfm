@@ -1,131 +1,78 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { FlatList, Keyboard, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { SendIcon, SparkleIcon } from "@/components/ui/Icon";
+import { SparkleIcon } from "@/components/ui/Icon";
 import { Screen } from "@/components/shared/Screen";
 import { TypingIndicator } from "@/components/shared/TypingIndicator";
-import { BudgetWizardCard } from "@/features/ai-chat/components/BudgetWizardCard";
-import { ChatBubble } from "@/features/ai-chat/components/ChatBubble";
-import { EditHistoryDialog } from "@/features/ai-chat/components/EditHistoryDialog";
-import { EditMessageModal } from "@/features/ai-chat/components/EditMessageModal";
-import { EditTransactionModal } from "@/features/ai-chat/components/EditTransactionModal";
-import { SwipeableMessageRow } from "@/features/ai-chat/components/SwipeableMessageRow";
+import { ChatInputBar } from "@/features/ai-chat/components/ChatInputBar";
+import { ChatMessageRow } from "@/features/ai-chat/components/ChatMessageRow";
+import { ChatOverlays } from "@/features/ai-chat/components/ChatOverlays";
+import { useTransactionRemoval } from "@/features/ai-chat/components/use-transaction-removal";
+import { useChatActions } from "@/features/ai-chat/hooks/use-chat-actions";
 import { isEditLocked } from "@/features/ai-chat/edit-lock";
-import { TransactionActionCard } from "@/features/ai-chat/components/TransactionActionCard";
-import { BudgetWizardModal } from "@/features/budget-wizard/components/BudgetWizardModal";
-import { TransactionFormModal } from "@/features/transactions/components/TransactionFormModal";
-import { getErrorCode, getErrorMessage } from "@/lib/axios";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { isTombstone } from "@/features/ai-chat/tombstone";
+import { colors, spacing, typography } from "@/lib/theme";
 import { useKeyboardHeight, useKeyboardVisible } from "@/lib/use-keyboard-height";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
-import { useSendChatMessageMutation } from "@/features/ai-chat/api/use-send-chat-message-mutation";
 import { useChatThreadQuery } from "@/features/ai-chat/api/use-chat-thread-sync";
-import { useCreateTransactionMutation } from "@/features/transactions/api/use-create-transaction-mutation";
-import { useUpdateTransactionMutation } from "@/features/transactions/api/use-update-transaction-mutation";
-import { ChatMessage, EditHistoryEntry, TransactionActionPayload } from "@/features/ai-chat/types";
+import { ChatMessage } from "@/features/ai-chat/types";
 import { useChatStore } from "@/stores/chat-store";
-import { useToastStore } from "@/stores/toast-store";
-
-// A per-session counter would collide with ids from a previous session now
-// that chat-store.ts persists the thread to disk (e.g. a fresh "msg_1" after
-// restart could match an already-persisted message's id).
-let idCounter = 0;
-const nextId = () => `msg_${Date.now()}_${++idCounter}`;
-
-// A manually-edited proposal never went through the AI Service, so it needs
-// its own idempotency_key (the backend requires a real UUID — see
-// backend/internal/dto/transaction_request.go). Not crypto-grade — this is
-// a dedupe key, not a security token, same reasoning as nextId() above.
-function uuidv4(): string {
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === "x" ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
-
-// Design's typing indicator is meant to be felt, not just a technicality —
-// README: "typing indicator (~1.3s)" — so even a fast API response holds the
-// dots for a beat before the reply appears.
-const MIN_TYPING_MS = 1300;
 
 // Gives the input bar's margin time to settle back to its closed-keyboard
-// value (see useKeyboardHeight's hide-event handler) before a modal opens
-// on top of it, so the sheet doesn't visibly jump as the keyboard closes.
+// value before a modal opens on top of it, so the sheet does not visibly jump
+// as the keyboard closes.
 const KEYBOARD_DISMISS_SETTLE_MS = 280;
-
-// BottomNav (components/shared/BottomNav.tsx) sits flush at insets.bottom,
-// standing 64px tall, with its active-tab ball floating another 24px above
-// that — this is how far above the screen's bottom edge (on top of
-// insets.bottom) the input bar's own bottom must sit to clear the ball when
-// the keyboard is closed.
-const NAV_CLEARANCE = 104;
-
-// Small gap between the input bar and the top of the keyboard once open.
-const KEYBOARD_GAP = spacing.sm;
+// A beat for the list to finish its mount/measure pass before scrolling to a
+// deep-linked message, then a longer one to retry if the row still was not
+// measured — onScrollToIndexFailed covers the miss, this avoids the stutter.
+const FOCUS_SCROLL_DELAY_MS = 50;
+const FOCUS_RETRY_DELAY_MS = 100;
 
 export default function AiChatScreen() {
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<ChatMessage>>(null);
-  // Thread lives in a Zustand store (chat-store.ts), not local state — this
-  // screen unmounts every time a bottom-nav tab is tapped, and local state
-  // would lose the whole conversation on every navigation.
+
+  // Thread lives in a store, not local state — this screen unmounts on every
+  // bottom-nav tab change, which would otherwise lose the conversation.
   const thread = useChatStore((s) => s.thread);
-  const addMessage = useChatStore((s) => s.addMessage);
   const updateMessage = useChatStore((s) => s.updateMessage);
   const hydrateThread = useChatStore((s) => s.hydrateThread);
+
   const [input, setInput] = useState("");
-  const [sending, setSending] = useState(false);
-  const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [manualEntryOpen, setManualEntryOpen] = useState(false);
-  // A plain chat bubble (user text, or an actionless assistant reply) opens
-  // a text editor; any transaction proposal — confirmed or not — opens the
-  // structured form directly (editAction below decides whether that PATCHes
-  // a real Transaction or just mutates the still-unconfirmed proposal).
+  // A plain bubble opens a text editor; any transaction proposal opens the
+  // structured form (editAction decides whether that patches a real
+  // transaction or only the unconfirmed proposal).
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
   const [editingActionMessage, setEditingActionMessage] = useState<ChatMessage | null>(null);
   const [historyMessage, setHistoryMessage] = useState<ChatMessage | null>(null);
-  // F-13 AI Budget Setup Wizard (specs/ai-budget-wizard) — budgetWizardOriginMessageId
-  // is null for the quick-action-chip entry point (US-01) and set to the
-  // tapped card's id for the chat-trigger entry point (US-02), so onCompleted
-  // knows which card (if any) to flip into its read-only "submitted" state.
+  // A removed proposal opens the full transaction history sheet rather than
+  // the proposal-only edit trail — see TransactionHistoryDrawer.
+  const [tombstoneMessage, setTombstoneMessage] = useState<ChatMessage | null>(null);
+  // Bumped on any scroll or thread change, so a parked swipe row is never left
+  // open over content that has moved underneath it.
+  const [closeSignal, setCloseSignal] = useState(0);
   const [budgetWizardOpen, setBudgetWizardOpen] = useState(false);
   const [budgetWizardOriginMessageId, setBudgetWizardOriginMessageId] = useState<string | null>(null);
-  // Drives the input bar's own margin directly off the measured keyboard
-  // height — see use-keyboard-height.ts for why this isn't
-  // KeyboardAvoidingView. BottomNav (app/(app)/_layout.tsx) hides itself on
-  // the same signal, so the input only needs nav clearance while it's closed.
+
   const keyboardHeight = useKeyboardHeight();
-  // ⚠️ From the keyboard events, NOT from `keyboardHeight > 0`. The height is
-  // what is left to pad AFTER the OS has resized the window, so on a device that
-  // resizes it is legitimately 0 while the keyboard is wide open — and the quick
-  // -action row and bottom nav would then stay on screen underneath it.
+  // ⚠️ From the keyboard events, not from `keyboardHeight > 0`. The height is
+  // what remains to pad AFTER the OS has resized the window, so on a device
+  // that resizes it is legitimately 0 while the keyboard is wide open.
   const keyboardVisible = useKeyboardVisible();
 
-  // Home's "Chờ xác nhận" list deep-links here at a specific message instead
-  // of leaving the (inverted) list at its default newest-message position —
-  // see index.tsx's goToPendingMessage. openEdit additionally opens that
-  // message's TransactionActionCard straight into edit mode, for the
-  // swipe-to-edit gesture on that same row. focusedAt is a nonce so tapping
-  // the same pending item twice in a row re-triggers the scroll even when
-  // focusMessageId hasn't changed (same convention as insights.tsx's
-  // focusedAt).
   const { focusMessageId, focusedAt, openEdit } = useLocalSearchParams<{
     focusMessageId?: string;
     focusedAt?: string;
     openEdit?: string;
   }>();
 
-  // Restores the synced thread from the server exactly once, only when the
-  // local (AsyncStorage-persisted) thread is empty — i.e. after a logout,
-  // reinstall, or new device wiped it (chat-store.ts's own debounced
-  // autosave is what put it on the server in the first place). Once
-  // hydrateThread sets a non-empty thread, `enabled` flips false and this
-  // never refetches for the rest of the session.
+  // Restores the synced thread exactly once, only when the local copy is
+  // empty — i.e. after a logout, reinstall or new device wiped it.
   const threadQuery = useChatThreadQuery(thread.length === 0);
   useEffect(() => {
     if (threadQuery.data?.length) hydrateThread(threadQuery.data);
@@ -133,43 +80,23 @@ export default function AiChatScreen() {
 
   const wallets = useWalletsQuery();
   const categories = useCategoriesQuery();
-  // Read only so an unconfirmed proposal can say what saving it would do to the
-  // category's budget — the card never writes budgets.
+  // Read only, so an unconfirmed proposal can say what saving it would do to
+  // the category's budget. The card never writes budgets.
   const budgets = useBudgetsQuery();
-  const sendMessage = useSendChatMessageMutation();
-  const createTransaction = useCreateTransactionMutation();
-  const updateTransaction = useUpdateTransactionMutation();
 
-  // The list renders inverted (see the FlatList below), so the newest message
-  // has to come first in the data. Reversed here rather than in chat-store so
-  // every other consumer of the thread — the autosave, the edit lookups —
-  // keeps reading it in natural order.
+  const chat = useChatActions({
+    onSent: () => listRef.current?.scrollToOffset({ offset: 0, animated: true }),
+  });
+  const removal = useTransactionRemoval();
+
+  // Reversed here rather than in the store, so every other consumer keeps
+  // reading the thread in natural order.
   const invertedThread = useMemo(() => [...thread].reverse(), [thread]);
-
-  useEffect(() => {
-    if (!focusMessageId) return;
-    const index = invertedThread.findIndex((m) => m.id === focusMessageId);
-    if (index === -1) return;
-    // A beat for the list to finish its own mount/measure pass — scrollToIndex
-    // on a not-yet-laid-out row is exactly what onScrollToIndexFailed below is
-    // for, but giving it this head start avoids the visible stutter of a
-    // failed attempt on every navigation.
-    const timer = setTimeout(() => {
-      listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
-    }, 50);
-    if (openEdit === "1") {
-      const message = thread.find((m) => m.id === focusMessageId);
-      if (message?.action) setEditingActionMessage(message);
-    }
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusMessageId, focusedAt]);
-
   const walletById = useMemo(() => new Map(wallets.data?.map((w) => [w.id, w])), [wallets.data]);
   const categoryById = useMemo(() => new Map(categories.data?.map((c) => [c.id, c])), [categories.data]);
 
-  // Keyed by "categoryId|currency": a budget carries a separate limit per
-  // currency, and a proposal in VND must never be measured against a USD one.
+  // Keyed "categoryId|currency": a budget carries a separate limit per
+  // currency, and a proposal in one must never be measured against another.
   const budgetByCategoryCurrency = useMemo(() => {
     const map = new Map<string, { amount_limit: number; spent: number }>();
     for (const budget of budgets.data ?? []) {
@@ -183,169 +110,39 @@ export default function AiChatScreen() {
     return map;
   }, [budgets.data]);
 
-  // Shared by both a fresh send and a resend-after-editing-the-user-message
-  // flow — same typing-indicator pacing either way, only the resulting
-  // message's `edited` flag differs. On failure, a rate-limit or
-  // AI-service-unavailable response gets its own distinct copy plus a
-  // manual-entry offer — both already exist server-side (AIChatRateLimiter,
-  // ErrAIServiceUnavailable) and are distinguishable by error_code — instead
-  // of the generic "couldn't process that" text every other failure gets.
-  const requestAssistantReply = async (message: string, edited?: boolean): Promise<ChatMessage> => {
-    const startedAt = Date.now();
-    try {
-      const response = await sendMessage.mutateAsync({ message });
-      const elapsed = Date.now() - startedAt;
-      if (elapsed < MIN_TYPING_MS) {
-        await new Promise((resolve) => setTimeout(resolve, MIN_TYPING_MS - elapsed));
-      }
-      const action = response.actions[0];
-      return {
-        id: nextId(),
-        role: "assistant",
-        text: response.message,
-        action,
-        intent: response.intent === "ambiguous" ? "ambiguous" : undefined,
-        actionType: response.action_type,
-        edited,
-        editHistory: action ? [{ payload: action.payload, timestamp: Date.now(), source: "created" }] : undefined,
-      };
-    } catch (err) {
-      const code = getErrorCode(err);
-      const isBusy = code === "RATE_LIMITED" || code === "AI_SERVICE_UNAVAILABLE";
-      return {
-        id: nextId(),
-        role: "assistant",
-        text: isBusy
-          ? "Hệ thống đang bận, vui lòng thử lại sau."
-          : "Xin lỗi, mình chưa xử lý được. Vui lòng thử lại.",
-        offerManualEntry: isBusy,
-        edited,
-      };
+  useEffect(() => {
+    setCloseSignal((n) => n + 1);
+  }, [thread.length]);
+
+  useEffect(() => {
+    if (!focusMessageId) return;
+    const index = invertedThread.findIndex((m) => m.id === focusMessageId);
+    if (index === -1) return;
+    const timer = setTimeout(() => {
+      listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+    }, FOCUS_SCROLL_DELAY_MS);
+    if (openEdit === "1") {
+      const message = thread.find((m) => m.id === focusMessageId);
+      if (message?.action && !isTombstone(message)) setEditingActionMessage(message);
     }
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusMessageId, focusedAt]);
+
+  const openHistory = (message: ChatMessage) => {
+    if (isTombstone(message)) setTombstoneMessage(message);
+    else setHistoryMessage(message);
   };
 
-  const send = async () => {
-    const text = input.trim();
-    if (!text || sending) return;
-    setInput("");
-    addMessage({ id: nextId(), role: "user", text });
-    // Offset 0 is the newest message on an inverted list — exact, no
-    // measurement. Only needed for the case where the user had scrolled up
-    // into history before sending; otherwise they are already there.
-    listRef.current?.scrollToOffset({ offset: 0, animated: true });
-    setSending(true);
-    addMessage(await requestAssistantReply(text));
-    setSending(false);
-  };
-
-  // Editing a user message patches its text in place (the bubble itself
-  // just shows the correction, same as any chat app's "edited" message) but
-  // re-runs extraction on the corrected text rather than silently leaving
-  // the old AI reply attached to now-stale input — the new reply is pushed
-  // to the end of the thread instead of replacing the old one, so nothing
-  // in the visible history is ever destroyed. If the reply immediately
-  // after it was an unconfirmed transaction proposal, that proposal is
-  // marked superseded so its own Confirm button can't save the stale guess.
-  const editUserMessage = async (target: ChatMessage, newText: string) => {
-    const trimmed = newText.trim();
-    if (!trimmed || sending) return;
-    updateMessage(target.id, { text: trimmed });
-
-    const index = thread.findIndex((m) => m.id === target.id);
-    const next = thread[index + 1];
-    if (next?.role === "assistant" && next.action && !next.confirmed) {
-      updateMessage(next.id, { superseded: true });
-    }
-
-    setSending(true);
-    addMessage(await requestAssistantReply(trimmed, true));
-    setSending(false);
-  };
-
-  // Editing an assistant's proposed transaction never calls the AI again —
-  // the user is directly supplying the corrected fields. Either way this
-  // mutates `target` itself in place and appends the new snapshot to its
-  // editHistory — no new message is ever created for an edit:
-  //   - not confirmed: nothing is saved yet, so a plain local update is
-  //     enough; a fresh idempotency_key is generated since the one on
-  //     record may already have been used by a prior failed attempt.
-  //   - confirmed: a real Transaction already exists (target.transactionId,
-  //     set by confirmAction below) — PATCH it directly. This must never
-  //     fall back to POST /transactions; doing so would silently create a
-  //     second, duplicate Transaction while leaving the original one
-  //     orphaned in the backend (the bug this replaced).
-  const editAction = (target: ChatMessage, payload: TransactionActionPayload) => {
-    const timestamp = Date.now();
-    const priorHistory: EditHistoryEntry[] =
-      target.editHistory ?? (target.action ? [{ payload: target.action.payload, timestamp, source: "created" }] : []);
-    const editHistory = [...priorHistory, { payload, timestamp, source: "edited" as const }];
-
-    if (target.confirmed && target.transactionId) {
-      updateTransaction.mutate(
-        {
-          id: target.transactionId,
-          body: {
-            amount: payload.amount,
-            category_id: payload.category_id,
-            occurred_at: payload.occurred_at,
-            note: payload.note ?? undefined,
-          },
-        },
-        {
-          onSuccess: () => {
-            updateMessage(target.id, { action: { ...target.action!, payload }, edited: true, editHistory });
-          },
-        },
-      );
-      return;
-    }
-
-    updateMessage(target.id, {
-      action: { ...target.action!, payload, idempotency_key: uuidv4() },
-      edited: true,
-      editHistory,
-    });
-  };
-
-  const confirmAction = (message: ChatMessage) => {
-    if (!message.action) return;
-    setConfirmingId(message.id);
-    const { payload, idempotency_key } = message.action;
-    createTransaction.mutate(
-      { ...payload, note: payload.note ?? undefined, idempotency_key },
-      {
-        onSuccess: (transaction) => updateMessage(message.id, { confirmed: true, transactionId: transaction.id }),
-        onError: (error) => {
-          if (getErrorCode(error) === "INSUFFICIENT_BALANCE") {
-            useToastStore.getState().show(getErrorMessage(error, "Số dư không đủ"), "error");
-          }
-        },
-        onSettled: () => setConfirmingId(null),
-      },
-    );
-  };
-
-  // Swipe-to-edit dispatch (SwipeableMessageRow's onTriggerEdit), factored
-  // out so the keyboard-open path below can delay it without duplicating the
-  // decision tree.
   const openEditTarget = (item: ChatMessage) => {
-    if (item.action) {
-      setEditingActionMessage(item);
-    } else if (isEditLocked(item)) {
-      // In practice SwipeableMessageRow's own `disabled` prop already stops
-      // the gesture from ever firing for these, so this is defense in depth —
-      // but it is the branch that guarantees no path opens EditMessageModal
-      // on an assistant bubble.
-      return;
-    } else {
-      setEditingMessage(item);
-    }
+    if (isEditLocked(item)) return;
+    if (item.action) setEditingActionMessage(item);
+    else setEditingMessage(item);
   };
 
-  // If the keyboard happens to be open while the user swipes a bubble above
-  // it, dismiss it first and let the input bar's margin settle back to its
-  // closed-keyboard position before the modal opens on top — avoids the
-  // sheet visibly jumping as the keyboard closes underneath it.
+  // If the keyboard is open while the user swipes a bubble above it, dismiss
+  // it first and let the input bar settle before the modal opens on top —
+  // otherwise the sheet visibly jumps as the keyboard closes underneath it.
   const handleEditTrigger = (item: ChatMessage) => {
     if (keyboardVisible) {
       Keyboard.dismiss();
@@ -357,222 +154,141 @@ export default function AiChatScreen() {
 
   return (
     <Screen>
-    <View style={styles.screen}>
-      <View style={styles.header}>
-        <SparkleIcon size={20} />
-        <Text style={styles.headerTitle}>Budgest AI</Text>
-      </View>
-
-      <FlatList
-        ref={listRef}
-        // Inverted, so "the bottom" is scroll offset 0 — a fixed point that
-        // needs no measurement at all. Chasing the bottom with scrollToEnd
-        // never held: FlatList derives content height from the rows it has
-        // actually measured and estimates the rest, and the viewport itself
-        // keeps changing under it (safe-area insets resolve a frame after
-        // mount, a bubble carrying a TransactionActionCard grows in a later
-        // pass). Every one of those left the list a little short of the end,
-        // which is exactly the "still have to scroll down a bit" report.
-        // Inverting deletes the problem rather than papering over it: the
-        // newest message is pinned at offset 0 on arrival and stays pinned as
-        // new ones push the older content away.
-        inverted
-        style={styles.list}
-        data={invertedThread}
-        keyExtractor={(m) => m.id}
-        contentContainerStyle={styles.thread}
-        // FlatList's default keyboardShouldPersistTaps="never" eats the
-        // first touch on any row below a focused TextInput just to dismiss
-        // the keyboard — SwipeableMessageRow's own PanResponder never even
-        // sees that first gesture, so swipe-to-edit silently did nothing
-        // while the keyboard was open. "handled" lets the touch reach the
-        // row's PanResponder immediately; the keyboard still dismisses via
-        // handleEditTrigger's own Keyboard.dismiss() once the swipe fires.
-        keyboardShouldPersistTaps="handled"
-        // scrollToIndex (the focusMessageId effect above) throws if the
-        // target row hasn't been measured yet — standard RN workaround is to
-        // retry once layout has actually settled rather than estimate an
-        // offset by hand.
-        onScrollToIndexFailed={(info) => {
-          setTimeout(() => {
-            listRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.5 });
-          }, 100);
-        }}
-        renderItem={({ item }) => {
-          // Resolved once per row rather than inline in the JSX: the card needs
-          // the budget for THIS proposal's category in THIS wallet's currency,
-          // and that lookup reads far better as two named values than as a
-          // spread expression buried in a prop list.
-          const rowCurrency = item.action ? walletById.get(item.action.payload.wallet_id)?.currency ?? "VND" : "VND";
-          const rowBudget = item.action
-            ? budgetByCategoryCurrency.get(`${item.action.payload.category_id}|${rowCurrency}`)
-            : undefined;
-
-          return (
-          <SwipeableMessageRow
-            // README: user bubbles are right-aligned, assistant bubbles
-            // left-aligned (ChatBubble.tsx) — swipe away from whichever edge
-            // the bubble already sits on, Messenger's own swipe-to-reply
-            // convention (see SwipeableMessageRow's doc comment).
-            direction={item.role === "user" ? "left" : "right"}
-            // See isEditLocked — only a user's own message or a transaction
-            // proposal is editable; everything the assistant says in prose is
-            // its own words, with nothing for the user to "correct". See
-            // openEditTarget for the rest of the dispatch.
-            disabled={isEditLocked(item)}
-            onTriggerEdit={() => handleEditTrigger(item)}
-          >
-            <ChatBubble role={item.role} text={item.text}>
-              {item.action && !item.superseded ? (
-                <TransactionActionCard
-                  action={item.action}
-                  budgetLimit={rowBudget?.amount_limit}
-                  budgetSpent={rowBudget?.spent}
-                  walletName={walletById.get(item.action.payload.wallet_id)?.name ?? "Ví"}
-                  categoryName={categoryById.get(item.action.payload.category_id)?.name ?? "Danh mục"}
-                  categoryIcon={categoryById.get(item.action.payload.category_id)?.icon}
-                  categoryIconUrl={categoryById.get(item.action.payload.category_id)?.icon_url}
-                  currency={rowCurrency}
-                  confirmed={Boolean(item.confirmed)}
-                  saving={confirmingId === item.id}
-                  onConfirm={() => confirmAction(item)}
-                  edited={item.edited}
-                  onPressHistory={item.editHistory ? () => setHistoryMessage(item) : undefined}
-                />
-              ) : item.actionType === "budget_wizard" ? (
-                <BudgetWizardCard
-                  submitted={Boolean(item.budgetWizardSubmitted)}
-                  createdCount={item.budgetWizardCreatedCount}
-                  onPress={() => {
-                    setBudgetWizardOriginMessageId(item.id);
-                    setBudgetWizardOpen(true);
-                  }}
-                />
-              ) : item.offerManualEntry ? (
-                <Pressable style={styles.manualEntryButton} onPress={() => setManualEntryOpen(true)}>
-                  <Text style={styles.manualEntryLabel}>Tạo giao dịch thủ công</Text>
-                </Pressable>
-              ) : null}
-            </ChatBubble>
-          </SwipeableMessageRow>
-          );
-        }}
-        // No counter-transform on either of these: VirtualizedList already
-        // composes its own inversion style onto the header/empty slots, so
-        // adding a second scaleY would cancel it out and render them upside
-        // down.
-        ListEmptyComponent={
-          <Text style={styles.hint}>
-            Cho mình biết bạn đã chi hay thu gì — vd: &ldquo;Cà phê 50k tiền mặt&rdquo; — mình sẽ soạn sẵn giao dịch cho bạn.
-          </Text>
-        }
-        // Header, not footer: on an inverted list the header is what renders
-        // at the visual bottom, which is where the typing dots belong.
-        ListHeaderComponent={
-          sending ? (
-            <View style={styles.typingRow}>
-              <TypingIndicator />
-            </View>
-          ) : null
-        }
-      />
-
-      {!keyboardVisible ? (
-        <View style={styles.quickActionRow}>
-          <Pressable
-            testID="btn-open-budget-wizard"
-            style={styles.quickActionChip}
-            onPress={() => {
-              setBudgetWizardOriginMessageId(null);
-              setBudgetWizardOpen(true);
-            }}
-          >
-            <SparkleIcon size={14} />
-            <Text style={styles.quickActionLabel}>Lập ngân sách</Text>
-          </Pressable>
+      <View style={styles.screen}>
+        <View style={styles.header}>
+          <SparkleIcon size={20} />
+          <Text style={styles.headerTitle}>Budgest AI</Text>
         </View>
-      ) : null}
 
-      <View
-        style={[
-          styles.inputBar,
-          // keyboardHeight is what still needs reserving after the OS has had
-          // its say: on a device whose window really does shrink around the
-          // keyboard it comes back ~0 and only KEYBOARD_GAP is added, while on
-          // one that does not shrink it is the full height. Adding the raw
-          // keyboard height unconditionally is what left a dead gap a whole
-          // keyboard tall between this bar and the keyboard.
-          { marginBottom: keyboardVisible ? keyboardHeight + KEYBOARD_GAP : insets.bottom + NAV_CLEARANCE },
-        ]}
-      >
-        <TextInput
+        <FlatList
+          ref={listRef}
+          // Inverted, so "the bottom" is scroll offset 0 — a fixed point
+          // needing no measurement. Chasing the bottom with scrollToEnd never
+          // held: FlatList estimates content height from the rows it has
+          // measured, and the viewport keeps changing under it (insets resolve
+          // a frame after mount, a bubble carrying an action card grows in a
+          // later pass). Inverting deletes the problem instead of papering
+          // over it.
+          inverted
+          style={styles.list}
+          data={invertedThread}
+          keyExtractor={(m) => m.id}
+          contentContainerStyle={styles.thread}
+          // The default eats the first touch on any row below a focused
+          // input, so a swipe silently did nothing while the keyboard was open.
+          keyboardShouldPersistTaps="handled"
+          onScrollBeginDrag={() => setCloseSignal((n) => n + 1)}
+          onScrollToIndexFailed={(info) => {
+            setTimeout(() => {
+              listRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.5 });
+            }, FOCUS_RETRY_DELAY_MS);
+          }}
+          renderItem={({ item }) => (
+            <ChatMessageRow
+              message={item}
+              walletById={walletById}
+              categoryById={categoryById}
+              budgetByCategoryCurrency={budgetByCategoryCurrency}
+              confirming={chat.confirmingId === item.id}
+              closeSignal={closeSignal}
+              onConfirm={chat.confirmAction}
+              onTriggerEdit={handleEditTrigger}
+              onTriggerDelete={removal.request}
+              onPressHistory={openHistory}
+              onOpenBudgetWizard={(message) => {
+                setBudgetWizardOriginMessageId(message.id);
+                setBudgetWizardOpen(true);
+              }}
+              onOpenManualEntry={() => setManualEntryOpen(true)}
+            />
+          )}
+          // No counter-transform on these: the list already composes its own
+          // inversion onto the header/empty slots, so a second one would
+          // render them upside down.
+          ListEmptyComponent={
+            <Text style={styles.hint}>
+              Cho mình biết bạn đã chi hay thu gì — vd: &ldquo;Cà phê 50k tiền mặt&rdquo; — mình sẽ soạn sẵn giao dịch
+              cho bạn.
+            </Text>
+          }
+          // Header, not footer: on an inverted list the header renders at the
+          // visual bottom, which is where the typing dots belong.
+          ListHeaderComponent={
+            chat.sending ? (
+              <View style={styles.typingRow}>
+                <TypingIndicator />
+              </View>
+            ) : null
+          }
+        />
+
+        <ChatInputBar
           value={input}
           onChangeText={setInput}
-          placeholder="Mô tả một giao dịch…"
-          placeholderTextColor={colors.textMuted}
-          style={styles.input}
-          multiline
-          textAlignVertical="top"
+          onSend={() => {
+            const text = input;
+            setInput("");
+            void chat.send(text);
+          }}
+          sending={chat.sending}
+          keyboardVisible={keyboardVisible}
+          keyboardHeight={keyboardHeight}
+          bottomInset={insets.bottom}
+          onOpenBudgetWizard={() => {
+            setBudgetWizardOriginMessageId(null);
+            setBudgetWizardOpen(true);
+          }}
         />
-        <Pressable style={styles.sendButton} onPress={send} disabled={!input.trim() || sending}>
-          <SendIcon size={18} />
-        </Pressable>
       </View>
-    </View>
 
-    <EditMessageModal
-      visible={Boolean(editingMessage)}
-      initialText={editingMessage?.text ?? ""}
-      onCancel={() => setEditingMessage(null)}
-      onSave={(text) => {
-        const target = editingMessage;
-        setEditingMessage(null);
-        // Only a user message can reach this modal (isEditLocked), so there
-        // is no assistant branch to fall back to — editing an assistant
-        // bubble used to patch its text in place and do nothing else.
-        if (target) editUserMessage(target, text);
-      }}
-    />
-
-    <EditTransactionModal
-      visible={Boolean(editingActionMessage)}
-      payload={editingActionMessage?.action?.payload ?? null}
-      lockWalletAndType={Boolean(editingActionMessage?.confirmed)}
-      onClose={() => setEditingActionMessage(null)}
-      onSave={(payload) => {
-        const target = editingActionMessage;
-        setEditingActionMessage(null);
-        if (target) editAction(target, payload);
-      }}
-    />
-
-    <EditHistoryDialog
-      visible={Boolean(historyMessage)}
-      history={historyMessage?.editHistory ?? []}
-      currency={
-        historyMessage?.action ? walletById.get(historyMessage.action.payload.wallet_id)?.currency ?? "VND" : "VND"
-      }
-      onClose={() => setHistoryMessage(null)}
-    />
-
-    <TransactionFormModal visible={manualEntryOpen} onClose={() => setManualEntryOpen(false)} />
-
-    <BudgetWizardModal
-      visible={budgetWizardOpen}
-      onClose={() => setBudgetWizardOpen(false)}
-      onCompleted={(createdCount) => {
-        if (budgetWizardOriginMessageId) {
-          updateMessage(budgetWizardOriginMessageId, { budgetWizardSubmitted: true, budgetWizardCreatedCount: createdCount });
-        }
-      }}
-    />
+      <ChatOverlays
+        walletById={walletById}
+        categoryById={categoryById}
+        removal={removal}
+        editingMessage={editingMessage}
+        editingActionMessage={editingActionMessage}
+        historyMessage={historyMessage}
+        tombstoneMessage={tombstoneMessage}
+        manualEntryOpen={manualEntryOpen}
+        budgetWizardOpen={budgetWizardOpen}
+        onCloseEditingMessage={() => setEditingMessage(null)}
+        onSaveEditingMessage={(text) => {
+          const target = editingMessage;
+          setEditingMessage(null);
+          if (target) void chat.editUserMessage(target, text);
+        }}
+        onCloseEditingAction={() => setEditingActionMessage(null)}
+        onSaveEditingAction={(payload) => {
+          const target = editingActionMessage;
+          setEditingActionMessage(null);
+          if (target) chat.editAction(target, payload);
+        }}
+        onCloseHistory={() => setHistoryMessage(null)}
+        onCloseTombstone={() => setTombstoneMessage(null)}
+        onCloseManualEntry={() => setManualEntryOpen(false)}
+        onCloseBudgetWizard={() => setBudgetWizardOpen(false)}
+        onBudgetWizardCompleted={(createdCount) => {
+          if (budgetWizardOriginMessageId) {
+            updateMessage(budgetWizardOriginMessageId, {
+              budgetWizardSubmitted: true,
+              budgetWizardCreatedCount: createdCount,
+            });
+          }
+        }}
+      />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bgApp },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, paddingVertical: spacing.lg },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    paddingVertical: spacing.lg,
+  },
   headerTitle: { ...typography.cardTitle, color: colors.textPrimary },
   list: { flex: 1 },
   // paddingVertical, not paddingBottom: `inverted` mirrors the content
@@ -581,52 +297,4 @@ const styles = StyleSheet.create({
   thread: { paddingHorizontal: spacing.xl, gap: spacing.md, paddingVertical: spacing.md, flexGrow: 1 },
   hint: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xxl },
   typingRow: { alignItems: "flex-start" },
-  manualEntryButton: {
-    alignSelf: "flex-start",
-    marginTop: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radii.pill,
-    backgroundColor: colors.green,
-  },
-  manualEntryLabel: { ...typography.label, color: colors.onGreen },
-  quickActionRow: { marginHorizontal: spacing.xl, flexDirection: "row" },
-  quickActionChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    marginBottom: spacing.sm,
-  },
-  quickActionLabel: { ...typography.caption, color: colors.textPrimary },
-  inputBar: {
-    marginHorizontal: spacing.xl,
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: spacing.sm,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    borderRadius: radii.hero,
-    paddingLeft: spacing.lg,
-    paddingRight: spacing.xs,
-    paddingVertical: spacing.xs,
-  },
-  // ~3 lines of typography.body before it scrolls internally instead of
-  // growing further (multiline TextInputs scroll their own content once
-  // it exceeds maxHeight — no manual measurement needed).
-  input: { flex: 1, minHeight: 40, maxHeight: 88, color: colors.textPrimary, paddingVertical: spacing.sm, ...typography.body },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.pill,
-    backgroundColor: colors.green,
-    alignItems: "center",
-    justifyContent: "center",
-  },
 });

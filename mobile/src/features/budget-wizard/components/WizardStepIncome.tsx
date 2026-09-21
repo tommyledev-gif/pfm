@@ -1,16 +1,13 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { AmountPromptModal } from "@/components/ui/AmountPromptModal";
 import { MoneyField } from "@/features/budget-wizard/components/MoneyField";
+import { WizardSavingsField } from "@/features/budget-wizard/components/WizardSavingsField";
 import {
-  DEFAULT_SAVINGS_PCT,
-  SAVINGS_PCT_OPTIONS,
   SavingsChoice,
   daysInCycle,
   disposableXu,
   perDayXu,
-  roundStepXu,
   savingsAmount,
   validateIncomeStep,
 } from "@/features/budget-wizard/budget-math";
@@ -21,6 +18,7 @@ import {
   summarizeFixedCosts,
 } from "@/features/budget-wizard/fixed-costs";
 import { formatCurrency } from "@/lib/currency";
+import { formatSavedAt } from "@/features/budget-wizard/saved-plan";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 
 interface WizardStepIncomeProps {
@@ -38,6 +36,9 @@ interface WizardStepIncomeProps {
   onChangeSavingsChoice: (c: SavingsChoice) => void;
   onChangeCycleStartDay: (v: number) => void;
   onOpenFixedCosts: () => void;
+  /** ISO timestamp of the kept plan these figures came from, when they did. */
+  restoredFromSavedAt?: string;
+  onDiscardSavedPlan?: () => void;
   onNext: () => void;
 }
 
@@ -74,14 +75,29 @@ export function WizardStepIncome({
   onChangeCycleStartDay,
   onOpenFixedCosts,
   onNext,
+  restoredFromSavedAt,
+  onDiscardSavedPlan,
 }: WizardStepIncomeProps) {
-  const [savingsPromptOpen, setSavingsPromptOpen] = useState(false);
-
   const savings = savingsAmount(savingsChoice, income);
   const disposable = disposableXu(income, fixed, savings);
   const days = daysInCycle(cycleStartDay);
   const perDay = perDayXu(disposable, days);
   const validation = validateIncomeStep(income, fixed, savings);
+
+  /**
+   * The one error worth showing right now, and the field it belongs under.
+   *
+   * ⚠️ It is rendered UNDER THE FIELD IT IS ABOUT, not in a strip at the bottom
+   * of the screen. "Chi phí cố định và tiết kiệm đã vượt thu nhập" printed below
+   * the result figures leaves the user scanning three fields to work out which
+   * one to change — and the fixed-cost field, which is almost always the answer,
+   * is the one furthest from it.
+   *
+   * A blank form is not a mistake, so "Thu nhập phải lớn hơn 0" stays quiet until
+   * there is something to be wrong about — nobody needs to be told the form they
+   * have not filled in yet is empty.
+   */
+  const error = validation.ok || (validation.field === "income" && income <= 0) ? null : validation;
 
   // Recomputed from the two things the parent stores rather than kept as a
   // third: the merge is deterministic, so deriving it here cannot drift out of
@@ -96,6 +112,22 @@ export function WizardStepIncome({
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>Mỗi tháng bạn có bao nhiêu?</Text>
 
+        {/* Says where these numbers came from. A form that opens pre-filled with
+            no explanation reads as the app having remembered something it was
+            never asked to, and leaves no way back to a blank one. */}
+        {restoredFromSavedAt ? (
+          <View style={styles.restoredBanner}>
+            <Text style={styles.restoredText}>
+              Đã điền sẵn từ kế hoạch bạn lưu ngày {formatSavedAt(restoredFromSavedAt)}.
+            </Text>
+            {onDiscardSavedPlan ? (
+              <Pressable onPress={onDiscardSavedPlan} hitSlop={8} testID="btn-wizard-discard-plan">
+                <Text style={styles.restoredAction}>Bắt đầu lại</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+
         <MoneyField
           testID="input-wizard-income"
           label="Thu nhập hàng tháng"
@@ -103,6 +135,7 @@ export function WizardStepIncome({
           onChange={onChangeIncome}
           sliderCeiling={INCOME_SLIDER_CEILING_XU}
         />
+        {error?.field === "income" ? <Text style={styles.error}>{error.message}</Text> : null}
 
         <MoneyField
           testID="input-wizard-fixed"
@@ -123,50 +156,19 @@ export function WizardStepIncome({
             testID: "btn-wizard-fixed-costs",
           }}
         />
+        {/* Here, directly under the input it is about — this message names the
+            fixed-cost total and savings together, and the fixed-cost total is the
+            one the user can usually do something about. */}
+        {error?.field === "fixed" ? <Text style={styles.error}>{error.message}</Text> : null}
 
-        <View style={styles.field}>
-          <View style={styles.savingsHeader}>
-            <Text style={styles.label}>Muốn để dành</Text>
-            <Text style={styles.savingsAmount}>{formatCurrency(savings, currency)}</Text>
-          </View>
-          <View style={styles.chipRow}>
-            {SAVINGS_PCT_OPTIONS.map((pct) => {
-              const active = savingsChoice.kind === "pct" && pct === savingsChoice.pct;
-              return (
-                <Pressable
-                  key={pct}
-                  testID={`chip-wizard-savings-${pct}`}
-                  onPress={() => onChangeSavingsChoice({ kind: "pct", pct })}
-                  style={[styles.chip, active && styles.chipActive]}
-                >
-                  <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>
-                    {pct === 0 ? "Chưa" : `${pct}%`}
-                  </Text>
-                </Pressable>
-              );
-            })}
-            {/* Last in the row: a flat figure for people saving toward a fixed
-                commitment — a 3tr transfer, a loan repayment — which a
-                percentage cannot express without re-deriving it by hand every
-                time income changes. */}
-            <Pressable
-              testID="chip-wizard-savings-custom"
-              onPress={() => setSavingsPromptOpen(true)}
-              style={[styles.chip, savingsChoice.kind === "amount" && styles.chipActive]}
-            >
-              <Text style={[styles.chipLabel, savingsChoice.kind === "amount" && styles.chipLabelActive]}>
-                {savingsChoice.kind === "amount" ? "Số khác ✎" : "Số khác"}
-              </Text>
-            </Pressable>
-          </View>
-          {/* 10% is the default rather than the textbook 20%. Someone who has
-              never tracked their spending, committing a fifth of their income on
-              top of costs they have not measured, breaks the plan in week two —
-              and an abandoned plan saves nothing at all. */}
-          {savingsChoice.kind === "pct" && savingsChoice.pct === DEFAULT_SAVINGS_PCT ? (
-            <Text style={styles.hint}>Mức dễ giữ được. Tháng sau dư thì mình nâng lên.</Text>
-          ) : null}
-        </View>
+        <WizardSavingsField
+          currency={currency}
+          income={income}
+          savings={savings}
+          choice={savingsChoice}
+          onChange={onChangeSavingsChoice}
+          errorMessage={error?.field === "savings" ? error.message : undefined}
+        />
 
         <View style={styles.field}>
           <Text style={styles.label}>Lương về ngày</Text>
@@ -188,21 +190,28 @@ export function WizardStepIncome({
           <Text style={styles.hint}>Chu kỳ này dài {days} ngày.</Text>
         </View>
 
-        <View style={styles.result}>
-          <View style={styles.resultLeft}>
-            <Text style={styles.label}>Còn được chi</Text>
-            <Text testID="text-wizard-disposable" style={styles.resultBig}>
-              {/* An em dash, not 0đ. Zero is a computed answer; this is "not
-                  answerable yet", and showing 0đ would state something false. */}
-              {disposable > 0 ? formatCurrency(disposable, currency) : "—"}
+        {/* ⚠️ Only once there is an answer to show.
+            The block used to render unconditionally, so a freshly opened wizard
+            led with a rule, the words "Còn được chi", an em dash and a blank
+            column — a summary of nothing, holding the most prominent position on
+            the screen and leaving the user to work out whether it was broken or
+            just empty. It earns its place the moment the figure is real.
+            The live update itself is still the point: someone who abandons the
+            wizard right here has still learned the most useful number in it. */}
+        {disposable > 0 ? (
+          <View style={styles.result}>
+            <View style={styles.resultLeft}>
+              <Text style={styles.label}>Còn được chi</Text>
+              <Text testID="text-wizard-disposable" style={styles.resultBig}>
+                {formatCurrency(disposable, currency)}
+              </Text>
+            </View>
+            <Text testID="text-wizard-per-day" style={styles.resultPerDay}>
+              {perDay > 0 ? `${formatCurrency(perDay, currency)}
+mỗi ngày` : ""}
             </Text>
           </View>
-          <Text testID="text-wizard-per-day" style={styles.resultPerDay}>
-            {perDay > 0 ? `${formatCurrency(perDay, currency)}\nmỗi ngày` : ""}
-          </Text>
-        </View>
-
-        {!validation.ok ? <Text style={styles.error}>{validation.message}</Text> : null}
+        ) : null}
       </ScrollView>
 
       <Pressable
@@ -214,21 +223,6 @@ export function WizardStepIncome({
         <Text style={styles.primaryLabel}>Tiếp →</Text>
       </Pressable>
 
-      <AmountPromptModal
-        visible={savingsPromptOpen}
-        title="Muốn để dành bao nhiêu?"
-        hint="Không quá thu nhập"
-        value={savings}
-        max={income}
-        step={roundStepXu(Math.max(income, 1))}
-        currency={currency}
-        testID="btn-wizard-savings-custom-confirm"
-        onClose={() => setSavingsPromptOpen(false)}
-        onConfirm={(amountXu) => {
-          onChangeSavingsChoice({ kind: "amount", amountXu });
-          setSavingsPromptOpen(false);
-        }}
-      />
 
     </View>
   );
@@ -241,8 +235,6 @@ const styles = StyleSheet.create({
   field: { gap: spacing.xs },
   label: { ...typography.caption, color: colors.textSecondary },
   hint: { ...typography.tiny, color: colors.textMuted },
-  savingsHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
-  savingsAmount: { ...typography.label, color: colors.textPrimary },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   chip: {
     paddingVertical: 8,
@@ -268,6 +260,20 @@ const styles = StyleSheet.create({
   resultBig: { ...typography.hero, fontSize: 26, color: colors.textPrimary },
   resultPerDay: { ...typography.label, color: colors.green, textAlign: "right" },
   error: { ...typography.caption, color: colors.mustard },
+  restoredBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.listCard,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.green,
+    backgroundColor: "rgba(133,255,51,0.06)",
+  },
+  restoredText: { flex: 1, ...typography.tiny, color: colors.textSecondary },
+  restoredAction: { ...typography.tiny, color: colors.green },
   primaryBtn: {
     marginHorizontal: spacing.xl,
     marginBottom: spacing.md,

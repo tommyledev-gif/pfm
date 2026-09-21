@@ -7,8 +7,13 @@ import { colors, spacing, typography } from "@/lib/theme";
 import { SpendingTab } from "@/features/reports/components/SpendingTab";
 import { BudgetsTab } from "@/features/budgets/components/BudgetsTab";
 
-const SUB_TABS = ["Spending", "Budgets"] as const;
-type SubTab = (typeof SUB_TABS)[number];
+// Keys stay English because they cross a navigation boundary — Home deep-links
+// here with `tab: "Budgets"`. Only what the user reads is translated.
+const SUB_TABS = [
+  { key: "Spending", label: "Chi tiêu" },
+  { key: "Budgets", label: "Ngân sách" },
+] as const;
+type SubTab = (typeof SUB_TABS)[number]["key"];
 
 export default function InsightsScreen() {
   const [tab, setTab] = useState<SubTab>("Spending");
@@ -38,13 +43,13 @@ export default function InsightsScreen() {
 
   return (
     <Screen style={styles.screen}>
-      <Text style={styles.title}>Insights</Text>
+      <Text style={styles.title}>Phân tích</Text>
 
       <View style={styles.tabRow}>
         {SUB_TABS.map((t) => (
-          <Pressable key={t} onPress={() => setTab(t)} style={styles.tabButton}>
-            <Text style={[styles.tabLabel, tab === t && styles.tabLabelActive]}>{t}</Text>
-            {tab === t ? <View style={styles.tabUnderline} /> : null}
+          <Pressable key={t.key} onPress={() => setTab(t.key)} style={styles.tabButton}>
+            <Text style={[styles.tabLabel, tab === t.key && styles.tabLabelActive]}>{t.label}</Text>
+            {tab === t.key ? <View style={styles.tabUnderline} /> : null}
           </Pressable>
         ))}
       </View>

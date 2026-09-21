@@ -6,9 +6,9 @@ import { ChevronLeftIcon } from "@/components/ui/Icon";
 import { Screen } from "@/components/shared/Screen";
 import { dayLabelVi, formatDateViShort } from "@/lib/format-date";
 import { colors, spacing, typography } from "@/lib/theme";
-import { AuditLogRow } from "@/features/audit-log/components/AuditLogRow";
-import { useAuditLogsQuery } from "@/features/audit-log/api/use-audit-logs-query";
-import { AuditLogEntry } from "@/features/audit-log/types";
+import { AuditLogRow } from "@/features/audit-logs/components/AuditLogRow";
+import { useAuditLogsQuery } from "@/features/audit-logs/api/use-audit-logs-query";
+import { AuditLogEntry } from "@/features/audit-logs/types";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { primaryCurrency } from "@/features/wallets/wallet-totals";
@@ -24,7 +24,7 @@ interface DaySection {
 // Settings → "Nhật ký giao dịch" (specs/transaction-audit-log/spec.md US-02).
 // Read-only by design: no undo/restore affordance anywhere on this screen —
 // the log is history, not a time machine (that spec's Out of Scope).
-export default function AuditLogScreen() {
+export default function AuditLogsScreen() {
   const router = useRouter();
   const auditLogs = useAuditLogsQuery();
   const categories = useCategoriesQuery();

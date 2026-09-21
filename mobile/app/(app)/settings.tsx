@@ -34,19 +34,19 @@ import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary
 // The server-side gate remains the actual authorization boundary; this is
 // just not advertising a door the user can't open.
 const SETTINGS_ROWS = [
-  { label: "Wallets", Icon: WalletIcon, href: "/wallets" as const, adminOnly: false },
-  { label: "Categories", Icon: TagIcon, href: "/categories" as const, adminOnly: false },
-  { label: "Household Members", Icon: UsersIcon, href: "/users" as const, adminOnly: true },
-  { label: "Nhật ký giao dịch", Icon: HistoryIcon, href: "/audit-log" as const, adminOnly: false },
-  { label: "Security", Icon: ShieldIcon, href: null, adminOnly: false },
-  { label: "Help & Support", Icon: HelpIcon, href: null, adminOnly: false },
-  { label: "Developer", Icon: CodeIcon, href: "/developer" as const, adminOnly: false },
+  { label: "Ví của bạn", Icon: WalletIcon, href: "/wallets" as const, adminOnly: false },
+  { label: "Danh mục", Icon: TagIcon, href: "/categories" as const, adminOnly: false },
+  { label: "Thành viên gia đình", Icon: UsersIcon, href: "/users" as const, adminOnly: true },
+  { label: "Nhật ký giao dịch", Icon: HistoryIcon, href: "/audit-logs" as const, adminOnly: false },
+  { label: "Bảo mật", Icon: ShieldIcon, href: null, adminOnly: false },
+  { label: "Trợ giúp & hỗ trợ", Icon: HelpIcon, href: null, adminOnly: false },
+  { label: "Nhà phát triển", Icon: CodeIcon, href: "/developer" as const, adminOnly: false },
 ];
 
 const LOGOUT_FLUSH_TIMEOUT_MS = 4000;
 
 function displayNameFromEmail(email: string | null): string {
-  if (!email) return "Member";
+  if (!email) return "Thành viên";
   const local = email.split("@")[0] ?? email;
   return local.charAt(0).toUpperCase() + local.slice(1);
 }
@@ -94,19 +94,19 @@ export default function SettingsScreen() {
 
       <View style={styles.statRow}>
         <Card style={styles.statCard}>
-          <Text style={styles.statLabel}>Net Worth</Text>
+          <Text style={styles.statLabel}>Tài sản ròng</Text>
           <Text style={styles.statValue} numberOfLines={1}>
             {netWorth ? formatCurrency(netWorth.amount, netWorth.currency) : "—"}
           </Text>
         </Card>
         <Card style={styles.statCard}>
-          <Text style={styles.statLabel}>Income</Text>
+          <Text style={styles.statLabel}>Thu nhập</Text>
           <Text style={[styles.statValue, { color: colors.green }]} numberOfLines={1}>
             {primaryTotal ? formatCurrency(primaryTotal.total_income, primaryTotal.currency) : "—"}
           </Text>
         </Card>
         <Card style={styles.statCard}>
-          <Text style={styles.statLabel}>Expense</Text>
+          <Text style={styles.statLabel}>Chi tiêu</Text>
           <Text style={[styles.statValue, { color: colors.peach }]} numberOfLines={1}>
             {primaryTotal ? formatCurrency(primaryTotal.total_expense, primaryTotal.currency) : "—"}
           </Text>
@@ -125,7 +125,7 @@ export default function SettingsScreen() {
 
       <Pressable style={styles.logoutRow} onPress={logout}>
         <LogOutIcon size={20} />
-        <Text style={styles.logoutLabel}>Log out</Text>
+        <Text style={styles.logoutLabel}>Đăng xuất</Text>
       </Pressable>
     </ScrollView>
     </Screen>

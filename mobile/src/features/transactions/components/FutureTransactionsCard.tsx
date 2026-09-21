@@ -1,0 +1,59 @@
+import { Pressable, StyleSheet, Text, View } from "react-native";
+
+import { formatDateViShort } from "@/lib/format-date";
+import { colors, radii, spacing, typography } from "@/lib/theme";
+import { Transaction } from "@/features/transactions/types";
+
+interface FutureTransactionsCardProps {
+  /** Already sorted soonest-first — see splitFutureTransactions. */
+  transactions: Transaction[];
+  onPress: () => void;
+}
+
+/**
+ * The dashed placeholder standing in for transactions dated ahead of today.
+ *
+ * Dashed and dimmed on purpose, and deliberately NOT a section of the list: a
+ * solid row among the real ones would read as money already spent. The card
+ * says how many there are and when the next one lands, which is everything the
+ * user needs from the top of the screen — the rows themselves are one tap away
+ * and cost nothing until asked for.
+ */
+export function FutureTransactionsCard({ transactions, onPress }: FutureTransactionsCardProps) {
+  if (transactions.length === 0) return null;
+  const next = transactions[0];
+
+  return (
+    <Pressable style={styles.card} onPress={onPress} testID="btn-future-transactions">
+      <View style={styles.textBlock}>
+        <Text style={styles.title}>{transactions.length} giao dịch sắp tới</Text>
+        <Text style={styles.subtitle} numberOfLines={1}>
+          Gần nhất: {formatDateViShort(next.occurred_at)} · {next.category_name}
+        </Text>
+      </View>
+      <Text style={styles.chevron}>›</Text>
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radii.listCard,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: colors.surfaceBorder,
+    // Faded as a whole rather than per-element: everything in here describes
+    // money that has not moved yet, and the opacity is what says so before a
+    // single word is read.
+    opacity: 0.6,
+  },
+  textBlock: { flex: 1, gap: 2 },
+  title: { ...typography.label, color: colors.textPrimary },
+  subtitle: { ...typography.tiny, color: colors.textSecondary },
+  chevron: { ...typography.title, color: colors.textMuted },
+});

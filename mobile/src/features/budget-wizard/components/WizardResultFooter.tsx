@@ -1,0 +1,117 @@
+import { Pressable, StyleSheet, Text, View } from "react-native";
+
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { colors, radii, spacing, typography } from "@/lib/theme";
+
+interface WizardResultFooterProps {
+  submitting: boolean;
+  /** Asks to submit. The parent decides whether a confirmation is owed first. */
+  onSubmit: () => void;
+  hasExistingBudgets: boolean;
+  overwriteConfirmOpen: boolean;
+  onConfirmOverwrite: () => void;
+  onCancelOverwrite: () => void;
+  onSavePlan: () => void;
+  planSaved: boolean;
+  /** ⚠️ Submitting an empty plan would replace every existing budget with
+   *  nothing. The guard lives in the wizard's state; this only reflects it. */
+  canSubmit: boolean;
+}
+
+// The two ways out of wizard screen 3, plus the guard on the destructive one.
+// Split out of WizardStepResult to keep that file under the 300-line limit
+// (CLAUDE.md), same reason WizardProgressHeader lives on its own.
+export function WizardResultFooter({
+  submitting,
+  onSubmit,
+  hasExistingBudgets,
+  overwriteConfirmOpen,
+  onConfirmOverwrite,
+  onCancelOverwrite,
+  onSavePlan,
+  planSaved,
+  canSubmit,
+}: WizardResultFooterProps) {
+  return (
+    <View style={styles.footer}>
+      {/* Ghost on the left, commit on the right — the ordinary reading order
+          for "the way out that keeps something" beside "the way out that
+          writes". As a full-width text row above the button it read as a
+          caption belonging to the button rather than as its own action. */}
+      <View style={styles.actionRow}>
+        <Pressable
+          testID="btn-wizard-save-plan"
+          onPress={onSavePlan}
+          disabled={planSaved}
+          style={[styles.ghostBtn, planSaved && styles.ghostBtnDone]}
+        >
+          <Text style={[styles.ghostLabel, planSaved && styles.ghostLabelDone]} numberOfLines={2}>
+            {planSaved ? "✓ Đã lưu kế hoạch" : "Lưu kế hoạch này để dùng lại"}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          testID="btn-wizard-submit"
+          onPress={onSubmit}
+          disabled={submitting || !canSubmit}
+          style={[styles.primaryBtn, (submitting || !canSubmit) && styles.primaryBtnDisabled]}
+        >
+          <Text style={styles.primaryLabel}>{submitting ? "Đang lưu…" : "Bắt đầu dùng"}</Text>
+        </Pressable>
+      </View>
+
+      {/* ⚠️ Not a courtesy prompt. POST /budgets/bulk REPLACES the account's
+          entire active budget set (see useBulkCreateBudgetsMutation), so
+          finishing the wizard on an account that already has budgets deletes
+          every one of them — including limits the user tuned by hand over weeks
+          and which appear nowhere in this flow. Nothing on this screen said so
+          before. */}
+      <ConfirmDialog
+        visible={overwriteConfirmOpen && hasExistingBudgets}
+        title="Bạn đã có ngân sách"
+        message="Kế hoạch này sẽ thay thế toàn bộ ngân sách hiện tại của bạn. Các hạn mức cũ sẽ không khôi phục được."
+        confirmLabel="Ghi đè"
+        onCancel={onCancelOverwrite}
+        onConfirm={onConfirmOverwrite}
+        loading={submitting}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  footer: { gap: spacing.xs },
+  actionRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+  },
+  // Outlined, not filled: it must read as the quieter of the two without
+  // disappearing, on a dark surface where a border-only shape nearly does.
+  ghostBtn: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radii.listCard,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+  },
+  ghostBtnDone: { borderColor: "transparent" },
+  ghostLabel: { ...typography.caption, color: colors.green, textAlign: "center" },
+  ghostLabelDone: { color: colors.textMuted },
+  primaryBtn: {
+    flex: 1,
+    justifyContent: "center",
+    paddingVertical: spacing.md,
+    borderRadius: radii.listCard,
+    backgroundColor: colors.green,
+    alignItems: "center",
+  },
+  primaryBtnDisabled: { opacity: 0.5 },
+  primaryLabel: { ...typography.body, color: colors.onGreen },
+});

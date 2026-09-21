@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import * as ImagePicker from "expo-image-picker";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AmountInput } from "@/components/ui/AmountInput";
 import { Avatar } from "@/components/ui/Avatar";
+import { CategorySelectField } from "@/components/shared/CategorySelectField";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Drawer } from "@/components/shared/Drawer";
-import { EmojiPickerInput } from "@/components/ui/EmojiPickerInput";
+import { DrawerHeader } from "@/components/shared/DrawerHeader";
 import { FieldError } from "@/components/ui/FieldError";
 import { PillButton } from "@/components/ui/PillButton";
 import { TrashIcon } from "@/components/ui/Icon";
@@ -15,10 +15,10 @@ import { colorForCategory } from "@/lib/category-color";
 import { toCents, toMajorUnits } from "@/lib/currency";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
+import { useCategoryPicker } from "@/features/categories/components/use-category-picker";
 import { useCreateBudgetMutation } from "@/features/budgets/api/use-create-budget-mutation";
 import { useUpdateBudgetMutation } from "@/features/budgets/api/use-update-budget-mutation";
 import { useDeleteBudgetMutation } from "@/features/budgets/api/use-delete-budget-mutation";
-import { useUploadBudgetIconMutation } from "@/features/budgets/api/use-upload-budget-icon-mutation";
 import { Budget } from "@/features/budgets/types";
 import { WalletCurrency } from "@/lib/constants";
 
@@ -33,24 +33,31 @@ interface BudgetFormModalProps {
 
 // Insights → Budgets tab "+ New budget" action (README), extended to also
 // handle editing an existing budget's limit (tap a BudgetListRow) — kept as one
-// Modal sheet rather than two near-identical ones. Moved here from
-// components/shared/NewBudgetModal.tsx to match the feature-scoped
-// CategoryFormModal/WalletFormModal convention (it's only ever used by
-// BudgetsTab.tsx, so "shared" never applied).
-// Icon picker mirrors CategoryFormModal.tsx's pattern exactly
-// (specs/wallet-budget-icons/spec.md US-03/US-04) — independent of the
-// selected Category's own icon.
+// Drawer sheet rather than two near-identical ones.
+//
+// ⚠️ NO ICON CONTROLS, deliberately — the emoji field and the image upload that
+// used to live at the top of this sheet are gone. One budget is one category in
+// this app, so a budget with an icon of its own could only ever disagree with
+// the category it is a budget FOR: the same line then reads "🍔 Ăn uống" in the
+// category list and "💸 Ăn uống" in the budget list, and the user has to
+// maintain two pictures of one thing. The budget now simply inherits its
+// category's icon (and carries it to the server on save, so existing budgets
+// that were given their own picture are brought back into line the first time
+// they are edited). The upload endpoint and its mutation hook are untouched and
+// still reachable from the category form, which is where an icon belongs.
+//
+// The category field is the searchable picker the transaction form uses
+// (CategorySelectField + useCategoryPicker), not the horizontal chip row it had
+// before — that row rendered every expense category at once with no way to find
+// one, which is unusable past a dozen.
 export function BudgetFormModal({ visible, onClose, currency, editingBudget }: BudgetFormModalProps) {
   const isEditing = Boolean(editingBudget);
   const categories = useCategoriesQuery("expense");
   const createBudget = useCreateBudgetMutation();
   const updateBudget = useUpdateBudgetMutation();
   const deleteBudget = useDeleteBudgetMutation();
-  const uploadIcon = useUploadBudgetIconMutation();
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
-  const [icon, setIcon] = useState("");
-  const [iconUrl, setIconUrl] = useState<string | undefined>(undefined);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
@@ -60,37 +67,20 @@ export function BudgetFormModal({ visible, onClose, currency, editingBudget }: B
       setCategoryId(editingBudget.category_id);
       const existingLimit = editingBudget.limits.find((l) => l.currency === currency);
       setAmount(existingLimit ? String(toMajorUnits(existingLimit.amount_limit)) : "");
-      setIcon(editingBudget.icon ?? "");
-      setIconUrl(editingBudget.icon_url ?? undefined);
     } else {
       setCategoryId(null);
       setAmount("");
-      setIcon("");
-      setIconUrl(undefined);
     }
     setSubmitAttempted(false);
   }, [visible, editingBudget, currency]);
 
   const mutation = isEditing ? updateBudget : createBudget;
 
-  const pickIcon = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) return;
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      quality: 0.8,
-    });
-    if (result.canceled) return;
-
-    const asset = result.assets[0];
-    const mimeType = asset.mimeType ?? "image/jpeg";
-    const name = asset.fileName ?? `icon.${mimeType.split("/")[1] ?? "jpg"}`;
-    uploadIcon.mutate(
-      { uri: asset.uri, name, mimeType },
-      { onSuccess: (data) => setIconUrl(data.icon_url) },
-    );
-  };
+  const selectedCategory = categories.data?.find((c) => c.id === categoryId);
+  // What the budget is saved with: whatever picture the category already
+  // carries. Never edited here — see the note above the component.
+  const inheritedIcon = selectedCategory?.icon ?? undefined;
+  const inheritedIconUrl = selectedCategory?.icon_url ?? undefined;
 
   const amountValue = Number(amount);
   const errors = {
@@ -105,67 +95,72 @@ export function BudgetFormModal({ visible, onClose, currency, editingBudget }: B
     const limits = { [currency]: toCents(amountValue) };
     if (isEditing && editingBudget) {
       updateBudget.mutate(
-        { id: editingBudget.id, body: { limits, icon: icon || undefined, icon_url: iconUrl } },
+        { id: editingBudget.id, body: { limits, icon: inheritedIcon, icon_url: inheritedIconUrl } },
         { onSuccess: onClose },
       );
     } else {
       createBudget.mutate(
-        { category_id: categoryId, limits, icon: icon || undefined, icon_url: iconUrl },
+        { category_id: categoryId, limits, icon: inheritedIcon, icon_url: inheritedIconUrl },
         { onSuccess: onClose },
       );
     }
   };
 
-  const activeError = mutation.isError
-    ? mutation.error
-    : deleteBudget.isError
-      ? deleteBudget.error
-      : uploadIcon.isError
-        ? uploadIcon.error
-        : null;
+  const categoryPicker = useCategoryPicker({
+    categories: categories.data ?? [],
+    selectedIds: categoryId ? [categoryId] : [],
+    onApply: (ids) => setCategoryId(ids[0] ?? null),
+  });
+
+  const activeError = mutation.isError ? mutation.error : deleteBudget.isError ? deleteBudget.error : null;
 
   return (
     <>
-      <Drawer visible={visible} onClose={onClose}>
-        <Text style={styles.title}>{isEditing ? "Sửa ngân sách" : "Ngân sách mới"}</Text>
-
-        <View style={styles.iconPickerRow}>
-          <View style={styles.iconPreview}>
-            {uploadIcon.isPending ? (
-              <ActivityIndicator color={colors.textPrimary} />
-            ) : (
-              <Avatar
-                name={editingBudget?.category_name ?? "?"}
-                color={editingBudget ? colorForCategory(editingBudget.category_id) : colors.lavender}
-                size={56}
-                icon={icon}
-                iconUrl={iconUrl}
-              />
-            )}
+      <Drawer
+        visible={visible}
+        onClose={onClose}
+        // Editing never re-opens the picker, so the panel is only wired up in
+        // create mode — a Drawer child that can never become visible is just a
+        // subscription the sheet does not need.
+        child={isEditing ? undefined : categoryPicker.child}
+        footer={
+          <View style={styles.actions}>
+            <PillButton label="Hủy" variant="outline" onPress={onClose} style={styles.flexButton} />
+            <PillButton
+              label={isEditing ? "Lưu" : "Tạo"}
+              onPress={submit}
+              loading={mutation.isPending}
+              disabled={submitAttempted && hasErrors}
+              style={styles.flexButton}
+            />
           </View>
-          <Pressable onPress={pickIcon} disabled={uploadIcon.isPending} hitSlop={8}>
-            <Text style={styles.changePhoto}>{iconUrl ? "Đổi ảnh" : "Tải ảnh lên"}</Text>
-          </Pressable>
-        </View>
+        }
+      >
+        <DrawerHeader title={isEditing ? "Sửa ngân sách" : "Ngân sách mới"} />
 
-        <Text style={styles.label}>Danh mục</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
-          {categories.data?.map((c) => (
-            <Pressable
-              key={c.id}
-              onPress={() => !isEditing && setCategoryId(c.id)}
-              style={[styles.categoryChip, categoryId === c.id && styles.categoryChipActive]}
-            >
-              <Text style={[styles.categoryChipLabel, categoryId === c.id && styles.categoryChipLabelActive]}>
-                {c.name}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
+        <Text style={styles.label}>Danh mục{isEditing ? " (khóa sau khi tạo)" : ""}</Text>
+        {isEditing ? (
+          // Locked, so it is shown rather than offered: the backend's
+          // UpdateBudgetRequest does not accept category_id at all.
+          <View style={styles.lockedCategory}>
+            <Avatar
+              name={editingBudget?.category_name ?? "?"}
+              color={editingBudget ? colorForCategory(editingBudget.category_id) : colors.lavender}
+              size={28}
+              icon={inheritedIcon}
+              iconUrl={inheritedIconUrl}
+            />
+            <Text style={styles.lockedCategoryLabel} numberOfLines={1}>
+              {editingBudget?.category_name}
+            </Text>
+          </View>
+        ) : (
+          <CategorySelectField categories={categoryPicker.selected} onPress={categoryPicker.open} />
+        )}
         {submitAttempted ? <FieldError message={errors.category} /> : null}
-
-        <Text style={styles.label}>Biểu tượng emoji (dùng khi chưa có ảnh)</Text>
-        <EmojiPickerInput value={icon} onChange={setIcon} placeholder="vd: 💸" />
+        {selectedCategory ? (
+          <Text style={styles.iconHint}>Ngân sách dùng luôn biểu tượng của danh mục này.</Text>
+        ) : null}
 
         <Text style={styles.label}>Hạn mức hàng tháng ({currency})</Text>
         <AmountInput value={amount} onChangeText={setAmount} />
@@ -174,17 +169,6 @@ export function BudgetFormModal({ visible, onClose, currency, editingBudget }: B
         {activeError ? (
           <Text style={styles.error}>{getErrorMessage(activeError, "Không thể lưu ngân sách")}</Text>
         ) : null}
-
-        <View style={styles.actions}>
-          <PillButton label="Hủy" variant="outline" onPress={onClose} style={styles.flexButton} />
-          <PillButton
-            label={isEditing ? "Lưu" : "Tạo"}
-            onPress={submit}
-            loading={mutation.isPending}
-            disabled={submitAttempted && hasErrors}
-            style={styles.flexButton}
-          />
-        </View>
 
         {isEditing ? (
           <Pressable style={styles.deleteRow} onPress={() => setConfirmDeleteOpen(true)} disabled={deleteBudget.isPending}>
@@ -210,23 +194,20 @@ export function BudgetFormModal({ visible, onClose, currency, editingBudget }: B
 }
 
 const styles = StyleSheet.create({
-  title: { ...typography.title, color: colors.textPrimary },
-  iconPickerRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
-  iconPreview: { width: 56, height: 56, alignItems: "center", justifyContent: "center" },
-  changePhoto: { ...typography.label, color: colors.green },
   label: { ...typography.caption, color: colors.textSecondary },
-  categoryRow: { gap: spacing.sm },
-  categoryChip: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: radii.pill,
+  iconHint: { ...typography.tiny, color: colors.textMuted },
+  lockedCategory: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radii.listCard,
     backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
+    opacity: 0.7,
   },
-  categoryChipActive: { backgroundColor: colors.green, borderColor: colors.green },
-  categoryChipLabel: { ...typography.caption, color: colors.textSecondary },
-  categoryChipLabelActive: { color: colors.onGreen },
+  lockedCategoryLabel: { flex: 1, ...typography.body, color: colors.textPrimary },
   error: { color: colors.peach, ...typography.caption },
   actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
   flexButton: { flex: 1 },

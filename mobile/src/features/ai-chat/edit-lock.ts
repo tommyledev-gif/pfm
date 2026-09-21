@@ -1,3 +1,4 @@
+import { isTombstone } from "@/features/ai-chat/tombstone";
 import { ChatMessage } from "@/features/ai-chat/types";
 
 // Whether swipe-to-edit is closed on a bubble.
@@ -19,6 +20,10 @@ import { ChatMessage } from "@/features/ai-chat/types";
 // content behind it — it opens EditTransactionModal, not EditMessageModal,
 // and stays editable whether or not it's already confirmed.
 export function isEditLocked(message: ChatMessage): boolean {
+  // A removed proposal has nothing left to correct: editing a deleted
+  // transaction would PATCH a record the user just took away, and editing a
+  // discarded one would revise a proposal that will never be saved.
+  if (isTombstone(message)) return true;
   if (message.role !== "assistant") return false;
   return !message.action;
 }

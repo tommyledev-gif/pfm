@@ -19,6 +19,9 @@ interface BudgetListRowProps {
   category?: Category;
   onPress: () => void;
   onHold: () => void;
+  /** Tapping the bar itself drills into the transactions behind it — a
+   *  separate target from the row's own tap, which edits the limit. */
+  onPressBar: () => void;
   highlighted?: boolean;
 }
 
@@ -42,6 +45,7 @@ export function BudgetListRow({
   category,
   onPress,
   onHold,
+  onPressBar,
   highlighted,
 }: BudgetListRowProps) {
   const status = budgetRowStatus(limit, periodElapsed);
@@ -86,22 +90,33 @@ export function BudgetListRow({
         </Text>
       </View>
 
-      <BudgetProgressBar
-        ratio={status.ratio}
-        // A budget with nothing spent yet has no pace to be behind, and the
-        // tick on an empty track just reads as noise.
-        pace={status.state === "unused" ? undefined : periodElapsed}
-        color={status.color}
-      />
+      {/* The bar is its own target: the row answers "change this limit", the
+          bar answers "what is this number made of". Nested inside the row's
+          Pressable rather than beside it so the layout is unchanged — RN gives
+          the innermost responder the tap, so the two never both fire. */}
+      <Pressable onPress={onPressBar} hitSlop={6} testID="btn-budget-transactions">
+        <BudgetProgressBar
+          ratio={status.ratio}
+          // A budget with nothing spent yet has no pace to be behind, and the
+          // tick on an empty track just reads as noise.
+          pace={status.state === "unused" ? undefined : periodElapsed}
+          color={status.color}
+        />
 
-      <View style={styles.footRow}>
-        <Text style={[styles.caption, { color: status.color }]} numberOfLines={1}>
-          {status.percent}% — {status.caption}
-        </Text>
-        <Text style={styles.amounts} numberOfLines={1}>
-          {formatCurrency(limit.spent, limit.currency)} / {formatCurrency(limit.amount_limit, limit.currency)}
-        </Text>
-      </View>
+        <View style={styles.footRow}>
+          <Text style={[styles.caption, { color: status.color }]} numberOfLines={1}>
+            {status.percent}% — {status.caption}
+          </Text>
+          <Text style={styles.amounts} numberOfLines={1}>
+            {formatCurrency(limit.spent, limit.currency)} / {formatCurrency(limit.amount_limit, limit.currency)}
+          </Text>
+        </View>
+
+        {/* Said out loud, because a bar that happens to be tappable is a
+            secret. Only on rows that have something to show — an untouched
+            budget would open an empty sheet. */}
+        {status.state !== "unused" ? <Text style={styles.drillLink}>Xem giao dịch →</Text> : null}
+      </Pressable>
     </Pressable>
   );
 }
@@ -130,7 +145,14 @@ const styles = StyleSheet.create({
   iconGlyph: { fontSize: 16, color: colors.textPrimary, fontWeight: "700" },
   name: { flex: 1, ...typography.cardTitle },
   headline: { ...typography.cardTitle, flexShrink: 0 },
-  footRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
+  footRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+    paddingTop: spacing.sm,
+  },
+  drillLink: { ...typography.tiny, color: colors.green, paddingTop: spacing.xs },
   caption: { ...typography.caption },
   amounts: { ...typography.caption, color: colors.textMuted, flexShrink: 1 },
 });

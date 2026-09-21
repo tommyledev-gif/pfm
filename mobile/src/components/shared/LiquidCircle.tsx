@@ -20,6 +20,15 @@ const WAVE_LOOP_MS = 3200;
 // label at the very top of the circle, at 0%/100% progress respectively.
 const MIN_FILL = 0.08;
 const MAX_FILL = 0.92;
+// ⚠️ The label sits on a near-black track at low fill and on a bright liquid
+// at high fill, and at intermediate levels the wave crosses the text itself.
+// A scrim behind the label is the only treatment that holds in all three: a
+// threshold that flips the text color cannot serve a line that is half on each
+// side, and deciding per frame from the animated wave position would strobe as
+// the surface moves. Tuned dark enough to carry white text over the lightest
+// palette color a caller can pass, light enough that the fill still reads
+// through it — the circle's whole job is showing a level.
+const LABEL_SCRIM_COLOR = "rgba(5,11,20,0.62)";
 
 function buildWavePath(width: number, height: number, waterY: number): string {
   const hump = width / 2;
@@ -80,12 +89,14 @@ export function LiquidCircle({
         </Svg>
       </Animated.View>
       <View style={[styles.label, { width: size * 0.78 }]} pointerEvents="none">
-        <Text style={styles.caption} numberOfLines={1}>
-          {topLabel}
-        </Text>
-        <Text style={styles.value} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.55}>
-          {topValue}
-        </Text>
+        <View style={styles.scrim}>
+          <Text style={styles.caption} numberOfLines={1}>
+            {topLabel}
+          </Text>
+          <Text style={styles.value} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.55}>
+            {topValue}
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -94,7 +105,15 @@ export function LiquidCircle({
 const styles = StyleSheet.create({
   wrapper: { alignItems: "center", justifyContent: "center", overflow: "hidden" },
   wave: { position: "absolute", left: 0, top: 0 },
-  label: { position: "absolute", alignItems: "center", gap: 2 },
+  label: { position: "absolute", alignItems: "center" },
+  scrim: {
+    alignItems: "center",
+    gap: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: LABEL_SCRIM_COLOR,
+  },
   caption: { ...typography.caption, color: colors.textSecondary },
   value: { ...typography.title, color: colors.textPrimary },
 });

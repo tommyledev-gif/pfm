@@ -15,6 +15,9 @@ export function useDeleteTransactionMutation() {
       queryClient.invalidateQueries({ queryKey: ["wallets"] });
       queryClient.invalidateQueries({ queryKey: ["budgets"] });
       queryClient.invalidateQueries({ queryKey: ["report-summary"] });
+      // The delete writes an audit entry server side, so a log screen left
+      // open behind this would otherwise keep showing history without it.
+      queryClient.invalidateQueries({ queryKey: ["audit-logs"] });
     },
   });
 }

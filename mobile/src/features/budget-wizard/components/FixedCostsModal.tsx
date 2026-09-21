@@ -20,6 +20,9 @@ interface FixedCostsModalProps {
   /** Whatever the helper produced last time, so reopening resumes rather than restarts. */
   initialText: string;
   initialSuggested: FixedCostItem[];
+  /** True when the parent re-spread the items across a total the user changed
+   *  by hand since the last confirm — see scaleFixedCosts. */
+  rescaled?: boolean;
   onClose: () => void;
   onConfirm: (result: { items: FixedCostItem[]; text: string; suggested: FixedCostItem[] }) => void;
 }
@@ -73,6 +76,7 @@ export function FixedCostsModal({
   currency,
   initialText,
   initialSuggested,
+  rescaled,
   onClose,
   onConfirm,
 }: FixedCostsModalProps) {
@@ -163,6 +167,15 @@ export function FixedCostsModal({
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          {/* Numbers that changed themselves, unannounced, read as data loss.
+              Said once, on the open that did it, and never again. */}
+          {rescaled ? (
+            <Text style={styles.rescaledNote}>
+              Bạn vừa đổi tổng chi phí cố định, nên các khoản dưới đây đã được chia lại theo đúng tỉ lệ cũ. Bạn sửa
+              lại khoản nào cũng được.
+            </Text>
+          ) : null}
+
           <Text style={styles.label}>Kể ra những khoản cố định của bạn</Text>
           <TextInput
             testID="input-wizard-fixed-costs-text"
@@ -311,6 +324,15 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   hint: { ...typography.tiny, color: colors.textMuted },
+  rescaledNote: {
+    ...typography.tiny,
+    color: colors.textSecondary,
+    lineHeight: 16,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.mustard,
+    paddingLeft: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
   askToggle: { paddingVertical: spacing.sm },
   askToggleLabel: { ...typography.caption, color: colors.green },
   prompts: { gap: spacing.xs },

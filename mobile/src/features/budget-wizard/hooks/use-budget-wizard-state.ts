@@ -2,8 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useBudgetProposalsMutation } from "@/features/budget-wizard/api/use-budget-proposals-mutation";
 import { useBudgetWizardPrefillQuery } from "@/features/budget-wizard/api/use-budget-wizard-prefill-query";
-import { useBulkCreateBudgetsMutation } from "@/features/budget-wizard/api/use-bulk-create-budgets-mutation";
-import { useCreateCategoryMutation } from "@/features/categories/api/use-create-category-mutation";
 import { AddBudgetRowResult } from "@/features/budget-wizard/components/AddBudgetRowModal";
 import {
   DEFAULT_SAVINGS_CHOICE,
@@ -12,28 +10,24 @@ import {
   savingsAmount,
   validateIncomeStep,
 } from "@/features/budget-wizard/budget-math";
-import { FixedCostItem, totalFixedCosts } from "@/features/budget-wizard/fixed-costs";
-import {
-  BudgetProposalsResponse,
-  CategoryIntentRequest,
-  PresetKey,
-  ProposalEntry,
-} from "@/features/budget-wizard/types";
+import { useWizardFixedCosts } from "@/features/budget-wizard/hooks/use-wizard-fixed-costs";
+import { SavedBudgetPlan, SavedPlanRow, useSavedBudgetPlanStore } from "@/features/budget-wizard/saved-plan";
+import { useWizardPlanPersistence } from "@/features/budget-wizard/hooks/use-wizard-plan-persistence";
+import { useWizardSubmit } from "@/features/budget-wizard/hooks/use-wizard-submit";
+import { withAddedRow, withEditedAmount, withRemovedRow } from "@/features/budget-wizard/proposal-edits";
+import { PROBLEM_MESSAGES, resolvePresetIntents } from "@/features/budget-wizard/preset-intents";
+import { useWizardKeptCategories } from "@/features/budget-wizard/hooks/use-wizard-kept-categories";
+import { useWizardStepBack } from "@/features/budget-wizard/hooks/use-wizard-step-back";
+import { restoreProposal } from "@/features/budget-wizard/proposal-restore";
+import { BudgetProposalsResponse, CategoryIntentRequest, PresetKey } from "@/features/budget-wizard/types";
 import { getErrorMessage } from "@/lib/api-envelope";
 
 export const BUDGET_WIZARD_TOTAL_STEPS = 3;
 
-/** Why the wizard could not build a proposal, when the reason is the server's
- *  state rather than the user's input. Kept separate from ordinary request
- *  failures because the fix is different: these need a deploy, not a retry. */
-type WizardProblem = "server_outdated" | "categories_unmigrated";
-
-const PROBLEM_MESSAGES: Record<WizardProblem, string> = {
-  server_outdated:
-    "Máy chủ chưa hỗ trợ phiên bản thiết lập ngân sách này. Bạn cập nhật lại máy chủ rồi thử lại nhé.",
-  categories_unmigrated:
-    "Danh mục hệ thống trên máy chủ chưa được cập nhật nên chưa khớp được với các gói gợi ý.",
-};
+// ⚠️ A plan with no rows must never be submitted: confirming replaces the
+// account's entire active budget set, so an empty plan would silently wipe
+// every budget the user has.
+const MIN_PLAN_ROWS = 1;
 
 /**
  * All of the wizard's state and transitions, kept out of the modal so that file
@@ -52,37 +46,45 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
 
   // Every amount here is xu.
   const [income, setIncome] = useState(0);
-  const [fixed, setFixed] = useState(0);
   const [savingsChoice, setSavingsChoice] = useState<SavingsChoice>(DEFAULT_SAVINGS_CHOICE);
-  // The fixed-cost helper's own working state, kept here so reopening it resumes
-  // where the user left off instead of asking them to describe everything again.
-  const [fixedCostsText, setFixedCostsText] = useState("");
-  const [fixedCostsSuggested, setFixedCostsSuggested] = useState<FixedCostItem[]>([]);
-  // Owned here rather than inside the step so the panel can render as a sibling
-  // of the whole wizard and cover its progress header too — a full-screen sheet
-  // that leaves the step chrome showing reads as a layer that failed to open.
-  const [fixedCostsOpen, setFixedCostsOpen] = useState(false);
   const [addRowOpen, setAddRowOpen] = useState(false);
   const [cycleStartDay, setCycleStartDay] = useState(1);
   const [preset, setPreset] = useState<PresetKey | null>(null);
 
   const [result, setResult] = useState<BudgetProposalsResponse | null>(null);
-  // Rows the user added by hand on the result screen — the only ones that may
-  // be removed again. A preset row left at zero is still information; a row the
-  // user invented and then thought better of has nothing to say.
+  // Rows the user added by hand on the result screen. Every row is removable
+  // now, so this no longer gates that — it records which rows are the user's
+  // own, for the saved-plan shape and for re-adding them after a step-back.
   const [addedIds, setAddedIds] = useState<string[]>([]);
   // Categories that do not exist yet, keyed by the placeholder id their row
   // carries. ⚠️ NOT created here: the wizard writes nothing before the final
   // confirmation, so a user who backs out leaves no stray category behind.
   // submit() creates them first and swaps the placeholders for real ids.
   const [pendingCategories, setPendingCategories] = useState<Record<string, string>>({});
-  const [createdCount, setCreatedCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Set when this run was seeded from a saved plan: the banner on screen 1
+  // reads it, and the amounts are re-applied once the server's proposal for the
+  // saved preset comes back (see applySavedRows).
+  const [restoredFrom, setRestoredFrom] = useState<SavedBudgetPlan | null>(null);
+  const [pendingSavedRows, setPendingSavedRows] = useState<SavedPlanRow[] | null>(null);
+  const [planSaved, setPlanSaved] = useState(false);
+  const [overwriteConfirmOpen, setOverwriteConfirmOpen] = useState(false);
+  // Suggested rows the user removed. Held apart from addedIds because the two
+  // answer different questions: which rows are the user's own, and which of
+  // the allocator's rows they rejected.
+  const [removedIds, setRemovedIds] = useState<string[]>([]);
+  const keptCategories = useWizardKeptCategories();
+
+  // The fixed-cost field and its breakdown, which must always agree.
+  const fixedCosts = useWizardFixedCosts();
+  const fixed = fixedCosts.fixed;
+
+  const savedPlan = useSavedBudgetPlanStore((s) => s.plan);
+  const savedPlanHydrated = useSavedBudgetPlanStore((s) => s.hydrated);
 
   const prefill = useBudgetWizardPrefillQuery(visible);
   const proposals = useBudgetProposalsMutation();
-  const bulkCreate = useBulkCreateBudgetsMutation();
-  const createCategory = useCreateCategoryMutation();
+  const commit = useWizardSubmit();
 
   const currency = prefill.data?.currency ?? "VND";
   const savings = savingsAmount(savingsChoice, income);
@@ -90,84 +92,49 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
 
   // Reset on every open. A wizard that reopens holding the previous run's
   // half-finished figures looks like it saved something it did not.
+  //
+  // ⚠️ A SAVED plan is the one exception, and it is not the same thing: those
+  // figures were explicitly kept by the user for exactly this moment, and the
+  // banner on screen 1 says where they came from and offers to drop them. An
+  // unsaved half-run still starts from zero.
+  //
+  // Waits for the persisted store to have been read back — treating "storage
+  // has not resolved yet" as "nothing saved" would blank a plan on a cold
+  // launch, which is the one launch where the user is most likely to be
+  // reaching for it.
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || !savedPlanHydrated) return;
+    const plan = useSavedBudgetPlanStore.getState().plan;
     setStep(1);
-    setIncome(0);
-    setFixed(0);
+    setIncome(plan?.income ?? 0);
     setSavingsChoice(
-      prefill.data?.default_savings_pct !== undefined
-        ? { kind: "pct", pct: prefill.data.default_savings_pct }
-        : DEFAULT_SAVINGS_CHOICE,
+      plan?.savingsChoice ??
+        (prefill.data?.default_savings_pct !== undefined
+          ? { kind: "pct", pct: prefill.data.default_savings_pct }
+          : DEFAULT_SAVINGS_CHOICE),
     );
-    setFixedCostsText("");
-    setFixedCostsSuggested([]);
-    setFixedCostsOpen(false);
+    fixedCosts.reset(
+      plan ? { fixed: plan.fixed, text: plan.fixedCostsText, suggested: plan.fixedCostsSuggested } : undefined,
+    );
     setAddRowOpen(false);
-    setCycleStartDay(prefill.data?.cycle_start_day ?? 1);
-    setPreset(null);
+    setCycleStartDay(plan?.cycleStartDay ?? prefill.data?.cycle_start_day ?? 1);
+    setPreset(plan?.preset ?? null);
     setResult(null);
     setAddedIds([]);
     setPendingCategories({});
-    setCreatedCount(null);
+    commit.resetCreatedCount();
     setError(null);
+    setRestoredFrom(plan ?? null);
+    setPendingSavedRows(plan?.rows ?? null);
+    setPlanSaved(false);
+    setOverwriteConfirmOpen(false);
+    setRemovedIds([]);
+    keptCategories.forget();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
+  }, [visible, savedPlanHydrated]);
 
-  /**
-   * The categories a preset needs, resolved through system_key against what the
-   * user actually has.
-   *
-   * ⚠️ Every field of the prefill response is read defensively, including ones
-   * the current server always sends. A client must not crash because a field it
-   * expected is absent — and this one did: `prefill.data?.presets.find(...)`
-   * guarded `data` but not `presets`, so a server response without that key
-   * threw "Cannot read property 'find' of undefined" the moment a preset was
-   * tapped. Optional chaining has to cover the whole path, not just its head.
-   *
-   * Returns a `problem` rather than an empty array when it cannot build the
-   * intents, so the caller can say something specific instead of sending a
-   * request that is going to be rejected anyway.
-   */
   const intentsForPreset = useCallback(
-    (key: PresetKey): { intents: CategoryIntentRequest[]; problem: WizardProblem | null } => {
-      const presets = prefill.data?.presets;
-      // No preset table at all means this app build is talking to a server that
-      // predates the v2 wizard. Nothing downstream can work — POST
-      // /ai/budget-proposals would reject the new payload too — so say that
-      // plainly rather than failing later and more obscurely.
-      if (!presets || presets.length === 0) return { intents: [], problem: "server_outdated" };
-
-      const presetDef = presets.find((p) => p.key === key);
-      if (!presetDef?.shares?.length) return { intents: [], problem: "server_outdated" };
-
-      const categories = prefill.data?.categories ?? [];
-      const intents = presetDef.shares
-        .map((share): CategoryIntentRequest | null => {
-          const match = categories.find((c) => c.system_key === share.system_key);
-          if (!match) return null;
-          return {
-            category_id: match.id,
-            category_name: match.name,
-            system_key: share.system_key,
-            source: "preset" as const,
-            // Zero on purpose: the server owns the allocation. Computing it here
-            // too would mean two implementations of the same formula, free to
-            // drift apart.
-            amount_min: 0,
-            amount_max: 0,
-            locked: false,
-          };
-        })
-        .filter((v): v is CategoryIntentRequest => v !== null);
-
-      // Categories carry no system_key until migration 019 has run, so every
-      // preset line resolves to nothing. Distinct from the case above: the
-      // server is new enough to send presets but its database has not been
-      // migrated.
-      if (intents.length === 0) return { intents, problem: "categories_unmigrated" };
-      return { intents, problem: null };
-    },
+    (key: PresetKey) => resolvePresetIntents(prefill.data, key),
     [prefill.data],
   );
 
@@ -185,13 +152,24 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
           profile_preset: chosenPreset,
           intents,
         });
-        setResult(data);
+        const restored = restoreProposal(data, {
+          pendingSavedRows,
+          restoredFrom,
+          keptPlan: keptCategories.keptPlan,
+          chosenPreset,
+        });
+        setResult(restored.response);
+        if (restored.addedIds) setAddedIds(restored.addedIds);
+        if (restored.pendingCategories) setPendingCategories(restored.pendingCategories);
+        // One-shot: from here on the screen is live, and a retry after changing
+        // the income must show what the server actually says.
+        setPendingSavedRows(null);
       } catch (e) {
         setResult(null);
         setError(getErrorMessage(e, "Chưa tính được ngân sách, bạn thử lại nhé."));
       }
     },
-    [proposals, income, fixed, savings, currency, cycleStartDay],
+    [proposals, income, fixed, savings, currency, cycleStartDay, pendingSavedRows, restoredFrom, keptCategories.keptPlan],
   );
 
   const selectPreset = useCallback(
@@ -227,74 +205,25 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
    * the difference and every other row is left untouched. Re-asking the server
    * would re-run the allocator, which would rebalance rows the user did not
    * touch: exactly the silent rewrite the edit modal's ceiling exists to
-   * prevent.
+   * prevent. The transform itself lives in proposal-edits.ts.
    */
   const editAmount = useCallback((categoryId: string, amountXu: number) => {
-    setResult((prev) => {
-      if (!prev) return prev;
-      const proposalsNext: ProposalEntry[] = prev.proposals.map((p) =>
-        p.category_id === categoryId
-          ? { ...p, amount_min: amountXu, amount_max: amountXu, source: "manual", locked: true }
-          : p,
-      );
-      const allocated = proposalsNext.reduce((sum, p) => sum + p.amount_max, 0);
-      return { ...prev, proposals: proposalsNext, unallocated_amount: prev.disposable - allocated };
-    });
+    setResult((prev) => (prev ? withEditedAmount(prev, categoryId, amountXu) : prev));
   }, []);
 
-  /**
-   * Append a row the user asked for.
-   *
-   * Funded entirely out of the buffer, like every other manual change: nothing
-   * the allocator produced is touched. Picking a category that is already on
-   * the plan updates that row instead of adding a second one — two rows for one
-   * category would both be written as budgets and the later one would silently
-   * win server-side.
-   */
   const addProposalRow = useCallback((entry: AddBudgetRowResult) => {
     const tempId = entry.categoryId ?? `new:${Date.now()}`;
-    if (!entry.categoryId) {
-      setPendingCategories((prev) => ({ ...prev, [tempId]: entry.name }));
-    }
-
-    setResult((prev) => {
-      if (!prev) return prev;
-      const existing = prev.proposals.find((p) => p.category_id === tempId);
-      const proposalsNext: ProposalEntry[] = existing
-        ? prev.proposals.map((p) =>
-            p.category_id === tempId
-              ? { ...p, amount_min: entry.amountXu, amount_max: entry.amountXu, source: "manual", locked: true }
-              : p,
-          )
-        : [
-            ...prev.proposals,
-            {
-              category_id: tempId,
-              category_name: entry.name,
-              amount_min: entry.amountXu,
-              amount_max: entry.amountXu,
-              source: "manual" as const,
-              locked: true,
-              confidence: 1,
-            },
-          ];
-      const allocated = proposalsNext.reduce((sum, p) => sum + p.amount_max, 0);
-      return { ...prev, proposals: proposalsNext, unallocated_amount: prev.disposable - allocated };
-    });
-
-    if (!entry.categoryId) setAddedIds((prev) => [...prev, tempId]);
-    else setAddedIds((prev) => (prev.includes(tempId) ? prev : [...prev, tempId]));
+    if (!entry.categoryId) setPendingCategories((prev) => ({ ...prev, [tempId]: entry.name }));
+    setResult((prev) => (prev ? withAddedRow(prev, tempId, entry.name, entry.amountXu) : prev));
+    setAddedIds((prev) => (prev.includes(tempId) ? prev : [...prev, tempId]));
     setAddRowOpen(false);
   }, []);
 
   const removeProposalRow = useCallback((categoryId: string) => {
-    setResult((prev) => {
-      if (!prev) return prev;
-      const proposalsNext = prev.proposals.filter((p) => p.category_id !== categoryId);
-      const allocated = proposalsNext.reduce((sum, p) => sum + p.amount_max, 0);
-      return { ...prev, proposals: proposalsNext, unallocated_amount: prev.disposable - allocated };
-    });
+    setResult((prev) => (prev ? withRemovedRow(prev, categoryId) : prev));
     setAddedIds((prev) => prev.filter((id) => id !== categoryId));
+    // Recorded so a step-back that keeps the plan does not resurrect it.
+    setRemovedIds((prev) => (prev.includes(categoryId) ? prev : [...prev, categoryId]));
     setPendingCategories((prev) => {
       const next = { ...prev };
       delete next[categoryId];
@@ -302,34 +231,83 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
     });
   }, []);
 
-  const submit = useCallback(async () => {
-    if (!result) return;
-    setError(null);
-    try {
-      // Categories the user invented are created HERE, at the confirmation, not
-      // when they were typed — dismissing the wizard has to leave the account
-      // exactly as it was found.
-      const idByPlaceholder: Record<string, string> = {};
-      for (const [placeholder, name] of Object.entries(pendingCategories)) {
-        if (!result.proposals.some((p) => p.category_id === placeholder)) continue;
-        const created = await createCategory.mutateAsync({ name, type: "expense" });
-        idByPlaceholder[placeholder] = created.id;
-      }
+  /**
+   * Whether this account already has budgets that a run would replace.
+   *
+   * Read from the prefill response the wizard already fetched rather than from a
+   * second budgets query — it is on the wire either way, and two sources for one
+   * fact can disagree.
+   */
+  const stepBack = useWizardStepBack({
+    resultStep: BUDGET_WIZARD_TOTAL_STEPS,
+    step,
+    hasResult: result !== null,
+    setStep,
+    remember: () => {
+      if (result) keptCategories.remember(result.proposals, addedIds, pendingCategories, removedIds);
+    },
+    forget: keptCategories.forget,
+    onDiscard: () => setRemovedIds([]),
+  });
 
-      const data = await bulkCreate.mutateAsync({
-        budgets: result.proposals.map((p) => ({
-          category_id: idByPlaceholder[p.category_id] ?? p.category_id,
-          period: "monthly" as const,
-          limits: [{ currency, amount_limit: p.amount_max }],
-        })),
-      });
-      setCreatedCount(data.created_count);
-      setStep(BUDGET_WIZARD_TOTAL_STEPS + 1);
-      onCompleted?.(data.created_count);
-    } catch (e) {
-      setError(getErrorMessage(e, "Chưa lưu được ngân sách, bạn thử lại nhé."));
+  const hasExistingBudgets = (prefill.data?.existing_budgets?.length ?? 0) > 0;
+
+  const persistence = useWizardPlanPersistence(useCallback(() => setPlanSaved(true), []));
+
+  const savePlan = useCallback(
+    () =>
+      persistence.savePlan({
+        result,
+        currency,
+        income,
+        fixed,
+        fixedCostsText: fixedCosts.text,
+        fixedCostsSuggested: fixedCosts.suggested,
+        savingsChoice,
+        cycleStartDay,
+        preset,
+        addedIds,
+        pendingCategories,
+      }),
+    [
+      persistence,
+      result,
+      currency,
+      income,
+      fixed,
+      fixedCosts.text,
+      fixedCosts.suggested,
+      savingsChoice,
+      cycleStartDay,
+      preset,
+      addedIds,
+      pendingCategories,
+    ],
+  );
+
+  /** Drops the restored figures and starts this run from zero. */
+  const discardSavedPlan = useCallback(() => {
+    persistence.clearStoredPlan();
+    setRestoredFrom(null);
+    setPendingSavedRows(null);
+    setIncome(0);
+    fixedCosts.reset();
+    setPreset(null);
+    setResult(null);
+    setAddedIds([]);
+    setPendingCategories({});
+  }, [persistence, fixedCosts]);
+
+  const submit = useCallback(async () => {
+    setError(null);
+    const outcome = await commit.submit({ result, currency, pendingCategories });
+    if ("error" in outcome) {
+      if (outcome.error) setError(outcome.error);
+      return;
     }
-  }, [result, bulkCreate, createCategory, pendingCategories, currency, onCompleted]);
+    setStep(BUDGET_WIZARD_TOTAL_STEPS + 1);
+    onCompleted?.(outcome.count);
+  }, [commit, result, currency, pendingCategories, onCompleted]);
 
   const canLeaveIncomeStep = useMemo(
     () => validateIncomeStep(income, fixed, savings).ok,
@@ -344,39 +322,47 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
     savings,
     savingsChoice,
     cycleStartDay,
-    fixedCostsText,
-    fixedCostsSuggested,
-    fixedCostsOpen,
+    fixedCostsText: fixedCosts.text,
+    fixedCostsSuggested: fixedCosts.suggested,
+    fixedCostsOpen: fixedCosts.open,
+    fixedCostsRescaled: fixedCosts.rescaled,
     disposable,
+    hasExistingBudgets,
+    // Present only when this run was seeded from a kept plan — screen 1's
+    // banner and nothing else reads it.
+    restoredFrom,
+    savedPlan,
+    planSaved,
+    overwriteConfirmOpen,
     preset,
     result,
     addedIds,
     addRowOpen,
     availableCategories: prefill.data?.categories ?? [],
-    createdCount,
+    createdCount: commit.createdCount,
     error,
     loadingProposal: proposals.isPending,
-    submitting: bulkCreate.isPending,
+    submitting: commit.submitting,
     setIncome,
-    setFixed,
+    setFixed: fixedCosts.setFixed,
     setSavingsChoice,
     setCycleStartDay,
-    openFixedCosts: () => setFixedCostsOpen(true),
-    closeFixedCosts: () => setFixedCostsOpen(false),
-    // One action, not three call sites: the breakdown and the total it implies
-    // must never be set separately, or the field can show a total that its own
-    // itemised list does not add up to.
-    applyFixedCosts: (result: { items: FixedCostItem[]; text: string; suggested: FixedCostItem[] }) => {
-      setFixedCostsText(result.text);
-      setFixedCostsSuggested(result.suggested);
-      setFixed(totalFixedCosts(result.items));
-      setFixedCostsOpen(false);
-    },
+    openFixedCosts: fixedCosts.openHelper,
+    closeFixedCosts: fixedCosts.closeHelper,
+    applyFixedCosts: fixedCosts.apply,
     goToProfile: () => canLeaveIncomeStep && setStep(2),
     // ⚠️ Never below 1, and never back FROM the success screen: a plan has been
     // written by then, so "back" would offer to re-run a decision that is
     // already committed.
     goBack: () => setStep((prev) => Math.max(1, Math.min(prev, BUDGET_WIZARD_TOTAL_STEPS) - 1)),
+    // From the result step, going back asks first — the user is about to
+    // change an input every figure on screen was derived from.
+    backConfirmOpen: stepBack.backConfirmOpen,
+    requestBack: stepBack.requestBack,
+    confirmBackKeeping: stepBack.confirmBackKeeping,
+    confirmBackDiscarding: stepBack.confirmBackDiscarding,
+    cancelBack: stepBack.closeBackConfirm,
+    canSubmit: (result?.proposals.length ?? 0) >= MIN_PLAN_ROWS,
     selectPreset,
     retryProposal,
     editAmount,
@@ -384,7 +370,30 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
     closeAddRow: () => setAddRowOpen(false),
     addProposalRow,
     removeProposalRow,
+    // ⚠️ The submit button calls THIS, not submit(): POST /budgets/bulk replaces
+    // the caller's entire active budget set (see useBulkCreateBudgetsMutation),
+    // so running the wizard on an account that already has budgets silently
+    // discards every one of them. That is a fine outcome when it is what the
+    // user meant and a terrible one when it is not, and nothing on screen 3 said
+    // which was about to happen.
+    requestSubmit: () => {
+      // ⚠️ Checked before the overwrite prompt, not after: an empty plan is
+      // refused outright rather than offered as something to confirm.
+      if ((result?.proposals.length ?? 0) < MIN_PLAN_ROWS) {
+        setError("Kế hoạch đang trống. Thêm ít nhất một danh mục trước khi lưu.");
+        return;
+      }
+      if (hasExistingBudgets) setOverwriteConfirmOpen(true);
+      else void submit();
+    },
+    confirmOverwrite: () => {
+      setOverwriteConfirmOpen(false);
+      void submit();
+    },
+    cancelOverwrite: () => setOverwriteConfirmOpen(false),
     submit,
+    savePlan,
+    discardSavedPlan,
     close: onClose,
   };
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
@@ -21,6 +21,19 @@ export default function CategoriesScreen() {
   const categories = useCategoriesQuery(type);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+
+  // The user's own categories first, the system defaults under them.
+  //
+  // GET /categories returns them interleaved (the system set was seeded first,
+  // so a user's own category lands wherever its name happens to sort), which
+  // buries the handful of rows they actually made among two dozen they did not.
+  // Only the user's own are editable in any meaningful sense, and they are the
+  // ones being looked for. Array.prototype.sort is stable, so within each group
+  // the server's own ordering is left exactly as it came.
+  const ordered = useMemo(
+    () => [...(categories.data ?? [])].sort((a, b) => Number(a.user_id === null) - Number(b.user_id === null)),
+    [categories.data],
+  );
 
   return (
     <Screen>
@@ -56,7 +69,7 @@ export default function CategoriesScreen() {
         </View>
       ) : (
         <FlatList
-          data={categories.data ?? []}
+          data={ordered}
           keyExtractor={(c) => c.id}
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}

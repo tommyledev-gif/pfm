@@ -36,6 +36,12 @@ export function toMajorUnits(amountCents: number): number {
 // tell 7.08m and 7.1m apart — the leading "~" says plainly that this is a
 // rounded display value, not the exact figure (long-press callers pair this
 // with AmountRevealPopup for the exact one).
+// Vietnamese magnitude shorthand: nghìn / triệu / tỷ. Named rather than
+// inlined because three screens render these — the Insights donut and stat
+// cards, and the Transactions type tabs — and an abbreviation that differs
+// between them reads as a different unit, not a different style.
+const MAGNITUDE_SUFFIX = { thousand: "ng", million: "tr", billion: "tỷ" } as const;
+
 export function formatCurrencyCompact(amountCents: number, currency: string = "VND"): string {
   const amount = Math.round(amountCents / 100);
   const abs = Math.abs(amount);
@@ -44,12 +50,12 @@ export function formatCurrencyCompact(amountCents: number, currency: string = "V
   const sign = amount < 0 ? "-" : "";
   const isBillions = abs >= 1_000_000_000;
   const threshold = isBillions ? 1_000_000_000 : 1_000_000;
-  const suffix = isBillions ? "b" : "m";
+  const suffix = isBillions ? MAGNITUDE_SUFFIX.billion : MAGNITUDE_SUFFIX.million;
   // The sub-unit is one order of magnitude down from the main one (millions
   // → thousands, billions → millions) — always rounded, never truncated, so
   // "999.6k" reads as "1m" rather than a misleadingly-clipped "999k".
   const subUnit = isBillions ? 1_000_000 : 1_000;
-  const subSuffix = isBillions ? "m" : "k";
+  const subSuffix = isBillions ? MAGNITUDE_SUFFIX.million : MAGNITUDE_SUFFIX.thousand;
 
   let whole = Math.floor(abs / threshold);
   let subWhole = Math.round((abs % threshold) / subUnit);

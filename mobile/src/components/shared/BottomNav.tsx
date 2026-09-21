@@ -20,7 +20,7 @@ const TABS = [
 // showing Settings as active while on any of these instead of freezing on
 // whichever tab was active before the push, which read as the nav losing
 // track of where you are.
-const SETTINGS_SUB_ROUTES = ["/wallets", "/categories", "/users", "/audit-log", "/developer"];
+const SETTINGS_SUB_ROUTES = ["/wallets", "/categories", "/users", "/audit-logs", "/developer"];
 
 const PILL_HEIGHT = 64;
 const BALL_SIZE = 48;
@@ -67,6 +67,23 @@ export function BottomNav() {
   const tabRects = useRef<{ x: number; width: number }[]>([]);
   const positioned = useRef(false);
   const lastAnimatedIndex = useRef(activeIndex);
+  // ⚠️ The ball is HIDDEN until the tab row has been measured, and that is a
+  // correctness fix, not a polish pass.
+  //
+  // app/(app)/_layout.tsx unmounts this whole component while any Drawer sheet
+  // is open (the sheet renders in-tree and cannot otherwise paint above it), so
+  // every form modal — invite member, new category, new wallet — tears the nav
+  // down and rebuilds it on close. On a fresh mount `ballX` is a brand new
+  // Animated.Value(0) and `styles.ball` pins left: 0, so the ball paints under
+  // the FIRST tab (Home) and only jumps to the real one once onLayout has fired
+  // and moveBallTo(…, instant) has run. That one-frame flash is what read as
+  // "opening the form resets the nav to Home" on Wallets/Categories/Members,
+  // which are Settings sub-routes and never stopped being so.
+  //
+  // Fading in on the first measurement costs nothing on a cold app start (the
+  // measurement happens in the same commit) and removes the flash entirely.
+  const [positionedReady, setPositionedReady] = useState(false);
+  const ballOpacity = useRef(new Animated.Value(0)).current;
 
   const ballX = useRef(new Animated.Value(0)).current;
   const squish = useRef(new Animated.Value(0)).current;
@@ -148,7 +165,13 @@ export function BottomNav() {
     lastAnimatedIndex.current = startIndex;
     moveBallTo(startIndex, true);
     setDisplayIndex(startIndex);
+    setPositionedReady(true);
   };
+
+  useEffect(() => {
+    if (!positionedReady) return;
+    Animated.timing(ballOpacity, { toValue: 1, duration: 120, useNativeDriver: true }).start();
+  }, [positionedReady, ballOpacity]);
 
   const DisplayIcon = TABS[displayIndex].Icon;
 
@@ -163,7 +186,7 @@ export function BottomNav() {
           pointerEvents="none"
           style={[
             styles.auraOuter,
-            { left: AURA_LEFT_OFFSET, top: AURA_TOP, transform: [{ translateX: ballX }] },
+            { left: AURA_LEFT_OFFSET, top: AURA_TOP, opacity: ballOpacity, transform: [{ translateX: ballX }] },
           ]}
         >
           <View style={styles.auraMid}>
@@ -197,6 +220,7 @@ export function BottomNav() {
         style={[
           styles.ball,
           {
+            opacity: ballOpacity,
             transform: [
               { translateX: ballX },
               { translateY: ballBobY },

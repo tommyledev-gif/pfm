@@ -6,40 +6,26 @@ import { CategoryPickerDrawer } from "@/components/shared/CategoryPickerDrawer";
 import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
 import { BudgetFormModal } from "@/features/budgets/components/BudgetFormModal";
 import { colorForCategory } from "@/lib/category-color";
+import { monthRange } from "@/lib/date-range";
 import { formatDateRange } from "@/lib/format-date";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { useRefresh } from "@/lib/use-refresh";
 import { WalletCurrency } from "@/lib/constants";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
-import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary-query";
 import { Budget } from "@/features/budgets/types";
-import {
-  budgetPeriodElapsed,
-  budgetRowStatus,
-  BudgetPaceState,
-  currentMonthPace,
-  daysInRange,
-  proratedLimit,
-} from "@/features/budgets/budget-pace";
+import { currentMonthPace } from "@/features/budgets/budget-pace";
+import { useBudgetRows } from "@/features/budgets/hooks/use-budget-rows";
+import { BudgetFilterChips, BudgetFilterKey } from "@/features/budgets/components/BudgetFilterChips";
 import { BudgetCardSkeleton } from "@/features/budgets/components/BudgetCardSkeleton";
 import { BudgetListRow } from "@/features/budgets/components/BudgetListRow";
 import { BudgetMonthSummary } from "@/features/budgets/components/BudgetMonthSummary";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
+import { CategoryTransactionsDialog } from "@/features/reports/components/CategoryTransactionsDialog";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { primaryCurrency } from "@/features/wallets/wallet-totals";
 
 const CARD_SKELETON_COUNT = 3;
 
-// Which pace states each filter chip keeps. "Sắp vượt" deliberately covers
-// only at-risk and not over — a budget already blown is past being at risk,
-// and its own chip is right next to this one.
-const FILTERS = [
-  { key: "all", label: "Tất cả", states: null },
-  { key: "at-risk", label: "Sắp vượt", states: ["at-risk"] },
-  { key: "over", label: "Đã vượt", states: ["over"] },
-] as const;
-
-type FilterKey = (typeof FILTERS)[number]["key"];
 
 // Insights → Budgets tab: a month-level summary on top, then one row per
 // budget ordered worst-first, with chips to jump straight to the budgets that
@@ -67,7 +53,11 @@ export function BudgetsTab({ initialRange, rangeNonce }: BudgetsTabProps = {}) {
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [highlightedBudgetId, setHighlightedBudgetId] = useState<string | null>(null);
-  const [filter, setFilter] = useState<FilterKey>("all");
+  // Which budget's transactions are being read. Held as the whole row (budget
+  // + the limit it was drawn from) so the sheet's header can quote the exact
+  // figure the bar showed, rather than re-deriving it and risking disagreement.
+  const [detailRow, setDetailRow] = useState<{ budget: Budget; limit: Budget["limits"][number] } | null>(null);
+  const [filter, setFilter] = useState<BudgetFilterKey>("all");
 
   // Wallets and categories are refreshed alongside the budgets themselves:
   // the primary currency the whole tab is scaled to comes from wallets, and
@@ -86,116 +76,13 @@ export function BudgetsTab({ initialRange, rangeNonce }: BudgetsTabProps = {}) {
   // ⚠️ `limit.spent` from the budgets endpoint is ALWAYS the current calendar
   // month — the backend has no date-range parameter for it. So a filtered view
   // cannot use it, and per-category spend for the selected range comes from the
-  // reports endpoint instead, compared against a prorated slice of the limit.
-  const rangeActive = Boolean(dateRange.from || dateRange.to);
-  const rangeSummary = useReportSummaryQuery(rangeActive ? dateRange : {});
-
   useEffect(() => {
     if (initialRange?.from || initialRange?.to) setDateRange(initialRange);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialRange?.from, initialRange?.to, rangeNonce]);
 
-  // The backend resolves an open-ended range for us, so read the window back
-  // from the response rather than guessing what a missing `from` meant.
-  const resolvedRange = rangeSummary.data?.range;
-  const rangeDayCount = useMemo(
-    () => (resolvedRange ? daysInRange(resolvedRange.from, resolvedRange.to) : 1),
-    [resolvedRange],
-  );
-
-  const spentByCategory = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const entry of rangeSummary.data?.by_category ?? []) {
-      if (entry.type !== "expense" || entry.currency !== currency) continue;
-      map.set(entry.category_id, (map.get(entry.category_id) ?? 0) + entry.amount);
-    }
-    return map;
-  }, [rangeSummary.data, currency]);
-
-  // How far through the selected window we are. A window that has already
-  // finished is fully elapsed; one containing right now is however far into it
-  // the clock has got — which for a single day is a fraction of today.
-  const rangeElapsed = useMemo(() => {
-    if (!resolvedRange) return 0;
-    const [fy, fm, fd] = resolvedRange.from.slice(0, 10).split("-").map(Number);
-    const [ty, tm, td] = resolvedRange.to.slice(0, 10).split("-").map(Number);
-    const start = new Date(fy, fm - 1, fd).getTime();
-    const end = new Date(ty, tm - 1, td + 1).getTime();
-    const now = Date.now();
-    if (now >= end) return 1;
-    if (now <= start) return 0;
-    return (now - start) / (end - start);
-  }, [resolvedRange]);
-
-
-  const rows = useMemo(() => {
-    const all = (budgets.data ?? [])
-      .flatMap((budget) => budget.limits.map((limit) => ({ budget, limit })))
-      // Only the primary currency's limits belong on one scale — a USD limit
-      // listed beside VND ones would make the summary's totals nonsense.
-      .filter(({ limit }) => limit.currency === currency)
-      // Each row is paced against its own start_date, not the shared month
-      // figure — the summary card above still speaks for the whole month, but
-      // a budget created on the 25th is not 83% through its first period.
-      .map((row) => {
-        if (!rangeActive) {
-          const periodElapsed = budgetPeriodElapsed(row.budget.start_date);
-          return { ...row, periodElapsed, limit: row.limit, status: budgetRowStatus(row.limit, periodElapsed) };
-        }
-        // Filtered: the limit is prorated to the range's length and the spend
-        // comes from the report, so "today vs today's share" is a comparison
-        // that actually means something. Against the untouched monthly limit a
-        // heavy day reads as 3% used, which is worse than showing nothing.
-        const spent = spentByCategory.get(row.budget.category_id) ?? 0;
-        const scaledLimit = proratedLimit(row.limit.amount_limit, rangeDayCount);
-        const limit = {
-          ...row.limit,
-          amount_limit: scaledLimit,
-          spent,
-          remaining: scaledLimit - spent,
-          status: (spent > scaledLimit ? "exceeded" : "within") as typeof row.limit.status,
-        };
-        // A finished day is fully elapsed; today is however far through it we
-        // are. Either way the marker answers "should this much be gone by now".
-        const periodElapsed = rangeElapsed;
-        return { ...row, periodElapsed, limit, status: budgetRowStatus(limit, periodElapsed) };
-      });
-
-    // Worst first: over, then at risk, then on track, then untouched. The
-    // thing you opened this tab to find should never be below the fold.
-    const rank: Record<BudgetPaceState, number> = { over: 0, "at-risk": 1, "on-track": 2, unused: 3 };
-    return all.sort((a, b) => rank[a.status.state] - rank[b.status.state] || b.status.ratio - a.status.ratio);
-    // pace.elapsed is a deliberate clock dependency, not a value this memo
-    // reads: budgetPeriodElapsed below calls new Date() itself, so without
-    // something that changes at midnight every row's tick would freeze at
-    // whatever it was when the screen mounted.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [budgets.data, currency, pace.elapsed, rangeActive, rangeDayCount, rangeElapsed, spentByCategory]);
-
-  const counts = useMemo(
-    () => ({
-      all: rows.length,
-      "at-risk": rows.filter((r) => r.status.state === "at-risk").length,
-      over: rows.filter((r) => r.status.state === "over").length,
-    }),
-    [rows],
-  );
-
-  const totals = useMemo(
-    () =>
-      rows.reduce(
-        (acc, { limit }) => ({ limit: acc.limit + limit.amount_limit, spent: acc.spent + limit.spent }),
-        { limit: 0, spent: 0 },
-      ),
-    [rows],
-  );
-
-  const visibleRows = useMemo(() => {
-    const states = FILTERS.find((f) => f.key === filter)?.states;
-    if (!states) return rows;
-    return rows.filter((r) => (states as readonly BudgetPaceState[]).includes(r.status.state));
-  }, [rows, filter]);
-
+  const { rangeActive, resolvedRange, rangeDayCount, rangeElapsed, rows, counts, totals, visibleRows } =
+    useBudgetRows({ budgets: budgets.data, currency, dateRange, filter, paceElapsed: pace.elapsed });
   const pickerCategories = Array.from(new Map(rows.map(({ budget }) => [budget.category_id, budget])).values()).map(
     (budget) => ({
       id: budget.category_id,
@@ -216,6 +103,11 @@ export function BudgetsTab({ initialRange, rangeNonce }: BudgetsTabProps = {}) {
     const y = rowOffsets.current[row.budget.id];
     if (y !== undefined) scrollRef.current?.scrollTo({ y: Math.max(y - spacing.md, 0), animated: true });
   };
+
+  // Budgets are monthly, so an unfiltered view drills into the current
+  // calendar month — the same window the backend's own `spent` is computed
+  // over (BudgetRepo.SpentByUserCurrentPeriod).
+  const detailRange = resolvedRange ?? monthRange(0);
 
   const openNew = () => {
     setEditingBudget(null);
@@ -279,18 +171,7 @@ export function BudgetsTab({ initialRange, rangeNonce }: BudgetsTabProps = {}) {
           currency={currency}
         />
 
-        <View style={styles.chipRow}>
-          {FILTERS.map((f) => {
-            const active = filter === f.key;
-            return (
-              <Pressable key={f.key} style={[styles.chip, active && styles.chipActive]} onPress={() => setFilter(f.key)}>
-                <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>
-                  {f.label} {counts[f.key]}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <BudgetFilterChips value={filter} onChange={setFilter} counts={counts} />
 
         {visibleRows.length === 0 ? (
           <Text style={styles.empty}>
@@ -316,6 +197,7 @@ export function BudgetsTab({ initialRange, rangeNonce }: BudgetsTabProps = {}) {
                   setModalOpen(true);
                 }}
                 onHold={() => setPickerOpen(true)}
+                onPressBar={() => setDetailRow({ budget, limit })}
               />
             </View>
           ))
@@ -346,6 +228,26 @@ export function BudgetsTab({ initialRange, rangeNonce }: BudgetsTabProps = {}) {
         }}
       />
 
+      {/* The window the rows were drawn for, not the calendar month by
+          default — under a filter the bar shows a prorated slice, so the rows
+          behind it have to cover that same slice or the two disagree. */}
+      <CategoryTransactionsDialog
+        visible={detailRow !== null}
+        onClose={() => setDetailRow(null)}
+        categoryId={detailRow?.budget.category_id ?? null}
+        categoryName={detailRow?.budget.category_name ?? ""}
+        color={detailRow ? colorForCategory(detailRow.budget.category_id) : colors.lavender}
+        icon={detailRow?.budget.icon ?? (detailRow ? categoryById.get(detailRow.budget.category_id)?.icon : undefined)}
+        iconUrl={
+          detailRow?.budget.icon_url ??
+          (detailRow ? categoryById.get(detailRow.budget.category_id)?.icon_url : undefined)
+        }
+        from={detailRange.from}
+        to={detailRange.to}
+        currency={currency}
+        total={detailRow?.limit.spent ?? 0}
+      />
+
       <CategoryPickerDrawer
         visible={pickerOpen}
         onClose={() => setPickerOpen(false)}
@@ -367,21 +269,6 @@ const styles = StyleSheet.create({
   rangeLabel: { ...typography.caption, color: colors.textSecondary },
   rangeClear: { ...typography.caption, color: colors.green },
   rangeNote: { ...typography.tiny, color: colors.textMuted, paddingBottom: spacing.xs },
-  chipRow: { flexDirection: "row", gap: spacing.sm, paddingVertical: spacing.lg },
-  chip: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-  },
-  // Outlined rather than filled: the chips sit directly above rows whose own
-  // color carries meaning, and a solid green pill there reads as another
-  // status.
-  chipActive: { borderColor: colors.green, backgroundColor: "rgba(133,255,51,0.08)" },
-  chipLabel: { ...typography.caption, color: colors.textSecondary },
-  chipLabelActive: { color: colors.green },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
   fab: {
     position: "absolute",

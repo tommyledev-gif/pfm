@@ -11,9 +11,11 @@ import { DonutLegendRow } from "@/components/shared/DonutLegendRow";
 import { CategoryTransactionsDialog } from "@/features/reports/components/CategoryTransactionsDialog";
 import { buildCategoryColorMap } from "@/lib/category-color";
 import { formatCurrencyCompact } from "@/lib/currency";
+import { monthRange } from "@/lib/date-range";
 import { formatDateRange } from "@/lib/format-date";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
+import { daysInRange, proratedLimit } from "@/features/budgets/budget-pace";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary-query";
 import { SpendingTabSkeleton } from "@/features/reports/components/SpendingTabSkeleton";
@@ -83,14 +85,32 @@ export function SpendingTab({ focusCategoryId, focusNonce }: SpendingTabProps = 
   const totalExpense = segments.reduce((sum, s) => sum + s.amount, 0);
   const detailSegment = segments.find((s) => s.key === detailCategoryId);
 
-  // The report's own backend default window is the current month, and
-  // budgets are monthly-only — a custom date range has no corresponding
-  // budget period, so the "/budget" half of the center label only makes
-  // sense while viewing that default window.
-  const isDefaultRange = !dateRange.from && !dateRange.to;
-  const budgetTotal = isDefaultRange
-    ? (budgets.data ?? []).reduce((sum, b) => sum + (b.limits.find((l) => l.currency === currency)?.amount_limit ?? 0), 0)
-    : null;
+  // Budgets are monthly-only, so a custom window has no budget period of its
+  // own. The old behaviour was to drop the "/budget" half of the donut's centre
+  // label entirely and print a fixed line saying budgets only apply to the
+  // current month — which was keyed on "has the user touched the filter", not
+  // on what the filter actually selected: picking this very month by hand still
+  // showed the note, and the note itself never changed no matter which range
+  // was chosen, so it read as a stuck label rather than an explanation.
+  //
+  // Now the monthly total is PRORATED to the window on screen, the same way
+  // BudgetsTab.tsx already prorates each row's limit, and the note says which
+  // window it was divided by. Comparing a single day's spend against a whole
+  // month's limit was the thing worth avoiding, and prorating avoids it without
+  // going silent.
+  const thisMonth = monthRange(0);
+  const isCurrentMonthRange = range.from.slice(0, 10) === thisMonth.from && range.to.slice(0, 10) === thisMonth.to;
+  const monthlyBudgetTotal = (budgets.data ?? []).reduce(
+    (sum, b) => sum + (b.limits.find((l) => l.currency === currency)?.amount_limit ?? 0),
+    0,
+  );
+  const rangeDayCount = daysInRange(range.from, range.to);
+  const budgetTotal =
+    monthlyBudgetTotal === 0
+      ? null
+      : isCurrentMonthRange
+        ? monthlyBudgetTotal
+        : proratedLimit(monthlyBudgetTotal, rangeDayCount);
 
   return (
     <View style={styles.container}>
@@ -127,8 +147,10 @@ export function SpendingTab({ focusCategoryId, focusNonce }: SpendingTabProps = 
           budgetTotal={budgetTotal}
           onPressDetails={setDetailCategoryId}
         />
-        {!isDefaultRange ? (
-          <Text style={styles.budgetHint}>Ngân sách chỉ áp dụng cho tháng hiện tại</Text>
+        {budgetTotal !== null && !isCurrentMonthRange ? (
+          <Text style={styles.budgetHint}>
+            Hạn mức tháng đã chia theo {rangeDayCount === 1 ? "ngày" : `${rangeDayCount} ngày`} bạn chọn.
+          </Text>
         ) : null}
       </Card>
 

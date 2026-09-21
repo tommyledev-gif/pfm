@@ -221,3 +221,68 @@ export function summarizeFixedCosts(items: FixedCostItem[], maxChars = SUMMARY_M
   // asked for.
   return `${joined.slice(0, maxChars - 1).trimEnd()}…`;
 }
+
+/**
+ * Re-spreads a breakdown across a new total, keeping every item's share.
+ *
+ * ⚠️ WHY SHARES AND NOT A RESET: once the helper has run, the "chi phí cố định"
+ * field is a total that a real itemised list adds up to. Dragging the slider
+ * afterwards changes that total — and if the list is left alone, the field and
+ * its own breakdown now contradict each other: the hint underneath still lists
+ * costs summing to 12tr while the field says 15tr. Zeroing the list instead
+ * throws away work the user did by hand.
+ *
+ * Proportional scaling is the only option that keeps both halves true and keeps
+ * the user's input: someone who drags 12tr → 15tr is saying "everything is
+ * about a quarter more than I said", which is exactly what the shares express.
+ *
+ * ⚠️ Call this ONLY when the breakdown is about to be looked at again — i.e.
+ * when the helper sheet opens — never on the slider's own onChange. The slider
+ * emits a value per gesture frame, and re-deriving and re-serialising the whole
+ * list on each one is work whose result nothing on screen reads.
+ *
+ * The remainder from rounding lands on the largest item, so the scaled list
+ * sums to `newTotalXu` exactly rather than to "near enough".
+ */
+export function scaleFixedCosts(items: FixedCostItem[], newTotalXu: number): FixedCostItem[] {
+  const current = totalFixedCosts(items);
+  if (items.length === 0 || current <= 0 || newTotalXu <= 0 || current === newTotalXu) return items;
+
+  const ratio = newTotalXu / current;
+  // Rounded to whole đồng (100 xu): these are amounts a person typed, and
+  // handing back 1.999.987,43đ for a scaled 2tr reads as a glitch.
+  const scaled = items.map((item) => ({
+    ...item,
+    amountXu: Math.max(100, Math.round((item.amountXu * ratio) / 100) * 100),
+  }));
+
+  const drift = newTotalXu - totalFixedCosts(scaled);
+  if (drift !== 0) {
+    let largest = 0;
+    for (let i = 1; i < scaled.length; i++) {
+      if (scaled[i].amountXu > scaled[largest].amountXu) largest = i;
+    }
+    scaled[largest] = { ...scaled[largest], amountXu: Math.max(100, scaled[largest].amountXu + drift) };
+  }
+
+  return scaled;
+}
+
+/**
+ * Serialises items back into the free-text form the textarea holds.
+ *
+ * Needed because scaling has to write its result somewhere the parser will read
+ * it back identically — `parseFixedCosts` is the source of truth for the typed
+ * half, so a scaled typed item that is not expressed as text would simply be
+ * lost on the next parse.
+ *
+ * Plain đồng, no "3m"/"50k" shorthand: the shorthand the user typed cannot
+ * survive scaling anyway (3m × 1.25 is not a round shorthand), and a literal
+ * figure is unambiguous. Separators are stripped from labels because a comma
+ * inside one would split that item in two on the way back in.
+ */
+export function formatFixedCostsText(items: FixedCostItem[]): string {
+  return items
+    .map((item) => `${item.label.replace(/[;,\n]/g, " ").trim()} ${Math.round(item.amountXu / 100)}`)
+    .join(", ");
+}

@@ -1,186 +1,83 @@
-import { ComponentType, ReactNode, useRef } from "react";
-import { Animated, Dimensions, PanResponder, StyleProp, StyleSheet, Vibration, View, ViewStyle } from "react-native";
+import { ReactNode, useEffect } from "react";
+import { Animated, Dimensions, StyleSheet, View } from "react-native";
 
-import { IconProps } from "@/components/ui/icons/primitives";
-import { colors, radii } from "@/lib/theme";
+import { SwipeAction, SwipeActionButton } from "@/components/shared/SwipeActionButton";
+import { DELETE_SWIPE_RATIO, EDIT_SWIPE_RATIO, useSwipeActions } from "@/components/shared/use-swipe-actions";
 
-export interface SwipeRowAction {
-  Icon: ComponentType<IconProps>;
-  // Armed background/border color — a solid fill, same "this is a different,
-  // committed control, not a tinted resting one" language as
-  // SwipeableMessageRow's own pencil.
-  color: string;
-  onTrigger: () => void;
-}
+export type { SwipeAction } from "@/components/shared/SwipeActionButton";
+
+const SCREEN_WIDTH = Dimensions.get("window").width;
 
 interface SwipeableRowProps {
   children: ReactNode;
-  // Revealed on the LEFT edge, dragging the row itself to the right.
-  leftAction?: SwipeRowAction;
-  // Revealed on the RIGHT edge, dragging the row itself to the left.
-  rightAction?: SwipeRowAction;
+  /** Revealed on the LEFT edge, dragging the row to the right. */
+  leftAction?: SwipeAction;
+  /** Revealed on the RIGHT edge, dragging the row to the left. */
+  rightAction?: SwipeAction;
   disabled?: boolean;
+  /**
+   * Bumped by the parent whenever the surrounding list changes, is scrolled,
+   * or is refreshed. Any change closes a parked row — a revealed button must
+   * never be left pointing at content that has moved underneath it.
+   */
+  closeSignal?: number | string;
 }
 
-const SCREEN_WIDTH = Dimensions.get("window").width;
-// Same cap/arm/vibration tuning as ai-chat's SwipeableMessageRow (see that
-// file's doc comment for the full rationale) — this is its two-sided sibling:
-// SwipeableMessageRow reveals one fixed action on one fixed edge per row,
-// while this one lets either edge be armed depending on which way the row is
-// actually dragged, for rows that need two distinct actions (Home's "Chờ xác
-// nhận" list: edit on a right-drag, delete on a left-drag).
-const MAX_SWIPE = SCREEN_WIDTH * 0.2;
-const ARM_RATIO = 0.9;
-const FADE_LEAD = 0.15;
-const FIRE_EPSILON = 0.5;
-const ACTIVATION_DISTANCE = 10;
-const ARM_VIBRATION_MS = 10;
-const FIRE_VIBRATION_MS = 25;
+/**
+ * A row with up to two swipe-revealed actions.
+ *
+ * ⚠️ Releasing the drag reveals a button; it does not act. The action fires
+ * only when that button is tapped, which is what stops an accidental flick
+ * from deleting something. See use-swipe-actions for the gesture itself.
+ */
+export function SwipeableRow({ children, leftAction, rightAction, disabled, closeSignal }: SwipeableRowProps) {
+  // A destructive side gets the wider cap so its parked button has room for a
+  // label; a plain one keeps the narrower, long-standing feel.
+  const leftRatio = leftAction?.destructive ? DELETE_SWIPE_RATIO : EDIT_SWIPE_RATIO;
+  const rightRatio = rightAction?.destructive ? DELETE_SWIPE_RATIO : EDIT_SWIPE_RATIO;
 
-export function SwipeableRow({ children, leftAction, rightAction, disabled }: SwipeableRowProps) {
-  // Signed: positive while dragging right (leftAction's territory), negative
-  // while dragging left (rightAction's territory). Native-driven so the
-  // transform stays off the JS thread.
-  const translateX = useRef(new Animated.Value(0)).current;
-  // Unsigned 0..1 magnitude per side — kept apart from translateX because
-  // color interpolation only exists on the JS driver, and mixing a JS-driven
-  // color interpolation onto a native-driven value is what RN rejects (see
-  // SwipeableMessageRow's own comment on this exact trap).
-  const leftProgress = useRef(new Animated.Value(0)).current;
-  const rightProgress = useRef(new Animated.Value(0)).current;
-  const armedRef = useRef(false);
-  const atMaxRef = useRef(false);
-  const activeSideRef = useRef<"left" | "right" | null>(null);
-  const baseRef = useRef(0);
-  const offsetRef = useRef(0);
-  const disabledRef = useRef(disabled);
-  disabledRef.current = disabled;
-  const leftActionRef = useRef(leftAction);
-  leftActionRef.current = leftAction;
-  const rightActionRef = useRef(rightAction);
-  rightActionRef.current = rightAction;
+  const swipe = useSwipeActions({
+    left: leftAction ? { ratio: leftRatio } : undefined,
+    right: rightAction ? { ratio: rightRatio } : undefined,
+    disabled,
+  });
 
-  const reset = () => {
-    Animated.spring(translateX, { toValue: 0, useNativeDriver: true, bounciness: 6 }).start();
-    Animated.timing(leftProgress, { toValue: 0, duration: 180, useNativeDriver: false }).start();
-    Animated.timing(rightProgress, { toValue: 0, duration: 180, useNativeDriver: false }).start();
-    armedRef.current = false;
-    atMaxRef.current = false;
-    activeSideRef.current = null;
-    offsetRef.current = 0;
-    baseRef.current = 0;
-  };
+  const { close } = swipe;
+  useEffect(() => {
+    close();
+  }, [closeSignal, close]);
 
-  const release = () => {
-    if (!atMaxRef.current || disabledRef.current) {
-      reset();
-      return;
-    }
-    const side = activeSideRef.current;
-    const action = side === "left" ? leftActionRef.current : side === "right" ? rightActionRef.current : undefined;
-    if (action) {
-      Vibration.vibrate(FIRE_VIBRATION_MS);
-      action.onTrigger();
-    }
-    reset();
-  };
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gesture) => {
-        if (disabledRef.current) return false;
-        const draggingRight = gesture.dx > 0 && Boolean(leftActionRef.current);
-        const draggingLeft = gesture.dx < 0 && Boolean(rightActionRef.current);
-        return (
-          (draggingRight || draggingLeft) &&
-          Math.abs(gesture.dx) > ACTIVATION_DISTANCE &&
-          Math.abs(gesture.dx) > Math.abs(gesture.dy)
-        );
-      },
-      onPanResponderTerminationRequest: () => false,
-      onShouldBlockNativeResponder: () => true,
-      onPanResponderGrant: () => {
-        baseRef.current = offsetRef.current;
-      },
-      onPanResponderMove: (_, gesture) => {
-        const total = baseRef.current + gesture.dx;
-        const max = leftActionRef.current ? MAX_SWIPE : 0;
-        const min = rightActionRef.current ? -MAX_SWIPE : 0;
-        const clampedTotal = Math.max(min, Math.min(max, total));
-        offsetRef.current = clampedTotal;
-        translateX.setValue(clampedTotal);
-
-        const side: "left" | "right" | null = clampedTotal > 0 ? "left" : clampedTotal < 0 ? "right" : null;
-        activeSideRef.current = side ?? activeSideRef.current;
-
-        const fraction = Math.abs(clampedTotal) / MAX_SWIPE;
-        leftProgress.setValue(side === "left" ? fraction : 0);
-        rightProgress.setValue(side === "right" ? fraction : 0);
-
-        if (fraction >= ARM_RATIO && !armedRef.current) {
-          armedRef.current = true;
-          Vibration.vibrate(ARM_VIBRATION_MS);
-        } else if (fraction < ARM_RATIO && armedRef.current) {
-          armedRef.current = false;
-        }
-
-        atMaxRef.current = Math.abs(clampedTotal) >= MAX_SWIPE - FIRE_EPSILON;
-      },
-      onPanResponderRelease: release,
-      onPanResponderTerminate: reset,
-    }),
-  ).current;
-
-  const renderIndicator = (
-    action: SwipeRowAction | undefined,
-    progress: Animated.Value,
-    positionStyle: StyleProp<ViewStyle>,
-  ) => {
-    if (!action) return null;
-    const iconOpacity = progress.interpolate({
-      inputRange: [ARM_RATIO - FADE_LEAD, ARM_RATIO],
-      outputRange: [0, 1],
-      extrapolate: "clamp",
-    });
-    const armedIconOpacity = progress.interpolate({
-      inputRange: [ARM_RATIO, 1],
-      outputRange: [0, 1],
-      extrapolate: "clamp",
-    });
-    const borderColor = progress.interpolate({
-      inputRange: [ARM_RATIO, 1],
-      outputRange: [colors.surfaceBorder, action.color],
-      extrapolate: "clamp",
-    });
-    const backgroundColor = progress.interpolate({
-      inputRange: [ARM_RATIO, 1],
-      outputRange: [colors.surface, action.color],
-      extrapolate: "clamp",
-    });
-    const scale = progress.interpolate({
-      inputRange: [ARM_RATIO, 1],
-      outputRange: [1, 1.15],
-      extrapolate: "clamp",
-    });
-    const { Icon } = action;
-
-    return (
-      <View pointerEvents="none" style={[styles.indicator, positionStyle]}>
-        <Animated.View style={[styles.pill, { opacity: iconOpacity, backgroundColor, borderColor, transform: [{ scale }] }]}>
-          <Icon size={16} color={colors.textPrimary} />
-          <Animated.View style={[StyleSheet.absoluteFill, styles.pillOverlay, { opacity: armedIconOpacity }]}>
-            <Icon size={16} color={colors.onGreen} />
-          </Animated.View>
-        </Animated.View>
-      </View>
-    );
-  };
+  const wrap = (action: SwipeAction): SwipeAction => ({
+    ...action,
+    onPress: () => {
+      // Closed before the action runs: a navigation that leaves this screen
+      // must not come back to a row still hanging open.
+      close();
+      action.onPress();
+    },
+  });
 
   return (
     <View style={styles.wrapper}>
-      {renderIndicator(leftAction, leftProgress, styles.indicatorLeft)}
-      {renderIndicator(rightAction, rightProgress, styles.indicatorRight)}
-      <Animated.View style={{ transform: [{ translateX }] }} {...panResponder.panHandlers}>
+      {leftAction ? (
+        <SwipeActionButton
+          action={wrap(leftAction)}
+          progress={swipe.leftProgress}
+          width={SCREEN_WIDTH * leftRatio}
+          parked={swipe.parkedSide === "left"}
+          positionStyle={styles.left}
+        />
+      ) : null}
+      {rightAction ? (
+        <SwipeActionButton
+          action={wrap(rightAction)}
+          progress={swipe.rightProgress}
+          width={SCREEN_WIDTH * rightRatio}
+          parked={swipe.parkedSide === "right"}
+          positionStyle={styles.right}
+        />
+      ) : null}
+      <Animated.View style={{ transform: [{ translateX: swipe.translateX }] }} {...swipe.panHandlers}>
         {children}
       </Animated.View>
     </View>
@@ -189,23 +86,6 @@ export function SwipeableRow({ children, leftAction, rightAction, disabled }: Sw
 
 const styles = StyleSheet.create({
   wrapper: { width: "100%" },
-  indicator: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    width: MAX_SWIPE,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  indicatorLeft: { left: 0 },
-  indicatorRight: { right: 0 },
-  pill: {
-    width: 32,
-    height: 32,
-    borderRadius: radii.pill,
-    borderWidth: 1.5,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pillOverlay: { alignItems: "center", justifyContent: "center" },
+  left: { left: 0 },
+  right: { right: 0 },
 });

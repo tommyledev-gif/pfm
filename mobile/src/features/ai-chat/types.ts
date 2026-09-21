@@ -90,4 +90,19 @@ export interface ChatMessage {
   actionType?: "budget_wizard";
   budgetWizardSubmitted?: boolean;
   budgetWizardCreatedCount?: number;
+  // Set when this proposal has been removed. The message itself is NEVER
+  // deleted from the thread — the thread is the user's record of what they
+  // asked for, and quietly dropping entries from it is how "what happened to
+  // that transaction?" becomes unanswerable.
+  //
+  // "deleted" means a real Transaction existed and was soft-deleted server
+  // side, so its history is readable via the audit log. "discarded" means the
+  // proposal was never confirmed, so no Transaction ever existed and there is
+  // nothing server side to read — the local trail below is all there is.
+  //
+  // ⚠️ Both optional: messages persisted before this existed must keep
+  // deserializing. See features/ai-chat/tombstone.ts.
+  removalState?: "deleted" | "discarded";
+  /** ISO-8601 UTC. Displayed in device-local time. */
+  removedAt?: string;
 }

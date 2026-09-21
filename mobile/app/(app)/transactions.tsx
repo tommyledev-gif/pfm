@@ -14,6 +14,9 @@ import { useTransactionIO } from "@/features/transactions/use-transaction-io";
 import { useFilteredReportTotal } from "@/features/transactions/api/use-filtered-report-total";
 import { Transaction } from "@/features/transactions/types";
 import { buildDaySections } from "@/features/transactions/day-sections";
+import { rangeTargetsFuture, splitFutureTransactions } from "@/features/transactions/future";
+import { FutureTransactionsCard } from "@/features/transactions/components/FutureTransactionsCard";
+import { FutureTransactionsDialog } from "@/features/transactions/components/FutureTransactionsDialog";
 import { TransactionFormModal } from "@/features/transactions/components/TransactionFormModal";
 import { TransactionRowSkeleton } from "@/features/transactions/components/TransactionRowSkeleton";
 import { TransactionDayHeader } from "@/features/transactions/components/TransactionDayHeader";
@@ -37,6 +40,7 @@ export default function TransactionsScreen() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
+  const [futureOpen, setFutureOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   // Day keys (YYYY-MM-DD) the user has folded away. Session-local and
   // deliberately not persisted — collapsing is a "get this out of my way
@@ -102,9 +106,18 @@ export default function TransactionsScreen() {
   // buildDaySections' `grouped` option.
   const hasAmountSort = sortKeys.some((key) => SORT_OPTIONS.find((o) => o.key === key)?.group === "amount");
 
+  // Rows dated ahead of today are lifted out of the list and summarised in a
+  // dashed card above it — see splitFutureTransactions for why the top of the
+  // list has to stay "what just happened". A filter that deliberately reaches
+  // into the future opts out: those rows were asked for.
+  const { future, upToToday } = useMemo(() => {
+    if (rangeTargetsFuture(dateRange.to)) return { future: [], upToToday: sortedItems };
+    return splitFutureTransactions(sortedItems);
+  }, [sortedItems, dateRange.to]);
+
   const sections = useMemo(
-    () => buildDaySections(sortedItems, { grouped: !hasAmountSort, walletCurrencyMap, collapsedDays }),
-    [sortedItems, hasAmountSort, walletCurrencyMap, collapsedDays],
+    () => buildDaySections(upToToday, { grouped: !hasAmountSort, walletCurrencyMap, collapsedDays }),
+    [upToToday, hasAmountSort, walletCurrencyMap, collapsedDays],
   );
 
   const toggleDay = (dayKey: string) =>
@@ -185,7 +198,9 @@ export default function TransactionsScreen() {
             onImport={transactionIO.onImport}
             exporting={transactionIO.exporting}
             importing={transactionIO.importing}
-          />
+          >
+            <FutureTransactionsCard transactions={future} onPress={() => setFutureOpen(true)} />
+          </TransactionsHeader>
         }
         renderSectionHeader={({ section }) =>
           section.dayLabel ? <TransactionDayHeader section={section} onToggle={() => toggleDay(section.key)} /> : null
@@ -247,6 +262,19 @@ export default function TransactionsScreen() {
         visible={formOpen}
         onClose={() => setFormOpen(false)}
         editingTransaction={editingTransaction}
+      />
+
+      <FutureTransactionsDialog
+        visible={futureOpen}
+        onClose={() => setFutureOpen(false)}
+        transactions={future}
+        walletCurrencyMap={walletCurrencyMap}
+        categoryById={categoryById}
+        onSelect={(transaction) => {
+          setFutureOpen(false);
+          setEditingTransaction(transaction);
+          setFormOpen(true);
+        }}
       />
 
       {transactionIO.modal}

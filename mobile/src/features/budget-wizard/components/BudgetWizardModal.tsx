@@ -8,6 +8,7 @@ import { colors, spacing } from "@/lib/theme";
 import { useSheetStore } from "@/stores/sheet-store";
 import { BUDGET_WIZARD_TOTAL_STEPS, useBudgetWizardState } from "@/features/budget-wizard/hooks/use-budget-wizard-state";
 import { FixedCostsModal } from "@/features/budget-wizard/components/FixedCostsModal";
+import { WizardBackConfirmDialog } from "@/features/budget-wizard/components/WizardBackConfirmDialog";
 import { WizardProgressHeader } from "@/features/budget-wizard/components/WizardProgressHeader";
 import { WizardStepIncome } from "@/features/budget-wizard/components/WizardStepIncome";
 import { WizardStepProfile } from "@/features/budget-wizard/components/WizardStepProfile";
@@ -87,7 +88,7 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
           step={step}
           totalSteps={BUDGET_WIZARD_TOTAL_STEPS}
           onClose={onClose}
-          onBack={step > 1 ? wizard.goBack : undefined}
+          onBack={step > 1 ? wizard.requestBack : undefined}
         />
 
         <View style={styles.body}>
@@ -106,6 +107,8 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
               onChangeCycleStartDay={wizard.setCycleStartDay}
               onOpenFixedCosts={wizard.openFixedCosts}
               onNext={wizard.goToProfile}
+              restoredFromSavedAt={wizard.restoredFrom?.savedAt}
+              onDiscardSavedPlan={wizard.discardSavedPlan}
             />
           ) : null}
 
@@ -130,13 +133,29 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
               onAddRow={wizard.addProposalRow}
               onRemoveRow={wizard.removeProposalRow}
               onRetry={wizard.retryProposal}
-              onSubmit={wizard.submit}
+              // requestSubmit, not submit: the bulk write replaces every
+              // existing budget, so the confirmation is owed first.
+              onSubmit={wizard.requestSubmit}
+              hasExistingBudgets={wizard.hasExistingBudgets}
+              overwriteConfirmOpen={wizard.overwriteConfirmOpen}
+              onConfirmOverwrite={wizard.confirmOverwrite}
+              onCancelOverwrite={wizard.cancelOverwrite}
+              onSavePlan={wizard.savePlan}
+              planSaved={wizard.planSaved}
+              canSubmit={wizard.canSubmit}
             />
           ) : null}
 
         </View>
       </SafeAreaView>
       )}
+
+      <WizardBackConfirmDialog
+        visible={wizard.backConfirmOpen}
+        onKeep={wizard.confirmBackKeeping}
+        onDiscard={wizard.confirmBackDiscarding}
+        onCancel={wizard.cancelBack}
+      />
 
       {/* Sibling of the SafeAreaView, not a child of the step: it has to cover
           the progress header as well, and a panel rendered inside the step body
@@ -146,6 +165,7 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
         currency={wizard.currency}
         initialText={wizard.fixedCostsText}
         initialSuggested={wizard.fixedCostsSuggested}
+        rescaled={wizard.fixedCostsRescaled}
         onClose={wizard.closeFixedCosts}
         onConfirm={wizard.applyFixedCosts}
       />

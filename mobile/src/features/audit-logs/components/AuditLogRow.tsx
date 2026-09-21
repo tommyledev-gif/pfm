@@ -3,12 +3,12 @@ import { StyleSheet, Text, View } from "react-native";
 import { formatCurrency } from "@/lib/currency";
 import { formatDateShort, formatTime } from "@/lib/format-date";
 import { colors, radii, spacing, typography } from "@/lib/theme";
-import { AuditAction, AuditLogEntry, AuditSnapshot } from "@/features/audit-log/types";
+import { AuditAction, AuditLogEntry, AuditSnapshot } from "@/features/audit-logs/types";
 
 const ACTION_LABEL: Record<AuditAction, string> = {
   create: "Tạo",
   update: "Sửa",
-  delete: "Xóa",
+  delete: "Đã xóa",
 };
 
 const ACTION_COLOR: Record<AuditAction, string> = {
@@ -103,9 +103,19 @@ export function AuditLogRow({ entry, resolveCategoryName, resolveWalletName, cur
           )}
         </View>
       ) : (
-        <Text style={styles.changeLine} numberOfLines={2}>
-          {snapshot ? snapshotSummary(snapshot) : "—"}
-        </Text>
+        <>
+          <Text style={styles.changeLine} numberOfLines={2}>
+            {snapshot ? snapshotSummary(snapshot) : "—"}
+          </Text>
+          {/* A removal is the one entry people come here to find, so it says
+              when it happened in words rather than leaving the reader to infer
+              it from the day header and the trailing time. */}
+          {entry.action === "delete" ? (
+            <Text style={styles.removedNote} numberOfLines={1}>
+              Đã xóa lúc {formatTime(entry.created_at)} · {formatDateShort(entry.created_at)}
+            </Text>
+          ) : null}
+        </>
       )}
     </View>
   );
@@ -131,6 +141,7 @@ const styles = StyleSheet.create({
   time: { ...typography.tiny, color: colors.textMuted },
   changeList: { gap: 2 },
   changeLine: { ...typography.caption, color: colors.textSecondary },
+  removedNote: { ...typography.tiny, color: colors.peach },
   fieldLabel: { color: colors.textMuted },
   newValue: { color: colors.textPrimary, fontWeight: "700" },
 });

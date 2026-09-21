@@ -1,3 +1,4 @@
+import { ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { CalendarIcon, DownloadIcon, PlusIcon, SearchIcon, SortIcon, TagIcon, UploadIcon } from "@/components/ui/Icon";
@@ -39,6 +40,10 @@ interface TransactionsHeaderProps {
   onImport: () => void;
   exporting: boolean;
   importing: boolean;
+  // Rendered as the last thing in the header, directly above the first day
+  // section — where the Transactions screen hangs its "sắp tới" card so the
+  // card scrolls with the list instead of pinning over it.
+  children?: ReactNode;
 }
 
 // Everything above the Transactions list — title + matched count, the period
@@ -67,6 +72,7 @@ export function TransactionsHeader({
   onImport,
   exporting,
   importing,
+  children,
 }: TransactionsHeaderProps) {
   // The summary line's figure follows whichever tab is active: on Thu nhập
   // it's the income figure (green, the positive register used for income
@@ -137,6 +143,17 @@ export function TransactionsHeader({
         ) : null}
       </Text>
 
+      {/* ⚠️ Said out loud rather than left to be inferred. With no date filter
+          the figure above covers the current month while the list below is not
+          limited to it — so a month with no income reads "Tổng thu: +0" over a
+          list of last month's income, and both numbers are correct. Only the
+          wording is new; no figure, filter default or query changed. */}
+      {dateRangeLabel === null ? (
+        <Text style={styles.periodNote} numberOfLines={2}>
+          Số liệu trên tính theo {periodLabel.toLowerCase()}. Danh sách bên dưới hiển thị mọi giao dịch.
+        </Text>
+      ) : null}
+
       <View style={styles.searchRow}>
         <SearchIcon size={16} color={colors.textSecondary} />
         <TextInput
@@ -193,6 +210,8 @@ export function TransactionsHeader({
           testID="btn-import-transactions"
         /> */}
       </ScrollView>
+
+      {children}
     </View>
   );
 }
@@ -211,6 +230,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(133,255,51,0.3)",
   },
   countBadgeLabel: { ...typography.tiny, color: colors.green, fontWeight: "700" },
+  periodNote: { ...typography.tiny, color: colors.textMuted, marginTop: 2 },
   subtitle: { ...typography.caption, color: colors.textSecondary },
   subtitleAmount: { fontWeight: "700" },
   segmentTrailing: { ...typography.tiny, color: colors.textMuted, fontWeight: "700" },

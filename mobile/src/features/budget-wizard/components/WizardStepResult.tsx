@@ -5,10 +5,12 @@ import { BarSegment, SegmentedBar } from "@/components/shared/SegmentedBar";
 import { EditAmountModal } from "@/features/budget-wizard/components/EditAmountModal";
 import { AddBudgetRowModal, AddBudgetRowResult } from "@/features/budget-wizard/components/AddBudgetRowModal";
 import { ProposalRow } from "@/features/budget-wizard/components/ProposalRow";
+import { WizardPlanSummaryRows } from "@/features/budget-wizard/components/WizardPlanSummaryRows";
+import { WizardResultFooter } from "@/features/budget-wizard/components/WizardResultFooter";
 import { Category } from "@/features/categories/types";
 import { daysInCycle, perDayXu } from "@/features/budget-wizard/budget-math";
 import { BudgetProposalsResponse, ProposalEntry } from "@/features/budget-wizard/types";
-import { colorForCategory } from "@/lib/category-color";
+import { buildCategoryColorMap } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 
@@ -23,7 +25,8 @@ interface WizardStepResultProps {
   submitting: boolean;
   error: string | null;
   onEditAmount: (categoryId: string, amountXu: number) => void;
-  /** Ids of rows the user added by hand — the only removable ones. */
+  /** Ids of rows the user added by hand. Kept for the saved-plan shape only —
+   *  it no longer gates removal, because every row is removable now. */
   addedIds: string[];
   categories: Category[];
   addRowOpen: boolean;
@@ -32,7 +35,17 @@ interface WizardStepResultProps {
   onAddRow: (entry: AddBudgetRowResult) => void;
   onRemoveRow: (categoryId: string) => void;
   onRetry: () => void;
+  /** Asks to submit — the parent decides whether an overwrite confirmation is
+   *  owed first. NOT the write itself. */
   onSubmit: () => void;
+  /** Whether POST /budgets/bulk is about to replace budgets that already exist. */
+  hasExistingBudgets: boolean;
+  overwriteConfirmOpen: boolean;
+  onConfirmOverwrite: () => void;
+  onCancelOverwrite: () => void;
+  onSavePlan: () => void;
+  planSaved: boolean;
+  canSubmit: boolean;
 }
 
 /** The catch-all bucket. Always rendered last — see `orderedProposals`. */
@@ -66,6 +79,13 @@ export function WizardStepResult({
   onRemoveRow,
   onRetry,
   onSubmit,
+  hasExistingBudgets,
+  overwriteConfirmOpen,
+  onConfirmOverwrite,
+  onCancelOverwrite,
+  onSavePlan,
+  planSaved,
+  canSubmit,
 }: WizardStepResultProps) {
   const [editing, setEditing] = useState<ProposalEntry | null>(null);
 
@@ -84,6 +104,20 @@ export function WizardStepResult({
     const rest = rows.filter((p) => p.system_key !== CATCH_ALL_KEY);
     return [...rest, ...catchAll];
   }, [result?.proposals]);
+
+  /**
+   * One colour per row, allocated across the whole visible list.
+   *
+   * ⚠️ Not `colorForCategory` per row. That hashes a single id with no
+   * knowledge of its neighbours, so two rows could land on the same colour —
+   * and a row the user has just added carries a placeholder id, which made the
+   * collision likely rather than merely possible. The bar below reads this
+   * same map, so a segment and its row can never disagree.
+   */
+  const rowColors = useMemo(
+    () => buildCategoryColorMap(orderedProposals.map((p) => p.category_id)),
+    [orderedProposals],
+  );
 
   if (loading) {
     return (
@@ -105,10 +139,10 @@ export function WizardStepResult({
   }
 
   const perDay = perDayXu(result.disposable, daysInCycle(cycleStartDay));
-  const segments: BarSegment[] = result.proposals.map((p) => ({
+  const segments: BarSegment[] = orderedProposals.map((p) => ({
     key: p.category_id,
     share: result.disposable > 0 ? p.amount_max / result.disposable : 0,
-    color: colorForCategory(p.category_id),
+    color: rowColors.get(p.category_id) ?? colors.lavender,
   }));
   if (result.unallocated_amount > 0) {
     // The buffer is drawn hatched, never solid: it is money with no category
@@ -139,13 +173,19 @@ export function WizardStepResult({
         <SegmentedBar segments={segments} />
 
         <View style={styles.rows}>
+          {orderedProposals.length === 0 ? (
+            <Text testID="text-wizard-empty-plan" style={styles.emptyPlan}>
+              Kế hoạch đang trống. Thêm ít nhất một danh mục để bắt đầu.
+            </Text>
+          ) : null}
           {orderedProposals.map((entry) => (
             <ProposalRow
               key={entry.category_id}
               entry={entry}
               currency={currency}
+              color={rowColors.get(entry.category_id) ?? colors.lavender}
               onPress={() => setEditing(entry)}
-              onRemove={addedIds.includes(entry.category_id) ? () => onRemoveRow(entry.category_id) : undefined}
+              onRemove={() => onRemoveRow(entry.category_id)}
             />
           ))}
 
@@ -158,45 +198,27 @@ export function WizardStepResult({
           </Pressable>
         </View>
 
-        {result.unallocated_amount > 0 ? (
-          <View style={styles.bufferRow}>
-            <Text style={styles.bufferLabel}>🛟 Dự phòng</Text>
-            <Text testID="text-wizard-buffer" style={styles.bufferValue}>
-              {formatCurrency(result.unallocated_amount, currency)}
-            </Text>
-          </View>
-        ) : null}
-
-        {/* Savings and fixed costs sit below the divider as reference, NOT in the
-            bar above. They were subtracted before any of this was divided up —
-            listing them beside the spending rows would double-count them and
-            invite treating savings as just another line to raid. */}
-        <View style={styles.deducted}>
-          <View style={styles.deductedRow}>
-            <Text style={styles.deductedLabel}>📈 Tiết kiệm</Text>
-            <Text style={styles.deductedValue}>{formatCurrency(savings, currency)}</Text>
-          </View>
-          <View style={styles.deductedRow}>
-            <Text style={styles.deductedLabel}>🏠 Cố định</Text>
-            <Text style={styles.deductedValue}>{formatCurrency(fixed, currency)}</Text>
-          </View>
-        </View>
-
-        {result.over_committed ? (
-          <Text style={styles.warn}>
-            Bạn khai nhiều hơn số còn được chi {formatCurrency(result.shortfall, currency)}. Bạn giảm bớt ở đâu đó nhé.
-          </Text>
-        ) : null}
+        <WizardPlanSummaryRows
+          currency={currency}
+          buffer={result.unallocated_amount}
+          savings={savings}
+          fixed={fixed}
+          overCommitted={result.over_committed}
+          shortfall={result.shortfall}
+        />
       </ScrollView>
 
-      <Pressable
-        testID="btn-wizard-submit"
-        onPress={onSubmit}
-        disabled={submitting}
-        style={[styles.primaryBtn, submitting && styles.primaryBtnDisabled]}
-      >
-        <Text style={styles.primaryLabel}>{submitting ? "Đang lưu…" : "Bắt đầu dùng"}</Text>
-      </Pressable>
+      <WizardResultFooter
+        submitting={submitting}
+        onSubmit={onSubmit}
+        hasExistingBudgets={hasExistingBudgets}
+        overwriteConfirmOpen={overwriteConfirmOpen}
+        onConfirmOverwrite={onConfirmOverwrite}
+        onCancelOverwrite={onCancelOverwrite}
+        onSavePlan={onSavePlan}
+        planSaved={planSaved}
+        canSubmit={canSubmit}
+      />
 
       <AddBudgetRowModal
         visible={addRowOpen}
@@ -241,6 +263,7 @@ const styles = StyleSheet.create({
   headlineLabel: { ...typography.caption, color: colors.textSecondary },
   headlineValue: { ...typography.hero, fontSize: 26, color: colors.textPrimary },
   rows: { gap: 2 },
+  emptyPlan: { ...typography.caption, color: colors.textSecondary, paddingVertical: spacing.md, textAlign: "center" },
   addRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -252,37 +275,6 @@ const styles = StyleSheet.create({
   },
   addRowLabel: { ...typography.label, color: colors.green },
   addRowHint: { ...typography.tiny, color: colors.textMuted },
-  bufferRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    borderTopWidth: 1,
-    borderTopColor: colors.surfaceBorder,
-    paddingTop: spacing.sm,
-  },
-  bufferLabel: { ...typography.label, color: colors.textSecondary },
-  bufferValue: { ...typography.label, color: colors.textSecondary },
-  deducted: {
-    gap: spacing.xs,
-    borderTopWidth: 1,
-    borderTopColor: colors.surfaceBorder,
-    paddingTop: spacing.sm,
-  },
-  deductedRow: { flexDirection: "row", justifyContent: "space-between" },
-  deductedLabel: { ...typography.caption, color: colors.textMuted },
-  deductedValue: { ...typography.caption, color: colors.textMuted },
-  // Amber, not red — the plan is over-committed, which is a constraint the user
-  // can resolve, not a system fault.
-  warn: { ...typography.caption, color: colors.mustard },
-  primaryBtn: {
-    marginHorizontal: spacing.xl,
-    marginBottom: spacing.md,
-    paddingVertical: spacing.md,
-    borderRadius: radii.listCard,
-    backgroundColor: colors.green,
-    alignItems: "center",
-  },
-  primaryBtnDisabled: { opacity: 0.5 },
-  primaryLabel: { ...typography.body, color: colors.onGreen },
   secondaryBtn: {
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.xl,

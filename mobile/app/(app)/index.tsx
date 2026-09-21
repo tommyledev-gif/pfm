@@ -1,46 +1,39 @@
 import { useMemo, useState } from "react";
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
-import { Avatar } from "@/components/ui/Avatar";
-import { Card } from "@/components/ui/Card";
-import { CheckIcon, EditIcon, HistoryIcon, PlusIcon, TrashIcon } from "@/components/ui/Icon";
+import { PlusIcon } from "@/components/ui/Icon";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
-import { LiquidCircle } from "@/components/shared/LiquidCircle";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Screen } from "@/components/shared/Screen";
-import { SnapshotCardSkeleton } from "@/components/shared/SnapshotCardSkeleton";
-import { SwipeableRow } from "@/components/shared/SwipeableRow";
 import { TopBar } from "@/components/shared/TopBar";
 import { TransactionRow } from "@/components/shared/TransactionRow";
-import { WalletCard } from "@/components/shared/WalletCard";
-import { colorForCategory } from "@/lib/category-color";
-import { formatCurrency } from "@/lib/currency";
-import { currentPeriodRange, monthRange, previousPeriodLabel, previousPeriodRange } from "@/lib/date-range";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { previousPeriodLabel } from "@/lib/date-range";
+import { colors, spacing, typography } from "@/lib/theme";
 import { useRefresh } from "@/lib/use-refresh";
+import { PendingConfirmationsSection } from "@/features/ai-chat/components/PendingConfirmationsSection";
+import { useTransactionRemoval } from "@/features/ai-chat/components/use-transaction-removal";
+import { removalDialogCopy } from "@/features/ai-chat/removal-copy";
+import { HomeSnapshotCard } from "@/features/reports/components/HomeSnapshotCard";
+import { useHomeSnapshot } from "@/features/reports/hooks/use-home-snapshot";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
-import { primaryCurrency } from "@/features/wallets/wallet-totals";
+import { WalletCarousel } from "@/features/wallets/components/WalletCarousel";
 import { WalletCardSkeleton } from "@/features/wallets/components/WalletCardSkeleton";
 import { useTransactionsQuery } from "@/features/transactions/api/use-transactions-query";
 import { Transaction } from "@/features/transactions/types";
+import { splitFutureTransactions } from "@/features/transactions/future";
 import { TransactionFormModal } from "@/features/transactions/components/TransactionFormModal";
 import { TransactionRowSkeleton } from "@/features/transactions/components/TransactionRowSkeleton";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
-import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
-import { budgetTotals } from "@/features/budgets/budget-totals";
-import {
-  budgetPeriodElapsed,
-  budgetRowStatus,
-  daysLeftInMonth,
-  remainingPerDay,
-} from "@/features/budgets/budget-pace";
-import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary-query";
 import { useUiPrefsStore, HomePeriod } from "@/stores/ui-prefs-store";
 import { useChatStore } from "@/stores/chat-store";
 
-const WALLET_SKELETON_COUNT = 3;
 const RECENT_TRANSACTION_SKELETON_COUNT = 4;
-const TOP_CATEGORIES_COUNT = 3;
+const RECENT_TRANSACTION_COUNT = 4;
+// Over-fetched on purpose: rows dated ahead of today are dropped below, and
+// asking for exactly four would leave the list short by however many there are.
+const RECENT_FETCH_LIMIT = 10;
+const FALLBACK_CURRENCY = "VND";
 
 const PERIODS: { label: string; value: HomePeriod }[] = [
   { label: "Ngày", value: "day" },
@@ -50,110 +43,62 @@ const PERIODS: { label: string; value: HomePeriod }[] = [
 
 export default function HomeScreen() {
   const router = useRouter();
-  const wallets = useWalletsQuery();
-  const recent = useTransactionsQuery({ limit: 4 });
-  const categories = useCategoriesQuery();
-  const budgets = useBudgetsQuery();
-  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+
+  const thread = useChatStore((s) => s.thread);
   const homePeriod = useUiPrefsStore((s) => s.homePeriod);
   const setHomePeriod = useUiPrefsStore((s) => s.setHomePeriod);
-  // Select the raw, referentially-stable `thread` array and derive the
-  // filtered list via useMemo, rather than filtering inline inside the
-  // Zustand selector — a selector that returns a brand-new array on every
-  // call (as `.filter()` does) makes useSyncExternalStore see a "changed"
-  // snapshot on every render and re-render again to check, forever
-  // ("Maximum update depth exceeded" — reproduced live on the Home screen).
-  const thread = useChatStore((s) => s.thread);
-  const removeChatMessage = useChatStore((s) => s.removeMessage);
-  const allPendingConfirmations = useMemo(
-    () => thread.filter((m) => m.action && !m.confirmed && !m.superseded),
-    [thread],
-  );
-  // "Bỏ qua" only hides the banner for the session, it never mutates
-  // chat-store — a message dropping off this set (edited, confirmed, or a
-  // fresh one arriving) means there's something new to review, so the
-  // dismissal for that id no longer applies.
-  const [dismissedPendingIds, setDismissedPendingIds] = useState<Set<string>>(new Set());
-  const pendingConfirmations = useMemo(
-    () => allPendingConfirmations.filter((m) => !dismissedPendingIds.has(m.id)),
-    [allPendingConfirmations, dismissedPendingIds],
-  );
 
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  // "Bỏ qua" only hides the banner for the session and never mutates the
+  // thread — a message leaving this set (edited, confirmed, or a new one
+  // arriving) means there is something new to review, so the dismissal no
+  // longer applies to it.
+  const [dismissedPendingIds, setDismissedPendingIds] = useState<Set<string>>(new Set());
+
+  const wallets = useWalletsQuery();
+  const recent = useTransactionsQuery({ limit: RECENT_FETCH_LIMIT });
+  const categories = useCategoriesQuery();
+  const snapshot = useHomeSnapshot(homePeriod);
+  const removal = useTransactionRemoval();
+
+  const categoryById = useMemo(() => new Map(categories.data?.map((c) => [c.id, c])), [categories.data]);
   const walletCurrencyMap = useMemo(() => {
     const map = new Map<string, string>();
     wallets.data?.forEach((w) => map.set(w.id, w.currency));
     return map;
   }, [wallets.data]);
 
-  const categoryById = useMemo(() => new Map(categories.data?.map((c) => [c.id, c])), [categories.data]);
+  // Selecting the raw, referentially stable thread and filtering in a memo —
+  // a selector returning a fresh array every call makes the store see a
+  // changed snapshot on every render and re-render forever.
+  const pendingConfirmations = useMemo(
+    () =>
+      thread.filter(
+        (m) => m.action && !m.confirmed && !m.superseded && !m.removalState && !dismissedPendingIds.has(m.id),
+      ),
+    [thread, dismissedPendingIds],
+  );
 
-  const periodRange = useMemo(() => currentPeriodRange(homePeriod), [homePeriod]);
-  const periodSummary = useReportSummaryQuery(periodRange);
-  // Top Categories always reflects the calendar month, independent of the
-  // Day/Month/Year snapshot selector above — a "top categories today" list
-  // would usually hold one row or none, which is noise rather than insight.
-  const thisMonthRange = useMemo(() => monthRange(0), []);
-  const thisMonthSummary = useReportSummaryQuery(thisMonthRange);
-  // The trend badge, by contrast, DOES track the selected period — comparing
-  // against "hôm qua" only means anything while Ngày is the selection.
-  const previousRange = useMemo(() => previousPeriodRange(homePeriod), [homePeriod]);
-  const previousPeriodSummary = useReportSummaryQuery(previousRange);
+  // "Recent" means recent, and the list is ordered newest first — so a
+  // transaction booked for next month would sit above things that have
+  // actually happened. Those rows are not lost; the Transactions screen
+  // surfaces them behind its own upcoming card.
+  const recentTransactions = splitFutureTransactions(recent.data?.pages[0]?.data ?? []).upToToday.slice(
+    0,
+    RECENT_TRANSACTION_COUNT,
+  );
 
-  // The report's own currency is the source of truth for the whole snapshot
-  // (matches SpendingTab.tsx's `totals[0]` convention) — fall back to the
-  // wallets' primary currency only while the report hasn't loaded yet / has
-  // no transactions in range at all.
-  const currency =
-    periodSummary.data?.totals[0]?.currency ?? (wallets.data ? primaryCurrency(wallets.data) : undefined) ?? "VND";
-  const periodSpent = periodSummary.data?.totals[0]?.total_expense ?? 0;
-  const previousPeriodSpent = previousPeriodSummary.data?.totals[0]?.total_expense ?? 0;
-  const spentDelta = periodSpent - previousPeriodSpent;
-  const budgetSnapshot = budgets.data ? budgetTotals(budgets.data, currency) : null;
-  const isOverBudget = Boolean(budgetSnapshot && periodSpent > budgetSnapshot.limit);
-  const isDay = homePeriod === "day";
+  const { refreshControl } = useRefresh([wallets, recent, categories, ...snapshot.queries]);
 
-  /**
-   * What is still spendable today.
-   *
-   * ⚠️ `budgetSnapshot.remaining` already has today's spending removed, so this
-   * shrinks through the day — which is the whole reason to look at it more than
-   * once. Today counts as a day you can still spend on, hence the inclusive
-   * count: excluding it would inflate every later day by money that is actually
-   * available right now.
-   *
-   * Same formula as the budget spec's moment-of-spend line and the wizard's
-   * "được chi mỗi ngày", through one shared rounding helper so the three
-   * surfaces can never quote different figures.
-   */
-  const daysLeft = daysLeftInMonth();
-  const remainingToday = budgetSnapshot ? remainingPerDay(budgetSnapshot.remaining, daysLeft) : null;
-  // What today started with: what is left plus what has already gone. Drives the
-  // ring, so a heavy morning visibly fills it.
-  const todayAllowance = remainingToday !== null ? remainingToday + periodSpent : null;
+  const removalCopy = removalDialogCopy(removal.target, removal.targetIsPersisted, {
+    currency:
+      walletCurrencyMap.get(removal.target?.action?.payload.wallet_id ?? "") ?? FALLBACK_CURRENCY,
+    resolveCategoryName: (id) => categoryById.get(id)?.name,
+  });
 
-  /**
-   * Budgets running hotter than the month is long, worst first.
-   *
-   * The Ngày tab is for tracking a single day, and the useful thing to see
-   * beside today's number is not what you spend most on in general — it is which
-   * limit is about to stop you. "Chi nhiều nhất" answers a question nobody asks
-   * at 3pm on a Tuesday.
-   */
-  const atRiskBudgets = useMemo(() => {
-    const rows = (budgets.data ?? [])
-      .flatMap((budget) => budget.limits.map((limit) => ({ budget, limit })))
-      .filter(({ limit }) => limit.currency === currency)
-      .map((row) => ({ ...row, status: budgetRowStatus(row.limit, budgetPeriodElapsed(row.budget.start_date)) }))
-      .filter((row) => row.status.state === "over" || row.status.state === "at-risk");
-    return rows.sort((a, b) => b.status.ratio - a.status.ratio).slice(0, TOP_CATEGORIES_COUNT);
-  }, [budgets.data, currency]);
-
-  // Deep-links into ai-chat.tsx at the exact message the user tapped/swiped,
-  // instead of ai-chat's own default (inverted list lands on the newest
-  // message) — mirrors Insights' own "Home deep-links the other way" pattern
-  // (see insights.tsx). focusedAt is a nonce so tapping the same pending item
-  // twice in a row still re-triggers the scroll even though focusMessageId
-  // didn't change.
+  // Deep-links into the chat at the exact message, instead of the chat's own
+  // default of landing on the newest one. The nonce lets the same item be
+  // re-opened twice in a row.
   const goToPendingMessage = (messageId: string, openEdit?: boolean) =>
     router.push({
       pathname: "/ai-chat",
@@ -161,319 +106,118 @@ export default function HomeScreen() {
     });
 
   // Hands the exact window the user is looking at to the Budgets tab, so the
-  // limits there are prorated to the same day rather than to the whole month.
+  // limits there are prorated to the same period rather than the whole month.
   const openBudgetsForPeriod = () =>
     router.push({
       pathname: "/insights",
-      params: { tab: "Budgets", from: periodRange.from, to: periodRange.to },
+      params: { tab: "Budgets", from: snapshot.periodRange.from, to: snapshot.periodRange.to },
     });
-
-  const topCategories = useMemo(() => {
-    const expenseCategories = thisMonthSummary.data?.by_category.filter((c) => c.type === "expense") ?? [];
-    return [...expenseCategories].sort((a, b) => b.amount - a.amount).slice(0, TOP_CATEGORIES_COUNT);
-  }, [thisMonthSummary.data]);
-
-  // Same currency-matched total the donut/legend on Insights' Spending tab
-  // already divides by (SpendingTab.tsx: `seg.amount / totalExpense`) — reused
-  // here so the compact right-panel row can show a percent-of-month-spend
-  // instead of a currency string, which is what actually fits this column's
-  // width (see the icon-only row below).
-  const topCategoriesExpenseTotal =
-    thisMonthSummary.data?.totals.find((t) => t.currency === currency)?.total_expense ?? 0;
-
-  const recentTransactions = recent.data?.pages[0]?.data.slice(0, 4) ?? [];
-
-  // Every input this Card renders defaults to 0/[] before its own query
-  // resolves — without this, the very first render showed "Đã chi 0 ₫" and
-  // an empty categories column instead of a loading state.
-  const snapshotLoading = wallets.isLoading || periodSummary.isLoading || thisMonthSummary.isLoading || budgets.isLoading;
-
-  // Home is the widest fan-out of queries in the app — the snapshot alone is
-  // three separate report calls (selected period, this month, previous
-  // period). Refreshing anything less than all of them would leave the trend
-  // badge comparing a fresh number against a stale one.
-  const { refreshControl } = useRefresh([
-    wallets,
-    recent,
-    categories,
-    budgets,
-    periodSummary,
-    thisMonthSummary,
-    previousPeriodSummary,
-  ]);
 
   return (
     <Screen>
       <FlatList
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      data={recentTransactions}
-      keyExtractor={(t) => t.id}
-      refreshControl={refreshControl}
-      ListHeaderComponent={
-        <View style={styles.header}>
-          <TopBar userName="Me" />
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={recentTransactions}
+        keyExtractor={(t) => t.id}
+        refreshControl={refreshControl}
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <TopBar userName="Me" />
 
-          <SegmentedTabs
-            style={styles.periodRow}
-            options={PERIODS}
-            value={homePeriod}
-            onChange={setHomePeriod}
-          />
+            <SegmentedTabs style={styles.periodRow} options={PERIODS} value={homePeriod} onChange={setHomePeriod} />
 
-          <Card style={styles.snapshotCard} radius={radii.hero}>
-            {snapshotLoading ? (
-              <SnapshotCardSkeleton />
-            ) : (
-              <>
-                {/* In-flow and right-aligned, not absolutely pinned to the
-                    corner — the trend text's length varies with the amount and
-                    a fixed absolute overlay collided with the categories column
-                    below it for any but the shortest amounts. */}
-                <View
-                  style={[
-                    styles.trendBadge,
-                    spentDelta > 0 ? styles.trendBadgeNegative : styles.trendBadgePositive,
-                  ]}
-                >
-                  <Text
-                    style={[styles.trendBadgeLabel, { color: spentDelta > 0 ? colors.peach : colors.green }]}
-                    numberOfLines={1}
-                  >
-                    {spentDelta > 0 ? "Nhiều hơn " : spentDelta < 0 ? "Ít hơn " : "Bằng "}
-                    {formatCurrency(Math.abs(spentDelta), currency)} so với {previousPeriodLabel(homePeriod)}
-                  </Text>
-                </View>
-                <View style={styles.snapshotRow}>
-                  <View style={styles.snapshotLeft}>
-                    <LiquidCircle
-                      size={132}
-                      // On Ngày the ring is today against today's share, not
-                      // against the month: filling it 3% every day would say
-                      // nothing, and it is the day the tab is about.
-                      progress={
-                        isDay
-                          ? todayAllowance && todayAllowance > 0
-                            ? periodSpent / todayAllowance
-                            : 0
-                          : budgetSnapshot && budgetSnapshot.limit > 0
-                            ? periodSpent / budgetSnapshot.limit
-                            : 0
-                      }
-                      topLabel={isDay ? "Đã chi hôm nay" : "Đã chi"}
-                      topValue={formatCurrency(periodSpent, currency)}
-                    />
-                    <Text style={styles.snapshotRemaining}>
-                      {isDay ? "Hôm nay còn: " : "Còn lại: "}
-                      <Text style={styles.snapshotRemainingValue} testID="text-home-remaining-today">
-                        {isDay
-                          ? remainingToday !== null
-                            ? formatCurrency(remainingToday, currency)
-                            : "—"
-                          : budgetSnapshot
-                            ? formatCurrency(budgetSnapshot.remaining, currency)
-                            : "—"}
-                      </Text>
-                    </Text>
-                    {isDay ? (
-                      budgetSnapshot ? (
-                        <Text style={styles.snapshotStatus}>
-                          {/* Stated plainly so the figure is not mistaken for a
-                              hard cap — it is this month's remainder spread over
-                              the days it still has to cover. */}
-                          {daysLeft} ngày còn lại trong tháng
-                        </Text>
-                      ) : null
-                    ) : budgetSnapshot ? (
-                      <Text style={[styles.snapshotStatus, { color: isOverBudget ? colors.peach : colors.green }]}>
-                        {isOverBudget ? "Vượt ngân sách" : "Trong ngân sách"}
-                      </Text>
-                    ) : null}
-                  </View>
+            <HomeSnapshotCard
+              loading={snapshot.loading}
+              isDay={homePeriod === "day"}
+              currency={snapshot.currency}
+              periodSpent={snapshot.periodSpent}
+              spentDelta={snapshot.spentDelta}
+              previousPeriodLabel={previousPeriodLabel(homePeriod)}
+              budgetSnapshot={snapshot.budgetSnapshot}
+              remainingToday={snapshot.remainingToday}
+              todayAllowance={snapshot.todayAllowance}
+              daysLeft={snapshot.daysLeft}
+              atRiskBudgets={snapshot.atRiskBudgets}
+              topCategories={snapshot.topCategories}
+              topCategoriesExpenseTotal={snapshot.topCategoriesExpenseTotal}
+              categoryById={categoryById}
+              onOpenBudgets={openBudgetsForPeriod}
+              onOpenInsights={() => router.push("/insights")}
+            />
 
-                  {isDay && atRiskBudgets.length > 0 ? (
-                    <View style={styles.snapshotRight}>
-                      <View style={styles.compactHeaderRow}>
-                        <Text style={styles.compactSectionTitle} numberOfLines={2}>
-                          Sắp vượt
-                        </Text>
-                        <Pressable onPress={openBudgetsForPeriod} hitSlop={8}>
-                          <Text style={styles.compactSeeAll} numberOfLines={1}>
-                            Xem tất cả
-                          </Text>
-                        </Pressable>
-                      </View>
-                      {atRiskBudgets.map(({ budget, limit, status }) => (
-                        <Pressable
-                          key={`${budget.id}-${limit.currency}`}
-                          testID={`row-home-at-risk-${budget.category_id}`}
-                          onPress={openBudgetsForPeriod}
-                          style={styles.categoryRow}
-                        >
-                          <Avatar
-                            name={budget.category_name}
-                            color={colorForCategory(budget.category_id)}
-                            size={24}
-                            icon={budget.icon ?? categoryById.get(budget.category_id)?.icon}
-                            iconUrl={budget.icon_url ?? categoryById.get(budget.category_id)?.icon_url}
-                          />
-                          {/* Amber and plain-spoken, never red: being close to a
-                              limit is information, not a fault. Name is dropped —
-                              the icon alone identifies the category in this
-                              compact column, matching the topCategories row below. */}
-                          <Text style={[styles.categoryAmount, { color: status.color }]} numberOfLines={1}>
-                            {status.percent}%
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  ) : topCategories.length > 0 ? (
-                    <View style={styles.snapshotRight}>
-                      <View style={styles.compactHeaderRow}>
-                        <Text style={styles.compactSectionTitle} numberOfLines={2}>
-                          Chi nhiều nhất
-                        </Text>
-                        <Pressable onPress={() => router.push("/insights")} hitSlop={8}>
-                          <Text style={styles.compactSeeAll} numberOfLines={1}>
-                            Xem tất cả
-                          </Text>
-                        </Pressable>
-                      </View>
-                      {topCategories.map((c) => (
-                        <View key={c.category_id} style={styles.categoryRow}>
-                          <Avatar
-                            name={c.category_name}
-                            color={colorForCategory(c.category_id)}
-                            size={24}
-                            icon={categoryById.get(c.category_id)?.icon}
-                            iconUrl={categoryById.get(c.category_id)?.icon_url}
-                          />
-                          <Text style={styles.categoryAmount} numberOfLines={1}>
-                            {topCategoriesExpenseTotal > 0
-                              ? `${Math.round((c.amount / topCategoriesExpenseTotal) * 100)}%`
-                              : "0%"}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  ) : null}
-                </View>
-              </>
-            )}
-          </Card>
+            <PendingConfirmationsSection
+              messages={pendingConfirmations}
+              categoryById={categoryById}
+              currency={snapshot.currency}
+              onDismissAll={() =>
+                setDismissedPendingIds((prev) => new Set([...prev, ...pendingConfirmations.map((m) => m.id)]))
+              }
+              onOpenMessage={goToPendingMessage}
+              onRequestRemove={removal.request}
+            />
 
-          {pendingConfirmations.length > 0 ? (
             <View style={styles.section}>
               <View style={styles.sectionHeaderRow}>
                 <View style={styles.sectionTitleRow}>
-                  <Text style={styles.sectionTitleUppercase}>Chờ xác nhận</Text>
-                  <View style={styles.pendingCountBadge}>
-                    <Text style={styles.pendingCountBadgeLabel}>{pendingConfirmations.length}</Text>
-                  </View>
+                  <Text style={styles.sectionTitle}>Ví của bạn</Text>
+                  <Text style={styles.sectionCountHint}>{wallets.data?.length ?? 0} nguồn tiền</Text>
                 </View>
-                <Pressable
-                  onPress={() => setDismissedPendingIds((prev) => new Set([...prev, ...pendingConfirmations.map((m) => m.id)]))}
-                  hitSlop={8}
-                >
-                  <Text style={styles.sectionAction}>Bỏ qua</Text>
+                <Pressable onPress={() => router.push("/wallets")} hitSlop={8} style={styles.addWalletAction}>
+                  <PlusIcon size={12} color={colors.green} />
+                  <Text style={styles.sectionAction}>Thêm ví</Text>
                 </Pressable>
               </View>
-              {pendingConfirmations.map((m) => (
-                <SwipeableRow
-                  key={m.id}
-                  leftAction={{ Icon: EditIcon, color: colors.green, onTrigger: () => goToPendingMessage(m.id, true) }}
-                  rightAction={{ Icon: TrashIcon, color: colors.peach, onTrigger: () => removeChatMessage(m.id) }}
-                >
-                  <Pressable style={styles.pendingRow} onPress={() => goToPendingMessage(m.id)}>
-                    <View style={styles.pendingIconTile}>
-                      <HistoryIcon size={18} color={colors.mustard} />
-                    </View>
-                    <View style={styles.pendingTextCol}>
-                      <Text style={styles.pendingLabel} numberOfLines={1}>
-                        {m.action?.payload.note || categoryById.get(m.action?.payload.category_id ?? "")?.name || "Giao dịch"}
-                      </Text>
-                      <Text style={styles.pendingHint} numberOfLines={1}>
-                        Chạm để duyệt mục {m.action?.payload.type === "income" ? "thu" : "chi"}
-                      </Text>
-                    </View>
-                    <Text
-                      style={[
-                        styles.pendingAmount,
-                        { color: m.action?.payload.type === "income" ? colors.green : colors.peach },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {formatCurrency(m.action?.payload.amount ?? 0, currency)}
-                    </Text>
-                    <View style={styles.pendingCheckButton}>
-                      <CheckIcon size={16} color={colors.onGreen} />
-                    </View>
-                  </Pressable>
-                </SwipeableRow>
-              ))}
+              {wallets.isLoading ? <WalletCardSkeleton /> : <WalletCarousel wallets={wallets.data ?? []} />}
             </View>
-          ) : null}
 
-          <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
-              <View style={styles.sectionTitleRow}>
-                <Text style={styles.sectionTitleUppercase}>Ví của bạn</Text>
-                <Text style={styles.sectionCountHint}>{wallets.data?.length ?? 0} nguồn tiền</Text>
-              </View>
-              <Pressable onPress={() => router.push("/wallets")} hitSlop={8} style={styles.addWalletAction}>
-                <PlusIcon size={12} color={colors.green} />
-                <Text style={styles.sectionAction}>Thêm ví</Text>
+              <Text style={styles.sectionTitle}>Giao dịch gần đây</Text>
+              <Pressable onPress={() => router.push("/transactions")} hitSlop={8}>
+                <Text style={styles.sectionAction}>Xem tất cả →</Text>
               </Pressable>
             </View>
-            {wallets.isLoading ? (
-              <View style={[styles.walletRow, styles.walletRowStatic]}>
-                {Array.from({ length: WALLET_SKELETON_COUNT }).map((_, i) => (
-                  <WalletCardSkeleton key={i} />
-                ))}
-              </View>
-            ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.walletRow}>
-                {wallets.data?.map((w) => (
-                  <WalletCard key={w.id} wallet={w} />
-                ))}
-              </ScrollView>
-            )}
           </View>
-
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitleUppercase}>Giao dịch gần đây</Text>
-            <Pressable onPress={() => router.push("/transactions")} hitSlop={8}>
-              <Text style={styles.sectionAction}>Xem tất cả →</Text>
-            </Pressable>
-          </View>
-        </View>
-      }
-      renderItem={({ item }) => (
-        <Pressable onPress={() => setEditingTransaction(item)}>
-          <TransactionRow
-            transaction={item}
-            currency={walletCurrencyMap.get(item.wallet_id)}
-            category={categoryById.get(item.category_id)}
-          />
-        </Pressable>
-      )}
-      ListEmptyComponent={
-        recent.isLoading ? (
-          <View>
-            {Array.from({ length: RECENT_TRANSACTION_SKELETON_COUNT }).map((_, i) => (
-              <TransactionRowSkeleton key={i} />
-            ))}
-          </View>
-        ) : (
-          <Text style={styles.empty}>Chưa có giao dịch nào.</Text>
-        )
-      }
+        }
+        renderItem={({ item }) => (
+          <Pressable onPress={() => setEditingTransaction(item)}>
+            <TransactionRow
+              transaction={item}
+              currency={walletCurrencyMap.get(item.wallet_id)}
+              category={categoryById.get(item.category_id)}
+            />
+          </Pressable>
+        )}
+        ListEmptyComponent={
+          recent.isLoading ? (
+            <View>
+              {Array.from({ length: RECENT_TRANSACTION_SKELETON_COUNT }).map((_, i) => (
+                <TransactionRowSkeleton key={i} />
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.empty}>Chưa có giao dịch nào.</Text>
+          )
+        }
       />
 
       <TransactionFormModal
         visible={Boolean(editingTransaction)}
         onClose={() => setEditingTransaction(null)}
         editingTransaction={editingTransaction}
+      />
+
+      {/* ⚠️ Every pending row here is an unconfirmed proposal, so confirming
+          writes nothing to the server — the message is marked discarded and
+          stays in the thread. It is never deleted from it. */}
+      <ConfirmDialog
+        visible={removal.target !== null}
+        title={removalCopy.title}
+        message={removalCopy.message}
+        confirmLabel={removalCopy.confirmLabel}
+        loading={removal.deleting}
+        onCancel={removal.cancel}
+        onConfirm={removal.confirm}
       />
     </Screen>
   );
@@ -485,57 +229,16 @@ const styles = StyleSheet.create({
   header: { gap: spacing.lg },
   section: { gap: spacing.sm },
   periodRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
-  snapshotCard: { gap: spacing.md },
-  // Translucent tinted pill (same convention as profile.tsx's logout row),
-  // not a solid fill — a loud solid-color block read as jarring against the
-  // rest of this dark, low-saturation card.
-  trendBadge: {
-    alignSelf: "flex-end",
-    maxWidth: "100%",
-    paddingVertical: 6,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-  },
-  trendBadgeNegative: { backgroundColor: "rgba(255,158,150,0.12)", borderColor: "rgba(255,158,150,0.35)" },
-  trendBadgePositive: { backgroundColor: "rgba(133,255,51,0.1)", borderColor: "rgba(133,255,51,0.3)" },
-  trendBadgeLabel: { ...typography.tiny },
-  snapshotRow: { flexDirection: "row", gap: spacing.lg, alignItems: "flex-start" },
-  snapshotLeft: { alignItems: "center", gap: spacing.xs },
-  snapshotRight: { flex: 1, gap: 2, minWidth: 0 },
-  compactHeaderRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.xs },
-  compactSectionTitle: { ...typography.label, color: colors.textPrimary, flexShrink: 1 },
-  compactSeeAll: { ...typography.tiny, color: colors.green, flexShrink: 0 },
-  snapshotRemaining: { ...typography.caption, color: colors.textSecondary },
-  snapshotRemainingValue: { ...typography.label, color: colors.textPrimary },
-  snapshotStatus: { ...typography.label },
-  addButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.sm,
-    height: 48,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-  },
-  addButtonLabel: { ...typography.body, color: colors.green },
-  categoryRow: {
+  sectionHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: spacing.xs,
-    paddingVertical: spacing.xs,
+    marginBottom: spacing.xs,
   },
-  categoryAmount: { ...typography.tiny, color: colors.textSecondary },
-  sectionHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.xs },
   sectionTitleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  // Uppercase + letter-spacing label, muted rather than full-white — the
-  // section-title register the design reference uses for "CHỜ XÁC NHẬN" /
-  // "VÍ CỦA BẠN" / "GIAO DỊCH GẦN ĐÂY", distinct from a card's own
-  // full-weight title (styles.compactSectionTitle above).
-  sectionTitleUppercase: {
+  // Uppercase, letter-spaced and muted — the section-title register, distinct
+  // from a card's own full-weight title.
+  sectionTitle: {
     ...typography.caption,
     color: colors.textSecondary,
     textTransform: "uppercase",
@@ -544,52 +247,5 @@ const styles = StyleSheet.create({
   sectionCountHint: { ...typography.tiny, color: colors.textMuted },
   sectionAction: { ...typography.caption, color: colors.green },
   addWalletAction: { flexDirection: "row", alignItems: "center", gap: 4 },
-  pendingCountBadge: {
-    minWidth: 18,
-    height: 18,
-    paddingHorizontal: 5,
-    borderRadius: radii.pill,
-    backgroundColor: colors.mustard,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pendingCountBadgeLabel: { fontSize: 10, fontWeight: "800", color: colors.onGreen },
-  pendingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    // A gold outline (not the neutral surfaceBorder every other card uses)
-    // is this row's own visual cue that it's awaiting action, not just
-    // another list item.
-    borderColor: "rgba(242,201,76,0.4)",
-    borderRadius: radii.listCard,
-  },
-  pendingIconTile: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.listCard - 2,
-    backgroundColor: "rgba(242,201,76,0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(242,201,76,0.3)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pendingTextCol: { flex: 1, minWidth: 0, gap: 2 },
-  pendingLabel: { ...typography.body, color: colors.textPrimary },
-  pendingHint: { ...typography.tiny, color: colors.textSecondary },
-  pendingAmount: { ...typography.body, fontWeight: "700" },
-  pendingCheckButton: {
-    width: 28,
-    height: 28,
-    borderRadius: radii.pill,
-    backgroundColor: colors.green,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  walletRow: { gap: spacing.md, paddingBottom: spacing.xs },
-  walletRowStatic: { flexDirection: "row" },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
 });

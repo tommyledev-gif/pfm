@@ -1,6 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colorForCategory } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
 import { colors, spacing, typography } from "@/lib/theme";
 import { ProposalEntry, confidenceBadge } from "@/features/budget-wizard/types";
@@ -8,10 +7,14 @@ import { ProposalEntry, confidenceBadge } from "@/features/budget-wizard/types";
 interface ProposalRowProps {
   entry: ProposalEntry;
   currency: string;
+  /** Assigned across the whole visible list so no two rows collide — see
+   *  WizardStepResult. A row must never pick its own colour: a hash of one id
+   *  in isolation cannot know what the rows beside it were painted. */
+  color: string;
   onPress: () => void;
-  /** Only rows the user added by hand can be taken away again — a preset row
-   *  left alone is still part of the plan the allocator balanced. */
-  onRemove?: () => void;
+  /** Every row is removable, including the ones the allocator suggested — a
+   *  plan the user cannot correct is a plan they work around instead. */
+  onRemove: () => void;
 }
 
 /**
@@ -24,12 +27,10 @@ interface ProposalRowProps {
  * guess. An honest badge and nothing else beats a confident sentence that means
  * nothing.
  */
-export function ProposalRow({ entry, currency, onPress, onRemove }: ProposalRowProps) {
-  const dotColor = colorForCategory(entry.category_id);
-
+export function ProposalRow({ entry, currency, color, onPress, onRemove }: ProposalRowProps) {
   return (
     <Pressable testID={`row-wizard-proposal-${entry.category_id}`} onPress={onPress} style={styles.row}>
-      <View style={[styles.dot, { backgroundColor: dotColor }]} />
+      <View style={[styles.dot, { backgroundColor: color }]} />
 
       <View style={styles.labels}>
         <Text style={styles.name} numberOfLines={1}>
@@ -52,11 +53,11 @@ export function ProposalRow({ entry, currency, onPress, onRemove }: ProposalRowP
         ) : null}
       </View>
 
-      {onRemove ? (
-        <Pressable onPress={onRemove} hitSlop={10} testID={`btn-wizard-remove-row-${entry.category_id}`}>
-          <Text style={styles.remove}>✕</Text>
-        </Pressable>
-      ) : null}
+      {/* Its own touch target, so the common action (tap the row to edit the
+          amount) and the rare one (remove it) never share a tap. */}
+      <Pressable onPress={onRemove} hitSlop={10} testID={`btn-wizard-remove-row-${entry.category_id}`}>
+        <Text style={styles.remove}>✕</Text>
+      </Pressable>
     </Pressable>
   );
 }
