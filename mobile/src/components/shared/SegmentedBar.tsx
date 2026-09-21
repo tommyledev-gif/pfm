@@ -1,4 +1,4 @@
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import { colors } from "@/lib/theme";
 
@@ -19,6 +19,13 @@ export interface BarSegment {
 interface SegmentedBarProps {
   segments: BarSegment[];
   height?: number;
+  /** Makes each block its own tap target. Without it the bar is a readout the
+   *  user can see but not interrogate — the colours say a proportion without
+   *  ever saying whose. */
+  onPressSegment?: (key: string) => void;
+  /** The block currently being explained; every other one dims so the answer
+   *  and the question are unmistakably about the same block. */
+  activeKey?: string | null;
 }
 
 const STRIPE_COUNT = 10;
@@ -35,7 +42,7 @@ const SEGMENT_GAP = 2;
 // This one answers "how is the whole disposable amount divided", where nothing
 // is spent yet and every block is a plan. Merging them would mean a component
 // with two mutually exclusive halves.
-export function SegmentedBar({ segments, height = 8 }: SegmentedBarProps) {
+export function SegmentedBar({ segments, height = 8, onPressSegment, activeKey }: SegmentedBarProps) {
   // Fully rounded ends, same derivation as BudgetProgressBar — the two bars
   // appear on adjacent screens and a different corner treatment reads as a
   // mistake rather than a distinction.
@@ -43,23 +50,33 @@ export function SegmentedBar({ segments, height = 8 }: SegmentedBarProps) {
 
   return (
     <View style={[styles.track, { height, borderRadius: radius }]}>
-      {segments.map((seg) => (
-        <View
-          key={seg.key}
-          style={[
-            styles.segment,
-            // flexGrow carries the share instead of a percentage width: with a
-            // gap between blocks, percentages sum past 100% and the last block
-            // gets clipped. Flex distributes what's actually left after gaps.
-            { flexGrow: Math.max(seg.share, 0), backgroundColor: seg.hatched ? "transparent" : seg.color },
-            seg.hatched && styles.hatched,
-          ]}
-        >
-          {seg.hatched
-            ? Array.from({ length: STRIPE_COUNT }).map((_, i) => <View key={i} style={styles.stripe} />)
-            : null}
-        </View>
-      ))}
+      {segments.map((seg) => {
+        const dimmed = activeKey != null && activeKey !== seg.key;
+        return (
+          <Pressable
+            key={seg.key}
+            testID={`segment-${seg.key}`}
+            onPress={onPressSegment ? () => onPressSegment(seg.key) : undefined}
+            disabled={!onPressSegment}
+            // A tall hit area on a bar only 8px high — the block is the target
+            // the user aims at, not the pixels it happens to paint.
+            hitSlop={{ top: 12, bottom: 12, left: 0, right: 0 }}
+            style={[
+              styles.segment,
+              // flexGrow carries the share instead of a percentage width: with
+              // a gap between blocks, percentages sum past 100% and the last
+              // block gets clipped. Flex distributes what is left after gaps.
+              { flexGrow: Math.max(seg.share, 0), backgroundColor: seg.hatched ? "transparent" : seg.color },
+              seg.hatched && styles.hatched,
+              dimmed && styles.segmentDimmed,
+            ]}
+          >
+            {seg.hatched
+              ? Array.from({ length: STRIPE_COUNT }).map((_, i) => <View key={i} style={styles.stripe} />)
+              : null}
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -73,6 +90,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgApp,
   },
   segment: { flexBasis: 0, flexShrink: 1, overflow: "hidden" },
+  segmentDimmed: { opacity: 0.32 },
   hatched: {
     flexDirection: "row",
     justifyContent: "space-around",

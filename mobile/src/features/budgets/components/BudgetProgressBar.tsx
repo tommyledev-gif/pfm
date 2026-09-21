@@ -1,6 +1,7 @@
 import { StyleSheet, View } from "react-native";
 
 import { colors } from "@/lib/theme";
+import { OverspendHatch } from "@/features/budgets/components/OverspendHatch";
 
 interface BudgetProgressBarProps {
   // spent / limit. Values above 1 are expected and drawn as a full bar whose
@@ -13,7 +14,6 @@ interface BudgetProgressBarProps {
   height?: number;
 }
 
-const STRIPE_COUNT = 14;
 // Width of the dark seam drawn wherever two coloured sections of the bar meet
 // (spent | remaining, and spent | overspend). Without it the fill bleeds into
 // the track as one continuous ramp and the boundary — the only thing this bar
@@ -28,9 +28,8 @@ const SEAM_WIDTH = 2;
 // OVERSPEND: once ratio > 1 the track can't grow, so the bar is drawn full and
 // the *share of it that is overspend* is hatched at the tail. At ratio 1.2
 // that's 0.2/1.2 ≈ 17% of the bar, which reads as "a sixth of this was over"
-// without needing a second scale. Hatching is a row of skewed slivers behind
-// an overflow-hidden clip — react-native has no repeating-pattern fill, and
-// pulling in react-native-svg for one texture isn't worth it.
+// without needing a second scale. The hatch drifts leftward on a seamless
+// loop — see OverspendHatch.
 export function BudgetProgressBar({ ratio, pace, color, height = 8 }: BudgetProgressBarProps) {
   const over = ratio > 1;
   const fill = Math.max(0, Math.min(1, ratio));
@@ -49,10 +48,8 @@ export function BudgetProgressBar({ ratio, pace, color, height = 8 }: BudgetProg
       ) : null}
 
       {over ? (
-        <View style={[styles.overspend, { width: `${overspendShare * 100}%`, borderRadius: radius }]}>
-          {Array.from({ length: STRIPE_COUNT }).map((_, i) => (
-            <View key={i} style={styles.stripe} />
-          ))}
+        <View style={[styles.overspend, { width: `${overspendShare * 100}%` }]}>
+          <OverspendHatch radius={radius} />
         </View>
       ) : null}
 
@@ -78,22 +75,7 @@ const styles = StyleSheet.create({
   // underneath is a translucent white, so a hole would show the track, not a
   // gap. This has to be an opaque cut.
   seam: { position: "absolute", top: 0, bottom: 0, width: SEAM_WIDTH, backgroundColor: colors.bgApp },
-  overspend: {
-    position: "absolute",
-    right: 0,
-    top: 0,
-    bottom: 0,
-    flexDirection: "row",
-    justifyContent: "space-around",
-    overflow: "hidden",
-    backgroundColor: "rgba(0,0,0,0.18)",
-  },
-  stripe: {
-    width: 2,
-    height: "220%",
-    backgroundColor: "rgba(255,255,255,0.55)",
-    transform: [{ rotate: "30deg" }],
-  },
+  overspend: { position: "absolute", right: 0, top: 0, bottom: 0 },
   // Sits proud of the bar on both edges so it stays legible over a filled
   // section as well as over the empty track.
   pace: { position: "absolute", width: 2, backgroundColor: colors.textSecondary, borderRadius: 1 },

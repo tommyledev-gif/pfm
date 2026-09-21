@@ -17,7 +17,7 @@ export const BUDGET_FILTERS: {
    *  disagrees with the rows beneath it contradicts the screen. */
   color: string;
 }[] = [
-  { key: "all", label: "Tất cả", states: null, color: colors.textSecondary },
+  { key: "all", label: "Tất cả", states: null, color: colors.green },
   { key: "at-risk", label: "Sắp vượt", states: ["at-risk"], color: colors.mustard },
   { key: "over", label: "Đã vượt", states: ["over"], color: colors.peach },
 ];

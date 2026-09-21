@@ -2,6 +2,7 @@ package handler
 
 import (
 	"io"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -37,6 +38,11 @@ func (h *CategoryHandler) CreateCategory(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, h.logger, common.NewInvalidInputError("malformed request body"))
 	}
+	// Trimmed BEFORE validating, not after. `required` rejects "" but accepts
+	// " ", so an all-whitespace name passed validation and was stored as a
+	// category that renders blank and can never be matched by search. Shape
+	// normalization belongs here; the duplicate rule stays in the service.
+	req.Name = strings.TrimSpace(req.Name)
 	if err := validate.Struct(req); err != nil {
 		return response.Error(c, h.logger, newValidationError(err))
 	}
@@ -109,6 +115,21 @@ func (h *CategoryHandler) UpdateCategory(c *fiber.Ctx) error {
 	var req dto.UpdateCategoryRequest
 	if err := dto.DecodeStrict(c.Body(), &req); err != nil {
 		return response.Error(c, h.logger, common.NewInvalidInputError("malformed request body or unrecognized field"))
+	}
+	// Same normalization as CreateCategory, with one extra step. ⚠️ Only when
+	// the field was supplied: trimming a nil pointer's target would turn "no
+	// change" into "set to empty", which is a different request entirely.
+	//
+	// ⚠️ And the empty check cannot be left to the struct tag: Name carries
+	// `omitempty`, which SKIPS validation for an empty string, so a name of
+	// only whitespace would trim to "" and then sail straight through to the
+	// service. Create is safe because its tag is `required`.
+	if req.Name != nil {
+		trimmed := strings.TrimSpace(*req.Name)
+		if trimmed == "" {
+			return response.Error(c, h.logger, common.NewInvalidInputError("name must not be blank"))
+		}
+		req.Name = &trimmed
 	}
 	if err := validate.Struct(req); err != nil {
 		return response.Error(c, h.logger, newValidationError(err))

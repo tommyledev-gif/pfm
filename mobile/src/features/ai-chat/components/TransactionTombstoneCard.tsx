@@ -84,7 +84,6 @@ export function TransactionTombstoneCard({
 const styles = StyleSheet.create({
   card: {
     gap: spacing.xs,
-    marginTop: spacing.sm,
     padding: spacing.md,
     borderRadius: radii.listCard,
     borderWidth: 1,

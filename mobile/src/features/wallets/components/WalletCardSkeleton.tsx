@@ -2,35 +2,47 @@ import { StyleSheet, View } from "react-native";
 
 import { SkeletonBlock } from "@/components/ui/SkeletonBlock";
 import { colors, radii, spacing } from "@/lib/theme";
+import { CARD_HEIGHT, CARD_WIDTH } from "@/features/wallets/components/WalletStackCard";
 
-// Mirrors WalletCard's own StyleSheet (width 170, radii.listCard, padding
-// md, gap 6) so swapping in the real card causes no layout shift
+// Mirrors the carousel's own geometry — one centred card at the same width,
+// height and padding — so swapping in the real cards causes no layout shift
 // (specs/mobile-loading-skeletons/spec.md Edge Case #2).
 export function WalletCardSkeleton() {
   return (
-    <View style={styles.card}>
-      <View style={styles.topRow}>
-        <SkeletonBlock width={36} height={36} borderRadius={14} />
-        <SkeletonBlock width={70} height={14} style={styles.name} />
+    <View style={styles.container}>
+      <View style={styles.card}>
+        <View style={styles.topRow}>
+          <SkeletonBlock width={32} height={32} borderRadius={12} />
+          <View style={styles.identity}>
+            <SkeletonBlock width={90} height={14} />
+            <SkeletonBlock width={56} height={10} />
+          </View>
+        </View>
+        <View style={styles.balanceBlock}>
+          <SkeletonBlock width={70} height={10} />
+          <SkeletonBlock width="70%" height={20} />
+        </View>
       </View>
-      <SkeletonBlock width={50} height={11} />
-      <SkeletonBlock width={40} height={11} style={styles.label} />
-      <SkeletonBlock width="60%" height={17} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  // Matches WalletCarousel's own full-bleed container, so the placeholder and
+  // the loaded carousel occupy the same box.
+  container: { height: CARD_HEIGHT, marginHorizontal: -spacing.xl, alignItems: "center" },
   card: {
-    width: 170,
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
-    borderRadius: radii.listCard,
+    borderRadius: radii.card,
     padding: spacing.md,
-    gap: 6,
+    gap: spacing.md,
+    justifyContent: "center",
   },
-  topRow: { flexDirection: "row", alignItems: "center" },
-  name: { marginLeft: spacing.sm },
-  label: { marginTop: spacing.xs },
+  topRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  identity: { gap: 4 },
+  balanceBlock: { gap: 4 },
 });

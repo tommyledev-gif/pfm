@@ -29,49 +29,54 @@ const BALANCE_LABEL: Record<Wallet["type"], string> = {
   other: "Số dư hiện có",
 };
 
-export const STACK_CARD_WIDTH = 248;
-export const STACK_CARD_HEIGHT = 150;
+export const CARD_WIDTH = 236;
+export const CARD_HEIGHT = 132;
+export const CARD_GAP = spacing.md;
 
 interface WalletStackCardProps {
   wallet: Wallet;
-  /** Animated style from the carousel: translate, scale and opacity by depth. */
+  /** Position transform from the carousel: lean, scale and opacity by distance
+   *  from the centre. */
   animatedStyle: Animated.WithAnimatedValue<object>;
-  /** The front card is the only one rendered at full emphasis. */
-  isFront: boolean;
+  /** 1 when this card is the centred one, 0 when it is not. Drives the tint
+   *  and the accent border. */
+  activeOpacity: Animated.AnimatedInterpolation<number>;
 }
 
 /**
- * One card in the wallet stack.
+ * One card in the wallet carousel.
  *
- * The front card is tinted and blurred; the ones behind it are flattened to a
- * plain surface. That is not only taste — a blur view per card is expensive,
- * and the cards behind are mostly occluded anyway.
+ * ⚠️ The active treatment is faded in by an animated value rather than a
+ * boolean prop, so scrolling does not re-render every card on every frame —
+ * which is also why the blur layer is always mounted and only its opacity
+ * changes. Mounting a BlurView mid-gesture is the one thing here expensive
+ * enough to drop frames.
  *
- * ⚠️ The balance is never abbreviated here. It shrinks to fit instead, because
- * a clipped balance is a wrong balance.
+ * The balance is never abbreviated: it shrinks to fit, because a clipped
+ * balance is a wrong balance.
  */
-export function WalletStackCard({ wallet, animatedStyle, isFront }: WalletStackCardProps) {
+export function WalletStackCard({ wallet, animatedStyle, activeOpacity }: WalletStackCardProps) {
   const typeColor = TYPE_COLOR[wallet.type];
 
   return (
-    <Animated.View
-      testID={`card-wallet-${wallet.id}`}
-      style={[styles.card, { borderColor: isFront ? `${typeColor}55` : colors.surfaceBorder }, animatedStyle]}
-    >
-      {isFront ? (
-        <>
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: `${typeColor}1F` }]} />
-          <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFill} />
-        </>
-      ) : (
-        <View style={[StyleSheet.absoluteFill, styles.backFill]} />
-      )}
+    <Animated.View testID={`card-wallet-${wallet.id}`} style={[styles.card, animatedStyle]}>
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: activeOpacity }]}>
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: `${typeColor}1F` }]} />
+        <BlurView intensity={24} tint="dark" style={StyleSheet.absoluteFill} />
+      </Animated.View>
+
+      {/* The accent border is its own overlay for the same reason as the tint:
+          borderColor cannot be animated on the native driver. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.accentBorder, { borderColor: `${typeColor}66`, opacity: activeOpacity }]}
+      />
 
       <View style={styles.content}>
         <View style={styles.topRow}>
           <TintedIconTile
             color={typeColor}
-            size={34}
+            size={32}
             icon={wallet.icon}
             iconUrl={wallet.icon_url}
             label={wallet.name}
@@ -89,7 +94,7 @@ export function WalletStackCard({ wallet, animatedStyle, isFront }: WalletStackC
           </View>
         </View>
 
-        <View>
+        <View style={styles.balanceBlock}>
           <Text style={styles.balanceLabel} numberOfLines={1}>
             {BALANCE_LABEL[wallet.type]}
           </Text>
@@ -104,22 +109,30 @@ export function WalletStackCard({ wallet, animatedStyle, isFront }: WalletStackC
 
 const styles = StyleSheet.create({
   card: {
-    position: "absolute",
-    width: STACK_CARD_WIDTH,
-    height: STACK_CARD_HEIGHT,
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
     borderRadius: radii.card,
     borderWidth: 1,
+    borderColor: colors.surfaceBorder,
     overflow: "hidden",
     backgroundColor: colors.surface,
   },
-  backFill: { backgroundColor: colors.surface },
-  content: { flex: 1, padding: spacing.lg, justifyContent: "space-between" },
+  accentBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: radii.card,
+    borderWidth: 1,
+  },
+  // A measured gap between the two blocks rather than space-between: pinning
+  // them to the card's edges left a pool of dead space in the middle that made
+  // the name and the balance look unrelated.
+  content: { flex: 1, padding: spacing.md, gap: spacing.md, justifyContent: "center" },
   topRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  identity: { flex: 1, minWidth: 0, gap: 2 },
+  identity: { flex: 1, minWidth: 0, gap: 1 },
   name: { ...typography.body, fontWeight: "700", color: colors.textPrimary },
-  typeRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  dot: { width: 7, height: 7, borderRadius: 4 },
+  typeRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  dot: { width: 6, height: 6, borderRadius: 3 },
   type: { ...typography.tiny, color: colors.textSecondary },
+  balanceBlock: { gap: 1 },
   balanceLabel: { ...typography.tiny, color: colors.textSecondary },
   balance: { ...typography.title, color: colors.textPrimary },
 });

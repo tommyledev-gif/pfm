@@ -88,7 +88,7 @@ export function LiquidCircle({
           <Path d={buildWavePath(waveWidth, size, waterY)} fill={color} />
         </Svg>
       </Animated.View>
-      <View style={[styles.label, { width: size * 0.78 }]} pointerEvents="none">
+      <View style={[styles.label, { width: size * 0.86 }]} pointerEvents="none">
         <View style={styles.scrim}>
           <Text style={styles.caption} numberOfLines={1}>
             {topLabel}
@@ -109,9 +109,9 @@ const styles = StyleSheet.create({
   scrim: {
     alignItems: "center",
     gap: 2,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 10,
     backgroundColor: LABEL_SCRIM_COLOR,
   },
   caption: { ...typography.caption, color: colors.textSecondary },

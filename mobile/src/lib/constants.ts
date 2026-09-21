@@ -59,3 +59,11 @@ export const XLSX_UTI = "org.openxmlformats.spreadsheetml.sheet";
 // Mirrors common.TransactionImportMaxUploadBytes — checked client-side too so
 // a too-large file fails instantly instead of after a 5MB upload.
 export const IMPORT_MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+
+// Mirrors backend/internal/common/constants.go (CategoryNameMaxLength /
+// CategoryIconMaxLength). Hand-kept in sync like every other DTO shape in
+// this project — there is no codegen pipeline. Enforced on the inputs so an
+// over-long name is stopped at the keyboard instead of coming back as a 400
+// the user cannot act on.
+export const CATEGORY_NAME_MAX_LENGTH = 50;
+export const CATEGORY_ICON_MAX_LENGTH = 32;

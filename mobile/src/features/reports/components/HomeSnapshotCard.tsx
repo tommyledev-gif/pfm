@@ -18,7 +18,9 @@ import { ReportCategoryEntry } from "@/features/reports/types";
 // bleed across the gap into the meters beside it. Measured, then clamped:
 // below the floor the amount inside stops being readable at all, and nothing
 // is gained by letting it grow past the old size on a tablet.
-const RING_MIN_SIZE = 64;
+// Raised from 64: at that floor the amount inside had to shrink far enough
+// that "Đã chi" and the figure ran into each other and into the fill's edge.
+const RING_MIN_SIZE = 84;
 const RING_MAX_SIZE = 132;
 
 export interface AtRiskBudgetRow {
@@ -235,11 +237,12 @@ const styles = StyleSheet.create({
   trendPositive: { backgroundColor: "rgba(133,255,51,0.1)", borderColor: "rgba(133,255,51,0.3)" },
   trendLabel: { ...typography.tiny },
   row: { flexDirection: "row", gap: spacing.md, alignItems: "flex-start" },
-  // A 3/9 split: the ring is a glance, the meters beside it are what is being
-  // read. Both need a zero minimum — with no floor, a long category name would
-  // widen the right column and squeeze the left one below its measured width.
-  left: { flex: 3, minWidth: 0, alignItems: "center", gap: 2 },
-  right: { flex: 9, gap: 2, minWidth: 0 },
+  // A 4/8 split, widened from 3/9: the meters are still the thing being read,
+  // but 3/12 left the ring column narrower than its own contents. Both need a
+  // zero minimum — with no floor, a long category name would widen the right
+  // column and squeeze the left one below its measured width.
+  left: { flex: 4, minWidth: 0, alignItems: "center", gap: 2 },
+  right: { flex: 8, gap: 2, minWidth: 0 },
   compactHeaderRow: {
     flexDirection: "row",
     alignItems: "flex-start",

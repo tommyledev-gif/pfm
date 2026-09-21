@@ -17,7 +17,7 @@ interface TintedIconTileProps {
 
 // A softly-tinted rounded square (color-at-~10%-opacity fill, ~25% border,
 // colored glyph) — the opposite look from Avatar.tsx's solid-filled circle.
-// Shared by TransactionRow and WalletCard (both want this specific subtler
+// Shared by TransactionRow and WalletStackCard (both want this specific subtler
 // treatment); Avatar itself stays untouched since its opaque-circle look is
 // still correct everywhere else it's used (category/user list items,
 // identity chips, etc.) — restyling it globally would change screens nobody

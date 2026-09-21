@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-
 
 import { Avatar } from "@/components/ui/Avatar";
 import { CheckIcon, SearchIcon } from "@/components/ui/Icon";
+import { CategoryQuickCreateRow } from "@/features/categories/components/CategoryQuickCreateRow";
 import { colorForCategory } from "@/lib/category-color";
 import { matchesSearch } from "@/lib/search-text";
 import { colors, radii, spacing, typography } from "@/lib/theme";
@@ -53,8 +54,16 @@ export function CategoryPickerList({ categories, selectedIds, onToggle, multiple
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator
       >
+        {/* Above the first category, inside the scroll, so it sits where a
+            user who has just failed to find what they wanted is already
+            looking. Selecting the new category is automatic — creating one
+            here is only ever a step toward choosing it. */}
+        <CategoryQuickCreateRow onCreated={onToggle} />
+
         {visible.length === 0 ? (
-          <Text style={styles.empty}>Không tìm thấy danh mục phù hợp.</Text>
+          <Text style={styles.empty}>
+            {search ? "Không tìm thấy danh mục phù hợp." : "Chưa có danh mục nào."}
+          </Text>
         ) : (
           visible.map((c) => {
             const active = selected.has(c.id);
@@ -96,7 +105,7 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, paddingVertical: 10, color: colors.textPrimary, ...typography.body },
   clearSearch: { ...typography.body, color: colors.textSecondary },
   list: { flex: 1 },
-  listContent: { paddingBottom: spacing.md },
+  listContent: { paddingBottom: spacing.md, gap: spacing.xs },
   row: {
     flexDirection: "row",
     alignItems: "center",

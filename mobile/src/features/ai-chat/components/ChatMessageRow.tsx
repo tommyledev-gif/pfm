@@ -70,7 +70,8 @@ export function ChatMessageRow({
       onTriggerDelete={isRemovable(message) ? () => onTriggerDelete(message) : undefined}
       closeSignal={closeSignal}
     >
-      <ChatBubble role={message.role} text={message.text}>
+      {/* A tombstone speaks for itself — see ChatBubble on the empty text. */}
+      <ChatBubble role={message.role} text={kind ? "" : message.text}>
         {kind && message.action ? (
           <TransactionTombstoneCard
             kind={kind}

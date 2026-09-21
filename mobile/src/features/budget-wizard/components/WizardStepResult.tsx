@@ -1,15 +1,18 @@
 import { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { BarSegment, SegmentedBar } from "@/components/shared/SegmentedBar";
+import { SegmentedBar } from "@/components/shared/SegmentedBar";
 import { EditAmountModal } from "@/features/budget-wizard/components/EditAmountModal";
 import { AddBudgetRowModal, AddBudgetRowResult } from "@/features/budget-wizard/components/AddBudgetRowModal";
+import { ConfidencePopup } from "@/features/budget-wizard/components/ConfidencePopup";
 import { ProposalRow } from "@/features/budget-wizard/components/ProposalRow";
+import { SegmentLegend } from "@/features/budget-wizard/components/SegmentLegend";
 import { WizardPlanSummaryRows } from "@/features/budget-wizard/components/WizardPlanSummaryRows";
 import { WizardResultFooter } from "@/features/budget-wizard/components/WizardResultFooter";
 import { Category } from "@/features/categories/types";
 import { daysInCycle, perDayXu } from "@/features/budget-wizard/budget-math";
-import { BudgetProposalsResponse, ProposalEntry } from "@/features/budget-wizard/types";
+import { buildProposalSegments, segmentLegendEntry } from "@/features/budget-wizard/proposal-segments";
+import { BudgetProposalsResponse, ConfidenceBadge, ProposalEntry } from "@/features/budget-wizard/types";
 import { buildCategoryColorMap } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
 import { colors, radii, spacing, typography } from "@/lib/theme";
@@ -88,6 +91,11 @@ export function WizardStepResult({
   canSubmit,
 }: WizardStepResultProps) {
   const [editing, setEditing] = useState<ProposalEntry | null>(null);
+  // Which block of the allocation bar the user is asking about, and which
+  // row's figure they are asking the provenance of. Both are transient
+  // presentation state, so neither belongs anywhere but here.
+  const [activeSegment, setActiveSegment] = useState<string | null>(null);
+  const [confidence, setConfidence] = useState<{ name: string; badge: ConfidenceBadge } | null>(null);
 
   /**
    * "Chi khác" sinks to the bottom, whatever order the server sent.
@@ -139,22 +147,9 @@ export function WizardStepResult({
   }
 
   const perDay = perDayXu(result.disposable, daysInCycle(cycleStartDay));
-  const segments: BarSegment[] = orderedProposals.map((p) => ({
-    key: p.category_id,
-    share: result.disposable > 0 ? p.amount_max / result.disposable : 0,
-    color: rowColors.get(p.category_id) ?? colors.lavender,
-  }));
-  if (result.unallocated_amount > 0) {
-    // The buffer is drawn hatched, never solid: it is money with no category
-    // behind it, and colouring it like the others would make it look like a
-    // seventh spending line the user could file against.
-    segments.push({
-      key: "__buffer__",
-      share: result.unallocated_amount / result.disposable,
-      color: colors.surfaceBorder,
-      hatched: true,
-    });
-  }
+  const colorFor = (categoryId: string) => rowColors.get(categoryId) ?? colors.lavender;
+  const segments = buildProposalSegments(result, orderedProposals, colorFor);
+  const legendEntry = segmentLegendEntry(result, orderedProposals, colorFor, activeSegment);
 
   return (
     <View style={styles.container}>
@@ -170,7 +165,12 @@ export function WizardStepResult({
           <Text style={styles.headlineValue}>{formatCurrency(perDay, currency)}</Text>
         </View>
 
-        <SegmentedBar segments={segments} />
+        <SegmentedBar
+          segments={segments}
+          activeKey={activeSegment}
+          onPressSegment={(key) => setActiveSegment((prev) => (prev === key ? null : key))}
+        />
+        <SegmentLegend entry={legendEntry} currency={currency} />
 
         <View style={styles.rows}>
           {orderedProposals.length === 0 ? (
@@ -186,6 +186,7 @@ export function WizardStepResult({
               color={rowColors.get(entry.category_id) ?? colors.lavender}
               onPress={() => setEditing(entry)}
               onRemove={() => onRemoveRow(entry.category_id)}
+              onPressConfidence={(badge) => setConfidence({ name: entry.category_name, badge })}
             />
           ))}
 
@@ -228,6 +229,13 @@ export function WizardStepResult({
         usedCategoryIds={result.proposals.map((p) => p.category_id)}
         onClose={onCloseAddRow}
         onConfirm={onAddRow}
+      />
+
+      <ConfidencePopup
+        visible={confidence !== null}
+        categoryName={confidence?.name ?? ""}
+        badge={confidence?.badge ?? null}
+        onClose={() => setConfidence(null)}
       />
 
       <EditAmountModal

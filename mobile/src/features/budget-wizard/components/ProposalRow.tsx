@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { formatCurrency } from "@/lib/currency";
 import { colors, spacing, typography } from "@/lib/theme";
-import { ProposalEntry, confidenceBadge } from "@/features/budget-wizard/types";
+import { ConfidenceBadge, ProposalEntry, confidenceBadge } from "@/features/budget-wizard/types";
 
 interface ProposalRowProps {
   entry: ProposalEntry;
@@ -15,6 +15,8 @@ interface ProposalRowProps {
   /** Every row is removable, including the ones the allocator suggested — a
    *  plan the user cannot correct is a plan they work around instead. */
   onRemove: () => void;
+  /** Opens the confidence explanation for this row. */
+  onPressConfidence: (badge: ConfidenceBadge) => void;
 }
 
 /**
@@ -27,7 +29,16 @@ interface ProposalRowProps {
  * guess. An honest badge and nothing else beats a confident sentence that means
  * nothing.
  */
-export function ProposalRow({ entry, currency, color, onPress, onRemove }: ProposalRowProps) {
+export function ProposalRow({
+  entry,
+  currency,
+  color,
+  onPress,
+  onRemove,
+  onPressConfidence,
+}: ProposalRowProps) {
+  const badge = confidenceBadge(entry.source);
+
   return (
     <Pressable testID={`row-wizard-proposal-${entry.category_id}`} onPress={onPress} style={styles.row}>
       <View style={[styles.dot, { backgroundColor: color }]} />
@@ -36,11 +47,21 @@ export function ProposalRow({ entry, currency, color, onPress, onRemove }: Propo
         <Text style={styles.name} numberOfLines={1}>
           {entry.category_name}
         </Text>
-        <Text testID={`badge-wizard-confidence-${entry.category_id}`} style={styles.badge}>
-          {/* Evidence when there is any, the badge alone when there is not.
-              Never a substitute sentence. */}
-          {entry.evidence ? entry.evidence : confidenceBadge(entry.source)}
-        </Text>
+        {/* Words, not dots. The level is real information but "●●○" beside a
+            number has no self-evident meaning, so it lives behind this tap
+            instead of sitting on the row unexplained — see ConfidencePopup. */}
+        <Pressable
+          testID={`badge-wizard-confidence-${entry.category_id}`}
+          onPress={() => onPressConfidence(badge)}
+          hitSlop={6}
+        >
+          <Text style={styles.badge} numberOfLines={1}>
+            {/* Evidence when there is any, the label alone when there is not.
+                Never a substitute sentence. */}
+            {entry.evidence ? entry.evidence : badge.label}
+            <Text style={styles.badgeHint}> · vì sao?</Text>
+          </Text>
+        </Pressable>
       </View>
 
       <View style={styles.amounts}>
@@ -73,6 +94,7 @@ const styles = StyleSheet.create({
   labels: { flex: 1, gap: 1 },
   name: { ...typography.label, color: colors.textPrimary },
   badge: { ...typography.tiny, color: colors.textMuted },
+  badgeHint: { color: colors.green },
   amounts: { alignItems: "flex-end", gap: 1 },
   amount: { ...typography.label, color: colors.textPrimary },
   band: { ...typography.tiny, color: colors.textMuted },

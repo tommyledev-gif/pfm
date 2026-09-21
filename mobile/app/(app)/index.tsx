@@ -226,14 +226,16 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bgApp },
   content: { paddingBottom: 140, paddingHorizontal: spacing.xl, gap: spacing.md },
-  header: { gap: spacing.lg },
-  section: { gap: spacing.sm },
+  header: { gap: spacing.xl },
+  section: { gap: spacing.md },
   periodRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
+  // No bottom margin: the section's own gap owns the space under a header,
+  // so adding one here stacked two spacings and left the carousel floating
+  // further from its title than from the block below it.
   sectionHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: spacing.xs,
   },
   sectionTitleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   // Uppercase, letter-spaced and muted — the section-title register, distinct

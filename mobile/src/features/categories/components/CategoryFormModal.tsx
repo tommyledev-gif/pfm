@@ -12,7 +12,7 @@ import { TrashIcon } from "@/components/ui/Icon";
 import { getErrorMessage } from "@/lib/axios";
 import { colorForCategory } from "@/lib/category-color";
 import { colors, radii, spacing, typography } from "@/lib/theme";
-import { CATEGORY_TYPES, CategoryType } from "@/lib/constants";
+import { CATEGORY_NAME_MAX_LENGTH, CATEGORY_TYPES, CategoryType } from "@/lib/constants";
 import { useCreateCategoryMutation } from "@/features/categories/api/use-create-category-mutation";
 import { useUpdateCategoryMutation } from "@/features/categories/api/use-update-category-mutation";
 import { useDeleteCategoryMutation } from "@/features/categories/api/use-delete-category-mutation";
@@ -93,11 +93,11 @@ export function CategoryFormModal({ visible, onClose, editingCategory }: Categor
     if (errors.name) return;
     if (isEditing && editingCategory) {
       updateCategory.mutate(
-        { id: editingCategory.id, body: { name, icon: icon || undefined, icon_url: iconUrl } },
+        { id: editingCategory.id, body: { name: name.trim(), icon: icon || undefined, icon_url: iconUrl } },
         { onSuccess: onClose },
       );
     } else {
-      createCategory.mutate({ name, icon: icon || undefined, type, icon_url: iconUrl }, { onSuccess: onClose });
+      createCategory.mutate({ name: name.trim(), icon: icon || undefined, type, icon_url: iconUrl }, { onSuccess: onClose });
     }
   };
 
@@ -140,6 +140,7 @@ export function CategoryFormModal({ visible, onClose, editingCategory }: Categor
           placeholder="vd: Đi chợ"
           placeholderTextColor={colors.textMuted}
           style={styles.input}
+          maxLength={CATEGORY_NAME_MAX_LENGTH}
         />
         {submitAttempted ? <FieldError message={errors.name} /> : null}
 

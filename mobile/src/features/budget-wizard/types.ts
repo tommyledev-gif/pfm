@@ -94,24 +94,77 @@ export interface WizardDraft {
 }
 
 /** The four lifestyle options, in the order screen 2 lists them. */
-export const PRESET_OPTIONS: { key: PresetKey; icon: string; label: string }[] = [
-  { key: "rented_eating_out", icon: "🏙", label: "Ở trọ, đi làm, ăn ngoài là chính" },
-  { key: "with_family", icon: "🏡", label: "Ở với gia đình, ăn cơm nhà" },
-  { key: "own_family", icon: "👨‍👩‍👧", label: "Có gia đình riêng, có con nhỏ" },
-  { key: "student", icon: "🎓", label: "Sinh viên" },
+// `description` says what the option implies for the resulting budget, which
+// the label alone does not. Picking a living situation is a proxy for a
+// spending shape, and a user who cannot see the shape is guessing at which
+// label fits them — the one thing this screen exists to avoid.
+export const PRESET_OPTIONS: { key: PresetKey; icon: string; label: string; description: string }[] = [
+  {
+    key: "rented_eating_out",
+    icon: "🏙",
+    label: "Ở trọ, đi làm",
+    description: "Tiền nhà, ăn ngoài và đi lại chiếm phần lớn.",
+  },
+  {
+    key: "with_family",
+    icon: "🏡",
+    label: "Ở với gia đình",
+    description: "Ít tiền nhà và tiền ăn, dư nhiều hơn cho mục khác.",
+  },
+  {
+    key: "own_family",
+    icon: "👨‍👩‍👧",
+    label: "Có gia đình riêng",
+    description: "Thêm chi phí cho con và sinh hoạt cả nhà.",
+  },
+  {
+    key: "student",
+    icon: "🎓",
+    label: "Sinh viên",
+    description: "Thu nhập thấp, chi tiêu gọn quanh ăn uống và đi lại.",
+  },
 ];
 
-/** Confidence badge per source — the row's honest label for how much the app
- *  actually knows. `preset` is the lowest and says so in plain words. */
-export function confidenceBadge(source: IntentSource): string {
+export interface ConfidenceBadge {
+  /** 1..3 — how much the app actually knows about this figure. */
+  level: 1 | 2 | 3;
+  /** The short words shown on the row. */
+  label: string;
+  /** Read only when the user asks — see ProposalRow's confidence popup. */
+  explanation: string;
+}
+
+/**
+ * How the app came by a row's figure.
+ *
+ * ⚠️ The level is deliberately NOT rendered as filled/empty dots by default.
+ * "●●○" beside a number looks like a rating of the category, or a progress
+ * bar, or a signal strength — three readings, none of them the intended one,
+ * and a glyph that has to be explained is worse than the words it replaced.
+ * The words carry the meaning on the row; the level and its explanation are
+ * there for whoever taps to ask.
+ */
+export function confidenceBadge(source: IntentSource): ConfidenceBadge {
   switch (source) {
     case "stated":
     case "manual":
-      return "●●● bạn đã nói";
+      return {
+        level: 3,
+        label: "bạn đã nói",
+        explanation: "Con số này là của bạn — bạn đã tự nhập hoặc tự sửa nó, nên tôi không đoán gì cả.",
+      };
     case "history":
-      return "●●○ từ lịch sử chi tiêu";
+      return {
+        level: 2,
+        label: "từ lịch sử chi tiêu",
+        explanation: "Tính từ các giao dịch bạn đã ghi trước đây, nên khá gần thực tế của bạn.",
+      };
     default:
-      return "○○○ ước lượng";
+      return {
+        level: 1,
+        label: "ước lượng",
+        explanation: "Chỉ dựa trên kiểu sống bạn chọn, chưa dựa trên chi tiêu thật. Bạn sửa lại bất cứ lúc nào.",
+      };
   }
 }
 
