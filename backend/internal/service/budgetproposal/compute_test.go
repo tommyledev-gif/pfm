@@ -51,6 +51,8 @@ func TestComputeSumInvariantExact(t *testing.T) {
 		common.BudgetPresetWithFamily,
 		common.BudgetPresetOwnFamily,
 		common.BudgetPresetStudent,
+		common.BudgetPresetCoupleNoKids,
+		common.BudgetPresetRetired,
 	} {
 		for _, income := range []int64{d(3_000_000), d(8_000_000), d(12_000_000), d(25_000_000), d(100_000_000)} {
 			fixed := income / 5

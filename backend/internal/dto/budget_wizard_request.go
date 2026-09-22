@@ -53,7 +53,7 @@ type BudgetProposalsRequest struct {
 	// moving someone's pay cycle is worse than asking them to pick again.
 	CycleStartDay int `json:"cycle_start_day" validate:"required,gte=1,lte=28"`
 
-	ProfilePreset string                  `json:"profile_preset" validate:"omitempty,oneof=rented_eating_out with_family own_family student"`
+	ProfilePreset string                  `json:"profile_preset" validate:"omitempty,oneof=rented_eating_out with_family own_family student couple_no_kids retired"`
 	Intents       []CategoryIntentRequest `json:"intents" validate:"required,min=1,max=20,dive"`
 }
 

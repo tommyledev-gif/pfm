@@ -80,6 +80,16 @@ export function HomeSnapshotCard({
   const ringSize = Math.min(RING_MAX_SIZE, Math.max(RING_MIN_SIZE, ringColumnWidth));
   const isOverBudget = Boolean(budgetSnapshot && periodSpent > budgetSnapshot.limit);
 
+  // The figure under the ring is the one the user acts on, and it was rendered
+  // in the same white as the "Đã chi" figure INSIDE the ring — two different
+  // numbers, one of them a cost and the other a headroom, in identical type
+  // and identical color, stacked eight pixels apart. Giving it the headroom
+  // color (green, or peach once it goes negative) separates the two at a
+  // glance and makes the sign readable without parsing the minus.
+  const remainingAmount = isDay ? remainingToday : (budgetSnapshot?.remaining ?? null);
+  const remainingColor =
+    remainingAmount === null ? colors.textPrimary : remainingAmount < 0 ? colors.peach : colors.green;
+
   // On the day tab the ring is today against today's share, not against the
   // month: filling it 3% a day would say nothing, and the day is what the tab
   // is about.
@@ -124,7 +134,7 @@ export function HomeSnapshotCard({
                 {isDay ? "Hôm nay còn" : "Còn lại"}
               </Text>
               <Text
-                style={styles.remainingValue}
+                style={[styles.remainingValue, { color: remainingColor }]}
                 numberOfLines={1}
                 adjustsFontSizeToFit
                 minimumFontScale={0.7}
@@ -147,8 +157,12 @@ export function HomeSnapshotCard({
                   </Text>
                 ) : null
               ) : budgetSnapshot ? (
+                // In-budget stays muted: the figure above it is already green,
+                // and repeating the colour on the line below it made the two
+                // read as one run of text. Over budget keeps the alarm — that
+                // is the one state worth spending a second colour on.
                 <Text
-                  style={[styles.status, { color: isOverBudget ? colors.peach : colors.green }]}
+                  style={[styles.status, isOverBudget ? { color: colors.peach } : null]}
                   numberOfLines={2}
                 >
                   {isOverBudget ? "Vượt ngân sách" : "Trong ngân sách"}
@@ -241,8 +255,8 @@ const styles = StyleSheet.create({
   // but 3/12 left the ring column narrower than its own contents. Both need a
   // zero minimum — with no floor, a long category name would widen the right
   // column and squeeze the left one below its measured width.
-  left: { flex: 4, minWidth: 0, alignItems: "center", gap: 2 },
-  right: { flex: 8, gap: 2, minWidth: 0 },
+  left: { flex: 6, minWidth: 0, alignItems: "center", gap: 2 },
+  right: { flex: 6, gap: 2, minWidth: 0 },
   compactHeaderRow: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -253,6 +267,10 @@ const styles = StyleSheet.create({
   compactSeeAll: { ...typography.tiny, color: colors.green, flexShrink: 0 },
   // Stepped down and centered: at 3/12 the column is about eleven characters.
   remainingLabel: { ...typography.tiny, color: colors.textSecondary, marginTop: spacing.xs },
-  remainingValue: { ...typography.label, color: colors.textPrimary, textAlign: "center" },
-  status: { ...typography.tiny, color: colors.textSecondary, textAlign: "center" },
+  // Color is set per render from the sign — see remainingColor.
+  remainingValue: { ...typography.cardTitle, textAlign: "center" },
+  // Muted rather than secondary: it sits directly under a label that is
+  // already secondary, and two identical greys around the figure flattened the
+  // block into one undifferentiated paragraph.
+  status: { ...typography.tiny, color: colors.textMuted, textAlign: "center" },
 });

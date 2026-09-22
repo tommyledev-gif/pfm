@@ -11,8 +11,14 @@ import { Category } from "@/features/categories/types";
 /** Where a row's amount came from. Drives the confidence badge and band width. */
 export type IntentSource = "preset" | "stated" | "manual" | "history";
 
-/** One of the four lifestyle answers on screen 2. */
-export type PresetKey = "rented_eating_out" | "with_family" | "own_family" | "student";
+/** One of the lifestyle answers on screen 2. Mirrors common.BudgetPresetKey. */
+export type PresetKey =
+  | "rented_eating_out"
+  | "with_family"
+  | "couple_no_kids"
+  | "own_family"
+  | "student"
+  | "retired";
 
 export interface PresetShare {
   system_key: string;
@@ -93,7 +99,7 @@ export interface WizardDraft {
   preset: PresetKey | null;
 }
 
-/** The four lifestyle options, in the order screen 2 lists them. */
+/** The lifestyle options, in the order screen 2 lists them. */
 // `description` says what the option implies for the resulting budget, which
 // the label alone does not. Picking a living situation is a proxy for a
 // spending shape, and a user who cannot see the shape is guessing at which
@@ -112,6 +118,15 @@ export const PRESET_OPTIONS: { key: PresetKey; icon: string; label: string; desc
     description: "Ít tiền nhà và tiền ăn, dư nhiều hơn cho mục khác.",
   },
   {
+    // Between "ở với gia đình" and "có gia đình riêng" there was no answer for
+    // a couple without children, so they picked own_family and got a
+    // children_education line they will never spend on.
+    key: "couple_no_kids",
+    icon: "💑",
+    label: "Vợ chồng son",
+    description: "Hai người, chưa có con — ăn ngoài và đi chơi nhiều hơn.",
+  },
+  {
     key: "own_family",
     icon: "👨‍👩‍👧",
     label: "Có gia đình riêng",
@@ -122,6 +137,14 @@ export const PRESET_OPTIONS: { key: PresetKey; icon: string; label: string; desc
     icon: "🎓",
     label: "Sinh viên",
     description: "Thu nhập thấp, chi tiêu gọn quanh ăn uống và đi lại.",
+  },
+  {
+    // The one profile where health is a standing monthly line and transport is
+    // the smallest — no commute.
+    key: "retired",
+    icon: "🧓",
+    label: "Đã nghỉ hưu",
+    description: "Chi tiêu đều đặn, y tế chiếm phần lớn hơn.",
   },
 ];
 

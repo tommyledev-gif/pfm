@@ -12,12 +12,18 @@ import {
 
 import { colors, spacing, typography } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
-import { CARD_GAP, CARD_HEIGHT, CARD_WIDTH, WalletStackCard } from "@/features/wallets/components/WalletStackCard";
+import {
+  CARD_HEIGHT,
+  CARD_OVERLAP,
+  CARD_WIDTH,
+  WalletStackCard,
+} from "@/features/wallets/components/WalletStackCard";
 
-const SNAP_INTERVAL = CARD_WIDTH + CARD_GAP;
-// How far a neighbour leans inward, on top of the layout gap, so the flanking
-// cards tuck under the active one and the row reads as a stack rather than a
-// filmstrip.
+// Each card steps less than its own width, so every card overlaps its
+// neighbour — the layout itself is a stack, not a row with gaps.
+const SNAP_INTERVAL = CARD_WIDTH - CARD_OVERLAP;
+// How far a neighbour leans further inward on top of that, so the flanking
+// cards tuck under the active one instead of merely touching it.
 const NEIGHBOUR_OVERLAP = 18;
 const NEIGHBOUR_SCALE = 0.88;
 const NEIGHBOUR_OPACITY = 0.5;
@@ -49,6 +55,11 @@ export function WalletCarousel({ wallets }: WalletCarouselProps) {
   const scrollRef = useRef<ScrollView>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
   const [containerWidth, setContainerWidth] = useState(0);
+  // Which card is currently centred, in `rendered` indices. Only used to order
+  // the overlapping cards — the centred one has to paint ON TOP of both its
+  // neighbours, and paint order in React Native is render order, which would
+  // otherwise put every card to the right over the active one.
+  const [centreIndex, setCentreIndex] = useState(0);
   const didInitialScroll = useRef(false);
 
   const looping = wallets.length >= MIN_WALLETS_TO_LOOP;
@@ -72,6 +83,16 @@ export function WalletCarousel({ wallets }: WalletCarouselProps) {
     if (didInitialScroll.current || !looping || containerWidth === 0) return;
     didInitialScroll.current = true;
     scrollRef.current?.scrollTo({ x: loopWidth, animated: false });
+    setCentreIndex(wallets.length);
+  };
+
+  // ⚠️ Attached as the listener of the native-driven scroll event, not as a
+  // second onScroll: the animation stays on the native driver, and this only
+  // re-renders when the centred card actually changes — once per swipe, not
+  // once per frame.
+  const onScrollFrame = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const next = Math.round(event.nativeEvent.contentOffset.x / SNAP_INTERVAL);
+    setCentreIndex((prev) => (prev === next ? prev : next));
   };
 
   // ⚠️ The wrap happens only once motion has stopped. Re-anchoring mid-fling
@@ -80,8 +101,13 @@ export function WalletCarousel({ wallets }: WalletCarouselProps) {
   const onMomentumEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (!looping) return;
     const x = event.nativeEvent.contentOffset.x;
-    if (x < loopWidth / 2) scrollRef.current?.scrollTo({ x: x + loopWidth, animated: false });
-    else if (x > loopWidth * 1.5) scrollRef.current?.scrollTo({ x: x - loopWidth, animated: false });
+    if (x < loopWidth / 2) {
+      scrollRef.current?.scrollTo({ x: x + loopWidth, animated: false });
+      setCentreIndex(Math.round((x + loopWidth) / SNAP_INTERVAL));
+    } else if (x > loopWidth * 1.5) {
+      scrollRef.current?.scrollTo({ x: x - loopWidth, animated: false });
+      setCentreIndex(Math.round((x - loopWidth) / SNAP_INTERVAL));
+    }
   };
 
   if (wallets.length === 0) {
@@ -100,11 +126,16 @@ export function WalletCarousel({ wallets }: WalletCarouselProps) {
         // Only the horizontal axis is claimed, so the home screen's vertical
         // scroll still works over the cards.
         directionalLockEnabled
-        contentContainerStyle={{ paddingHorizontal: sidePadding, gap: CARD_GAP }}
+        // No gap: the overlap is carried by each card's negative right margin
+        // below, which Yoga will not accept as a negative `gap`.
+        contentContainerStyle={{ paddingHorizontal: sidePadding }}
         scrollEventThrottle={16}
         onContentSizeChange={onContentSizeChange}
         onMomentumScrollEnd={onMomentumEnd}
-        onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: true })}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], {
+          useNativeDriver: true,
+          listener: onScrollFrame,
+        })}
       >
         {containerWidth === 0
           ? null
@@ -113,6 +144,11 @@ export function WalletCarousel({ wallets }: WalletCarouselProps) {
               // snap intervals: -1 is one card left of centre, 0 is centred.
               const offsetFromCentre = Animated.subtract(index, Animated.divide(scrollX, SNAP_INTERVAL));
               const range = [-1, 0, 1];
+              // Nearest to the centre paints last. The final card keeps its
+              // full width so the scrollable content is exactly long enough to
+              // bring it to the middle.
+              const proximity = Math.abs(index - centreIndex);
+              const isLast = index === rendered.length - 1;
 
               return (
                 <WalletStackCard
@@ -120,6 +156,14 @@ export function WalletCarousel({ wallets }: WalletCarouselProps) {
                   key={`${wallet.id}-${index}`}
                   wallet={wallet}
                   animatedStyle={{
+                    marginRight: isLast ? 0 : -CARD_OVERLAP,
+                    zIndex: rendered.length - proximity,
+                    // Android orders siblings by elevation before zIndex, so
+                    // the two have to agree or the stack inverts there. Kept in
+                    // a small range because on Android elevation is also the
+                    // shadow's size — ordering by raw index would give the
+                    // centre card a shadow the size of the card.
+                    elevation: Math.max(0, 8 - proximity),
                     transform: [
                       {
                         translateX: offsetFromCentre.interpolate({

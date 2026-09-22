@@ -133,8 +133,8 @@ type BudgetPresetShare struct {
 	Percent int64
 }
 
-// BudgetPresetKey identifies one of the four lifestyle answers on wizard
-// screen 2 — the single question that replaces v1's per-category tier grid.
+// BudgetPresetKey identifies one of the lifestyle answers on wizard screen 2 —
+// the single question that replaces v1's per-category tier grid.
 type BudgetPresetKey string
 
 const (
@@ -142,6 +142,13 @@ const (
 	BudgetPresetWithFamily      BudgetPresetKey = "with_family"
 	BudgetPresetOwnFamily       BudgetPresetKey = "own_family"
 	BudgetPresetStudent         BudgetPresetKey = "student"
+	// Added after the first four: a couple with no children and a retired
+	// user were both answering "own_family" or "with_family" for want of
+	// anything closer, which handed them a children_education line they will
+	// never spend on — a budget with a category the user cannot use is the
+	// fastest way to teach them the plan is not about them.
+	BudgetPresetCoupleNoKids BudgetPresetKey = "couple_no_kids"
+	BudgetPresetRetired      BudgetPresetKey = "retired"
 )
 
 // BudgetPresets is an ORDERED slice, not a map.
@@ -202,6 +209,32 @@ var BudgetPresets = []struct {
 			{SystemKey: "transport", Percent: 8},
 			{SystemKey: "shopping", Percent: 6},
 			{SystemKey: "other", Percent: 5},
+		},
+	},
+	{
+		// Two incomes, no children: the money own_family spends on
+		// children_education shows up here as eating out and going out.
+		Key: BudgetPresetCoupleNoKids,
+		Shares: []BudgetPresetShare{
+			{SystemKey: "food", Percent: 32},
+			{SystemKey: "entertainment", Percent: 18},
+			{SystemKey: "shopping", Percent: 14},
+			{SystemKey: "transport", Percent: 12},
+			{SystemKey: "other", Percent: 7},
+			{SystemKey: "health", Percent: 5},
+		},
+	},
+	{
+		// The one profile where health is a standing monthly line rather than
+		// an occasional one, and transport is the smallest — no commute.
+		Key: BudgetPresetRetired,
+		Shares: []BudgetPresetShare{
+			{SystemKey: "food", Percent: 34},
+			{SystemKey: "health", Percent: 20},
+			{SystemKey: "other", Percent: 12},
+			{SystemKey: "shopping", Percent: 10},
+			{SystemKey: "entertainment", Percent: 7},
+			{SystemKey: "transport", Percent: 5},
 		},
 	},
 }

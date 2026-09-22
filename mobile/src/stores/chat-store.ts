@@ -2,8 +2,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import { syncChatThreadRequest } from "@/features/ai-chat/api/use-chat-thread-sync";
+import { CHAT_THREAD_QUERY_KEY, syncChatThreadRequest } from "@/features/ai-chat/api/use-chat-thread-sync";
 import { ChatMessage } from "@/features/ai-chat/types";
+import { queryClient } from "@/lib/query-client";
 
 // Persisted to AsyncStorage (not expo-secure-store — its ~2KB per-key limit
 // on Android can't hold a growing thread of messages + transaction action
@@ -23,6 +24,16 @@ import { ChatMessage } from "@/features/ai-chat/types";
 const SYNC_DEBOUNCE_MS = 3000;
 let syncTimer: ReturnType<typeof setTimeout> | null = null;
 
+// What we just pushed IS what the server now holds, so the GET's cache entry
+// is stale the moment a sync lands. It outlives the chat screen (the
+// QueryClient is app-wide, the screen is not), so leaving it behind means a
+// later read of it describes a thread from before the last few edits.
+function refreshSyncedCache(thread: ChatMessage[]) {
+  if (queryClient.getQueryData(CHAT_THREAD_QUERY_KEY)) {
+    queryClient.setQueryData(CHAT_THREAD_QUERY_KEY, thread);
+  }
+}
+
 function scheduleSync(getThread: () => ChatMessage[]) {
   if (syncTimer) clearTimeout(syncTimer);
   syncTimer = setTimeout(() => {
@@ -32,7 +43,9 @@ function scheduleSync(getThread: () => ChatMessage[]) {
     // Best-effort — a failed sync (offline, expired session) just leaves the
     // next mutation to reschedule it; settings.tsx's logout flush gets one
     // more attempt before the local copy is wiped.
-    syncChatThreadRequest(thread).catch(() => {});
+    syncChatThreadRequest(thread)
+      .then(() => refreshSyncedCache(thread))
+      .catch(() => {});
   }, SYNC_DEBOUNCE_MS);
 }
 
@@ -41,10 +54,13 @@ interface ChatState {
   addMessage: (message: ChatMessage) => void;
   updateMessage: (id: string, patch: Partial<ChatMessage>) => void;
   removeMessage: (id: string) => void;
-  // Drops in a thread fetched from GET /ai/chat/thread (ai-chat.tsx, only
-  // called once when the local thread is empty) — a plain replace, not
+  // Drops in a thread fetched from GET /ai/chat/thread (ai-chat.tsx) — not
   // merged with scheduleSync, since restoring server state is not itself a
   // local change that needs re-syncing.
+  //
+  // ⚠️ Ignored unless the local thread is EMPTY. This is a restore path for a
+  // device that has nothing, never a merge: the local copy is always the newer
+  // one (every local edit syncs UP to the server, seconds after the fact).
   hydrateThread: (messages: ChatMessage[]) => void;
   clear: () => void;
   // Best-effort immediate flush — settings.tsx awaits this (capped by its own
@@ -66,7 +82,15 @@ export const useChatStore = create<ChatState>()(
         scheduleSync(() => get().thread);
       },
       removeMessage: (id) => set((state) => ({ thread: state.thread.filter((m) => m.id !== id) })),
-      hydrateThread: (messages) => set({ thread: messages }),
+      // ⚠️ Guarded in the store rather than at the call site, because the call
+      // site cannot see the danger: TanStack keeps the GET's result cached for
+      // minutes after the chat screen unmounts, so ai-chat.tsx's mount effect
+      // fires again — with a pre-edit server snapshot — every time the user
+      // leaves the tab and comes back. That is how a deleted transaction's
+      // tombstone came back to life as a live card: nothing had failed, the
+      // stale fetch simply overwrote the thread that held the tombstone.
+      hydrateThread: (messages) =>
+        set((state) => (state.thread.length === 0 ? { thread: messages } : state)),
       clear: () => {
         if (syncTimer) {
           clearTimeout(syncTimer);
@@ -82,6 +106,7 @@ export const useChatStore = create<ChatState>()(
         const thread = get().thread;
         if (!thread.length) return;
         await syncChatThreadRequest(thread);
+        refreshSyncedCache(thread);
       },
     }),
     {

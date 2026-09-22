@@ -71,12 +71,22 @@ export default function AiChatScreen() {
     openEdit?: string;
   }>();
 
-  // Restores the synced thread exactly once, only when the local copy is
-  // empty — i.e. after a logout, reinstall or new device wiped it.
-  const threadQuery = useChatThreadQuery(thread.length === 0);
+  // Restores the synced thread when the local copy is empty — i.e. after a
+  // logout, reinstall or new device wiped it.
+  //
+  // ⚠️ Frozen at mount rather than read live. This screen unmounts on every
+  // bottom-nav tab change, but the query's CACHED result does not go with it —
+  // so on the next mount `threadQuery.data` still holds the thread as the
+  // server had it at fetch time, and re-running the effect against it undid
+  // every local change since (a deleted transaction's tombstone reverting to a
+  // live card is how this showed up). The store refuses a hydrate over a
+  // non-empty thread as well; this keeps the request from being made at all.
+  const [needsServerThread] = useState(() => thread.length === 0);
+  const threadQuery = useChatThreadQuery(needsServerThread && thread.length === 0);
   useEffect(() => {
+    if (!needsServerThread) return;
     if (threadQuery.data?.length) hydrateThread(threadQuery.data);
-  }, [threadQuery.data, hydrateThread]);
+  }, [needsServerThread, threadQuery.data, hydrateThread]);
 
   const wallets = useWalletsQuery();
   const categories = useCategoriesQuery();

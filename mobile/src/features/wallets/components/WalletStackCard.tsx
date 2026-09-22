@@ -31,7 +31,11 @@ const BALANCE_LABEL: Record<Wallet["type"], string> = {
 
 export const CARD_WIDTH = 236;
 export const CARD_HEIGHT = 132;
-export const CARD_GAP = spacing.md;
+// How far each card sits UNDER the one before it, as a negative margin rather
+// than a gap. The cards used to be laid out with 12px of background between
+// them, which read as a filmstrip of unrelated tiles; overlapping them makes
+// the row read as one stack of cards with the active one lifted off the top.
+export const CARD_OVERLAP = 56;
 
 interface WalletStackCardProps {
   wallet: Wallet;
@@ -115,7 +119,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     overflow: "hidden",
+    // Opaque, not translucent: the neighbouring cards now pass UNDERNEATH this
+    // one, and a see-through surface would show their edges through it.
     backgroundColor: colors.surface,
+    // The drop shadow is what separates the overlapping cards from each other
+    // now that no background shows between them. iOS reads these; Android
+    // takes the animated elevation the carousel supplies per card.
+    shadowColor: "#000",
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    shadowOffset: { width: -6, height: 6 },
   },
   accentBorder: {
     ...StyleSheet.absoluteFillObject,

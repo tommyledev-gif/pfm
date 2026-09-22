@@ -10,23 +10,27 @@ interface WizardStepProfileProps {
   onSelect: (key: PresetKey) => void;
 }
 
-// One tint per option, so the selected state names *which* option is selected
-// rather than only that something is. A single shared accent made all four
-// rows look identical once chosen, which is the moment the distinction matters
-// most — and it left the screen with nothing to distinguish the options by
-// while the user was still deciding.
+// One tint per option while the user is still deciding — six identical grey
+// rows give the eye nothing to tell them apart by. The tint is resting state
+// only: the SELECTED row is always the primary green, because "this is the one
+// I picked" is a single meaning and should have a single color everywhere in
+// the app, not a different one per option.
 const PRESET_TINT: Record<PresetKey, string> = {
   rented_eating_out: colors.periwinkle,
   with_family: colors.mint,
+  couple_no_kids: colors.peach,
   own_family: colors.lavender,
   student: colors.mustard,
+  retired: colors.mint,
 };
 
-const ICON_TILE_SIZE = 48;
+const ICON_TILE_SIZE = 44;
 // A comfortable row, not a grid cell: the icon, a title and a line of
-// description need vertical room, and four full-width rows are easier to
-// compare than a 2×2 grid where the eye has to travel in two directions.
-const ROW_MIN_HEIGHT = 84;
+// description need vertical room, and six full-width rows are easier to
+// compare than a 2×3 grid where the eye has to travel in two directions.
+// Trimmed from 84 when the list went from four options to six — at the old
+// height the last row sat under the footer on a short phone.
+const ROW_MIN_HEIGHT = 72;
 
 /**
  * Screen 2 — one question.
@@ -44,6 +48,10 @@ const ROW_MIN_HEIGHT = 84;
  * Each row carries a description of what the option implies for the budget.
  * Without it the user is matching themselves to a label; with it they are
  * choosing a shape, which is the actual decision being asked of them.
+ *
+ * The rows are centred in whatever height is left over rather than pinned
+ * under the question: on a tall phone a top-aligned list of six left a block
+ * of dead space above the footer and made the screen look unfinished.
  */
 export function WizardStepProfile({ selected, onSelect }: WizardStepProfileProps) {
   return (
@@ -58,7 +66,9 @@ export function WizardStepProfile({ selected, onSelect }: WizardStepProfileProps
 
         {PRESET_OPTIONS.map((opt) => {
           const active = opt.key === selected;
-          const tint = PRESET_TINT[opt.key];
+          // Resting tint for the icon tile; the selected state is the app's
+          // primary green, the same as every other "chosen" affordance.
+          const tint = active ? colors.green : PRESET_TINT[opt.key];
 
           return (
             <Pressable
@@ -109,8 +119,17 @@ export function WizardStepProfile({ selected, onSelect }: WizardStepProfileProps
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  scroll: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl, gap: spacing.md },
-  head: { gap: spacing.xs, marginBottom: spacing.xs },
+  // flexGrow + centre, not a plain top-aligned stack: when the six rows are
+  // shorter than the viewport they sit in the middle of it, and when they are
+  // taller flexGrow does nothing and the list simply scrolls.
+  scroll: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xl,
+    gap: spacing.sm,
+  },
+  head: { gap: spacing.xs, marginBottom: spacing.sm },
   title: { ...typography.title, color: colors.textPrimary },
   subtitle: { ...typography.caption, color: colors.textSecondary },
   row: {

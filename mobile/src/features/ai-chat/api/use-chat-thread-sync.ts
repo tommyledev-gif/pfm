@@ -3,6 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { apiClient, unwrap } from "@/lib/axios";
 import { ChatMessage } from "@/features/ai-chat/types";
 
+// Exported so chat-store.ts can keep this cache entry in step with what it
+// last pushed — see the setQueryData call there.
+export const CHAT_THREAD_QUERY_KEY = ["chat-thread"] as const;
+
 interface ChatThreadMessageWire {
   client_message_id: string;
   payload: ChatMessage;
@@ -35,9 +39,17 @@ export async function fetchChatThreadRequest(): Promise<ChatMessage[]> {
   return data.messages.map((m) => m.payload);
 }
 
+/**
+ * ⚠️ The cached result of this outlives the chat screen. The screen unmounts on
+ * every bottom-nav tab change while the QueryClient does not, so `data` is
+ * still sitting here — a snapshot of the thread as the SERVER had it at fetch
+ * time — when the screen mounts again. Anything consuming it has to decide
+ * whether it still wants it; `data` being present says nothing about it being
+ * newer than the local thread. See chat-store's hydrateThread.
+ */
 export function useChatThreadQuery(enabled: boolean) {
   return useQuery({
-    queryKey: ["chat-thread"],
+    queryKey: CHAT_THREAD_QUERY_KEY,
     queryFn: fetchChatThreadRequest,
     enabled,
   });

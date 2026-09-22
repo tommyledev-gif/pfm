@@ -325,7 +325,7 @@ No write.
 - Screen 1 complete.
 
 ### Main Flow
-1. System asks "Bạn đang sống kiểu nào?" with four options: 🏙 `rented_eating_out`, 🏡 `with_family`, 👨‍👩‍👧 `own_family`, 🎓 `student`.
+1. System asks "Bạn đang sống kiểu nào?" with six options: 🏙 `rented_eating_out`, 🏡 `with_family`, 💑 `couple_no_kids`, 👨‍👩‍👧 `own_family`, 🎓 `student`, 🧓 `retired`. (`couple_no_kids` and `retired` were added after the original four: both groups were otherwise forced onto a family preset and handed a `children_education` line they can never spend on.)
 2. User picks one.
 3. System maps the preset to shares **of disposable** (not of gross income), resolved by `system_key`.
 4. System proceeds to Screen 3.
