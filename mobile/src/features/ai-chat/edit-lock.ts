@@ -24,6 +24,10 @@ export function isEditLocked(message: ChatMessage): boolean {
   // transaction would PATCH a record the user just took away, and editing a
   // discarded one would revise a proposal that will never be saved.
   if (isTombstone(message)) return true;
+  // Analysis questions and answers: an answer is a snapshot of figures, and
+  // the edit path for a user message re-runs transaction extraction — a
+  // question must never be resent as a transaction description.
+  if (message.consult || message.consultQuestion) return true;
   if (message.role !== "assistant") return false;
   return !message.action;
 }

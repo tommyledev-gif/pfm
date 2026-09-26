@@ -152,7 +152,7 @@ SELECT EXISTS (
 -- RPT-T1) — one query per request, grouped by (type, currency), over an
 -- arbitrary caller-supplied window (from_ts/to_ts always resolved by
 -- ReportService before this runs — plan.md Finding #6), unlike
--- SumExpenseByUserCurrentPeriod's hardcoded current-month/expense-only scope.
+-- SumExpenseByUserCycle's fixed cycle-window/expense-only scope.
 -- Every filter beyond the window is an optional sqlc.narg — a NULL narg
 -- leaves that AND clause a no-op (same convention as ListTransactionsByUser).
 -- Ordered by currency for a deterministic response (plan.md Finding #9).
@@ -198,22 +198,24 @@ WHERE t.user_id = $1
 GROUP BY t.category_id, c.name, t.type, w.currency
 ORDER BY amount DESC;
 
--- name: SumExpenseByUserCurrentPeriod :many
--- Backs F-05's real spend computation (BUD-T17) — one aggregate query per
--- request, never N+1 (specs/budget-management/spec.md US-02 Edge Cases #1).
--- Called from BudgetRepository, not TransactionRepository (cross-repository
--- query exception). The current UTC calendar month is computed in SQL via
--- date_trunc so the app server and DB never disagree on "now"
--- (specs/budget-management/spec.md's resolved period-window decision).
+-- name: SumExpenseByUserCycle :many
+-- Backs F-05's real spend computation (BUD-T17) and F-10's budget job — one
+-- aggregate query per request, never N+1 (specs/budget-management/spec.md
+-- US-02 Edge Cases #1). Called from BudgetRepository, not
+-- TransactionRepository (cross-repository query exception). The window is a
+-- half-open [cycle_start, cycle_end) resolved in Go by
+-- service.ResolveCycleWindow in the app timezone
+-- (specs/ai-budget-wizard-v2/spec.md US-03) — replaces the old UTC
+-- date_trunc('month', NOW()) window.
 SELECT
     t.category_id,
     w.currency,
     SUM(t.amount)::bigint AS spent
 FROM transactions t
 JOIN wallets w ON w.id = t.wallet_id
-WHERE t.user_id = $1
+WHERE t.user_id = @user_id
   AND t.type = 'expense'
   AND t.deleted_at IS NULL
-  AND t.occurred_at >= date_trunc('month', NOW())
-  AND t.occurred_at < date_trunc('month', NOW()) + INTERVAL '1 month'
+  AND t.occurred_at >= @cycle_start::timestamptz
+  AND t.occurred_at < @cycle_end::timestamptz
 GROUP BY t.category_id, w.currency;

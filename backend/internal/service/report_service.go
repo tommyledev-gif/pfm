@@ -27,17 +27,22 @@ type ReportService struct {
 	repo         ReportRepo
 	walletRepo   WalletRepo
 	categoryRepo CategoryRepo
+	cycles       *CycleResolver
 	logger       *zap.Logger
 }
 
-func NewReportService(repo ReportRepo, walletRepo WalletRepo, categoryRepo CategoryRepo, logger *zap.Logger) *ReportService {
-	return &ReportService{repo: repo, walletRepo: walletRepo, categoryRepo: categoryRepo, logger: logger}
+func NewReportService(repo ReportRepo, walletRepo WalletRepo, categoryRepo CategoryRepo, cycles *CycleResolver, logger *zap.Logger) *ReportService {
+	return &ReportService{repo: repo, walletRepo: walletRepo, categoryRepo: categoryRepo, cycles: cycles, logger: logger}
 }
 
 // GetSummary resolves the report window, validates any wallet/category/type
 // filter, and returns the aggregated totals and category breakdown.
 func (s *ReportService) GetSummary(ctx context.Context, userID uuid.UUID, q dto.ReportSummaryQuery) (dto.ReportSummaryResponse, error) {
-	from, to, err := resolveReportWindow(q.From, q.To)
+	cycle, err := s.cycles.Current(ctx, userID)
+	if err != nil {
+		return dto.ReportSummaryResponse{}, fmt.Errorf("service.GetSummary: %w", err)
+	}
+	from, to, err := resolveReportWindow(q.From, q.To, cycle.Start)
 	if err != nil {
 		return dto.ReportSummaryResponse{}, err
 	}
@@ -114,15 +119,16 @@ func pivotReportTotals(rows []model.ReportTypeAmount) []model.ReportTotal {
 	return totals
 }
 
-// resolveReportWindow defaults from/to independently, per missing bound, to
-// the calendar month containing "now" (UTC) — plan.md Finding #6. Unlike
+// resolveReportWindow defaults from/to independently, per missing bound:
+// from to the start of the caller's current cycle (the same window Budgets
+// use, specs/ai-budget-wizard-v2 US-03 Edge Case #2), to to now — plan.md
+// Finding #6. Unlike
 // TransactionService's from/to filter (no default — an omitted bound there
 // is simply unbounded), an omitted bound here always resolves to a real
 // timestamp, never left nil.
-func resolveReportWindow(fromStr, toStr string) (time.Time, time.Time, error) {
-	now := time.Now().UTC()
-	from := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
-	to := now
+func resolveReportWindow(fromStr, toStr string, defaultFrom time.Time) (time.Time, time.Time, error) {
+	from := defaultFrom
+	to := time.Now().UTC()
 
 	if fromStr != "" {
 		parsed, err := parseFlexibleTimestamp(fromStr)

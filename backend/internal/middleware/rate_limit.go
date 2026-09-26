@@ -46,6 +46,28 @@ func AIChatRateLimiter(logger *zap.Logger) fiber.Handler {
 	})
 }
 
+// AIConsultRateLimiter caps free-text analytics questions per user
+// (specs/ai-chat-query-spending/spec.md US-05). It is attached to
+// POST /analytics/consult only — never to the /ai group — so asking
+// questions can never use up the transaction-recording budget of
+// AIChatRateLimiter (S-AIQ-37), and chips/follow-ups (POST /analytics/query)
+// are never counted (S-AIQ-35). SkipFailedRequests keeps rejected messages
+// (400) from counting (plan.md BR-19); a degraded reply is 200 and counts.
+func AIConsultRateLimiter(logger *zap.Logger) fiber.Handler {
+	return limiter.New(limiter.Config{
+		Max:                common.AIConsultRateLimit,
+		Expiration:         common.AIConsultRateLimitWindow,
+		SkipFailedRequests: true,
+		KeyGenerator: func(c *fiber.Ctx) string {
+			userID, _ := c.Locals(common.LocalsUserID).(string)
+			return userID
+		},
+		LimitReached: func(c *fiber.Ctx) error {
+			return response.Error(c, logger, common.ErrRateLimited)
+		},
+	})
+}
+
 // LoginRateLimiter enforces spec.md S-SEC-07 (10 attempts/15min/IP).
 //
 // Deliberate simplification: this counts every request to /auth/login from

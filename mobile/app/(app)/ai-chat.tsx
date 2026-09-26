@@ -13,6 +13,8 @@ import { ChatOverlays } from "@/features/ai-chat/components/ChatOverlays";
 import { useTransactionRemoval } from "@/features/ai-chat/components/use-transaction-removal";
 import { ChatMode, useChatModeStore } from "@/features/ai-chat/chat-mode";
 import { useChatActions } from "@/features/ai-chat/hooks/use-chat-actions";
+import { useConsultActions } from "@/features/ai-chat/hooks/use-consult-actions";
+import { StarterChipsRow } from "@/features/analytics/components/StarterChipsRow";
 import { useChatOverlays } from "@/features/ai-chat/hooks/use-chat-overlays";
 import { isTombstone } from "@/features/ai-chat/tombstone";
 import { colors, spacing, typography } from "@/lib/theme";
@@ -89,9 +91,16 @@ export default function AiChatScreen() {
   // the category's budget. The card never writes budgets.
   const budgets = useBudgetsQuery();
 
-  const chat = useChatActions({
-    onSent: () => listRef.current?.scrollToOffset({ offset: 0, animated: true }),
+  const scrollToNewest = () => listRef.current?.scrollToOffset({ offset: 0, animated: true });
+  const chat = useChatActions({ onSent: scrollToNewest });
+  // Analysis mode's own path — a question can never become a proposal.
+  const consult = useConsultActions({
+    onSent: scrollToNewest,
+    categories: categories.data ?? [],
+    onSwitchToRecording: () => setMode("transaction"),
+    otherBusy: chat.sending,
   });
+  const sending = chat.sending || consult.sending;
   const removal = useTransactionRemoval();
 
   // Reversed here rather than in the store, so every other consumer keeps
@@ -185,6 +194,7 @@ export default function AiChatScreen() {
               onPressHistory={overlays.openHistory}
               onOpenBudgetWizard={(message) => overlays.openBudgetWizard(message.id)}
               onOpenManualEntry={() => overlays.setManualEntryOpen(true)}
+              consultHandlers={consult.handlers}
             />
           )}
           // No counter-transform on these: the list already composes its own
@@ -199,7 +209,7 @@ export default function AiChatScreen() {
           // Header, not footer: on an inverted list the header renders at the
           // visual bottom, which is where the typing dots belong.
           ListHeaderComponent={
-            chat.sending ? (
+            sending ? (
               <View style={styles.typingRow}>
                 <TypingIndicator />
               </View>
@@ -213,14 +223,16 @@ export default function AiChatScreen() {
           onSend={() => {
             const text = input;
             setInput("");
-            void chat.send(text);
+            if (mode === "consult") consult.sendConsult(text);
+            else void chat.send(text);
           }}
-          sending={chat.sending}
+          sending={sending}
           keyboardVisible={keyboardVisible}
           keyboardHeight={keyboardHeight}
           bottomInset={insets.bottom}
           onOpenBudgetWizard={() => overlays.openBudgetWizard(null)}
           mode={mode}
+          quickActions={mode === "consult" ? <StarterChipsRow onAsk={consult.askQuery} disabled={sending} /> : undefined}
         />
       </View>
 

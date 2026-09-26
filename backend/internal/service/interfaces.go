@@ -74,10 +74,10 @@ type CategoryRepo interface {
 // BudgetRepo is the repository contract BudgetService depends on (F-05).
 // *repository.BudgetRepository satisfies this structurally; tests
 // substitute an in-memory fake, same convention as WalletRepo/CategoryRepo.
-// SpentByUserCurrentPeriod was added by
-// specs/transaction-management/plan.md Finding #3 / BUD-T17 — backs the
-// previously-stubbed real spend computation now that the transactions table
-// exists.
+// SpentByUserInWindow (originally SpentByUserCurrentPeriod, added by
+// specs/transaction-management/plan.md Finding #3 / BUD-T17) takes the
+// half-open cycle window from CycleResolver since
+// specs/ai-budget-wizard-v2 US-03.
 type BudgetRepo interface {
 	BeginTx(ctx context.Context) (pgx.Tx, error)
 	LockCategoryForBudgetCheck(ctx context.Context, tx pgx.Tx, categoryID uuid.UUID) (*model.Category, error)
@@ -91,7 +91,7 @@ type BudgetRepo interface {
 	ListBudgetsByUser(ctx context.Context, userID uuid.UUID) ([]*model.Budget, error)
 	GetBudgetByID(ctx context.Context, id uuid.UUID) (*model.Budget, error)
 	SoftDeleteBudget(ctx context.Context, id, userID uuid.UUID) (*model.Budget, error)
-	SpentByUserCurrentPeriod(ctx context.Context, userID uuid.UUID) (map[uuid.UUID]map[string]int64, error)
+	SpentByUserInWindow(ctx context.Context, userID uuid.UUID, from, to time.Time) (map[uuid.UUID]map[string]int64, error)
 	// ListDistinctUserIDsWithActiveBudgets was added by
 	// specs/notification-handling/plan.md Finding #1 — backs
 	// NotificationService.EvaluateBudgets, which loops this list and reuses
@@ -100,6 +100,10 @@ type BudgetRepo interface {
 	// LockBudgetsByUser/SoftDeleteBudgetsByUser/DeleteBudgetLimitsByBudgetIDs
 	// were added by specs/ai-budget-wizard/plan.md Finding #5/#10 — back
 	// BudgetService.BulkReplaceBudgets's atomic full-replace (F-13).
+	// LockUserForBudgetReplace closes the first-submit race
+	// (docs/new-tasks.md I-4): LockBudgetsByUser locks nothing for a User
+	// with no Budgets yet.
+	LockUserForBudgetReplace(ctx context.Context, tx pgx.Tx, userID uuid.UUID) error
 	LockBudgetsByUser(ctx context.Context, tx pgx.Tx, userID uuid.UUID) ([]*model.Budget, error)
 	SoftDeleteBudgetsByUser(ctx context.Context, tx pgx.Tx, userID uuid.UUID) error
 	DeleteBudgetLimitsByBudgetIDs(ctx context.Context, tx pgx.Tx, budgetIDs []uuid.UUID) error
@@ -182,10 +186,46 @@ type AIBudgetClient interface {
 // TransactionRepo. Both methods run queries declared in transactions.sql
 // (cross-repository query exception, specs/financial-reporting/plan.md
 // Security & Actor Resolution — the same exception F-05's
-// SpentByUserCurrentPeriod already uses).
+// SpentByUserInWindow already uses).
 type ReportRepo interface {
 	SumTotals(ctx context.Context, userID uuid.UUID, filter repository.ReportFilter) ([]model.ReportTypeAmount, error)
 	SumByCategory(ctx context.Context, userID uuid.UUID, filter repository.ReportFilter) ([]model.ReportCategoryEntry, error)
+}
+
+// CyclePlanRepo is the one read CycleResolver needs from the plan layer
+// (specs/ai-budget-wizard-v2 US-03). Returns 0 when the User has no plan.
+type CyclePlanRepo interface {
+	ActiveCycleStartDay(ctx context.Context, userID uuid.UUID) (int, error)
+}
+
+// AnalyticsRepo backs AnalyticsService's aggregates the report queries cannot
+// answer (specs/ai-chat-query-spending/plan.md AIQ-T14).
+type AnalyticsRepo interface {
+	ListExpensesByAmount(ctx context.Context, userID uuid.UUID, f repository.AnalyticsFilter, limit int) ([]model.AnalyticsExpense, error)
+	CountTransactions(ctx context.Context, userID uuid.UUID, f repository.AnalyticsFilter) (int64, error)
+	SumExpenseByWallet(ctx context.Context, userID uuid.UUID, f repository.AnalyticsFilter) ([]model.AnalyticsKeyedAmount, error)
+	SumExpenseByLocalDay(ctx context.Context, userID uuid.UUID, f repository.AnalyticsFilter, tz string) ([]model.AnalyticsDayAmount, error)
+	ListTopCategoriesRecent(ctx context.Context, userID uuid.UUID, since time.Time, limit int) ([]model.CategoryUsage, error)
+}
+
+// IntentParseLogRepo is the free-text question log (spec.md US-07).
+type IntentParseLogRepo interface {
+	Insert(ctx context.Context, entry model.IntentParseLog) error
+	ClearRawTextBefore(ctx context.Context, cutoff time.Time) (int64, error)
+	DeleteBefore(ctx context.Context, cutoff time.Time) (int64, error)
+}
+
+// AIConsultClient interprets one free-text spending question
+// (specs/ai-chat-query-spending/plan.md AIQ-T34).
+type AIConsultClient interface {
+	Parse(ctx context.Context, req AIConsultRequest) (*AIConsultParse, error)
+}
+
+// BudgetStatusReader is the one BudgetService read analytics reuses, so a
+// remaining-budget answer is computed by the exact code behind the Budgets
+// screen (specs/ai-chat-query-spending/plan.md BR-06).
+type BudgetStatusReader interface {
+	ListBudgets(ctx context.Context, userID uuid.UUID) ([]*model.Budget, error)
 }
 
 // NotificationRepo is the repository contract NotificationService depends on
@@ -203,15 +243,19 @@ type NotificationRepo interface {
 // Compile-time checks that the real repositories satisfy these interfaces —
 // catches a signature drift here instead of at runtime.
 var (
-	_ UserRepo         = (*repository.UserRepository)(nil)
-	_ RevokedTokenRepo = (*repository.RevokedTokenRepository)(nil)
-	_ WalletRepo       = (*repository.WalletRepository)(nil)
-	_ CategoryRepo     = (*repository.CategoryRepository)(nil)
-	_ BudgetRepo       = (*repository.BudgetRepository)(nil)
-	_ TransactionRepo  = (*repository.TransactionRepository)(nil)
-	_ AuditLogRepo     = (*repository.AuditLogRepository)(nil)
-	_ ReportRepo       = (*repository.ReportRepository)(nil)
-	_ NotificationRepo = (*repository.NotificationRepository)(nil)
-	_ ChatRepo         = (*repository.ChatRepository)(nil)
-	_ AIBudgetClient   = (*httpAIBudgetClient)(nil)
+	_ UserRepo           = (*repository.UserRepository)(nil)
+	_ RevokedTokenRepo   = (*repository.RevokedTokenRepository)(nil)
+	_ WalletRepo         = (*repository.WalletRepository)(nil)
+	_ CategoryRepo       = (*repository.CategoryRepository)(nil)
+	_ BudgetRepo         = (*repository.BudgetRepository)(nil)
+	_ CyclePlanRepo      = (*repository.BudgetPlanRepository)(nil)
+	_ AnalyticsRepo      = (*repository.AnalyticsRepository)(nil)
+	_ IntentParseLogRepo = (*repository.IntentParseLogRepository)(nil)
+	_ BudgetStatusReader = (*BudgetService)(nil)
+	_ TransactionRepo    = (*repository.TransactionRepository)(nil)
+	_ AuditLogRepo       = (*repository.AuditLogRepository)(nil)
+	_ ReportRepo         = (*repository.ReportRepository)(nil)
+	_ NotificationRepo   = (*repository.NotificationRepository)(nil)
+	_ ChatRepo           = (*repository.ChatRepository)(nil)
+	_ AIBudgetClient     = (*httpAIBudgetClient)(nil)
 )

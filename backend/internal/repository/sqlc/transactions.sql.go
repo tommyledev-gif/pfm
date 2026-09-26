@@ -379,7 +379,7 @@ type SumReportTotalsByUserRow struct {
 // (specs/financial-reporting/plan.md RPT-T1) — one query per request, grouped
 // by (type, currency), over an arbitrary caller-supplied window (from_ts/
 // to_ts always resolved by ReportService before this runs — plan.md Finding
-// #6), unlike SumExpenseByUserCurrentPeriod's hardcoded current-month/
+// #6), unlike SumExpenseByUserCycle's fixed cycle-window/
 // expense-only scope. Ordered by currency for a deterministic response
 // (plan.md Finding #9).
 func (q *Queries) SumReportTotalsByUser(ctx context.Context, arg SumReportTotalsByUserParams) ([]SumReportTotalsByUserRow, error) {
@@ -473,7 +473,7 @@ func (q *Queries) SumReportByCategoryForUser(ctx context.Context, arg SumReportB
 	return items, nil
 }
 
-const sumExpenseByUserCurrentPeriod = `-- name: SumExpenseByUserCurrentPeriod :many
+const sumExpenseByUserCycle = `-- name: SumExpenseByUserCycle :many
 SELECT
     t.category_id,
     w.currency,
@@ -483,31 +483,38 @@ JOIN wallets w ON w.id = t.wallet_id
 WHERE t.user_id = $1
   AND t.type = 'expense'
   AND t.deleted_at IS NULL
-  AND t.occurred_at >= date_trunc('month', NOW())
-  AND t.occurred_at < date_trunc('month', NOW()) + INTERVAL '1 month'
+  AND t.occurred_at >= $2::timestamptz
+  AND t.occurred_at < $3::timestamptz
 GROUP BY t.category_id, w.currency
 `
 
-type SumExpenseByUserCurrentPeriodRow struct {
+type SumExpenseByUserCycleParams struct {
+	UserID     uuid.UUID
+	CycleStart time.Time
+	CycleEnd   time.Time
+}
+
+type SumExpenseByUserCycleRow struct {
 	CategoryID uuid.UUID
 	Currency   string
 	Spent      int64
 }
 
-// SumExpenseByUserCurrentPeriod backs F-05's real spend computation
-// (BUD-T17) — called from BudgetRepository via the shared *Queries struct
-// (cross-repository query exception). One aggregate query per request, never
-// N+1 (specs/budget-management/spec.md US-02 Edge Cases #1).
-func (q *Queries) SumExpenseByUserCurrentPeriod(ctx context.Context, userID uuid.UUID) ([]SumExpenseByUserCurrentPeriodRow, error) {
-	rows, err := q.db.Query(ctx, sumExpenseByUserCurrentPeriod, userID)
+// SumExpenseByUserCycle backs F-05's real spend computation (BUD-T17) and
+// F-10's budget job — called from BudgetRepository via the shared *Queries
+// struct (cross-repository query exception). The half-open window is
+// resolved in Go by service.ResolveCycleWindow
+// (specs/ai-budget-wizard-v2/spec.md US-03).
+func (q *Queries) SumExpenseByUserCycle(ctx context.Context, arg SumExpenseByUserCycleParams) ([]SumExpenseByUserCycleRow, error) {
+	rows, err := q.db.Query(ctx, sumExpenseByUserCycle, arg.UserID, arg.CycleStart, arg.CycleEnd)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var items []SumExpenseByUserCurrentPeriodRow
+	var items []SumExpenseByUserCycleRow
 	for rows.Next() {
-		var i SumExpenseByUserCurrentPeriodRow
+		var i SumExpenseByUserCycleRow
 		if err := rows.Scan(&i.CategoryID, &i.Currency, &i.Spent); err != nil {
 			return nil, err
 		}

@@ -4,10 +4,10 @@ Kept separate from extract_service.py (dev.md LLM Rules: "All prompt
 templates in prompt_builder.py — never hardcoded in router or service") and
 testable in isolation — pure string building, no I/O, no SDK calls.
 
-This cut's Go Backend only understands two intents — create_transaction and
-ambiguous (specs/ai-chat-assistant/spec.md Resolved design decision #2) — so
-the prompt never asks the model to emit edit_transaction/query_spending/
-general_advice, even though a broader Feature-12 vision includes them.
+The Go Backend understands three intents here — create_transaction,
+ambiguous and budget_wizard. Spending questions never reach this prompt:
+they go to POST /consult with its own prompt (consult_prompt.py), routed by
+the chat mode the User picked, not by this model's classification.
 """
 
 from app.schemas.extract_schema import CategoryContext, WalletContext

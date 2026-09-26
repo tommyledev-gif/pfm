@@ -26,14 +26,15 @@ export type ChatMode = "transaction" | "budget" | "consult";
 export const DEFAULT_CHAT_MODE: ChatMode = "transaction";
 
 /**
- * `POST /ai/consult` does not exist yet — it is the subject of SRS Feature-12
- * US-03 (Query Spending) / US-04 (General Advice), still unbuilt.
+ * Analysis mode is built (specs/ai-chat-query-spending/): chips and
+ * follow-ups call `POST /analytics/query`, typed questions
+ * `POST /analytics/consult` — deliberately not under `/ai`, so asking never
+ * uses up the transaction-recording limit.
  *
- * The mode is in the picker now because it is the thing that decides the
- * routing, and that decision belongs in the UI where it can be seen. But
- * selecting it today would send a request nothing answers, so it renders
- * disabled. Flipping this to `true` is the only client-side change the
- * endpoint's arrival needs.
+ * Still off until the release gate in plan.md AIQ-T46: the backend with the
+ * cycle-window fix must be deployed, and the free-text golden set run
+ * against the real provider (AIQ-T01/T36). Flipping this to `true` is the
+ * only client-side change left.
  */
 export const CONSULT_MODE_ENABLED = false;
 

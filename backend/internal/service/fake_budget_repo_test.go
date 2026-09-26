@@ -22,10 +22,16 @@ type fakeBudgetRepo struct {
 	mu         sync.Mutex
 	budgets    map[uuid.UUID]*model.Budget
 	categories map[uuid.UUID]*model.Category
-	// spent backs SpentByUserCurrentPeriod (BUD-T17) — nil until a test
+	// spent backs SpentByUserInWindow (BUD-T17) — nil until a test
 	// calls seedSpend, in which case ListBudgets/GetBudget/UpdateBudget see
 	// 0 for every currency, matching a real caller with no Transactions yet.
 	spent map[uuid.UUID]map[string]int64
+	// lastWindow records the window SpentByUserInWindow was last called with,
+	// so tests can assert the service resolved the cycle rather than the
+	// fake returning seeded spend for any window.
+	lastWindow CycleWindow
+	// userLocks counts LockUserForBudgetReplace calls (I-4 race guard).
+	userLocks int
 }
 
 func newFakeBudgetRepo() *fakeBudgetRepo {
@@ -174,13 +180,15 @@ func (f *fakeBudgetRepo) SoftDeleteBudget(_ context.Context, id, userID uuid.UUI
 	return &cp, nil
 }
 
-// SpentByUserCurrentPeriod backs BUD-T17's real spend computation — the fake
+// SpentByUserInWindow backs BUD-T17's real spend computation — the fake
 // returns whatever seedSpend has staged, keyed by category ID then currency,
 // same convention as seedCategory. Defaults to an empty map (0 spent
 // everywhere) when nothing has been staged.
-func (f *fakeBudgetRepo) SpentByUserCurrentPeriod(_ context.Context, _ uuid.UUID) (map[uuid.UUID]map[string]int64, error) {
+func (f *fakeBudgetRepo) SpentByUserInWindow(_ context.Context, _ uuid.UUID, from, to time.Time) (map[uuid.UUID]map[string]int64, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+
+	f.lastWindow = CycleWindow{Start: from, End: to}
 
 	if f.spent == nil {
 		return map[uuid.UUID]map[string]int64{}, nil
@@ -203,6 +211,15 @@ func (f *fakeBudgetRepo) ListDistinctUserIDsWithActiveBudgets(_ context.Context)
 		}
 	}
 	return userIDs, nil
+}
+
+// LockUserForBudgetReplace only counts calls — the fake has no concurrency.
+func (f *fakeBudgetRepo) LockUserForBudgetReplace(_ context.Context, _ pgx.Tx, _ uuid.UUID) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.userLocks++
+	return nil
 }
 
 // LockBudgetsByUser backs BulkReplaceBudgets (specs/ai-budget-wizard) — the
@@ -252,7 +269,7 @@ func (f *fakeBudgetRepo) DeleteBudgetLimitsByBudgetIDs(_ context.Context, _ pgx.
 	return nil
 }
 
-// seedSpend stages the SpentByUserCurrentPeriod result a test wants —
+// seedSpend stages the SpentByUserInWindow result a test wants —
 // BudgetService tests that need a non-zero spent figure call this before
 // exercising ListBudgets/GetBudget/UpdateBudget.
 func (f *fakeBudgetRepo) seedSpend(categoryID uuid.UUID, currency string, amount int64) {

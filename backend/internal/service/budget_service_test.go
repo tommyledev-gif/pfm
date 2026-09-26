@@ -119,7 +119,7 @@ func TestBudgetService_BulkReplaceBudgets_ServerAssignedStartDate(t *testing.T) 
 func newTestBudgetService(t *testing.T) (*BudgetService, *fakeBudgetRepo) {
 	t.Helper()
 	repo := newFakeBudgetRepo()
-	return NewBudgetService(repo, zap.NewNop()), repo
+	return NewBudgetService(repo, newTestCycleResolver(), zap.NewNop()), repo
 }
 
 func seedExpenseCategory(repo *fakeBudgetRepo, ownerID uuid.UUID) *model.Category {

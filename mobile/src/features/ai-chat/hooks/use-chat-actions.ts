@@ -11,7 +11,7 @@ import { useToastStore } from "@/stores/toast-store";
 
 // The typing indicator is meant to be felt, not just technically present —
 // even a fast reply holds the dots for a beat before the answer appears.
-const MIN_TYPING_MS = 1300;
+export const MIN_TYPING_MS = 1300;
 
 interface UseChatActionsOptions {
   /** Scrolls the thread to the newest message after the user sends. */

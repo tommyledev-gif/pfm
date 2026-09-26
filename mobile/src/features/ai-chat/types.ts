@@ -1,3 +1,4 @@
+import { ConsultMessageData } from "@/features/analytics/types";
 import { TransactionType } from "@/lib/constants";
 
 // Mirrors backend/internal/dto/chat_{request,response}.go — POST /ai/chat.
@@ -105,4 +106,10 @@ export interface ChatMessage {
   removalState?: "deleted" | "discarded";
   /** ISO-8601 UTC. Displayed in device-local time. */
   removedAt?: string;
+  // specs/ai-chat-query-spending — an analysis reply, stored as received and
+  // redrawn from this snapshot on restore, never recomputed (US-06).
+  consult?: ConsultMessageData;
+  // A user message sent in analysis mode (or a tapped chip). Marked so the
+  // edit path never re-sends it as a transaction description.
+  consultQuestion?: boolean;
 }

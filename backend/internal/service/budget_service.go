@@ -23,11 +23,12 @@ import (
 // here.
 type BudgetService struct {
 	repo   BudgetRepo
+	cycles *CycleResolver
 	logger *zap.Logger
 }
 
-func NewBudgetService(repo BudgetRepo, logger *zap.Logger) *BudgetService {
-	return &BudgetService{repo: repo, logger: logger}
+func NewBudgetService(repo BudgetRepo, cycles *CycleResolver, logger *zap.Logger) *BudgetService {
+	return &BudgetService{repo: repo, cycles: cycles, logger: logger}
 }
 
 // CreateBudget implements US-01. Category existence/visibility/type
@@ -129,7 +130,7 @@ func (s *BudgetService) ListBudgets(ctx context.Context, userID uuid.UUID) ([]*m
 	if err != nil {
 		return nil, fmt.Errorf("service.ListBudgets: %w", err)
 	}
-	spentByCategory, err := s.repo.SpentByUserCurrentPeriod(ctx, userID)
+	spentByCategory, err := s.spentThisCycle(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("service.ListBudgets: %w", err)
 	}
@@ -146,7 +147,7 @@ func (s *BudgetService) GetBudget(ctx context.Context, userID, budgetID uuid.UUI
 	if err != nil {
 		return nil, err
 	}
-	spentByCategory, err := s.repo.SpentByUserCurrentPeriod(ctx, userID)
+	spentByCategory, err := s.spentThisCycle(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("service.GetBudget: %w", err)
 	}
@@ -204,7 +205,7 @@ func (s *BudgetService) UpdateBudget(ctx context.Context, userID, budgetID uuid.
 	}
 	// spec.md US-04 step 6 wants real recomputed spent against the *new*
 	// limits (S-BUD-33) — unlike Create, this is never a bare spent=0.
-	spentByCategory, err := s.repo.SpentByUserCurrentPeriod(ctx, userID)
+	spentByCategory, err := s.spentThisCycle(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("service.UpdateBudget: %w", err)
 	}
@@ -262,30 +263,4 @@ func (s *BudgetService) DeleteBudget(ctx context.Context, userID, budgetID uuid.
 		return nil, fmt.Errorf("service.DeleteBudget: %w", err)
 	}
 	return deleted, nil
-}
-
-// computeStatus fills in each currency entry's Spent/Remaining/Status and
-// the Budget's overall status from spentByCurrency — this Budget's
-// category's real per-currency expense total for the current period,
-// already aggregated by a single SUM(transactions.amount) ... GROUP BY
-// category_id, currency query per request (BudgetRepo.SpentByUserCurrentPeriod,
-// specs/transaction-management/plan.md Finding #3 / BUD-T17 — closes the
-// stub this method used to be). spentByCurrency may be nil (CreateBudget's
-// call, spec.md US-01 step 6: a freshly created Budget always reports
-// spent=0 regardless of any pre-existing Transactions in that Category this
-// period) — a nil map read returns the zero value, so this needs no special
-// case here.
-func (s *BudgetService) computeStatus(budget *model.Budget, spentByCurrency map[string]int64) {
-	overall := model.BudgetStatusWithin
-	for i := range budget.Limits {
-		limit := &budget.Limits[i]
-		limit.Spent = spentByCurrency[limit.Currency]
-		limit.Remaining = limit.AmountLimit - limit.Spent
-		limit.Status = model.BudgetStatusWithin
-		if limit.Spent > limit.AmountLimit {
-			limit.Status = model.BudgetStatusExceeded
-			overall = model.BudgetStatusExceeded
-		}
-	}
-	budget.OverallStatus = overall
 }

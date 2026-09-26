@@ -27,8 +27,10 @@ type bulkValidatedItem struct {
 
 // BulkReplaceBudgets implements F-13 AI Budget Setup Wizard's US-05
 // (specs/ai-budget-wizard/spec.md) — one transaction: lock the caller's
-// existing active Budgets, re-validate every submitted category (ownership +
-// existence + type=expense, sequential/gating per item, plan.md Finding #8),
+// users row (serializes even a first submit with nothing else to lock,
+// docs/new-tasks.md I-4) and existing active Budgets, re-validate every
+// submitted category (ownership + existence + type=expense,
+// sequential/gating per item, plan.md Finding #8),
 // delete the locked Budgets' budget_limits rows (batched), soft-delete the
 // locked Budgets, then insert the submitted set. All-or-nothing: any failure
 // rolls back the whole request via the existing defer tx.Rollback
@@ -42,6 +44,9 @@ func (s *BudgetService) BulkReplaceBudgets(ctx context.Context, userID uuid.UUID
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck // no-op once committed
 
+	if err := s.repo.LockUserForBudgetReplace(ctx, tx, userID); err != nil {
+		return nil, fmt.Errorf("service.BulkReplaceBudgets: %w", err)
+	}
 	existing, err := s.repo.LockBudgetsByUser(ctx, tx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("service.BulkReplaceBudgets: %w", err)

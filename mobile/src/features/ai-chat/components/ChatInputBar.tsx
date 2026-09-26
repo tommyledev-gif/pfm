@@ -1,3 +1,4 @@
+import { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { SendIcon, SparkleIcon } from "@/components/ui/Icon";
@@ -22,6 +23,8 @@ interface ChatInputBarProps {
   bottomInset: number;
   onOpenBudgetWizard: () => void;
   mode: ChatMode;
+  /** Replaces the default quick-action row — analysis mode's starter chips. */
+  quickActions?: ReactNode;
 }
 
 export function ChatInputBar({
@@ -34,6 +37,7 @@ export function ChatInputBar({
   bottomInset,
   onOpenBudgetWizard,
   mode,
+  quickActions,
 }: ChatInputBarProps) {
   // The wizard is a modal, not a conversation — in its mode there is nothing
   // to type, so the text field is replaced rather than left sitting there
@@ -51,7 +55,9 @@ export function ChatInputBar({
 
   return (
     <>
-      {!keyboardVisible ? (
+      {quickActions ? (
+        <View style={styles.quickActionRow}>{quickActions}</View>
+      ) : !keyboardVisible ? (
         <View style={styles.quickActionRow}>
           <Pressable testID="btn-open-budget-wizard" style={styles.quickActionChip} onPress={onOpenBudgetWizard}>
             <SparkleIcon size={14} />

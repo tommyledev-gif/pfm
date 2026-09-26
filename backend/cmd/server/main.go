@@ -51,15 +51,21 @@ func main() {
 	notificationRepo := repository.NewNotificationRepository(queries)
 	chatRepo := repository.NewChatRepository(queries)
 	chatThreadRepo := repository.NewChatThreadRepository(queries)
+	budgetPlanRepo := repository.NewBudgetPlanRepository(queries)
+	analyticsRepo := repository.NewAnalyticsRepository(queries)
+	intentLogRepo := repository.NewIntentParseLogRepository(queries)
 
 	tokenService := service.NewTokenService(cfg.JWTSecret)
 	emailSender := newEmailSender(cfg, logger)
 	iconUploader := newIconUploader(cfg, logger)
+	// One resolver shared by every spend figure (budgets, notifications,
+	// reports' default window) so no two screens disagree on "this cycle".
+	cycleResolver := service.NewCycleResolver(budgetPlanRepo)
 	userService := service.NewUserService(userRepo, emailSender, logger)
 	authService := service.NewAuthService(userRepo, revokedRepo, tokenService, logger)
 	walletService := service.NewWalletService(walletRepo, logger)
 	categoryService := service.NewCategoryService(categoryRepo, logger)
-	budgetService := service.NewBudgetService(budgetRepo, logger)
+	budgetService := service.NewBudgetService(budgetRepo, cycleResolver, logger)
 	transactionService := service.NewTransactionService(transactionRepo, walletRepo, categoryRepo, logger)
 	auditLogService := service.NewAuditLogService(auditLogRepo, transactionRepo, logger)
 	transactionExportService := service.NewTransactionExportService(transactionRepo, walletRepo, logger)
@@ -67,13 +73,21 @@ func main() {
 	// written through its CreateTransaction (specs/transaction-export-import/
 	// spec.md Context #4), never by a second insert path.
 	transactionImportService := service.NewTransactionImportService(transactionService, transactionRepo, walletRepo, categoryRepo, tokenService, logger)
-	reportService := service.NewReportService(reportRepo, walletRepo, categoryRepo, logger)
-	notificationService := service.NewNotificationService(notificationRepo, budgetRepo, logger)
+	reportService := service.NewReportService(reportRepo, walletRepo, categoryRepo, cycleResolver, logger)
+	notificationService := service.NewNotificationService(notificationRepo, budgetRepo, cycleResolver, logger)
 	aiServiceClient := service.NewHTTPAIServiceClient(cfg.AIServiceURL)
 	chatService := service.NewChatService(chatRepo, walletRepo, categoryRepo, aiServiceClient, logger)
 	chatThreadService := service.NewChatThreadService(chatThreadRepo)
 	aiBudgetClient := service.NewHTTPAIBudgetClient(cfg.AIServiceURL)
 	budgetWizardService := service.NewBudgetWizardService(budgetRepo, categoryRepo, walletRepo, aiBudgetClient, logger)
+	// Feature-12 US-03 (specs/ai-chat-query-spending/): figures reuse the
+	// report queries and BudgetService itself; free text gets its own
+	// interpreter client, token guard and log.
+	analyticsService := service.NewAnalyticsService(reportRepo, analyticsRepo, walletRepo, categoryRepo, budgetService, cycleResolver, logger)
+	consultTokens := service.NewConsultTokenBudget(common.ConsultTokenBudgetPerMinute, common.ConsultTokenBudgetWindow)
+	aiConsultClient := service.NewHTTPAIConsultClient(cfg.AIServiceURL)
+	consultService := service.NewConsultService(analyticsService, analyticsRepo, walletRepo, categoryRepo, aiConsultClient, consultTokens, intentLogRepo, cycleResolver, logger)
+	intentLogRetention := service.NewIntentLogRetention(intentLogRepo, logger)
 
 	userHandler := handler.NewUserHandler(userService, logger)
 	authHandler := handler.NewAuthHandler(authService, logger)
@@ -88,6 +102,7 @@ func main() {
 	notificationHandler := handler.NewNotificationHandler(notificationService, logger)
 	chatHandler := handler.NewChatHandler(chatService, chatThreadService, logger)
 	budgetWizardHandler := handler.NewBudgetWizardHandler(budgetWizardService, logger)
+	analyticsHandler := handler.NewAnalyticsHandler(analyticsService, consultService, logger)
 
 	app := fiber.New(fiber.Config{
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
@@ -99,7 +114,7 @@ func main() {
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 		AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 	}))
-	registerRoutes(app, userHandler, authHandler, walletHandler, categoryHandler, budgetHandler, transactionHandler, transactionExportHandler, transactionImportHandler, auditLogHandler, reportHandler, notificationHandler, chatHandler, budgetWizardHandler, tokenService, logger)
+	registerRoutes(app, userHandler, authHandler, walletHandler, categoryHandler, budgetHandler, transactionHandler, transactionExportHandler, transactionImportHandler, auditLogHandler, reportHandler, notificationHandler, chatHandler, budgetWizardHandler, analyticsHandler, tokenService, logger)
 
 	go func() {
 		if err := app.Listen(":" + cfg.Port); err != nil {
@@ -114,6 +129,7 @@ func main() {
 	// goroutine never outlives the process on SIGTERM/SIGINT.
 	schedulerCtx, stopScheduler := context.WithCancel(context.Background())
 	go runNotificationScheduler(schedulerCtx, notificationService, logger)
+	go runIntentLogRetention(schedulerCtx, intentLogRetention, logger)
 
 	waitForShutdown(app, stopScheduler, logger)
 }
@@ -197,4 +213,24 @@ func newIconUploader(cfg *config.Config, logger *zap.Logger) service.IconUploade
 	}
 	logger.Info("R2 icon uploader configured", zap.String("bucket", cfg.R2Bucket))
 	return uploader
+}
+
+// runIntentLogRetention applies the question log's privacy retention
+// (specs/ai-chat-query-spending/spec.md US-07) once at startup and then on a
+// fixed interval — at startup too, so a backend that restarts more often
+// than the interval still purges.
+func runIntentLogRetention(ctx context.Context, retention *service.IntentLogRetention, logger *zap.Logger) {
+	ticker := time.NewTicker(common.IntentLogPurgeInterval)
+	defer ticker.Stop()
+
+	retention.Purge(ctx)
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Info("intent log retention stopped")
+			return
+		case <-ticker.C:
+			retention.Purge(ctx)
+		}
+	}
 }
