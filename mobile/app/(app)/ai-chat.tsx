@@ -1,17 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, Keyboard, StyleSheet, Text, View } from "react-native";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { SparkleIcon } from "@/components/ui/Icon";
 import { Screen } from "@/components/shared/Screen";
 import { TypingIndicator } from "@/components/shared/TypingIndicator";
 import { ChatInputBar } from "@/features/ai-chat/components/ChatInputBar";
 import { ChatMessageRow } from "@/features/ai-chat/components/ChatMessageRow";
+import { ChatModeHeader } from "@/features/ai-chat/components/ChatModeHeader";
+import { ChatModePicker } from "@/features/ai-chat/components/ChatModePicker";
 import { ChatOverlays } from "@/features/ai-chat/components/ChatOverlays";
 import { useTransactionRemoval } from "@/features/ai-chat/components/use-transaction-removal";
+import { ChatMode, useChatModeStore } from "@/features/ai-chat/chat-mode";
 import { useChatActions } from "@/features/ai-chat/hooks/use-chat-actions";
-import { isEditLocked } from "@/features/ai-chat/edit-lock";
+import { useChatOverlays } from "@/features/ai-chat/hooks/use-chat-overlays";
 import { isTombstone } from "@/features/ai-chat/tombstone";
 import { colors, spacing, typography } from "@/lib/theme";
 import { useKeyboardHeight, useKeyboardVisible } from "@/lib/use-keyboard-height";
@@ -22,10 +24,6 @@ import { useChatThreadQuery } from "@/features/ai-chat/api/use-chat-thread-sync"
 import { ChatMessage } from "@/features/ai-chat/types";
 import { useChatStore } from "@/stores/chat-store";
 
-// Gives the input bar's margin time to settle back to its closed-keyboard
-// value before a modal opens on top of it, so the sheet does not visibly jump
-// as the keyboard closes.
-const KEYBOARD_DISMISS_SETTLE_MS = 280;
 // A beat for the list to finish its mount/measure pass before scrolling to a
 // deep-linked message, then a longer one to retry if the row still was not
 // measured — onScrollToIndexFailed covers the miss, this avoids the stutter.
@@ -42,28 +40,25 @@ export default function AiChatScreen() {
   const updateMessage = useChatStore((s) => s.updateMessage);
   const hydrateThread = useChatStore((s) => s.hydrateThread);
 
+  // Which of the three things the next message means. Stored outside the
+  // screen for the same unmount-on-tab-change reason, but NOT persisted —
+  // see chat-mode.ts.
+  const mode = useChatModeStore((s) => s.mode);
+  const setMode = useChatModeStore((s) => s.setMode);
+  const [modePickerOpen, setModePickerOpen] = useState(false);
+
   const [input, setInput] = useState("");
-  const [manualEntryOpen, setManualEntryOpen] = useState(false);
-  // A plain bubble opens a text editor; any transaction proposal opens the
-  // structured form (editAction decides whether that patches a real
-  // transaction or only the unconfirmed proposal).
-  const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
-  const [editingActionMessage, setEditingActionMessage] = useState<ChatMessage | null>(null);
-  const [historyMessage, setHistoryMessage] = useState<ChatMessage | null>(null);
-  // A removed proposal opens the full transaction history sheet rather than
-  // the proposal-only edit trail — see TransactionHistoryDrawer.
-  const [tombstoneMessage, setTombstoneMessage] = useState<ChatMessage | null>(null);
   // Bumped on any scroll or thread change, so a parked swipe row is never left
   // open over content that has moved underneath it.
   const [closeSignal, setCloseSignal] = useState(0);
-  const [budgetWizardOpen, setBudgetWizardOpen] = useState(false);
-  const [budgetWizardOriginMessageId, setBudgetWizardOriginMessageId] = useState<string | null>(null);
 
   const keyboardHeight = useKeyboardHeight();
   // ⚠️ From the keyboard events, not from `keyboardHeight > 0`. The height is
   // what remains to pad AFTER the OS has resized the window, so on a device
   // that resizes it is legitimately 0 while the keyboard is wide open.
   const keyboardVisible = useKeyboardVisible();
+
+  const overlays = useChatOverlays(keyboardVisible);
 
   const { focusMessageId, focusedAt, openEdit } = useLocalSearchParams<{
     focusMessageId?: string;
@@ -133,42 +128,25 @@ export default function AiChatScreen() {
     }, FOCUS_SCROLL_DELAY_MS);
     if (openEdit === "1") {
       const message = thread.find((m) => m.id === focusMessageId);
-      if (message?.action && !isTombstone(message)) setEditingActionMessage(message);
+      if (message?.action && !isTombstone(message)) overlays.setEditingActionMessage(message);
     }
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusMessageId, focusedAt]);
 
-  const openHistory = (message: ChatMessage) => {
-    if (isTombstone(message)) setTombstoneMessage(message);
-    else setHistoryMessage(message);
-  };
-
-  const openEditTarget = (item: ChatMessage) => {
-    if (isEditLocked(item)) return;
-    if (item.action) setEditingActionMessage(item);
-    else setEditingMessage(item);
-  };
-
-  // If the keyboard is open while the user swipes a bubble above it, dismiss
-  // it first and let the input bar settle before the modal opens on top —
-  // otherwise the sheet visibly jumps as the keyboard closes underneath it.
-  const handleEditTrigger = (item: ChatMessage) => {
-    if (keyboardVisible) {
-      Keyboard.dismiss();
-      setTimeout(() => openEditTarget(item), KEYBOARD_DISMISS_SETTLE_MS);
-    } else {
-      openEditTarget(item);
-    }
+  // Picking the wizard's mode opens it straight away — two taps to reach a
+  // modal the user has already named is one tap too many. The CTA in the
+  // input bar is what reopens it after a dismissal.
+  const handleSelectMode = (next: ChatMode) => {
+    setMode(next);
+    setModePickerOpen(false);
+    if (next === "budget") overlays.openBudgetWizard(null);
   };
 
   return (
     <Screen>
       <View style={styles.screen}>
-        <View style={styles.header}>
-          <SparkleIcon size={20} />
-          <Text style={styles.headerTitle}>Budgest AI</Text>
-        </View>
+        <ChatModeHeader mode={mode} onPressMode={() => setModePickerOpen(true)} />
 
         <FlatList
           ref={listRef}
@@ -202,14 +180,11 @@ export default function AiChatScreen() {
               confirming={chat.confirmingId === item.id}
               closeSignal={closeSignal}
               onConfirm={chat.confirmAction}
-              onTriggerEdit={handleEditTrigger}
+              onTriggerEdit={overlays.triggerEdit}
               onTriggerDelete={removal.request}
-              onPressHistory={openHistory}
-              onOpenBudgetWizard={(message) => {
-                setBudgetWizardOriginMessageId(message.id);
-                setBudgetWizardOpen(true);
-              }}
-              onOpenManualEntry={() => setManualEntryOpen(true)}
+              onPressHistory={overlays.openHistory}
+              onOpenBudgetWizard={(message) => overlays.openBudgetWizard(message.id)}
+              onOpenManualEntry={() => overlays.setManualEntryOpen(true)}
             />
           )}
           // No counter-transform on these: the list already composes its own
@@ -244,42 +219,47 @@ export default function AiChatScreen() {
           keyboardVisible={keyboardVisible}
           keyboardHeight={keyboardHeight}
           bottomInset={insets.bottom}
-          onOpenBudgetWizard={() => {
-            setBudgetWizardOriginMessageId(null);
-            setBudgetWizardOpen(true);
-          }}
+          onOpenBudgetWizard={() => overlays.openBudgetWizard(null)}
+          mode={mode}
         />
       </View>
+
+      <ChatModePicker
+        visible={modePickerOpen}
+        mode={mode}
+        onClose={() => setModePickerOpen(false)}
+        onSelect={handleSelectMode}
+      />
 
       <ChatOverlays
         walletById={walletById}
         categoryById={categoryById}
         removal={removal}
-        editingMessage={editingMessage}
-        editingActionMessage={editingActionMessage}
-        historyMessage={historyMessage}
-        tombstoneMessage={tombstoneMessage}
-        manualEntryOpen={manualEntryOpen}
-        budgetWizardOpen={budgetWizardOpen}
-        onCloseEditingMessage={() => setEditingMessage(null)}
+        editingMessage={overlays.editingMessage}
+        editingActionMessage={overlays.editingActionMessage}
+        historyMessage={overlays.historyMessage}
+        tombstoneMessage={overlays.tombstoneMessage}
+        manualEntryOpen={overlays.manualEntryOpen}
+        budgetWizardOpen={overlays.budgetWizardOpen}
+        onCloseEditingMessage={() => overlays.setEditingMessage(null)}
         onSaveEditingMessage={(text) => {
-          const target = editingMessage;
-          setEditingMessage(null);
+          const target = overlays.editingMessage;
+          overlays.setEditingMessage(null);
           if (target) void chat.editUserMessage(target, text);
         }}
-        onCloseEditingAction={() => setEditingActionMessage(null)}
+        onCloseEditingAction={() => overlays.setEditingActionMessage(null)}
         onSaveEditingAction={(payload) => {
-          const target = editingActionMessage;
-          setEditingActionMessage(null);
+          const target = overlays.editingActionMessage;
+          overlays.setEditingActionMessage(null);
           if (target) chat.editAction(target, payload);
         }}
-        onCloseHistory={() => setHistoryMessage(null)}
-        onCloseTombstone={() => setTombstoneMessage(null)}
-        onCloseManualEntry={() => setManualEntryOpen(false)}
-        onCloseBudgetWizard={() => setBudgetWizardOpen(false)}
+        onCloseHistory={() => overlays.setHistoryMessage(null)}
+        onCloseTombstone={() => overlays.setTombstoneMessage(null)}
+        onCloseManualEntry={() => overlays.setManualEntryOpen(false)}
+        onCloseBudgetWizard={() => overlays.setBudgetWizardOpen(false)}
         onBudgetWizardCompleted={(createdCount) => {
-          if (budgetWizardOriginMessageId) {
-            updateMessage(budgetWizardOriginMessageId, {
+          if (overlays.budgetWizardOriginMessageId) {
+            updateMessage(overlays.budgetWizardOriginMessageId, {
               budgetWizardSubmitted: true,
               budgetWizardCreatedCount: createdCount,
             });
@@ -292,14 +272,6 @@ export default function AiChatScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bgApp },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.sm,
-    paddingVertical: spacing.lg,
-  },
-  headerTitle: { ...typography.cardTitle, color: colors.textPrimary },
   list: { flex: 1 },
   // paddingVertical, not paddingBottom: `inverted` mirrors the content
   // container, so a bottom-only pad would end up above the oldest message

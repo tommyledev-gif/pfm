@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { SendIcon, SparkleIcon } from "@/components/ui/Icon";
+import { CHAT_MODE_META, ChatMode } from "@/features/ai-chat/chat-mode";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 
 // BottomNav sits flush at the safe-area inset, stands 64 tall, and floats its
@@ -20,6 +21,7 @@ interface ChatInputBarProps {
   keyboardHeight: number;
   bottomInset: number;
   onOpenBudgetWizard: () => void;
+  mode: ChatMode;
 }
 
 export function ChatInputBar({
@@ -31,7 +33,22 @@ export function ChatInputBar({
   keyboardHeight,
   bottomInset,
   onOpenBudgetWizard,
+  mode,
 }: ChatInputBarProps) {
+  // The wizard is a modal, not a conversation — in its mode there is nothing
+  // to type, so the text field is replaced rather than left sitting there
+  // accepting input that would be routed somewhere the user did not choose.
+  if (mode === "budget") {
+    return (
+      <View style={[styles.wizardCtaWrap, { marginBottom: bottomInset + NAV_CLEARANCE }]}>
+        <Pressable testID="btn-open-budget-wizard" style={styles.wizardCta} onPress={onOpenBudgetWizard}>
+          <SparkleIcon size={16} color={colors.onGreen} />
+          <Text style={styles.wizardCtaLabel}>Mở trình lập ngân sách</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <>
       {!keyboardVisible ? (
@@ -57,7 +74,7 @@ export function ChatInputBar({
         <TextInput
           value={value}
           onChangeText={onChangeText}
-          placeholder="Mô tả một giao dịch…"
+          placeholder={CHAT_MODE_META[mode].placeholder}
           placeholderTextColor={colors.textMuted}
           style={styles.input}
           multiline
@@ -72,6 +89,17 @@ export function ChatInputBar({
 }
 
 const styles = StyleSheet.create({
+  wizardCtaWrap: { marginHorizontal: spacing.xl },
+  wizardCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    paddingVertical: spacing.lg,
+    borderRadius: radii.hero,
+    backgroundColor: colors.green,
+  },
+  wizardCtaLabel: { ...typography.body, color: colors.onGreen, fontWeight: "700" },
   quickActionRow: { marginHorizontal: spacing.xl, flexDirection: "row" },
   quickActionChip: {
     flexDirection: "row",

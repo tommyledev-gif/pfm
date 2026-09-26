@@ -17,7 +17,7 @@ Each test case:
 
 ID: TC-{FEATURE}-{NN}
 Type: unit | integration | e2e
-Layer: handler | service | repository | flutter
+Layer: handler | service | repository | mobile | web
 Title: <imperative, concise>
 Preconditions: <state required before test>
 Steps: <numbered actions>
@@ -48,12 +48,19 @@ Any test touching money must verify:
 - Amount stored as integer cents, never float — test with values like 100001 (not 100000.5)
 - Soft delete does NOT affect balance calculations — deleted transactions should be excluded from aggregations
 
-## Flutter Test Conventions
+## React Native (Expo) Test Conventions — `mobile/`
 
-- Widget tests: test behavior, not implementation. Never test internal state directly.
-- Provider tests: use `ProviderContainer` with overrides, not real HTTP calls
-- Navigation: use `GoRouter` test harness, verify route pushed not widget tree
-- Secure storage: always mock `flutter_secure_storage` in tests — never real storage
+- Component tests: `@testing-library/react-native`. Query by `testID` or accessible role — never reach into component state, and never assert on a snapshot as the only check.
+- Server state: a component under test is wrapped in a fresh `QueryClientProvider` per test (`new QueryClient({ defaultOptions: { queries: { retry: false } } })`). Stubbing happens at the Axios layer (`mobile/src/lib/axios.ts`), never by mocking the `use-*-query.ts` hook itself — mocking the hook tests nothing but the mock.
+- Zustand stores (`mobile/src/stores/`): reset with `useStore.setState(initialState, true)` in `beforeEach`. A store that survives between tests is the most common source of a green suite that passes for the wrong reason.
+- Navigation: Expo Router — assert the `router.push`/`router.replace` call, not the resulting tree. Auth-gated routes are covered by asserting the `Stack.Protected` guard's decision, not by rendering the protected screen.
+- Secure storage: always mock `expo-secure-store` — never touch real device storage.
+- Money on screen: assert the formatted string a user actually sees (`formatCurrency` output), not the raw `int64` xu behind it — a rendering bug that drops a thousands separator is invisible to a test that asserts the number.
+
+## Next.js Test Conventions — `frontend/`
+
+- Same two rules as mobile: fresh `QueryClient` per test with `retry: false`, and stub at the Axios/BFF layer rather than mocking the query hook.
+- Query by `data-testid` or accessible role, matching the IDs `plan.md`'s Element/Key IDs table declares.
 
 ## Go Test Conventions
 
@@ -79,8 +86,11 @@ Any test touching money must verify:
 
 ## Project Context
 
-Stack: Flutter (Riverpod, go_router, drift, dio) | Go Fiber (sqlc, PostgreSQL, JWT) | Python FastAPI (Groq LLM)  
-Auth: JWT access (15m) + refresh (7d), invite-only user flow  
-Money: BIGINT integer cents, UTC timestamps, UUID v4 IDs, soft delete via deleted_at  
+Stack: React Native + Expo (Expo Router, TanStack Query, Zustand, Axios, expo-secure-store) | Next.js (App Router, TanStack Query, Zustand, Axios) | Go 1.22+ Fiber v2 (sqlc, pgx/v5, PostgreSQL 16, JWT) | Python 3.12+ FastAPI (Groq SDK primary, Anthropic SDK fallback)
+
+> `mobile/` was rebuilt from Flutter to React Native on 2026-08-16 and has since reached full MVP feature parity. Flutter, Riverpod, go_router, drift, dio and `flutter_secure_storage` no longer exist anywhere in this repo — never write a test case against them.
+
+Auth: JWT access (15m) + refresh (7d), invite-only user flow (no self-register)  
+Money: BIGINT integer cents (VND xu), UTC timestamps stored / local displayed, UUID v4 IDs, soft delete via `deleted_at`  
 Roles: admin | member  
-Key race conditions to always test: invite token activation (concurrent), wallet balance (concurrent expense)
+Key race conditions to always test: invite token activation (concurrent), wallet balance (concurrent expense), budget bulk-replace (concurrent wizard submit — note the row lock takes zero rows when the user has no budgets yet)
