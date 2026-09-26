@@ -21,7 +21,8 @@ interface ChatInputBarProps {
   keyboardVisible: boolean;
   keyboardHeight: number;
   bottomInset: number;
-  onOpenBudgetWizard: () => void;
+  /** The recording pane's "Lập ngân sách" chip; omitted in analysis mode. */
+  onOpenBudgetWizard?: () => void;
   mode: ChatMode;
   /** Replaces the default quick-action row — analysis mode's starter chips. */
   quickActions?: ReactNode;
@@ -39,25 +40,11 @@ export function ChatInputBar({
   mode,
   quickActions,
 }: ChatInputBarProps) {
-  // The wizard is a modal, not a conversation — in its mode there is nothing
-  // to type, so the text field is replaced rather than left sitting there
-  // accepting input that would be routed somewhere the user did not choose.
-  if (mode === "budget") {
-    return (
-      <View style={[styles.wizardCtaWrap, { marginBottom: bottomInset + NAV_CLEARANCE }]}>
-        <Pressable testID="btn-open-budget-wizard" style={styles.wizardCta} onPress={onOpenBudgetWizard}>
-          <SparkleIcon size={16} color={colors.onGreen} />
-          <Text style={styles.wizardCtaLabel}>Mở trình lập ngân sách</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
   return (
     <>
       {quickActions ? (
         <View style={styles.quickActionRow}>{quickActions}</View>
-      ) : !keyboardVisible ? (
+      ) : !keyboardVisible && onOpenBudgetWizard ? (
         <View style={styles.quickActionRow}>
           <Pressable testID="btn-open-budget-wizard" style={styles.quickActionChip} onPress={onOpenBudgetWizard}>
             <SparkleIcon size={14} />
@@ -95,17 +82,6 @@ export function ChatInputBar({
 }
 
 const styles = StyleSheet.create({
-  wizardCtaWrap: { marginHorizontal: spacing.xl },
-  wizardCta: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.sm,
-    paddingVertical: spacing.lg,
-    borderRadius: radii.hero,
-    backgroundColor: colors.green,
-  },
-  wizardCtaLabel: { ...typography.body, color: colors.onGreen, fontWeight: "700" },
   quickActionRow: { marginHorizontal: spacing.xl, flexDirection: "row" },
   quickActionChip: {
     flexDirection: "row",

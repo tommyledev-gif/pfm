@@ -1,7 +1,7 @@
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { CheckIcon } from "@/components/ui/Icon";
-import { CHAT_MODE_META, CHAT_MODE_ORDER, ChatMode, isChatModeEnabled } from "@/features/ai-chat/chat-mode";
+import { CHAT_MODE_META, CHAT_MODE_ORDER, ChatMode } from "@/features/ai-chat/chat-mode";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 
 interface ChatModePickerProps {
@@ -12,8 +12,8 @@ interface ChatModePickerProps {
 }
 
 /**
- * The three things the chat box can mean, listed so the user picks one
- * instead of the model guessing (see `chat-mode.ts`).
+ * The chat screen's modes — recording, the budget wizard, analysis — listed
+ * so the user picks one instead of the model guessing (see `chat-mode.ts`).
  *
  * Centred popup rather than an anchored menu, matching `AmountRevealPopup` —
  * the app has no Popover primitive and no anchor measurement, and a list of
@@ -30,7 +30,6 @@ export function ChatModePicker({ visible, mode, onClose, onSelect }: ChatModePic
           {CHAT_MODE_ORDER.map((candidate) => {
             const meta = CHAT_MODE_META[candidate];
             const Icon = meta.icon;
-            const enabled = isChatModeEnabled(candidate);
             const active = candidate === mode;
 
             return (
@@ -38,14 +37,8 @@ export function ChatModePicker({ visible, mode, onClose, onSelect }: ChatModePic
                 key={candidate}
                 testID={`btn-chat-mode-${candidate}`}
                 accessibilityRole="button"
-                accessibilityState={{ selected: active, disabled: !enabled }}
-                disabled={!enabled}
-                style={({ pressed }) => [
-                  styles.row,
-                  active && { borderColor: meta.tint },
-                  !enabled && styles.rowDisabled,
-                  pressed && enabled && styles.rowPressed,
-                ]}
+                accessibilityState={{ selected: active }}
+                style={({ pressed }) => [styles.row, active && { borderColor: meta.tint }, pressed && styles.rowPressed]}
                 onPress={() => onSelect(candidate)}
               >
                 <View style={[styles.iconTile, { backgroundColor: `${meta.tint}1F` }]}>
@@ -53,14 +46,7 @@ export function ChatModePicker({ visible, mode, onClose, onSelect }: ChatModePic
                 </View>
 
                 <View style={styles.rowText}>
-                  <View style={styles.labelRow}>
-                    <Text style={styles.label}>{meta.label}</Text>
-                    {!enabled ? (
-                      <View style={styles.badge}>
-                        <Text style={styles.badgeLabel}>Sắp có</Text>
-                      </View>
-                    ) : null}
-                  </View>
+                  <Text style={styles.label}>{meta.label}</Text>
                   <Text style={styles.description}>{meta.description}</Text>
                 </View>
 
@@ -104,17 +90,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgApp,
   },
   rowPressed: { opacity: 0.6 },
-  rowDisabled: { opacity: 0.45 },
   iconTile: { width: 36, height: 36, borderRadius: radii.pill, alignItems: "center", justifyContent: "center" },
   rowText: { flex: 1, gap: 2 },
-  labelRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   label: { ...typography.body, color: colors.textPrimary, fontWeight: "600" },
   description: { ...typography.caption, color: colors.textSecondary },
-  badge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surfaceBorder,
-  },
-  badgeLabel: { ...typography.caption, color: colors.textMuted, fontSize: 11 },
 });

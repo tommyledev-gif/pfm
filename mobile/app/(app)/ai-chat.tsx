@@ -9,15 +9,17 @@ import { ChatInputBar } from "@/features/ai-chat/components/ChatInputBar";
 import { ChatMessageRow } from "@/features/ai-chat/components/ChatMessageRow";
 import { ChatModeHeader } from "@/features/ai-chat/components/ChatModeHeader";
 import { ChatModePicker } from "@/features/ai-chat/components/ChatModePicker";
+import { ChatThreadList } from "@/features/ai-chat/components/ChatThreadList";
 import { ChatOverlays } from "@/features/ai-chat/components/ChatOverlays";
+import { chatThreadStyles } from "@/features/ai-chat/components/chat-thread-styles";
+import { ConsultPane } from "@/features/ai-chat/components/ConsultPane";
 import { useTransactionRemoval } from "@/features/ai-chat/components/use-transaction-removal";
 import { ChatMode, useChatModeStore } from "@/features/ai-chat/chat-mode";
+import { isConsultMessage } from "@/features/ai-chat/consult-message";
 import { useChatActions } from "@/features/ai-chat/hooks/use-chat-actions";
-import { useConsultActions } from "@/features/ai-chat/hooks/use-consult-actions";
-import { StarterChipsRow } from "@/features/analytics/components/StarterChipsRow";
 import { useChatOverlays } from "@/features/ai-chat/hooks/use-chat-overlays";
 import { isTombstone } from "@/features/ai-chat/tombstone";
-import { colors, spacing, typography } from "@/lib/theme";
+import { colors } from "@/lib/theme";
 import { useKeyboardHeight, useKeyboardVisible } from "@/lib/use-keyboard-height";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
@@ -42,9 +44,9 @@ export default function AiChatScreen() {
   const updateMessage = useChatStore((s) => s.updateMessage);
   const hydrateThread = useChatStore((s) => s.hydrateThread);
 
-  // Which of the three things the next message means. Stored outside the
-  // screen for the same unmount-on-tab-change reason, but NOT persisted —
-  // see chat-mode.ts.
+  // Which conversation is on screen — recording or analysis, each its own
+  // pane. Stored outside the screen for the same unmount-on-tab-change
+  // reason, but NOT persisted — see chat-mode.ts.
   const mode = useChatModeStore((s) => s.mode);
   const setMode = useChatModeStore((s) => s.setMode);
   const [modePickerOpen, setModePickerOpen] = useState(false);
@@ -91,21 +93,15 @@ export default function AiChatScreen() {
   // the category's budget. The card never writes budgets.
   const budgets = useBudgetsQuery();
 
-  const scrollToNewest = () => listRef.current?.scrollToOffset({ offset: 0, animated: true });
-  const chat = useChatActions({ onSent: scrollToNewest });
-  // Analysis mode's own path — a question can never become a proposal.
-  const consult = useConsultActions({
-    onSent: scrollToNewest,
-    categories: categories.data ?? [],
-    onSwitchToRecording: () => setMode("transaction"),
-    otherBusy: chat.sending,
+  const chat = useChatActions({
+    onSent: () => listRef.current?.scrollToOffset({ offset: 0, animated: true }),
   });
-  const sending = chat.sending || consult.sending;
   const removal = useTransactionRemoval();
 
-  // Reversed here rather than in the store, so every other consumer keeps
-  // reading the thread in natural order.
-  const invertedThread = useMemo(() => [...thread].reverse(), [thread]);
+  // Recording pane only — analysis messages live in ConsultPane. Reversed here
+  // rather than in the store, so every other consumer keeps reading the
+  // thread in natural order.
+  const invertedThread = useMemo(() => thread.filter((m) => !isConsultMessage(m)).reverse(), [thread]);
   const walletById = useMemo(() => new Map(wallets.data?.map((w) => [w.id, w])), [wallets.data]);
   const categoryById = useMemo(() => new Map(categories.data?.map((c) => [c.id, c])), [categories.data]);
 
@@ -130,6 +126,9 @@ export default function AiChatScreen() {
 
   useEffect(() => {
     if (!focusMessageId) return;
+    // Deep links always point at a Transaction proposal, which lives in the
+    // recording pane.
+    setMode("transaction");
     const index = invertedThread.findIndex((m) => m.id === focusMessageId);
     if (index === -1) return;
     const timer = setTimeout(() => {
@@ -143,13 +142,16 @@ export default function AiChatScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusMessageId, focusedAt]);
 
-  // Picking the wizard's mode opens it straight away — two taps to reach a
-  // modal the user has already named is one tap too many. The CTA in the
-  // input bar is what reopens it after a dismissal.
+  // Picking "Lập ngân sách" opens the wizard straight away; the mode lasts only
+  // while it is open, and closing it returns to recording.
   const handleSelectMode = (next: ChatMode) => {
     setMode(next);
     setModePickerOpen(false);
     if (next === "budget") overlays.openBudgetWizard(null);
+  };
+  const handleCloseBudgetWizard = () => {
+    overlays.setBudgetWizardOpen(false);
+    if (mode === "budget") setMode("transaction");
   };
 
   return (
@@ -157,83 +159,86 @@ export default function AiChatScreen() {
       <View style={styles.screen}>
         <ChatModeHeader mode={mode} onPressMode={() => setModePickerOpen(true)} />
 
-        <FlatList
-          ref={listRef}
-          // Inverted, so "the bottom" is scroll offset 0 — a fixed point
-          // needing no measurement. Chasing the bottom with scrollToEnd never
-          // held: FlatList estimates content height from the rows it has
-          // measured, and the viewport keeps changing under it (insets resolve
-          // a frame after mount, a bubble carrying an action card grows in a
-          // later pass). Inverting deletes the problem instead of papering
-          // over it.
-          inverted
-          style={styles.list}
-          data={invertedThread}
-          keyExtractor={(m) => m.id}
-          contentContainerStyle={styles.thread}
-          // The default eats the first touch on any row below a focused
-          // input, so a swipe silently did nothing while the keyboard was open.
-          keyboardShouldPersistTaps="handled"
-          onScrollBeginDrag={() => setCloseSignal((n) => n + 1)}
-          onScrollToIndexFailed={(info) => {
-            setTimeout(() => {
-              listRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.5 });
-            }, FOCUS_RETRY_DELAY_MS);
-          }}
-          renderItem={({ item }) => (
-            <ChatMessageRow
-              message={item}
-              walletById={walletById}
-              categoryById={categoryById}
-              budgetByCategoryCurrency={budgetByCategoryCurrency}
-              confirming={chat.confirmingId === item.id}
-              closeSignal={closeSignal}
-              onConfirm={chat.confirmAction}
-              onTriggerEdit={overlays.triggerEdit}
-              onTriggerDelete={removal.request}
-              onPressHistory={overlays.openHistory}
-              onOpenBudgetWizard={(message) => overlays.openBudgetWizard(message.id)}
-              onOpenManualEntry={() => overlays.setManualEntryOpen(true)}
-              consultHandlers={consult.handlers}
+        {mode === "consult" ? (
+          <ConsultPane
+            keyboardVisible={keyboardVisible}
+            keyboardHeight={keyboardHeight}
+            bottomInset={insets.bottom}
+            onSwitchToRecording={() => setMode("transaction")}
+          />
+        ) : (
+          <>
+            <ChatThreadList
+              listRef={listRef}
+              data={invertedThread}
+              keyExtractor={(m) => m.id}
+              contentContainerStyle={chatThreadStyles.thread}
+              // The default eats the first touch on any row below a focused
+              // input, so a swipe silently did nothing while the keyboard was open.
+              keyboardShouldPersistTaps="handled"
+              onScrollBeginDrag={() => setCloseSignal((n) => n + 1)}
+              onScrollToIndexFailed={(info) => {
+                setTimeout(() => {
+                  listRef.current?.scrollToIndex({
+                    index: info.index,
+                    animated: true,
+                    viewPosition: 0.5,
+                  });
+                }, FOCUS_RETRY_DELAY_MS);
+              }}
+              renderItem={({ item }) => (
+                <ChatMessageRow
+                  message={item}
+                  walletById={walletById}
+                  categoryById={categoryById}
+                  budgetByCategoryCurrency={budgetByCategoryCurrency}
+                  confirming={chat.confirmingId === item.id}
+                  closeSignal={closeSignal}
+                  onConfirm={chat.confirmAction}
+                  onTriggerEdit={overlays.triggerEdit}
+                  onTriggerDelete={removal.request}
+                  onPressHistory={overlays.openHistory}
+                  onOpenBudgetWizard={(message) => overlays.openBudgetWizard(message.id)}
+                  onOpenManualEntry={() => overlays.setManualEntryOpen(true)}
+                />
+              )}
+              // No counter-transform on these: the list already composes its own
+              // inversion onto the header/empty slots, so a second one would
+              // render them upside down.
+              ListEmptyComponent={
+                <Text style={chatThreadStyles.hint}>
+                  Cho mình biết bạn đã chi hay thu gì — vd: &ldquo;Cà phê 50k tiền mặt&rdquo; — mình sẽ soạn sẵn giao
+                  dịch cho bạn.
+                </Text>
+              }
+              // Header, not footer: on an inverted list the header renders at the
+              // visual bottom, which is where the typing dots belong.
+              ListHeaderComponent={
+                chat.sending ? (
+                  <View style={chatThreadStyles.typingRow}>
+                    <TypingIndicator />
+                  </View>
+                ) : null
+              }
             />
-          )}
-          // No counter-transform on these: the list already composes its own
-          // inversion onto the header/empty slots, so a second one would
-          // render them upside down.
-          ListEmptyComponent={
-            <Text style={styles.hint}>
-              Cho mình biết bạn đã chi hay thu gì — vd: &ldquo;Cà phê 50k tiền mặt&rdquo; — mình sẽ soạn sẵn giao dịch
-              cho bạn.
-            </Text>
-          }
-          // Header, not footer: on an inverted list the header renders at the
-          // visual bottom, which is where the typing dots belong.
-          ListHeaderComponent={
-            sending ? (
-              <View style={styles.typingRow}>
-                <TypingIndicator />
-              </View>
-            ) : null
-          }
-        />
 
-        <ChatInputBar
-          value={input}
-          onChangeText={setInput}
-          onSend={() => {
-            const text = input;
-            setInput("");
-            if (mode === "consult") consult.sendConsult(text);
-            else void chat.send(text);
-          }}
-          sending={sending}
-          keyboardVisible={keyboardVisible}
-          keyboardHeight={keyboardHeight}
-          bottomInset={insets.bottom}
-          onOpenBudgetWizard={() => overlays.openBudgetWizard(null)}
-          mode={mode}
-          quickActions={mode === "consult" ? <StarterChipsRow onAsk={consult.askQuery} disabled={sending} /> : undefined}
-        />
+            <ChatInputBar
+              value={input}
+              onChangeText={setInput}
+              onSend={() => {
+                const text = input;
+                setInput("");
+                void chat.send(text);
+              }}
+              sending={chat.sending}
+              keyboardVisible={keyboardVisible}
+              keyboardHeight={keyboardHeight}
+              bottomInset={insets.bottom}
+              onOpenBudgetWizard={() => overlays.openBudgetWizard(null)}
+              mode="transaction"
+            />
+          </>
+        )}
       </View>
 
       <ChatModePicker
@@ -268,7 +273,7 @@ export default function AiChatScreen() {
         onCloseHistory={() => overlays.setHistoryMessage(null)}
         onCloseTombstone={() => overlays.setTombstoneMessage(null)}
         onCloseManualEntry={() => overlays.setManualEntryOpen(false)}
-        onCloseBudgetWizard={() => overlays.setBudgetWizardOpen(false)}
+        onCloseBudgetWizard={handleCloseBudgetWizard}
         onBudgetWizardCompleted={(createdCount) => {
           if (overlays.budgetWizardOriginMessageId) {
             updateMessage(overlays.budgetWizardOriginMessageId, {
@@ -284,11 +289,4 @@ export default function AiChatScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bgApp },
-  list: { flex: 1 },
-  // paddingVertical, not paddingBottom: `inverted` mirrors the content
-  // container, so a bottom-only pad would end up above the oldest message
-  // instead of below the newest one.
-  thread: { paddingHorizontal: spacing.xl, gap: spacing.md, paddingVertical: spacing.md, flexGrow: 1 },
-  hint: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xxl },
-  typingRow: { alignItems: "flex-start" },
 });

@@ -30,8 +30,6 @@ interface UseConsultActionsOptions {
   /** The User's Categories, for the "Change" picker under a banner. */
   categories: Category[];
   onSwitchToRecording: () => void;
-  /** True while the transaction path is waiting on its own reply. */
-  otherBusy: boolean;
 }
 
 /**
@@ -42,7 +40,7 @@ interface UseConsultActionsOptions {
  * follow-ups, Category picks and "Change" all go to /analytics/query — only
  * typed text goes to /analytics/consult, the one limited endpoint.
  */
-export function useConsultActions({ onSent, categories, onSwitchToRecording, otherBusy }: UseConsultActionsOptions) {
+export function useConsultActions({ onSent, categories, onSwitchToRecording }: UseConsultActionsOptions) {
   const addMessage = useChatStore((s) => s.addMessage);
 
   const [sending, setSending] = useState(false);
@@ -116,7 +114,7 @@ export function useConsultActions({ onSent, categories, onSwitchToRecording, oth
     onPickCategory: pickCategory,
     onChangeCategories: changeCategories,
     onSwitchToRecording,
-    busy: sending || otherBusy,
+    busy: sending,
   };
 
   return { sending, sendConsult, askQuery, handlers };

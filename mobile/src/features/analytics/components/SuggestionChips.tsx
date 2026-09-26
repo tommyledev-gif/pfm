@@ -31,6 +31,6 @@ export function SuggestionChips({ chips, onPress, disabled, testIDPrefix }: Sugg
 const DISABLED_OPACITY = 0.5;
 
 const styles = StyleSheet.create({
-  row: { gap: spacing.sm, paddingVertical: spacing.xs },
+  row: { gap: spacing.sm, paddingVertical: spacing.xs, marginBottom: spacing.sm },
   disabled: { opacity: DISABLED_OPACITY },
 });

@@ -9,7 +9,6 @@ import { ChatMessage } from "@/features/ai-chat/types";
 import { Category } from "@/features/categories/types";
 import { Wallet } from "@/features/wallets/types";
 import { ManualEntryButton } from "@/features/ai-chat/components/ManualEntryButton";
-import { ConsultHandlers, ConsultReplyCard } from "@/features/analytics/components/ConsultReplyCard";
 
 const FALLBACK_CURRENCY = "VND";
 
@@ -29,7 +28,6 @@ interface ChatMessageRowProps {
   onPressHistory: (message: ChatMessage) => void;
   onOpenBudgetWizard: (message: ChatMessage) => void;
   onOpenManualEntry: () => void;
-  consultHandlers: ConsultHandlers;
 }
 
 /**
@@ -52,7 +50,6 @@ export function ChatMessageRow({
   onPressHistory,
   onOpenBudgetWizard,
   onOpenManualEntry,
-  consultHandlers,
 }: ChatMessageRowProps) {
   const currency = message.action
     ? walletById.get(message.action.payload.wallet_id)?.currency ?? FALLBACK_CURRENCY
@@ -108,8 +105,6 @@ export function ChatMessageRow({
           />
         ) : message.offerManualEntry ? (
           <ManualEntryButton onPress={onOpenManualEntry} />
-        ) : message.consult ? (
-          <ConsultReplyCard data={message.consult} handlers={consultHandlers} />
         ) : null}
       </ChatBubble>
     </SwipeableMessageRow>
