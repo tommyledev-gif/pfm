@@ -24,9 +24,15 @@ export const colors = {
   periwinkle: "#9FB3FF",
 
   trackMuted: "rgba(255,255,255,0.22)",
-  navBg: "rgba(15,17,22,0.72)",
+  // Fully opaque — the translucent blur let scrolling content show through
+  // the bar, which read as the nav being washed out.
+  navBg: "#0F1116",
   navBorder: "rgba(255,255,255,0.08)",
   error: "#FF9E96",
+  // Solid fill for destructive buttons that must read as "this deletes" at a
+  // glance. `peach` is too light to carry white text; this red is not.
+  danger: "#E5484D",
+  onDanger: "#FFFFFF",
   info: "#5dbde3",
   warning: "#F2C94C",
   
@@ -99,6 +105,23 @@ export const categoryColors = {
 
 // Ordered view of the same 50 colors — what category-color.ts indexes into.
 export const categoryPalette = Object.values(categoryColors);
+
+// Wallet card accents, one per wallet in carousel order. Unlike
+// categoryPalette (50 hues packed tightly enough that neighbours can look
+// alike), these are picked to be told apart by eye, not just by hex: hues at
+// least ~40° apart on the wheel, ordered so each color's neighbours sit far
+// from it (warm next to cool, light next to deep). Deliberately avoids the
+// app's own neon green, which already means "primary action".
+export const walletAccentPalette = [
+  "#4F8BFF", // blue
+  "#FFB23F", // amber
+  "#B266FF", // violet
+  "#2FD6A3", // teal
+  "#FF5C7A", // rose
+  "#3FD0F0", // cyan
+  "#FF8A3D", // orange
+  "#E86BD8", // magenta
+] as const;
 
 export const radii = {
   hero: 24,

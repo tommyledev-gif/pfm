@@ -99,6 +99,16 @@ func (r *CategoryRepository) GetCategoryByID(ctx context.Context, id uuid.UUID) 
 	return toCategoryModel(row), nil
 }
 
+// GetSystemCategoryByKey returns pgx.ErrNoRows (unwrap with errors.Is) when no
+// live system Category carries that key.
+func (r *CategoryRepository) GetSystemCategoryByKey(ctx context.Context, systemKey string) (*model.Category, error) {
+	row, err := r.q.GetSystemCategoryByKey(ctx, &systemKey)
+	if err != nil {
+		return nil, fmt.Errorf("repository.GetSystemCategoryByKey: %w", err)
+	}
+	return toCategoryModel(row), nil
+}
+
 type UpdateCategoryParams struct {
 	ID      uuid.UUID
 	UserID  uuid.UUID

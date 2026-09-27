@@ -45,8 +45,23 @@ export type WalletCurrency = (typeof WALLET_CURRENCIES)[number];
 export const CATEGORY_TYPES = ["income", "expense"] as const;
 export type CategoryType = (typeof CATEGORY_TYPES)[number];
 
+// The two types a Category, a budget, a report or an AI proposal can carry.
 export const TRANSACTION_TYPES = ["income", "expense"] as const;
 export type TransactionType = (typeof TRANSACTION_TYPES)[number];
+
+// Every type a stored transaction can have: the two above plus "transfer"
+// (money moved between two of the user's own wallets — backend
+// 022_transaction_transfer.sql). A transfer is neither income nor expense, so
+// it is kept out of TransactionType deliberately: nothing that sums income
+// or expense should ever have to think about it.
+export const TRANSACTION_KINDS = ["expense", "income", "transfer"] as const;
+export type TransactionKind = (typeof TRANSACTION_KINDS)[number];
+
+export const TRANSACTION_KIND_LABELS: Record<TransactionKind, string> = {
+  expense: "Chi",
+  income: "Thu",
+  transfer: "Chuyển khoản",
+};
 
 // Mirrors common.TransactionNoteMaxLength.
 export const TRANSACTION_NOTE_MAX_LENGTH = 500;

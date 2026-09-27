@@ -5,16 +5,20 @@ import { StatusBar } from "expo-status-bar";
 import { BottomNav } from "@/components/shared/BottomNav";
 import { colors } from "@/lib/theme";
 import { useKeyboardVisible } from "@/lib/use-keyboard-height";
+import { usePrefetchRecordIcons } from "@/lib/use-prefetch-record-icons";
 import { useSheetStore } from "@/stores/sheet-store";
 
 // Notifications is a full-screen overlay without the bottom nav (README:
 // bell opens a "full-screen Notifications overlay"). AI Chat keeps the nav
 // visible — its input bar floats just above the pill (README: "Input bar:
 // floating pill above the bottom nav").
-const ROUTES_WITHOUT_NAV = ["/notifications"];
+// Pending review has its own pinned "Duyệt tất cả" footer where the nav would sit.
+const ROUTES_WITHOUT_NAV = ["/notifications", "/pending"];
 
 export default function AppLayout() {
   const pathname = usePathname();
+  // Signed-in area only — the lists it reads need a session.
+  usePrefetchRecordIcons();
   // BottomNav is an absolutely-positioned overlay outside any screen's own
   // keyboard handling, so it never moves out of the way on its own — a
   // focused input (AI Chat's, but any future one too) can end up sharing the
@@ -33,6 +37,8 @@ export default function AppLayout() {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
+      {/* Tab-to-tab switching (and its fade) lives in (tabs)/_layout.tsx;
+          this stack only carries the pushed sub-screens above the tabs. */}
       <Stack screenOptions={{ headerShown: false, animation: "fade" }} />
       {showNav ? <BottomNav /> : null}
     </View>

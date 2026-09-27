@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { LayoutChangeEvent, StyleSheet, Text, View } from "react-native";
+import { Animated, LayoutChangeEvent, StyleSheet, Text, View } from "react-native";
 import Svg, { Circle, Polyline } from "react-native-svg";
 
 import { AnalyticsChartItem } from "@/features/analytics/types";
 import { formatCurrencyCompact } from "@/lib/currency";
 import { colors, spacing, typography } from "@/lib/theme";
+import { useEntryAnimation } from "@/lib/use-entry-animation";
 
 interface LineChartProps {
   items: AnalyticsChartItem[];
@@ -21,6 +22,15 @@ const STROKE_WIDTH = 2;
 // chat bubble, and anything more crowds it.
 export function LineChart({ items, currency }: LineChartProps) {
   const [width, setWidth] = useState(0);
+  // First render: the line draws itself left to right. A clip window slides
+  // in from the left while its content slides the opposite way by the same
+  // amount, so the chart itself stays put and only the visible part grows.
+  // Two translations instead of an animated width, so it runs on the native
+  // driver — an animated width re-laid-out the chart on the JS thread every
+  // frame, which is what stuttered on slower phones.
+  const reveal = useEntryAnimation({ ready: width > 0 });
+  const clipShift = reveal.interpolate({ inputRange: [0, 1], outputRange: [-width, 0] });
+  const contentShift = reveal.interpolate({ inputRange: [0, 1], outputRange: [width, 0] });
 
   const max = Math.max(...items.map((i) => i.amount), 1);
   const step = items.length > 1 ? (width - PADDING * 2) / (items.length - 1) : 0;
@@ -35,17 +45,21 @@ export function LineChart({ items, currency }: LineChartProps) {
   return (
     <View style={styles.wrap} onLayout={handleLayout}>
       {width > 0 ? (
-        <Svg width={width} height={HEIGHT}>
-          <Polyline
-            points={points.map((p) => `${p.x},${p.y}`).join(" ")}
-            fill="none"
-            stroke={colors.periwinkle}
-            strokeWidth={STROKE_WIDTH}
-          />
-          {points.map((p, i) => (
-            <Circle key={items[i].key} cx={p.x} cy={p.y} r={DOT_RADIUS} fill={colors.periwinkle} />
-          ))}
-        </Svg>
+        <Animated.View style={[styles.clip, { width, transform: [{ translateX: clipShift }] }]}>
+          <Animated.View style={{ transform: [{ translateX: contentShift }] }}>
+            <Svg width={width} height={HEIGHT}>
+              <Polyline
+                points={points.map((p) => `${p.x},${p.y}`).join(" ")}
+                fill="none"
+                stroke={colors.periwinkle}
+                strokeWidth={STROKE_WIDTH}
+              />
+              {points.map((p, i) => (
+                <Circle key={items[i].key} cx={p.x} cy={p.y} r={DOT_RADIUS} fill={colors.periwinkle} />
+              ))}
+            </Svg>
+          </Animated.View>
+        </Animated.View>
       ) : (
         <View style={styles.placeholder} />
       )}
@@ -65,6 +79,7 @@ export function LineChart({ items, currency }: LineChartProps) {
 const styles = StyleSheet.create({
   wrap: { width: "100%", gap: spacing.xs },
   placeholder: { height: HEIGHT },
+  clip: { height: HEIGHT, overflow: "hidden" },
   labels: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   label: { ...typography.tiny, color: colors.textMuted },
   peak: { ...typography.tiny, color: colors.textSecondary },

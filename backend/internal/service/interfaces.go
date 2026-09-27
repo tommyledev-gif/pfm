@@ -65,6 +65,9 @@ type CategoryRepo interface {
 	NameTypeExists(ctx context.Context, userID uuid.UUID, name, categoryType string, excludeID *uuid.UUID) (bool, error)
 	ListCategoriesForUser(ctx context.Context, userID uuid.UUID, categoryType *string) ([]*model.Category, error)
 	GetCategoryByID(ctx context.Context, id uuid.UUID) (*model.Category, error)
+	// GetSystemCategoryByKey resolves the transfer Category (and any future
+	// server-assigned system Category) by its stable system_key.
+	GetSystemCategoryByKey(ctx context.Context, systemKey string) (*model.Category, error)
 	UpdateCategory(ctx context.Context, arg repository.UpdateCategoryParams) (*model.Category, error)
 	SoftDeleteCategory(ctx context.Context, tx pgx.Tx, id, userID uuid.UUID) (*model.Category, error)
 	LockCategoryByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*model.Category, error)

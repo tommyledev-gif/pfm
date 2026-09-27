@@ -96,6 +96,9 @@ export function ChatMessageRow({
             onConfirm={() => onConfirm(message)}
             edited={message.edited}
             onPressHistory={message.editHistory ? () => onPressHistory(message) : undefined}
+            // Same availability rules as the swipe on this row.
+            onEdit={isEditLocked(message) ? undefined : () => onTriggerEdit(message)}
+            onDelete={isRemovable(message) ? () => onTriggerDelete(message) : undefined}
           />
         ) : message.actionType === "budget_wizard" ? (
           <BudgetWizardCard

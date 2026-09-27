@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { Calendar, DateData } from "react-native-calendars";
+import { DateData } from "react-native-calendars";
 
 import { AmountInput } from "@/components/ui/AmountInput";
 import { CategorySelectField } from "@/components/shared/CategorySelectField";
 import { Drawer } from "@/components/shared/Drawer";
+import { MonthYearCalendar } from "@/components/shared/MonthYearCalendar";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
-import { CALENDAR_THEME } from "@/lib/calendar-theme";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { toCents, toMajorUnits } from "@/lib/currency";
 import { formatDateShort } from "@/lib/format-date";
@@ -171,11 +171,10 @@ export function EditTransactionModal({ visible, payload, onClose, onSave, lockWa
 
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>Ngày{occurredAt ? ` — ${formatDateShort(occurredAt)}` : ""}</Text>
-        <Calendar
-          current={occurredAt || undefined}
+        <MonthYearCalendar
+          initialDate={occurredAt || undefined}
           markedDates={markedDates}
           onDayPress={(day: DateData) => setOccurredAt(day.dateString)}
-          theme={CALENDAR_THEME}
           style={styles.calendar}
         />
       </View>

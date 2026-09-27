@@ -17,10 +17,6 @@ export function TransactionDayHeader({ section, onToggle }: { section: DaySectio
           <ChevronRightIcon size={14} color={colors.textMuted} />
         </View>
         <Text style={styles.title}>{section.dayLabel}</Text>
-        <Text style={styles.divider}>•</Text>
-        <Text style={styles.date} numberOfLines={1}>
-          {section.dateLabel}
-        </Text>
         {section.collapsed ? <Text style={styles.count}>({section.count})</Text> : null}
       </View>
       <View style={styles.totals}>

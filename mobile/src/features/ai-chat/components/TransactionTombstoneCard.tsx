@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { HistoryIcon, TrashIcon } from "@/components/ui/Icon";
 import { formatCurrencyTruncated } from "@/lib/currency";
 import { formatDateShort, formatTime } from "@/lib/format-date";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { colors, spacing, typography } from "@/lib/theme";
 import { TombstoneKind } from "@/features/ai-chat/tombstone";
 import { TransactionActionPayload } from "@/features/ai-chat/types";
 
@@ -82,15 +82,10 @@ export function TransactionTombstoneCard({
 }
 
 const styles = StyleSheet.create({
-  card: {
-    gap: spacing.xs,
-    padding: spacing.md,
-    borderRadius: radii.listCard,
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderColor: colors.surfaceBorder,
-    backgroundColor: "rgba(255,255,255,0.02)",
-  },
+  // No box of its own: it already sits inside the chat bubble, and a dashed
+  // border + padding here nested a second card inside it. The strikethrough
+  // and muted colours carry "this was removed" on their own.
+  card: { gap: spacing.xs },
   headRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   kindLabel: { ...typography.tiny, color: colors.textMuted },
   bodyRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },

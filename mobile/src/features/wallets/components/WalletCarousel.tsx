@@ -10,7 +10,7 @@ import {
   View,
 } from "react-native";
 
-import { colors, spacing, typography } from "@/lib/theme";
+import { colors, spacing, typography, walletAccentPalette } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
 import {
   CARD_HEIGHT,
@@ -32,6 +32,18 @@ const NEIGHBOUR_OPACITY = 0.5;
 // three distinct wallets is the floor; below it this is a plain bounded list.
 const MIN_WALLETS_TO_LOOP = 3;
 const LOOP_COPIES = 3;
+
+// Each wallet's accent by its position in the list. Colors are assigned by
+// position, not by wallet type, so every card is visibly its own. The one
+// wrap-around case that could put the same color on two neighbours — the last
+// wallet landing on the first wallet's slot across the loop seam — is nudged
+// to the palette's opposite end.
+function accentForIndex(index: number, count: number): string {
+  const size = walletAccentPalette.length;
+  let slot = index % size;
+  if (count > 1 && index === count - 1 && slot === 0) slot = Math.floor(size / 2);
+  return walletAccentPalette[slot];
+}
 
 interface WalletCarouselProps {
   wallets: Wallet[];
@@ -155,6 +167,7 @@ export function WalletCarousel({ wallets }: WalletCarouselProps) {
                   // Index, not wallet id — the loop copies repeat every id.
                   key={`${wallet.id}-${index}`}
                   wallet={wallet}
+                  accentColor={accentForIndex(index % wallets.length, wallets.length)}
                   animatedStyle={{
                     marginRight: isLast ? 0 : -CARD_OVERLAP,
                     zIndex: rendered.length - proximity,
@@ -186,7 +199,7 @@ export function WalletCarousel({ wallets }: WalletCarouselProps) {
                       extrapolate: "clamp",
                     }),
                   }}
-                  // Fades the tint and accent border in on whichever card is
+                  // Fades the accent border in on whichever card is
                   // centred, without re-rendering on every scroll frame.
                   activeOpacity={offsetFromCentre.interpolate({
                     inputRange: [-0.6, 0, 0.6],

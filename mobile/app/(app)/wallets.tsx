@@ -34,7 +34,7 @@ export default function WalletsScreen() {
   // /wallets.sql) — fine for a flat list, but it means every wallet visibly
   // jumps to the top the moment it becomes the new default. Re-sorted here by
   // created_at only (is_default never enters the comparison), then grouped by
-  // type, so changing the default flips just the "Default" badge and nothing
+  // type, so changing the default flips just the "Mặc định" badge and nothing
   // about position or grouping.
   const sections = useMemo<WalletSection[]>(() => {
     const byType = new Map<WalletType, Wallet[]>();
@@ -55,7 +55,7 @@ export default function WalletsScreen() {
         <Pressable onPress={() => router.back()} hitSlop={8}>
           <ChevronLeftIcon size={24} />
         </Pressable>
-        <Text style={styles.title}>Wallets</Text>
+        <Text style={styles.title}>Ví tiền</Text>
         <Pressable
           style={styles.addButton}
           onPress={() => {
@@ -93,7 +93,7 @@ export default function WalletsScreen() {
               }}
             />
           )}
-          ListEmptyComponent={<Text style={styles.empty}>No wallets yet — tap + to create one.</Text>}
+          ListEmptyComponent={<Text style={styles.empty}>Chưa có ví nào — nhấn + để tạo ví mới.</Text>}
         />
       )}
 

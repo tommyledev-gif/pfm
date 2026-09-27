@@ -71,6 +71,14 @@ const (
 	// reasoning as ErrCodeInvalidCategoryType — the request is well-formed,
 	// the referenced Category simply isn't eligible for this Transaction's type.
 	ErrCodeCategoryTypeMismatch = "CATEGORY_TYPE_MISMATCH"
+	// ErrCodeTransferSameWallet / ErrCodeTransferCurrencyMismatch back the
+	// transfer rules: the two Wallets must differ, and share one currency —
+	// there is no exchange-rate conversion, so a cross-currency transfer
+	// could not keep both balances honest. 422, same reasoning as
+	// ErrCodeCategoryTypeMismatch.
+	ErrCodeTransferSameWallet        = "TRANSFER_SAME_WALLET"
+	ErrCodeTransferCurrencyMismatch  = "TRANSFER_CURRENCY_MISMATCH"
+	ErrCodeTransferCategoryImmutable = "TRANSFER_CATEGORY_IMMUTABLE"
 	// ErrCodeCurrencyLocked backs F-03's long-deferred 409 CURRENCY_LOCKED
 	// check (specs/wallet-management/spec.md S-WAL-21) — wired up by
 	// specs/transaction-management/plan.md Finding #2 / WAL-T14 now that the
@@ -174,6 +182,9 @@ var (
 	ErrTransactionNotFound        = &AppError{Code: ErrCodeTransactionNotFound, Status: http.StatusNotFound, Message: "không tìm thấy giao dịch"}
 	ErrInsufficientBalance        = &AppError{Code: ErrCodeInsufficientBalance, Status: http.StatusConflict, Message: "Số dư không đủ"}
 	ErrCategoryTypeMismatch       = &AppError{Code: ErrCodeCategoryTypeMismatch, Status: http.StatusUnprocessableEntity, Message: "loại giao dịch phải khớp với loại danh mục"}
+	ErrTransferSameWallet         = &AppError{Code: ErrCodeTransferSameWallet, Status: http.StatusUnprocessableEntity, Message: "ví nguồn và ví nhận phải khác nhau"}
+	ErrTransferCurrencyMismatch   = &AppError{Code: ErrCodeTransferCurrencyMismatch, Status: http.StatusUnprocessableEntity, Message: "chỉ chuyển được giữa hai ví cùng đơn vị tiền tệ"}
+	ErrTransferCategoryImmutable  = &AppError{Code: ErrCodeTransferCategoryImmutable, Status: http.StatusUnprocessableEntity, Message: "không thể đổi danh mục của giao dịch chuyển khoản"}
 	ErrCurrencyLocked             = &AppError{Code: ErrCodeCurrencyLocked, Status: http.StatusConflict, Message: "không thể đổi đơn vị tiền tệ khi ví đã có giao dịch"}
 	ErrNotificationAccessDenied   = &AppError{Code: ErrCodeNotificationAccessDenied, Status: http.StatusForbidden, Message: "bạn không có quyền truy cập thông báo này"}
 	ErrNotificationNotFound       = &AppError{Code: ErrCodeNotificationNotFound, Status: http.StatusNotFound, Message: "không tìm thấy thông báo"}

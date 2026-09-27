@@ -87,7 +87,7 @@ export default function SettingsScreen() {
     <Screen>
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.identity}>
-        <Avatar name={name} size={72} />
+        <Avatar name={name} size={72} fallback="initial" />
         <Text style={styles.name}>{name}</Text>
         {email ? <Text style={styles.email}>{email}</Text> : null}
       </View>

@@ -73,5 +73,5 @@ const styles = StyleSheet.create({
   tabLabel: { ...typography.body, color: colors.textMuted },
   tabLabelActive: { color: colors.textPrimary },
   tabUnderline: { height: 2, width: "100%", backgroundColor: colors.green, borderRadius: 1 },
-  body: { flex: 1, paddingBottom: 140 },
+  body: { flex: 1 },
 });

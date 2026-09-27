@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 import { create } from "zustand";
 
-import { BarChartIcon, IconProps, PlusIcon, SparkleIcon } from "@/components/ui/Icon";
+import { IconProps, InsightIcon, ReceiptIcon, TargetIcon } from "@/components/ui/Icon";
 import { colors } from "@/lib/theme";
 
 /**
@@ -26,36 +26,45 @@ export const DEFAULT_CHAT_MODE: ChatMode = "transaction";
 
 interface ChatModeMeta {
   label: string;
+  /** Fits the header's mode pill. */
+  shortLabel: string;
   /** One line, shown under the label in the picker. */
   description: string;
   /** Placeholder for the input bar while this mode is active. */
   placeholder: string;
-  icon: (props: IconProps) => ReactElement;
+  icon: (props: IconProps & { toColor?: string }) => ReactElement;
   /** Tints the header button and the picker's icon tile. */
   tint: string;
+  /** Optional second colour: the icon is drawn as a tint → iconToColor gradient. */
+  iconToColor?: string;
 }
 
 export const CHAT_MODE_META: Record<ChatMode, ChatModeMeta> = {
   transaction: {
     label: "Ghi giao dịch",
-    description: "Mô tả khoản chi hoặc thu, mình soạn sẵn giao dịch cho bạn.",
+    shortLabel: "Giao dịch",
+    // No voice input exists, so the copy promises typing only.
+    description: "Ghi chi tiêu, thu nhập nhanh chỉ bằng một câu.",
     placeholder: "Mô tả một giao dịch…",
-    icon: PlusIcon,
+    icon: ReceiptIcon,
     tint: colors.green,
   },
   budget: {
     label: "Lập ngân sách",
-    description: "Mở trình lập ngân sách theo thu nhập và thói quen chi tiêu.",
+    shortLabel: "Ngân sách",
+    description: "Tạo kế hoạch tài chính thông minh dựa trên thói quen của bạn.",
     placeholder: "Mô tả một giao dịch…",
-    icon: SparkleIcon,
+    icon: TargetIcon,
     tint: colors.lavender,
   },
   consult: {
     label: "Hỏi phân tích",
-    description: "Hỏi về chi tiêu, xem tiền đi đâu, so sánh với kỳ trước.",
+    shortLabel: "Phân tích",
+    description: "Nhận phân tích sâu về thói quen chi tiêu của bạn.",
     placeholder: "Hỏi về chi tiêu của bạn…",
-    icon: BarChartIcon,
-    tint: colors.periwinkle,
+    icon: InsightIcon,
+    tint: colors.mint,
+    iconToColor: colors.info,
   },
 };
 

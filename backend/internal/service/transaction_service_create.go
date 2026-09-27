@@ -47,12 +47,30 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, userID uuid.
 	if err != nil {
 		return nil, nil, false, err
 	}
-	category, err := s.getVisibleCategory(ctx, userID, req.CategoryID)
-	if err != nil {
-		return nil, nil, false, err
+	// A transfer's Category is never the client's choice — it is always the
+	// system transfer Category — and only a transfer may name a destination.
+	var category *model.Category
+	var destination *model.Wallet
+	if isTransfer(req.Type) {
+		destination, category, err = s.resolveTransfer(ctx, userID, wallet, req.ToWalletID)
+		if err != nil {
+			return nil, nil, false, err
+		}
+	} else {
+		if req.ToWalletID != nil {
+			return nil, nil, false, common.NewInvalidInputError("to_wallet_id is only valid for a transfer")
+		}
+		category, err = s.getVisibleCategory(ctx, userID, req.CategoryID)
+		if err != nil {
+			return nil, nil, false, err
+		}
+		if string(category.Type) != req.Type {
+			return nil, nil, false, common.ErrCategoryTypeMismatch
+		}
 	}
-	if string(category.Type) != req.Type {
-		return nil, nil, false, common.ErrCategoryTypeMismatch
+	var destinationID *uuid.UUID
+	if destination != nil {
+		destinationID = &destination.ID
 	}
 
 	occurredAt := time.Now().UTC()
@@ -64,7 +82,7 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, userID uuid.
 		occurredAt = parsed
 	}
 
-	transaction, walletBalance, err := s.createTransactionTx(ctx, userID, wallet.ID, req, occurredAt)
+	transaction, walletBalance, err := s.createTransactionTx(ctx, userID, wallet.ID, category.ID, destinationID, req, occurredAt)
 	if err != nil {
 		// Two confirms racing past the lookup above with the same fresh key
 		// (specs/ai-chat-assistant/plan.md Finding #13): the partial unique
@@ -80,6 +98,9 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, userID uuid.
 	}
 	transaction.WalletName = wallet.Name
 	transaction.CategoryName = category.Name
+	if destination != nil {
+		transaction.ToWalletName = &destination.Name
+	}
 	return transaction, &walletBalance, false, nil
 }
 
@@ -92,8 +113,9 @@ func (s *TransactionService) lookupIdempotentTransaction(ctx context.Context, us
 
 // createTransactionTx returns the Wallet's new balance alongside the created
 // Transaction (spec.md US-01 step 8: "returns 201 with the created
-// Transaction and the Wallet's new balance").
-func (s *TransactionService) createTransactionTx(ctx context.Context, userID uuid.UUID, walletID uuid.UUID, req dto.CreateTransactionRequest, occurredAt time.Time) (*model.Transaction, int64, error) {
+// Transaction and the Wallet's new balance"). For a transfer that is the
+// SOURCE Wallet's balance; toWalletID is nil for income/expense.
+func (s *TransactionService) createTransactionTx(ctx context.Context, userID uuid.UUID, walletID, categoryID uuid.UUID, toWalletID *uuid.UUID, req dto.CreateTransactionRequest, occurredAt time.Time) (*model.Transaction, int64, error) {
 	tx, err := s.repo.BeginTx(ctx)
 	if err != nil {
 		return nil, 0, fmt.Errorf("service.CreateTransaction: %w", err)
@@ -101,7 +123,9 @@ func (s *TransactionService) createTransactionTx(ctx context.Context, userID uui
 	defer tx.Rollback(ctx) //nolint:errcheck // no-op once committed
 
 	var walletBalance int64
-	if req.Type == string(model.TransactionTypeExpense) {
+	// A transfer's source obeys the same floor as an expense: money that
+	// isn't in the wallet can't leave it, whether it is spent or moved.
+	if req.Type == string(model.TransactionTypeExpense) || isTransfer(req.Type) {
 		// The WHERE balance >= amount clause IS the concurrency guard
 		// (spec.md Context #4) — zero rows affected (pgx.ErrNoRows) is the
 		// authoritative INSUFFICIENT_BALANCE signal, closing the race
@@ -122,15 +146,22 @@ func (s *TransactionService) createTransactionTx(ctx context.Context, userID uui
 		walletBalance = wallet.Balance
 	}
 
+	if toWalletID != nil {
+		if _, err := s.repo.AdjustWalletBalance(ctx, tx, *toWalletID, req.Amount); err != nil {
+			return nil, 0, fmt.Errorf("service.CreateTransaction: %w", err)
+		}
+	}
+
 	transaction, err := s.repo.CreateTransaction(ctx, tx, repository.CreateTransactionParams{
 		UserID:         userID,
 		WalletID:       walletID,
-		CategoryID:     req.CategoryID,
+		CategoryID:     categoryID,
 		Amount:         req.Amount,
 		Type:           req.Type,
 		Note:           req.Note,
 		OccurredAt:     occurredAt,
 		IdempotencyKey: req.IdempotencyKey,
+		ToWalletID:     toWalletID,
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("service.CreateTransaction: %w", err)

@@ -3,12 +3,14 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Stack } from "expo-router";
+import { DarkTheme, Theme, ThemeProvider } from "@react-navigation/native";
 
 import { DebugBubble } from "@/components/debug/DebugBubble";
 import { NavigationLogger } from "@/components/debug/NavigationLogger";
 import { Toast } from "@/components/shared/Toast";
 import { installGlobalErrorLogger } from "@/lib/global-error-logger";
 import { queryClient } from "@/lib/query-client";
+import { colors } from "@/lib/theme";
 import { useSessionStore } from "@/stores/session-store";
 
 // Installed once at module scope, not inside the component — a global
@@ -22,6 +24,23 @@ installGlobalErrorLogger();
 // declarative Stack.Protected guard (current SDK's recommended pattern,
 // replacing the manual-redirect approach from older SDKs — see
 // mobile/AGENTS.md).
+// ⚠️ Without this, every navigator falls back to react-navigation's LIGHT
+// default theme, whose background is near-white. Mid-transition (the tab
+// cross-fade, a stack fade) both screens are partly transparent, so that
+// white showed through as a flash on every tab switch. Every navigator
+// surface is pinned to the app's own dark tokens here instead.
+const NAVIGATION_THEME: Theme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    background: colors.bgApp,
+    card: colors.surface,
+    border: colors.surfaceBorder,
+    primary: colors.green,
+    text: colors.textPrimary,
+  },
+};
+
 export default function RootLayout() {
   const isHydrated = useSessionStore((s) => s.isHydrated);
   const hasSession = useSessionStore((s) => s.accessToken !== null);
@@ -36,27 +55,29 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <QueryClientProvider client={queryClient}>
-        {!isHydrated ? (
-          <View style={styles.splash}>
-            <ActivityIndicator />
-          </View>
-        ) : (
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Protected guard={hasSession}>
-              <Stack.Screen name="(app)" />
-            </Stack.Protected>
-            <Stack.Protected guard={!hasSession}>
-              <Stack.Screen name="(auth)" />
-            </Stack.Protected>
-          </Stack>
-        )}
-        {/* Rendered above everything, on every screen including login —
-            specs/mobile-debug-console/spec.md decision #4. */}
-        <NavigationLogger />
-        <DebugBubble />
-        <Toast />
-      </QueryClientProvider>
+      <ThemeProvider value={NAVIGATION_THEME}>
+        <QueryClientProvider client={queryClient}>
+          {!isHydrated ? (
+            <View style={styles.splash}>
+              <ActivityIndicator />
+            </View>
+          ) : (
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Protected guard={hasSession}>
+                <Stack.Screen name="(app)" />
+              </Stack.Protected>
+              <Stack.Protected guard={!hasSession}>
+                <Stack.Screen name="(auth)" />
+              </Stack.Protected>
+            </Stack>
+          )}
+          {/* Rendered above everything, on every screen including login —
+              specs/mobile-debug-console/spec.md decision #4. */}
+          <NavigationLogger />
+          <DebugBubble />
+          <Toast />
+        </QueryClientProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

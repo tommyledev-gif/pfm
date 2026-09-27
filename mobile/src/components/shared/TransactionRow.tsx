@@ -10,6 +10,8 @@ import { colors, spacing, typography } from "@/lib/theme";
 import { Transaction } from "@/features/transactions/types";
 
 const ICON_SIZE = 44;
+// Same emoji migration 022 seeds on the system transfer category.
+const TRANSFER_ICON = "🔁";
 
 // Home's "Recent Transactions" and the full Transactions list both render
 // this exact row shape (README: "Row = icon + name/time + amount + sub-label
@@ -31,15 +33,22 @@ export function TransactionRow({
   category?: { icon: string | null; icon_url: string | null };
 }) {
   const isIncome = transaction.type === "income";
+  const isTransfer = transaction.type === "transfer";
   const label = transaction.note?.trim() || transaction.category_name;
+  // A transfer only moves money between the user's own wallets — neither a
+  // gain nor a loss — so it gets a neutral colour and no +/- sign.
+  const amountColor = isTransfer ? colors.periwinkle : isIncome ? colors.green : colors.peach;
+  const amountSign = isTransfer ? "" : isIncome ? "+" : "-";
   const [revealVisible, setRevealVisible] = useState(false);
 
   return (
     <View style={styles.row}>
       <TintedIconTile
-        color={colorForCategory(transaction.category_id)}
+        color={isTransfer ? colors.periwinkle : colorForCategory(transaction.category_id)}
         size={ICON_SIZE}
-        icon={category?.icon}
+        // The system transfer category is never in the user's category list,
+        // so its icon cannot come from the `category` lookup.
+        icon={isTransfer ? TRANSFER_ICON : category?.icon}
         iconUrl={category?.icon_url}
         label={label}
       />
@@ -54,7 +63,7 @@ export function TransactionRow({
           <Text style={styles.subDivider}>•</Text>
           <View style={styles.walletDot} />
           <Text style={styles.sub} numberOfLines={1}>
-            {transaction.wallet_name}
+            {isTransfer ? `${transaction.wallet_name} → ${transaction.to_wallet_name ?? "?"}` : transaction.wallet_name}
           </Text>
         </View>
       </View>
@@ -62,11 +71,10 @@ export function TransactionRow({
           Pressable inside whatever outer row-tap the caller wraps this in, same idiom as the
           chat-bubble long-press-to-edit flow; a plain tap still passes through to the outer row. */}
       <Pressable style={styles.right} onLongPress={() => setRevealVisible(true)}>
-        <Text style={[styles.amount, { color: isIncome ? colors.green : colors.peach }]} numberOfLines={1}>
-          {isIncome ? "+" : "-"}
+        <Text style={[styles.amount, { color: amountColor }]} numberOfLines={1}>
+          {amountSign}
           {formatCurrencyTruncated(transaction.amount, currency)}
         </Text>
-        <Text style={styles.time}>{formatDateDMY(transaction.occurred_at)}</Text>
       </Pressable>
 
       <AmountRevealPopup

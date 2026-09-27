@@ -1,8 +1,9 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Animated, StyleSheet, Text, View } from "react-native";
 
 import { AnalyticsCompare } from "@/features/analytics/types";
 import { formatCurrency } from "@/lib/currency";
 import { colors, radii, spacing, typography } from "@/lib/theme";
+import { useEntryAnimation } from "@/lib/use-entry-animation";
 
 interface CompareBarsProps {
   compare: AnalyticsCompare;
@@ -15,6 +16,7 @@ const BAR_HEIGHT = 10;
 // was zero — then no percentage is shown at all (spec.md S-AIQ-08).
 export function CompareBars({ compare, currency }: CompareBarsProps) {
   const max = Math.max(compare.current, compare.previous, 1);
+  const grow = useEntryAnimation();
   const rows = [
     { key: "current", label: compare.current_label, amount: compare.current, color: colors.periwinkle },
     { key: "previous", label: compare.previous_label, amount: compare.previous, color: colors.trackMuted },
@@ -30,7 +32,13 @@ export function CompareBars({ compare, currency }: CompareBarsProps) {
             <Text style={styles.amount}>{formatCurrency(row.amount, currency)}</Text>
           </View>
           <View style={styles.track}>
-            <View style={[styles.fill, { width: `${(row.amount / max) * 100}%`, backgroundColor: row.color }]} />
+            <Animated.View
+              style={[
+                styles.fill,
+                { width: `${(row.amount / max) * 100}%`, backgroundColor: row.color },
+                { transform: [{ scaleX: grow }] },
+              ]}
+            />
           </View>
         </View>
       ))}
@@ -50,7 +58,7 @@ const styles = StyleSheet.create({
   label: { ...typography.caption, color: colors.textSecondary },
   amount: { ...typography.caption, color: colors.textPrimary },
   track: { height: BAR_HEIGHT, borderRadius: radii.pill, backgroundColor: colors.surfaceBorder, overflow: "hidden" },
-  fill: { height: BAR_HEIGHT, borderRadius: radii.pill },
+  fill: { height: BAR_HEIGHT, borderRadius: radii.pill, transformOrigin: "left" },
   change: { ...typography.label },
   // Spending up is the cautionary direction, down the reassuring one.
   up: { color: colors.peach },

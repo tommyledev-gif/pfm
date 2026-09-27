@@ -1,15 +1,15 @@
 import { ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { CalendarIcon, DownloadIcon, PlusIcon, SearchIcon, SortIcon, TagIcon, UploadIcon } from "@/components/ui/Icon";
+import { CalendarIcon, DownloadIcon, SearchIcon, SortIcon, TagIcon, UploadIcon } from "@/components/ui/Icon";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { FilterPill } from "@/features/transactions/components/FilterPill";
 import { formatCurrency, formatCurrencyCompact } from "@/lib/currency";
 import { colors, radii, spacing, typography } from "@/lib/theme";
-import { TransactionType } from "@/lib/constants";
+import { TransactionKind } from "@/lib/constants";
 import { ReportTotal } from "@/features/reports/types";
 
-export type TypeFilterValue = "all" | TransactionType;
+export type TypeFilterValue = "all" | TransactionKind;
 
 interface TransactionsHeaderProps {
   // Rows matching every active filter, and the same count ignoring the type
@@ -31,7 +31,6 @@ interface TransactionsHeaderProps {
   sortCount: number;
   hasCustomSort: boolean;
   onOpenSort: () => void;
-  onAdd: () => void;
   // Export/import (specs/transaction-export-import). They sit in the filter
   // row rather than getting a toolbar of their own: the row already scrolls
   // horizontally, so two more pills cost no vertical space on a screen whose
@@ -67,7 +66,6 @@ export function TransactionsHeader({
   sortCount,
   hasCustomSort,
   onOpenSort,
-  onAdd,
   onExport,
   onImport,
   exporting,
@@ -117,6 +115,9 @@ export function TransactionsHeader({
         </Text>
       ) : undefined,
     },
+    // Transfers carry no total of their own — they change no net worth, so
+    // the tab only narrows the list.
+    { value: "transfer" as TypeFilterValue, label: "Chuyển" },
   ];
 
   return (
@@ -128,9 +129,6 @@ export function TransactionsHeader({
             <Text style={styles.countBadgeLabel}>{matchedCount} giao dịch</Text>
           </View>
         </View>
-        <Pressable style={styles.addButton} onPress={onAdd} hitSlop={8}>
-          <PlusIcon size={16} color={colors.onGreen} />
-        </Pressable>
       </View>
 
       <Text style={styles.subtitle} numberOfLines={1}>
@@ -142,17 +140,6 @@ export function TransactionsHeader({
           </Text>
         ) : null}
       </Text>
-
-      {/* ⚠️ Said out loud rather than left to be inferred. With no date filter
-          the figure above covers the current month while the list below is not
-          limited to it — so a month with no income reads "Tổng thu: +0" over a
-          list of last month's income, and both numbers are correct. Only the
-          wording is new; no figure, filter default or query changed. */}
-      {dateRangeLabel === null ? (
-        <Text style={styles.periodNote} numberOfLines={2}>
-          Số liệu trên tính theo {periodLabel.toLowerCase()}. Danh sách bên dưới hiển thị mọi giao dịch.
-        </Text>
-      ) : null}
 
       <View style={styles.searchRow}>
         <SearchIcon size={16} color={colors.textSecondary} />
@@ -263,12 +250,4 @@ const styles = StyleSheet.create({
     borderColor: colors.bgApp,
   },
   sortBadgeText: { fontSize: 10, fontWeight: "700", color: colors.onGreen },
-  addButton: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.pill,
-    backgroundColor: colors.green,
-    alignItems: "center",
-    justifyContent: "center",
-  },
 });

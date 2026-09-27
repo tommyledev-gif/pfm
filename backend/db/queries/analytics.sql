@@ -39,6 +39,7 @@ WHERE t.user_id = @user_id
   AND t.occurred_at >= @window_start::timestamptz
   AND t.occurred_at < @window_end::timestamptz
   AND (sqlc.narg('tx_type')::text IS NULL OR t.type = sqlc.narg('tx_type'))
+  AND t.type <> 'transfer'
   AND (sqlc.narg('amount_min')::bigint IS NULL OR t.amount >= sqlc.narg('amount_min'))
   AND (sqlc.narg('category_ids')::uuid[] IS NULL OR t.category_id = ANY(sqlc.narg('category_ids')::uuid[]))
   AND (sqlc.narg('wallet_id')::uuid IS NULL OR t.wallet_id = sqlc.narg('wallet_id'));
@@ -85,6 +86,7 @@ JOIN categories c ON c.id = t.category_id
 WHERE t.user_id = @user_id
   AND t.deleted_at IS NULL
   AND c.deleted_at IS NULL
+  AND t.type <> 'transfer'
   AND t.occurred_at >= @since::timestamptz
 GROUP BY t.category_id, c.name, c.type
 ORDER BY tx_count DESC, t.category_id

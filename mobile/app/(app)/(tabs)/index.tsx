@@ -14,6 +14,7 @@ import { useRefresh } from "@/lib/use-refresh";
 import { PendingConfirmationsSection } from "@/features/ai-chat/components/PendingConfirmationsSection";
 import { useTransactionRemoval } from "@/features/ai-chat/components/use-transaction-removal";
 import { removalDialogCopy } from "@/features/ai-chat/removal-copy";
+import { isPendingProposal } from "@/features/ai-chat/pending";
 import { HomeSnapshotCard } from "@/features/reports/components/HomeSnapshotCard";
 import { useHomeSnapshot } from "@/features/reports/hooks/use-home-snapshot";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
@@ -49,12 +50,6 @@ export default function HomeScreen() {
   const setHomePeriod = useUiPrefsStore((s) => s.setHomePeriod);
 
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-  // "Bỏ qua" only hides the banner for the session and never mutates the
-  // thread — a message leaving this set (edited, confirmed, or a new one
-  // arriving) means there is something new to review, so the dismissal no
-  // longer applies to it.
-  const [dismissedPendingIds, setDismissedPendingIds] = useState<Set<string>>(new Set());
-
   const wallets = useWalletsQuery();
   const recent = useTransactionsQuery({ limit: RECENT_FETCH_LIMIT });
   const categories = useCategoriesQuery();
@@ -71,13 +66,7 @@ export default function HomeScreen() {
   // Selecting the raw, referentially stable thread and filtering in a memo —
   // a selector returning a fresh array every call makes the store see a
   // changed snapshot on every render and re-render forever.
-  const pendingConfirmations = useMemo(
-    () =>
-      thread.filter(
-        (m) => m.action && !m.confirmed && !m.superseded && !m.removalState && !dismissedPendingIds.has(m.id),
-      ),
-    [thread, dismissedPendingIds],
-  );
+  const pendingConfirmations = useMemo(() => thread.filter(isPendingProposal), [thread]);
 
   // "Recent" means recent, and the list is ordered newest first — so a
   // transaction booked for next month would sit above things that have
@@ -150,9 +139,7 @@ export default function HomeScreen() {
               messages={pendingConfirmations}
               categoryById={categoryById}
               currency={snapshot.currency}
-              onDismissAll={() =>
-                setDismissedPendingIds((prev) => new Set([...prev, ...pendingConfirmations.map((m) => m.id)]))
-              }
+              onViewAll={() => router.push("/pending")}
               onOpenMessage={goToPendingMessage}
               onRequestRemove={removal.request}
             />

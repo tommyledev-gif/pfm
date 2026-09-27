@@ -22,7 +22,7 @@ export function TopBar({ userName }: { userName: string }) {
           {hasUnread ? <View style={styles.dot} /> : null}
         </Pressable>
         <Pressable onPress={() => router.push("/settings")} hitSlop={8}>
-          <Avatar name={userName} size={36} />
+          <Avatar name={userName} size={36} fallback="initial" />
         </Pressable>
       </View>
     </View>

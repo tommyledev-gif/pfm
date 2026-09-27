@@ -12,7 +12,8 @@ interface PendingConfirmationsSectionProps {
   messages: ChatMessage[];
   categoryById: Map<string, Category>;
   currency: string;
-  onDismissAll: () => void;
+  /** Opens the full pending-review screen. */
+  onViewAll: () => void;
   onOpenMessage: (messageId: string, openEdit?: boolean) => void;
   /** Opens the discard confirmation. ⚠️ Never removes the message itself. */
   onRequestRemove: (message: ChatMessage) => void;
@@ -33,7 +34,7 @@ export function PendingConfirmationsSection({
   messages,
   categoryById,
   currency,
-  onDismissAll,
+  onViewAll,
   onOpenMessage,
   onRequestRemove,
 }: PendingConfirmationsSectionProps) {
@@ -57,10 +58,11 @@ export function PendingConfirmationsSection({
             <Text style={styles.countBadgeLabel}>{messages.length}</Text>
           </View>
         </View>
-        {/* Not a delete: this only hides the banner for the session and
-            changes nothing stored, so it needs no confirmation. */}
-        <Pressable onPress={onDismissAll} hitSlop={8}>
-          <Text style={styles.action}>Bỏ qua</Text>
+        {/* Replaces the old "Bỏ qua", which only hid this section for the
+            session — it read as "discard all", and hiding pending work is
+            the opposite of what the section is for. */}
+        <Pressable onPress={onViewAll} hitSlop={8} testID="btn-pending-view-all">
+          <Text style={styles.action}>Xem tất cả</Text>
         </Pressable>
       </View>
 

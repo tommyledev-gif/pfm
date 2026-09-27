@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 
 import { AmountRevealPopup } from "@/components/ui/AmountRevealPopup";
 import { Avatar } from "@/components/ui/Avatar";
-import { CalendarIcon, CheckIcon, EditIcon } from "@/components/ui/Icon";
+import { QuickActionsPopup } from "@/components/shared/QuickActionsPopup";
+import { SwipeAction } from "@/components/shared/SwipeActionButton";
+import { CalendarIcon, CheckIcon, EditIcon, TrashIcon } from "@/components/ui/Icon";
 import { PillButton } from "@/components/ui/PillButton";
 import { PillTag } from "@/components/ui/PillTag";
 import { ProgressBar } from "@/components/ui/ProgressBar";
@@ -18,6 +20,8 @@ import { ChatAction } from "@/features/ai-chat/types";
 // transaction of this size is plausibly the one that crosses the line, which
 // is exactly when it is worth a glance.
 const NEAR_LIMIT_RATIO = 0.8;
+// Hold this long on the card to open its Edit / Delete menu.
+const LONG_PRESS_MS = 1000;
 
 interface TransactionActionCardProps {
   action: ChatAction;
@@ -38,6 +42,10 @@ interface TransactionActionCardProps {
    *  Both in xu; `spent` is the cycle's spend BEFORE this proposal. */
   budgetLimit?: number;
   budgetSpent?: number;
+  /** Same handlers as the bubble's swipe actions — omitted when that action
+   *  is unavailable (edit-locked / not removable), exactly as the swipe is. */
+  onEdit?: () => void;
+  onDelete?: () => void;
 }
 
 // Renders inside an AI assistant chat bubble once a transaction has been
@@ -62,6 +70,8 @@ export function TransactionActionCard({
   onPressHistory,
   budgetLimit,
   budgetSpent,
+  onEdit,
+  onDelete,
 }: TransactionActionCardProps) {
   const { payload } = action;
   const isIncome = payload.type === "income";
@@ -102,7 +112,35 @@ export function TransactionActionCard({
         })()
       : null;
   const [revealVisible, setRevealVisible] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
   const label = payload.note || categoryName;
+
+  // Mirrors SwipeableMessageRow's two sides, so holding and swiping offer
+  // the same choices.
+  const menuActions: SwipeAction[] = [
+    ...(onEdit
+      ? [{ Icon: EditIcon, color: colors.green, label: "Sửa", testID: "btn-card-menu-edit", onPress: onEdit }]
+      : []),
+    ...(onDelete
+      ? [
+          {
+            Icon: TrashIcon,
+            color: colors.peach,
+            label: "Xóa",
+            destructive: true,
+            testID: "btn-card-menu-delete",
+            onPress: onDelete,
+          },
+        ]
+      : []),
+  ];
+  const openMenu =
+    menuActions.length > 0
+      ? () => {
+          Vibration.vibrate(20);
+          setMenuVisible(true);
+        }
+      : undefined;
 
   const amountText = (
     <Pressable onLongPress={() => setRevealVisible(true)}>
@@ -117,7 +155,7 @@ export function TransactionActionCard({
   );
 
   return (
-    <View style={styles.card}>
+    <Pressable style={styles.card} onLongPress={openMenu} delayLongPress={LONG_PRESS_MS}>
       {edited ? (
         <Pressable style={styles.editedBadge} onPress={onPressHistory} disabled={!onPressHistory}>
           <EditIcon size={12} color={colors.lavender} />
@@ -196,7 +234,13 @@ export function TransactionActionCard({
         amountCents={payload.amount}
         currency={currency}
       />
-    </View>
+      <QuickActionsPopup
+        visible={menuVisible}
+        onClose={() => setMenuVisible(false)}
+        title={label}
+        actions={menuActions}
+      />
+    </Pressable>
   );
 }
 

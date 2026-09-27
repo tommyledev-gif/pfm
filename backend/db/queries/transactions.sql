@@ -1,10 +1,11 @@
 -- name: CreateTransaction :one
+-- to_wallet_id ($9) is set only for a transfer (022_transaction_transfer.sql).
 -- idempotency_key ($8) is nullable — every pre-existing caller omits it and
 -- gets NULL, which the partial unique index (010_transactions_idempotency_key.sql)
 -- never treats as a collision (specs/ai-chat-assistant/plan.md Finding #3).
-INSERT INTO transactions (user_id, wallet_id, category_id, amount, type, note, occurred_at, idempotency_key)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING *;
+INSERT INTO transactions (user_id, wallet_id, category_id, amount, type, note, occurred_at, idempotency_key, to_wallet_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, created_at, updated_at, deleted_at, idempotency_key, to_wallet_id;
 
 -- name: GetTransactionByIdempotencyKey :one
 -- Backs the AI Chat confirm-step replay check (specs/ai-chat-assistant/spec.md
@@ -17,10 +18,12 @@ RETURNING *;
 SELECT
     t.id, t.user_id, t.wallet_id, t.category_id, t.amount, t.type, t.note,
     t.occurred_at, t.created_at, t.updated_at, t.deleted_at,
-    w.name AS wallet_name, c.name AS category_name
+    w.name AS wallet_name, c.name AS category_name,
+    t.to_wallet_id, tw.name AS to_wallet_name
 FROM transactions t
 JOIN wallets w ON w.id = t.wallet_id
 JOIN categories c ON c.id = t.category_id
+LEFT JOIN wallets tw ON tw.id = t.to_wallet_id
 WHERE t.user_id = $1
   AND t.idempotency_key = $2
   AND t.deleted_at IS NULL
@@ -36,10 +39,12 @@ LIMIT 1;
 SELECT
     t.id, t.user_id, t.wallet_id, t.category_id, t.amount, t.type, t.note,
     t.occurred_at, t.created_at, t.updated_at, t.deleted_at,
-    w.name AS wallet_name, c.name AS category_name
+    w.name AS wallet_name, c.name AS category_name,
+    t.to_wallet_id, tw.name AS to_wallet_name
 FROM transactions t
 JOIN wallets w ON w.id = t.wallet_id
 JOIN categories c ON c.id = t.category_id
+LEFT JOIN wallets tw ON tw.id = t.to_wallet_id
 WHERE t.id = $1
   AND t.deleted_at IS NULL
 LIMIT 1;
@@ -60,13 +65,15 @@ LIMIT 1;
 SELECT
     t.id, t.user_id, t.wallet_id, t.category_id, t.amount, t.type, t.note,
     t.occurred_at, t.created_at, t.updated_at, t.deleted_at,
-    w.name AS wallet_name, c.name AS category_name
+    w.name AS wallet_name, c.name AS category_name,
+    t.to_wallet_id, tw.name AS to_wallet_name
 FROM transactions t
 JOIN wallets w ON w.id = t.wallet_id
 JOIN categories c ON c.id = t.category_id
+LEFT JOIN wallets tw ON tw.id = t.to_wallet_id
 WHERE t.user_id = $1
   AND t.deleted_at IS NULL
-  AND (sqlc.narg('wallet_id')::uuid IS NULL OR t.wallet_id = sqlc.narg('wallet_id'))
+  AND (sqlc.narg('wallet_id')::uuid IS NULL OR t.wallet_id = sqlc.narg('wallet_id') OR t.to_wallet_id = sqlc.narg('wallet_id'))
   AND (sqlc.narg('category_id')::uuid IS NULL OR t.category_id = sqlc.narg('category_id'))
   AND (sqlc.narg('category_ids')::uuid[] IS NULL OR t.category_id = ANY(sqlc.narg('category_ids')::uuid[]))
   AND (sqlc.narg('type')::text IS NULL OR t.type = sqlc.narg('type'))
@@ -103,7 +110,7 @@ JOIN wallets w ON w.id = t.wallet_id
 JOIN categories c ON c.id = t.category_id
 WHERE t.user_id = $1
   AND t.deleted_at IS NULL
-  AND (sqlc.narg('wallet_id')::uuid IS NULL OR t.wallet_id = sqlc.narg('wallet_id'))
+  AND (sqlc.narg('wallet_id')::uuid IS NULL OR t.wallet_id = sqlc.narg('wallet_id') OR t.to_wallet_id = sqlc.narg('wallet_id'))
   AND (sqlc.narg('category_id')::uuid IS NULL OR t.category_id = sqlc.narg('category_id'))
   AND (sqlc.narg('category_ids')::uuid[] IS NULL OR t.category_id = ANY(sqlc.narg('category_ids')::uuid[]))
   AND (sqlc.narg('type')::text IS NULL OR t.type = sqlc.narg('type'))
@@ -126,7 +133,7 @@ SET
 WHERE id = $1
   AND user_id = $2
   AND deleted_at IS NULL
-RETURNING *;
+RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, created_at, updated_at, deleted_at, idempotency_key, to_wallet_id;
 
 -- name: SoftDeleteTransaction :one
 UPDATE transactions
@@ -134,7 +141,7 @@ SET deleted_at = NOW()
 WHERE id = $1
   AND user_id = $2
   AND deleted_at IS NULL
-RETURNING *;
+RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, created_at, updated_at, deleted_at, idempotency_key, to_wallet_id;
 
 -- name: ExistsTransactionForWallet :one
 -- Backs F-03's long-deferred 409 CURRENCY_LOCKED check (WAL-T14) — called
@@ -143,7 +150,7 @@ RETURNING *;
 -- Resolution — same pattern as F-05's ExistsActiveBudgetForCategory).
 SELECT EXISTS (
     SELECT 1 FROM transactions
-    WHERE wallet_id = $1
+    WHERE (wallet_id = $1 OR to_wallet_id = $1)
       AND deleted_at IS NULL
 ) AS exists;
 
@@ -169,6 +176,7 @@ WHERE t.user_id = $1
   AND (sqlc.narg('wallet_id')::uuid IS NULL OR t.wallet_id = sqlc.narg('wallet_id'))
   AND (sqlc.narg('category_id')::uuid IS NULL OR t.category_id = sqlc.narg('category_id'))
   AND (sqlc.narg('type')::text IS NULL OR t.type = sqlc.narg('type'))
+  AND t.type <> 'transfer'
 GROUP BY t.type, w.currency
 ORDER BY w.currency ASC;
 
@@ -195,6 +203,7 @@ WHERE t.user_id = $1
   AND (sqlc.narg('wallet_id')::uuid IS NULL OR t.wallet_id = sqlc.narg('wallet_id'))
   AND (sqlc.narg('category_id')::uuid IS NULL OR t.category_id = sqlc.narg('category_id'))
   AND (sqlc.narg('type')::text IS NULL OR t.type = sqlc.narg('type'))
+  AND t.type <> 'transfer'
 GROUP BY t.category_id, c.name, t.type, w.currency
 ORDER BY amount DESC;
 

@@ -104,6 +104,9 @@ type Transaction struct {
 	UpdatedAt      time.Time
 	DeletedAt      *time.Time
 	IdempotencyKey *uuid.UUID
+	// ToWalletID is the destination of a transfer (022_transaction_transfer.sql);
+	// nil for income/expense.
+	ToWalletID *uuid.UUID
 }
 
 // Notification mirrors the notifications table exactly (009_notifications.sql).

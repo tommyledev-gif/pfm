@@ -1,6 +1,8 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { SheetHandle } from "@/components/shared/SheetHandle";
+import { useSheetDrag } from "@/components/shared/use-sheet-drag";
 import { ChevronLeftIcon, CloseIcon } from "@/components/ui/Icon";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 
@@ -43,10 +45,16 @@ export function DrawerChildPanel({
   // sliding back out.
   const [rendered, setRendered] = useState(visible);
   const translateX = useRef(new Animated.Value(visible ? 0 : width)).current;
+  // Vertical drag from the handle, separate from the horizontal slide. The
+  // panel already fills the sheet's full height, so it only drags down to
+  // close (back to the parent sheet), never up.
+  const translateY = useRef(new Animated.Value(0)).current;
+  const drag = useSheetDrag({ translateY, onClose, expandable: false });
 
   useEffect(() => {
     if (visible) {
       setRendered(true);
+      translateY.setValue(0);
       Animated.spring(translateX, {
         toValue: 0,
         useNativeDriver: true,
@@ -66,12 +74,13 @@ export function DrawerChildPanel({
 
   return (
     <Animated.View
-      style={[styles.panel, { bottom: bottomInset, transform: [{ translateX }] }]}
+      style={[styles.panel, { bottom: bottomInset, transform: [{ translateX }, { translateY }] }]}
       // Nothing here should fall through to the backdrop underneath, which
       // would dismiss the parent sheet along with this panel.
       pointerEvents="box-none"
     >
-      <View style={styles.surface}>
+      <View style={styles.surface} onLayout={drag.onSheetLayout}>
+        <SheetHandle panHandlers={drag.panHandlers} />
         <View style={styles.header}>
           <Pressable onPress={onClose} hitSlop={10}>
             <ChevronLeftIcon size={20} color={colors.textPrimary} />
@@ -108,7 +117,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.md,
     paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.surfaceBorder,
   },

@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 
 import { AmountInput } from "@/components/ui/AmountInput";
-import { Avatar } from "@/components/ui/Avatar";
 import { Drawer } from "@/components/shared/Drawer";
-import { EmojiPickerInput } from "@/components/ui/EmojiPickerInput";
+import { IconSelectField } from "@/components/shared/IconSelectField";
+import { useIconPicker } from "@/components/shared/use-icon-picker";
 import { FieldError } from "@/components/ui/FieldError";
 import { PillButton } from "@/components/ui/PillButton";
 import { getErrorMessage } from "@/lib/axios";
@@ -46,7 +46,8 @@ export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormM
   const [currency, setCurrency] = useState<WalletCurrency>("VND");
   const [initialBalance, setInitialBalance] = useState("");
   const [icon, setIcon] = useState("");
-  const [iconUrl, setIconUrl] = useState<string | undefined>(undefined);
+  // undefined = none, null = an existing photo the user chose to drop.
+  const [iconUrl, setIconUrl] = useState<string | null | undefined>(undefined);
   const [submitAttempted, setSubmitAttempted] = useState(false);
 
   useEffect(() => {
@@ -92,6 +93,18 @@ export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormM
     );
   };
 
+  // One "Biểu tượng" field instead of a photo link plus an emoji input.
+  // Picking an emoji also drops any uploaded photo (null = clear it on save),
+  // since the photo would otherwise keep winning over the emoji on display.
+  const iconPicker = useIconPicker({
+    icon,
+    onPickEmoji: (emoji) => {
+      setIcon(emoji);
+      setIconUrl((prev) => (prev ? null : prev));
+    },
+    onUpload: pickIcon,
+  });
+
   const errors = {
     name: !name.trim() ? "Vui lòng nhập tên ví" : undefined,
   };
@@ -112,7 +125,7 @@ export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormM
           currency,
           initial_balance: initialBalance ? toCents(Number(initialBalance)) : undefined,
           icon: icon || undefined,
-          icon_url: iconUrl,
+          icon_url: iconUrl ?? undefined,
         },
         { onSuccess: onClose },
       );
@@ -122,28 +135,23 @@ export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormM
   const activeError = mutation.isError ? mutation.error : uploadIcon.isError ? uploadIcon.error : null;
 
   return (
-    <Drawer visible={visible} onClose={onClose}>
+    <Drawer visible={visible} onClose={onClose} child={iconPicker.child}>
       <Text style={styles.title}>{isEditing ? "Sửa ví" : "Ví mới"}</Text>
 
-      <View style={styles.iconPickerRow}>
-        <View style={styles.iconPreview}>
-          {uploadIcon.isPending ? (
-            <ActivityIndicator color={colors.textPrimary} />
-          ) : (
-            <Avatar name={name || "?"} color={colors.mint} size={56} icon={icon} iconUrl={iconUrl} />
-          )}
-        </View>
-        <Pressable onPress={pickIcon} disabled={uploadIcon.isPending} hitSlop={8}>
-          <Text style={styles.changePhoto}>{iconUrl ? "Đổi ảnh" : "Tải ảnh lên"}</Text>
-        </Pressable>
-      </View>
+      <Text style={styles.label}>Biểu tượng</Text>
+      <IconSelectField
+        name={name}
+        color={colors.mint}
+        icon={icon}
+        iconUrl={iconUrl ?? undefined}
+        uploading={uploadIcon.isPending}
+        onPress={iconPicker.open}
+      />
 
       <Text style={styles.label}>Tên</Text>
       <TextInput value={name} onChangeText={setName} placeholder="vd: Tiền mặt" placeholderTextColor={colors.textMuted} style={styles.input} />
       {submitAttempted ? <FieldError message={errors.name} /> : null}
 
-      <Text style={styles.label}>Biểu tượng emoji (dùng khi chưa có ảnh)</Text>
-      <EmojiPickerInput value={icon} onChange={setIcon} placeholder="vd: 💵" />
 
       <Text style={styles.label}>Loại</Text>
       <View style={styles.chipRow}>
@@ -194,9 +202,6 @@ export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormM
 
 const styles = StyleSheet.create({
   title: { ...typography.title, color: colors.textPrimary },
-  iconPickerRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
-  iconPreview: { width: 56, height: 56, alignItems: "center", justifyContent: "center" },
-  changePhoto: { ...typography.label, color: colors.green },
   label: { ...typography.caption, color: colors.textSecondary },
   chipRow: { flexDirection: "row", gap: spacing.sm, flexWrap: "wrap" },
   chip: {

@@ -1,8 +1,9 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Animated, StyleSheet, Text, View } from "react-native";
 
 import { AnalyticsChartItem } from "@/features/analytics/types";
 import { formatCurrencyCompact } from "@/lib/currency";
 import { colors, radii, spacing, typography } from "@/lib/theme";
+import { useEntryAnimation } from "@/lib/use-entry-animation";
 
 interface ColumnBarsProps {
   items: AnalyticsChartItem[];
@@ -18,6 +19,8 @@ const MIN_BAR_HEIGHT = 2;
 // figure sits above each bar.
 export function ColumnBars({ items, currency }: ColumnBarsProps) {
   const max = Math.max(...items.map((i) => i.amount), 1);
+  // Every bar rises from the baseline to its value on first render.
+  const grow = useEntryAnimation();
   return (
     <View style={styles.row}>
       {items.map((item) => (
@@ -26,7 +29,13 @@ export function ColumnBars({ items, currency }: ColumnBarsProps) {
             {item.amount > 0 ? formatCurrencyCompact(item.amount, currency) : ""}
           </Text>
           <View style={styles.barArea}>
-            <View style={[styles.bar, { height: Math.max(MIN_BAR_HEIGHT, (item.amount / max) * BAR_AREA_HEIGHT) }]} />
+            <Animated.View
+              style={[
+                styles.bar,
+                { height: Math.max(MIN_BAR_HEIGHT, (item.amount / max) * BAR_AREA_HEIGHT) },
+                { transform: [{ scaleY: grow }] },
+              ]}
+            />
           </View>
           <Text style={styles.label} numberOfLines={1}>
             {item.label}
@@ -42,6 +51,6 @@ const styles = StyleSheet.create({
   column: { flex: 1, alignItems: "center", gap: spacing.xs },
   amount: { ...typography.tiny, color: colors.textSecondary },
   barArea: { height: BAR_AREA_HEIGHT, justifyContent: "flex-end", width: "100%", alignItems: "center" },
-  bar: { width: "70%", backgroundColor: colors.periwinkle, borderRadius: radii.pill },
+  bar: { width: "70%", backgroundColor: colors.periwinkle, borderRadius: radii.pill, transformOrigin: "bottom" },
   label: { ...typography.tiny, color: colors.textMuted },
 });

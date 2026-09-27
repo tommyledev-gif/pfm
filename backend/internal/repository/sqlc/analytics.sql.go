@@ -84,6 +84,7 @@ WHERE t.user_id = $1
   AND t.occurred_at >= $3::timestamptz
   AND t.occurred_at < $4::timestamptz
   AND ($5::text IS NULL OR t.type = $5)
+  AND t.type <> 'transfer'
   AND ($6::bigint IS NULL OR t.amount >= $6)
   AND ($7::uuid[] IS NULL OR t.category_id = ANY($7::uuid[]))
   AND ($8::uuid IS NULL OR t.wallet_id = $8)
@@ -223,6 +224,7 @@ JOIN categories c ON c.id = t.category_id
 WHERE t.user_id = $1
   AND t.deleted_at IS NULL
   AND c.deleted_at IS NULL
+  AND t.type <> 'transfer'
   AND t.occurred_at >= $2::timestamptz
 GROUP BY t.category_id, c.name, c.type
 ORDER BY tx_count DESC, t.category_id

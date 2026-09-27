@@ -1,17 +1,11 @@
+import { useId } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
-import { BlurView } from "expo-blur";
+import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 
 import { TintedIconTile } from "@/components/ui/TintedIconTile";
 import { formatCurrency } from "@/lib/currency";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
-
-const TYPE_COLOR: Record<Wallet["type"], string> = {
-  cash: colors.mint,
-  bank: colors.periwinkle,
-  e_wallet: colors.lavender,
-  other: colors.mustard,
-};
 
 const TYPE_LABEL: Record<Wallet["type"], string> = {
   cash: "Tiền mặt",
@@ -39,11 +33,14 @@ export const CARD_OVERLAP = 56;
 
 interface WalletStackCardProps {
   wallet: Wallet;
+  /** This wallet's own color from walletAccentPalette — picked per wallet by
+   *  the carousel, not per type, so two bank wallets never look alike. */
+  accentColor: string;
   /** Position transform from the carousel: lean, scale and opacity by distance
    *  from the centre. */
   animatedStyle: Animated.WithAnimatedValue<object>;
-  /** 1 when this card is the centred one, 0 when it is not. Drives the tint
-   *  and the accent border. */
+  /** 1 when this card is the centred one, 0 when it is not. Drives the
+   *  accent border. */
   activeOpacity: Animated.AnimatedInterpolation<number>;
 }
 
@@ -51,35 +48,45 @@ interface WalletStackCardProps {
  * One card in the wallet carousel.
  *
  * ⚠️ The active treatment is faded in by an animated value rather than a
- * boolean prop, so scrolling does not re-render every card on every frame —
- * which is also why the blur layer is always mounted and only its opacity
- * changes. Mounting a BlurView mid-gesture is the one thing here expensive
- * enough to drop frames.
+ * boolean prop, so scrolling does not re-render every card on every frame.
+ *
+ * The background is a diagonal gradient of the wallet's own accent, strongest
+ * in the bottom-left corner and fading out toward the top-right, drawn with
+ * react-native-svg (no gradient package is a dependency of this project).
  *
  * The balance is never abbreviated: it shrinks to fit, because a clipped
  * balance is a wrong balance.
  */
-export function WalletStackCard({ wallet, animatedStyle, activeOpacity }: WalletStackCardProps) {
-  const typeColor = TYPE_COLOR[wallet.type];
+export function WalletStackCard({ wallet, accentColor, animatedStyle, activeOpacity }: WalletStackCardProps) {
+  // SVG gradient ids must be unique on screen — the loop copies render the
+  // same wallet several times. useId's colons are not valid in url(#…).
+  const gradientId = `wallet-grad-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
 
   return (
     <Animated.View testID={`card-wallet-${wallet.id}`} style={[styles.card, animatedStyle]}>
-      <Animated.View style={[StyleSheet.absoluteFill, { opacity: activeOpacity }]}>
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: `${typeColor}1F` }]} />
-        <BlurView intensity={24} tint="dark" style={StyleSheet.absoluteFill} />
-      </Animated.View>
+      <Svg width={CARD_WIDTH} height={CARD_HEIGHT} style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Defs>
+          {/* Bottom-left (0,1) to top-right (1,0). */}
+          <LinearGradient id={gradientId} x1="0" y1="1" x2="1" y2="0">
+            <Stop offset="0" stopColor={accentColor} stopOpacity={0.45} />
+            <Stop offset="0.55" stopColor={accentColor} stopOpacity={0.18} />
+            <Stop offset="1" stopColor={accentColor} stopOpacity={0.04} />
+          </LinearGradient>
+        </Defs>
+        <Rect x="0" y="0" width={CARD_WIDTH} height={CARD_HEIGHT} fill={`url(#${gradientId})`} />
+      </Svg>
 
       {/* The accent border is its own overlay for the same reason as the tint:
           borderColor cannot be animated on the native driver. */}
       <Animated.View
         pointerEvents="none"
-        style={[styles.accentBorder, { borderColor: `${typeColor}66`, opacity: activeOpacity }]}
+        style={[styles.accentBorder, { borderColor: `${accentColor}40`, opacity: activeOpacity }]}
       />
 
       <View style={styles.content}>
         <View style={styles.topRow}>
           <TintedIconTile
-            color={typeColor}
+            color={accentColor}
             size={32}
             icon={wallet.icon}
             iconUrl={wallet.icon_url}
@@ -90,7 +97,7 @@ export function WalletStackCard({ wallet, animatedStyle, activeOpacity }: Wallet
               {wallet.name}
             </Text>
             <View style={styles.typeRow}>
-              <View style={[styles.dot, { backgroundColor: typeColor }]} />
+              <View style={[styles.dot, { backgroundColor: accentColor }]} />
               <Text style={styles.type} numberOfLines={1}>
                 {TYPE_LABEL[wallet.type]}
               </Text>
@@ -116,8 +123,10 @@ const styles = StyleSheet.create({
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
     borderRadius: radii.card,
+    // Barely-there hairline: the gradient and the drop shadow already separate
+    // the cards, so a full-strength border only added noise.
     borderWidth: 1,
-    borderColor: colors.surfaceBorder,
+    borderColor: "rgba(255,255,255,0.04)",
     overflow: "hidden",
     // Opaque, not translucent: the neighbouring cards now pass UNDERNEATH this
     // one, and a see-through surface would show their edges through it.

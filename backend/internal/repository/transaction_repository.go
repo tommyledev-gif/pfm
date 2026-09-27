@@ -49,6 +49,8 @@ type CreateTransactionParams struct {
 	// unchanged) and non-nil only for the AI Chat confirm flow
 	// (specs/ai-chat-assistant/plan.md Finding #3).
 	IdempotencyKey *uuid.UUID
+	// ToWalletID is the destination Wallet, set only for a transfer.
+	ToWalletID *uuid.UUID
 }
 
 func (r *TransactionRepository) CreateTransaction(ctx context.Context, tx pgx.Tx, arg CreateTransactionParams) (*model.Transaction, error) {
@@ -61,6 +63,7 @@ func (r *TransactionRepository) CreateTransaction(ctx context.Context, tx pgx.Tx
 		Note:           arg.Note,
 		OccurredAt:     arg.OccurredAt,
 		IdempotencyKey: arg.IdempotencyKey,
+		ToWalletID:     arg.ToWalletID,
 	})
 	if err != nil {
 		return nil, err
@@ -91,6 +94,8 @@ func (r *TransactionRepository) GetTransactionByIdempotencyKey(ctx context.Conte
 		CreatedAt:    row.CreatedAt,
 		UpdatedAt:    row.UpdatedAt,
 		DeletedAt:    row.DeletedAt,
+		ToWalletID:   row.ToWalletID,
+		ToWalletName: row.ToWalletName,
 	}, nil
 }
 
@@ -147,6 +152,8 @@ func (r *TransactionRepository) GetTransactionByID(ctx context.Context, id uuid.
 		CreatedAt:    row.CreatedAt,
 		UpdatedAt:    row.UpdatedAt,
 		DeletedAt:    row.DeletedAt,
+		ToWalletID:   row.ToWalletID,
+		ToWalletName: row.ToWalletName,
 	}, nil
 }
 
@@ -205,6 +212,8 @@ func (r *TransactionRepository) ListTransactionsByUser(ctx context.Context, user
 			CreatedAt:    row.CreatedAt,
 			UpdatedAt:    row.UpdatedAt,
 			DeletedAt:    row.DeletedAt,
+			ToWalletID:   row.ToWalletID,
+			ToWalletName: row.ToWalletName,
 		})
 	}
 	return transactions, nil
@@ -282,6 +291,7 @@ func toTransactionModel(row sqlc.Transaction) *model.Transaction {
 		CreatedAt:  row.CreatedAt,
 		UpdatedAt:  row.UpdatedAt,
 		DeletedAt:  row.DeletedAt,
+		ToWalletID: row.ToWalletID,
 	}
 }
 

@@ -8,9 +8,9 @@ import (
 )
 
 const createTransaction = `-- name: CreateTransaction :one
-INSERT INTO transactions (user_id, wallet_id, category_id, amount, type, note, occurred_at, idempotency_key)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, created_at, updated_at, deleted_at, idempotency_key
+INSERT INTO transactions (user_id, wallet_id, category_id, amount, type, note, occurred_at, idempotency_key, to_wallet_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, created_at, updated_at, deleted_at, idempotency_key, to_wallet_id
 `
 
 type CreateTransactionParams struct {
@@ -25,16 +25,20 @@ type CreateTransactionParams struct {
 	// NULL, which the partial unique index (010_transactions_idempotency_key.sql)
 	// never treats as a collision (specs/ai-chat-assistant/plan.md Finding #3).
 	IdempotencyKey *uuid.UUID
+	// ToWalletID is set only for a transfer.
+	ToWalletID *uuid.UUID
 }
 
 func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionParams) (Transaction, error) {
 	row := q.db.QueryRow(ctx, createTransaction,
 		arg.UserID, arg.WalletID, arg.CategoryID, arg.Amount, arg.Type, arg.Note, arg.OccurredAt, arg.IdempotencyKey,
+		arg.ToWalletID,
 	)
 	var i Transaction
 	err := row.Scan(
 		&i.ID, &i.UserID, &i.WalletID, &i.CategoryID, &i.Amount, &i.Type,
 		&i.Note, &i.OccurredAt, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.IdempotencyKey,
+		&i.ToWalletID,
 	)
 	return i, err
 }
@@ -43,10 +47,12 @@ const getTransactionByIdempotencyKey = `-- name: GetTransactionByIdempotencyKey 
 SELECT
     t.id, t.user_id, t.wallet_id, t.category_id, t.amount, t.type, t.note,
     t.occurred_at, t.created_at, t.updated_at, t.deleted_at,
-    w.name AS wallet_name, c.name AS category_name
+    w.name AS wallet_name, c.name AS category_name,
+    t.to_wallet_id, tw.name AS to_wallet_name
 FROM transactions t
 JOIN wallets w ON w.id = t.wallet_id
 JOIN categories c ON c.id = t.category_id
+LEFT JOIN wallets tw ON tw.id = t.to_wallet_id
 WHERE t.user_id = $1
   AND t.idempotency_key = $2
   AND t.deleted_at IS NULL
@@ -67,6 +73,8 @@ type GetTransactionByIdempotencyKeyRow struct {
 	DeletedAt    *time.Time
 	WalletName   string
 	CategoryName string
+	ToWalletID   *uuid.UUID
+	ToWalletName *string
 }
 
 // GetTransactionByIdempotencyKey backs the AI Chat confirm-step replay check
@@ -79,7 +87,7 @@ func (q *Queries) GetTransactionByIdempotencyKey(ctx context.Context, userID uui
 	err := row.Scan(
 		&i.ID, &i.UserID, &i.WalletID, &i.CategoryID, &i.Amount, &i.Type,
 		&i.Note, &i.OccurredAt, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
-		&i.WalletName, &i.CategoryName,
+		&i.WalletName, &i.CategoryName, &i.ToWalletID, &i.ToWalletName,
 	)
 	return i, err
 }
@@ -88,10 +96,12 @@ const getTransactionByID = `-- name: GetTransactionByID :one
 SELECT
     t.id, t.user_id, t.wallet_id, t.category_id, t.amount, t.type, t.note,
     t.occurred_at, t.created_at, t.updated_at, t.deleted_at,
-    w.name AS wallet_name, c.name AS category_name
+    w.name AS wallet_name, c.name AS category_name,
+    t.to_wallet_id, tw.name AS to_wallet_name
 FROM transactions t
 JOIN wallets w ON w.id = t.wallet_id
 JOIN categories c ON c.id = t.category_id
+LEFT JOIN wallets tw ON tw.id = t.to_wallet_id
 WHERE t.id = $1
   AND t.deleted_at IS NULL
 LIMIT 1
@@ -111,6 +121,8 @@ type GetTransactionByIDRow struct {
 	DeletedAt    *time.Time
 	WalletName   string
 	CategoryName string
+	ToWalletID   *uuid.UUID
+	ToWalletName *string
 }
 
 // GetTransactionByID is deliberately NOT scoped by user_id, same precedent as
@@ -124,7 +136,7 @@ func (q *Queries) GetTransactionByID(ctx context.Context, id uuid.UUID) (GetTran
 	err := row.Scan(
 		&i.ID, &i.UserID, &i.WalletID, &i.CategoryID, &i.Amount, &i.Type,
 		&i.Note, &i.OccurredAt, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
-		&i.WalletName, &i.CategoryName,
+		&i.WalletName, &i.CategoryName, &i.ToWalletID, &i.ToWalletName,
 	)
 	return i, err
 }
@@ -133,13 +145,15 @@ const listTransactionsByUser = `-- name: ListTransactionsByUser :many
 SELECT
     t.id, t.user_id, t.wallet_id, t.category_id, t.amount, t.type, t.note,
     t.occurred_at, t.created_at, t.updated_at, t.deleted_at,
-    w.name AS wallet_name, c.name AS category_name
+    w.name AS wallet_name, c.name AS category_name,
+    t.to_wallet_id, tw.name AS to_wallet_name
 FROM transactions t
 JOIN wallets w ON w.id = t.wallet_id
 JOIN categories c ON c.id = t.category_id
+LEFT JOIN wallets tw ON tw.id = t.to_wallet_id
 WHERE t.user_id = $1
   AND t.deleted_at IS NULL
-  AND ($3::uuid IS NULL OR t.wallet_id = $3)
+  AND ($3::uuid IS NULL OR t.wallet_id = $3 OR t.to_wallet_id = $3)
   AND ($4::uuid IS NULL OR t.category_id = $4)
   AND ($5::uuid[] IS NULL OR t.category_id = ANY($5::uuid[]))
   AND ($6::text IS NULL OR t.type = $6)
@@ -185,6 +199,8 @@ type ListTransactionsByUserRow struct {
 	DeletedAt    *time.Time
 	WalletName   string
 	CategoryName string
+	ToWalletID   *uuid.UUID
+	ToWalletName *string
 }
 
 // ListTransactionsByUser is cursor-paginated on (occurred_at, created_at, id)
@@ -207,7 +223,7 @@ func (q *Queries) ListTransactionsByUser(ctx context.Context, arg ListTransactio
 		if err := rows.Scan(
 			&i.ID, &i.UserID, &i.WalletID, &i.CategoryID, &i.Amount, &i.Type,
 			&i.Note, &i.OccurredAt, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
-			&i.WalletName, &i.CategoryName,
+			&i.WalletName, &i.CategoryName, &i.ToWalletID, &i.ToWalletName,
 		); err != nil {
 			return nil, err
 		}
@@ -226,7 +242,7 @@ JOIN wallets w ON w.id = t.wallet_id
 JOIN categories c ON c.id = t.category_id
 WHERE t.user_id = $1
   AND t.deleted_at IS NULL
-  AND ($2::uuid IS NULL OR t.wallet_id = $2)
+  AND ($2::uuid IS NULL OR t.wallet_id = $2 OR t.to_wallet_id = $2)
   AND ($3::uuid IS NULL OR t.category_id = $3)
   AND ($4::uuid[] IS NULL OR t.category_id = ANY($4::uuid[]))
   AND ($5::text IS NULL OR t.type = $5)
@@ -270,7 +286,7 @@ SET
 WHERE id = $1
   AND user_id = $2
   AND deleted_at IS NULL
-RETURNING *
+RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, created_at, updated_at, deleted_at, idempotency_key, to_wallet_id
 `
 
 type UpdateTransactionParams struct {
@@ -282,10 +298,10 @@ type UpdateTransactionParams struct {
 	Note       *string
 }
 
-// UpdateTransaction's query is RETURNING * (db/queries/transactions.sql) —
-// the Scan below includes IdempotencyKey as the trailing column added by
-// 010_transactions_idempotency_key.sql, even though this statement never
-// touches that column itself.
+// UpdateTransaction returns every column explicitly — the Scan below includes
+// IdempotencyKey (010_transactions_idempotency_key.sql) and ToWalletID
+// (022_transaction_transfer.sql) as the trailing columns, even though this
+// statement never touches either.
 func (q *Queries) UpdateTransaction(ctx context.Context, arg UpdateTransactionParams) (Transaction, error) {
 	row := q.db.QueryRow(ctx, updateTransaction,
 		arg.ID, arg.UserID, arg.Amount, arg.CategoryID, arg.OccurredAt, arg.Note,
@@ -294,6 +310,7 @@ func (q *Queries) UpdateTransaction(ctx context.Context, arg UpdateTransactionPa
 	err := row.Scan(
 		&i.ID, &i.UserID, &i.WalletID, &i.CategoryID, &i.Amount, &i.Type,
 		&i.Note, &i.OccurredAt, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.IdempotencyKey,
+		&i.ToWalletID,
 	)
 	return i, err
 }
@@ -304,7 +321,7 @@ SET deleted_at = NOW()
 WHERE id = $1
   AND user_id = $2
   AND deleted_at IS NULL
-RETURNING *
+RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, created_at, updated_at, deleted_at, idempotency_key, to_wallet_id
 `
 
 type SoftDeleteTransactionParams struct {
@@ -312,14 +329,15 @@ type SoftDeleteTransactionParams struct {
 	UserID uuid.UUID
 }
 
-// SoftDeleteTransaction's query is RETURNING * — same trailing-column note as
-// UpdateTransaction above.
+// SoftDeleteTransaction returns every column explicitly — same trailing-column
+// note as UpdateTransaction above.
 func (q *Queries) SoftDeleteTransaction(ctx context.Context, arg SoftDeleteTransactionParams) (Transaction, error) {
 	row := q.db.QueryRow(ctx, softDeleteTransaction, arg.ID, arg.UserID)
 	var i Transaction
 	err := row.Scan(
 		&i.ID, &i.UserID, &i.WalletID, &i.CategoryID, &i.Amount, &i.Type,
 		&i.Note, &i.OccurredAt, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.IdempotencyKey,
+		&i.ToWalletID,
 	)
 	return i, err
 }
@@ -327,7 +345,7 @@ func (q *Queries) SoftDeleteTransaction(ctx context.Context, arg SoftDeleteTrans
 const existsTransactionForWallet = `-- name: ExistsTransactionForWallet :one
 SELECT EXISTS (
     SELECT 1 FROM transactions
-    WHERE wallet_id = $1
+    WHERE (wallet_id = $1 OR to_wallet_id = $1)
       AND deleted_at IS NULL
 ) AS "exists"
 `
@@ -356,6 +374,7 @@ WHERE t.user_id = $1
   AND ($4::uuid IS NULL OR t.wallet_id = $4)
   AND ($5::uuid IS NULL OR t.category_id = $5)
   AND ($6::text IS NULL OR t.type = $6)
+  AND t.type <> 'transfer'
 GROUP BY t.type, w.currency
 ORDER BY w.currency ASC
 `
@@ -422,6 +441,7 @@ WHERE t.user_id = $1
   AND ($4::uuid IS NULL OR t.wallet_id = $4)
   AND ($5::uuid IS NULL OR t.category_id = $5)
   AND ($6::text IS NULL OR t.type = $6)
+  AND t.type <> 'transfer'
 GROUP BY t.category_id, c.name, t.type, w.currency
 ORDER BY amount DESC
 `

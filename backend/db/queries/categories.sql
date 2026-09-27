@@ -24,8 +24,19 @@ SELECT EXISTS (
 SELECT * FROM categories
 WHERE (user_id IS NULL OR user_id = $1)
   AND (sqlc.narg('type')::text IS NULL OR type = sqlc.narg('type'))
+  -- The system transfer Category is assigned by the server, never picked.
+  AND type <> 'transfer'
   AND deleted_at IS NULL
 ORDER BY (user_id IS NULL) DESC, name ASC;
+
+-- name: GetSystemCategoryByKey :one
+-- A system Category by its stable system_key (019_categories_system_key.sql)
+-- — used to resolve the transfer Category (022_transaction_transfer.sql).
+SELECT * FROM categories
+WHERE user_id IS NULL
+  AND system_key = $1
+  AND deleted_at IS NULL
+LIMIT 1;
 
 -- name: GetCategoryByID :one
 -- Deliberately NOT scoped by user_id, like GetWalletByID — the service layer
