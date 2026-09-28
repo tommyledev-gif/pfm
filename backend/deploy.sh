@@ -93,7 +93,6 @@ pull_with_retry() {
 for service in $services; do
   pull_with_retry "$service"
 done
-docker compose --env-file "$ENV_FILE_PATH" up -d --remove-orphans
 
 # Apply any pending migrations before anything else touches the database.
 #
@@ -119,6 +118,15 @@ docker compose --env-file "$ENV_FILE_PATH" up -d --remove-orphans
 # only the genuinely missing ones. Adoption is allowed on that first run
 # only — afterwards a duplicate-object error is a real failure.
 docker compose --env-file "$ENV_FILE_PATH" run --rm --entrypoint ./migrate pfm-backend
+
+# ⚠️ Migrate runs BEFORE `up -d`, not after. `run` starts pfm-postgres on its
+# own and connects with the NEW env file, so a wrong POSTGRES_PASSWORD (the
+# volume keeps the password it was initialised with, whatever the env says
+# later) or a failing migration stops the deploy while the old backend is
+# still serving. Run after `up -d`, the same mistake had already replaced the
+# working backend with one that cannot reach the database.
+
+docker compose --env-file "$ENV_FILE_PATH" up -d --remove-orphans
 
 # One-shot bootstrap of the first admin user (see cmd/seed). Runs on every
 # deploy but is idempotent — a no-op once the admin row exists, and a no-op
