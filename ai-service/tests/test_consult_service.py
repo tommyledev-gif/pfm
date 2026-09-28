@@ -68,3 +68,13 @@ def test_usage_reads_cached_tokens_when_present() -> None:
     usage = _usage(_Usage())
     assert (usage.prompt_tokens, usage.completion_tokens, usage.cached_tokens) == (300, 40, 120)
     assert _usage(None).prompt_tokens == 0
+
+
+def test_provider_error_code_reads_only_the_code() -> None:
+    from app.services.consult_service import _provider_error_code
+
+    class FakeGroqError(Exception):
+        body = {"error": {"code": "tool_use_failed", "failed_generation": "question text"}}
+
+    assert _provider_error_code(FakeGroqError()) == "tool_use_failed"
+    assert _provider_error_code(ValueError("no body")) is None

@@ -53,10 +53,22 @@ async def consult(req: ConsultRequest) -> ConsultResponse:
     except Exception as exc:  # noqa: BLE001 - any provider failure degrades, never propagates raw
         logger.warning(
             "consult interpretation failed",
-            extra={"prompt_chars": len(req.message), "error_type": type(exc).__name__},
+            extra={"prompt_chars": len(req.message), "error_type": type(exc).__name__, "error_code": _provider_error_code(exc)},
         )
         raise ConsultUnavailableError from exc
     return to_response(output, req, normalized, usage)
+
+
+def _provider_error_code(exc: Exception) -> str | None:
+    """Groq's own error code ("tool_use_failed", "rate_limit_exceeded", …),
+    which error_type alone cannot tell apart. Only the code: the error body's
+    failed_generation echoes the model's reading of the question."""
+    body = getattr(exc, "body", None)
+    if isinstance(body, dict):
+        error = body.get("error", body)
+        if isinstance(error, dict):
+            return error.get("code")
+    return None
 
 
 def to_response(output: ConsultToolOutput, req: ConsultRequest, normalized: str, usage: ConsultUsage) -> ConsultResponse:
@@ -109,6 +121,7 @@ def _call_groq(system_prompt: str, user_message: str) -> tuple[ConsultToolOutput
     completion = client.chat.completions.create(
         model=settings.groq_model,
         max_tokens=settings.consult_max_tokens,
+        reasoning_effort=settings.consult_reasoning_effort,
         temperature=settings.temperature,
         tools=[tool],
         tool_choice={"type": "function", "function": {"name": _TOOL_NAME}},
@@ -121,12 +134,17 @@ def _call_groq(system_prompt: str, user_message: str) -> tuple[ConsultToolOutput
     if not tool_calls:
         raise ValueError("groq response contained no tool call")
     usage = _usage(completion.usage)
+    completion_details = getattr(completion.usage, "completion_tokens_details", None)
     logger.info(
         "consult interpretation completed",
         extra={
             "prompt_tokens": usage.prompt_tokens,
             "completion_tokens": usage.completion_tokens,
             "cached_tokens": usage.cached_tokens,
+            # Reasoning share and finish reason are what show a creeping
+            # truncation before it starts failing calls (plan.md R-F19).
+            "reasoning_tokens": getattr(completion_details, "reasoning_tokens", None),
+            "finish_reason": completion.choices[0].finish_reason,
         },
     )
     return ConsultToolOutput.model_validate(json.loads(tool_calls[0].function.arguments)), usage

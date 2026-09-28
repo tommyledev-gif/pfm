@@ -50,7 +50,17 @@ class Settings(BaseSettings):
     # the output is a small classification, so a tight cap; and a timeout
     # under the Go backend's 8s budget so this service answers 503 before
     # the backend gives up on it.
-    consult_max_tokens: int = 400
+    #
+    # ⚠️ groq_model is a reasoning model, and its hidden reasoning counts
+    # against max_tokens. At 400 with the default effort, reasoning alone took
+    # 291-376 tokens on harder questions and the tool call was cut off (Groq
+    # 400 tool_use_failed), which reached the User as "temporarily
+    # unavailable" (specs/ai-chat-query-spending/plan.md R-F19, measured live
+    # 2026-09-28). Low effort measured 122-186 reasoning / 208-272 total.
+    # Keep the cap modest: Groq charges the whole reservation against the
+    # org's shared tokens-per-minute limit (plan.md R-F27).
+    consult_reasoning_effort: str = "low"
+    consult_max_tokens: int = 600
     consult_timeout_seconds: float = 7.0
 
 

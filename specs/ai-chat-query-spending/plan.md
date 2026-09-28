@@ -184,7 +184,7 @@ func ResolveCycleWindow(now time.Time, cycleStartDay int, offset int, loc *time.
 | BR-15 | Category confidence bands: ≥ high → answer; ≥ medium → answer + banner; else → choice list, no figures | S-AIQ-24…26 | `ConsultService.route()` |
 | BR-16 | Non-query kinds (`evaluate`, `scenario`, `unsupported`, `needs_context`, `transaction_like`) never produce figures; each maps to a fixed message + chips | S-AIQ-28…31 | `ConsultService.route()` + `analytics_followups.go` |
 | BR-17 | Free-text limit is per User, separate from `/ai`; chips/follow-ups/Change never count | S-AIQ-35, S-AIQ-37…39 | `AIConsultRateLimiter` only on `POST /analytics/consult`; `/analytics/query` has none |
-| BR-18 | AI down / timeout / token budget reached → degraded answer (message + starter chips), no retry | S-AIQ-40, S-AIQ-41, F13 | `ConsultService` (returns 200 `kind=degraded`, see Error Flows note) |
+| BR-18 | AI down / timeout / token budget reached → degraded answer (message + starter chips), no retry. **Only** these three — an output the model produced but the catalog cannot hold is BR-26, not degraded | S-AIQ-40, S-AIQ-41, F13, S-AIQ-60 | `ConsultService` (returns 200 `kind=degraded`, see Error Flows note) |
 | BR-19 | Validation-rejected messages do not reach the limiter count | EC (US-05 #3) | Fiber's limiter runs before the handler, so it is configured with `SkipFailedRequests: true`; the handler returns 400 for invalid text, and responses with status ≥ 400 are not counted |
 | BR-20 | One log row per free-text question; log failure never fails the answer; text never in app logs | S-AIQ-45, S-AIQ-48, EC (US-07 #1) | `ConsultService.logParse()` (error logged without text) |
 | BR-21 | Raw text cleared after raw retention; rows deleted after full retention | S-AIQ-46 | `intent_log_retention.go` on scheduler tick |
@@ -197,7 +197,7 @@ func ResolveCycleWindow(now time.Time, cycleStartDay int, offset int, loc *time.
 |---|---|---|---|---|---|
 | `POST /api/v1/analytics/query` | US-01, US-02, US-04, US-03 "Change" | `AnalyticsQueryRequest` = metric, group_by?, tx_type?, period, from?, to?, category_ids?, wallet_id?, amount_min?, limit?, currency? | `AnalyticsAnswerResponse` (200) | Yes — read-only, non-transactional | **gating:** JWT → shape → ownership (BR-01). **independent** (returned together as `details`): unknown metric, unknown period, missing custom dates, range too long, bad limit, bad amount_min |
 | `POST /api/v1/analytics/consult` | US-03, US-05, US-07 | `ConsultRequest` = message (1…300) | `ConsultResponse` (200) = kind (`answer`,`clarify_category`,`unsupported`,`needs_context`,`coming_later`,`switch_mode`,`degraded`), message key, answer?, category_choices?, banner_categories?, chips[] | No financial write; appends one log row (single statement, non-transactional) | **gating:** JWT → limiter → shape → AI parse → ownership of returned ids (BR-01) → routing |
-| `POST /consult` (ai-service, internal) | US-03 | message, categories (≤ 20 {id,name,type}), wallets ({id,name,currency,is_default}), today (local date), tz | kind, coverage, query fields (flat), category_confidence, normalized_text, usage {prompt, completion, cached}, latency_ms | Pure | 422 on schema; 503 provider failure |
+| `POST /consult` (ai-service, internal) | US-03 | message, categories (≤ 20 {id,name,type}), wallets ({id,name,currency,is_default}), today (local date), tz | kind, coverage, query fields (flat), category_confidence, normalized_text, usage {prompt, completion, cached}, latency_ms, **invalid_output** (bool, R-F19) | Pure | 422 on schema; 503 provider **unavailable** only — an out-of-catalog model output is 200 `kind=unsupported`, `invalid_output=true` (BR-26) |
 
 Service 1-to-1: `AnalyticsHandler.Query → AnalyticsService.Answer`; `AnalyticsHandler.Consult → ConsultService.Consult`.
 
@@ -299,14 +299,21 @@ sequenceDiagram
             else Not a full spending question
                 B-->>M: 200 unsupported, needs context, coming later or switch mode reply with chips
                 M-->>U: Short explanation and chips, no figures
+            else Parse flagged as output outside the catalog
+                B-->>M: 200 unsupported reply with chips, logged as error, never the degraded reply
+                M-->>U: Short explanation and chips, no figures
+            else Single day after today, a nonexistent date, or a single-day comparison
+                B->>B: Day guard rejects the question before any figure is read
+                B-->>M: 200 unsupported reply with a chip for today
+                M-->>U: Short explanation and chips, no figures
             else Low Category confidence
                 B-->>M: 200 clarify reply with the User's Categories as choices
                 M-->>U: Category picker
             else Full question, medium or high confidence
-                B->>D: Computes the answer as in US-02
+                B->>D: Computes the answer as in US-02, a single day being a one-day range
                 D-->>B: Rows
                 B-->>M: 200 answer, with Category banner when confidence is medium
-                M-->>U: Answer card
+                M-->>U: Answer card, a question about today marked up to now
             end
             B->>D: Appends one question log row
         end
@@ -413,7 +420,8 @@ sequenceDiagram
 | Wallet not owned by caller | 403 | `WALLET_ACCESS_DENIED` | client |
 | Free-text hourly limit reached | 429 | `RATE_LIMITED` | client |
 | AI Service down / timeout / token budget reached | **200** `kind=degraded` | — | upstream, degraded by design (BR-18): the reply is a valid answer the client renders as a message; an error status would make the app show a generic failure instead of the chips |
-| AI Service returns malformed parse | 200 `kind=degraded` | — (logged `outcome=error`) | system, degraded |
+| AI Service returns malformed parse, or the model's output falls outside the catalog | 200 `kind=unsupported` *(was `degraded` — changed by R-F19 / BR-26)* | — (logged `outcome=error`) | system, surfaced as out of scope (S-AIQ-60) |
+| Single-day question for a day after today, a nonexistent date, or a single-day comparison | 200 `kind=unsupported` + today chip | — (logged `outcome=unsupported`) | client-side meaning, no figures (BR-27) |
 | DB failure during answer | 500 | `INTERNAL_ERROR` | system |
 | ai-service `/consult` schema violation (internal) | 422 → Go treats as degraded | — | system |
 
@@ -534,12 +542,13 @@ None required: analytics is read-only; log is append-only; the purge is idempote
 
 | Step | State | Owner next |
 |---|---|---|
-| Spec | Done — `spec.md` (7 US, 48 scenarios) | — |
+| Spec | Done — `spec.md` (7 US, 60 scenarios after the 2026-09-28 revision) | — |
 | Plan | Done — this file | — |
 | Prerequisite I-1 (`BWZ2-T06` + app timezone) | **Not started** | `/cook-implementation specs/ai-budget-wizard-v2/` |
 | P0-A token measurement (`AIQ-T01`) | Not started | Developer, before any AI-service task |
 | Implementation `AIQ-T02…T46` | Not started — backend T11–T25 can proceed once T10 is done; AI T30–T36 after T01 | `/cook-implementation specs/ai-chat-query-spending/` |
 | Test cases | Not started | `/cook-qc` |
+| Revision 2026-09-28 (reasoning-token truncation, single-day periods, listing phrasing, failure classes) — `AIQ-T49…T60` | T50 done (root cause confirmed). **T49 first.** T60 needs a Groq key from a separate org. Owner decision pending: provider tier / separate org for consult (R-F27) | `/cook-implementation specs/ai-chat-query-spending/` |
 
 ---
 
@@ -559,4 +568,82 @@ Recorded where the code deliberately differs from the plan above.
 | IN-8 | Category context = top-20 by usage | All visible Categories when ≤ 20; otherwise top by usage over 6 cycles, topped up alphabetically | Spec EC: a rarely used Category must still be nameable |
 | IN-9 | — | The interpreter's invented ids (not in the list it was shown) mark the question `partial` in the AI service | Never silently drop a filter (spec US-03 EC) |
 | IN-10 | — | Migrations and SQL were not executed against a real Postgres | No Docker on the dev machine this session. `cmd/migrate` applies `021` on deploy; an existing local volume needs a manual `psql <` |
+
+---
+
+## Revision 2026-09-28 — single-day periods and listing phrasing
+
+> Spec revision: A-05, A-06, S-AIQ-49→S-AIQ-60, EC-29→EC-35. Trigger: in live use, the questions of S-AIQ-53, S-AIQ-54 and S-AIQ-55 all got the **degraded** reply (`msgDegraded`), while a Transaction description sent right after was classified correctly (S-AIQ-31). So the provider was up and the failure was specific to these questions.
+> Scope: ai-service (prompt, normalize, failure classification, golden set) · Go backend (consult routing guard, wire flag, one-day label) · mobile (one suffix). **No migration, no new endpoint, no new period or metric value.** The backend already accepts `period=custom` with `from = to`.
+
+### Pre-flight: findings for this revision
+
+| # | Finding | Type | Resolution |
+|---|---------|------|------------|
+| **R-F19** | **Root cause — confirmed live 2026-09-28 (`AIQ-T50`).** `openai/gpt-oss-120b` is a reasoning model, and its hidden reasoning tokens count against `consult_max_tokens = 400`. On a question that needs more thought, reasoning alone took 291–376 tokens, so the tool call was cut off. Groq then answers 400 `tool_use_failed`, either "Failed to parse tool call arguments as JSON" (truncated arguments) or "Tool choice is required, but model did not call a tool". The same question succeeded at `max_tokens=2000` (reasoning 291–376, output 377–462) and at `max_tokens=400` with `reasoning_effort=low` (reasoning 122–186, output 208–272). Production question log: about half the free-text questions over two days were `degraded`, including supported Q4/Q11/Q13 phrasings, not only single days. The earlier hypothesis (a period outside the enum) was **wrong**: for "today" the model already returned `period=custom`, `from_date = today`. `/extract` does not hit this because it runs at `max_tokens=1024`. Every such failure lands in the bare `except Exception` in `consult_service.consult()`, which gives 503, which Go turns into `kind=degraded`. So a budget miss is reported to the User as an outage. | ⚠️ Bug — config + wrong failure class | (1) **`AIQ-T49`, first:** `reasoning_effort="low"` on the consult call, with headroom on `consult_max_tokens` (BR-31). (2) Split the failure classes (BR-26): a provider transport/auth/429/timeout error stays 503. `tool_use_failed` or an output-validation failure becomes 200 `kind=unsupported`, `coverage=partial`, `invalid_output=true`. Go logs it as `outcome=error`, never `degraded`. |
+| **R-F27** | **Provider capacity, measured live.** The Groq org is on the free `on_demand` tier: **8,000 tokens per minute for the whole org**, shared by consult and `/extract` (recording). One consult call is charged about 1.9–2.1k tokens (prompt plus the output reservation). That is about 4 questions per minute across all Users, and the diagnostic run itself hit 429 after 5 calls. `ConsultTokenBudgetPerMinute = 4000` (IN-5 placeholder) would allow only about 2 consult calls a minute. It does protect recording (S-AIQ-37), but it also degrades almost every question at any real usage. Raising `max_tokens` makes this worse, because Groq counts the reservation against the TPM limit. | ⚠️ Capacity constraint | Keep the output reservation small: `reasoning_effort=low` makes a low cap viable (BR-31). Record the measured numbers as the `AIQ-T01` baseline and set `ConsultTokenBudgetPerMinute` from them (`AIQ-T49`). The real fix, a paid tier or a separate org for consult, is a product/cost decision → **Open question for the owner**, not decided here. API keys in the same org share the limit, so a new key does not help. |
+| **R-F20** | Asking the model to compute "yesterday" / "the day before yesterday" is date arithmetic, which LLMs get wrong near month and year edges. | Risk | `build_consult_prompt` computes the anchors in Python from `req.today` (`date.fromisoformat` − 1 and − 2 days) and prints them in the prompt. The model only copies a date (BR-24). The prompt already carries `today`, so no prompt-cache prefix is lost. |
+| **R-F21** | A one-day custom range is labelled as a "from 28/09 to 28/09" range (`periodLabel` default branch). `soFar()` explicitly skips `custom`, so a question about today carries no "so far" wording. Mobile `ConsultReplyCard` appends its "until today" suffix whenever `partial`, which would read as "today (28/09) until today". S-AIQ-49 fails on wording. | Gap | One-day label: "today (DD/MM)" when the day is today, else "day DD/MM". `soFar()` gets a one-day-today case with an "up to now" prefix. Multi-day custom is unchanged. Mobile suffix becomes "up to now" when `from_date == to_date`, else unchanged (BR-29). Vietnamese copy lives in `analytics_template.go` and the mobile component, as for every other message. |
+| **R-F22** | The consult path calls `AnalyticsService.Answer` with a DTO built by `queryFromParse`, **never passing the DTO `validate` tags**. `validateAnalyticsDates` discards parse errors (`from, _ := time.ParseInLocation`). A model date such as `2026-02-31` therefore becomes a zero `time.Time`, not a validation error. Nothing rejects a day after today either. | ⚠️ Gap | (a) `validateAnalyticsDates` checks both parse errors and reports rule `invalid_date` (defense for both paths). (b) New consult-only guard `consultDayGuard` runs before `Answer`. It maps a day after today (EC-29), an unparseable date (EC-30) and `compare` on a one-day range (EC-32) to `kind=unsupported` with a today chip (BR-27). The chip path (`/analytics/query`) keeps accepting any valid custom range: a chip never asks for a future day, and rejecting one there is not a spec requirement. |
+| **R-F23** | `normalize.py` maps `may bua nay` ("these past days") to the last 30 days, but has no rule for the Southern `bua nay` (= today) or for the shorthands `hnay` / `hqua`. Adding `bua nay` naively would also rewrite the inside of `may bua nay`. | Gap | `hnay` → `hom nay` and `hqua` → `hom qua` go in the word map. `bua nay` → `hom nay` goes in `_TIME_ALIASES` **after** the `may bua nay` rule, so the longer phrase is consumed first. Tests cover both (S-AIQ-57). |
+| **R-F24** | Golden `_matches()` does not compare `from`/`to`, so a single-day row cannot catch a wrong day. The golden `today` is fixed at `2026-10-14`. | Gap | `_matches` compares `from`/`to` when the expected row has them. New rows use dates relative to `2026-10-14`. |
+| **R-F25** | Listing phrasing (A-06: "what did I spend on", "which expenses", "list") has no prompt rule. The backend already answers `top_n` with no `limit` at `AnalyticsListDefaultRows`, and follow-ups for `top_n` on a custom range keep the dates (`topOf`, `whereDidItGo`). | Gap — prompt only | Prompt rule only (BR-25). No backend change. |
+| **R-F26** | The spec revision appended new IDs (S-AIQ-49→51 inside US-02; EC-29→35 inside US-03) out of document order. | Convention trade-off | Kept deliberately: renumbering would break every `S-AIQ-NN` / `EC-NN` reference already in this plan, the code comments and `test_cases.md`. |
+
+### Business rules (added)
+
+| ID | Rule | Source | Enforcement |
+|----|------|--------|-------------|
+| BR-24 | A single named day → `period=custom`, `from = to` = that local day. "Today" / "yesterday" / "day before yesterday" are copied from anchors computed in code. A year-less date → its most recent occurrence not after today. | A-05, S-AIQ-52, S-AIQ-56→59 | `consult_prompt.build_consult_prompt()` (anchors + rule) |
+| BR-25 | Listing phrasing (A-06) → `metric=top_n`, no `limit`. "Where did my money go" stays `breakdown` by category whatever the period. | A-06, S-AIQ-53→56 | `consult_prompt.py` rule 2 |
+| BR-26 | A model output that fails the tool schema or Pydantic validation → 200 `kind=unsupported`, `coverage=partial`, `invalid_output=true`. Go replies with `msgUnsupported`, logs `outcome=error`, never shows figures. Degraded is reserved for BR-18. | S-AIQ-60, R-F19 | `consult_service.consult()` (Python) · `ConsultService.consult()` (Go) |
+| BR-27 | A one-day range after today (EC-29), an unparseable custom date (EC-30), and `compare` on a one-day range (EC-32) → `kind=unsupported`, chips `[today total, this-cycle total]`, no figures. | EC-29, EC-30, EC-32 | `consultDayGuard()` in Go, called from `route()` after the coverage check |
+| BR-28 | A part of a day ("this morning", "last night") → `coverage=partial` → `msgPartial`. Never the whole day's total. | ⚠️ EC-31 | Prompt rule 6 examples + existing BR-14 |
+| BR-29 | A one-day answer is labelled "today (DD/MM)" or "day DD/MM". When the day is today, the summary opens with "up to now" wording and the period line carries the "up to now" suffix. | S-AIQ-49, EC-04 | `analytics_template.go` `periodLabel` + `soFar` · mobile `ConsultReplyCard.tsx` |
+| BR-30 | A single day with a multi-period metric (`series`) → the existing `INVALID_INPUT` → `msgPartial` mapping in `route()`. Never answered without the day. | EC-33 | Existing `toAnalyticsQuery` (`series` needs last_3/6) + `route()` — test only |
+| BR-31 | The consult call runs with low reasoning effort and a named output cap sized from measured usage, so the tool call is never truncated at normal load. Both are settings, not literals. The call logs `finish_reason` and reasoning-token count (no text) so truncation is visible. | S-AIQ-40 (degraded only for real outages), S-AIQ-60, R-F19, R-F27 | `core/config.py` (`consult_reasoning_effort`, `consult_max_tokens`) · `consult_service._call_groq()` |
+
+⚠️ **Money / time for this revision:** no new amount path. A one-day window is `[local midnight, next local midnight)` in `common.AppTimezone`, returned as UTC plus local dates, exactly like every custom range (`analytics_window.go` custom branch, BR-03). Q11 on one day divides by 1 day with spending (A-03, EC-34); integer arithmetic unchanged.
+
+### Sequence diagram
+
+No separate diagram: the single-day, day-guard and out-of-catalog branches are merged into the **US-03 diagram** above (one diagram per story). The ai-service computes the date anchors before the model call (R-F20); the provider-down branch is unchanged (BR-18).
+
+### Security and transactions (revision)
+
+No new endpoint, route or middleware. `POST /analytics/consult` keeps `JWTAuth` at the `/analytics` group and `AIConsultRateLimiter` on the route. The actor is still `common.LocalsUserID` passed to the service, and ownership of returned ids is still checked in `ConsultService` (BR-01). CSRF is not applicable (bearer token, no cookies). Every figure read stays non-transactional. The only write is the existing single-statement log insert, which is non-transactional by design. `consultDayGuard` is a **gating** check that runs after the parse and before `Answer`. `invalid_date` (T56) is an **independent** check, collected with the other date rules in `validateAnalyticsDates`.
+
+### Error flows (delta)
+
+The two changed rows are in §Error Flows above. Classification stays the same: nothing in this revision adds a 4xx or 5xx. The day guard and invalid output are 200 replies the client already renders (`kind=unsupported`).
+
+### Element / Key IDs
+
+No new elements. The one-day label reuses `text-analytics-period`. The today chip reuses `chip-followup-{index}` / `chip-starter-{key}`.
+
+### Open tasks (revision)
+
+| ID | Task | File | Blocks / Blocked by |
+|----|------|------|---|
+| AIQ-T49 | 🔶 **Code done 2026-09-28** (`consult_reasoning_effort="low"`, `consult_max_tokens=600`, typed `reasoning_effort` in `groq==1.6.0`, `finish_reason` / `reasoning_tokens` / Groq `error_code` logged). **Open:** baseline doc, `ConsultTokenBudgetPerMinute`, post-deploy question-log check. **Do first — fixes most degraded replies by itself.** Add settings `consult_reasoning_effort = "low"` and a `consult_max_tokens` with headroom over the measured low-effort output (208–272 observed; proposal 600, a named setting). Pass the effort through the SDK (`extra_body={"reasoning_effort": …}` if `groq==1.6.0` has no typed parameter). In `_call_groq`, log `finish_reason`, `completion_tokens` and reasoning tokens (no text). Record the R-F27 numbers in `docs/groq-token-baseline.md` (closes `AIQ-T01`) and set `ConsultTokenBudgetPerMinute` from them. Re-query the question log after deploy: `degraded` should drop to real outages only. | `ai-service/app/core/config.py`, `ai-service/app/services/consult_service.py`, `docs/groq-token-baseline.md`, `backend/internal/common/constants_analytics.go` | — |
+| AIQ-T50 | ✅ **Done 2026-09-28.** ai-service logs: three `consult interpretation failed`, `error_type=BadRequestError`. A direct call in the production container returned 400 `tool_use_failed` "Failed to parse tool call arguments as JSON" (truncated `failed_generation`). A diagnostic matrix (`max_tokens` 400 / 2000 / 400 + low effort) confirmed reasoning-token truncation (R-F19) and measured TPM usage (R-F27). The backend log had no match because the container was redeployed within the window; the DB question log kept the history. | — (ops) | — |
+| AIQ-T51 | `normalize.py`: `hnay` → `hom nay`, `hqua` → `hom qua` (word map); `bua nay` → `hom nay` in `_TIME_ALIASES` **after** the `may bua nay` rule. Offline tests: `bua nay` alone → today, `may bua nay` → still the last 30 days, and the S-AIQ-57 inputs. | `ai-service/app/nlu/normalize.py`, `tests/test_normalize.py` | — |
+| AIQ-T52 | Prompt: (1) date anchors computed from `today` (today, yesterday, day before yesterday); (2) rule 3 adds single day → `custom`, `from_date = to_date`, and year-less date → most recent not after today; (3) rule 2 adds listing phrasing → `top_n`, no `limit` (BR-25); (4) rule 6 adds part-of-day examples → `partial` (BR-28); (5) comparing two single days → `unsupported`. Pure string building. | `ai-service/app/services/consult_prompt.py` | T51 |
+| AIQ-T53 | *(after T49; T49 removes the common cause, this makes any remaining miss honest)* Split failure classes (BR-26): catch `pydantic.ValidationError`, `json.JSONDecodeError`, `ValueError` (no tool call) and Groq `BadRequestError` whose body code is `tool_use_failed` (both observed messages: truncated JSON, and "model did not call a tool") → return `ConsultResponse(kind="unsupported", coverage="partial", invalid_output=True, …)`. Every other exception stays `ConsultUnavailableError` → 503. Add `invalid_output: bool = False` to `ConsultResponse`. Offline tests with a stubbed client for both branches. Log only `error_type`, never text. | `ai-service/app/services/consult_service.py`, `schemas/consult_schema.py`, `tests/test_consult_service.py` | T50 (exception list) |
+| AIQ-T54 | Go wire: `consultWireResponse.InvalidOutput` → `AIConsultParse.InvalidOutput`. `ConsultService.consult()`: when set, reply `kind=unsupported` (`msgUnsupported`, starter chips) and log `outcome=error`. Tokens still recorded. | `service/ai_consult_client.go`, `service/consult_service.go` | T53 |
+| AIQ-T55 | `consultDayGuard(p, today, currency)` + `todayChip(today, currency)` (sum, custom, `from = to = today`). Called in `route()` after the coverage check and before the confidence check. Unit tests: EC-29 (tomorrow), EC-30 (`2026-02-31`), EC-32 (`compare` + one-day custom), multi-day custom still passes through, a valid today passes. New file to keep `consult_routing.go` focused. | `service/consult_day_guard.go`, `service/consult_routing.go`, `service/consult_service_test.go` | — |
+| AIQ-T56 | `validateAnalyticsDates`: report `invalid_date` on a `ParseInLocation` error instead of discarding it (R-F22 a). Test on both `/analytics/query` and consult paths. | `service/analytics_validate.go`, `service/analytics_service_test.go` | — |
+| AIQ-T57 | One-day label and so-far (BR-29): `periodLabel` custom branch → "today (DD/MM)" / "day DD/MM" copy when start and end are the same local day; `soFar` → "up to now" prefix for a one-day range that is today. Tests: S-AIQ-49 (00:30 and 23:50 on the day counted, 23:50 the day before not counted), multi-day custom label unchanged. `analytics_template.go` is at 270 lines — if it would exceed 300, move period labelling to `analytics_period_label.go`. | `service/analytics_template.go` (or new `analytics_period_label.go`), `service/analytics_service_test.go` | — |
+| AIQ-T58 | Mobile: "up to now" period suffix when `period.from_date === period.to_date && period.partial`, else the existing "until today" suffix. | `mobile/src/features/analytics/components/ConsultReplyCard.tsx` | T57 |
+| AIQ-T59 | Golden set: ≥ 12 new rows in a new group `single_day` (golden `today` = 2026-10-14). Cover every input of S-AIQ-52→S-AIQ-59, with and without accents; a year-less date before the golden today (1/10 → 2026-10-01) and after it (20/10 → 2025-10-20, A-05); and the boundaries EC-29 (tomorrow → unsupported), EC-31 (this morning → partial) and EC-32 (today vs yesterday → unsupported). `_matches` compares `from`/`to` when present (R-F24). | `ai-service/tests/golden/analytics_intents.jsonl`, `tests/test_consult_golden.py` | T51, T52 |
+| AIQ-T60 | Live golden run (`PFM_LIVE_LLM=1`): whole set ≥ the previous pass rate, `single_day` group recorded separately, zero partial-understanding answers (S-AIQ-27). Record in §Implementation notes. ⚠️ **R-F27:** at about 2k tokens per call against an 8k TPM org limit, about 130 rows need about 35 minutes. The test must pace its calls (a named inter-call delay) and back off on 429 instead of failing the row. Run it from a **different Groq org** (a separate account), never the production key: keys in one org share the limit, so the run would degrade production questions and recording for its whole duration. | `ai-service/tests/test_consult_golden.py` (pacing) | T49, T52, T53, T59 |
+
+### Regression scope (revision)
+
+| Area | Risk | Check |
+|---|---|---|
+| Existing golden rows | Prompt additions shift other classifications | T60 whole-set run, compared with the previous pass rate |
+| Degraded rate in the question log | Drops, because misses are now `outcome=error` | Expected — note it when reading the log after deploy |
+| Multi-day custom ranges | Label or so-far wording change leaking | T57 test: multi-day label unchanged |
+| Recording via chat (`/extract`) | None: separate prompt and service (`prompt_builder.py`), normalize not applied there (spec Out of Scope #8) | Existing extract tests |
 

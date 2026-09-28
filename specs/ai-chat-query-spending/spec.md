@@ -2,6 +2,7 @@
 
 > Source: `SRS.md` FR-09, BF-10 (step 2 "direct answer (spending query)"), Feature-12 **US-03 Query Spending via Chat [MVP]**. Design brief: `docs/new-tasks.md` Part II, question group **Q** (§II.3.1, §II.4, §II.7, §II.8, §II.13). The brief's working name "F-14" is **not** a feature id — this is Feature-12.
 > Status: Draft — spec + plan may proceed; **implementation is blocked** until F-13.1 US-03 (spending cycle window) ships. See Dependencies.
+> Revision 2026-09-28: **single-day periods and "what did I spend on" phrasing** (A-05, A-06, S-AIQ-49→S-AIQ-60, EC-29→EC-35). Found in live use: "hôm nay tiêu những gì", "tiền đi đâu hôm nay", "đã chi những khoản nào hôm nay" all reached the "temporarily unavailable" reply. Supported questions did too ("hay tiêu vào thứ mấy", "trung bình mỗi ngày tiêu bao nhiêu"). The cause was the interpretation failing to finish, not the Service being down, yet the User was told it was unavailable (S-AIQ-60). The spec did not state how a single day or a listing request is interpreted, so this revision states it.
 > Related: [Feature-12 US-01 Create via Chat](../ai-chat-assistant/spec.md) (same chat surface), [F-07 Financial Reporting](../financial-reporting/spec.md) (every figure here must agree with it), [F-05 Budget Management](../budget-management/spec.md) (remaining-budget answers must agree with it), [F-13.1 AI Budget Wizard v2](../ai-budget-wizard-v2/spec.md) (owns the spending cycle definition and the three-tier Category class)
 
 ## Context
@@ -25,6 +26,8 @@ Client scope: **mobile only.** The web client's chat keeps its current behavior 
 2. **A-02 — "Month" means spending cycle.** Words like "this month" / "last month" resolve to the current / previous spending cycle as defined by F-13.1 US-03. A User who never chose a cycle start day has cycles equal to calendar months.
 3. **A-03 — Average per day** divides by the number of days in the period **that have at least one expense**, and the answer states that day count, so the figure is never presented as a per-calendar-day average.
 4. **A-04 — Single-turn interpretation.** Each free-text question is interpreted on its own; earlier messages are never used to fill in missing parts (US-04 replaces that need with follow-up chips).
+5. **A-05 — A single named day is a one-day date range.** "Hôm nay" / "bữa nay", "hôm qua", "hôm kia" and an explicit day ("ngày 15/9") resolve to the explicit date range that starts and ends on that local day, in the app's timezone. They are not a new kind of period. A day given without a year means its most recent occurrence that is not after today.
+6. **A-06 — "What did I spend on" is the ranked list with no count.** "Tiêu những gì", "chi những khoản nào", "liệt kê các khoản chi" ask for the Transactions themselves, so they are answered as Q5 with no count given, which uses the standard list length. The list is ordered by amount, largest first, like every Q5 answer (Open Question #6).
 
 ## Preconditions (feature-level)
 
@@ -130,7 +133,7 @@ Question IDs follow the design brief; Q7 (keyword search) is Out of Scope #4.
 | Q2 | Spending breakdown by Category | "Where did my money go" | Proportion breakdown |
 | Q3 | Spending per cycle over several cycles | "How was my spending over the last 6 months" | Bars |
 | Q4 | One Category, two periods compared | "Food this month vs last month" | Paired bars + change |
-| Q5 | Largest Transactions | "My 5 biggest expenses this month" | Ranked list |
+| Q5 | Largest Transactions | "My 5 biggest expenses this month"; with no count: "What did I spend on today" (A-06) | Ranked list |
 | Q6 | Transactions above an amount | "Expenses over 1 million this week" | Ranked list |
 | Q8 | Spending breakdown by Wallet | "Which wallet did I spend most from" | Bars |
 | Q9 | Remaining budget | "How much budget do I have left" | Progress per Budget |
@@ -140,7 +143,9 @@ Question IDs follow the design brief; Q7 (keyword search) is Out of Scope #4.
 | Q13 | Spending by weekday | "Which day do I spend the most" | Weekday view |
 | Q14 | Single largest expense | "Biggest expense this month" | Single card |
 
-Supported periods: current cycle, previous cycle, last 3 cycles, last 6 cycles, last 30 days, this week, and an explicit date range.
+Supported periods: current cycle, previous cycle, last 3 cycles, last 6 cycles, last 30 days, this week, and an explicit date range. A single day (today, yesterday, the day before yesterday, or a named date) is an explicit date range of one day (A-05).
+
+Question kinds that need several periods cannot be asked for a single day. Q3 and Q12 need several cycles. Q4 needs a previous period, and an explicit date range has none. A single day paired with one of these is covered by EC-32 and EC-33.
 
 ### Scenarios
 
@@ -159,6 +164,9 @@ Supported periods: current cycle, previous cycle, last 3 cycles, last 6 cycles, 
 | S-AIQ-16 | Request has an unknown question kind or period | Request is sent | Rejected as invalid input (4xx) | Validation error |
 | S-AIQ-17 | Stored data temporarily unreachable | Any question | System error (5xx)<br>and the chat shows an error bubble with retry | System error |
 | S-AIQ-18 | A Transaction was soft-deleted | Asks Q1 | The deleted Transaction is not counted | Soft delete |
+| S-AIQ-49 | Today is 28/09; Transactions at 00:30 and 23:50 local time on 28/09, and at 23:50 on 27/09 | Asks Q1 for the single day 28/09 | The total counts the two 28/09 Transactions only<br>and the period label reads "28/09 (so far)" | Timezone rule, A-05, EC-04 |
+| S-AIQ-50 | More expenses today than the standard list length | Asks Q5 with no count, for today | The standard number of largest expenses are listed, largest first<br>and the answer says how many matched in total | A-06, EC-05 |
+| S-AIQ-51 | Fewer expenses today than the count asked for | Asks Q5 with that count, for today | Every expense of the day is listed | Never padded, never an error |
 
 ### Edge Cases
 1. **EC-04** — **Periods not yet complete** (current cycle, this week) are labelled as "so far", never projected forward.
@@ -226,6 +234,15 @@ Read-only. The same question over unchanged data always returns the same figures
 | S-AIQ-30 | Question is an evaluation or what-if ("tháng này tiêu nhiều không", "cắt cafe 50% thì sao") | Question sent | A message says evaluations and what-if scenarios are coming later<br>and offers the closest supported question as a chip | Covered by later US-04 / US-05 of Feature-12 |
 | S-AIQ-31 | Question is a Transaction description ("cafe 50k") while in analysis mode | Question sent | Treated as a question that cannot be answered<br>and a chip offers switching to record-Transaction mode | No Transaction is ever created from analysis mode |
 | S-AIQ-32 | Empty or over-length text | User sends | Rejected as invalid input (4xx) before interpretation | Validation error |
+| S-AIQ-52 | Analysis mode, today is 28/09 | User types "hôm nay tiêu bao nhiêu" | Answered as Q1 for the single day 28/09 | A-05 |
+| S-AIQ-53 | Analysis mode | User types "hôm nay tiêu những gì" | Answered as Q5 with no count, for today | A-06 |
+| S-AIQ-54 | Analysis mode | User types "đã chi những khoản nào hôm nay" | Answered as Q5 with no count, for today | A-06 |
+| S-AIQ-55 | Analysis mode | User types "tiền đi đâu hôm nay" | Answered as Q2 (breakdown by Category) for today | "Tiền đi đâu" stays Q2 whatever the period |
+| S-AIQ-56 | Analysis mode, today is 28/09 | User types "hom qua tieu nhung gi" (no accents) | Answered as Q5 with no count, for 27/09 | Accentless input |
+| S-AIQ-57 | Analysis mode | User types "hnay chi bn" or "bữa nay xài nhiêu" | Answered as Q1 for today | Shorthand and Southern "bữa nay" = today, while "mấy bữa nay" stays "recently" (last 30 days) |
+| S-AIQ-58 | Analysis mode, today is 28/09 | User types "hôm kia tiêu bao nhiêu" | Answered as Q1 for 26/09 | A-05 |
+| S-AIQ-59 | Analysis mode, today is 28/09/2026 | User types "ngày 15/9 chi bao nhiêu" | Answered as Q1 for 15/09/2026 | Year-less date = most recent not after today (A-05) |
+| S-AIQ-60 | The interpretation of a question falls outside the catalog (a period or question kind the System does not support) | Question sent | Treated as out of scope (S-AIQ-28)<br>and **never** as "temporarily unavailable" (S-AIQ-40)<br>and no figures are shown | The misleading reply seen in live use |
 
 ### Edge Cases
 1. **EC-11** — ⚠️ **Any part of the question not covered by the interpretation** (an unmatched Category, an extra condition) means the System must not answer from the covered part alone — it either asks for clarification or says it cannot answer.
@@ -234,6 +251,13 @@ Read-only. The same question over unchanged data always returns the same figures
 4. **EC-14** — **User with many Categories** → matching considers the User's most-used Categories over recent cycles plus all Categories named explicitly; a Category outside that set can still be picked from the low-confidence list.
 5. **EC-15** — **Personal pronouns and filler words** ("tôi", "mình", "t") are ignored; every question is about the logged-in User.
 6. **EC-16** — **Very slow interpretation** → times out and follows the US-05 degradation path instead of hanging.
+7. **EC-29** — **A day after today** ("ngày mai tiêu gì", "ngày 30/9" when today is 28/09) → out of scope in this release, with a chip for today. The answer shows no figures, not even Transactions already dated in the future (Out of Scope #6).
+8. **EC-30** — **A date that does not exist** ("ngày 31/2") → out of scope, with a chip for today. It is never moved to a nearby valid date.
+9. **EC-31** — ⚠️ **A part of a day** ("sáng nay", "tối qua", "trưa nay") → partial understanding (EC-11). The System must not answer with the whole day's total, because that is a plausible, wrong number.
+10. **EC-32** — **Comparing single days** ("hôm nay so với hôm qua") → out of scope in this release, with a chip for Q1 for today. It is never answered as a comparison of spending cycles (Open Question #7).
+11. **EC-33** — **A single day with a multi-period kind** ("hôm nay theo từng tháng") → partial understanding (EC-11). The day is never dropped to answer the multi-period question alone.
+12. **EC-34** — **Q11 for a single day** → answered. By A-03 the average equals that day's total, and the summary still states the day count. A day with no expense gets the empty state (S-AIQ-14).
+13. **EC-35** — **Q13 for a single day** → answered with the EC-08 notice that the period is too short to show a pattern.
 
 ### UI states
 - **Loading:** typing indicator.
@@ -244,6 +268,8 @@ Read-only. The same question over unchanged data always returns the same figures
 
 ### Definition of Done
 - A labelled set of at least 100 Vietnamese questions (with accents, without accents, shorthand, misspellings, vague periods, evaluation-vs-query boundary, unsupported) is committed, and interpretation is measured against it by comparing the structured question, never the wording of the answer.
+- The labelled set includes at least 12 single-day and listing questions: today, "bữa nay", yesterday, the day before yesterday and a named date, each with and without accents and in shorthand ("hnay", "hqua"). It also includes the EC-29→EC-33 boundaries. All of them are measured the same structural way, and S-AIQ-52→S-AIQ-59 pass.
+- S-AIQ-60 passes: an interpretation outside the catalog produces the out-of-scope reply, verified with a crafted out-of-catalog interpretation.
 - S-AIQ-27 passes: no partial-understanding answer across the whole set.
 - Out-of-scope, context-dependent and evaluation/what-if questions never show figures.
 - Recording Transactions via chat has no regression (the existing chat test set still passes).
@@ -426,3 +452,6 @@ Append-only; one record per received free-text question.
 3. **Starter chip set** — which 3–4 questions appear first. Proposal: Q1, Q2, Q9, Q10.
 4. **Currency switch** — should a User with several currencies get a chip to re-ask in another currency (A-01)? Proposal: yes, as a follow-up chip.
 5. **Consult-mode availability before cycle window ships** — confirm the mode stays disabled until F-13.1 US-03 is live, rather than shipping calendar-month answers first.
+6. **Order of a listing answer** (A-06) — "hôm nay tiêu những gì" may read more naturally in time order than by amount. Proposal: keep amount order for now, because it is the existing Q5 behavior and needs no new question kind. Revisit using the question log.
+7. **Single-day comparison** (EC-32) — "hôm nay so với hôm qua" needs a previous period for an explicit date range. Proposal: leave it out of scope until the question log shows real demand.
+8. **Interpretation capacity** — the AI provider's current plan allows only a few free-text questions per minute across **all** Users combined, and that allowance is shared with recording Transactions via chat. US-05 protects recording by degrading questions first, so at modest real use most free-text questions would show the "temporarily unavailable" notice. Decide: a higher provider plan, a separate allowance for questions, or accept the limit for now. This is a cost decision, not a technical one.
