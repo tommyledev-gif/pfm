@@ -10,8 +10,9 @@ import (
 )
 
 // LimitEntryResponse is one currency's limit plus its computed spend status
-// (spec.md Response Shape, US-02). Spent/Remaining are currently always 0/
-// full-limit — see model.BudgetLimit's doc comment (Finding #1 / BUD-T17).
+// (spec.md Response Shape, US-02). Spent/Remaining are real, computed over
+// the caller's current spending cycle (BUD-T17; cycle window since
+// specs/ai-budget-wizard-v2 US-03).
 type LimitEntryResponse struct {
 	Currency    string `json:"currency"`
 	AmountLimit int64  `json:"amount_limit"`

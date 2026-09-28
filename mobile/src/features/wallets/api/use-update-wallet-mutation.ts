@@ -11,7 +11,8 @@ export interface UpdateWalletRequest {
   type?: WalletType;
   currency?: WalletCurrency;
   icon?: string;
-  icon_url?: string;
+  // null clears an uploaded photo (backend OptionalString); omitted leaves it.
+  icon_url?: string | null;
 }
 
 export function useUpdateWalletMutation() {

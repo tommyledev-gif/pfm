@@ -24,11 +24,12 @@ import (
 type NotificationService struct {
 	repo       NotificationRepo
 	budgetRepo BudgetRepo
+	cycles     *CycleResolver
 	logger     *zap.Logger
 }
 
-func NewNotificationService(repo NotificationRepo, budgetRepo BudgetRepo, logger *zap.Logger) *NotificationService {
-	return &NotificationService{repo: repo, budgetRepo: budgetRepo, logger: logger}
+func NewNotificationService(repo NotificationRepo, budgetRepo BudgetRepo, cycles *CycleResolver, logger *zap.Logger) *NotificationService {
+	return &NotificationService{repo: repo, budgetRepo: budgetRepo, cycles: cycles, logger: logger}
 }
 
 // EvaluateBudgets implements US-00 — the scheduled background job
@@ -45,9 +46,8 @@ func (s *NotificationService) EvaluateBudgets(ctx context.Context) {
 		return
 	}
 
-	periodStart := currentPeriodStart()
 	for _, userID := range userIDs {
-		if err := s.evaluateBudgetsForUser(ctx, userID, periodStart); err != nil {
+		if err := s.evaluateBudgetsForUser(ctx, userID); err != nil {
 			// One user's failure must not stop the rest of the run — there is
 			// no HTTP caller to fail this back to (spec.md US-00).
 			s.logger.Error("notification job: failed to evaluate user's budgets",
@@ -56,15 +56,25 @@ func (s *NotificationService) EvaluateBudgets(ctx context.Context) {
 	}
 }
 
-func (s *NotificationService) evaluateBudgetsForUser(ctx context.Context, userID uuid.UUID, periodStart time.Time) error {
+// evaluateBudgetsForUser resolves the window per User, not once per run:
+// since specs/ai-budget-wizard-v2 US-03 each User's cycle can start on a
+// different day. The dedup period is that cycle's first local date, so a
+// User whose cycle starts on the 1st keeps exactly the period_start values
+// the old calendar-month job wrote — no duplicate notification on deploy.
+func (s *NotificationService) evaluateBudgetsForUser(ctx context.Context, userID uuid.UUID) error {
 	budgets, err := s.budgetRepo.ListBudgetsByUser(ctx, userID)
 	if err != nil {
 		return fmt.Errorf("service.evaluateBudgetsForUser: %w", err)
 	}
-	spentByCategory, err := s.budgetRepo.SpentByUserCurrentPeriod(ctx, userID)
+	window, err := s.cycles.Current(ctx, userID)
 	if err != nil {
 		return fmt.Errorf("service.evaluateBudgetsForUser: %w", err)
 	}
+	spentByCategory, err := s.budgetRepo.SpentByUserInWindow(ctx, userID, window.Start, window.End)
+	if err != nil {
+		return fmt.Errorf("service.evaluateBudgetsForUser: %w", err)
+	}
+	periodStart := window.StartDate(s.cycles.Location())
 
 	for _, budget := range budgets {
 		spentByCurrency := spentByCategory[budget.CategoryID]
@@ -114,16 +124,6 @@ func buildBudgetExceededNotification(categoryName, currency string, amountLimit,
 	body = fmt.Sprintf("You've spent %s against a %s monthly limit for %s.",
 		common.FormatCents(spent, currency), common.FormatCents(amountLimit, currency), categoryName)
 	return title, body
-}
-
-// currentPeriodStart is the first day of the calendar month containing "now"
-// (UTC) — mirrors Budget's own period-window convention
-// (specs/budget-management/spec.md Context decision #3), computed once per
-// job run in Go rather than per-query in SQL, since every user in one run
-// shares the same period.
-func currentPeriodStart() time.Time {
-	now := time.Now().UTC()
-	return time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
 }
 
 // ListNotifications implements US-01 — strictly scoped to the caller

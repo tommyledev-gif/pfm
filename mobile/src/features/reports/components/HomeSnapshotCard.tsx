@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 import { Card } from "@/components/ui/Card";
 import { LiquidCircle } from "@/components/shared/LiquidCircle";
 import { SnapshotCardSkeleton } from "@/components/shared/SnapshotCardSkeleton";
 import { SnapshotProgressRow } from "@/components/shared/SnapshotProgressRow";
+import { RowPlaceholders, SnapshotHeader } from "@/features/reports/components/SnapshotColumnParts";
 import { colorForCategory } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
 import { colors, radii, spacing, typography } from "@/lib/theme";
@@ -22,6 +23,12 @@ import { ReportCategoryEntry } from "@/features/reports/types";
 // that "Đã chi" and the figure ran into each other and into the fill's edge.
 const RING_MIN_SIZE = 84;
 const RING_MAX_SIZE = 132;
+// ⚠️ The card must keep ONE height across the Ngày / Tháng / Năm tabs —
+// the list below it jumping up and down on every tab switch read as the
+// screen reflowing. So the right column always reserves this many rows
+// (padding with invisible copies), and the left column always reserves its
+// status line, whether or not the active tab has anything to put there.
+const RIGHT_COLUMN_ROWS = 3;
 
 export interface AtRiskBudgetRow {
   budget: Budget;
@@ -77,6 +84,9 @@ export function HomeSnapshotCard({
   // Measured rather than assumed — see RING_MIN_SIZE. Zero until the first
   // layout pass, which clamps to the floor for that one frame.
   const [ringColumnWidth, setRingColumnWidth] = useState(0);
+  // Belt-and-braces for the reserved slots above: the tallest the content has
+  // been is kept as its minimum, so no tab can ever make the card shrink.
+  const [contentMinHeight, setContentMinHeight] = useState(0);
   const ringSize = Math.min(RING_MAX_SIZE, Math.max(RING_MIN_SIZE, ringColumnWidth));
   const isOverBudget = Boolean(budgetSnapshot && periodSpent > budgetSnapshot.limit);
 
@@ -103,10 +113,18 @@ export function HomeSnapshotCard({
 
   return (
     <Card style={styles.card} radius={radii.hero}>
-      {loading ? (
-        <SnapshotCardSkeleton />
-      ) : (
-        <>
+      {/* ⚠️ While loading, the REAL layout still renders — invisibly — with the
+          skeleton laid over it. A separately-built skeleton could only ever
+          approximate the card's height (the ring is measured, the rows have
+          their own padding), so the card grew or shrank the moment data
+          arrived. Rendering the real thing underneath makes the loading and
+          loaded card exactly the same height by construction. */}
+      <View>
+        <View
+          style={[styles.body, loading && styles.hidden]}
+          pointerEvents={loading ? "none" : "auto"}
+          importantForAccessibility={loading ? "no-hide-descendants" : "auto"}
+        >
           {/* In flow and right-aligned, not pinned to the corner — the trend
               text's length varies with the amount, and a fixed overlay
               collided with the column below it for all but the shortest. */}
@@ -120,7 +138,13 @@ export function HomeSnapshotCard({
             </Text>
           </View>
 
-          <View style={styles.row}>
+          <View
+            style={[styles.row, { minHeight: contentMinHeight }]}
+            onLayout={(e) => {
+              const height = e.nativeEvent.layout.height;
+              setContentMinHeight((prev) => (height > prev ? height : prev));
+            }}
+          >
             <View style={styles.left} onLayout={(e) => setRingColumnWidth(e.nativeEvent.layout.width)}>
               <LiquidCircle
                 size={ringSize}
@@ -149,13 +173,12 @@ export function HomeSnapshotCard({
                     : "—"}
               </Text>
               {isDay ? (
-                budgetSnapshot ? (
-                  // Said plainly so the figure is not mistaken for a hard cap
-                  // — it is the month's remainder spread over the days left.
-                  <Text style={styles.status} numberOfLines={2}>
-                    Còn {daysLeft} ngày trong tháng
-                  </Text>
-                ) : null
+                // Said plainly so the figure is not mistaken for a hard cap
+                // — it is the month's remainder spread over the days left.
+                // Rendered empty rather than omitted — see RIGHT_COLUMN_ROWS.
+                <Text style={styles.status} numberOfLines={2}>
+                  {budgetSnapshot ? `Còn ${daysLeft} ngày trong tháng` : " "}
+                </Text>
               ) : budgetSnapshot ? (
                 // In-budget stays muted: the figure above it is already green,
                 // and repeating the colour on the line below it made the two
@@ -167,7 +190,9 @@ export function HomeSnapshotCard({
                 >
                   {isOverBudget ? "Vượt ngân sách" : "Trong ngân sách"}
                 </Text>
-              ) : null}
+              ) : (
+                <Text style={styles.status}> </Text>
+              )}
             </View>
 
             {isDay && atRiskBudgets.length > 0 ? (
@@ -189,6 +214,7 @@ export function HomeSnapshotCard({
                     pace={elapsed}
                   />
                 ))}
+                <RowPlaceholders count={RIGHT_COLUMN_ROWS - atRiskBudgets.length} />
               </View>
             ) : topCategories.length > 0 ? (
               <View style={styles.right}>
@@ -211,32 +237,35 @@ export function HomeSnapshotCard({
                     />
                   );
                 })}
+                <RowPlaceholders count={RIGHT_COLUMN_ROWS - topCategories.length} />
               </View>
-            ) : null}
+            ) : (
+              <View style={styles.right}>
+                <SnapshotHeader title="Chi nhiều nhất" onPressAll={onOpenInsights} />
+                {/* Laid over a full set of placeholder rows, so an empty period
+                    is exactly as tall as a full one. */}
+                <View>
+                  <RowPlaceholders count={RIGHT_COLUMN_ROWS} />
+                  <Text style={styles.emptyRight}>Chưa có khoản chi nào trong kỳ này.</Text>
+                </View>
+              </View>
+            )}
           </View>
-        </>
-      )}
+        </View>
+        {loading ? (
+          <View style={StyleSheet.absoluteFill} pointerEvents="none">
+            <SnapshotCardSkeleton />
+          </View>
+        ) : null}
+      </View>
     </Card>
-  );
-}
-
-function SnapshotHeader({ title, onPressAll }: { title: string; onPressAll: () => void }) {
-  return (
-    <View style={styles.compactHeaderRow}>
-      <Text style={styles.compactTitle} numberOfLines={2}>
-        {title}
-      </Text>
-      <Pressable onPress={onPressAll} hitSlop={8}>
-        <Text style={styles.compactSeeAll} numberOfLines={1}>
-          Xem tất cả
-        </Text>
-      </Pressable>
-    </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: { gap: spacing.md },
+  body: { gap: spacing.md },
+  hidden: { opacity: 0 },
   // A translucent tinted pill, not a solid fill — a loud block read as jarring
   // against the rest of this dark, low-saturation card.
   trendBadge: {
@@ -246,25 +275,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     borderRadius: radii.pill,
     borderWidth: 1,
+    borderColor: colors.navBorder,
   },
   trendNegative: { backgroundColor: "rgba(255,158,150,0.12)", borderColor: "rgba(255,158,150,0.35)" },
   trendPositive: { backgroundColor: "rgba(133,255,51,0.1)", borderColor: "rgba(133,255,51,0.3)" },
   trendLabel: { ...typography.tiny },
-  row: { flexDirection: "row", gap: spacing.md, alignItems: "flex-start" },
+  row: { flexDirection: "row", gap: spacing.md, alignItems: "flex-start",  },
   // A 4/8 split, widened from 3/9: the meters are still the thing being read,
   // but 3/12 left the ring column narrower than its own contents. Both need a
   // zero minimum — with no floor, a long category name would widen the right
   // column and squeeze the left one below its measured width.
   left: { flex: 6, minWidth: 0, alignItems: "center", gap: 2 },
   right: { flex: 6, gap: 2, minWidth: 0 },
-  compactHeaderRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: spacing.xs,
-  },
-  compactTitle: { ...typography.label, color: colors.textPrimary, flexShrink: 1 },
-  compactSeeAll: { ...typography.tiny, color: colors.green, flexShrink: 0 },
   // Stepped down and centered: at 3/12 the column is about eleven characters.
   remainingLabel: { ...typography.tiny, color: colors.textSecondary, marginTop: spacing.xs },
   // Color is set per render from the sign — see remainingColor.
@@ -273,4 +295,5 @@ const styles = StyleSheet.create({
   // already secondary, and two identical greys around the figure flattened the
   // block into one undifferentiated paragraph.
   status: { ...typography.tiny, color: colors.textMuted, textAlign: "center" },
+  emptyRight: { ...typography.tiny, color: colors.textMuted, position: "absolute", top: spacing.sm, left: 0, right: 0 },
 });

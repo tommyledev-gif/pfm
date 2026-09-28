@@ -11,7 +11,14 @@ type CategoryType string
 const (
 	CategoryTypeIncome  CategoryType = "income"
 	CategoryTypeExpense CategoryType = "expense"
+	// CategoryTypeTransfer exists for exactly one system Category (system_key
+	// SystemKeyTransfer), which the service assigns to every transfer. Users
+	// can never create one, and it never appears in category listings.
+	CategoryTypeTransfer CategoryType = "transfer"
 )
+
+// SystemKeyTransfer is the system_key of the Category every transfer uses.
+const SystemKeyTransfer = "transfer"
 
 // Category is the domain representation of the categories table. Zero
 // framework imports, same convention as model.Wallet. UserID nil means

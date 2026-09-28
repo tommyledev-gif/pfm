@@ -10,6 +10,17 @@ import (
 	"github.com/example/pfm/backend/internal/model"
 )
 
+// LockUserForBudgetReplace locks the caller's users row inside tx, so two
+// concurrent bulk-replaces serialize even when there are no Budgets for
+// LockBudgetsByUser to lock (docs/new-tasks.md I-4). Must be the first
+// statement of the replace transaction.
+func (r *BudgetRepository) LockUserForBudgetReplace(ctx context.Context, tx pgx.Tx, userID uuid.UUID) error {
+	if err := r.q.WithTx(tx).LockUserForBudgetReplace(ctx, userID); err != nil {
+		return fmt.Errorf("repository.LockUserForBudgetReplace: %w", err)
+	}
+	return nil
+}
+
 // LockBudgetsByUser takes a row lock on every one of userID's non-deleted
 // Budgets, inside the caller's transaction — closes the bulk-replace race
 // between two concurrent wizard submissions

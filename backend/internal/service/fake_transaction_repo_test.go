@@ -112,6 +112,7 @@ func (f *fakeTransactionRepo) CreateTransaction(_ context.Context, _ pgx.Tx, arg
 		OccurredAt: arg.OccurredAt,
 		CreatedAt:  now,
 		UpdatedAt:  now,
+		ToWalletID: arg.ToWalletID,
 	}
 	f.transactions[t.ID] = t
 	if arg.IdempotencyKey != nil {

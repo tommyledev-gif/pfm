@@ -1,68 +1,93 @@
-import { StyleSheet, View } from "react-native";
+import { Animated, StyleSheet, View } from "react-native";
 
 import { colors } from "@/lib/theme";
-import { OverspendHatch } from "@/features/budgets/components/OverspendHatch";
+import { useEntryAnimation } from "@/lib/use-entry-animation";
 
 interface BudgetProgressBarProps {
-  // spent / limit. Values above 1 are expected and drawn as a full bar whose
-  // tail is hatched — see OVERSPEND below.
+  // spent / limit. Values above 1 are expected — see OVER BUDGET below.
   ratio: number;
-  // 0..1 share of the month elapsed, drawn as a vertical tick. Omitted on the
+  // 0..1 share of the period elapsed, drawn as a vertical tick. Omitted on the
   // rows where a pace comparison is meaningless.
   pace?: number;
   color: string;
   height?: number;
 }
 
-// Width of the dark seam drawn wherever two coloured sections of the bar meet
-// (spent | remaining, and spent | overspend). Without it the fill bleeds into
-// the track as one continuous ramp and the boundary — the only thing this bar
-// exists to communicate — has to be inferred from a colour change alone.
+// Width of the dark seam drawn where two coloured sections of the bar meet.
+// Without it the two sections bleed into one ramp and the boundary — the one
+// thing this bar exists to show — has to be inferred from a colour change.
 const SEAM_WIDTH = 2;
 
-// A budget bar, which the plain ProgressBar can't express: it has to show
-// three things at once — how much is spent, where the month's pace marker
-// sits (so "80% used" reads differently on the 5th than on the 25th), and how
-// far past the limit an overspend went.
+// The budget's own share of the bar once it is overspent, drawn soft; the
+// overspend after it is drawn solid, so the loud part is the part that's wrong.
+const OVER_BASE_COLOR = "rgba(255,158,150,0.45)";
+const OVER_EXCESS_COLOR = colors.danger;
+
+// A budget bar, which the plain ProgressBar can't express: it shows how much
+// is spent, where the period's pace marker sits (so "80% used" reads
+// differently on the 5th than on the 25th), and how far past the limit an
+// overspend went.
 //
-// OVERSPEND: once ratio > 1 the track can't grow, so the bar is drawn full and
-// the *share of it that is overspend* is hatched at the tail. At ratio 1.2
-// that's 0.2/1.2 ≈ 17% of the bar, which reads as "a sixth of this was over"
-// without needing a second scale. The hatch drifts leftward on a seamless
-// loop — see OverspendHatch.
+// OVER BUDGET: ⚠️ the bar is always FULL once spent passes the limit. It used
+// to draw the in-budget part as a normal fill and only hatch the overspend
+// tail, so at 385% three-quarters of the bar was a pale diagonal pattern and
+// the solid part looked like "a quarter used" — the eye read the opposite of
+// the number printed under it. Now the track is entirely filled: the first
+// 1/ratio of it is the limit itself (soft coral), everything after the seam
+// is the overspend (solid red). Scale is relative to what was spent, so the
+// red share IS the overspent share. No pattern — solid colour carries it.
 export function BudgetProgressBar({ ratio, pace, color, height = 8 }: BudgetProgressBarProps) {
   const over = ratio > 1;
   const fill = Math.max(0, Math.min(1, ratio));
-  const overspendShare = over ? (ratio - 1) / ratio : 0;
+  // Where the limit falls along a full, overspent bar.
+  const limitMark = over ? 1 / ratio : 1;
   const radius = height / 2;
+  // First render: everything that represents spend grows in from the left
+  // edge together; the pace tick is a fact about the calendar and stays put.
+  const grow = useEntryAnimation();
+
+  // Pace is a share of the BUDGET, so once the bar's scale becomes "total
+  // spent" the tick has to shrink into the budget's own section with it.
+  const paceMark = pace === undefined ? undefined : Math.max(0, Math.min(1, pace)) * limitMark;
 
   return (
     <View style={[styles.track, { height, borderRadius: radius }]}>
-      <View style={[styles.fill, { width: `${fill * 100}%`, backgroundColor: color, borderRadius: radius }]} />
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.spend, { borderRadius: radius, transform: [{ scaleX: grow }] }]}
+      >
+        {over ? (
+          <>
+            <View
+              style={[styles.segment, { left: 0, width: `${limitMark * 100}%`, backgroundColor: OVER_BASE_COLOR }]}
+            />
+            <View
+              style={[styles.segment, { left: `${limitMark * 100}%`, right: 0, backgroundColor: OVER_EXCESS_COLOR }]}
+            />
+            <View
+              pointerEvents="none"
+              style={[styles.seam, { left: `${limitMark * 100}%`, marginLeft: -SEAM_WIDTH / 2 }]}
+            />
+          </>
+        ) : (
+          <>
+            <View
+              style={[
+                styles.segment,
+                { left: 0, width: `${fill * 100}%`, backgroundColor: color, borderRadius: radius },
+              ]}
+            />
+            {/* The spent | remaining seam. Only while the bar is partly full —
+                at 0% or 100% a floating dark tick reads as a defect. */}
+            {fill > 0 && fill < 1 ? (
+              <View pointerEvents="none" style={[styles.seam, { left: `${fill * 100}%`, marginLeft: -SEAM_WIDTH }]} />
+            ) : null}
+          </>
+        )}
+      </Animated.View>
 
-      {/* The spent | remaining seam. Only drawn while the bar is partly full —
-          at 0% there is nothing to its left and at 100% nothing to its right,
-          and in both cases a floating dark tick reads as a defect. */}
-      {fill > 0 && fill < 1 ? (
-        <View pointerEvents="none" style={[styles.seam, { left: `${fill * 100}%`, marginLeft: -SEAM_WIDTH }]} />
-      ) : null}
-
-      {over ? (
-        <View style={[styles.overspend, { width: `${overspendShare * 100}%` }]}>
-          <OverspendHatch radius={radius} />
-        </View>
-      ) : null}
-
-      {/* The spent | overspend seam, on the hatch's leading edge. */}
-      {over && overspendShare > 0 && overspendShare < 1 ? (
-        <View pointerEvents="none" style={[styles.seam, { right: `${overspendShare * 100}%` }]} />
-      ) : null}
-
-      {pace !== undefined ? (
-        <View
-          pointerEvents="none"
-          style={[styles.pace, { left: `${Math.max(0, Math.min(1, pace)) * 100}%`, height: height + 6, top: -3 }]}
-        />
+      {paceMark !== undefined ? (
+        <View pointerEvents="none" style={[styles.pace, { left: `${paceMark * 100}%`, height: height + 6, top: -3 }]} />
       ) : null}
     </View>
   );
@@ -70,12 +95,13 @@ export function BudgetProgressBar({ ratio, pace, color, height = 8 }: BudgetProg
 
 const styles = StyleSheet.create({
   track: { width: "100%", backgroundColor: colors.trackMuted, overflow: "visible", justifyContent: "center" },
-  fill: { position: "absolute", left: 0, top: 0, bottom: 0 },
+  // Clips the square segment ends to the bar's rounded shape.
+  spend: { ...StyleSheet.absoluteFillObject, overflow: "hidden", transformOrigin: "left" },
+  segment: { position: "absolute", top: 0, bottom: 0 },
   // Painted in the app background rather than left transparent: the track
   // underneath is a translucent white, so a hole would show the track, not a
   // gap. This has to be an opaque cut.
   seam: { position: "absolute", top: 0, bottom: 0, width: SEAM_WIDTH, backgroundColor: colors.bgApp },
-  overspend: { position: "absolute", right: 0, top: 0, bottom: 0 },
   // Sits proud of the bar on both edges so it stays legible over a filled
   // section as well as over the empty track.
   pace: { position: "absolute", width: 2, backgroundColor: colors.textSecondary, borderRadius: 1 },

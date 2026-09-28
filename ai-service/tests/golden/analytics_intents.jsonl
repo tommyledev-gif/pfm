@@ -1,0 +1,115 @@
+{"text": "tháng này tiêu bao nhiêu", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_cycle"}}
+{"text": "tháng trước tôi tiêu bao nhiêu", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "last_cycle"}}
+{"text": "tiền đi đâu hết rồi", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "breakdown", "period": "this_cycle", "group_by": "category"}}
+{"text": "tháng này chi vào những đâu", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "breakdown", "period": "this_cycle", "group_by": "category"}}
+{"text": "6 tháng qua tiêu thế nào theo từng tháng", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "series", "period": "last_6_cycles"}}
+{"text": "3 tháng gần đây mỗi tháng chi bao nhiêu", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "series", "period": "last_3_cycles"}}
+{"text": "ăn uống tháng này so với tháng trước", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "compare", "period": "this_cycle", "category_names": ["Ăn uống"]}}
+{"text": "chi tiêu tuần này so với tuần trước", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "compare", "period": "this_week"}}
+{"text": "5 khoản chi lớn nhất tháng này", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "top_n", "period": "this_cycle"}}
+{"text": "3 khoản chi lớn nhất tháng trước", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "top_n", "period": "last_cycle"}}
+{"text": "các khoản chi trên 1 triệu tuần này", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "top_n", "period": "this_week", "amount_min_vnd": 1000000}}
+{"text": "những khoản trên 500 nghìn tháng này", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "top_n", "period": "this_cycle", "amount_min_vnd": 500000}}
+{"text": "ví nào tiêu nhiều nhất", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "breakdown", "period": "this_cycle", "group_by": "wallet"}}
+{"text": "tháng này chi từ ví nào nhiều nhất", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "breakdown", "period": "this_cycle", "group_by": "wallet"}}
+{"text": "còn bao nhiêu ngân sách", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "budget_status", "period": "this_cycle"}}
+{"text": "ngân sách tháng này còn lại bao nhiêu", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "budget_status", "period": "this_cycle"}}
+{"text": "thu nhập tháng này", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_cycle", "tx_type": "income"}}
+{"text": "tháng trước nhận được bao nhiêu tiền lương", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "last_cycle", "tx_type": "income", "category_names": ["Lương"]}}
+{"text": "trung bình mỗi ngày tiêu bao nhiêu", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "avg_daily", "period": "this_cycle"}}
+{"text": "tháng trước trung bình một ngày chi bao nhiêu", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "avg_daily", "period": "last_cycle"}}
+{"text": "ăn uống 6 tháng qua thế nào", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "series", "period": "last_6_cycles", "category_names": ["Ăn uống"]}}
+{"text": "cà phê 3 tháng gần đây mỗi tháng bao nhiêu", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "series", "period": "last_3_cycles", "category_names": ["Cà phê"]}}
+{"text": "hay tiêu vào thứ mấy", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "breakdown", "period": "this_cycle", "group_by": "weekday"}}
+{"text": "tháng này ngày nào trong tuần chi nhiều nhất", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "breakdown", "period": "this_cycle", "group_by": "weekday"}}
+{"text": "khoản chi lớn nhất tháng này", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "max_tx", "period": "this_cycle"}}
+{"text": "khoản chi lớn nhất tuần này là gì", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "max_tx", "period": "this_week"}}
+{"text": "tháng này tiêu bao nhiêu cho ăn uống", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_cycle", "category_names": ["Ăn uống"]}}
+{"text": "tuần này đi lại hết bao nhiêu", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_week", "category_names": ["Di chuyển"]}}
+{"text": "từ ngày 1 đến ngày 15 tháng 9 năm 2026 tiêu bao nhiêu", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "custom"}}
+{"text": "mua sắm tháng này tốn bao nhiêu", "group": "accented", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_cycle", "category_names": ["Mua sắm"]}}
+{"text": "thang nay tieu bao nhieu", "group": "accentless", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_cycle"}}
+{"text": "thang nay tieu bao nhieu cho an uong", "group": "accentless", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_cycle", "category_names": ["Ăn uống"]}}
+{"text": "thang truoc chi bao nhieu", "group": "accentless", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "last_cycle"}}
+{"text": "tien di dau het roi", "group": "accentless", "expected": {"kind": "query", "coverage": "full", "metric": "breakdown", "period": "this_cycle", "group_by": "category"}}
+{"text": "6 thang qua tieu the nao", "group": "accentless", "expected": {"kind": "query", "coverage": "full", "metric": "series", "period": "last_6_cycles"}}
+{"text": "an uong thang nay so voi thang truoc", "group": "accentless", "expected": {"kind": "query", "coverage": "full", "metric": "compare", "period": "this_cycle", "category_names": ["Ăn uống"]}}
+{"text": "5 khoan chi lon nhat thang nay", "group": "accentless", "expected": {"kind": "query", "coverage": "full", "metric": "top_n", "period": "this_cycle"}}
+{"text": "chi tren 1 trieu tuan nay", "group": "accentless", "expected": {"kind": "query", "coverage": "full", "metric": "top_n", "period": "this_week", "amount_min_vnd": 1000000}}
+{"text": "vi nao tieu nhieu nhat", "group": "accentless", "expected": {"kind": "query", "coverage": "full", "metric": "breakdown", "period": "this_cycle", "group_by": "wallet"}}
+{"text": "con bao nhieu ngan sach", "group": "accentless", "expected": {"kind": "query", "coverage": "full", "metric": "budget_status", "period": "this_cycle"}}
+{"text": "thu nhap thang nay bao nhieu", "group": "accentless", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_cycle", "tx_type": "income"}}
+{"text": "trung binh moi ngay tieu bao nhieu", "group": "accentless", "expected": {"kind": "query", "coverage": "full", "metric": "avg_daily", "period": "this_cycle"}}
+{"text": "hay tieu vao thu may", "group": "accentless", "expected": {"kind": "query", "coverage": "full", "metric": "breakdown", "period": "this_cycle", "group_by": "weekday"}}
+{"text": "khoan chi lon nhat thang nay", "group": "accentless", "expected": {"kind": "query", "coverage": "full", "metric": "max_tx", "period": "this_cycle"}}
+{"text": "ca phe thang nay het bao nhieu", "group": "accentless", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_cycle", "category_names": ["Cà phê"]}}
+{"text": "di chuyen thang truoc bao nhieu", "group": "accentless", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "last_cycle", "category_names": ["Di chuyển"]}}
+{"text": "tuan nay tieu bao nhieu", "group": "accentless", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_week"}}
+{"text": "3 thang qua moi thang chi bao nhieu", "group": "accentless", "expected": {"kind": "query", "coverage": "full", "metric": "series", "period": "last_3_cycles"}}
+{"text": "mua sam 6 thang qua the nao", "group": "accentless", "expected": {"kind": "query", "coverage": "full", "metric": "series", "period": "last_6_cycles", "category_names": ["Mua sắm"]}}
+{"text": "thang truoc nhan luong bao nhieu", "group": "accentless", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "last_cycle", "tx_type": "income", "category_names": ["Lương"]}}
+{"text": "tien nha thang nay bao nhieu", "group": "accentless", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_cycle", "category_names": ["Nhà ở"]}}
+{"text": "hoa don thang nay het bao nhieu", "group": "accentless", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_cycle", "category_names": ["Hoá đơn"]}}
+{"text": "tuan nay so voi tuan truoc chi bao nhieu", "group": "accentless", "expected": {"kind": "query", "coverage": "full", "metric": "compare", "period": "this_week"}}
+{"text": "cac khoan tren 500k thang nay", "group": "accentless", "expected": {"kind": "query", "coverage": "full", "metric": "top_n", "period": "this_cycle", "amount_min_vnd": 500000}}
+{"text": "giai tri thang nay tieu bao nhieu", "group": "accentless", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_cycle", "category_names": ["Giải trí"]}}
+{"text": "thang nay tiu bn", "group": "teencode", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_cycle"}}
+{"text": "t tieu bn thang nay", "group": "teencode", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_cycle"}}
+{"text": "thg nay chi bn", "group": "teencode", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_cycle"}}
+{"text": "thg trc tiu bn", "group": "teencode", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "last_cycle"}}
+{"text": "an uong thg nay bn", "group": "teencode", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_cycle", "category_names": ["Ăn uống"]}}
+{"text": "cf thang nay het bn", "group": "teencode", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_cycle", "category_names": ["Cà phê"]}}
+{"text": "tien di dau j het r", "group": "teencode", "expected": {"kind": "query", "coverage": "full", "metric": "breakdown", "period": "this_cycle", "group_by": "category"}}
+{"text": "con bn ngan sach", "group": "teencode", "expected": {"kind": "query", "coverage": "full", "metric": "budget_status", "period": "this_cycle"}}
+{"text": "mk tiu bn tuan nay", "group": "teencode", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_week"}}
+{"text": "chi tren 50k tuan nay", "group": "teencode", "expected": {"kind": "query", "coverage": "full", "metric": "top_n", "period": "this_week", "amount_min_vnd": 50000}}
+{"text": "khoan tren 1tr thg nay", "group": "teencode", "expected": {"kind": "query", "coverage": "full", "metric": "top_n", "period": "this_cycle", "amount_min_vnd": 1000000}}
+{"text": "khoan tren 1tr5 thang nay", "group": "teencode", "expected": {"kind": "query", "coverage": "full", "metric": "top_n", "period": "this_cycle", "amount_min_vnd": 1500000}}
+{"text": "vi nao tiu nhiu nhat", "group": "teencode", "expected": {"kind": "query", "coverage": "full", "metric": "breakdown", "period": "this_cycle", "group_by": "wallet"}}
+{"text": "tb 1 ngay tiu bn", "group": "teencode", "expected": {"kind": "query", "coverage": "full", "metric": "avg_daily", "period": "this_cycle"}}
+{"text": "hay tiu vao thu may v", "group": "teencode", "expected": {"kind": "query", "coverage": "full", "metric": "breakdown", "period": "this_cycle", "group_by": "weekday"}}
+{"text": "6 thg qua tiu ntn", "group": "teencode", "expected": {"kind": "query", "coverage": "full", "metric": "series", "period": "last_6_cycles"}}
+{"text": "luong thg nay dc bn", "group": "teencode", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_cycle", "tx_type": "income", "category_names": ["Lương"]}}
+{"text": "an uong thg nay vs thg trc", "group": "teencode", "expected": {"kind": "query", "coverage": "full", "metric": "compare", "period": "this_cycle", "category_names": ["Ăn uống"]}}
+{"text": "top 3 khoan chi thg nay", "group": "teencode", "expected": {"kind": "query", "coverage": "full", "metric": "top_n", "period": "this_cycle"}}
+{"text": "khoan to nhat thg nay la j", "group": "teencode", "expected": {"kind": "query", "coverage": "full", "metric": "max_tx", "period": "this_cycle"}}
+{"text": "tháng nay tieu bao nhiu", "group": "misspelled", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_cycle"}}
+{"text": "thángg này tiêu bao nhiêu", "group": "misspelled", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_cycle"}}
+{"text": "tháng trươc tiêu bao nhieu", "group": "misspelled", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "last_cycle"}}
+{"text": "tiền đi đau hết rồi", "group": "misspelled", "expected": {"kind": "query", "coverage": "full", "metric": "breakdown", "period": "this_cycle", "group_by": "category"}}
+{"text": "ăn uông tháng này bao nhiêu", "group": "misspelled", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_cycle", "category_names": ["Ăn uống"]}}
+{"text": "còn bao nhiu ngân sach", "group": "misspelled", "expected": {"kind": "query", "coverage": "full", "metric": "budget_status", "period": "this_cycle"}}
+{"text": "thu nhâp tháng này", "group": "misspelled", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_cycle", "tx_type": "income"}}
+{"text": "khoản chi lơn nhất tháng này", "group": "misspelled", "expected": {"kind": "query", "coverage": "full", "metric": "max_tx", "period": "this_cycle"}}
+{"text": "vi nào tiêu nhiu nhất", "group": "misspelled", "expected": {"kind": "query", "coverage": "full", "metric": "breakdown", "period": "this_cycle", "group_by": "wallet"}}
+{"text": "trung bình mổi ngày tiêu bao nhiêu", "group": "misspelled", "expected": {"kind": "query", "coverage": "full", "metric": "avg_daily", "period": "this_cycle"}}
+{"text": "bữa h tiêu bao nhiêu", "group": "vague_time", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "last_30_days"}}
+{"text": "dạo này tiêu bao nhiêu", "group": "vague_time", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "last_30_days"}}
+{"text": "mấy bữa nay chi vào đâu", "group": "vague_time", "expected": {"kind": "query", "coverage": "full", "metric": "breakdown", "period": "last_30_days", "group_by": "category"}}
+{"text": "gần đây ăn uống hết bao nhiêu", "group": "vague_time", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "last_30_days", "category_names": ["Ăn uống"]}}
+{"text": "30 ngày qua tiêu bao nhiêu", "group": "vague_time", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "last_30_days"}}
+{"text": "dạo này trung bình mỗi ngày chi bao nhiêu", "group": "vague_time", "expected": {"kind": "query", "coverage": "full", "metric": "avg_daily", "period": "last_30_days"}}
+{"text": "tiêu bao nhiêu rồi", "group": "vague_time", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_cycle"}}
+{"text": "từ Tết tới giờ tiêu bao nhiêu", "group": "vague_time", "expected": {"kind": "unsupported"}}
+{"text": "đầu tháng tới giờ chi bao nhiêu", "group": "vague_time", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_cycle"}}
+{"text": "dạo này khoản chi lớn nhất là gì", "group": "vague_time", "expected": {"kind": "query", "coverage": "full", "metric": "max_tx", "period": "last_30_days"}}
+{"text": "tháng này tiêu nhiều không", "group": "query_vs_evaluate", "expected": {"kind": "evaluate"}}
+{"text": "ăn uống tháng này so tháng trước có tăng nhiều không", "group": "query_vs_evaluate", "expected": {"kind": "evaluate"}}
+{"text": "đánh giá chi tiêu tháng này", "group": "query_vs_evaluate", "expected": {"kind": "evaluate"}}
+{"text": "thói quen chi tiêu của tôi thế nào", "group": "query_vs_evaluate", "expected": {"kind": "evaluate"}}
+{"text": "tháng này chi tiêu ổn không", "group": "query_vs_evaluate", "expected": {"kind": "evaluate"}}
+{"text": "cắt cà phê 50% thì dư bao nhiêu", "group": "query_vs_evaluate", "expected": {"kind": "scenario"}}
+{"text": "muốn mua laptop 25 triệu thì bao lâu", "group": "query_vs_evaluate", "expected": {"kind": "scenario"}}
+{"text": "còn tháng trước?", "group": "query_vs_evaluate", "expected": {"kind": "needs_context"}}
+{"text": "thế còn ăn uống?", "group": "query_vs_evaluate", "expected": {"kind": "needs_context"}}
+{"text": "cafe 50k", "group": "query_vs_evaluate", "expected": {"kind": "transaction_like"}}
+{"text": "nên đầu tư gì", "group": "unsupported", "expected": {"kind": "unsupported"}}
+{"text": "có khoản nào bất thường không", "group": "unsupported", "expected": {"kind": "unsupported"}}
+{"text": "đang trả subscription nào", "group": "unsupported", "expected": {"kind": "unsupported"}}
+{"text": "so với người khác tôi tiêu nhiều không", "group": "unsupported", "expected": {"kind": "unsupported"}}
+{"text": "cuối tháng còn bao nhiêu", "group": "unsupported", "expected": {"kind": "unsupported"}}
+{"text": "tốn bao nhiêu cho Grab", "group": "unsupported", "expected": {"kind": "unsupported"}}
+{"text": "tháng này tiêu bao nhiêu cho ăn uống ở quận 1", "group": "unsupported", "expected": {"kind": "query", "coverage": "partial"}}
+{"text": "chi bao nhiêu cho mẹ tháng này", "group": "unsupported", "expected": {"kind": "unsupported"}}
+{"text": "thời tiết hôm nay thế nào", "group": "unsupported", "expected": {"kind": "unsupported"}}
+{"text": "mua vàng có lời không", "group": "unsupported", "expected": {"kind": "unsupported"}}

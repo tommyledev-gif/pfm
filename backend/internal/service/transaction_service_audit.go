@@ -70,6 +70,9 @@ func auditSnapshot(t *model.Transaction) map[string]any {
 		"type":        string(t.Type),
 		"occurred_at": t.OccurredAt,
 	}
+	if t.ToWalletID != nil {
+		snapshot["to_wallet_id"] = *t.ToWalletID
+	}
 	if t.Note != nil {
 		snapshot["note"] = *t.Note
 	} else {

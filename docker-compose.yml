@@ -39,6 +39,8 @@ services:
       # exactly what happens when only one of the two lists is updated.
       - ./backend/db/migrations/019_categories_system_key.sql:/docker-entrypoint-initdb.d/19_categories_system_key.sql:ro
       - ./backend/db/migrations/020_budget_plans.sql:/docker-entrypoint-initdb.d/20_budget_plans.sql:ro
+      # Feature-12 US-03 (specs/ai-chat-query-spending/plan.md AIQ-T11).
+      - ./backend/db/migrations/021_intent_parse_log.sql:/docker-entrypoint-initdb.d/21_intent_parse_log.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s

@@ -2,6 +2,8 @@ import { ReactNode, useEffect, useRef, useState } from "react";
 import { Animated, BackHandler, Dimensions, Pressable, ScrollView, StyleSheet, View } from "react-native";
 
 import { DrawerChildPanel } from "@/components/shared/DrawerChildPanel";
+import { SheetHandle } from "@/components/shared/SheetHandle";
+import { useSheetDrag } from "@/components/shared/use-sheet-drag";
 import { colors, radii, spacing } from "@/lib/theme";
 import { useKeyboardHeight } from "@/lib/use-keyboard-height";
 import { useSheetStore } from "@/stores/sheet-store";
@@ -91,6 +93,9 @@ export function Drawer({ visible, onClose, children, footer, child }: DrawerProp
   const [rendered, setRendered] = useState(visible);
   const translateY = useRef(new Animated.Value(visible ? 0 : OFFSCREEN_Y)).current;
   const backdropOpacity = useRef(new Animated.Value(visible ? 1 : 0)).current;
+  // Grab-handle drag: down past half the height closes, up expands to max.
+  const drag = useSheetDrag({ translateY, onClose });
+  const { collapse } = drag;
 
   // Rendering in-tree (rather than through <Modal>, see the note above) has
   // one consequence the original version missed: an absolutely-positioned
@@ -132,7 +137,10 @@ export function Drawer({ visible, onClose, children, footer, child }: DrawerProp
         Animated.timing(backdropOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
         Animated.timing(translateY, { toValue: OFFSCREEN_Y, duration: 220, useNativeDriver: true }),
       ]).start(({ finished }) => {
-        if (finished) setRendered(false);
+        if (!finished) return;
+        setRendered(false);
+        // Every open starts at the resting height, not wherever it was left.
+        collapse();
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -177,13 +185,24 @@ export function Drawer({ visible, onClose, children, footer, child }: DrawerProp
         ]}
       >
         <Pressable style={[styles.backdrop, { paddingBottom: keyboardHeight }]} onPress={onClose}>
-          <Animated.View style={[styles.sheetTouchArea, { transform: [{ translateY }] }]}>
-            <Pressable onPress={() => {}} style={styles.sheetSurface}>
+          <Animated.View
+            style={[
+              styles.sheetTouchArea,
+              drag.expanded && styles.sheetTouchAreaExpanded,
+              { transform: [{ translateY }] },
+            ]}
+          >
+            <Pressable
+              onPress={() => {}}
+              onLayout={drag.onSheetLayout}
+              style={[styles.sheetSurface, drag.expanded && styles.sheetSurfaceExpanded]}
+            >
+              <SheetHandle panHandlers={drag.panHandlers} />
               <ScrollView
                 // flexShrink so a pinned footer can claim its space out of the
                 // scroll area once the sheet hits its 90% cap, rather than
                 // being pushed off the bottom of the screen by it.
-                style={styles.sheetScroll}
+                style={[styles.sheetScroll, drag.expanded && styles.sheetScrollExpanded]}
                 contentContainerStyle={styles.sheet}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
@@ -205,6 +224,12 @@ const styles = StyleSheet.create({
   overlay: { position: "absolute", zIndex: 1000, elevation: 1000 },
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
   sheetTouchArea: { maxHeight: "90%" },
+  // Dragged up via the handle: fills to the max height regardless of how
+  // short the content is, with the scroll area taking the extra room so a
+  // pinned footer stays at the bottom.
+  sheetTouchAreaExpanded: { height: "94%", maxHeight: "94%" },
+  sheetSurfaceExpanded: { flex: 1 },
+  sheetScrollExpanded: { flex: 1 },
   // The surface (background + rounded top) moved off the ScrollView's content
   // container and onto this wrapper once a pinned footer joined it — the
   // footer sits outside the scroll view and would otherwise have had to
@@ -217,7 +242,8 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   sheetScroll: { flexGrow: 0, flexShrink: 1 },
-  sheet: { padding: spacing.xl, gap: spacing.md },
+  // Top padding is small because SheetHandle's strip already sits above it.
+  sheet: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl, paddingTop: spacing.sm, gap: spacing.md },
   footer: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,

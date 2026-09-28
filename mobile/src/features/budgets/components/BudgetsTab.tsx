@@ -146,15 +146,6 @@ export function BudgetsTab({ initialRange, rangeNonce }: BudgetsTabProps = {}) {
           ) : null}
         </View>
 
-        {rangeActive ? (
-          // Said out loud rather than left to be inferred from smaller numbers:
-          // the limits on screen are a slice of the monthly figure, not the
-          // monthly figure itself.
-          <Text style={styles.rangeNote}>
-            Hạn mức đã chia theo {rangeDayCount === 1 ? "ngày" : `${rangeDayCount} ngày`} bạn chọn.
-          </Text>
-        ) : null}
-
         <BudgetMonthSummary
           // Under a filter the card describes the selected window, not the
           // month — its own totals already come from the filtered rows, so the
@@ -169,6 +160,7 @@ export function BudgetsTab({ initialRange, rangeNonce }: BudgetsTabProps = {}) {
           totalLimit={totals.limit}
           totalSpent={totals.spent}
           currency={currency}
+          overCount={counts.over}
         />
 
         <BudgetFilterChips value={filter} onChange={setFilter} counts={counts} />

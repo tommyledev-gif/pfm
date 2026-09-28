@@ -1,0 +1,150 @@
+// Mirrors backend/internal/dto/analytics_request.go + analytics_response.go
+// (specs/ai-chat-query-spending/plan.md AIQ-T40). Hand-synced — there is no
+// codegen. Every amount is integer xu; the client only formats it, never
+// derives a new amount from it.
+
+export type AnalyticsMetric =
+  | "sum"
+  | "breakdown"
+  | "compare"
+  | "series"
+  | "top_n"
+  | "max_tx"
+  | "avg_daily"
+  | "budget_status";
+
+export type AnalyticsPeriod =
+  | "this_cycle"
+  | "last_cycle"
+  | "last_3_cycles"
+  | "last_6_cycles"
+  | "last_30_days"
+  | "this_week"
+  | "custom";
+
+export interface AnalyticsQuery {
+  metric: AnalyticsMetric;
+  group_by?: "category" | "wallet" | "weekday";
+  tx_type?: "income" | "expense";
+  period: AnalyticsPeriod;
+  from?: string;
+  to?: string;
+  category_ids?: string[];
+  wallet_id?: string;
+  amount_min?: number;
+  limit?: number;
+  currency?: string;
+}
+
+export interface AnalyticsChartItem {
+  key: string;
+  label: string;
+  amount: number;
+}
+
+export interface AnalyticsCompare {
+  current: number;
+  previous: number;
+  change_pct: number | null;
+  current_label: string;
+  previous_label: string;
+}
+
+export interface AnalyticsTxRow {
+  id: string;
+  occurred_at: string;
+  amount: number;
+  category_name: string;
+  wallet_name: string;
+}
+
+export interface AnalyticsBudgetItem {
+  budget_id: string;
+  category_name: string;
+  limit: number;
+  spent: number;
+  remaining: number;
+  exceeded: boolean;
+}
+
+// A flat union keyed by `type` — only the fields that type uses are set.
+// Kept as `string` for type: an answer stored by a newer app version may
+// carry a chart this version does not know, and must still render (as a
+// list — spec.md S-AIQ-43).
+export interface AnalyticsChart {
+  type: string;
+  value?: number;
+  days?: number;
+  items?: AnalyticsChartItem[];
+  compare?: AnalyticsCompare;
+  rows?: AnalyticsTxRow[];
+  total_matched?: number;
+  budgets?: AnalyticsBudgetItem[];
+}
+
+export interface AnalyticsNotice {
+  code: string;
+  message: string;
+}
+
+export interface AnalyticsFollowUp {
+  label: string;
+  query: AnalyticsQuery;
+}
+
+export interface AnalyticsPeriodInfo {
+  key: AnalyticsPeriod;
+  label: string;
+  from: string;
+  to: string;
+  from_date: string;
+  to_date: string;
+  partial: boolean;
+}
+
+export interface AnalyticsAnswer {
+  schema_version: number;
+  query: AnalyticsQuery;
+  period: AnalyticsPeriodInfo;
+  currency: string;
+  summary: string;
+  chart: AnalyticsChart;
+  notices: AnalyticsNotice[];
+  tx_count: number;
+  follow_ups: AnalyticsFollowUp[];
+}
+
+export type ConsultKind =
+  | "answer"
+  | "clarify_category"
+  | "unsupported"
+  | "needs_context"
+  | "coming_later"
+  | "switch_mode"
+  | "degraded";
+
+export interface ConsultCategoryRef {
+  id: string;
+  name: string;
+}
+
+export interface ConsultResponse {
+  kind: ConsultKind;
+  message: string;
+  answer?: AnalyticsAnswer;
+  banner_categories?: ConsultCategoryRef[];
+  category_choices?: ConsultCategoryRef[];
+  pending_query?: AnalyticsQuery;
+  chips: AnalyticsFollowUp[];
+  switch_to_recording?: boolean;
+}
+
+export interface ConsultRequest {
+  message: string;
+}
+
+/**
+ * What an analysis reply stores in the chat thread (spec.md US-06): the
+ * reply as received, never recomputed on restore.
+ */
+export type ConsultMessageData = Omit<ConsultResponse, "message">;

@@ -3,11 +3,13 @@ import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, View } fro
 
 import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
 import { Screen } from "@/components/shared/Screen";
+import { Fab } from "@/components/ui/Fab";
 import { TransactionRow } from "@/components/shared/TransactionRow";
 import { monthRange } from "@/lib/date-range";
+import { formatDateRange } from "@/lib/format-date";
 import { useRefresh } from "@/lib/use-refresh";
 import { colors, spacing, typography } from "@/lib/theme";
-import { TransactionType } from "@/lib/constants";
+import { TransactionKind } from "@/lib/constants";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useTransactionsQuery } from "@/features/transactions/api/use-transactions-query";
 import { useTransactionIO } from "@/features/transactions/use-transaction-io";
@@ -30,7 +32,7 @@ const LIST_SKELETON_COUNT = 6;
 const SEARCH_DEBOUNCE_MS = 400;
 
 export default function TransactionsScreen() {
-  const [filter, setFilter] = useState<TransactionType | undefined>(undefined);
+  const [filter, setFilter] = useState<TransactionKind | undefined>(undefined);
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
   const [pickerOpen, setPickerOpen] = useState(false);
   const [categoryIds, setCategoryIds] = useState<string[]>([]);
@@ -130,7 +132,8 @@ export default function TransactionsScreen() {
 
   const now = new Date();
   const currentMonthLabel = `Tháng ${now.getMonth() + 1}, ${now.getFullYear()}`;
-  const dateRangeLabel = hasDateFilter ? `${dateRange.from} – ${dateRange.to}` : null;
+  const dateRangeLabel =
+    hasDateFilter && dateRange.from ? formatDateRange(dateRange.from, dateRange.to ?? dateRange.from) : null;
   const headerRange = hasDateFilter ? { from: dateRange.from, to: dateRange.to } : monthRange(0);
   const { total: headerTotal, refetch: refetchHeaderTotal } = useFilteredReportTotal(headerRange, categoryIds);
 
@@ -190,10 +193,6 @@ export default function TransactionsScreen() {
             sortCount={sortKeys.length}
             hasCustomSort={hasCustomSort}
             onOpenSort={() => setSortDrawerOpen(true)}
-            onAdd={() => {
-              setEditingTransaction(null);
-              setFormOpen(true);
-            }}
             onExport={transactionIO.onExport}
             onImport={transactionIO.onImport}
             exporting={transactionIO.exporting}
@@ -233,6 +232,15 @@ export default function TransactionsScreen() {
         ListFooterComponent={
           transactions.isFetchingNextPage ? <ActivityIndicator color={colors.green} style={styles.loader} /> : null
         }
+      />
+
+      <Fab
+        accessibilityLabel="Thêm giao dịch"
+        testID="btn-add-transaction"
+        onPress={() => {
+          setEditingTransaction(null);
+          setFormOpen(true);
+        }}
       />
 
       <DateRangePickerModal

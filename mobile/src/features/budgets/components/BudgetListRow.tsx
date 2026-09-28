@@ -84,9 +84,10 @@ export function BudgetListRow({
         <Animated.Text style={[styles.name, { color: nameColor }]} numberOfLines={1}>
           {budget.category_name}
         </Animated.Text>
-        <Text style={[styles.headline, { color: status.color }]} numberOfLines={1}>
-          {status.over ? "vượt " : "còn "}
-          {formatCurrency(Math.abs(status.remaining), limit.currency)}
+        {/* What was spent, in the header's corner. Over-budget turns it red;
+            otherwise it stays plain — the bar and caption below carry pace. */}
+        <Text style={[styles.headline, status.over && styles.headlineOver]} numberOfLines={1}>
+          {formatCurrency(limit.spent, limit.currency)}
         </Text>
       </View>
 
@@ -103,12 +104,14 @@ export function BudgetListRow({
           color={status.color}
         />
 
+        {/* Two figures, not four: the old footer said "over budget" three
+            times (385% — đã vượt, vượt 5.280.000 đ, 7.130.000 / 1.850.000). */}
         <View style={styles.footRow}>
-          <Text style={[styles.caption, { color: status.color }]} numberOfLines={1}>
-            {status.percent}% — {status.caption}
+          <Text style={[styles.caption, { color: status.over ? colors.danger : status.color }]} numberOfLines={1}>
+            {status.percent}% · {status.over ? "Vượt" : "Còn"} {formatCurrency(Math.abs(status.remaining), limit.currency)}
           </Text>
           <Text style={styles.amounts} numberOfLines={1}>
-            {formatCurrency(limit.spent, limit.currency)} / {formatCurrency(limit.amount_limit, limit.currency)}
+            Hạn mức: {formatCurrency(limit.amount_limit, limit.currency)}
           </Text>
         </View>
 
@@ -144,7 +147,8 @@ const styles = StyleSheet.create({
   iconImage: { width: 36, height: 36, borderRadius: radii.pill },
   iconGlyph: { fontSize: 16, color: colors.textPrimary, fontWeight: "700" },
   name: { flex: 1, ...typography.cardTitle },
-  headline: { ...typography.cardTitle, flexShrink: 0 },
+  headline: { ...typography.body, fontWeight: "700", color: colors.textPrimary, flexShrink: 0 },
+  headlineOver: { color: colors.danger },
   footRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -153,6 +157,6 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
   },
   drillLink: { ...typography.tiny, color: colors.green, paddingTop: spacing.xs },
-  caption: { ...typography.caption },
+  caption: { ...typography.caption, flexShrink: 1 },
   amounts: { ...typography.caption, color: colors.textMuted, flexShrink: 1 },
 });

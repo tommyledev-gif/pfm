@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { Calendar, DateData } from "react-native-calendars";
+import { StyleSheet, Text, View } from "react-native";
+import { DateData } from "react-native-calendars";
 import { MarkingProps } from "react-native-calendars/src/calendar/day/marking";
 
-import { CALENDAR_THEME } from "@/lib/calendar-theme";
-import { Drawer, DrawerChild } from "@/components/shared/Drawer";
+import { Drawer } from "@/components/shared/Drawer";
+import { MonthYearCalendar } from "@/components/shared/MonthYearCalendar";
+import { formatDateShort } from "@/lib/format-date";
 import { PillButton } from "@/components/ui/PillButton";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 
@@ -16,23 +17,10 @@ interface DateRangePickerModalProps {
   onApply: (range: { from?: string; to?: string }) => void;
 }
 
-// react-native-calendars' `renderHeader` hands back its internal `XDate`
-// instance — no `@types/xdate` package exists, so this is just the sliver of
-// its API this file actually calls, rather than pulling in the untyped lib.
-interface CalendarMonth {
-  getMonth(): number;
-  getFullYear(): number;
-}
-
 // Inclusive day count a range may span — a year, generously defined. Anything
 // past this stops being "a period to review" and starts being "the whole
 // transaction history", which this picker isn't built to browse.
 const MAX_RANGE_DAYS = 365;
-
-const MONTH_LABELS = Array.from({ length: 12 }, (_, i) => `Tháng ${i + 1}`);
-// Latest year first, per the design ask — going back far enough to cover any
-// realistic account age without scrolling forever.
-const YEAR_RANGE = 15;
 
 function buildMarkedDates(start: string | null, end: string | null): Record<string, MarkingProps> {
   if (!start) return {};
@@ -70,32 +58,18 @@ function addDaysIso(iso: string, days: number): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-function monthStartIso(year: number, month: number): string {
-  return `${year}-${String(month + 1).padStart(2, "0")}-01`;
-}
-
 // Transactions screen's date-range filter — calendar UI with a "period"
 // range highlight (start/end days as filled circles, days between them
 // joined by a soft band), matching the reference screenshot the user
 // supplied. `react-native-calendars`' built-in period marking type is the
 // closest match rather than hand-building arc/band geometry.
 //
-// The month/year label above the grid is its own pressable (via `renderHeader`)
-// that opens a Drawer child panel with a 12-month grid and a descending year
-// list — react-native-calendars' own header has no such picker, only
-// prev/next arrows, which made jumping more than a couple of months away a
-// lot of tapping.
+// The month/year title above the grid jumps to any month and year inline
+// (MonthYearCalendar) — react-native-calendars' own header only has
+// prev/next arrows.
 export function DateRangePickerModal({ visible, onClose, from, to, onApply }: DateRangePickerModalProps) {
   const [start, setStart] = useState<string | null>(from ?? null);
   const [end, setEnd] = useState<string | null>(to ?? null);
-  // Drives react-native-calendars' `initialDate` prop — unlike `current`,
-  // Calendar actually re-reads `initialDate` on every change (see its own
-  // effect keyed on that prop), so this is the one way to jump the grid to an
-  // arbitrary month/year from outside.
-  const [jumpDate, setJumpDate] = useState(from ?? new Date().toISOString().slice(0, 10));
-  const [monthYearOpen, setMonthYearOpen] = useState(false);
-  const [draftYear, setDraftYear] = useState(new Date().getFullYear());
-  const [draftMonth, setDraftMonth] = useState(new Date().getMonth());
 
   // Re-seeds from the caller's own applied range every time the sheet opens —
   // without this, clearing the filter and dismissing without pressing Áp
@@ -105,7 +79,6 @@ export function DateRangePickerModal({ visible, onClose, from, to, onApply }: Da
     if (!visible) return;
     setStart(from ?? null);
     setEnd(to ?? null);
-    setJumpDate(from ?? new Date().toISOString().slice(0, 10));
   }, [visible, from, to]);
 
   const markedDates = useMemo(() => buildMarkedDates(start, end), [start, end]);
@@ -145,86 +118,22 @@ export function DateRangePickerModal({ visible, onClose, from, to, onApply }: Da
     onClose();
   };
 
-  const openMonthYearPicker = (month: CalendarMonth) => {
-    setDraftYear(month.getFullYear());
-    setDraftMonth(month.getMonth());
-    setMonthYearOpen(true);
-  };
-
-  const years = useMemo(() => {
-    const current = new Date().getFullYear();
-    return Array.from({ length: YEAR_RANGE }, (_, i) => current - i);
-  }, []);
-
-  const monthYearChild: DrawerChild = {
-    visible: monthYearOpen,
-    onClose: () => setMonthYearOpen(false),
-    title: "Chọn tháng, năm",
-    children: (
-      <View style={styles.monthYearBody}>
-        <View style={styles.monthGrid}>
-          {MONTH_LABELS.map((label, index) => (
-            <Pressable
-              key={label}
-              style={[styles.monthChip, draftMonth === index && styles.monthChipActive]}
-              onPress={() => setDraftMonth(index)}
-            >
-              <Text style={[styles.monthChipLabel, draftMonth === index && styles.monthChipLabelActive]}>
-                {label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <Text style={styles.yearListLabel}>Năm</Text>
-        <ScrollView style={styles.yearList} showsVerticalScrollIndicator={false}>
-          {years.map((year) => (
-            <Pressable
-              key={year}
-              style={[styles.yearRow, draftYear === year && styles.yearRowActive]}
-              onPress={() => setDraftYear(year)}
-            >
-              <Text style={[styles.yearRowLabel, draftYear === year && styles.yearRowLabelActive]}>{year}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </View>
-    ),
-    footer: (
-      <PillButton
-        label="Xong"
-        onPress={() => {
-          setJumpDate(monthStartIso(draftYear, draftMonth));
-          setMonthYearOpen(false);
-        }}
-        style={{ flex: 1 }}
-      />
-    ),
-  };
-
   return (
-    <Drawer visible={visible} onClose={onClose} child={monthYearChild}>
+    <Drawer visible={visible} onClose={onClose}>
       <Text style={styles.title}>Khoảng thời gian</Text>
       <Text style={styles.subtitle}>
-        {start ? `${start}${end && end !== start ? `  –  ${end}` : ""}` : "Chọn ngày bắt đầu"}
+        {start
+          ? `${formatDateShort(start)}${end && end !== start ? `  –  ${formatDateShort(end)}` : ""}`
+          : "Chọn ngày bắt đầu"}
       </Text>
 
-      <Calendar
+      <MonthYearCalendar
         markingType="period"
         markedDates={markedDates}
         onDayPress={onDayPress}
-        theme={CALENDAR_THEME}
         style={styles.calendar}
-        initialDate={jumpDate}
+        initialDate={from}
         maxDate={maxSelectableDate}
-        renderHeader={(month: CalendarMonth) => (
-          <Pressable style={styles.headerButton} onPress={() => openMonthYearPicker(month)} hitSlop={8}>
-            <Text style={styles.headerLabel}>
-              Tháng {month.getMonth() + 1}, {month.getFullYear()}
-            </Text>
-            <Text style={styles.headerCaret}>▾</Text>
-          </Pressable>
-        )}
       />
 
       <Text style={styles.maxRangeHint}>Khoảng thời gian tối đa {MAX_RANGE_DAYS} ngày.</Text>
@@ -244,27 +153,4 @@ const styles = StyleSheet.create({
   maxRangeHint: { ...typography.tiny, color: colors.textMuted, textAlign: "center" },
   actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
   flexButton: { flex: 1 },
-  headerButton: { flexDirection: "row", alignItems: "center", gap: 4 },
-  headerLabel: { ...typography.body, fontWeight: "700", color: colors.textPrimary },
-  headerCaret: { ...typography.caption, color: colors.textSecondary },
-  monthYearBody: { flex: 1, gap: spacing.md },
-  monthGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  monthChip: {
-    width: "31%",
-    paddingVertical: 10,
-    alignItems: "center",
-    borderRadius: radii.pill,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-  },
-  monthChipActive: { backgroundColor: colors.green, borderColor: colors.green },
-  monthChipLabel: { ...typography.caption, color: colors.textSecondary },
-  monthChipLabelActive: { color: colors.onGreen, fontWeight: "700" },
-  yearListLabel: { ...typography.caption, color: colors.textSecondary },
-  yearList: { flex: 1 },
-  yearRow: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radii.listCard },
-  yearRowActive: { backgroundColor: "rgba(133,255,51,0.1)" },
-  yearRowLabel: { ...typography.body, color: colors.textPrimary },
-  yearRowLabelActive: { color: colors.green, fontWeight: "700" },
 });

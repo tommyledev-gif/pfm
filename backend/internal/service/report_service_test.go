@@ -20,7 +20,7 @@ func newTestReportService(t *testing.T) (*ReportService, *fakeReportRepo, *fakeW
 	reportRepo := newFakeReportRepo()
 	walletRepo := newFakeWalletRepo()
 	categoryRepo := newFakeCategoryRepo()
-	return NewReportService(reportRepo, walletRepo, categoryRepo, zap.NewNop()), reportRepo, walletRepo, categoryRepo
+	return NewReportService(reportRepo, walletRepo, categoryRepo, newTestCycleResolver(), zap.NewNop()), reportRepo, walletRepo, categoryRepo
 }
 
 // S-RPT-01/S-RPT-04: happy path, no filters — the seeded per-currency totals
@@ -67,8 +67,9 @@ func TestReportService_GetSummary_Empty(t *testing.T) {
 }
 
 // Domain Concept table / plan.md Finding #6: with no from/to supplied, the
-// window defaults to the calendar month containing "now" (UTC).
-func TestReportService_GetSummary_DefaultWindowIsCurrentCalendarMonth(t *testing.T) {
+// window defaults to the caller's current cycle — with no plan, the calendar
+// month containing "now" with its boundary at local (app timezone) midnight.
+func TestReportService_GetSummary_DefaultWindowIsCurrentCycle(t *testing.T) {
 	svc, reportRepo, _, _ := newTestReportService(t)
 
 	_, err := svc.GetSummary(context.Background(), uuid.New(), dto.ReportSummaryQuery{})
@@ -77,7 +78,8 @@ func TestReportService_GetSummary_DefaultWindowIsCurrentCalendarMonth(t *testing
 	}
 
 	now := time.Now().UTC()
-	wantFrom := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	local := now.In(common.AppLocation)
+	wantFrom := time.Date(local.Year(), local.Month(), 1, 0, 0, 0, 0, common.AppLocation)
 	if !reportRepo.lastFilter.From.Equal(wantFrom) {
 		t.Fatalf("expected default from %v, got %v", wantFrom, reportRepo.lastFilter.From)
 	}

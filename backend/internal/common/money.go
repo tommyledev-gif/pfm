@@ -72,6 +72,22 @@ func FormatCents(amountCents int64, currency string) string {
 	return groupThousands(majorUnits) + " " + currency
 }
 
+// FormatCentsVI renders xu the Vietnamese way for user-facing sentences —
+// "2.450.000đ" for VND, "1.234 USD" otherwise. Truncates sub-unit cents like
+// FormatCents; VND has none.
+func FormatCentsVI(amountCents int64, currency string) string {
+	grouped := strings.ReplaceAll(groupThousands(amountCents/VNDToCentsFactor), ",", ".")
+	if currency == vndCurrencyCode {
+		return grouped + vndSymbol
+	}
+	return grouped + " " + currency
+}
+
+const (
+	vndCurrencyCode = "VND"
+	vndSymbol       = "đ"
+)
+
 func groupThousands(n int64) string {
 	negative := n < 0
 	if negative {

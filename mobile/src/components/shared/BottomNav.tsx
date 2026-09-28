@@ -1,13 +1,25 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, Easing, LayoutChangeEvent, Pressable, StyleSheet, View } from "react-native";
-import { BlurView } from "expo-blur";
+import { Animated, Easing, LayoutChangeEvent, Pressable, View } from "react-native";
 import { useRouter, usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BarChartIcon, HomeIcon, ListIcon, SparkleIcon, UserIcon } from "@/components/ui/Icon";
-import { colors, radii } from "@/lib/theme";
+import { colors } from "@/lib/theme";
+import {
+  BALL_SIZE,
+  BOB_DISTANCE,
+  BOB_DURATION,
+  ICON_BOUNCE_SCALE,
+  INACTIVE_COLOR,
+  LINE_LEFT_END,
+  LINE_RIGHT_START,
+  PILL_HEIGHT,
+  AURA_LEFT_OFFSET,
+  AURA_TOP,
+  styles,
+} from "@/components/shared/bottom-nav-styles";
 
-const TABS = [
+export const TABS = [
   { href: "/", Icon: HomeIcon },
   { href: "/transactions", Icon: ListIcon },
   { href: "/ai-chat", Icon: SparkleIcon },
@@ -21,25 +33,6 @@ const TABS = [
 // whichever tab was active before the push, which read as the nav losing
 // track of where you are.
 const SETTINGS_SUB_ROUTES = ["/wallets", "/categories", "/users", "/audit-logs", "/developer"];
-
-const PILL_HEIGHT = 64;
-const BALL_SIZE = 48;
-const AURA_OUTER = 78;
-const AURA_MID = 60;
-const AURA_CORE = 44;
-const BALL_TOP = -(BALL_SIZE / 2);
-// Aura's vertical center must land on the same y as the ball's center
-// (the bar's top edge, y=0) — not the bar's own vertical middle. Centering
-// it there also means the bar's `overflow: hidden` clips away exactly the
-// top half of the circle for free, leaving a socket that's flat across the
-// top and rounded only on the bottom, instead of a full stray circle.
-const AURA_TOP = -(AURA_OUTER / 2);
-const AURA_LEFT_OFFSET = (BALL_SIZE - AURA_OUTER) / 2;
-const INACTIVE_COLOR = "rgba(255,255,255,0.5)";
-// Idle float: the ball drifts this many px above its resting spot and back,
-// forever. Kept tiny (and slow) so it reads as "alive", not as motion.
-const BOB_DISTANCE = 4;
-const BOB_DURATION = 1600;
 
 // Bottom nav — mobile/design_handoff_pfm_app/README.md "Design tokens" (nav)
 // + "Interactions summary". The bar itself sits flush against the screen's
@@ -88,6 +81,7 @@ export function BottomNav() {
   const ballX = useRef(new Animated.Value(0)).current;
   const squish = useRef(new Animated.Value(0)).current;
   const iconOpacity = useRef(new Animated.Value(1)).current;
+  const iconScale = useRef(new Animated.Value(1)).current;
   const bob = useRef(new Animated.Value(0)).current;
   const rowOpacities = useRef(TABS.map((_, i) => new Animated.Value(i === Math.max(activeIndex, 0) ? 0 : 1))).current;
 
@@ -144,6 +138,18 @@ export function BottomNav() {
     Animated.timing(iconOpacity, { toValue: 0, duration: 120, useNativeDriver: true }).start(() => {
       setDisplayIndex(index);
       Animated.timing(iconOpacity, { toValue: 1, duration: 180, useNativeDriver: true }).start();
+      // The new icon arrives with a small pop (1 → 1.15 → 1) so the switch
+      // registers as a response to the tap, not just a swap.
+      iconScale.setValue(1);
+      Animated.sequence([
+        Animated.timing(iconScale, {
+          toValue: ICON_BOUNCE_SCALE,
+          duration: 120,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.spring(iconScale, { toValue: 1, tension: 220, friction: 7, useNativeDriver: true }),
+      ]).start();
     });
   };
 
@@ -181,7 +187,7 @@ export function BottomNav() {
 
   return (
     <View style={[styles.wrapper, { height: PILL_HEIGHT + insets.bottom }]} pointerEvents="box-none">
-      <BlurView intensity={40} tint="dark" style={[styles.pill, { paddingBottom: insets.bottom }]}>
+      <View style={[styles.pill, { paddingBottom: insets.bottom }]}>
         <Animated.View
           pointerEvents="none"
           style={[
@@ -198,12 +204,12 @@ export function BottomNav() {
             <Pressable
               key={href}
               onLayout={handleTabLayout(index)}
-              // No-op on the tab that's already active — router.replace onto
-              // the same route still remounts the screen underneath, which
-              // was silently wiping Transactions' own filters/sort/search
-              // state every time its own tab was re-tapped.
+              // navigate, not replace: the tabs are a real tab navigator
+              // ((tabs)/_layout.tsx), so this jumps to the already-mounted
+              // tab — and from a pushed sub-screen (Wallets, …) it pops back
+              // to the tabs first. Still a no-op on the active tab.
               onPress={() => {
-                if (index !== activeIndex) router.replace(href);
+                if (index !== activeIndex) router.navigate(href);
               }}
               style={styles.tab}
               hitSlop={8}
@@ -214,7 +220,24 @@ export function BottomNav() {
             </Pressable>
           ))}
         </View>
-      </BlurView>
+      </View>
+      {/* Top hairline, in two halves that stop at the socket's edges — see
+          SOCKET_HALF_CHORD. Each half is a long line translated by the same
+          ballX as the ball, so the gap tracks it on the native driver. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.topLine,
+          { left: LINE_LEFT_END, opacity: ballOpacity, transform: [{ translateX: ballX }] },
+        ]}
+      />
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.topLine,
+          { left: LINE_RIGHT_START, opacity: ballOpacity, transform: [{ translateX: ballX }] },
+        ]}
+      />
       <Animated.View
         pointerEvents="none"
         style={[
@@ -230,77 +253,10 @@ export function BottomNav() {
           },
         ]}
       >
-        <Animated.View style={{ opacity: iconOpacity }}>
+        <Animated.View style={{ opacity: iconOpacity, transform: [{ scale: iconScale }] }}>
           <DisplayIcon size={22} color={colors.onGreen} />
         </Animated.View>
       </Animated.View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  wrapper: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  // Flush against the screen's bottom/left/right edges now, not a floating
-  // margined pill — only the top corners stay rounded. paddingBottom (set
-  // inline to insets.bottom) extends the bar's own background into the
-  // safe-area strip below the tabs instead of leaving it transparent.
-  pill: {
-    width: "100%",
-    // borderTopLeftRadius: radii.hero,
-    // borderTopRightRadius: radii.hero,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    borderColor: colors.navBorder,
-    overflow: "hidden",
-    backgroundColor: colors.navBg,
-  },
-  tabRow: { flexDirection: "row", width: "100%", height: PILL_HEIGHT },
-  tab: { flex: 1, alignItems: "center", justifyContent: "center" },
-  // Three concentric circles fake a radial-gradient "hollow socket" behind
-  // the ball (no gradient dependency in this project) — each ring darker
-  // and smaller than the last, centered via plain flex nesting.
-  auraOuter: {
-    position: "absolute",
-    width: AURA_OUTER,
-    height: AURA_OUTER,
-    borderRadius: AURA_OUTER / 2,
-    backgroundColor: "rgba(0,0,0,0.22)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  auraMid: {
-    width: AURA_MID,
-    height: AURA_MID,
-    borderRadius: AURA_MID / 2,
-    backgroundColor: "rgba(0,0,0,0.42)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  auraCore: {
-    width: AURA_CORE,
-    height: AURA_CORE,
-    borderRadius: AURA_CORE / 2,
-    backgroundColor: "rgba(0,0,0,0.65)",
-  },
-  ball: {
-    position: "absolute",
-    left: 0,
-    top: BALL_TOP,
-    width: BALL_SIZE,
-    height: BALL_SIZE,
-    borderRadius: BALL_SIZE / 2,
-    backgroundColor: colors.green,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: colors.green,
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
-  },
-});

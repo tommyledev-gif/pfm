@@ -16,7 +16,7 @@ export function UserListItem({ user }: { user: User }) {
 
   return (
     <View style={styles.row}>
-      <Avatar name={displayName} size={40} />
+      <Avatar name={displayName} size={40} fallback="initial" />
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>{displayName}</Text>
         <Text style={styles.email} numberOfLines={1}>{user.email}</Text>    

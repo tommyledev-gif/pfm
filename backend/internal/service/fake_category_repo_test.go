@@ -200,3 +200,16 @@ func (f *fakeCategoryRepo) SoftDeleteCategory(_ context.Context, _ pgx.Tx, id, u
 	cp := *c
 	return &cp, nil
 }
+
+func (f *fakeCategoryRepo) GetSystemCategoryByKey(_ context.Context, systemKey string) (*model.Category, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	for _, c := range f.categories {
+		if c.UserID == nil && c.SystemKey != nil && *c.SystemKey == systemKey && c.DeletedAt == nil {
+			cp := *c
+			return &cp, nil
+		}
+	}
+	return nil, pgx.ErrNoRows
+}

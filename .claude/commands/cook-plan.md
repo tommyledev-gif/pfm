@@ -12,7 +12,7 @@
 For the stacks this feature touches, use gitnexus to read ONE existing, complete implementation as reference:
 - **Go backend:** read the closest existing `_handler.go` + `_service.go` + `_repository.go` trio (e.g. `wallet` if planning a money feature)
 - **Next.js web:** read one feature's `api/use-*-query.ts` + `components/*.tsx` + `types.ts`
-- **Mobile (React Native/Expo):** read one feature's `api/` + `components/` + `types.ts` under `mobile/src/features/` (only if mobile scope is active — as of 2026-08-16 `mobile/` has only a project scaffold, no feature yet exists to use as reference)
+- **Mobile (React Native/Expo):** read one feature's `api/` + `components/` + `types.ts` under `mobile/src/features/`. `mobile/` reached full MVP feature parity on 2026-08-21 — `features/budgets/`, `features/transactions/` and `features/ai-chat/` are all complete references. (Ignore any older note saying `mobile/` is only a scaffold; that stopped being true in August.)
 - **Python AI:** read `ai-service/app/` structure only if this feature touches AI
 
 Do NOT read all features. One reference implementation per stack is enough.

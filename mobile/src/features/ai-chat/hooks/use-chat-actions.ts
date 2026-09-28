@@ -1,17 +1,16 @@
 import { useState } from "react";
 
-import { getErrorCode, getErrorMessage } from "@/lib/axios";
+import { getErrorCode } from "@/lib/axios";
 import { useSendChatMessageMutation } from "@/features/ai-chat/api/use-send-chat-message-mutation";
-import { useCreateTransactionMutation } from "@/features/transactions/api/use-create-transaction-mutation";
 import { useUpdateTransactionMutation } from "@/features/transactions/api/use-update-transaction-mutation";
 import { ChatMessage, EditHistoryEntry, TransactionActionPayload } from "@/features/ai-chat/types";
 import { nextMessageId, newIdempotencyKey } from "@/features/ai-chat/message-id";
+import { useConfirmProposal } from "@/features/ai-chat/hooks/use-confirm-proposal";
 import { useChatStore } from "@/stores/chat-store";
-import { useToastStore } from "@/stores/toast-store";
 
 // The typing indicator is meant to be felt, not just technically present —
 // even a fast reply holds the dots for a beat before the answer appears.
-const MIN_TYPING_MS = 1300;
+export const MIN_TYPING_MS = 1300;
 
 interface UseChatActionsOptions {
   /** Scrolls the thread to the newest message after the user sends. */
@@ -31,10 +30,10 @@ export function useChatActions({ onSent }: UseChatActionsOptions) {
   const updateMessage = useChatStore((s) => s.updateMessage);
 
   const [sending, setSending] = useState(false);
-  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  // Saving a proposal lives in its own hook, shared with the pending-review screen.
+  const { confirmingId, confirm: confirmAction } = useConfirmProposal();
 
   const sendMessage = useSendChatMessageMutation();
-  const createTransaction = useCreateTransactionMutation();
   const updateTransaction = useUpdateTransactionMutation();
 
   // Shared by a fresh send and a resend-after-editing flow — same pacing
@@ -145,24 +144,6 @@ export function useChatActions({ onSent }: UseChatActionsOptions) {
       edited: true,
       editHistory,
     });
-  };
-
-  const confirmAction = (message: ChatMessage) => {
-    if (!message.action) return;
-    setConfirmingId(message.id);
-    const { payload, idempotency_key } = message.action;
-    createTransaction.mutate(
-      { ...payload, note: payload.note ?? undefined, idempotency_key },
-      {
-        onSuccess: (transaction) => updateMessage(message.id, { confirmed: true, transactionId: transaction.id }),
-        onError: (error) => {
-          if (getErrorCode(error) === "INSUFFICIENT_BALANCE") {
-            useToastStore.getState().show(getErrorMessage(error, "Số dư không đủ"), "error");
-          }
-        },
-        onSettled: () => setConfirmingId(null),
-      },
-    );
   };
 
   return { sending, confirmingId, send, editUserMessage, editAction, confirmAction };

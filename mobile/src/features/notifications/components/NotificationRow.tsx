@@ -11,7 +11,7 @@ import { Notification } from "@/features/notifications/types";
 export function NotificationRow({ notification }: { notification: Notification }) {
   return (
     <View style={[styles.row, !notification.is_read && styles.unread]}>
-      <Avatar name={notification.title} color={colorForCategory(notification.type)} size={40} />
+      <Avatar name={notification.title} color={colorForCategory(notification.type)} size={40} fallback="initial" />
       <View style={styles.body}>
         <View style={styles.headerRow}>
           <Text style={styles.title} numberOfLines={1}>

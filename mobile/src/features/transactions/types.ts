@@ -1,4 +1,4 @@
-import { TransactionType } from "@/lib/constants";
+import { TransactionKind, TransactionType } from "@/lib/constants";
 
 // Mirrors backend/internal/dto/transaction_response.go /
 // frontend/src/features/transactions/types.ts.
@@ -9,12 +9,16 @@ export interface Transaction {
   category_id: string;
   category_name: string;
   amount: number; // integer cents, always positive
-  type: TransactionType;
+  type: TransactionKind;
   note: string | null;
   occurred_at: string;
   created_at: string;
   updated_at: string;
   wallet_balance?: number; // only present on create/update responses
+  // A transfer's destination; null for income/expense. wallet_id/wallet_name
+  // are then the SOURCE wallet.
+  to_wallet_id: string | null;
+  to_wallet_name: string | null;
 }
 
 export interface ListTransactionsResult {
@@ -33,7 +37,7 @@ export interface ListTransactionsFilters {
   // multi-select category filter (backend/internal/dto.ListTransactionsQuery.
   // CategoryIDs). Additive with category_id; callers send one or the other.
   category_ids?: string;
-  type?: TransactionType;
+  type?: TransactionKind;
   from?: string;
   to?: string;
   // ILIKE substring match against a transaction's note.
@@ -43,9 +47,13 @@ export interface ListTransactionsFilters {
 
 export interface CreateTransactionRequest {
   wallet_id: string;
-  category_id: string;
+  // Omitted for a transfer — the server files it under its own system
+  // "Chuyển khoản" category.
+  category_id?: string;
+  // Required for a transfer (the destination), never sent otherwise.
+  to_wallet_id?: string;
   amount: number;
-  type: TransactionType;
+  type: TransactionKind;
   occurred_at?: string;
   note?: string;
   idempotency_key?: string;

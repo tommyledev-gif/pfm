@@ -30,6 +30,10 @@ type TransactionResponse struct {
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 	WalletBalance *int64    `json:"wallet_balance,omitempty"`
+	// ToWalletID / ToWalletName are the destination of a transfer; null for
+	// income and expense.
+	ToWalletID   *uuid.UUID `json:"to_wallet_id"`
+	ToWalletName *string    `json:"to_wallet_name"`
 }
 
 func NewTransactionResponse(t *model.Transaction) TransactionResponse {
@@ -45,6 +49,8 @@ func NewTransactionResponse(t *model.Transaction) TransactionResponse {
 		OccurredAt:   t.OccurredAt,
 		CreatedAt:    t.CreatedAt,
 		UpdatedAt:    t.UpdatedAt,
+		ToWalletID:   t.ToWalletID,
+		ToWalletName: t.ToWalletName,
 	}
 }
 

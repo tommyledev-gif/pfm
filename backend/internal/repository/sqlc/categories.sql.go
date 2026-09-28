@@ -56,6 +56,7 @@ const listCategoriesForUser = `-- name: ListCategoriesForUser :many
 SELECT id, user_id, name, icon, type, created_at, deleted_at, icon_url, system_key FROM categories
 WHERE (user_id IS NULL OR user_id = $1)
   AND ($2::text IS NULL OR type = $2)
+  AND type <> 'transfer'
   AND deleted_at IS NULL
 ORDER BY (user_id IS NULL) DESC, name ASC
 `
@@ -155,6 +156,24 @@ FOR UPDATE
 // see db/queries/categories.sql for why this one query serves both.
 func (q *Queries) LockCategoryByID(ctx context.Context, id uuid.UUID) (Category, error) {
 	row := q.db.QueryRow(ctx, lockCategoryByID, id)
+	var i Category
+	err := row.Scan(&i.ID, &i.UserID, &i.Name, &i.Icon, &i.Type, &i.CreatedAt, &i.DeletedAt, &i.IconURL, &i.SystemKey)
+	return i, err
+}
+
+const getSystemCategoryByKey = `-- name: GetSystemCategoryByKey :one
+SELECT id, user_id, name, icon, type, created_at, deleted_at, icon_url, system_key FROM categories
+WHERE user_id IS NULL
+  AND system_key = $1
+  AND deleted_at IS NULL
+LIMIT 1
+`
+
+// GetSystemCategoryByKey resolves a system Category by its stable system_key
+// (019_categories_system_key.sql) — used for the transfer Category
+// (022_transaction_transfer.sql).
+func (q *Queries) GetSystemCategoryByKey(ctx context.Context, systemKey *string) (Category, error) {
+	row := q.db.QueryRow(ctx, getSystemCategoryByKey, systemKey)
 	var i Category
 	err := row.Scan(&i.ID, &i.UserID, &i.Name, &i.Icon, &i.Type, &i.CreatedAt, &i.DeletedAt, &i.IconURL, &i.SystemKey)
 	return i, err

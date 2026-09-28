@@ -1,6 +1,8 @@
+import { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { SendIcon, SparkleIcon } from "@/components/ui/Icon";
+import { CHAT_MODE_META, ChatMode } from "@/features/ai-chat/chat-mode";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 
 // BottomNav sits flush at the safe-area inset, stands 64 tall, and floats its
@@ -19,7 +21,11 @@ interface ChatInputBarProps {
   keyboardVisible: boolean;
   keyboardHeight: number;
   bottomInset: number;
-  onOpenBudgetWizard: () => void;
+  /** The recording pane's "Lập ngân sách" chip; omitted in analysis mode. */
+  onOpenBudgetWizard?: () => void;
+  mode: ChatMode;
+  /** Replaces the default quick-action row — analysis mode's starter chips. */
+  quickActions?: ReactNode;
 }
 
 export function ChatInputBar({
@@ -31,10 +37,14 @@ export function ChatInputBar({
   keyboardHeight,
   bottomInset,
   onOpenBudgetWizard,
+  mode,
+  quickActions,
 }: ChatInputBarProps) {
   return (
     <>
-      {!keyboardVisible ? (
+      {quickActions ? (
+        <View style={styles.quickActionRow}>{quickActions}</View>
+      ) : !keyboardVisible && onOpenBudgetWizard ? (
         <View style={styles.quickActionRow}>
           <Pressable testID="btn-open-budget-wizard" style={styles.quickActionChip} onPress={onOpenBudgetWizard}>
             <SparkleIcon size={14} />
@@ -57,7 +67,7 @@ export function ChatInputBar({
         <TextInput
           value={value}
           onChangeText={onChangeText}
-          placeholder="Mô tả một giao dịch…"
+          placeholder={CHAT_MODE_META[mode].placeholder}
           placeholderTextColor={colors.textMuted}
           style={styles.input}
           multiline

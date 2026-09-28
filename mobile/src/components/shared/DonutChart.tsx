@@ -1,8 +1,9 @@
 import { useEffect, useRef } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
-import Svg, { Circle, G } from "react-native-svg";
+import Svg, { Path } from "react-native-svg";
 
 import { formatCurrency, formatCurrencyCompact } from "@/lib/currency";
+import { useEntryAnimation } from "@/lib/use-entry-animation";
 import { colors, typography } from "@/lib/theme";
 
 export interface DonutSegment {
@@ -56,6 +57,25 @@ function polarToPoint(cx: number, cy: number, r: number, angleDeg: number) {
   return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
 }
 
+const AnimatedPath = Animated.createAnimatedComponent(Path);
+
+// One segment as its own open arc path, clockwise from 12 o'clock-based
+// angles. Its own path (rather than a dash on a full circle) is what lets
+// the entry animation reveal it with the standard "draw a line" trick: a
+// dash exactly as long as the path, pulled in by strokeDashoffset. A full
+// 360° sweep can't be one SVG arc command, so it is drawn as two halves.
+function arcPath(cx: number, cy: number, r: number, startDeg: number, sweepDeg: number): string {
+  if (sweepDeg >= 359.99) {
+    const top = polarToPoint(cx, cy, r, startDeg);
+    const bottom = polarToPoint(cx, cy, r, startDeg + 180);
+    return `M ${top.x} ${top.y} A ${r} ${r} 0 1 1 ${bottom.x} ${bottom.y} A ${r} ${r} 0 1 1 ${top.x} ${top.y}`;
+  }
+  const start = polarToPoint(cx, cy, r, startDeg);
+  const end = polarToPoint(cx, cy, r, startDeg + sweepDeg);
+  const largeArc = sweepDeg > 180 ? 1 : 0;
+  return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y}`;
+}
+
 // Gentle continuous float while a tooltip is shown, so it reads as a live
 // callout rather than a static label — stops and resets the moment the
 // selection is cleared or moves to a different segment.
@@ -86,7 +106,7 @@ function useFloat(active: boolean, direction: number) {
 // clickable: clicking a segment or its legend row highlights that segment
 // (others fade to ~35% opacity) and swaps the center label to that
 // category's name + $ amount; clicking the same one again deselects."
-// Implemented as stacked <Circle> arcs via strokeDasharray/strokeDashoffset
+// Implemented as one arc <Path> per segment
 // (react-native-svg has no native "pie" primitive) rather than copying the
 // prototype's own runtime, per the design handoff's explicit instruction.
 // Controlled by `selected`/`onToggle` so the chart and the legend list below
@@ -123,6 +143,18 @@ export function DonutChart({
     offset += full;
     return arc;
   });
+
+  // First-render sweep: the ring draws itself clockwise from 12 o'clock
+  // through every segment in order until it closes the full 360°. Waits for
+  // real data — a chart that mounts empty would otherwise animate nothing
+  // and then snap to its values.
+  //
+  // One Animated value for the whole ring, each segment interpolating its
+  // own slice of it. Nothing re-renders while it plays — the previous
+  // version called setState every frame, which is what stuttered on slower
+  // phones. (Dash offsets aren't native-driver props, hence the JS driver;
+  // with no React work per frame that is still cheap.)
+  const sweep = useEntryAnimation({ ready: total > 0, useNativeDriver: false });
 
   const active = segments.find((s) => s.key === selected);
   const activeArc = arcs.find((a) => a.key === selected);
@@ -176,23 +208,31 @@ export function DonutChart({
         onPress={() => selected && onToggle(selected)}
       />
       <Svg width={size} height={size}>
-        <G rotation="-90" origin={`${size / 2}, ${size / 2}`}>
-          {arcs.map((arc) => (
-            <Circle
+        {arcs.map((arc) => {
+          if (arc.length <= 0) return null;
+          const startFraction = arc.offset / circumference;
+          const endFraction = (arc.offset + arc.length) / circumference;
+          return (
+            <AnimatedPath
               key={arc.key}
-              cx={size / 2}
-              cy={size / 2}
-              r={radius}
+              d={arcPath(size / 2, size / 2, radius, startFraction * 360, (arc.length / circumference) * 360)}
               stroke={arc.color}
               strokeWidth={STROKE_WIDTH}
-              strokeDasharray={`${arc.length} ${circumference - arc.length}`}
-              strokeDashoffset={-arc.offset}
-              fill="transparent"
+              fill="none"
+              strokeDasharray={`${arc.length} ${arc.length}`}
+              // This segment draws while the sweep crosses its own slice of
+              // the ring, and not before — so segments fill in one after
+              // another around the circle.
+              strokeDashoffset={sweep.interpolate({
+                inputRange: [startFraction, Math.max(endFraction, startFraction + 0.0001)],
+                outputRange: [arc.length, 0],
+                extrapolate: "clamp",
+              })}
               opacity={selected && selected !== arc.key ? 0.35 : 1}
               onPress={() => onToggle(arc.key)}
             />
-          ))}
-        </G>
+          );
+        })}
       </Svg>
       <View style={styles.center} pointerEvents="none">
         {/* <Text style={styles.centerLabel} numberOfLines={1}>

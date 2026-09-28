@@ -73,8 +73,9 @@ var TransactionImportRequiredColumns = []string{"Date", "Type", "Amount", "Categ
 // `Type` column carries (spec.md Context #2) — "Expense"/"Income", not the
 // lowercase enum. Import accepts either, case-insensitively.
 var TransactionExportTypeLabels = map[string]string{
-	"expense": "Expense",
-	"income":  "Income",
+	"expense":  "Expense",
+	"income":   "Income",
+	"transfer": "Transfer",
 }
 
 // CentsToMajorUnits converts stored integer cents into the major-unit number

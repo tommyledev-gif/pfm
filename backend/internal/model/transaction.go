@@ -11,6 +11,11 @@ type TransactionType string
 const (
 	TransactionTypeIncome  TransactionType = "income"
 	TransactionTypeExpense TransactionType = "expense"
+	// TransactionTypeTransfer moves money between two of the caller's own
+	// Wallets: WalletID is the source, ToWalletID the destination
+	// (022_transaction_transfer.sql). It is neither income nor expense and is
+	// kept out of every income/expense aggregate.
+	TransactionTypeTransfer TransactionType = "transfer"
 )
 
 // Transaction is the domain representation of the transactions table. Zero
@@ -34,10 +39,16 @@ type Transaction struct {
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	DeletedAt    *time.Time
+	// ToWalletID / ToWalletName are set only for a transfer — the Wallet the
+	// money arrived in. nil for income and expense.
+	ToWalletID   *uuid.UUID
+	ToWalletName *string
 }
 
 // SignedEffect returns this Transaction's effect on its Wallet's balance:
-// +Amount for income, -Amount for expense (spec.md Context #2). Used by
+// +Amount for income, -Amount for expense (spec.md Context #2) — and
+// -Amount for a transfer, on its SOURCE Wallet. A transfer's destination
+// always moves by the exact opposite (-SignedEffect()). Used by
 // TransactionService to compute the signed delta on Update and the reversal
 // on Delete — never re-derived from scratch.
 func (t *Transaction) SignedEffect() int64 {

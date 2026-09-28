@@ -87,6 +87,16 @@ RETURNING *;
 SELECT DISTINCT user_id FROM budgets
 WHERE deleted_at IS NULL;
 
+-- name: LockUserForBudgetReplace :exec
+-- Serializes concurrent bulk-replaces for one User even when they have no
+-- Budgets yet — LockBudgetsByUser alone locks zero rows for a first-time
+-- User, so two simultaneous first submissions would both insert
+-- (docs/new-tasks.md I-4). The users row always exists for the caller, so
+-- this lock always has something to hold.
+SELECT id FROM users
+WHERE id = $1
+FOR UPDATE;
+
 -- name: LockBudgetsByUser :many
 -- Backs F-13 AI Budget Wizard's bulk-replace race guard
 -- (specs/ai-budget-wizard/spec.md S-BWZ-27, plan.md Finding #5) — takes a row

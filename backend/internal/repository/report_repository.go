@@ -16,7 +16,7 @@ import (
 // live here — window default-resolution and wallet/category ownership checks
 // are decided by ReportService. Both queries it calls live in
 // db/queries/transactions.sql, a file "owned" by TransactionRepository (cross-
-// repository query exception, mirroring BudgetRepository.SpentByUserCurrentPeriod
+// repository query exception, mirroring BudgetRepository.SpentByUserInWindow
 // — specs/financial-reporting/plan.md Security & Actor Resolution).
 type ReportRepository struct {
 	q *sqlc.Queries

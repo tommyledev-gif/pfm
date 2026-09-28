@@ -92,6 +92,14 @@ export function ChevronRightIcon({ size, color = "#fff", strokeWidth = 2.2 }: Ic
   );
 }
 
+export function ChevronDownIcon({ size, color = "#fff", strokeWidth = 2.2 }: IconProps) {
+  return (
+    <Svg {...base(size)} fill="none">
+      <Path d="M5.5 9 12 16l6.5-7" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 export function SendIcon({ size, color = "#06130A" }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">

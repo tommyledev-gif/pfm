@@ -36,6 +36,10 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, userID, tran
 	}
 
 	var categoryName string
+	// A transfer is always filed under the system transfer Category.
+	if req.CategoryID != nil && existing.Type == model.TransactionTypeTransfer {
+		return nil, nil, common.ErrTransferCategoryImmutable
+	}
 	if req.CategoryID != nil {
 		category, err := s.getVisibleCategory(ctx, userID, *req.CategoryID)
 		if err != nil {
@@ -61,6 +65,7 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, userID, tran
 		return nil, nil, err
 	}
 	transaction.WalletName = existing.WalletName
+	transaction.ToWalletName = existing.ToWalletName
 	if categoryName != "" {
 		transaction.CategoryName = categoryName
 	} else {
@@ -84,7 +89,7 @@ func (s *TransactionService) updateTransactionTx(ctx context.Context, userID, tr
 		// Transaction's own (immutable) type.
 		oldSigned := existing.SignedEffect()
 		newSigned := *req.Amount
-		if existing.Type == model.TransactionTypeExpense {
+		if existing.Type == model.TransactionTypeExpense || existing.Type == model.TransactionTypeTransfer {
 			newSigned = -newSigned
 		}
 		delta := newSigned - oldSigned
@@ -96,6 +101,10 @@ func (s *TransactionService) updateTransactionTx(ctx context.Context, userID, tr
 				return nil, nil, fmt.Errorf("service.UpdateTransaction: %w", err)
 			}
 			walletBalance = &wallet.Balance
+			// A transfer's destination moves by the exact opposite.
+			if err := s.adjustTransferDestination(ctx, tx, existing, delta); err != nil {
+				return nil, nil, err
+			}
 		}
 	}
 
@@ -147,9 +156,14 @@ func (s *TransactionService) DeleteTransaction(ctx context.Context, userID, tran
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck // no-op once committed
 
-	wallet, err := s.repo.AdjustWalletBalance(ctx, tx, existing.WalletID, -existing.SignedEffect())
+	reversal := -existing.SignedEffect()
+	wallet, err := s.repo.AdjustWalletBalance(ctx, tx, existing.WalletID, reversal)
 	if err != nil {
 		return nil, fmt.Errorf("service.DeleteTransaction: %w", err)
+	}
+	// Deleting a transfer takes the money back out of its destination too.
+	if err := s.adjustTransferDestination(ctx, tx, existing, reversal); err != nil {
+		return nil, err
 	}
 
 	if _, err := s.repo.SoftDeleteTransaction(ctx, tx, transactionID, userID); err != nil {

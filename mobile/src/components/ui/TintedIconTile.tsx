@@ -1,17 +1,18 @@
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, View } from "react-native";
+import { Image as CachedImage } from "expo-image";
 
-import { initialFor } from "@/lib/category-color";
+import { EmojiGlyph } from "@/components/ui/EmojiGlyph";
 import { radii } from "@/lib/theme";
+
+const DEFAULT_ICON = require("../../../assets/simple-budgest-logo.png");
 
 interface TintedIconTileProps {
   color: string;
   size?: number;
   icon?: string | null;
   iconUrl?: string | null;
-  // Only rendered when neither icon nor iconUrl is set — same fallback
-  // chain as Avatar.tsx (uploaded image → emoji icon → initial), except the
-  // initial here is tinted the same color as the tile instead of Avatar's
-  // solid-fill + white text.
+  // Accessibility label for the fallback: with neither icon nor iconUrl set
+  // the tile shows the app logo (uploaded image → emoji icon → logo).
   label: string;
 }
 
@@ -39,11 +40,23 @@ export function TintedIconTile({ color, size = 44, icon, iconUrl, label }: Tinte
       ]}
     >
       {iconUrl ? (
-        <Image source={{ uri: iconUrl }} style={{ width: size, height: size }} />
+        <CachedImage
+          source={{ uri: iconUrl }}
+          cachePolicy="memory-disk"
+          recyclingKey={iconUrl}
+          style={{ width: size, height: size }}
+        />
       ) : icon ? (
-        <Text style={{ fontSize: size * 0.45 }}>{icon}</Text>
+        <EmojiGlyph emoji={icon} size={size * 0.6} />
       ) : (
-        <Text style={[styles.initial, { color, fontSize: size * 0.4 }]}>{initialFor(label)}</Text>
+        // Only ever a category/wallet tile, so no icon means the app logo,
+        // not the label's first letter (which read as a broken icon).
+        <Image
+          source={DEFAULT_ICON}
+          style={{ width: size * 0.66, height: size * 0.66 }}
+          resizeMode="contain"
+          accessibilityLabel={label}
+        />
       )}
     </View>
   );
@@ -51,5 +64,4 @@ export function TintedIconTile({ color, size = 44, icon, iconUrl, label }: Tinte
 
 const styles = StyleSheet.create({
   tile: { borderWidth: 1, alignItems: "center", justifyContent: "center", overflow: "hidden" },
-  initial: { fontWeight: "800" },
 });

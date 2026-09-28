@@ -16,6 +16,8 @@ interface BudgetMonthSummaryProps {
   totalLimit: number;
   totalSpent: number;
   currency: string;
+  /** How many budgets in view are individually over their limit. */
+  overCount?: number;
 }
 
 // The one figure this tab exists to answer — how much of this month's budgeted
@@ -29,15 +31,22 @@ export function BudgetMonthSummary({
   totalLimit,
   totalSpent,
   currency,
+  overCount = 0,
 }: BudgetMonthSummaryProps) {
   const remaining = totalLimit - totalSpent;
   const ratio = totalLimit > 0 ? totalSpent / totalLimit : 0;
   const over = remaining < 0;
+  // ⚠️ The total can still have room while one category is already blown —
+  // other categories' unspent money is hiding it. A bright green total bar
+  // sitting right above a red category bar read as the screen contradicting
+  // itself, so the total is never "all clear" green while anything is over,
+  // and it says why.
+  const someOver = !over && overCount > 0;
+  const barColor = over ? colors.peach : someOver ? colors.mustard : colors.green;
 
   return (
     <View style={styles.container}>
       <View style={styles.headRow}>
-        <Text style={styles.month}>{pace.label}</Text>
         {showDaysLeft ? <Text style={styles.daysLeft}>còn {pace.daysLeft} ngày</Text> : null}
       </View>
 
@@ -49,9 +58,14 @@ export function BudgetMonthSummary({
         </Text>
       </Text>
 
-      <BudgetProgressBar ratio={ratio} pace={pace.elapsed} color={over ? colors.peach : colors.green} height={10} />
+      <BudgetProgressBar ratio={ratio} pace={pace.elapsed} color={barColor} height={10} />
 
-      <Text style={styles.paceLabel}>{Math.round(pace.elapsed * 100)}% của {periodNoun} đã trôi qua</Text>
+      {someOver ? (
+        <Text style={styles.overNote}>
+          {overCount} danh mục đã vượt hạn mức — tổng vẫn còn nhờ các danh mục khác.
+        </Text>
+      ) : null}
+
     </View>
   );
 }
@@ -66,4 +80,5 @@ const styles = StyleSheet.create({
   amountOver: { color: colors.peach },
   amountSuffix: { ...typography.body, color: colors.textSecondary, fontWeight: "600" },
   paceLabel: { ...typography.tiny, color: colors.textMuted, textAlign: "center" },
+  overNote: { ...typography.caption, color: colors.mustard },
 });

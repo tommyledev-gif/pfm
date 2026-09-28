@@ -11,10 +11,10 @@ import { Wallet } from "@/features/wallets/types";
 import { useSetDefaultWalletMutation } from "@/features/wallets/api/use-set-default-wallet-mutation";
 
 const TYPE_LABEL: Record<Wallet["type"], string> = {
-  cash: "Cash",
-  bank: "Bank",
-  e_wallet: "E-wallet",
-  other: "Other",
+  cash: "Tiền mặt",
+  bank: "Ngân hàng",
+  e_wallet: "Ví điện tử",
+  other: "Khác",
 };
 
 export function WalletListItem({ wallet, onPress }: { wallet: Wallet; onPress: () => void }) {
@@ -33,7 +33,7 @@ export function WalletListItem({ wallet, onPress }: { wallet: Wallet; onPress: (
             <Text style={styles.name}>{wallet.name}</Text>
             {wallet.is_default ? (
               <View style={styles.badge}>
-                <Text style={styles.badgeLabel}>Default</Text>
+                <Text style={styles.badgeLabel}>Mặc định</Text>
               </View>
             ) : null}
           </View>
@@ -47,7 +47,7 @@ export function WalletListItem({ wallet, onPress }: { wallet: Wallet; onPress: (
             disabled={setDefault.isPending}
             style={styles.defaultButton}
           >
-            <Text style={styles.defaultButtonLabel}>Set default</Text>
+            <Text style={styles.defaultButtonLabel}>Đặt mặc định</Text>
           </Pressable>
         ) : null}
         <ChevronRightIcon size={18} color={colors.textMuted} />

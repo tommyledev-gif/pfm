@@ -5,7 +5,7 @@ specs/ai-chat-assistant (Feature-12 US-01)."""
 from fastapi import FastAPI
 
 from app.core.logging import configure_logging
-from app.routers import budget_router, extract_router
+from app.routers import budget_router, consult_router, extract_router
 
 configure_logging()
 
@@ -13,6 +13,7 @@ app = FastAPI(title="PFM AI Service")
 
 app.include_router(extract_router.router)
 app.include_router(budget_router.router)
+app.include_router(consult_router.router)
 
 
 @app.get("/health")

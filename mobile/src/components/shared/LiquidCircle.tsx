@@ -29,6 +29,11 @@ const MAX_FILL = 0.92;
 // palette color a caller can pass, light enough that the fill still reads
 // through it — the circle's whole job is showing a level.
 const LABEL_SCRIM_COLOR = "rgba(5,11,20,0.62)";
+// The empty part of the circle is transparent — only an outline ring marks
+// its boundary, with a small gap between the ring and the liquid so the ring
+// still reads as a separate edge once the liquid rises against it.
+const OUTLINE_WIDTH = 2;
+const OUTLINE_GAP = 4;
 
 function buildWavePath(width: number, height: number, waterY: number): string {
   const hump = width / 2;
@@ -46,19 +51,21 @@ interface LiquidCircleProps {
   // 0..1 fraction of the circle's height the liquid fills, from the bottom.
   progress: number;
   color?: string;
-  trackColor?: string;
+  /** Ring drawn around the circle. Defaults to the liquid color, softened. */
+  outlineColor?: string;
   topLabel: string;
   topValue: string;
 }
 
 export function LiquidCircle({
-  size = 180,
+  size: outerSize = 180,
   progress,
   color = colors.green,
-  trackColor = "rgba(255,255,255,0.06)",
+  outlineColor,
   topLabel,
   topValue,
 }: LiquidCircleProps) {
+  const size = outerSize - 2 * (OUTLINE_WIDTH + OUTLINE_GAP);
   const clamped = Math.min(MAX_FILL, Math.max(MIN_FILL, progress));
   const waterY = size * (1 - clamped);
   const waveWidth = size * WAVE_WIDTH_MULTIPLIER;
@@ -80,22 +87,34 @@ export function LiquidCircle({
   }, [shift, hump]);
 
   return (
-    <View style={[styles.wrapper, { width: size, height: size, borderRadius: size / 2, backgroundColor: trackColor }]}>
-      <Animated.View
-        style={[styles.wave, { width: waveWidth, height: size, transform: [{ translateX: shift }] }]}
-      >
-        <Svg width={waveWidth} height={size}>
-          <Path d={buildWavePath(waveWidth, size, waterY)} fill={color} />
-        </Svg>
-      </Animated.View>
-      <View style={[styles.label, { width: size * 0.86 }]} pointerEvents="none">
-        <View style={styles.scrim}>
-          <Text style={styles.caption} numberOfLines={1}>
-            {topLabel}
-          </Text>
-          <Text style={styles.value} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.55}>
-            {topValue}
-          </Text>
+    <View
+      style={[
+        styles.outline,
+        {
+          width: outerSize,
+          height: outerSize,
+          borderRadius: outerSize / 2,
+          borderColor: outlineColor ?? `${color}99`,
+        },
+      ]}
+    >
+      <View style={[styles.wrapper, { width: size, height: size, borderRadius: size / 2 }]}>
+        <Animated.View
+          style={[styles.wave, { width: waveWidth, height: size, transform: [{ translateX: shift }] }]}
+        >
+          <Svg width={waveWidth} height={size}>
+            <Path d={buildWavePath(waveWidth, size, waterY)} fill={color} />
+          </Svg>
+        </Animated.View>
+        <View style={[styles.label, { width: size * 0.86 }]} pointerEvents="none">
+          <View style={styles.scrim}>
+            <Text style={styles.caption} numberOfLines={1}>
+              {topLabel}
+            </Text>
+            <Text style={styles.value} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.55}>
+              {topValue}
+            </Text>
+          </View>
         </View>
       </View>
     </View>
@@ -103,6 +122,7 @@ export function LiquidCircle({
 }
 
 const styles = StyleSheet.create({
+  outline: { alignItems: "center", justifyContent: "center", borderWidth: OUTLINE_WIDTH },
   wrapper: { alignItems: "center", justifyContent: "center", overflow: "hidden" },
   wave: { position: "absolute", left: 0, top: 0 },
   label: { position: "absolute", alignItems: "center" },

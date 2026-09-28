@@ -54,6 +54,8 @@ services:
       # by hand — initdb only fires on first initialization.
       - ./db/migrations/019_categories_system_key.sql:/docker-entrypoint-initdb.d/18_categories_system_key.sql:ro
       - ./db/migrations/020_budget_plans.sql:/docker-entrypoint-initdb.d/19_budget_plans.sql:ro
+      # Feature-12 US-03 (specs/ai-chat-query-spending/plan.md AIQ-T11).
+      - ./db/migrations/021_intent_parse_log.sql:/docker-entrypoint-initdb.d/20_intent_parse_log.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s

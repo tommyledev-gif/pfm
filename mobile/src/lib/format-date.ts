@@ -1,8 +1,10 @@
 // Shared date/time formatters — Transactions rows show a date, Notifications
 // group by day label ("Today"/"Yesterday"/date). Kept here so no screen
 // hand-rolls its own Date math.
+// 24-hour "HH:mm", the way Vietnamese readers write times.
 export function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  const date = new Date(iso);
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
 // dd/mm/yyyy, in the device's local timezone (not UTC-anchored like
@@ -17,11 +19,10 @@ export function formatDateDMY(iso: string): string {
   return `${day}/${month}/${year}`;
 }
 
+// "01/09 – 30/09/2026" — the year only once, on the end date.
 export function formatDateRange(fromIso: string, toIso: string): string {
-  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
-  const from = new Date(fromIso).toLocaleDateString("en-US", opts);
-  const to = new Date(toIso).toLocaleDateString("en-US", { ...opts, year: "numeric" });
-  return `${from} – ${to}`;
+  const from = formatDateShort(fromIso).slice(0, 5);
+  return `${from} – ${formatDateShort(toIso)}`;
 }
 
 // Accepts either a plain "YYYY-MM-DD" date-only string OR a full timestamp
@@ -33,12 +34,10 @@ export function formatDateRange(fromIso: string, toIso: string): string {
 // timestamp would double up the suffix and produce an Invalid Date.
 export function formatDateShort(value: string): string {
   const iso = value.includes("T") ? value : `${value}T00:00:00Z`;
-  return new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  });
+  const date = new Date(iso);
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  return `${day}/${month}/${date.getUTCFullYear()}`;
 }
 
 export function dayLabel(iso: string): string {

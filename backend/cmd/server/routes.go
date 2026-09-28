@@ -14,7 +14,7 @@ import (
 // (/api/v1). Auth/rate-limit middleware ordering matters: JWTAuth must run
 // before RequireRole (role comes from the token) and before
 // InviteRateLimiter (keyed by the caller's user ID from that same token).
-func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, transactionExportHandler *handler.TransactionExportHandler, transactionImportHandler *handler.TransactionImportHandler, auditLogHandler *handler.AuditLogHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, chatHandler *handler.ChatHandler, budgetWizardHandler *handler.BudgetWizardHandler, tokens *service.TokenService, logger *zap.Logger) {
+func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, transactionExportHandler *handler.TransactionExportHandler, transactionImportHandler *handler.TransactionImportHandler, auditLogHandler *handler.AuditLogHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, chatHandler *handler.ChatHandler, budgetWizardHandler *handler.BudgetWizardHandler, analyticsHandler *handler.AnalyticsHandler, tokens *service.TokenService, logger *zap.Logger) {
 	// Serves the invite-activation form at the backend's own domain — see
 	// handler.ActivatePageHandler doc comment for why this lives here instead
 	// of on the (currently undeployed) frontend/ Next.js app.
@@ -147,4 +147,15 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	ai.Get("/budget-wizard/prefill", budgetWizardHandler.Prefill)
 	ai.Post("/budget-proposals", budgetWizardHandler.Proposals)
 	ai.Post("/suggest-category-name", budgetWizardHandler.SuggestCategoryName)
+
+	// Feature-12 US-03 Query Spending via Chat (specs/ai-chat-query-spending/
+	// plan.md F3). Deliberately NOT under /ai: Fiber group middleware applies
+	// to every path under its prefix, so any /ai/* route would consume
+	// AIChatRateLimiter's transaction-recording budget (spec.md S-AIQ-37).
+	// /query (chips, follow-ups) has no limiter at all (S-AIQ-35); only free
+	// text is limited, by its own per-route limiter. No CSRF token: both are
+	// Bearer-JWT APIs with no cookie session, so there is no ambient credential.
+	analytics := v1.Group("/analytics", middleware.JWTAuth(tokens, logger))
+	analytics.Post("/query", analyticsHandler.Query)
+	analytics.Post("/consult", middleware.AIConsultRateLimiter(logger), analyticsHandler.Consult)
 }

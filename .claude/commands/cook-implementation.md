@@ -13,7 +13,7 @@ Before writing any code, use gitnexus to read the ONE closest existing complete 
 
 - Go: handler + service + repository + dto files for the nearest entity
 - Next.js: `api/` hooks + `components/` for one existing feature
-- Mobile (React Native/Expo): `api/` + `components/` for one existing feature under `mobile/src/features/` (only if mobile scope active — as of 2026-08-16 `mobile/` has only a project scaffold, no feature yet exists to use as reference; `mobile/src/features/auth/` shows the folder shape but has no implemented API/components yet)
+- Mobile (React Native/Expo): `api/` + `components/` for one existing feature under `mobile/src/features/`. `mobile/` reached full MVP feature parity on 2026-08-21 — use `features/budgets/` or `features/transactions/` as the CRUD reference, `features/ai-chat/` as the chat/AI reference. (Ignore any older note saying `mobile/` is only a scaffold; that stopped being true in August.)
 - Migration: read the latest `.sql` migration as format reference
 
 ## Step 3 — Implement

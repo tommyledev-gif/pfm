@@ -15,12 +15,18 @@ import (
 // literal — struct tags can't reference a Go const (same DateOnlyLayout
 // precedent) — keep the two in sync by hand if this ever changes.
 type CreateTransactionRequest struct {
-	WalletID   uuid.UUID `json:"wallet_id" validate:"required"`
-	CategoryID uuid.UUID `json:"category_id" validate:"required"`
+	WalletID uuid.UUID `json:"wallet_id" validate:"required"`
+	// CategoryID is ignored for a transfer — the server always assigns the
+	// system transfer Category (model.SystemKeyTransfer) — so it is only
+	// required for income/expense.
+	CategoryID uuid.UUID `json:"category_id" validate:"required_unless=Type transfer"`
 	Amount     int64     `json:"amount" validate:"required,gt=0"`
-	Type       string    `json:"type" validate:"required,oneof=income expense"`
-	OccurredAt *string   `json:"occurred_at"`
-	Note       *string   `json:"note" validate:"omitempty,max=500"`
+	Type       string    `json:"type" validate:"required,oneof=income expense transfer"`
+	// ToWalletID is the destination Wallet of a transfer (WalletID is the
+	// source). Required for a transfer, rejected by the service otherwise.
+	ToWalletID *uuid.UUID `json:"to_wallet_id" validate:"required_if=Type transfer"`
+	OccurredAt *string    `json:"occurred_at"`
+	Note       *string    `json:"note" validate:"omitempty,max=500"`
 	// IdempotencyKey is optional and general-purpose — any caller may supply
 	// one (specs/ai-chat-assistant/spec.md Resolved design decision #5, Open
 	// Questions #4). Every existing caller (the manual "Add transaction"
@@ -66,7 +72,7 @@ type ListTransactionsQuery struct {
 	// can't express "comma-separated uuid4 list" so that validation happens
 	// there, not here.
 	CategoryIDs string `query:"category_ids"`
-	Type        string `query:"type" validate:"omitempty,oneof=income expense"`
+	Type        string `query:"type" validate:"omitempty,oneof=income expense transfer"`
 	From        string `query:"from"`
 	To          string `query:"to"`
 	// Search is an ILIKE substring match against a transaction's note (its

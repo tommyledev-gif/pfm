@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { AmountInput } from "@/components/ui/AmountInput";
 import { CategorySelectField } from "@/components/shared/CategorySelectField";
@@ -11,26 +10,18 @@ import { PillButton } from "@/components/ui/PillButton";
 import { TrashIcon } from "@/components/ui/Icon";
 import { SingleDatePickerModal } from "@/components/shared/SingleDatePickerModal";
 import { getErrorMessage } from "@/lib/axios";
-import { formatCurrency, toCents, toMajorUnits } from "@/lib/currency";
+import { formatCurrency } from "@/lib/currency";
 import { formatDateShort } from "@/lib/format-date";
 import { colors, radii, spacing, typography } from "@/lib/theme";
-import { TRANSACTION_NOTE_MAX_LENGTH, TRANSACTION_TYPES, TransactionType } from "@/lib/constants";
-import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
-import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
-import { useCategoryPicker } from "@/features/categories/components/use-category-picker";
-import { useCreateTransactionMutation } from "@/features/transactions/api/use-create-transaction-mutation";
-import { useUpdateTransactionMutation } from "@/features/transactions/api/use-update-transaction-mutation";
-import { useDeleteTransactionMutation } from "@/features/transactions/api/use-delete-transaction-mutation";
+import { TRANSACTION_KIND_LABELS, TRANSACTION_KINDS, TRANSACTION_NOTE_MAX_LENGTH } from "@/lib/constants";
 import { Transaction } from "@/features/transactions/types";
+import { WalletChipRow } from "@/features/transactions/components/WalletChipRow";
+import { useTransactionForm } from "@/features/transactions/components/use-transaction-form";
 
 interface TransactionFormModalProps {
   visible: boolean;
   onClose: () => void;
   editingTransaction?: Transaction | null;
-}
-
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
 }
 
 // Manual "Add/Edit Transaction" form — the AI Chat screen was previously the
@@ -39,104 +30,39 @@ function todayIso(): string {
 // wallet_id/type (dto.UpdateTransactionRequest), so both are locked once
 // editing, mirroring how currency is locked on WalletFormModal.
 export function TransactionFormModal({ visible, onClose, editingTransaction }: TransactionFormModalProps) {
-  const isEditing = Boolean(editingTransaction);
-  const wallets = useWalletsQuery();
-  const [walletId, setWalletId] = useState<string | null>(null);
-  const [type, setType] = useState<TransactionType>("expense");
-  const categories = useCategoriesQuery(type);
-  const [categoryId, setCategoryId] = useState<string | null>(null);
-  const [amount, setAmount] = useState("");
-  const [note, setNote] = useState("");
-  const [occurredAt, setOccurredAt] = useState(todayIso());
-  const [datePickerOpen, setDatePickerOpen] = useState(false);
-  const [submitAttempted, setSubmitAttempted] = useState(false);
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  // Bumped every time the sheet opens and remounts (as a `key`) the amount/
-  // note TextInputs below — belt-and-braces alongside the state reset right
-  // under it, so a stale native text-editing state left over from the
-  // previous open can never survive into a fresh "Giao dịch mới".
-  const [formKey, setFormKey] = useState(0);
-
-  const createTransaction = useCreateTransactionMutation();
-  const updateTransaction = useUpdateTransactionMutation();
-  const deleteTransaction = useDeleteTransactionMutation();
-  const mutation = isEditing ? updateTransaction : createTransaction;
-
-  useEffect(() => {
-    if (!visible) return;
-    if (editingTransaction) {
-      setWalletId(editingTransaction.wallet_id);
-      setType(editingTransaction.type);
-      setCategoryId(editingTransaction.category_id);
-      setAmount(String(toMajorUnits(editingTransaction.amount)));
-      setNote(editingTransaction.note ?? "");
-      setOccurredAt(editingTransaction.occurred_at.slice(0, 10));
-    } else {
-      const defaultWallet = wallets.data?.find((w) => w.is_default) ?? wallets.data?.[0];
-      setWalletId(defaultWallet?.id ?? null);
-      setType("expense");
-      setCategoryId(null);
-      setAmount("");
-      setNote("");
-      setOccurredAt(todayIso());
-    }
-    setSubmitAttempted(false);
-  }, [visible, editingTransaction, wallets.data]);
-
-  // Separate from the reset above on purpose: that effect also re-runs
-  // whenever `wallets.data` refetches in the background (e.g. right after
-  // creating a transaction invalidates it) — bumping the remount key there
-  // too would yank focus out from under anyone still typing in an open
-  // sheet. This one only fires on the true open transition.
-  useEffect(() => {
-    if (visible) setFormKey((k) => k + 1);
-  }, [visible]);
-
-  const amountValue = Number(amount);
-  const errors = {
-    wallet: !isEditing && !walletId ? "Vui lòng chọn ví" : undefined,
-    category: !categoryId ? "Vui lòng chọn danh mục" : undefined,
-    amount: !amount || !(amountValue > 0) ? "Vui lòng nhập số tiền hợp lệ" : undefined,
-  };
-  const hasErrors = Boolean(errors.wallet || errors.category || errors.amount);
-
-  // So the user knows what a create is about to do to the wallet before they
-  // commit to it, not after — the projected figure only shows once a valid
-  // amount is entered, since "→ NaN" before that would just be noise.
-  const selectedWallet = wallets.data?.find((w) => w.id === walletId);
-  const projectedBalance =
-    selectedWallet && amountValue > 0
-      ? selectedWallet.balance + (type === "income" ? toCents(amountValue) : -toCents(amountValue))
-      : null;
-
-  const submit = () => {
-    // The amount/note keyboard should never still be up once submit has been
-    // tapped — even a validation failure should leave the field errors
-    // visible, not hidden behind the keyboard.
-    Keyboard.dismiss();
-    setSubmitAttempted(true);
-    if (hasErrors || !walletId || !categoryId) return;
-    if (isEditing && editingTransaction) {
-      updateTransaction.mutate(
-        {
-          id: editingTransaction.id,
-          body: { amount: toCents(amountValue), category_id: categoryId, occurred_at: occurredAt, note: note || undefined },
-        },
-        { onSuccess: onClose },
-      );
-    } else {
-      createTransaction.mutate(
-        { wallet_id: walletId, category_id: categoryId, amount: toCents(amountValue), type, occurred_at: occurredAt, note: note || undefined },
-        { onSuccess: onClose },
-      );
-    }
-  };
-
-  const categoryPicker = useCategoryPicker({
-    categories: categories.data ?? [],
-    selectedIds: categoryId ? [categoryId] : [],
-    onApply: (ids) => setCategoryId(ids[0] ?? null),
-  });
+  const {
+    isEditing,
+    wallets,
+    walletId,
+    setWalletId,
+    type,
+    setType,
+    isTransfer,
+    toWalletId,
+    setToWalletId,
+    setCategoryId,
+    amount,
+    setAmount,
+    note,
+    setNote,
+    occurredAt,
+    setOccurredAt,
+    datePickerOpen,
+    setDatePickerOpen,
+    submitAttempted,
+    confirmDeleteOpen,
+    setConfirmDeleteOpen,
+    formKey,
+    deleteTransaction,
+    mutation,
+    errors,
+    hasErrors,
+    selectedWallet,
+    destinationWallets,
+    projectedBalance,
+    submit,
+    categoryPicker,
+  } = useTransactionForm({ visible, onClose, editingTransaction });
 
   const activeError = mutation.isError ? mutation.error : deleteTransaction.isError ? deleteTransaction.error : null;
 
@@ -161,18 +87,20 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
       >
         <DrawerHeader title={isEditing ? "Sửa giao dịch" : "Giao dịch mới"} />
 
-        <Text style={styles.label}>Ví{isEditing ? " (khóa sau khi tạo)" : ""}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-          {wallets.data?.map((w) => (
-            <Pressable
-              key={w.id}
-              onPress={() => !isEditing && setWalletId(w.id)}
-              style={[styles.chip, walletId === w.id && styles.chipActive, isEditing && styles.chipDisabled]}
-            >
-              <Text style={[styles.chipLabel, walletId === w.id && styles.chipLabelActive]}>{w.name}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
+        <Text style={styles.label}>
+          {isTransfer ? "Từ ví" : "Ví"}
+          {isEditing ? " (khóa sau khi tạo)" : ""}
+        </Text>
+        <WalletChipRow
+          wallets={wallets.data ?? []}
+          selectedId={walletId}
+          locked={isEditing}
+          onSelect={(id) => {
+            setWalletId(id);
+            // The destination may now be the source itself, or in another currency.
+            setToWalletId(null);
+          }}
+        />
         {submitAttempted ? <FieldError message={errors.wallet} /> : null}
         {selectedWallet ? (
           <Text style={styles.balanceHint}>
@@ -185,7 +113,7 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
 
         <Text style={styles.label}>Loại{isEditing ? " (khóa sau khi tạo)" : ""}</Text>
         <View style={styles.chipRow}>
-          {TRANSACTION_TYPES.map((t) => (
+          {TRANSACTION_KINDS.map((t) => (
             <Pressable
               key={t}
               onPress={() => {
@@ -196,15 +124,34 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
               style={[styles.chip, type === t && styles.chipActive, isEditing && styles.chipDisabled]}
             >
               <Text style={[styles.chipLabel, type === t && styles.chipLabelActive]}>
-                {t === "expense" ? "Chi" : "Thu"}
+                {TRANSACTION_KIND_LABELS[t]}
               </Text>
             </Pressable>
           ))}
         </View>
 
-        <Text style={styles.label}>Danh mục</Text>
-        <CategorySelectField categories={categoryPicker.selected} onPress={categoryPicker.open} />
-        {submitAttempted ? <FieldError message={errors.category} /> : null}
+        {isTransfer ? (
+          <>
+            <Text style={styles.label}>Đến ví{isEditing ? " (khóa sau khi tạo)" : ""}</Text>
+            {destinationWallets.length > 0 ? (
+              <WalletChipRow
+                wallets={destinationWallets}
+                selectedId={toWalletId}
+                onSelect={setToWalletId}
+                locked={isEditing}
+              />
+            ) : (
+              <Text style={styles.balanceHint}>Cần thêm một ví khác cùng đơn vị tiền tệ để chuyển khoản.</Text>
+            )}
+            {submitAttempted ? <FieldError message={errors.toWallet} /> : null}
+          </>
+        ) : (
+          <>
+            <Text style={styles.label}>Danh mục</Text>
+            <CategorySelectField categories={categoryPicker.selected} onPress={categoryPicker.open} />
+            {submitAttempted ? <FieldError message={errors.category} /> : null}
+          </>
+        )}
 
         <Text style={styles.label}>Số tiền</Text>
         <AmountInput key={`amount-${formKey}`} value={amount} onChangeText={setAmount} />
@@ -229,10 +176,14 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
         {activeError ? <Text style={styles.error}>{getErrorMessage(activeError, "Không thể lưu giao dịch")}</Text> : null}
 
         {isEditing ? (
-          <Pressable style={styles.deleteRow} onPress={() => setConfirmDeleteOpen(true)} disabled={deleteTransaction.isPending}>
-            <TrashIcon size={18} />
-            <Text style={styles.deleteLabel}>Xóa giao dịch</Text>
-          </Pressable>
+          <PillButton
+            label="Xóa giao dịch"
+            icon={<TrashIcon size={18} color={colors.onDanger} />}
+            onPress={() => setConfirmDeleteOpen(true)}
+            loading={deleteTransaction.isPending}
+            style={styles.deleteButton}
+            textStyle={styles.deleteLabel}
+          />
         ) : null}
       </Drawer>
 
@@ -261,9 +212,14 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
 const styles = StyleSheet.create({
   label: { ...typography.caption, color: colors.textSecondary },
   balanceHint: { ...typography.tiny, color: colors.textMuted },
-  chipRow: { flexDirection: "row", gap: spacing.sm },
+  chipRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
+  // Fixed height + centred label, not vertical padding: the type chips and
+  // the wallet chips (a horizontal ScrollView, which stretches its children)
+  // used to come out at different heights.
   chip: {
-    paddingVertical: 8,
+    height: 36,
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 14,
     borderRadius: radii.pill,
     backgroundColor: "rgba(255,255,255,0.06)",
@@ -287,6 +243,6 @@ const styles = StyleSheet.create({
   error: { color: colors.peach, ...typography.caption },
   actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
   flexButton: { flex: 1 },
-  deleteRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, paddingVertical: spacing.sm },
-  deleteLabel: { ...typography.body, color: colors.peach },
+  deleteButton: { backgroundColor: colors.danger, marginTop: spacing.sm },
+  deleteLabel: { color: colors.onDanger, fontWeight: "800" },
 });

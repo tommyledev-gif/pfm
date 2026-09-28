@@ -17,7 +17,7 @@ func newTestNotificationService(t *testing.T) (*NotificationService, *fakeNotifi
 	t.Helper()
 	notificationRepo := newFakeNotificationRepo()
 	budgetRepo := newFakeBudgetRepo()
-	return NewNotificationService(notificationRepo, budgetRepo, zap.NewNop()), notificationRepo, budgetRepo
+	return NewNotificationService(notificationRepo, budgetRepo, newTestCycleResolver(), zap.NewNop()), notificationRepo, budgetRepo
 }
 
 // seedActiveBudget inserts a Budget with a single currency limit directly
