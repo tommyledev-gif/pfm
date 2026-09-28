@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
@@ -147,12 +148,13 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 // caller with no valid credentials at all — worst case, the old token
 // simply outlives its intended single use by the remainder of its own TTL.
 func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (accessToken string, newRefreshToken string, err error) {
-	jti, subject, expiresAt, err := s.tokens.ParseRefreshTokenUnverified(refreshToken)
-	if err != nil {
+	// Signature, expiry and token kind are all checked here; a forged,
+	// expired or non-refresh token is simply unauthenticated.
+	jti, subject, expiresAt, err := s.tokens.ParseRefreshToken(refreshToken)
+	if errors.Is(err, jwt.ErrTokenMalformed) {
 		return "", "", common.NewInvalidInputError("refresh token is malformed")
 	}
-
-	if expiresAt.Before(time.Now().UTC()) {
+	if err != nil {
 		return "", "", common.ErrUnauthenticated
 	}
 

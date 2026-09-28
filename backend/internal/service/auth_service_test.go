@@ -272,6 +272,66 @@ func TestAuthService_Refresh(t *testing.T) {
 		}
 	})
 
+	// ⚠️ The account-takeover case: a token for a real user, signed with a
+	// key the attacker chose, must never be refreshed.
+	t.Run("forged refresh token for a real user is rejected", func(t *testing.T) {
+		svc, repo, _ := newTestAuthService(t)
+		seedActiveUser(t, repo, "homer@example.com", "correcthorse1", model.UserStatusActive)
+		user, err := repo.GetUserByEmail(context.Background(), "homer@example.com")
+		if err != nil {
+			t.Fatalf("seed lookup failed: %v", err)
+		}
+		forged := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				ID: uuid.NewString(), Subject: user.ID.String(),
+				ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(time.Hour)),
+			},
+		})
+		forgedStr, err := forged.SignedString([]byte("attacker-chosen-key"))
+		if err != nil {
+			t.Fatalf("failed to sign forged token: %v", err)
+		}
+
+		_, _, err = svc.Refresh(context.Background(), forgedStr)
+		var appErr *common.AppError
+		if !errors.As(err, &appErr) || appErr.Code != common.ErrCodeUnauthenticated {
+			t.Fatalf("expected UNAUTHENTICATED for a forged token, got %v", err)
+		}
+	})
+
+	t.Run("alg none token is rejected", func(t *testing.T) {
+		svc, repo, _ := newTestAuthService(t)
+		seedActiveUser(t, repo, "homer@example.com", "correcthorse1", model.UserStatusActive)
+		user, _ := repo.GetUserByEmail(context.Background(), "homer@example.com")
+		unsigned := jwt.NewWithClaims(jwt.SigningMethodNone, refreshClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				ID: uuid.NewString(), Subject: user.ID.String(),
+				ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(time.Hour)),
+			},
+		})
+		unsignedStr, err := unsigned.SignedString(jwt.UnsafeAllowNoneSignatureType)
+		if err != nil {
+			t.Fatalf("failed to build unsigned token: %v", err)
+		}
+		if _, _, err := svc.Refresh(context.Background(), unsignedStr); err == nil {
+			t.Fatal("expected an alg=none token to be rejected")
+		}
+	})
+
+	t.Run("access token cannot be used as a refresh token", func(t *testing.T) {
+		svc, repo, _ := newTestAuthService(t)
+		seedActiveUser(t, repo, "homer@example.com", "correcthorse1", model.UserStatusActive)
+		access, _, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1")
+		if err != nil {
+			t.Fatalf("login failed: %v", err)
+		}
+		_, _, err = svc.Refresh(context.Background(), access)
+		var appErr *common.AppError
+		if !errors.As(err, &appErr) || appErr.Code != common.ErrCodeUnauthenticated {
+			t.Fatalf("expected UNAUTHENTICATED for an access token, got %v", err)
+		}
+	})
+
 	t.Run("malformed refresh token is rejected as invalid input", func(t *testing.T) {
 		svc, _, _ := newTestAuthService(t)
 		_, _, err := svc.Refresh(context.Background(), "not-a-jwt")

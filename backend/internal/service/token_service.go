@@ -115,8 +115,31 @@ func (s *TokenService) ParseAccessToken(tokenString string) (*AccessClaims, erro
 	return claims, nil
 }
 
+// ParseRefreshToken verifies a refresh token's signature and expiry before
+// any claim is trusted. ⚠️ Refresh mints a new pair for the token's subject,
+// so an unverified parse there let anyone forge a token for any user. The
+// jti requirement also rejects access and import tokens (they carry none),
+// which share the signing key.
+func (s *TokenService) ParseRefreshToken(tokenString string) (jti string, subject string, expiresAt time.Time, err error) {
+	claims := &refreshClaims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
+		return s.signingKey, nil
+	}, jwt.WithExpirationRequired())
+	if err != nil {
+		return "", "", time.Time{}, fmt.Errorf("service.ParseRefreshToken: %w", err)
+	}
+	if !token.Valid || claims.ID == "" || claims.Subject == "" {
+		return "", "", time.Time{}, fmt.Errorf("service.ParseRefreshToken: not a valid refresh token")
+	}
+	return claims.ID, claims.Subject, claims.ExpiresAt.Time, nil
+}
+
 // ParseRefreshTokenUnverified extracts the jti and expiry from a refresh
-// token WITHOUT verifying its signature — plan.md's US-05 sequence diagram
+// token WITHOUT verifying its signature. Logout only — never to issue
+// credentials (see ParseRefreshToken) — plan.md's US-05 sequence diagram
 // explicitly does not require signature re-verification to revoke a token
 // (revoking a jti that never belonged to a real signed token is harmless:
 // it just occupies a row that will never be looked up by a legitimate

@@ -6,11 +6,22 @@
 # Variable substitution below (${VAR}) is resolved by `docker compose
 # --env-file .env.prod ...` (see deploy.sh) — .env.prod itself is written on
 # the VPS from the VPS_ENV_PROD GitHub secret, it is never committed.
+
+# Local container logs are size-capped so they can never fill the disk.
+# Retention by age (30 d normal / 60 d severe) is done off-box by
+# ops/archive-logs.sh, which ships each day's logs to R2 before rotation.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
 services:
   pfm-postgres:
     image: postgres:16-alpine
     container_name: pfm-postgres-container
     restart: unless-stopped
+    logging: *default-logging
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -71,6 +82,7 @@ services:
     container_name: pfm-backend-container
     restart: unless-stopped
     pull_policy: always
+    logging: *default-logging
     environment:
       PORT: 8080
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pfm-postgres:5432/${POSTGRES_DB}?sslmode=disable
@@ -106,8 +118,13 @@ services:
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
       SEED_ADMIN_NAME: ${SEED_ADMIN_NAME:-Admin}
     ports:
-      # 80 so Cloudflare/VPS firewall (setup-ufw.sh) can reach it directly.
-      - "${BACKEND_PORT_EXTERNAL:-80}:8080"
+      # ⚠️ Docker publishes ports through its own iptables chain, BEFORE ufw,
+      # so setup-ufw.sh's Cloudflare-only rule never applied to this port.
+      # Once traffic arrives through pfm-cloudflared, set
+      # BACKEND_BIND_ADDRESS=127.0.0.1 and nothing is exposed at all
+      # (docs/ops-runbook.md §Cloudflare Tunnel). The default keeps the old
+      # public port so a deploy without a tunnel never takes the API down.
+      - "${BACKEND_BIND_ADDRESS:-0.0.0.0}:${BACKEND_PORT_EXTERNAL:-80}:8080"
     healthcheck:
       test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:8080/api/v1/health"]
       interval: 10s
@@ -131,6 +148,7 @@ services:
     container_name: pfm-ai-service-container
     restart: unless-stopped
     pull_policy: always
+    logging: *default-logging
     environment:
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
@@ -144,6 +162,30 @@ services:
       resources:
         limits:
           memory: ${MEM_LIMIT_AI_SERVICE:-192M}
+
+  # Cloudflare Tunnel: an outbound, encrypted connection from this box to
+  # Cloudflare, so Cloudflare → origin never travels as plain HTTP and no
+  # inbound port has to be open. The public hostname's service is
+  # http://pfm-backend:8080, set in the Cloudflare dashboard. Started only
+  # when CLOUDFLARE_TUNNEL_TOKEN is set (deploy.sh enables this profile).
+  pfm-cloudflared:
+    # Not pinned on purpose: Cloudflare stops supporting cloudflared releases
+    # after a year, so a pinned tag silently ages into a broken tunnel.
+    image: cloudflare/cloudflared:latest
+    pull_policy: always
+    container_name: pfm-cloudflared-container
+    restart: unless-stopped
+    profiles: ["tunnel"]
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      - pfm-backend
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: ${MEM_LIMIT_CLOUDFLARED:-128M}
 
 volumes:
   pfm_postgres_data:

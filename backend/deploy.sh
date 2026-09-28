@@ -51,6 +51,20 @@ if [ -n "$missing" ]; then
   exit 1
 fi
 
+env_has() { grep -qE "^[[:space:]]*$1=.+" "$ENV_FILE_PATH"; }
+
+# Cloudflare Tunnel (docs/ops-runbook.md). The tunnel service only starts
+# with a token; closing the public port without one would take the API
+# offline, so that combination is refused rather than deployed.
+services="pfm-postgres pfm-backend ai-service"
+if env_has CLOUDFLARE_TUNNEL_TOKEN; then
+  export COMPOSE_PROFILES=tunnel
+  services="$services pfm-cloudflared"
+elif grep -qE "^[[:space:]]*BACKEND_BIND_ADDRESS=127\.0\.0\.1" "$ENV_FILE_PATH"; then
+  echo "Refusing to deploy — BACKEND_BIND_ADDRESS=127.0.0.1 without CLOUDFLARE_TUNNEL_TOKEN leaves the API unreachable." >&2
+  exit 1
+fi
+
 # `docker compose pull` (no service arg) fetches every service's image
 # concurrently, which is the trigger for a known containerd race
 # (moby/moby#43910, containerd/containerd#4931): a content lease created for
@@ -76,7 +90,7 @@ pull_with_retry() {
 
 # --env-file makes docker compose resolve ${VAR} in docker-compose.yml from
 # this file directly, no need to `source` it into the shell first.
-for service in pfm-postgres pfm-backend ai-service; do
+for service in $services; do
   pull_with_retry "$service"
 done
 docker compose --env-file "$ENV_FILE_PATH" up -d --remove-orphans
@@ -112,5 +126,16 @@ docker compose --env-file "$ENV_FILE_PATH" run --rm --entrypoint ./migrate pfm-b
 # $ENV_FILE_PATH. `run --rm` starts a throwaway container on the same
 # network/env as pfm-backend without touching the already-running one.
 docker compose --env-file "$ENV_FILE_PATH" run --rm --entrypoint ./seed pfm-backend
+
+# Nightly R2 backup + log archive (ops/, docs/ops-runbook.md). Only once the
+# backup bucket is configured — otherwise every night would log a failure.
+# ops/ is synced by deploy-backend.yml only, hence the existence check.
+if [ -f ops/install-cron.sh ]; then
+  if env_has BACKUP_R2_BUCKET; then
+    bash ops/install-cron.sh
+  else
+    echo "BACKUP_R2_BUCKET not set — Postgres backups to R2 are NOT scheduled." >&2
+  fi
+fi
 
 docker image prune -f

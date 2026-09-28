@@ -87,7 +87,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
-          source: "backend/deploy.sh,backend/docker-compose.yml,backend/db/migrations"
+          source: "backend/deploy.sh,backend/docker-compose.yml,backend/db/migrations,backend/ops"
           target: "${{ secrets.VPS_APP_DIR }}"
 
       - name: Deploy to VPS over SSH
