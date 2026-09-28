@@ -4,7 +4,7 @@ import { CategoryBanner } from "@/features/analytics/components/CategoryBanner";
 import { CategoryChoiceList } from "@/features/analytics/components/CategoryChoiceList";
 import { ChartRenderer } from "@/features/analytics/components/ChartRenderer";
 import { SuggestionChips } from "@/features/analytics/components/SuggestionChips";
-import { AnalyticsQuery, ConsultCategoryRef, ConsultMessageData } from "@/features/analytics/types";
+import { AnalyticsPeriodInfo, AnalyticsQuery, ConsultCategoryRef, ConsultMessageData } from "@/features/analytics/types";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 
 export interface ConsultHandlers {
@@ -20,9 +20,22 @@ interface ConsultReplyCardProps {
   handlers: ConsultHandlers;
 }
 
+const SO_FAR_SUFFIX = " (đến hôm nay)";
+// A single day that is today is still in progress — "up to now", since
+// "up to today" about today says nothing (spec.md S-AIQ-49).
+const SO_FAR_TODAY_SUFFIX = " (đến giờ)";
+
 function shortDate(isoDate: string): string {
   const [, month, day] = isoDate.split("-");
   return `${day}/${month}`;
+}
+
+// "28/09 (đến giờ)" for a single day, "01/09 – 30/09 (đến hôm nay)" for a range.
+function periodText(period: AnalyticsPeriodInfo): string {
+  const singleDay = period.from_date === period.to_date;
+  const range = singleDay ? shortDate(period.from_date) : `${shortDate(period.from_date)} – ${shortDate(period.to_date)}`;
+  if (!period.partial) return range;
+  return range + (singleDay ? SO_FAR_TODAY_SUFFIX : SO_FAR_SUFFIX);
 }
 
 // Everything under an analysis reply's text: the answer's period and chart,
@@ -42,8 +55,7 @@ export function ConsultReplyCard({ data, handlers }: ConsultReplyCardProps) {
       {answer ? (
         <>
           <Text testID="text-analytics-period" style={styles.period}>
-            {shortDate(answer.period.from_date)} – {shortDate(answer.period.to_date)}
-            {answer.period.partial ? " (đến hôm nay)" : ""} · {answer.tx_count} giao dịch
+            {periodText(answer.period)} · {answer.tx_count} giao dịch
           </Text>
           <ChartRenderer chart={answer.chart} currency={answer.currency} />
           {answer.notices.map((n) => (
