@@ -100,7 +100,11 @@ const styles = StyleSheet.create({
   },
   pressed: { opacity: 0.85 },
   disabled: { opacity: 0.4 },
-  label: { ...typography.body, fontWeight: "700" },
+  // textAlign + flexShrink, because a pill is often laid out with flex:1 in a
+  // two-button row (ConfirmDialog): a label like "Đặt mặc định" wraps there,
+  // and a wrapped Text block is centred as a block while its own lines stay
+  // left-aligned inside it — which reads as the button's text being off-centre.
+  label: { ...typography.body, fontWeight: "700", textAlign: "center", flexShrink: 1 },
   solidLabel: { color: colors.onGreen },
   outlineLabel: { color: colors.textPrimary },
 });

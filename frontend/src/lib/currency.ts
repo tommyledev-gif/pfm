@@ -1,9 +1,18 @@
 // Shared money formatter — mirrors mobile/'s CurrencyFormatter. Never format
 // money inline in JSX (`amount / 100`); every amount from the API is integer
 // cents and must go through here.
+// ⚠️ The locale follows the CURRENCY, not the user — same rule as
+// mobile/src/lib/currency.ts, which this mirrors. vi-VN renders a foreign
+// currency as "64.646.464 US$": a symbol nobody writes, in a position nobody
+// writes it in. VND keeps the Vietnamese conventions; everything else is
+// written the way its own users write it ("$64,646,464").
+function localeFor(currency: string): string {
+  return currency.toUpperCase() === "VND" ? "vi-VN" : "en-US";
+}
+
 export function formatCurrency(amountCents: number, currency: string = "VND"): string {
   const amount = amountCents / 100;
-  return new Intl.NumberFormat("vi-VN", {
+  return new Intl.NumberFormat(localeFor(currency), {
     style: "currency",
     currency,
     maximumFractionDigits: 0,

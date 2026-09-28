@@ -15,7 +15,7 @@ import {
   WalletIcon,
 } from "@/components/ui/Icon";
 import { Screen } from "@/components/shared/Screen";
-import { formatCurrency } from "@/lib/currency";
+import { RevealableAmount } from "@/components/shared/RevealableAmount";
 import { colors, spacing, typography } from "@/lib/theme";
 import { useSessionStore } from "@/stores/session-store";
 import { useChatStore } from "@/stores/chat-store";
@@ -93,23 +93,36 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.statRow}>
+        {/* Compacted, because three figures share one row: a fully-grouped
+            net worth shrank to unreadable or clipped mid-number here. The
+            exact figure is a one-second hold away on each — see
+            RevealableAmount. */}
         <Card style={styles.statCard}>
           <Text style={styles.statLabel}>Tài sản ròng</Text>
-          <Text style={styles.statValue} numberOfLines={1}>
-            {netWorth ? formatCurrency(netWorth.amount, netWorth.currency) : "—"}
-          </Text>
+          <RevealableAmount
+            amountCents={netWorth ? netWorth.amount : null}
+            currency={netWorth?.currency ?? "VND"}
+            style={styles.statValue}
+            testID="text-settings-net-worth"
+          />
         </Card>
         <Card style={styles.statCard}>
           <Text style={styles.statLabel}>Thu nhập</Text>
-          <Text style={[styles.statValue, { color: colors.green }]} numberOfLines={1}>
-            {primaryTotal ? formatCurrency(primaryTotal.total_income, primaryTotal.currency) : "—"}
-          </Text>
+          <RevealableAmount
+            amountCents={primaryTotal ? primaryTotal.total_income : null}
+            currency={primaryTotal?.currency ?? "VND"}
+            style={[styles.statValue, { color: colors.green }]}
+            testID="text-settings-income"
+          />
         </Card>
         <Card style={styles.statCard}>
           <Text style={styles.statLabel}>Chi tiêu</Text>
-          <Text style={[styles.statValue, { color: colors.peach }]} numberOfLines={1}>
-            {primaryTotal ? formatCurrency(primaryTotal.total_expense, primaryTotal.currency) : "—"}
-          </Text>
+          <RevealableAmount
+            amountCents={primaryTotal ? primaryTotal.total_expense : null}
+            currency={primaryTotal?.currency ?? "VND"}
+            style={[styles.statValue, { color: colors.peach }]}
+            testID="text-settings-expense"
+          />
         </Card>
       </View>
 

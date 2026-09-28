@@ -150,7 +150,7 @@ export function TransactionsHeader({
           wording is new; no figure, filter default or query changed. */}
       {dateRangeLabel === null ? (
         <Text style={styles.periodNote} numberOfLines={2}>
-          Số liệu trên tính theo {periodLabel.toLowerCase()}. Danh sách bên dưới hiển thị mọi giao dịch.
+          Số liệu trên tính theo {periodLabel.toLowerCase()}.
         </Text>
       ) : null}
 
@@ -172,7 +172,17 @@ export function TransactionsHeader({
 
       <SegmentedTabs options={typeOptions} value={typeFilter} onChange={onChangeTypeFilter} />
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+      {/* Full-bleed: the screen's own 20px side padding is cancelled on the
+          scroller and re-applied INSIDE it, so the first pill still lines up
+          with the title and the search box above, while pills scrolling past
+          either end run to the physical screen edge instead of stopping short
+          of it against a strip of background. */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterScroller}
+        contentContainerStyle={styles.filterRow}
+      >
         <FilterPill
           active={Boolean(dateRangeLabel)}
           label={dateRangeLabel ?? "Khoảng thời gian"}
@@ -247,7 +257,8 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, ...typography.body, color: colors.textPrimary, padding: 0 },
   clearSearch: { ...typography.body, color: colors.textSecondary },
-  filterRow: { flexDirection: "row", gap: spacing.sm },
+  filterScroller: { marginHorizontal: -spacing.xl },
+  filterRow: { flexDirection: "row", gap: spacing.sm, paddingHorizontal: spacing.xl },
   sortBadge: {
     position: "absolute",
     top: -4,

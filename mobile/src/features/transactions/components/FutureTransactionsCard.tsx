@@ -46,11 +46,12 @@ const styles = StyleSheet.create({
     borderRadius: radii.listCard,
     borderWidth: 1,
     borderStyle: "dashed",
-    borderColor: colors.surfaceBorder,
+    backgroundColor: colors.surface,
+    borderColor: colors.greenDark,
     // Faded as a whole rather than per-element: everything in here describes
     // money that has not moved yet, and the opacity is what says so before a
     // single word is read.
-    opacity: 0.6,
+    opacity: 0.8,
   },
   textBlock: { flex: 1, gap: 2 },
   title: { ...typography.label, color: colors.textPrimary },

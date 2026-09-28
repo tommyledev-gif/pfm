@@ -5,6 +5,7 @@ import { TintedIconTile } from "@/components/ui/TintedIconTile";
 import { formatCurrency } from "@/lib/currency";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
+import { walletSurface } from "@/features/wallets/wallet-surface";
 
 const TYPE_COLOR: Record<Wallet["type"], string> = {
   cash: colors.mint,
@@ -61,11 +62,18 @@ interface WalletStackCardProps {
  */
 export function WalletStackCard({ wallet, animatedStyle, activeOpacity }: WalletStackCardProps) {
   const typeColor = TYPE_COLOR[wallet.type];
+  // ⚠️ Keyed to the WALLET, not to its type: two bank accounts must not share a
+  // surface, or the stack shows one card where there are two. Type is still
+  // said by the icon tile and the dot, which keep typeColor.
+  const surface = walletSurface(wallet.id);
 
   return (
-    <Animated.View testID={`card-wallet-${wallet.id}`} style={[styles.card, animatedStyle]}>
+    <Animated.View
+      testID={`card-wallet-${wallet.id}`}
+      style={[styles.card, { backgroundColor: surface.bg, borderColor: `${surface.accent}33` }, animatedStyle]}
+    >
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: activeOpacity }]}>
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: `${typeColor}1F` }]} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: `${surface.accent}1F` }]} />
         <BlurView intensity={24} tint="dark" style={StyleSheet.absoluteFill} />
       </Animated.View>
 
@@ -73,7 +81,7 @@ export function WalletStackCard({ wallet, animatedStyle, activeOpacity }: Wallet
           borderColor cannot be animated on the native driver. */}
       <Animated.View
         pointerEvents="none"
-        style={[styles.accentBorder, { borderColor: `${typeColor}66`, opacity: activeOpacity }]}
+        style={[styles.accentBorder, { borderColor: `${surface.accent}80`, opacity: activeOpacity }]}
       />
 
       <View style={styles.content}>
@@ -117,10 +125,11 @@ const styles = StyleSheet.create({
     height: CARD_HEIGHT,
     borderRadius: radii.card,
     borderWidth: 1,
+    // Both are per-wallet — see wallet-surface.ts. The fill must stay opaque:
+    // neighbouring cards now pass UNDERNEATH this one, and a see-through
+    // surface would show their edges through it.
     borderColor: colors.surfaceBorder,
     overflow: "hidden",
-    // Opaque, not translucent: the neighbouring cards now pass UNDERNEATH this
-    // one, and a see-through surface would show their edges through it.
     backgroundColor: colors.surface,
     // The drop shadow is what separates the overlapping cards from each other
     // now that no background shows between them. iOS reads these; Android

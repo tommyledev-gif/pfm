@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
     gap: 2,
     paddingHorizontal: 6,
     paddingVertical: 3,
-    borderRadius: 10,
+    borderRadius: 6,
     backgroundColor: LABEL_SCRIM_COLOR,
   },
   caption: { ...typography.caption, color: colors.textSecondary },

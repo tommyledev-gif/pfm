@@ -3,13 +3,29 @@
 // specs/ai-chat-assistant's own live-tested cents-conversion bug — every
 // amount from the API is integer cents and must go through here, never
 // `amount / 100` inline in a component).
-export function formatCurrency(amountCents: number, currency: string = "VND"): string {
-  const amount = amountCents / 100;
-  return new Intl.NumberFormat("vi-VN", {
+// ⚠️ The locale follows the CURRENCY, not the user. vi-VN formats every
+// foreign currency by its ISO-ish fallback in the Vietnamese position —
+// "64.646.464 US$" — which is a symbol nobody writes, in a place nobody writes
+// it. VND keeps the Vietnamese conventions it belongs to (dot grouping,
+// trailing ₫); everything else is written the way its own users write it
+// ("$64,646,464").
+const VND_LOCALE = "vi-VN";
+const FOREIGN_LOCALE = "en-US";
+
+function localeFor(currency: string): string {
+  return currency.toUpperCase() === "VND" ? VND_LOCALE : FOREIGN_LOCALE;
+}
+
+function currencyFormat(currency: string): Intl.NumberFormat {
+  return new Intl.NumberFormat(localeFor(currency), {
     style: "currency",
     currency,
     maximumFractionDigits: 0,
-  }).format(amount);
+  });
+}
+
+export function formatCurrency(amountCents: number, currency: string = "VND"): string {
+  return currencyFormat(currency).format(amountCents / 100);
 }
 
 // Inverse of the above — converts a form input collected in the wallet's
@@ -36,11 +52,16 @@ export function toMajorUnits(amountCents: number): number {
 // tell 7.08m and 7.1m apart — the leading "~" says plainly that this is a
 // rounded display value, not the exact figure (long-press callers pair this
 // with AmountRevealPopup for the exact one).
-// Vietnamese magnitude shorthand: nghìn / triệu / tỷ. Named rather than
-// inlined because three screens render these — the Insights donut and stat
-// cards, and the Transactions type tabs — and an abbreviation that differs
-// between them reads as a different unit, not a different style.
-const MAGNITUDE_SUFFIX = { thousand: "ng", million: "tr", billion: "tỷ" } as const;
+// Magnitude shorthand: k / triệu / tỷ. Named rather than inlined because
+// several screens render these — the Insights donut and stat cards, the
+// Transactions type tabs, Settings' three figures — and an abbreviation that
+// differs between them reads as a different unit, not a different style.
+//
+// ⚠️ Thousands are "k", never "ng". "ng" abbreviates nghìn only in writing
+// that spells the rest out too; jammed against a compacted figure it reads as
+// a stray syllable ("7tr100ng"). "k" is what a Vietnamese reader already sees
+// on every price tag ("50k").
+const MAGNITUDE_SUFFIX = { thousand: "k", million: "tr", billion: "tỷ" } as const;
 
 export function formatCurrencyCompact(amountCents: number, currency: string = "VND"): string {
   const amount = Math.round(amountCents / 100);
@@ -64,16 +85,24 @@ export function formatCurrencyCompact(amountCents: number, currency: string = "V
     subWhole = 0;
   }
 
-  return `~${sign}${whole}${suffix}${subWhole ? `${subWhole}${subSuffix}` : ""} ${currencySymbol(currency)}`;
+  const digits = `${whole}${suffix}${subWhole ? `${subWhole}${subSuffix}` : ""}`;
+  const { symbol, symbolFirst } = currencyParts(currency);
+  // The "~" stays in front of the whole thing either way — it qualifies the
+  // figure, so it cannot sit between the symbol and its digits.
+  return symbolFirst ? `~${sign}${symbol}${digits}` : `~${sign}${digits} ${symbol}`;
 }
 
-function currencySymbol(currency: string): string {
-  const parts = new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).formatToParts(0);
-  return parts.find((p) => p.type === "currency")?.value ?? currency;
+// Symbol AND its placement, both taken from the same formatter the full
+// figures use — a compact amount that puts the symbol on the other side from
+// formatCurrency's would read as a different currency.
+function currencyParts(currency: string): { symbol: string; symbolFirst: boolean } {
+  const parts = currencyFormat(currency).formatToParts(0);
+  const symbolIndex = parts.findIndex((p) => p.type === "currency");
+  const digitIndex = parts.findIndex((p) => p.type === "integer");
+  return {
+    symbol: symbolIndex === -1 ? currency : parts[symbolIndex].value,
+    symbolFirst: symbolIndex !== -1 && digitIndex !== -1 && symbolIndex < digitIndex,
+  };
 }
 
 const MAX_TRUNCATED_DIGITS = 9;
