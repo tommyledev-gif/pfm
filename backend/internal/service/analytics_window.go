@@ -21,6 +21,11 @@ type analyticsWindows struct {
 	// monthly is true when cycles coincide with calendar months, so labels
 	// can say "tháng" instead of "kỳ".
 	monthly bool
+	// singleDay / isToday: an explicit range of one local day, and whether
+	// that day is today — labelled as a day, not a "from X to X" range
+	// (specs/ai-chat-query-spending/plan.md BR-29).
+	singleDay bool
+	isToday   bool
 }
 
 func (s *AnalyticsService) resolveWindows(ctx context.Context, userID uuid.UUID, q model.AnalyticsQuery) (analyticsWindows, error) {
@@ -64,6 +69,9 @@ func (s *AnalyticsService) resolveWindows(ctx context.Context, userID uuid.UUID,
 		out.prev = &p
 	case model.AnalyticsPeriodCustom:
 		out.whole = spanWindow(*q.From, q.To.AddDate(0, 0, 1), now)
+		first := q.From.In(loc).Format(common.DateOnlyLayout)
+		out.singleDay = first == q.To.In(loc).Format(common.DateOnlyLayout)
+		out.isToday = out.singleDay && first == now.In(loc).Format(common.DateOnlyLayout)
 	}
 	return out, nil
 }

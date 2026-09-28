@@ -16,6 +16,11 @@ from app.nlu.normalize import normalize, unaccent
         ("mình chi ntn", "chi nhu the nao"),
         ("bữa h tiêu bao nhiêu", "30 ngay qua tieu bao nhieu"),
         ("dạo này chi nhiều ko", "30 ngay qua chi nhieu khong"),
+        ("hnay chi bn", "hom nay chi bao nhieu"),
+        ("hqua tiêu gì", "hom qua tieu gi"),
+        ("hum nay tiêu bao nhiêu", "hom nay tieu bao nhieu"),
+        ("bữa nay xài nhiêu", "hom nay xai nhieu"),
+        ("mấy bữa nay tiêu bao nhiêu", "30 ngay qua tieu bao nhieu"),
     ],
 )
 def test_normalize_text(raw: str, expected: str) -> None:

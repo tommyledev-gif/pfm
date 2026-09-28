@@ -98,3 +98,6 @@ class ConsultResponse(BaseModel):
     category_confidence: float | None = None
     normalized_text: str
     usage: ConsultUsage
+    # True when the model answered but its output did not fit the catalog —
+    # the backend replies "unsupported" and logs an error, never "degraded".
+    invalid_output: bool = False

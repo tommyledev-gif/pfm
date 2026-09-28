@@ -27,6 +27,14 @@ const (
 // confident enough Category match reaches AnalyticsService.
 func (s *ConsultService) route(ctx context.Context, userID uuid.UUID, p *AIConsultParse, all []*model.Category, currency string) (consultOutcome, error) {
 	out := consultOutcome{parse: p, outcome: model.IntentOutcomeUnsupport}
+	if p.InvalidOutput {
+		// The provider answered; the model's reading just did not fit. An
+		// honest "cannot answer this", logged as an error so the question
+		// log still counts it as an interpretation miss (plan.md BR-26).
+		out.outcome = model.IntentOutcomeError
+		out.reply = &dto.ConsultResponse{Kind: string(model.ConsultKindUnsupported), Message: msgUnsupported, Chips: starterChips(currency)[:2]}
+		return out, nil
+	}
 	switch p.Kind {
 	case model.ParseKindQuery:
 	case model.ParseKindEvaluate, model.ParseKindScenario:
@@ -47,6 +55,12 @@ func (s *ConsultService) route(ctx context.Context, userID uuid.UUID, p *AIConsu
 	// the mapped part (spec.md S-AIQ-27).
 	if p.Coverage != model.ParseCoverageFull {
 		out.reply = &dto.ConsultResponse{Kind: string(model.ConsultKindUnsupported), Message: msgPartial, Chips: starterChips(currency)}
+		return out, nil
+	}
+
+	today := s.cycles.Now().In(s.cycles.Location()).Format(common.DateOnlyLayout)
+	if reply := consultDayGuard(p, today, currency); reply != nil {
+		out.reply = reply
 		return out, nil
 	}
 

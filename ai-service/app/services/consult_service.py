@@ -19,7 +19,9 @@ Only lengths and token counts are logged, never question text.
 import json
 import logging
 
+import groq
 from fastapi.concurrency import run_in_threadpool
+from pydantic import ValidationError
 
 from app.core.config import settings
 from app.core.groq_client import get_groq_consult_client
@@ -39,9 +41,18 @@ _TOOL_NAME = "classify_spending_question"
 _TOOL_DESCRIPTION = "Classify a Vietnamese spending question and map it to a structured question."
 
 
+# Groq's code for a tool call it could not accept: truncated arguments,
+# arguments that break the schema, or no tool call at all.
+_TOOL_USE_FAILED = "tool_use_failed"
+
+
 class ConsultUnavailableError(Exception):
     """Provider failure — the router maps this to 503, which the backend turns
     into a degraded reply (never an error screen)."""
+
+
+class _NoToolCallError(Exception):
+    """The provider answered, but without the forced tool call."""
 
 
 async def consult(req: ConsultRequest) -> ConsultResponse:
@@ -50,13 +61,29 @@ async def consult(req: ConsultRequest) -> ConsultResponse:
     user_message = f"Câu gốc: {req.message}\nDạng chuẩn hoá: {normalized}"
     try:
         output, usage = await run_in_threadpool(_call_groq, system_prompt, user_message)
-    except Exception as exc:  # noqa: BLE001 - any provider failure degrades, never propagates raw
-        logger.warning(
-            "consult interpretation failed",
-            extra={"prompt_chars": len(req.message), "error_type": type(exc).__name__, "error_code": _provider_error_code(exc)},
-        )
+    except Exception as exc:  # noqa: BLE001 - classified below, never propagates raw
+        log_extra = {"prompt_chars": len(req.message), "error_type": type(exc).__name__, "error_code": _provider_error_code(exc)}
+        if _is_invalid_output(exc):
+            # ⚠️ The provider is up; the model's reading did not fit the
+            # catalog. Telling the User "temporarily unavailable" here is a
+            # false outage (spec.md S-AIQ-60, plan.md BR-26).
+            logger.warning("consult interpretation invalid", extra=log_extra)
+            return invalid_output_response(normalized)
+        logger.warning("consult interpretation failed", extra=log_extra)
         raise ConsultUnavailableError from exc
     return to_response(output, req, normalized, usage)
+
+
+def invalid_output_response(normalized: str) -> ConsultResponse:
+    """Out of scope, never figures. Usage is unknown: a rejected call reports
+    none, so the backend's token window under-counts it (plan.md R-F27)."""
+    return ConsultResponse(kind="unsupported", coverage="partial", normalized_text=normalized, usage=ConsultUsage(), invalid_output=True)
+
+
+def _is_invalid_output(exc: Exception) -> bool:
+    if isinstance(exc, (ValidationError, json.JSONDecodeError, _NoToolCallError)):
+        return True
+    return isinstance(exc, groq.BadRequestError) and _provider_error_code(exc) == _TOOL_USE_FAILED
 
 
 def _provider_error_code(exc: Exception) -> str | None:
@@ -132,7 +159,7 @@ def _call_groq(system_prompt: str, user_message: str) -> tuple[ConsultToolOutput
     )
     tool_calls = completion.choices[0].message.tool_calls
     if not tool_calls:
-        raise ValueError("groq response contained no tool call")
+        raise _NoToolCallError("groq response contained no tool call")
     usage = _usage(completion.usage)
     completion_details = getattr(completion.usage, "completion_tokens_details", None)
     logger.info(

@@ -113,3 +113,19 @@
 {"text": "chi bao nhiêu cho mẹ tháng này", "group": "unsupported", "expected": {"kind": "unsupported"}}
 {"text": "thời tiết hôm nay thế nào", "group": "unsupported", "expected": {"kind": "unsupported"}}
 {"text": "mua vàng có lời không", "group": "unsupported", "expected": {"kind": "unsupported"}}
+{"text": "hôm nay tiêu bao nhiêu", "group": "single_day", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "custom", "from": "2026-10-14", "to": "2026-10-14"}}
+{"text": "hôm nay tiêu những gì", "group": "single_day", "expected": {"kind": "query", "coverage": "full", "metric": "top_n", "period": "custom", "from": "2026-10-14", "to": "2026-10-14"}}
+{"text": "đã chi những khoản nào hôm nay", "group": "single_day", "expected": {"kind": "query", "coverage": "full", "metric": "top_n", "period": "custom", "from": "2026-10-14", "to": "2026-10-14"}}
+{"text": "da chi nhung khoan nao hom nay", "group": "single_day", "expected": {"kind": "query", "coverage": "full", "metric": "top_n", "period": "custom", "from": "2026-10-14", "to": "2026-10-14"}}
+{"text": "tiền đi đâu hôm nay", "group": "single_day", "expected": {"kind": "query", "coverage": "full", "metric": "breakdown", "period": "custom", "from": "2026-10-14", "to": "2026-10-14", "group_by": "category"}}
+{"text": "Tien di dau hom nay", "group": "single_day", "expected": {"kind": "query", "coverage": "full", "metric": "breakdown", "period": "custom", "from": "2026-10-14", "to": "2026-10-14", "group_by": "category"}}
+{"text": "hom qua tieu nhung gi", "group": "single_day", "expected": {"kind": "query", "coverage": "full", "metric": "top_n", "period": "custom", "from": "2026-10-13", "to": "2026-10-13"}}
+{"text": "hnay chi bn", "group": "single_day", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "custom", "from": "2026-10-14", "to": "2026-10-14"}}
+{"text": "bữa nay xài nhiêu", "group": "single_day", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "custom", "from": "2026-10-14", "to": "2026-10-14"}}
+{"text": "hôm kia tiêu bao nhiêu", "group": "single_day", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "custom", "from": "2026-10-12", "to": "2026-10-12"}}
+{"text": "ngày 1/10 chi bao nhiêu", "group": "single_day", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "custom", "from": "2026-10-01", "to": "2026-10-01"}}
+{"text": "ngày 20/10 chi bao nhiêu", "group": "single_day", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "custom", "from": "2025-10-20", "to": "2025-10-20"}}
+{"text": "ngày mai tiêu bao nhiêu", "group": "single_day", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "custom", "from": "2026-10-15", "to": "2026-10-15"}}
+{"text": "hôm nay so với hôm qua", "group": "single_day", "expected": {"kind": "query", "coverage": "full", "metric": "compare", "period": "custom", "from": "2026-10-14", "to": "2026-10-14"}}
+{"text": "sáng nay tiêu bao nhiêu", "group": "single_day", "expected": {"kind": "query", "coverage": "partial"}}
+{"text": "tối qua chi gì", "group": "single_day", "expected": {"kind": "query", "coverage": "partial"}}

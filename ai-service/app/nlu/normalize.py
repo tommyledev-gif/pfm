@@ -37,13 +37,21 @@ _TEENCODE = {
     "vs": "voi",
     "thg": "thang",
     "t2": "thu hai",
+    "hnay": "hom nay",
+    "hqua": "hom qua",
+    "hum": "hom",
 }
 
 # Informal "recently" phrasings all mean the last 30 days (brief §II.5.2
 # step 7). Periods the product cannot resolve (e.g. relative to Tết) are left
 # as-is so the interpreter reports them unsupported rather than guessing.
+#
+# ⚠️ Order matters: Southern "bữa nay" means today, but "mấy bữa nay" means
+# "these past days". The longer phrase must be consumed first, or the today
+# rule would rewrite its tail (plan.md R-F23).
 _TIME_ALIASES = (
     (re.compile(r"\b(bua h|bua gio|dao nay|may bua nay|gan day)\b"), "30 ngay qua"),
+    (re.compile(r"\bbua nay\b"), "hom nay"),
 )
 
 _THOUSAND = 1_000

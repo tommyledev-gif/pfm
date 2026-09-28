@@ -22,9 +22,14 @@ const (
 	// ConsultTokenBudgetPerMinute caps provider tokens spent on free-text
 	// interpretation per rolling minute, so analysis can never starve
 	// transaction recording of the shared provider quota (plan.md F13).
-	// Placeholder until docs/groq-token-baseline.md (AIQ-T01) is measured.
-	ConsultTokenBudgetPerMinute = 4000
-	ConsultTokenBudgetWindow    = 1 * time.Minute
+	// Derived from the measured org limit (docs/groq-token-baseline.md),
+	// keeping the brief's §13.1 share for recording. The old placeholder
+	// (4000) let only ~3 questions a minute through at ~1.8k tokens each and
+	// degraded the rest before the provider was ever called (plan.md R-F27).
+	ProviderOrgTokensPerMinute   = 8000
+	RecordingTokenReservePercent = 15
+	ConsultTokenBudgetPerMinute  = ProviderOrgTokensPerMinute * (AnalyticsPercentScale - RecordingTokenReservePercent) / AnalyticsPercentScale
+	ConsultTokenBudgetWindow     = 1 * time.Minute
 
 	// Category confidence bands for free-text matches (spec.md US-03 step 6).
 	AnalyticsCategoryConfidenceHigh   = 0.8

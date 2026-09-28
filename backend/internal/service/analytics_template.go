@@ -40,45 +40,6 @@ func cycleUnit(monthly bool) string {
 	return unitCycle
 }
 
-// periodLabel names a period in running text ("tháng này", "3 kỳ gần nhất").
-func periodLabel(p model.AnalyticsPeriod, w analyticsWindows, capitalize bool) string {
-	unit := cycleUnit(w.monthly)
-	var label string
-	switch p {
-	case model.AnalyticsPeriodThisCycle:
-		label = unit + " này"
-	case model.AnalyticsPeriodLastCycle:
-		label = unit + " trước"
-	case model.AnalyticsPeriodLast3Cycles, model.AnalyticsPeriodLast6Cycles:
-		label = fmt.Sprintf("%d %s gần nhất", analyticsSeriesLength(p), unit)
-	case model.AnalyticsPeriodLast30Days:
-		label = fmt.Sprintf("%d ngày qua", common.AnalyticsLastDaysWindow)
-	case model.AnalyticsPeriodThisWeek:
-		label = "tuần này"
-	default:
-		label = fmt.Sprintf("từ %s đến %s", shortDate(w.whole.Start.In(common.AppLocation)),
-			shortDate(w.whole.End.Add(-reportBoundResolution).In(common.AppLocation)))
-	}
-	if capitalize {
-		return upperFirst(label)
-	}
-	return label
-}
-
-func previousPeriodLabel(p model.AnalyticsPeriod, monthly bool) string {
-	unit := cycleUnit(monthly)
-	switch p {
-	case model.AnalyticsPeriodLastCycle:
-		return unit + " trước nữa"
-	case model.AnalyticsPeriodThisWeek:
-		return "tuần trước"
-	case model.AnalyticsPeriodLast30Days:
-		return fmt.Sprintf("%d ngày trước đó", common.AnalyticsLastDaysWindow)
-	default:
-		return unit + " trước"
-	}
-}
-
 // cycleLabel names one cycle in a series: "T9/26" for calendar months,
 // its start date otherwise.
 func cycleLabel(w model.AnalyticsWindow, monthly bool, loc *time.Location) string {
@@ -115,22 +76,6 @@ func forCategories(run *analyticsRun) string {
 	return " cho " + strings.Join(run.categoryNames, listSeparator)
 }
 
-// soFar prefixes sentences about a period that has not ended (spec.md US-02 EC).
-func soFar(run *analyticsRun) string {
-	if run.windows.whole.Partial && run.q.Period != model.AnalyticsPeriodCustom {
-		return "Tính đến hôm nay, "
-	}
-	return ""
-}
-
-func lead(run *analyticsRun) string {
-	label := periodLabel(run.q.Period, run.windows, false)
-	if prefix := soFar(run); prefix != "" {
-		return prefix + label
-	}
-	return upperFirst(label)
-}
-
 func summaryEmpty(run *analyticsRun) string {
 	kind := "chi"
 	if isIncome(run) {
@@ -140,7 +85,7 @@ func summaryEmpty(run *analyticsRun) string {
 	if run.q.AmountMin != nil {
 		threshold = " từ " + money(run, *run.q.AmountMin) + " trở lên"
 	}
-	return fmt.Sprintf("Không có khoản %s nào%s%s trong %s.", kind, threshold, forCategories(run), periodLabel(run.q.Period, run.windows, false))
+	return fmt.Sprintf("Không có khoản %s nào%s%s %s.", kind, threshold, forCategories(run), periodIn(run))
 }
 
 func summarySum(run *analyticsRun, total int64) string {

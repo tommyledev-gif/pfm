@@ -21,8 +21,10 @@ import (
 // only turns text into a structured question; every figure still comes from
 // AnalyticsService, and no model text ever reaches the User (plan.md BR-11).
 // Anything short of a clean, complete interpretation becomes a reply with
-// chips — never a guess (BR-14…BR-16) — and any interpreter failure becomes
-// a degraded reply, never an error screen (BR-18).
+// chips — never a guess (BR-14…BR-16). An interpreter that is down, slow or
+// out of budget becomes a degraded reply, never an error screen (BR-18); an
+// interpreter that answered with something the catalog cannot hold is an
+// honest "cannot answer", not an outage (BR-26).
 type ConsultService struct {
 	analytics     *AnalyticsService
 	analyticsRepo AnalyticsRepo

@@ -647,3 +647,19 @@ No new elements. The one-day label reuses `text-analytics-period`. The today chi
 | Multi-day custom ranges | Label or so-far wording change leaking | T57 test: multi-day label unchanged |
 | Recording via chat (`/extract`) | None: separate prompt and service (`prompt_builder.py`), normalize not applied there (spec Out of Scope #8) | Existing extract tests |
 
+
+### Implementation notes (revision, 2026-09-28)
+
+| # | Task | State | Note |
+|---|---|---|---|
+| IN-11 | T49 | ✅ | Code shipped earlier today. `docs/groq-token-baseline.md` written (closes `AIQ-T01`). `ConsultTokenBudgetPerMinute` = 8000 × 85% = 6800, named from `ProviderOrgTokensPerMinute` / `RecordingTokenReservePercent`. Confirmed live: English questions were degraded by the **backend's own** budget (4000), with no ai-service failure logged |
+| IN-12 | T51 | ✅ | Also maps the teencode `hum` → `hom` |
+| IN-13 | T52 | ✅ | Adds a rule that a question word (đâu/gì/nào/bao nhiêu/mấy) is never `transaction_like`, because the accentless "Tien di dau hom nay" was read as a Transaction live. A day after today and a single-day comparison are **emitted as queries**, so the deterministic Go guard (T55) turns them away rather than relying on the model to say "unsupported" |
+| IN-14 | T53 | ✅ | A rejected call reports no usage, so the backend's token window under-counts it (noted in code) |
+| IN-15 | T54, T55 | ✅ | Guard lives in `consult_day_guard.go`; `route()` calls it after the coverage check. The "after today" rule applies to **single days only**: a multi-day range reaching past today is still answered "so far" (EC-29 names a day) |
+| IN-16 | T56 | ✅ | — |
+| IN-17 | T57 | ✅ | Period wording moved to `analytics_period_label.go` (template file 270 → 215 lines). `analyticsWindows` gains `singleDay` / `isToday`. Side fix: a multi-day empty state read "trong từ 01/09 đến 15/09"; it now drops the doubled preposition |
+| IN-18 | T58 | ✅ | — |
+| IN-19 | T59 | ✅ | 16 rows in group `single_day` (131 total). The live test paces calls (`PFM_LIVE_PACE_SECONDS`, default 15 s) and waits out a 429 instead of scoring it |
+| IN-20 | T60 | Not run | Needs a key from a separate Groq org |
+| IN-21 | Verification | Offline only | ai-service 38 passed (live golden skipped); backend `go build` + `go test ./...` green, 7 new tests; mobile `tsc` clean. Nothing was run against the real provider after T52, so the prompt changes are unverified until deploy |

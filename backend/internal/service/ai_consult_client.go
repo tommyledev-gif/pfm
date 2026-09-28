@@ -41,9 +41,12 @@ type AIConsultParse struct {
 	Limit              int
 	CategoryConfidence *float64
 	NormalizedText     string
-	PromptTokens       int
-	CompletionTokens   int
-	CachedTokens       int
+	// InvalidOutput: the model answered but its output did not fit the
+	// catalog. The reply is "unsupported", never "degraded" (plan.md BR-26).
+	InvalidOutput    bool
+	PromptTokens     int
+	CompletionTokens int
+	CachedTokens     int
 }
 
 type httpAIConsultClient struct {
@@ -93,6 +96,7 @@ type consultWireResponse struct {
 	CategoryConfidence *float64          `json:"category_confidence"`
 	NormalizedText     string            `json:"normalized_text"`
 	Usage              consultWireUsage  `json:"usage"`
+	InvalidOutput      bool              `json:"invalid_output"`
 }
 
 // Parse calls the AI Service's /consult endpoint. Any transport failure,
@@ -143,7 +147,7 @@ func toConsultWire(req AIConsultRequest) consultWireRequest {
 func fromConsultWire(w consultWireResponse) (*AIConsultParse, error) {
 	out := &AIConsultParse{
 		Kind: w.Kind, Coverage: w.Coverage, CategoryConfidence: w.CategoryConfidence,
-		NormalizedText: w.NormalizedText, PromptTokens: w.Usage.PromptTokens,
+		NormalizedText: w.NormalizedText, InvalidOutput: w.InvalidOutput, PromptTokens: w.Usage.PromptTokens,
 		CompletionTokens: w.Usage.CompletionTokens, CachedTokens: w.Usage.CachedTokens,
 	}
 	if w.Query == nil {

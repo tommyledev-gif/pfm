@@ -15,6 +15,7 @@ const (
 	analyticsRuleRangeTooLong    = "range_too_long"
 	analyticsRuleIncompatible    = "incompatible_with_metric"
 	analyticsRuleRequiredForKind = "required_for_metric"
+	analyticsRuleInvalidDate     = "invalid_date"
 )
 
 // analyticsRuleError is one entry in a 400's details — every broken rule is
@@ -134,9 +135,20 @@ func validateAnalyticsDates(req dto.AnalyticsQueryRequest, q *model.AnalyticsQue
 	if len(problems) > 0 {
 		return problems
 	}
-	// Shape (YYYY-MM-DD) was already enforced by the DTO tag.
-	from, _ := time.ParseInLocation(common.DateOnlyLayout, req.From, common.AppLocation)
-	to, _ := time.ParseInLocation(common.DateOnlyLayout, req.To, common.AppLocation)
+	// The DTO tag checks the shape only on the HTTP path; the free-text path
+	// builds this request itself, and a well-shaped date can still not exist
+	// ("2026-02-31"). A discarded parse error would be a zero time here.
+	from, fromErr := time.ParseInLocation(common.DateOnlyLayout, req.From, common.AppLocation)
+	if fromErr != nil {
+		problems = append(problems, analyticsRuleError{Field: "from", Rule: analyticsRuleInvalidDate})
+	}
+	to, toErr := time.ParseInLocation(common.DateOnlyLayout, req.To, common.AppLocation)
+	if toErr != nil {
+		problems = append(problems, analyticsRuleError{Field: "to", Rule: analyticsRuleInvalidDate})
+	}
+	if len(problems) > 0 {
+		return problems
+	}
 	if from.After(to) {
 		return []analyticsRuleError{{Field: "from", Rule: analyticsRuleFromAfterTo}}
 	}

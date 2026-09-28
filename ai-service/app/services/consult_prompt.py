@@ -10,7 +10,21 @@ the model cannot represent must be marked partial, because answering from
 the part it understood shows a plausible, wrong number (spec.md S-AIQ-27).
 """
 
+from datetime import date, timedelta
+
 from app.schemas.consult_schema import ConsultCategory, ConsultWallet
+
+
+def _day_anchors(today: str) -> str:
+    """Yesterday and the day before, computed here rather than by the model:
+    date arithmetic across a month or year edge is exactly what an LLM gets
+    wrong, and copying a printed date is not (plan.md R-F20, BR-24)."""
+    try:
+        day = date.fromisoformat(today)
+    except ValueError:
+        return ""
+    yesterday, day_before = day - timedelta(days=1), day - timedelta(days=2)
+    return f" Hôm qua là {yesterday.isoformat()}. Hôm kia là {day_before.isoformat()}."
 
 
 def build_consult_prompt(categories: list[ConsultCategory], wallets: list[ConsultWallet], today: str, timezone: str) -> str:
@@ -22,7 +36,7 @@ def build_consult_prompt(categories: list[ConsultCategory], wallets: list[Consul
 
     return f"""Bạn phân loại câu hỏi về chi tiêu cho ứng dụng tài chính cá nhân PFM.
 Bạn CHỈ phân loại và ánh xạ câu hỏi thành cấu trúc. Bạn KHÔNG tính toán, KHÔNG trả lời, KHÔNG nêu bất kỳ con số nào.
-Hôm nay là {today} (múi giờ {timezone}).
+Hôm nay là {today} (múi giờ {timezone}).{_day_anchors(today)}
 
 Danh mục CHI TIÊU của người dùng:
 {expense}
@@ -40,7 +54,9 @@ Bạn nhận câu gốc và một dạng đã chuẩn hoá (bỏ dấu, số ti�
 - "evaluate": xin nhận xét/đánh giá — "đánh giá", "nhận xét", "thế nào", "ổn không", "nhiều không", "có tăng nhiều không".
 - "scenario": giả định — "nếu", "giả sử", "muốn tiết kiệm", "cắt ... thì", "bao giờ đủ", "muốn mua".
 - "needs_context": câu thiếu chủ thể, phụ thuộc câu trước — "còn tháng trước?", "thế còn ăn uống?".
-- "transaction_like": đang mô tả một khoản chi/thu để ghi lại, không phải câu hỏi — "cafe 50k", "ăn trưa 35k".
+- "transaction_like": đang mô tả một khoản chi/thu để ghi lại, không phải câu hỏi — "cafe 50k", "ăn trưa 35k". \
+Câu có từ hỏi (đâu, gì, nào, bao nhiêu, mấy) KHÔNG BAO GIỜ là transaction_like, kể cả khi không dấu: \
+"tien di dau hom nay" = query.
 - "unsupported": mọi thứ khác — đầu tư, so với người khác, dự đoán cuối tháng, khoản bất thường, subscription, \
 hỏi theo tên cửa hàng/người/địa điểm/ghi chú (ví dụ "tốn bao nhiêu cho Grab" khi không có danh mục tên Grab), \
 mốc âm lịch ("từ Tết tới giờ").
@@ -53,7 +69,9 @@ Ví dụ ranh giới: "tháng này tiêu bao nhiêu" = query; "tháng này tiêu
 - compare: một kỳ so với kỳ liền trước (period chỉ được là this_cycle, last_cycle, this_week, last_30_days).
 - series: chi theo từng tháng qua nhiều tháng (period = last_3_cycles hoặc last_6_cycles).
 - top_n: các khoản chi lớn nhất (limit = số khoản được hỏi, mặc định bỏ trống); hoặc các khoản trên một mức tiền \
-(amount_min_vnd = mức tiền bằng đồng, ví dụ "trên 1tr" = 1000000).
+(amount_min_vnd = mức tiền bằng đồng, ví dụ "trên 1tr" = 1000000). Hỏi liệt kê các khoản đã chi — "tiêu những gì", \
+"chi những khoản nào", "đã mua gì", "liệt kê" — cũng là top_n, limit bỏ trống.
+- "tiền đi đâu" / "tien di dau" luôn là breakdown theo category, với bất kỳ kỳ nào.
 - max_tx: MỘT khoản chi lớn nhất.
 - avg_daily: trung bình mỗi ngày chi bao nhiêu.
 - budget_status: còn bao nhiêu ngân sách (period luôn = this_cycle).
@@ -61,6 +79,9 @@ Ví dụ ranh giới: "tháng này tiêu bao nhiêu" = query; "tháng này tiêu
 3. period: "tháng này" = this_cycle; "tháng trước" = last_cycle; "3 tháng qua" = last_3_cycles; "6 tháng qua" = \
 last_6_cycles; "30 ngày qua"/"dạo này"/"gần đây" = last_30_days; "tuần này" = this_week. Không nói kỳ nào → this_cycle. \
 Khoảng ngày cụ thể → custom với from_date, to_date dạng YYYY-MM-DD.
+Một ngày ("hôm nay", "hôm qua", "hôm kia", "ngày 15/9", "ngày mai") → custom với from_date = to_date = đúng ngày đó, \
+chép ngày từ dòng "Hôm nay/Hôm qua/Hôm kia" ở trên. Ngày không ghi năm → lần gần nhất không sau hôm nay. \
+"Hôm nay so với hôm qua" → metric compare, custom, from_date = to_date = hôm nay.
 
 4. category_ids: CHỈ copy nguyên văn id từ danh sách trên, đúng loại thu/chi. Không bao giờ bịa id. Nếu câu nhắc một \
 hạng mục mà không khớp chắc chắn, vẫn chọn id gần nhất và phản ánh qua category_confidence (0 đến 1): \
@@ -70,7 +91,8 @@ tên gần như trùng → cao; chỉ đoán theo nghĩa → thấp. Không nh�
 
 6. coverage = "full" CHỈ KHI mọi điều kiện trong câu đều đã được thể hiện bằng các trường ở trên. Nếu câu có bất kỳ \
 điều kiện nào bạn không thể thể hiện (địa điểm, người, cửa hàng, ghi chú, giờ trong ngày, một hạng mục không có trong \
-danh sách, ...) thì coverage = "partial". Ví dụ: "tháng này tiêu bao nhiêu cho ăn uống ở quận 1" = partial. \
+danh sách, ...) thì coverage = "partial". Ví dụ: "tháng này tiêu bao nhiêu cho ăn uống ở quận 1" = partial; \
+"sáng nay tiêu bao nhiêu", "tối qua chi gì" (một buổi trong ngày) = partial. \
 Không bao giờ bỏ qua một phần câu hỏi để trả lời phần còn lại.
 
 7. Với kind khác "query", để trống mọi trường của câu hỏi, coverage = "full"."""

@@ -78,3 +78,70 @@ def test_provider_error_code_reads_only_the_code() -> None:
 
     assert _provider_error_code(FakeGroqError()) == "tool_use_failed"
     assert _provider_error_code(ValueError("no body")) is None
+
+
+def _groq_error(cls: type, status: int, code: str) -> Exception:
+    import httpx
+
+    response = httpx.Response(status, request=httpx.Request("POST", "https://api.groq.com/openai/v1/chat/completions"))
+    return cls("provider error", response=response, body={"code": code})
+
+
+def _run_consult_raising(monkeypatch, exc: Exception):
+    import asyncio
+
+    from app.services import consult_service
+
+    def boom(*_args: object) -> None:
+        raise exc
+
+    monkeypatch.setattr(consult_service, "_call_groq", boom)
+    return asyncio.run(consult_service.consult(_req()))
+
+
+def test_truncated_tool_call_is_unsupported_not_unavailable(monkeypatch) -> None:
+    import groq
+
+    resp = _run_consult_raising(monkeypatch, _groq_error(groq.BadRequestError, 400, "tool_use_failed"))
+    assert resp.kind == "unsupported" and resp.coverage == "partial" and resp.invalid_output and resp.query is None
+
+
+def test_schema_breaking_output_is_unsupported(monkeypatch) -> None:
+    from pydantic import ValidationError
+
+    try:
+        ConsultToolOutput.model_validate({"kind": "query", "coverage": "full", "period": "today"})
+    except ValidationError as exc:
+        assert _run_consult_raising(monkeypatch, exc).invalid_output
+
+
+def test_missing_tool_call_is_unsupported(monkeypatch) -> None:
+    from app.services.consult_service import _NoToolCallError
+
+    assert _run_consult_raising(monkeypatch, _NoToolCallError("none")).invalid_output
+
+
+def test_provider_outages_stay_unavailable(monkeypatch) -> None:
+    import groq
+    import pytest
+
+    from app.services.consult_service import ConsultUnavailableError
+
+    for exc in (
+        _groq_error(groq.RateLimitError, 429, "rate_limit_exceeded"),
+        _groq_error(groq.BadRequestError, 400, "model_decommissioned"),
+        _groq_error(groq.AuthenticationError, 401, "invalid_api_key"),
+    ):
+        with pytest.raises(ConsultUnavailableError):
+            _run_consult_raising(monkeypatch, exc)
+
+
+def test_prompt_prints_day_anchors_across_a_month_edge() -> None:
+    prompt = build_consult_prompt([FOOD], [CASH], "2026-10-01", "Asia/Ho_Chi_Minh")
+    assert "Hôm nay là 2026-10-01" in prompt
+    assert "Hôm qua là 2026-09-30" in prompt and "Hôm kia là 2026-09-29" in prompt
+
+
+def test_prompt_day_anchors_across_a_year_edge() -> None:
+    prompt = build_consult_prompt([FOOD], [CASH], "2027-01-01", "Asia/Ho_Chi_Minh")
+    assert "Hôm qua là 2026-12-31" in prompt
