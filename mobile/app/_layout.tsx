@@ -1,11 +1,13 @@
 import { useEffect } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Stack } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
 import { DarkTheme, Theme, ThemeProvider } from "@react-navigation/native";
 
 import { DebugBubble } from "@/components/debug/DebugBubble";
+import { BrandSplash } from "@/components/shared/BrandSplash";
 import { NavigationLogger } from "@/components/debug/NavigationLogger";
 import { Toast } from "@/components/shared/Toast";
 import { installGlobalErrorLogger } from "@/lib/global-error-logger";
@@ -17,6 +19,17 @@ import { useSessionStore } from "@/stores/session-store";
 // error handler must be wired before the very first render, not after an
 // effect runs (specs/mobile-debug-console/spec.md decision #5).
 installGlobalErrorLogger();
+
+// The native splash stays up until BrandSplash — its JS continuation, which
+// adds the wordmark — has laid out beneath it and drops it. Module scope, so
+// it is held before the very first render.
+SplashScreen.preventAutoHideAsync().catch(() => {});
+// Failsafe: a render that throws before BrandSplash mounts would otherwise
+// leave the user on the native splash forever, with no error to see.
+const SPLASH_FAILSAFE_MS = 5000;
+setTimeout(() => {
+  SplashScreen.hideAsync().catch(() => {});
+}, SPLASH_FAILSAFE_MS);
 
 // Root layout — providers + the top-level authenticated/unauthenticated
 // split, mirrors frontend/'s middleware.ts route-protection role and
@@ -57,10 +70,10 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ThemeProvider value={NAVIGATION_THEME}>
         <QueryClientProvider client={queryClient}>
+          {/* Nothing but the background until the session is known — BrandSplash
+              covers this anyway, and keeps covering it until it fades out. */}
           {!isHydrated ? (
-            <View style={styles.splash}>
-              <ActivityIndicator />
-            </View>
+            <View style={styles.splash} />
           ) : (
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Protected guard={hasSession}>
@@ -76,6 +89,7 @@ export default function RootLayout() {
           <NavigationLogger />
           <DebugBubble />
           <Toast />
+          <BrandSplash ready={isHydrated} />
         </QueryClientProvider>
       </ThemeProvider>
     </SafeAreaProvider>
@@ -83,5 +97,5 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
-  splash: { flex: 1, alignItems: "center", justifyContent: "center" },
+  splash: { flex: 1, backgroundColor: colors.splashBg },
 });

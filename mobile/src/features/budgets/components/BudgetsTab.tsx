@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { CalendarIcon, PlusIcon } from "@/components/ui/Icon";
+import { Fab, useFabClearance } from "@/components/ui/Fab";
+import { CalendarIcon } from "@/components/ui/Icon";
 import { CategoryPickerDrawer } from "@/components/shared/CategoryPickerDrawer";
 import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
 import { BudgetFormModal } from "@/features/budgets/components/BudgetFormModal";
 import { colorForCategory } from "@/lib/category-color";
 import { monthRange } from "@/lib/date-range";
 import { formatDateRange } from "@/lib/format-date";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { colors, spacing, typography } from "@/lib/theme";
 import { useRefresh } from "@/lib/use-refresh";
 import { WalletCurrency } from "@/lib/constants";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
@@ -63,6 +64,7 @@ export function BudgetsTab({ initialRange, rangeNonce }: BudgetsTabProps = {}) {
   // the primary currency the whole tab is scaled to comes from wallets, and
   // each row's icon falls back to its linked category's.
   const { refreshControl } = useRefresh([budgets, wallets, categories]);
+  const fabClearance = useFabClearance();
 
   const scrollRef = useRef<ScrollView>(null);
   const rowOffsets = useRef<Record<string, number>>({});
@@ -129,7 +131,7 @@ export function BudgetsTab({ initialRange, rangeNonce }: BudgetsTabProps = {}) {
       <ScrollView
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={{ paddingBottom: fabClearance }}
         refreshControl={refreshControl}
       >
         <View style={styles.rangeRow}>
@@ -197,10 +199,13 @@ export function BudgetsTab({ initialRange, rangeNonce }: BudgetsTabProps = {}) {
       </ScrollView>
 
       {/* Floating over the list rather than a header button: the list is the
-          whole screen now, and "add" shouldn't cost a row of it. */}
-      <Pressable style={styles.fab} onPress={openNew} testID="btn-new-budget">
-        <PlusIcon size={24} color={colors.onGreen} />
-      </Pressable>
+          whole screen now, and "add" shouldn't cost a row of it. The shared
+          Fab, not a hand-placed one: Insights' body runs to the bottom of the
+          screen, under the floating BottomNav, and a button pinned 16px off
+          that bottom sat behind the nav. Fab lifts itself clear of the nav
+          and the safe-area inset. `right: 0` because Insights already pads
+          its sides — the same 20px from the edge as Transactions' Fab. */}
+      <Fab onPress={openNew} accessibilityLabel="Thêm ngân sách" testID="btn-new-budget" style={styles.fab} />
 
       <BudgetFormModal
         visible={modalOpen}
@@ -253,29 +258,11 @@ export function BudgetsTab({ initialRange, rangeNonce }: BudgetsTabProps = {}) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   skeletonList: { gap: spacing.md },
-  // Insights' own tab body already reserves 140px for the bottom nav; this is
-  // just enough extra to keep the last row clear of the floating add button.
-  scroll: { paddingBottom: 96 },
   rangeRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
   rangeButton: { flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingVertical: spacing.sm },
   rangeLabel: { ...typography.caption, color: colors.textSecondary },
   rangeClear: { ...typography.caption, color: colors.green },
   rangeNote: { ...typography.tiny, color: colors.textMuted, paddingBottom: spacing.xs },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
-  fab: {
-    position: "absolute",
-    right: 0,
-    bottom: spacing.lg,
-    width: 60,
-    height: 60,
-    borderRadius: radii.pill,
-    backgroundColor: colors.green,
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 6,
-    shadowColor: "#000",
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-  },
+  fab: { right: 0 },
 });

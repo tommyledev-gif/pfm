@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Keyboard } from "react-native";
 
-import { toCents, toMajorUnits } from "@/lib/currency";
 import { TransactionKind } from "@/lib/constants";
+import { useAmountExpression } from "@/lib/use-amount-expression";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useCategoryPicker } from "@/features/categories/components/use-category-picker";
@@ -38,14 +38,17 @@ export function useTransactionForm({ visible, onClose, editingTransaction }: Use
   // Destination of a transfer; unused otherwise.
   const [toWalletId, setToWalletId] = useState<string | null>(null);
   const [categoryId, setCategoryId] = useState<string | null>(null);
-  const [amount, setAmount] = useState("");
+  // Typed on the calculator keypad, so it is an expression ("120+45"), not a
+  // number — evaluated exactly to integer cents by calculator-engine.ts.
+  const amount = useAmountExpression();
+  const { reset: resetAmount } = amount;
   const [note, setNote] = useState("");
   const [occurredAt, setOccurredAt] = useState(todayIso());
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  // Bumped every time the sheet opens and remounts (as a `key`) the amount/
-  // note TextInputs below — belt-and-braces alongside the state reset right
+  // Bumped every time the sheet opens and remounts (as a `key`) the note
+  // TextInput — belt-and-braces alongside the state reset right
   // under it, so a stale native text-editing state left over from the
   // previous open can never survive into a fresh "Giao dịch mới".
   const [formKey, setFormKey] = useState(0);
@@ -62,7 +65,7 @@ export function useTransactionForm({ visible, onClose, editingTransaction }: Use
       setType(editingTransaction.type);
       setCategoryId(editingTransaction.category_id);
       setToWalletId(editingTransaction.to_wallet_id);
-      setAmount(String(toMajorUnits(editingTransaction.amount)));
+      resetAmount(editingTransaction.amount);
       setNote(editingTransaction.note ?? "");
       setOccurredAt(editingTransaction.occurred_at.slice(0, 10));
     } else {
@@ -71,28 +74,29 @@ export function useTransactionForm({ visible, onClose, editingTransaction }: Use
       setType("expense");
       setCategoryId(null);
       setToWalletId(null);
-      setAmount("");
+      resetAmount(null);
       setNote("");
       setOccurredAt(todayIso());
     }
     setSubmitAttempted(false);
-  }, [visible, editingTransaction, wallets.data]);
+  }, [visible, editingTransaction, wallets.data, resetAmount]);
 
   // Separate from the reset above on purpose: that effect also re-runs
   // whenever `wallets.data` refetches in the background (e.g. right after
   // creating a transaction invalidates it) — bumping the remount key there
-  // too would yank focus out from under anyone still typing in an open
-  // sheet. This one only fires on the true open transition.
+  // too would yank focus out from under anyone still typing the note in an
+  // open sheet. This one only fires on the true open transition.
   useEffect(() => {
     if (visible) setFormKey((k) => k + 1);
   }, [visible]);
 
-  const amountValue = Number(amount);
+  const amountCents = amount.cents;
+  const amountInvalid = (cents: number | null) => cents === null || cents <= 0;
   const errors = {
     wallet: !isEditing && !walletId ? "Vui lòng chọn ví" : undefined,
     category: !isTransfer && !categoryId ? "Vui lòng chọn danh mục" : undefined,
     toWallet: isTransfer && !isEditing && !toWalletId ? "Vui lòng chọn ví nhận" : undefined,
-    amount: !amount || !(amountValue > 0) ? "Vui lòng nhập số tiền hợp lệ" : undefined,
+    amount: amountInvalid(amountCents) ? "Vui lòng nhập số tiền hợp lệ" : undefined,
   };
   const hasErrors = Boolean(errors.wallet || errors.category || errors.toWallet || errors.amount);
 
@@ -105,25 +109,31 @@ export function useTransactionForm({ visible, onClose, editingTransaction }: Use
   const destinationWallets = (wallets.data ?? []).filter(
     (w) => w.id !== walletId && (!selectedWallet || w.currency === selectedWallet.currency),
   );
+  const transferTarget = wallets.data?.find((w) => w.id === toWalletId) ?? null;
   const projectedBalance =
-    selectedWallet && amountValue > 0
-      ? selectedWallet.balance + (type === "income" ? toCents(amountValue) : -toCents(amountValue))
+    selectedWallet && amountCents !== null && amountCents > 0
+      ? selectedWallet.balance + (type === "income" ? amountCents : -amountCents)
       : null;
 
   const submit = () => {
-    // The amount/note keyboard should never still be up once submit has been
+    // The note's keyboard should never still be up once submit has been
     // tapped — even a validation failure should leave the field errors
     // visible, not hidden behind the keyboard.
     Keyboard.dismiss();
     setSubmitAttempted(true);
-    if (hasErrors || !walletId) return;
+    // Resolved here rather than read from `amountCents`: the header's "Lưu"
+    // can be tapped mid-expression ("120+"), which this trims/evaluates in
+    // place so what is saved is exactly what the display then shows.
+    const cents = amount.resolve();
+    const otherErrors = Boolean(errors.wallet || errors.category || errors.toWallet);
+    if (otherErrors || amountInvalid(cents) || cents === null || !walletId) return;
     if (isEditing && editingTransaction) {
       updateTransaction.mutate(
         {
           id: editingTransaction.id,
           // A transfer's category is fixed server-side (and rejected if sent).
           body: {
-            amount: toCents(amountValue),
+            amount: cents,
             category_id: isTransfer ? undefined : categoryId ?? undefined,
             occurred_at: occurredAt,
             note: note || undefined,
@@ -136,7 +146,7 @@ export function useTransactionForm({ visible, onClose, editingTransaction }: Use
         {
           wallet_id: walletId,
           ...(isTransfer ? { to_wallet_id: toWalletId ?? undefined } : { category_id: categoryId ?? undefined }),
-          amount: toCents(amountValue),
+          amount: cents,
           type,
           occurred_at: occurredAt,
           note: note || undefined,
@@ -164,7 +174,6 @@ export function useTransactionForm({ visible, onClose, editingTransaction }: Use
     setToWalletId,
     setCategoryId,
     amount,
-    setAmount,
     note,
     setNote,
     occurredAt,
@@ -182,6 +191,7 @@ export function useTransactionForm({ visible, onClose, editingTransaction }: Use
     selectedWallet,
     destinationWallets,
     projectedBalance,
+    transferTarget,
     submit,
     categoryPicker,
   };

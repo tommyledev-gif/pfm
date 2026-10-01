@@ -1,5 +1,5 @@
 import { ComponentType } from "react";
-import { Pressable, StyleSheet } from "react-native";
+import { Pressable, StyleProp, StyleSheet, ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { IconProps } from "@/components/ui/icons/primitives";
@@ -17,6 +17,17 @@ interface FabProps {
   Icon?: ComponentType<IconProps>;
   accessibilityLabel: string;
   testID?: string;
+  /** Position tweaks only — e.g. `right: 0` inside a host that already pads its sides. */
+  style?: StyleProp<ViewStyle>;
+}
+
+/**
+ * Bottom padding a scrolling list under a Fab needs so its last row can
+ * scroll clear of both the nav and the button, instead of ending beneath them.
+ */
+export function useFabClearance(): number {
+  const insets = useSafeAreaInsets();
+  return NAV_HEIGHT + insets.bottom + spacing.xl + FAB_SIZE + spacing.lg;
 }
 
 /**
@@ -25,7 +36,7 @@ interface FabProps {
  * Render it BEFORE the screen's Drawer sheets in the tree, so an open sheet's
  * overlay paints over it rather than under it.
  */
-export function Fab({ onPress, Icon = PlusIcon, accessibilityLabel, testID }: FabProps) {
+export function Fab({ onPress, Icon = PlusIcon, accessibilityLabel, testID, style }: FabProps) {
   const insets = useSafeAreaInsets();
   return (
     <Pressable
@@ -37,6 +48,7 @@ export function Fab({ onPress, Icon = PlusIcon, accessibilityLabel, testID }: Fa
       style={({ pressed }) => [
         styles.fab,
         { bottom: NAV_HEIGHT + insets.bottom + spacing.xl },
+        style,
         pressed && styles.pressed,
       ]}
     >

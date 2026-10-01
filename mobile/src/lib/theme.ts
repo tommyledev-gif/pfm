@@ -4,6 +4,10 @@
 // components must reference these, never inline a color literal.
 export const colors = {
   bgApp: "#050B14",
+  // The native splash's own background (app.json → expo-splash-screen
+  // backgroundColor), one step off bgApp. BrandSplash has to match the native
+  // splash exactly, or the handoff between the two shows as a flicker.
+  splashBg: "#050B15",
   surface: "#12161F",
   surfaceBorder: "rgba(255,255,255,0.08)",
   textPrimary: "#F5F6F8",

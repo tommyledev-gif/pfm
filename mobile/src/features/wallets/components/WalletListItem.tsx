@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { ChevronRightIcon } from "@/components/ui/Icon";
@@ -17,7 +17,14 @@ const TYPE_LABEL: Record<Wallet["type"], string> = {
   other: "Khác",
 };
 
-export function WalletListItem({ wallet, onPress }: { wallet: Wallet; onPress: () => void }) {
+interface WalletListItemProps {
+  wallet: Wallet;
+  onPress: () => void;
+  /** 1 → 0 from useHighlightFade — the "you picked this one" border. */
+  highlightOpacity?: Animated.Value;
+}
+
+export function WalletListItem({ wallet, onPress, highlightOpacity }: WalletListItemProps) {
   const setDefault = useSetDefaultWalletMutation();
   // Setting a new default silently swapped it under the user with no way to
   // back out of an accidental tap — a confirm step first, same convention as
@@ -27,6 +34,9 @@ export function WalletListItem({ wallet, onPress }: { wallet: Wallet; onPress: (
   return (
     <>
       <Pressable style={styles.row} onPress={onPress}>
+        {highlightOpacity ? (
+          <Animated.View pointerEvents="none" style={[styles.highlightBorder, { opacity: highlightOpacity }]} />
+        ) : null}
         <Avatar name={wallet.name} color={colorForCategory(wallet.id)} size={40} icon={wallet.icon} iconUrl={wallet.icon_url} />
         <View style={styles.info}>
           <View style={styles.titleRow}>
@@ -81,6 +91,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     borderRadius: radii.listCard,
+  },
+  // Sits exactly over the row's own 1px border, so it replaces it rather than
+  // drawing a second ring inside it.
+  highlightBorder: {
+    position: "absolute",
+    top: -1,
+    left: -1,
+    right: -1,
+    bottom: -1,
+    borderRadius: radii.listCard,
+    borderWidth: 2,
+    borderColor: colors.green,
   },
   info: { flex: 1, gap: 4 },
   titleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },

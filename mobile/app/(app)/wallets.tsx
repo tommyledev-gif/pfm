@@ -1,13 +1,19 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { ChevronLeftIcon, PlusIcon } from "@/components/ui/Icon";
+import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { Screen } from "@/components/shared/Screen";
 import { WALLET_TYPES, WalletType } from "@/lib/constants";
 import { colors, radii, spacing, typography } from "@/lib/theme";
+import { useHighlightFade } from "@/lib/use-highlight-fade";
+import { useUiPrefsStore, WalletsViewMode } from "@/stores/ui-prefs-store";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { Wallet } from "@/features/wallets/types";
+import { WalletActiveActions } from "@/features/wallets/components/WalletActiveActions";
+import { WalletCardSkeleton } from "@/features/wallets/components/WalletCardSkeleton";
+import { WalletCarousel } from "@/features/wallets/components/WalletCarousel";
 import { WalletFormModal } from "@/features/wallets/components/WalletFormModal";
 import { WalletListItem } from "@/features/wallets/components/WalletListItem";
 
@@ -18,6 +24,16 @@ const TYPE_LABEL: Record<WalletType, string> = {
   other: "Khác",
 };
 
+const VIEW_MODES: { label: string; value: WalletsViewMode }[] = [
+  { label: "Dạng thẻ", value: "carousel" },
+  { label: "Theo nhóm", value: "list" },
+];
+
+// The list's rows are not measured on the first frame, so scrolling to one
+// can fail once or twice before its layout lands.
+const SCROLL_RETRY_MS = 120;
+const MAX_SCROLL_RETRIES = 3;
+
 interface WalletSection {
   type: WalletType;
   title: string;
@@ -26,9 +42,23 @@ interface WalletSection {
 
 export default function WalletsScreen() {
   const router = useRouter();
+  // Set by Home when one of its wallet cards is tapped: open on that wallet
+  // and flash a border on it. `focusedAt` is a nonce, so tapping the same
+  // card twice in a row still replays the highlight.
+  const { focusWalletId, focusedAt } = useLocalSearchParams<{ focusWalletId?: string; focusedAt?: string }>();
   const wallets = useWalletsQuery();
+  const viewMode = useUiPrefsStore((s) => s.walletsViewMode);
+  const setViewMode = useUiPrefsStore((s) => s.setWalletsViewMode);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingWallet, setEditingWallet] = useState<Wallet | null>(null);
+  // The wallet the card view is centred on — kept here rather than in the
+  // carousel so switching to the list and back lands on the same one.
+  const [activeWalletId, setActiveWalletId] = useState<string | null>(focusWalletId ?? null);
+
+  // Only once the wallet is actually on screen to be highlighted — fading a
+  // border over a loading skeleton would spend the whole fade on nothing.
+  const highlightWalletId = focusWalletId && wallets.data?.some((w) => w.id === focusWalletId) ? focusWalletId : null;
+  const highlightOpacity = useHighlightFade(highlightWalletId ? `${highlightWalletId}:${focusedAt ?? ""}` : null);
 
   // GET /wallets orders `is_default DESC, created_at ASC` (backend/db/queries
   // /wallets.sql) — fine for a flat list, but it means every wallet visibly
@@ -36,6 +66,10 @@ export default function WalletsScreen() {
   // created_at only (is_default never enters the comparison), then grouped by
   // type, so changing the default flips just the "Mặc định" badge and nothing
   // about position or grouping.
+  //
+  // The card view keeps the server order instead: it is the order Home's
+  // carousel shows, and a card's accent color comes from its position — the
+  // same wallet must not change color between the two screens.
   const sections = useMemo<WalletSection[]>(() => {
     const byType = new Map<WalletType, Wallet[]>();
     const stableOrder = [...(wallets.data ?? [])].sort((a, b) => a.created_at.localeCompare(b.created_at));
@@ -49,6 +83,38 @@ export default function WalletsScreen() {
     );
   }, [wallets.data]);
 
+  const activeWallet = wallets.data?.find((w) => w.id === activeWalletId) ?? wallets.data?.[0] ?? null;
+
+  const openEditor = (wallet: Wallet | null) => {
+    setEditingWallet(wallet);
+    setModalOpen(true);
+  };
+
+  const listRef = useRef<SectionList<Wallet, WalletSection>>(null);
+  const scrollRetries = useRef(0);
+  const didScrollToFocus = useRef(false);
+
+  const scrollToFocusedRow = () => {
+    const sectionIndex = sections.findIndex((s) => s.data.some((w) => w.id === highlightWalletId));
+    if (sectionIndex === -1) return;
+    const itemIndex = sections[sectionIndex].data.findIndex((w) => w.id === highlightWalletId);
+    // VirtualizedSectionList counts a section's header as its flat index 0,
+    // so the section's item k sits at itemIndex k + 1.
+    listRef.current?.scrollToLocation({ sectionIndex, itemIndex: itemIndex + 1, viewPosition: 0.5, animated: false });
+  };
+
+  // The card view lands on the wallet by itself (initialWalletId); the list
+  // has to be scrolled to it, once, so the highlighted row is in view.
+  useEffect(() => {
+    if (viewMode !== "list" || !highlightWalletId || didScrollToFocus.current || sections.length === 0) return;
+    const frame = requestAnimationFrame(() => {
+      didScrollToFocus.current = true;
+      scrollToFocusedRow();
+    });
+    return () => cancelAnimationFrame(frame);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, highlightWalletId, sections]);
+
   return (
     <Screen>
       <View style={styles.header}>
@@ -56,26 +122,48 @@ export default function WalletsScreen() {
           <ChevronLeftIcon size={24} />
         </Pressable>
         <Text style={styles.title}>Ví tiền</Text>
-        <Pressable
-          style={styles.addButton}
-          onPress={() => {
-            setEditingWallet(null);
-            setModalOpen(true);
-          }}
-          hitSlop={8}
-        >
+        <Pressable style={styles.addButton} onPress={() => openEditor(null)} hitSlop={8}>
           <PlusIcon size={16} color={colors.onGreen} />
         </Pressable>
       </View>
 
-      {wallets.isLoading ? (
+      <SegmentedTabs style={styles.modeTabs} options={VIEW_MODES} value={viewMode} onChange={setViewMode} />
+
+      {viewMode === "carousel" ? (
+        <View style={styles.cardsBody}>
+          {wallets.isLoading ? (
+            <WalletCardSkeleton />
+          ) : (
+            <WalletCarousel
+              wallets={wallets.data ?? []}
+              initialWalletId={activeWalletId}
+              onActiveWalletChange={setActiveWalletId}
+              onPressWallet={openEditor}
+              highlightWalletId={highlightWalletId}
+              highlightOpacity={highlightOpacity}
+            />
+          )}
+          {activeWallet ? (
+            <>
+              <WalletActiveActions wallet={activeWallet} onEdit={() => openEditor(activeWallet)} />
+              <Text style={styles.hint}>Vuốt hoặc chạm thẻ bên cạnh để đổi ví · chạm thẻ giữa để sửa</Text>
+            </>
+          ) : null}
+        </View>
+      ) : wallets.isLoading ? (
         <ActivityIndicator color={colors.green} style={styles.loader} />
       ) : (
         <SectionList
+          ref={listRef}
           sections={sections}
           keyExtractor={(w) => w.id}
           contentContainerStyle={styles.list}
           stickySectionHeadersEnabled={false}
+          onScrollToIndexFailed={() => {
+            if (scrollRetries.current >= MAX_SCROLL_RETRIES) return;
+            scrollRetries.current += 1;
+            setTimeout(scrollToFocusedRow, SCROLL_RETRY_MS);
+          }}
           ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
           SectionSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
           renderSectionHeader={({ section }) => (
@@ -88,9 +176,10 @@ export default function WalletsScreen() {
             <WalletListItem
               wallet={item}
               onPress={() => {
-                setEditingWallet(item);
-                setModalOpen(true);
+                setActiveWalletId(item.id);
+                openEditor(item);
               }}
+              highlightOpacity={item.id === highlightWalletId ? highlightOpacity : undefined}
             />
           )}
           ListEmptyComponent={<Text style={styles.empty}>Chưa có ví nào — nhấn + để tạo ví mới.</Text>}
@@ -120,6 +209,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  modeTabs: { marginHorizontal: spacing.xl, marginBottom: spacing.md },
+  // Same horizontal padding Home gives the carousel's section, which the
+  // carousel cancels to run full-bleed.
+  cardsBody: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm, gap: spacing.lg },
+  hint: { ...typography.tiny, color: colors.textMuted, textAlign: "center" },
   list: { paddingHorizontal: spacing.xl, paddingBottom: 140 },
   loader: { marginTop: spacing.xxl },
   sectionHeader: {

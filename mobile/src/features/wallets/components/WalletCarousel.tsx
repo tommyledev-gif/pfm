@@ -1,37 +1,15 @@
-import { useRef, useState } from "react";
-import {
-  Animated,
-  LayoutChangeEvent,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Animated, StyleSheet, Text, View } from "react-native";
 
 import { colors, spacing, typography, walletAccentPalette } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
-import {
-  CARD_HEIGHT,
-  CARD_OVERLAP,
-  CARD_WIDTH,
-  WalletStackCard,
-} from "@/features/wallets/components/WalletStackCard";
+import { CARD_HEIGHT, CARD_OVERLAP, WalletStackCard } from "@/features/wallets/components/WalletStackCard";
+import { SNAP_INTERVAL, useWalletCarousel } from "@/features/wallets/components/use-wallet-carousel";
 
-// Each card steps less than its own width, so every card overlaps its
-// neighbour — the layout itself is a stack, not a row with gaps.
-const SNAP_INTERVAL = CARD_WIDTH - CARD_OVERLAP;
-// How far a neighbour leans further inward on top of that, so the flanking
-// cards tuck under the active one instead of merely touching it.
+// How far a neighbour leans further inward on top of the overlap, so the
+// flanking cards tuck under the active one instead of merely touching it.
 const NEIGHBOUR_OVERLAP = 18;
 const NEIGHBOUR_SCALE = 0.88;
 const NEIGHBOUR_OPACITY = 0.5;
-// ⚠️ Looping needs enough wallets that the copies never put the same wallet on
-// screen twice. With the active card plus one neighbour each side visible,
-// three distinct wallets is the floor; below it this is a plain bounded list.
-const MIN_WALLETS_TO_LOOP = 3;
-const LOOP_COPIES = 3;
 
 // Each wallet's accent by its position in the list. Colors are assigned by
 // position, not by wallet type, so every card is visibly its own. The one
@@ -47,11 +25,22 @@ function accentForIndex(index: number, count: number): string {
 
 interface WalletCarouselProps {
   wallets: Wallet[];
+  /** Tapping the CENTRED card. Tapping one at the side brings it to the centre instead. */
+  onPressWallet?: (wallet: Wallet) => void;
+  /** Wallet to land on when the carousel first lays out; the first one otherwise. */
+  initialWalletId?: string | null;
+  /** Fires with the centred wallet's id whenever a different card settles in the middle. */
+  onActiveWalletChange?: (walletId: string) => void;
+  /** Draws a fading "you picked this one" border on this wallet's card. */
+  highlightWalletId?: string | null;
+  /** The 1 → 0 opacity for that border — from useHighlightFade. */
+  highlightOpacity?: Animated.Value;
 }
 
 /**
  * The wallets section: the selected wallet centred, its neighbours peeking on
- * both sides, wrapping around at either end.
+ * both sides, wrapping around at either end. Shared by Home and the Wallets
+ * screen's card view, so a wallet keeps the same accent color on both.
  *
  * ⚠️ A plain ScrollView rather than a FlatList, deliberately. Looping means
  * silently jumping the scroll offset by a whole copy's width once the user
@@ -59,68 +48,32 @@ interface WalletCarouselProps {
  * its windowing every time. Wallet counts are small enough that rendering
  * every card outright is cheaper than the machinery to avoid it.
  *
- * The OS owns the scroll, so fling physics and the home screen's own vertical
+ * The OS owns the scroll, so fling physics and the host screen's own vertical
  * scroll both keep working. No reanimated and no gesture-handler — neither is
  * a dependency of this project.
  */
-export function WalletCarousel({ wallets }: WalletCarouselProps) {
-  const scrollRef = useRef<ScrollView>(null);
-  const scrollX = useRef(new Animated.Value(0)).current;
-  const [containerWidth, setContainerWidth] = useState(0);
-  // Which card is currently centred, in `rendered` indices. Only used to order
-  // the overlapping cards — the centred one has to paint ON TOP of both its
-  // neighbours, and paint order in React Native is render order, which would
-  // otherwise put every card to the right over the active one.
-  const [centreIndex, setCentreIndex] = useState(0);
-  const didInitialScroll = useRef(false);
-
-  const looping = wallets.length >= MIN_WALLETS_TO_LOOP;
-  // Three copies laid end to end. The user always sits in the middle one, so
-  // there is a full copy of runway in either direction before a jump is owed.
-  const rendered = looping ? Array.from({ length: LOOP_COPIES }, () => wallets).flat() : wallets;
-  const loopWidth = wallets.length * SNAP_INTERVAL;
-
-  // Side padding is what actually centres a card: the first and last items
-  // need half a viewport of empty space beside them to reach the middle.
-  const sidePadding = containerWidth > 0 ? Math.max(0, (containerWidth - CARD_WIDTH) / 2) : 0;
-
-  const onLayout = (event: LayoutChangeEvent) => {
-    const next = event.nativeEvent.layout.width;
-    setContainerWidth((prev) => (Math.abs(prev - next) < 1 ? prev : next));
-  };
-
-  // Landing in the middle copy has to happen without animation, or the user
-  // watches the carousel scroll itself on arrival.
-  const onContentSizeChange = () => {
-    if (didInitialScroll.current || !looping || containerWidth === 0) return;
-    didInitialScroll.current = true;
-    scrollRef.current?.scrollTo({ x: loopWidth, animated: false });
-    setCentreIndex(wallets.length);
-  };
-
-  // ⚠️ Attached as the listener of the native-driven scroll event, not as a
-  // second onScroll: the animation stays on the native driver, and this only
-  // re-renders when the centred card actually changes — once per swipe, not
-  // once per frame.
-  const onScrollFrame = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const next = Math.round(event.nativeEvent.contentOffset.x / SNAP_INTERVAL);
-    setCentreIndex((prev) => (prev === next ? prev : next));
-  };
-
-  // ⚠️ The wrap happens only once motion has stopped. Re-anchoring mid-fling
-  // would cancel the user's own momentum and read as the carousel snatching
-  // the card back.
-  const onMomentumEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (!looping) return;
-    const x = event.nativeEvent.contentOffset.x;
-    if (x < loopWidth / 2) {
-      scrollRef.current?.scrollTo({ x: x + loopWidth, animated: false });
-      setCentreIndex(Math.round((x + loopWidth) / SNAP_INTERVAL));
-    } else if (x > loopWidth * 1.5) {
-      scrollRef.current?.scrollTo({ x: x - loopWidth, animated: false });
-      setCentreIndex(Math.round((x - loopWidth) / SNAP_INTERVAL));
-    }
-  };
+export function WalletCarousel({
+  wallets,
+  onPressWallet,
+  initialWalletId,
+  onActiveWalletChange,
+  highlightWalletId,
+  highlightOpacity,
+}: WalletCarouselProps) {
+  const {
+    scrollRef,
+    scrollX,
+    containerWidth,
+    centreIndex,
+    rendered,
+    sidePadding,
+    onLayout,
+    onContentSizeChange,
+    onScrollFrame,
+    onMomentumEnd,
+    pressCard,
+    onScrollBeginDrag,
+  } = useWalletCarousel({ wallets, initialWalletId, onActiveWalletChange });
 
   if (wallets.length === 0) {
     return <Text style={styles.empty}>Chưa có ví nào — thêm một ví để bắt đầu.</Text>;
@@ -144,6 +97,7 @@ export function WalletCarousel({ wallets }: WalletCarouselProps) {
         scrollEventThrottle={16}
         onContentSizeChange={onContentSizeChange}
         onMomentumScrollEnd={onMomentumEnd}
+        onScrollBeginDrag={onScrollBeginDrag}
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], {
           useNativeDriver: true,
           listener: onScrollFrame,
@@ -206,6 +160,12 @@ export function WalletCarousel({ wallets }: WalletCarouselProps) {
                     outputRange: [0, 1, 0],
                     extrapolate: "clamp",
                   })}
+                  // A side card is a shortcut for the swipe that would bring it
+                  // over; only the card already in the middle is "opened".
+                  onPress={() => pressCard(index, onPressWallet ? () => onPressWallet(wallet) : undefined)}
+                  // Every loop copy of the wallet gets it — whichever copy is
+                  // centred is the one the user sees.
+                  highlightOpacity={wallet.id === highlightWalletId ? highlightOpacity : undefined}
                 />
               );
             })}

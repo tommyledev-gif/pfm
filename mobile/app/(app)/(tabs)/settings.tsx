@@ -2,7 +2,6 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { Avatar } from "@/components/ui/Avatar";
-import { Card } from "@/components/ui/Card";
 import {
   ChevronRightIcon,
   CodeIcon,
@@ -16,7 +15,7 @@ import {
 } from "@/components/ui/Icon";
 import { Screen } from "@/components/shared/Screen";
 import { RevealableAmount } from "@/components/shared/RevealableAmount";
-import { colors, spacing, typography } from "@/lib/theme";
+import { colors, radii, spacing, typography } from "@/lib/theme";
 import { useSessionStore } from "@/stores/session-store";
 import { useChatStore } from "@/stores/chat-store";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
@@ -95,35 +94,35 @@ export default function SettingsScreen() {
       <View style={styles.statRow}>
         {/* Compacted, because three figures share one row: a fully-grouped
             net worth shrank to unreadable or clipped mid-number here. The
-            exact figure is a one-second hold away on each — see
-            RevealableAmount. */}
-        <Card style={styles.statCard}>
-          <Text style={styles.statLabel}>Tài sản ròng</Text>
-          <RevealableAmount
-            amountCents={netWorth ? netWorth.amount : null}
-            currency={netWorth?.currency ?? "VND"}
-            style={styles.statValue}
-            testID="text-settings-net-worth"
-          />
-        </Card>
-        <Card style={styles.statCard}>
-          <Text style={styles.statLabel}>Thu nhập</Text>
-          <RevealableAmount
-            amountCents={primaryTotal ? primaryTotal.total_income : null}
-            currency={primaryTotal?.currency ?? "VND"}
-            style={[styles.statValue, { color: colors.green }]}
-            testID="text-settings-income"
-          />
-        </Card>
-        <Card style={styles.statCard}>
-          <Text style={styles.statLabel}>Chi tiêu</Text>
-          <RevealableAmount
-            amountCents={primaryTotal ? primaryTotal.total_expense : null}
-            currency={primaryTotal?.currency ?? "VND"}
-            style={[styles.statValue, { color: colors.peach }]}
-            testID="text-settings-expense"
-          />
-        </Card>
+            exact figure is a one-second hold away on each — anywhere on the
+            card, not just its figure (see RevealableAmount). */}
+        <RevealableAmount
+          label="Tài sản ròng"
+          amountCents={netWorth ? netWorth.amount : null}
+          currency={netWorth?.currency ?? "VND"}
+          containerStyle={styles.statCard}
+          labelStyle={styles.statLabel}
+          style={styles.statValue}
+          testID="text-settings-net-worth"
+        />
+        <RevealableAmount
+          label="Thu nhập"
+          amountCents={primaryTotal ? primaryTotal.total_income : null}
+          currency={primaryTotal?.currency ?? "VND"}
+          containerStyle={styles.statCard}
+          labelStyle={styles.statLabel}
+          style={[styles.statValue, { color: colors.green }]}
+          testID="text-settings-income"
+        />
+        <RevealableAmount
+          label="Chi tiêu"
+          amountCents={primaryTotal ? primaryTotal.total_expense : null}
+          currency={primaryTotal?.currency ?? "VND"}
+          containerStyle={styles.statCard}
+          labelStyle={styles.statLabel}
+          style={[styles.statValue, { color: colors.peach }]}
+          testID="text-settings-expense"
+        />
       </View>
 
       <View style={styles.settingsGroup}>
@@ -152,7 +151,19 @@ const styles = StyleSheet.create({
   name: { ...typography.title, color: colors.textPrimary, marginTop: spacing.sm },
   email: { ...typography.caption, color: colors.textSecondary },
   statRow: { flexDirection: "row", gap: spacing.sm },
-  statCard: { flex: 1, gap: 4, paddingVertical: spacing.md, paddingHorizontal: spacing.sm, alignItems: "center" },
+  // Card's own surface/border/radius (components/ui/Card.tsx), applied to the
+  // hold target itself so the whole card is what gets held.
+  statCard: {
+    flex: 1,
+    gap: 4,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    borderRadius: radii.card,
+  },
   statLabel: { ...typography.tiny, color: colors.textSecondary },
   statValue: { ...typography.label, color: colors.textPrimary },
   settingsGroup: { gap: spacing.xs },

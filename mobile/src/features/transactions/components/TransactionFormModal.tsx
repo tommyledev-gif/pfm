@@ -1,7 +1,5 @@
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { AmountInput } from "@/components/ui/AmountInput";
-import { CategorySelectField } from "@/components/shared/CategorySelectField";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Drawer } from "@/components/shared/Drawer";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
@@ -11,12 +9,14 @@ import { TrashIcon } from "@/components/ui/Icon";
 import { SingleDatePickerModal } from "@/components/shared/SingleDatePickerModal";
 import { getErrorMessage } from "@/lib/axios";
 import { formatCurrency } from "@/lib/currency";
-import { formatDateShort } from "@/lib/format-date";
 import { colors, radii, spacing, typography } from "@/lib/theme";
-import { TRANSACTION_KIND_LABELS, TRANSACTION_KINDS, TRANSACTION_NOTE_MAX_LENGTH } from "@/lib/constants";
+import { TRANSACTION_KIND_LABELS, TRANSACTION_KINDS } from "@/lib/constants";
 import { Transaction } from "@/features/transactions/types";
+import { TransactionKeypadFooter } from "@/features/transactions/components/TransactionKeypadFooter";
 import { WalletChipRow } from "@/features/transactions/components/WalletChipRow";
 import { useTransactionForm } from "@/features/transactions/components/use-transaction-form";
+
+const FALLBACK_CURRENCY = "VND";
 
 interface TransactionFormModalProps {
   visible: boolean;
@@ -25,10 +25,14 @@ interface TransactionFormModalProps {
 }
 
 // Manual "Add/Edit Transaction" form — the AI Chat screen was previously the
-// only way to create a transaction on mobile. Styled like
-// WalletFormModal/CategoryFormModal. Backend PATCH doesn't accept
+// only way to create a transaction on mobile. Backend PATCH doesn't accept
 // wallet_id/type (dto.UpdateTransactionRequest), so both are locked once
 // editing, mirroring how currency is locked on WalletFormModal.
+//
+// Laid out after the keypad sheets in reference-ui/: the choices (type,
+// wallets) scroll in the body, while the amount — typed on a calculator
+// keypad instead of the OS keyboard — sits in the pinned footer with the
+// category chip, the note, the date key and the ✓ key that saves.
 export function TransactionFormModal({ visible, onClose, editingTransaction }: TransactionFormModalProps) {
   const {
     isEditing,
@@ -42,7 +46,6 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
     setToWalletId,
     setCategoryId,
     amount,
-    setAmount,
     note,
     setNote,
     occurredAt,
@@ -60,11 +63,13 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
     selectedWallet,
     destinationWallets,
     projectedBalance,
+    transferTarget,
     submit,
     categoryPicker,
   } = useTransactionForm({ visible, onClose, editingTransaction });
 
   const activeError = mutation.isError ? mutation.error : deleteTransaction.isError ? deleteTransaction.error : null;
+  const lockedSuffix = isEditing ? " (khóa sau khi tạo)" : "";
 
   return (
     <>
@@ -73,23 +78,60 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
         onClose={onClose}
         child={categoryPicker.child}
         footer={
-          <View style={styles.actions}>
-            <PillButton label="Hủy" variant="outline" onPress={onClose} style={styles.flexButton} />
-            <PillButton
-              label={isEditing ? "Lưu" : "Tạo"}
-              onPress={submit}
-              loading={mutation.isPending}
-              disabled={submitAttempted && hasErrors}
-              style={styles.flexButton}
-            />
-          </View>
+          <TransactionKeypadFooter
+            amount={amount}
+            currency={selectedWallet?.currency ?? FALLBACK_CURRENCY}
+            type={type}
+            category={categoryPicker.selected[0] ?? null}
+            transferTarget={transferTarget}
+            onPressCategory={categoryPicker.open}
+            note={note}
+            onChangeNote={setNote}
+            noteInputKey={`note-${formKey}`}
+            occurredAt={occurredAt}
+            onPressDate={() => setDatePickerOpen(true)}
+            errors={submitAttempted ? [errors.category, errors.amount] : []}
+            submitError={activeError ? getErrorMessage(activeError, "Không thể lưu giao dịch") : null}
+            onSubmit={submit}
+            submitting={mutation.isPending}
+          />
         }
       >
-        <DrawerHeader title={isEditing ? "Sửa giao dịch" : "Giao dịch mới"} />
+        <DrawerHeader
+          title={isEditing ? "Sửa giao dịch" : "Giao dịch mới"}
+          actions={[
+            { label: "Hủy", onPress: onClose, variant: "secondary" },
+            {
+              label: isEditing ? "Lưu" : "Tạo",
+              onPress: submit,
+              disabled: mutation.isPending || (submitAttempted && hasErrors),
+              testID: "btn-transaction-submit",
+            },
+          ]}
+        />
+
+        <Text style={styles.label}>Loại{lockedSuffix}</Text>
+        <View style={styles.chipRow}>
+          {TRANSACTION_KINDS.map((t) => (
+            <Pressable
+              key={t}
+              onPress={() => {
+                if (isEditing) return;
+                setType(t);
+                setCategoryId(null);
+              }}
+              style={[styles.chip, type === t && styles.chipActive, isEditing && styles.chipDisabled]}
+            >
+              <Text style={[styles.chipLabel, type === t && styles.chipLabelActive]}>
+                {TRANSACTION_KIND_LABELS[t]}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
 
         <Text style={styles.label}>
           {isTransfer ? "Từ ví" : "Ví"}
-          {isEditing ? " (khóa sau khi tạo)" : ""}
+          {lockedSuffix}
         </Text>
         <WalletChipRow
           wallets={wallets.data ?? []}
@@ -111,28 +153,9 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
           </Text>
         ) : null}
 
-        <Text style={styles.label}>Loại{isEditing ? " (khóa sau khi tạo)" : ""}</Text>
-        <View style={styles.chipRow}>
-          {TRANSACTION_KINDS.map((t) => (
-            <Pressable
-              key={t}
-              onPress={() => {
-                if (isEditing) return;
-                setType(t);
-                setCategoryId(null);
-              }}
-              style={[styles.chip, type === t && styles.chipActive, isEditing && styles.chipDisabled]}
-            >
-              <Text style={[styles.chipLabel, type === t && styles.chipLabelActive]}>
-                {TRANSACTION_KIND_LABELS[t]}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
         {isTransfer ? (
           <>
-            <Text style={styles.label}>Đến ví{isEditing ? " (khóa sau khi tạo)" : ""}</Text>
+            <Text style={styles.label}>Đến ví{lockedSuffix}</Text>
             {destinationWallets.length > 0 ? (
               <WalletChipRow
                 wallets={destinationWallets}
@@ -145,35 +168,7 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
             )}
             {submitAttempted ? <FieldError message={errors.toWallet} /> : null}
           </>
-        ) : (
-          <>
-            <Text style={styles.label}>Danh mục</Text>
-            <CategorySelectField categories={categoryPicker.selected} onPress={categoryPicker.open} />
-            {submitAttempted ? <FieldError message={errors.category} /> : null}
-          </>
-        )}
-
-        <Text style={styles.label}>Số tiền</Text>
-        <AmountInput key={`amount-${formKey}`} value={amount} onChangeText={setAmount} />
-        {submitAttempted ? <FieldError message={errors.amount} /> : null}
-
-        <Text style={styles.label}>Ghi chú (không bắt buộc)</Text>
-        <TextInput
-          key={`note-${formKey}`}
-          value={note}
-          onChangeText={setNote}
-          placeholder="vd: Ăn trưa"
-          placeholderTextColor={colors.textMuted}
-          maxLength={TRANSACTION_NOTE_MAX_LENGTH}
-          style={styles.input}
-        />
-
-        <Text style={styles.label}>Ngày</Text>
-        <Pressable style={styles.input} onPress={() => setDatePickerOpen(true)}>
-          <Text style={{ color: colors.textPrimary, ...typography.body }}>{formatDateShort(occurredAt)}</Text>
-        </Pressable>
-
-        {activeError ? <Text style={styles.error}>{getErrorMessage(activeError, "Không thể lưu giao dịch")}</Text> : null}
+        ) : null}
 
         {isEditing ? (
           <PillButton
@@ -230,19 +225,6 @@ const styles = StyleSheet.create({
   chipDisabled: { opacity: 0.5 },
   chipLabel: { ...typography.caption, color: colors.textSecondary },
   chipLabelActive: { color: colors.onGreen },
-  input: {
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    borderRadius: radii.listCard,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: 12,
-    color: colors.textPrimary,
-    ...typography.body,
-  },
-  error: { color: colors.peach, ...typography.caption },
-  actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
-  flexButton: { flex: 1 },
   deleteButton: { backgroundColor: colors.danger, marginTop: spacing.sm },
   deleteLabel: { color: colors.onDanger, fontWeight: "800" },
 });

@@ -50,13 +50,26 @@ export function BudgetMonthSummary({
         {showDaysLeft ? <Text style={styles.daysLeft}>còn {pace.daysLeft} ngày</Text> : null}
       </View>
 
-      <Text style={styles.amountRow} numberOfLines={1}>
-        <Text style={[styles.amount, over && styles.amountOver]}>{formatCurrency(Math.abs(remaining), currency)}</Text>
-        <Text style={styles.amountSuffix}>
-          {over ? " vượt trên " : " còn lại trên "}
-          {formatCurrency(totalLimit, currency)}
+      {/* ⚠️ Two lines, never one clipped one. These used to share a single
+          numberOfLines={1} line, which fit at a glance but cut the limit
+          mid-number ("7.210.000 đ còn lại trên 7.21…") — a figure the user
+          could see was there but not read. The headline amount shrinks to fit
+          its own line rather than clip; the "of the limit" line can wrap. */}
+      <View style={styles.amountBlock}>
+        <Text
+          style={[styles.amount, over && styles.amountOver]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.6}
+          testID="text-budget-summary-remaining"
+        >
+          {formatCurrency(Math.abs(remaining), currency)}
         </Text>
-      </Text>
+        <Text style={styles.amountSuffix}>
+          {over ? "vượt trên hạn mức " : "còn lại trên hạn mức "}
+          <Text style={styles.amountLimit}>{formatCurrency(totalLimit, currency)}</Text>
+        </Text>
+      </View>
 
       <BudgetProgressBar ratio={ratio} pace={pace.elapsed} color={barColor} height={10} />
 
@@ -75,10 +88,11 @@ const styles = StyleSheet.create({
   headRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   month: { ...typography.cardTitle, color: colors.textPrimary },
   daysLeft: { ...typography.caption, color: colors.textSecondary },
-  amountRow: { flexDirection: "row", alignItems: "baseline" },
+  amountBlock: { gap: 2 },
   amount: { ...typography.hero, color: colors.textPrimary },
   amountOver: { color: colors.peach },
   amountSuffix: { ...typography.body, color: colors.textSecondary, fontWeight: "600" },
+  amountLimit: { color: colors.textPrimary },
   paceLabel: { ...typography.tiny, color: colors.textMuted, textAlign: "center" },
   overNote: { ...typography.caption, color: colors.mustard },
 });

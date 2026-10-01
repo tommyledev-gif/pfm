@@ -18,6 +18,7 @@ import { isPendingProposal } from "@/features/ai-chat/pending";
 import { HomeSnapshotCard } from "@/features/reports/components/HomeSnapshotCard";
 import { useHomeSnapshot } from "@/features/reports/hooks/use-home-snapshot";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
+import { Wallet } from "@/features/wallets/types";
 import { WalletCarousel } from "@/features/wallets/components/WalletCarousel";
 import { WalletCardSkeleton } from "@/features/wallets/components/WalletCardSkeleton";
 import { useTransactionsQuery } from "@/features/transactions/api/use-transactions-query";
@@ -94,6 +95,11 @@ export default function HomeScreen() {
       params: { focusMessageId: messageId, focusedAt: String(Date.now()), ...(openEdit ? { openEdit: "1" } : {}) },
     });
 
+  // Opens the Wallets screen on the tapped wallet, which flashes a border on
+  // it. Same nonce trick as above: tapping the same card twice still replays.
+  const openWallet = (wallet: Wallet) =>
+    router.push({ pathname: "/wallets", params: { focusWalletId: wallet.id, focusedAt: String(Date.now()) } });
+
   // Hands the exact window the user is looking at to the Budgets tab, so the
   // limits there are prorated to the same period rather than the whole month.
   const openBudgetsForPeriod = () =>
@@ -155,7 +161,11 @@ export default function HomeScreen() {
                   <Text style={styles.sectionAction}>Thêm ví</Text>
                 </Pressable>
               </View>
-              {wallets.isLoading ? <WalletCardSkeleton /> : <WalletCarousel wallets={wallets.data ?? []} />}
+              {wallets.isLoading ? (
+                <WalletCardSkeleton />
+              ) : (
+                <WalletCarousel wallets={wallets.data ?? []} onPressWallet={openWallet} />
+              )}
             </View>
 
             <View style={styles.sectionHeaderRow}>

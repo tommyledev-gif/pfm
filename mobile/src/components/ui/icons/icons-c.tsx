@@ -99,3 +99,18 @@ export function CheckCircleIcon({ size, color = "#85FF33", checkColor = "#06130A
     </Svg>
   );
 }
+
+/** The keypad's delete-last key: a left-pointing key cap with an ×. */
+export function BackspaceIcon({ size, color = "#F5F6F8", strokeWidth = 1.8 }: IconProps) {
+  return (
+    <Svg {...base(size)} fill="none">
+      <Path
+        d="M9 5h10.5A1.5 1.5 0 0 1 21 6.5v11a1.5 1.5 0 0 1-1.5 1.5H9l-6-7 6-7Z"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinejoin="round"
+      />
+      <Path d="m11.5 9.5 5 5m0-5-5 5" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+    </Svg>
+  );
+}

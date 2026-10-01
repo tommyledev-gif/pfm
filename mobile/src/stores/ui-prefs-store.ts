@@ -3,6 +3,9 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 export type HomePeriod = "day" | "month" | "year";
+// The Wallets screen's two layouts: the card carousel Home also shows (the
+// default), or the vertical list grouped by wallet type.
+export type WalletsViewMode = "carousel" | "list";
 
 // Small persisted UI-preferences store — currently just the Home screen's
 // selected Day/Month/Year snapshot period, so it survives navigation and
@@ -18,6 +21,8 @@ interface UiPrefsState {
   // independently of this flag and is never affected by it.
   debugBubbleVisible: boolean;
   setDebugBubbleVisible: (visible: boolean) => void;
+  walletsViewMode: WalletsViewMode;
+  setWalletsViewMode: (mode: WalletsViewMode) => void;
 }
 
 export const useUiPrefsStore = create<UiPrefsState>()(
@@ -27,6 +32,10 @@ export const useUiPrefsStore = create<UiPrefsState>()(
       setHomePeriod: (period) => set({ homePeriod: period }),
       debugBubbleVisible: true,
       setDebugBubbleVisible: (visible) => set({ debugBubbleVisible: visible }),
+      // A key missing from older persisted state takes this default at
+      // rehydration (persist's shallow merge), so no version bump is owed.
+      walletsViewMode: "carousel",
+      setWalletsViewMode: (mode) => set({ walletsViewMode: mode }),
     }),
     {
       name: "pfm_ui_prefs",

@@ -1,5 +1,5 @@
 import { useId } from "react";
-import { Animated, StyleSheet, Text, View } from "react-native";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 
 import { TintedIconTile } from "@/components/ui/TintedIconTile";
@@ -42,6 +42,10 @@ interface WalletStackCardProps {
   /** 1 when this card is the centred one, 0 when it is not. Drives the
    *  accent border. */
   activeOpacity: Animated.AnimatedInterpolation<number>;
+  onPress?: () => void;
+  /** 1 → 0 from useHighlightFade: the "you picked this one" border, drawn
+   *  over the accent border and faded out on the native driver. */
+  highlightOpacity?: Animated.Value;
 }
 
 /**
@@ -57,7 +61,14 @@ interface WalletStackCardProps {
  * The balance is never abbreviated: it shrinks to fit, because a clipped
  * balance is a wrong balance.
  */
-export function WalletStackCard({ wallet, accentColor, animatedStyle, activeOpacity }: WalletStackCardProps) {
+export function WalletStackCard({
+  wallet,
+  accentColor,
+  animatedStyle,
+  activeOpacity,
+  onPress,
+  highlightOpacity,
+}: WalletStackCardProps) {
   // SVG gradient ids must be unique on screen — the loop copies render the
   // same wallet several times. useId's colons are not valid in url(#…).
   const gradientId = `wallet-grad-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
@@ -83,7 +94,17 @@ export function WalletStackCard({ wallet, accentColor, animatedStyle, activeOpac
         style={[styles.accentBorder, { borderColor: `${accentColor}40`, opacity: activeOpacity }]}
       />
 
-      <View style={styles.content}>
+      {highlightOpacity ? (
+        <Animated.View pointerEvents="none" style={[styles.highlightBorder, { opacity: highlightOpacity }]} />
+      ) : null}
+
+      <Pressable
+        style={({ pressed }) => [styles.content, pressed && styles.contentPressed]}
+        onPress={onPress}
+        disabled={!onPress}
+        accessibilityRole={onPress ? "button" : undefined}
+        accessibilityLabel={`${wallet.name}, ${formatCurrency(wallet.balance, wallet.currency)}`}
+      >
         <View style={styles.topRow}>
           <TintedIconTile
             color={accentColor}
@@ -113,7 +134,7 @@ export function WalletStackCard({ wallet, accentColor, animatedStyle, activeOpac
             {formatCurrency(wallet.balance, wallet.currency)}
           </Text>
         </View>
-      </View>
+      </Pressable>
     </Animated.View>
   );
 }
@@ -144,10 +165,17 @@ const styles = StyleSheet.create({
     borderRadius: radii.card,
     borderWidth: 1,
   },
+  highlightBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: radii.card,
+    borderWidth: 2,
+    borderColor: colors.green,
+  },
   // A measured gap between the two blocks rather than space-between: pinning
   // them to the card's edges left a pool of dead space in the middle that made
   // the name and the balance look unrelated.
   content: { flex: 1, padding: spacing.md, gap: spacing.md, justifyContent: "center" },
+  contentPressed: { opacity: 0.8 },
   topRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   identity: { flex: 1, minWidth: 0, gap: 1 },
   name: { ...typography.body, fontWeight: "700", color: colors.textPrimary },

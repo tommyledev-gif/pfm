@@ -1,20 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { DateData } from "react-native-calendars";
+import { useEffect, useState } from "react";
+import { Keyboard, Pressable, StyleSheet, Text, View } from "react-native";
 
-import { AmountInput } from "@/components/ui/AmountInput";
-import { CategorySelectField } from "@/components/shared/CategorySelectField";
 import { Drawer } from "@/components/shared/Drawer";
-import { MonthYearCalendar } from "@/components/shared/MonthYearCalendar";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
+import { SingleDatePickerModal } from "@/components/shared/SingleDatePickerModal";
 import { colors, radii, spacing, typography } from "@/lib/theme";
-import { toCents, toMajorUnits } from "@/lib/currency";
-import { formatDateShort } from "@/lib/format-date";
 import { TRANSACTION_TYPES, TransactionType } from "@/lib/constants";
+import { useAmountExpression } from "@/lib/use-amount-expression";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useCategoryPicker } from "@/features/categories/components/use-category-picker";
+import { TransactionKeypadFooter } from "@/features/transactions/components/TransactionKeypadFooter";
+import { WalletChipRow } from "@/features/transactions/components/WalletChipRow";
 import { TransactionActionPayload } from "@/features/ai-chat/types";
+
+const FALLBACK_CURRENCY = "VND";
 
 interface EditTransactionModalProps {
   visible: boolean;
@@ -39,19 +39,20 @@ interface EditTransactionModalProps {
 // place — either way this same modal is reused, only the caller's `onSave`
 // handler and this component's `lockWalletAndType` prop differ.
 //
-// Built on the shared Drawer (single ScrollView, keyboard-safe padding) like
-// every other form sheet in the app — this modal used to roll its own bare
-// Modal/View/ScrollView with zero keyboard mitigation, one of the two worst
-// offenders behind the "keyboard covers the input" reports. The Save/Cancel
-// row now scrolls with the rest of the fields rather than staying pinned,
-// matching how every other Drawer-based form already behaves.
+// Same keypad layout as TransactionFormModal (reference-ui/): type and wallet
+// scroll in the body; the amount keypad, category chip, note and the date
+// key (which replaced the inline calendar that used to make this the
+// longest sheet in the app) are pinned in the Drawer footer.
 export function EditTransactionModal({ visible, payload, onClose, onSave, lockWalletAndType }: EditTransactionModalProps) {
   const [type, setType] = useState<TransactionType>("expense");
-  const [amount, setAmount] = useState("");
+  const amount = useAmountExpression();
+  const { reset: resetAmount } = amount;
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [walletId, setWalletId] = useState<string | null>(null);
   const [occurredAt, setOccurredAt] = useState("");
   const [note, setNote] = useState("");
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const wallets = useWalletsQuery();
   const categories = useCategoriesQuery(type);
@@ -59,7 +60,7 @@ export function EditTransactionModal({ visible, payload, onClose, onSave, lockWa
   useEffect(() => {
     if (!visible || !payload) return;
     setType(payload.type);
-    setAmount(String(toMajorUnits(payload.amount)));
+    resetAmount(payload.amount);
     setCategoryId(payload.category_id);
     setWalletId(payload.wallet_id);
     // react-native-calendars requires a strict "YYYY-MM-DD" key, but
@@ -67,7 +68,8 @@ export function EditTransactionModal({ visible, payload, onClose, onSave, lockWa
     // the first 10 characters are "YYYY-MM-DD" either way.
     setOccurredAt(payload.occurred_at.slice(0, 10));
     setNote(payload.note ?? "");
-  }, [visible, payload]);
+    setSubmitAttempted(false);
+  }, [visible, payload, resetAmount]);
 
   // Switching type can leave a category selected that belongs to the other
   // type's list (expense categories aren't valid once type flips to income).
@@ -83,102 +85,100 @@ export function EditTransactionModal({ visible, payload, onClose, onSave, lockWa
     onApply: (ids) => setCategoryId(ids[0] ?? null),
   });
 
-  const markedDates = useMemo(
-    () => (occurredAt ? { [occurredAt]: { selected: true, selectedColor: colors.green, selectedTextColor: colors.onGreen } } : {}),
-    [occurredAt],
-  );
-
-  const amountValue = Number(amount);
-  const canSave = amountValue > 0 && Boolean(categoryId) && Boolean(walletId) && Boolean(occurredAt);
+  const amountValid = amount.cents !== null && amount.cents > 0;
+  const canSave = amountValid && Boolean(categoryId) && Boolean(walletId) && Boolean(occurredAt);
+  const errors = submitAttempted
+    ? [categoryId ? undefined : "Vui lòng chọn danh mục", amountValid ? undefined : "Vui lòng nhập số tiền hợp lệ"]
+    : [];
 
   const submit = () => {
-    if (!canSave || !categoryId || !walletId) return;
+    Keyboard.dismiss();
+    setSubmitAttempted(true);
+    // Trims/evaluates an expression still being typed ("120+"), so what is
+    // saved is exactly what the amount display then shows.
+    const cents = amount.resolve();
+    if (cents === null || cents <= 0 || !categoryId || !walletId || !occurredAt) return;
     onSave({
       wallet_id: walletId,
       category_id: categoryId,
-      amount: toCents(amountValue),
+      amount: cents,
       type,
       note: note.trim() || null,
       occurred_at: occurredAt,
     });
   };
 
+  const currency = wallets.data?.find((w) => w.id === walletId)?.currency ?? FALLBACK_CURRENCY;
+
   return (
-    <Drawer visible={visible} onClose={onClose} child={categoryPicker.child}>
-      <DrawerHeader
-        title="Sửa giao dịch"
-        actions={[
-          { label: "Hủy", onPress: onClose, variant: "secondary" },
-          { label: "Lưu", onPress: submit, disabled: !canSave },
-        ]}
+    <>
+      <Drawer
+        visible={visible}
+        onClose={onClose}
+        child={categoryPicker.child}
+        footer={
+          <TransactionKeypadFooter
+            amount={amount}
+            currency={currency}
+            type={type}
+            category={categoryPicker.selected[0] ?? null}
+            onPressCategory={categoryPicker.open}
+            note={note}
+            onChangeNote={setNote}
+            occurredAt={occurredAt}
+            onPressDate={() => setDatePickerOpen(true)}
+            errors={errors}
+            onSubmit={submit}
+          />
+        }
+      >
+        <DrawerHeader
+          title="Sửa giao dịch"
+          actions={[
+            { label: "Hủy", onPress: onClose, variant: "secondary" },
+            { label: "Lưu", onPress: submit, disabled: !canSave },
+          ]}
+        />
+
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>Loại</Text>
+          <View style={styles.chipRow}>
+            {TRANSACTION_TYPES.map((t) => (
+              <Pressable
+                key={t}
+                onPress={() => !lockWalletAndType && setType(t)}
+                disabled={lockWalletAndType}
+                style={[styles.chip, type === t && styles.chipActive, lockWalletAndType && styles.chipDisabled]}
+              >
+                <Text style={[styles.chipLabel, type === t && styles.chipLabelActive]}>
+                  {t === "expense" ? "Chi" : "Thu"}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>Ví</Text>
+          <WalletChipRow
+            wallets={wallets.data ?? []}
+            selectedId={walletId}
+            onSelect={setWalletId}
+            locked={lockWalletAndType}
+          />
+          {lockWalletAndType ? (
+            <Text style={styles.lockedHint}>Không thể đổi loại và ví của giao dịch đã lưu</Text>
+          ) : null}
+        </View>
+      </Drawer>
+
+      <SingleDatePickerModal
+        visible={datePickerOpen}
+        onClose={() => setDatePickerOpen(false)}
+        value={occurredAt}
+        onApply={setOccurredAt}
       />
-
-      <View style={styles.fieldGroup}>
-        <Text style={styles.label}>Loại</Text>
-        <View style={styles.chipRow}>
-          {TRANSACTION_TYPES.map((t) => (
-            <Pressable
-              key={t}
-              onPress={() => !lockWalletAndType && setType(t)}
-              disabled={lockWalletAndType}
-              style={[styles.chip, type === t && styles.chipActive, lockWalletAndType && styles.chipDisabled]}
-            >
-              <Text style={[styles.chipLabel, type === t && styles.chipLabelActive]}>
-                {t === "expense" ? "Chi" : "Thu"}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        {lockWalletAndType ? <Text style={styles.lockedHint}>Không thể đổi loại giao dịch đã lưu</Text> : null}
-      </View>
-
-      <View style={styles.fieldGroup}>
-        <Text style={styles.label}>Số tiền (VND)</Text>
-        <AmountInput value={amount} onChangeText={setAmount} />
-      </View>
-
-      <View style={styles.fieldGroup}>
-        <Text style={styles.label}>Ghi chú (không bắt buộc)</Text>
-        <TextInput
-          value={note}
-          onChangeText={setNote}
-          placeholder="vd: Cà phê với bạn"
-          placeholderTextColor={colors.textMuted}
-          style={styles.input}
-        />
-      </View>
-
-      <View style={styles.fieldGroup}>
-        <Text style={styles.label}>Danh mục</Text>
-        <CategorySelectField categories={categoryPicker.selected} onPress={categoryPicker.open} />
-      </View>
-
-      <View style={styles.fieldGroup}>
-        <Text style={styles.label}>Ví</Text>
-        <View style={styles.chipRow}>
-          {(wallets.data ?? []).map((w) => (
-            <Pressable
-              key={w.id}
-              onPress={() => !lockWalletAndType && setWalletId(w.id)}
-              disabled={lockWalletAndType}
-              style={[styles.chip, walletId === w.id && styles.chipActive, lockWalletAndType && styles.chipDisabled]}
-            >
-              <Text style={[styles.chipLabel, walletId === w.id && styles.chipLabelActive]}>{w.name}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.fieldGroup}>
-        <Text style={styles.label}>Ngày{occurredAt ? ` — ${formatDateShort(occurredAt)}` : ""}</Text>
-        <MonthYearCalendar
-          initialDate={occurredAt || undefined}
-          markedDates={markedDates}
-          onDayPress={(day: DateData) => setOccurredAt(day.dateString)}
-          style={styles.calendar}
-        />
-      </View>
-    </Drawer>
+    </>
   );
 }
 
@@ -187,7 +187,9 @@ const styles = StyleSheet.create({
   label: { ...typography.caption, color: colors.textSecondary },
   chipRow: { flexDirection: "row", gap: spacing.sm, flexWrap: "wrap" },
   chip: {
-    paddingVertical: 8,
+    height: 36,
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 14,
     borderRadius: radii.pill,
     backgroundColor: "rgba(255,255,255,0.06)",
@@ -199,15 +201,4 @@ const styles = StyleSheet.create({
   chipLabel: { ...typography.caption, color: colors.textSecondary },
   chipLabelActive: { color: colors.onGreen },
   lockedHint: { ...typography.tiny, color: colors.textMuted },
-  input: {
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    borderRadius: radii.listCard,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: 12,
-    color: colors.textPrimary,
-    ...typography.body,
-  },
-  calendar: { borderRadius: radii.listCard },
 });
