@@ -21,14 +21,30 @@ export const BALL_TOP = -(BALL_SIZE / 2) + BALL_SINK;
 // the top and rounded only on the bottom, instead of a full stray circle.
 export const AURA_TOP = BALL_SINK - AURA_OUTER / 2;
 export const AURA_LEFT_OFFSET = (BALL_SIZE - AURA_OUTER) / 2;
-// The bar's top hairline has to break where the socket meets it, or a line
-// runs straight across the "hole" and the ball reads as sitting on a flat
-// surface instead of in a hollow. The gap is the socket's chord width at
-// the bar's top edge (y = 0), centred on the ball.
-export const SOCKET_HALF_CHORD = Math.sqrt((AURA_OUTER / 2) ** 2 - BALL_SINK ** 2);
+// The bar's top hairline has to leave the flat where the socket meets it, or
+// a line runs straight across the "hole" and the ball reads as sitting on a
+// flat surface instead of in a hollow. The straight halves stop at the
+// socket's chord — measured along the hairline's own centre line, so the rim
+// arc below starts exactly where they end — and the rim carries the line
+// down around the socket and back up.
+export const HAIRLINE = 1;
+const SOCKET_RADIUS = AURA_OUTER / 2;
+export const SOCKET_HALF_CHORD = Math.sqrt(SOCKET_RADIUS ** 2 - (BALL_SINK - HAIRLINE / 2) ** 2);
 export const LINE_LENGTH = 2000; // longer than any screen; the overflow runs off-edge
 export const LINE_LEFT_END = BALL_SIZE / 2 - SOCKET_HALF_CHORD - LINE_LENGTH;
 export const LINE_RIGHT_START = BALL_SIZE / 2 + SOCKET_HALF_CHORD;
+// The rim: the socket circle's arc below the bar's top edge, drawn in an SVG
+// box sitting exactly over the aura (plus room for the stroke's outer half).
+// Large-arc + counter-clockwise sweep is the part that dips below the chord,
+// since the socket's centre sits BALL_SINK below the edge.
+const RIM_PAD = HAIRLINE;
+export const RIM_LEFT_OFFSET = AURA_LEFT_OFFSET - RIM_PAD;
+export const RIM_WIDTH = AURA_OUTER + RIM_PAD * 2;
+export const RIM_HEIGHT = BALL_SINK + SOCKET_RADIUS + RIM_PAD;
+const RIM_CX = SOCKET_RADIUS + RIM_PAD;
+export const RIM_PATH =
+  `M ${RIM_CX - SOCKET_HALF_CHORD} ${HAIRLINE / 2} ` +
+  `A ${SOCKET_RADIUS} ${SOCKET_RADIUS} 0 1 0 ${RIM_CX + SOCKET_HALF_CHORD} ${HAIRLINE / 2}`;
 // Tab-switch "bounce" on the ball's icon: up to this scale, then back to 1.
 export const ICON_BOUNCE_SCALE = 1.15;
 export const INACTIVE_COLOR = "rgba(255,255,255,0.5)";
@@ -61,9 +77,10 @@ export const styles = StyleSheet.create({
     position: "absolute",
     top: 0,
     width: LINE_LENGTH,
-    height: 1,
+    height: HAIRLINE,
     backgroundColor: colors.navBorder,
   },
+  rim: { position: "absolute", top: 0, left: RIM_LEFT_OFFSET, width: RIM_WIDTH, height: RIM_HEIGHT },
   tabRow: { flexDirection: "row", width: "100%", height: PILL_HEIGHT },
   tab: { flex: 1, alignItems: "center", justifyContent: "center" },
   // Three concentric circles fake a radial-gradient "hollow socket" behind

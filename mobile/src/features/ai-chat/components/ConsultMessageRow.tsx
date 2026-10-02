@@ -1,8 +1,9 @@
 import { StyleSheet, Text, View } from "react-native";
 
+import { UserBubble } from "@/features/ai-chat/components/UserBubble";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { ConsultHandlers, ConsultReplyCard } from "@/features/analytics/components/ConsultReplyCard";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { colors, spacing, typography } from "@/lib/theme";
 
 interface ConsultMessageRowProps {
   message: ChatMessage;
@@ -21,10 +22,11 @@ const IN_TURN_GAP = spacing.sm;
  *
  * The assistant's reply is not a bubble: its text sits on the app's own
  * ground, left-aligned and full width, and only its data (the chart, the
- * list) gets a surface. The User's question is a plain tonal bubble — no
- * border, no accent — so neither side shouts and the figures are what stand
- * out. The recording pane keeps ChatBubble: its proposals are cards the
- * User acts on, which is a different job.
+ * list) gets a surface. The User's question is the mode's gradient bubble
+ * (UserBubble, the same one the recording pane uses), so the two sides of
+ * the conversation are told apart at a glance. The recording pane keeps
+ * ChatBubble around it: its proposals are cards the User acts on, which is
+ * a different job.
  */
 export function ConsultMessageRow({ message, startsTurn, handlers }: ConsultMessageRowProps) {
   const gap = { marginTop: startsTurn ? TURN_GAP : IN_TURN_GAP };
@@ -32,9 +34,7 @@ export function ConsultMessageRow({ message, startsTurn, handlers }: ConsultMess
   if (message.role === "user") {
     return (
       <View style={[styles.userRow, gap]}>
-        <View style={styles.userBubble}>
-          <Text style={styles.userText}>{message.text}</Text>
-        </View>
+        <UserBubble text={message.text} />
       </View>
     );
   }
@@ -49,14 +49,5 @@ export function ConsultMessageRow({ message, startsTurn, handlers }: ConsultMess
 
 const styles = StyleSheet.create({
   userRow: { flexDirection: "row", justifyContent: "flex-end" },
-  userBubble: {
-    maxWidth: "82%",
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radii.listCard,
-    borderBottomRightRadius: spacing.xs,
-    backgroundColor: colors.surfaceRaised,
-  },
-  userText: { ...typography.body, color: colors.textPrimary },
   assistantText: { ...typography.body, color: colors.textPrimary, lineHeight: 22 },
 });

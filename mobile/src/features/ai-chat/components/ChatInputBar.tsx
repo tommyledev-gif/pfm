@@ -13,8 +13,12 @@ import { colors, radii, spacing, typography } from "@/lib/theme";
 const NAV_CLEARANCE = 104;
 // Small gap between the bar and the top of an open keyboard.
 const KEYBOARD_GAP = spacing.sm;
-// The ring says "typing here", it should not compete with the send button.
-const FOCUS_RING_ALPHA = 0.45;
+// The field's fill is only one step off the ground, so without an edge of
+// its own the input area all but disappears; a faint ring in the mode's
+// colour marks it out. Focus brightens it to say "typing here" — still short
+// of competing with the send button.
+const IDLE_RING_ALPHA = 0.22;
+const FOCUS_RING_ALPHA = 0.55;
 
 interface ChatInputBarProps {
   value: string;
@@ -45,11 +49,12 @@ export function ChatInputBar({
 }: ChatInputBarProps) {
   const [focused, setFocused] = useState(false);
   const canSend = value.trim().length > 0 && !sending;
+  const tint = CHAT_MODE_META[mode].tint;
 
   return (
     <>
       {quickActions ? (
-        <View style={styles.quickActionRow}>{quickActions}</View>
+        <View style={styles.quickActionSlot}>{quickActions}</View>
       ) : !keyboardVisible && onOpenBudgetWizard ? (
         <View style={styles.quickActionRow}>
           <Pressable testID="btn-open-budget-wizard" style={styles.quickActionChip} onPress={onOpenBudgetWizard}>
@@ -68,7 +73,7 @@ export function ChatInputBar({
           // on one that does not it is the full height. Adding it
           // unconditionally left a dead gap a whole keyboard tall.
           { marginBottom: keyboardVisible ? keyboardHeight + KEYBOARD_GAP : bottomInset + NAV_CLEARANCE },
-          focused && styles.inputBarFocused,
+          { borderColor: withAlpha(tint, focused ? FOCUS_RING_ALPHA : IDLE_RING_ALPHA) },
         ]}
       >
         <TextInput
@@ -89,7 +94,7 @@ export function ChatInputBar({
           accessibilityRole="button"
           accessibilityLabel="Gửi"
           accessibilityState={{ disabled: !canSend }}
-          style={[styles.sendButton, !canSend && styles.sendButtonIdle]}
+          style={[styles.sendButton, { backgroundColor: canSend ? tint : colors.surfaceRaised }]}
           onPress={onSend}
           disabled={!canSend}
         >
@@ -102,6 +107,10 @@ export function ChatInputBar({
 
 const styles = StyleSheet.create({
   quickActionRow: { marginHorizontal: spacing.xl, flexDirection: "row" },
+  // A column, not a row: what goes here (the starter chips) bleeds past this
+  // margin to the screen edges by itself, which a stretched column child
+  // does reliably.
+  quickActionSlot: { marginHorizontal: spacing.xl },
   quickActionChip: {
     flexDirection: "row",
     alignItems: "center",
@@ -121,16 +130,14 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     gap: spacing.sm,
     backgroundColor: colors.surface,
-    // Transparent until focused rather than absent, so the focus ring never
-    // shifts the field by a pixel when it appears.
+    // Colour set inline from the mode and focus state; the width never
+    // changes, so focusing never shifts the field by a pixel.
     borderWidth: 1,
-    borderColor: "transparent",
     borderRadius: radii.hero,
     paddingLeft: spacing.lg,
     paddingRight: spacing.xs,
     paddingVertical: spacing.xs,
   },
-  inputBarFocused: { borderColor: withAlpha(colors.green, FOCUS_RING_ALPHA) },
   // ~3 lines before it scrolls its own content instead of growing further.
   input: {
     flex: 1,
@@ -144,9 +151,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: radii.pill,
-    backgroundColor: colors.green,
     alignItems: "center",
     justifyContent: "center",
   },
-  sendButtonIdle: { backgroundColor: colors.surfaceRaised },
 });

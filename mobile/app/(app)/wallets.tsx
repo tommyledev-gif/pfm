@@ -133,32 +133,42 @@ export default function WalletsScreen() {
       <SegmentedTabs style={styles.modeTabs} options={VIEW_MODES} value={viewMode} onChange={setViewMode} />
 
       {viewMode === "carousel" ? (
-        // Centred in the space below the tabs rather than pinned to the top:
-        // with only a card, its actions and a hint, a top-aligned column
-        // left half the screen empty under it. flexGrow + center keeps it in
-        // the middle while it is short, and lets it scroll from the top once
-        // the recent list makes it taller than the screen.
-        <ScrollView contentContainerStyle={styles.cardsBody} showsVerticalScrollIndicator={false}>
-          {wallets.isLoading ? (
-            <WalletCardSkeleton />
-          ) : (
-            <WalletCarousel
-              wallets={wallets.data ?? []}
-              initialWalletId={activeWalletId}
-              onActiveWalletChange={setActiveWalletId}
-              onPressWallet={openEditor}
-              highlightWalletId={highlightWalletId}
-              highlightOpacity={highlightOpacity}
-            />
-          )}
+        <View style={styles.cardsView}>
+          {/* Pinned under the tabs, outside any scroll: the carousel used to
+              sit in a vertically centred ScrollView, so every height change in
+              the recent list (skeleton → rows → "no transactions") re-centred
+              the column and dragged the cards up or down with it. Only the
+              recent list below scrolls now. */}
+          <View style={styles.cardsPinned}>
+            {wallets.isLoading ? (
+              <WalletCardSkeleton />
+            ) : (
+              <WalletCarousel
+                wallets={wallets.data ?? []}
+                initialWalletId={activeWalletId}
+                onActiveWalletChange={setActiveWalletId}
+                onPressWallet={openEditor}
+                highlightWalletId={highlightWalletId}
+                highlightOpacity={highlightOpacity}
+              />
+            )}
+            {activeWallet ? (
+              <>
+                <WalletActiveActions wallet={activeWallet} onEdit={() => openEditor(activeWallet)} />
+                <Text style={styles.hint}>Vuốt hoặc chạm thẻ bên cạnh để đổi ví · chạm thẻ giữa để sửa</Text>
+              </>
+            ) : null}
+          </View>
           {activeWallet ? (
-            <>
-              <WalletActiveActions wallet={activeWallet} onEdit={() => openEditor(activeWallet)} />
-              <Text style={styles.hint}>Vuốt hoặc chạm thẻ bên cạnh để đổi ví · chạm thẻ giữa để sửa</Text>
+            <ScrollView
+              style={styles.recentScroll}
+              contentContainerStyle={styles.recentBody}
+              showsVerticalScrollIndicator={false}
+            >
               <WalletRecentTransactions wallet={activeWallet} />
-            </>
+            </ScrollView>
           ) : null}
-        </ScrollView>
+        </View>
       ) : wallets.isLoading ? (
         <ActivityIndicator color={colors.green} style={styles.loader} />
       ) : (
@@ -219,16 +229,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   modeTabs: { marginHorizontal: spacing.xl, marginBottom: spacing.md },
+  cardsView: { flex: 1 },
   // Same horizontal padding Home gives the carousel's section, which the
   // carousel cancels to run full-bleed.
-  cardsBody: {
-    flexGrow: 1,
-    justifyContent: "center",
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.sm,
-    paddingBottom: BOTTOM_NAV_CLEARANCE,
-    gap: spacing.lg,
-  },
+  cardsPinned: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm, gap: spacing.lg },
+  recentScroll: { flex: 1 },
+  recentBody: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: BOTTOM_NAV_CLEARANCE },
   hint: { ...typography.tiny, color: colors.textMuted, textAlign: "center" },
   list: { paddingHorizontal: spacing.xl, paddingBottom: BOTTOM_NAV_CLEARANCE },
   loader: { marginTop: spacing.xxl },

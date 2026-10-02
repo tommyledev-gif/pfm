@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { AmountText } from "@/components/ui/AmountText";
@@ -7,6 +8,7 @@ import { BudgetIconTile } from "@/features/budgets/components/BudgetIconTile";
 import { BudgetProgressBar } from "@/features/budgets/components/BudgetProgressBar";
 import { BudgetLimit } from "@/features/budgets/types";
 import { useCategoryLookup } from "@/features/categories/api/use-category-lookup";
+import { Category } from "@/features/categories/types";
 import { formatCurrency } from "@/lib/currency";
 import { WalletCurrency } from "@/lib/constants";
 import { colors, spacing, typography } from "@/lib/theme";
@@ -36,20 +38,36 @@ function asBudgetLimit(b: AnalyticsBudgetItem, currency: string): BudgetLimit {
 // the same tile, bar and pace colours, so the two never look like different
 // measurements. The question is "how much is left", so the remaining amount
 // is each row's headline; spent / limit is the detail under the bar.
+//
+// Each row's icon: the Budget's own, else its Category's — found by id, or by
+// name for an answer stored before category_id was sent (those also carry no
+// icon of their own, which is what left them showing a bare initial).
 export function BudgetStatusList({ budgets, currency, elapsed }: BudgetStatusListProps) {
   const categories = useCategoryLookup();
+  const categoryByName = useMemo(() => {
+    const map = new Map<string, Category>();
+    for (const c of categories.values()) {
+      // Two Categories can share a name (a system one and the User's own);
+      // the first with an icon is the more useful match.
+      const current = map.get(c.name);
+      if (!current || (!current.icon && !current.icon_url)) map.set(c.name, c);
+    }
+    return map;
+  }, [categories]);
 
   return (
     <View>
       {budgets.map((b, i) => {
         const status = budgetRowStatus(asBudgetLimit(b, currency), elapsed);
-        const category = b.category_id ? categories.get(b.category_id) : undefined;
+        const category = (b.category_id ? categories.get(b.category_id) : undefined) ?? categoryByName.get(b.category_name);
         return (
           <View key={b.budget_id} style={[styles.row, i > 0 && styles.divider]}>
             <BudgetIconTile
               name={b.category_name}
-              icon={b.icon ?? category?.icon}
-              iconUrl={b.icon_url ?? category?.icon_url}
+              // || not ??: an icon saved as "" is no icon, and must not
+              // hide the Category's.
+              icon={b.icon || category?.icon}
+              iconUrl={b.icon_url || category?.icon_url}
             />
             <View style={styles.body}>
               <View style={styles.head}>

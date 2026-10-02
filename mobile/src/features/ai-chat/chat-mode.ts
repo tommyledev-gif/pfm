@@ -35,6 +35,12 @@ interface ChatModeMeta {
   icon: (props: IconProps & { toColor?: string }) => ReactElement;
   /** Tints the header button and the picker's icon tile. */
   tint: string;
+  /**
+   * The far end of the mode's tint → accentTo gradient: the User's own
+   * bubbles and the screen's backdrop wash, so each mode reads as its own
+   * colour at a glance. A light pastel like `tint` — dark text sits on both.
+   */
+  accentTo: string;
   /** Optional second colour: the icon is drawn as a tint → iconToColor gradient. */
   iconToColor?: string;
 }
@@ -48,6 +54,7 @@ export const CHAT_MODE_META: Record<ChatMode, ChatModeMeta> = {
     placeholder: "Mô tả một giao dịch…",
     icon: ReceiptIcon,
     tint: colors.green,
+    accentTo: colors.mint,
   },
   budget: {
     label: "Lập ngân sách",
@@ -56,6 +63,7 @@ export const CHAT_MODE_META: Record<ChatMode, ChatModeMeta> = {
     placeholder: "Mô tả một giao dịch…",
     icon: TargetIcon,
     tint: colors.lavender,
+    accentTo: colors.periwinkle,
   },
   consult: {
     label: "Hỏi phân tích",
@@ -64,6 +72,7 @@ export const CHAT_MODE_META: Record<ChatMode, ChatModeMeta> = {
     placeholder: "Hỏi về chi tiêu của bạn…",
     icon: InsightIcon,
     tint: colors.mint,
+    accentTo: colors.info,
     iconToColor: colors.info,
   },
 };

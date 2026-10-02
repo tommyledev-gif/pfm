@@ -91,6 +91,9 @@ export function ConsultReplyCard({ data, handlers }: ConsultReplyCardProps) {
             chips={chips}
             disabled={handlers.busy}
             testIDPrefix="chip-followup"
+            // The thread's side padding (chatThreadStyles.thread) — same
+            // edge-to-edge scroll as the starter row above the input.
+            bleed={spacing.xl}
             onPress={(chip) => handlers.onAskQuery(chip.query, chip.label)}
           />
         </View>

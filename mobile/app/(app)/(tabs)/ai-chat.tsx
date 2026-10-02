@@ -7,6 +7,7 @@ import { Screen } from "@/components/shared/Screen";
 import { TypingIndicator } from "@/components/shared/TypingIndicator";
 import { ChatInputBar } from "@/features/ai-chat/components/ChatInputBar";
 import { ChatMessageRow } from "@/features/ai-chat/components/ChatMessageRow";
+import { ChatModeBackdrop } from "@/features/ai-chat/components/ChatModeBackdrop";
 import { ChatModeHeader } from "@/features/ai-chat/components/ChatModeHeader";
 import { ChatModePicker } from "@/features/ai-chat/components/ChatModePicker";
 import { ChatThreadList } from "@/features/ai-chat/components/ChatThreadList";
@@ -19,7 +20,6 @@ import { isConsultMessage } from "@/features/ai-chat/consult-message";
 import { useChatActions } from "@/features/ai-chat/hooks/use-chat-actions";
 import { useChatOverlays } from "@/features/ai-chat/hooks/use-chat-overlays";
 import { isTombstone } from "@/features/ai-chat/tombstone";
-import { colors } from "@/lib/theme";
 import { useKeyboardHeight, useKeyboardVisible } from "@/lib/use-keyboard-height";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
@@ -156,6 +156,8 @@ export default function AiChatScreen() {
 
   return (
     <Screen>
+      {/* Outside the content View so its wash runs up under the status bar too. */}
+      <ChatModeBackdrop mode={mode} />
       <View style={styles.screen}>
         <ChatModeHeader mode={mode} onPressMode={() => setModePickerOpen(true)} />
 
@@ -235,7 +237,9 @@ export default function AiChatScreen() {
               keyboardHeight={keyboardHeight}
               bottomInset={insets.bottom}
               onOpenBudgetWizard={() => overlays.openBudgetWizard(null)}
-              mode="transaction"
+              // The real mode, not "transaction": while the budget wizard is
+              // open the screen behind it takes the wizard's colour too.
+              mode={mode}
             />
           </>
         )}
@@ -288,5 +292,7 @@ export default function AiChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bgApp },
+  // No background of its own — Screen paints bgApp, and ChatModeBackdrop
+  // has to show through.
+  screen: { flex: 1 },
 });

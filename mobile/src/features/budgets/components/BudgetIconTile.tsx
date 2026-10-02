@@ -1,7 +1,10 @@
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, View } from "react-native";
+import { Image as CachedImage } from "expo-image";
 
-import { initialFor } from "@/lib/category-color";
+import { EmojiGlyph } from "@/components/ui/EmojiGlyph";
 import { colors, radii } from "@/lib/theme";
+
+const DEFAULT_ICON = require("../../../../assets/simple-budgest-logo.png");
 
 interface BudgetIconTileProps {
   name: string;
@@ -10,20 +13,33 @@ interface BudgetIconTileProps {
 }
 
 const TILE_SIZE = 36;
-const GLYPH_SIZE = 16;
+const GLYPH_SIZE = 22;
+const LOGO_SIZE = 22;
 
 // A budget's icon on a uniform neutral tile rather than a per-category coloured
 // circle: in a budget list, colour is spent entirely on pace state (the bar and
 // its caption), and two colour systems in one row would fight each other.
 // Shared by the Budgets screen and the analysis chat's budget answer, so the
 // same budget looks the same in both.
+//
+// Same fallback chain as TintedIconTile — uploaded image → emoji (as its
+// OpenMoji artwork) → app logo. Never the name's first letter: a lone "Ă" in
+// a circle read as a broken icon, not as the Category.
 export function BudgetIconTile({ name, icon, iconUrl }: BudgetIconTileProps) {
   return (
     <View style={styles.tile}>
       {iconUrl ? (
-        <Image source={{ uri: iconUrl }} style={styles.image} />
+        <CachedImage
+          source={{ uri: iconUrl }}
+          cachePolicy="memory-disk"
+          recyclingKey={iconUrl}
+          style={styles.image}
+          accessibilityLabel={name}
+        />
+      ) : icon ? (
+        <EmojiGlyph emoji={icon} size={GLYPH_SIZE} />
       ) : (
-        <Text style={styles.glyph}>{icon || initialFor(name)}</Text>
+        <Image source={DEFAULT_ICON} style={styles.logo} resizeMode="contain" accessibilityLabel={name} />
       )}
     </View>
   );
@@ -42,5 +58,5 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   image: { width: TILE_SIZE, height: TILE_SIZE, borderRadius: radii.pill },
-  glyph: { fontSize: GLYPH_SIZE, color: colors.textPrimary, fontWeight: "700" },
+  logo: { width: LOGO_SIZE, height: LOGO_SIZE },
 });

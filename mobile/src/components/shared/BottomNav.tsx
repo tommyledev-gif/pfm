@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Animated, Easing, LayoutChangeEvent, Pressable, View } from "react-native";
 import { useRouter, usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Svg, { Path } from "react-native-svg";
 
 import { BarChartIcon, HomeIcon, ListIcon, SparkleIcon, UserIcon } from "@/components/ui/Icon";
 import { colors } from "@/lib/theme";
@@ -9,11 +10,13 @@ import {
   BALL_SIZE,
   BOB_DISTANCE,
   BOB_DURATION,
+  HAIRLINE,
   ICON_BOUNCE_SCALE,
   INACTIVE_COLOR,
   LINE_LEFT_END,
   LINE_RIGHT_START,
   PILL_HEIGHT,
+  RIM_PATH,
   AURA_LEFT_OFFSET,
   AURA_TOP,
   styles,
@@ -221,9 +224,10 @@ export function BottomNav() {
           ))}
         </View>
       </View>
-      {/* Top hairline, in two halves that stop at the socket's edges — see
-          SOCKET_HALF_CHORD. Each half is a long line translated by the same
-          ballX as the ball, so the gap tracks it on the native driver. */}
+      {/* Top hairline: two straight halves that stop at the socket's edges,
+          joined by the rim arc that dips around the socket — see
+          SOCKET_HALF_CHORD / RIM_PATH. All three are translated by the same
+          ballX as the ball, so the dip tracks it on the native driver. */}
       <Animated.View
         pointerEvents="none"
         style={[
@@ -238,6 +242,14 @@ export function BottomNav() {
           { left: LINE_RIGHT_START, opacity: ballOpacity, transform: [{ translateX: ballX }] },
         ]}
       />
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.rim, { opacity: ballOpacity, transform: [{ translateX: ballX }] }]}
+      >
+        <Svg width="100%" height="100%">
+          <Path d={RIM_PATH} stroke={colors.navBorder} strokeWidth={HAIRLINE} fill="none" />
+        </Svg>
+      </Animated.View>
       <Animated.View
         pointerEvents="none"
         style={[
