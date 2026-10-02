@@ -13,8 +13,10 @@ import (
 
 // Reply copy for every non-answer outcome (Vietnamese product copy).
 const (
-	msgDegraded     = "Hiện mình chưa trả lời được câu hỏi tự do. Bạn thử các gợi ý bên dưới nhé."
-	msgUnsupported  = "Câu này mình chưa trả lời được. Bạn thử một trong các câu dưới đây nhé."
+	// Both end on "Bạn thử:" — the client lists the reply's chips right
+	// under it as tappable rows, so the sentence leads straight into them.
+	msgDegraded     = "Lúc này mình chưa đọc được câu bạn gõ. Bạn thử:"
+	msgUnsupported  = "Mình chưa hiểu câu này. Bạn thử:"
 	msgPartial      = "Mình chưa hiểu hết câu hỏi nên không muốn đoán số. Bạn thử hỏi cụ thể hơn, hoặc chọn một gợi ý nhé."
 	msgNeedsContext = "Bạn hỏi đầy đủ giúp mình nhé, ví dụ \"tháng trước tiêu bao nhiêu\"."
 	msgComingLater  = "Đánh giá và thử kịch bản sẽ có trong bản sau. Trong lúc chờ, bạn xem số liệu này nhé."

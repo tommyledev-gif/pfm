@@ -1,19 +1,22 @@
 import { StyleSheet, Text, View } from "react-native";
 
+import { AmountText } from "@/components/ui/AmountText";
+import { BarList } from "@/features/analytics/components/BarList";
 import { BudgetStatusList } from "@/features/analytics/components/BudgetStatusList";
-import { ColumnBars } from "@/features/analytics/components/ColumnBars";
+import { ColumnBars, fitsColumns } from "@/features/analytics/components/ColumnBars";
 import { CompareBars } from "@/features/analytics/components/CompareBars";
 import { DonutAnswer } from "@/features/analytics/components/DonutAnswer";
 import { LineChart } from "@/features/analytics/components/LineChart";
 import { NumberStat } from "@/features/analytics/components/NumberStat";
 import { RankedList } from "@/features/analytics/components/RankedList";
 import { AnalyticsChart } from "@/features/analytics/types";
-import { formatCurrency } from "@/lib/currency";
-import { colors, spacing, typography } from "@/lib/theme";
+import { colors, radii, spacing, typography } from "@/lib/theme";
 
 interface ChartRendererProps {
   chart: AnalyticsChart;
   currency: string;
+  /** 0..1 of the answer's period gone by — budget bars draw it as their pace tick. */
+  elapsed: number;
 }
 
 // A daily line needs enough points to be a line rather than two dots.
@@ -23,13 +26,13 @@ const MIN_LINE_POINTS = 3;
 // computed — nothing here derives a new amount. An unknown type (an answer
 // stored by a newer app version) falls back to a plain list of whatever
 // figures it carries, never a blank bubble (spec.md S-AIQ-43).
-export function ChartRenderer({ chart, currency }: ChartRendererProps) {
+export function ChartRenderer({ chart, currency, elapsed }: ChartRendererProps) {
   const body = (() => {
     switch (chart.type) {
       case "none":
         return null;
       case "number":
-        if (chart.value === undefined) return <FallbackList chart={chart} currency={currency} />;
+        if (chart.value === undefined) return <FallbackList chart={chart} currency={currency} elapsed={elapsed} />;
         return (
           <View style={styles.stack}>
             <NumberStat
@@ -46,31 +49,45 @@ export function ChartRenderer({ chart, currency }: ChartRendererProps) {
         return chart.items ? <DonutAnswer items={chart.items} currency={currency} /> : null;
       case "bar":
       case "weekday":
-        return chart.items ? <ColumnBars items={chart.items} currency={currency} /> : null;
+        // Columns only when every label fits under one; names (Wallets) get
+        // full-width rows instead of being cut to "…".
+        if (!chart.items) return null;
+        return fitsColumns(chart.items) ? (
+          <ColumnBars items={chart.items} currency={currency} />
+        ) : (
+          <BarList items={chart.items} currency={currency} />
+        );
       case "line":
         return chart.items ? <LineChart items={chart.items} currency={currency} /> : null;
       case "compare":
         return chart.compare ? <CompareBars compare={chart.compare} currency={currency} /> : null;
       case "table":
-        return chart.rows ? <RankedList rows={chart.rows} currency={currency} totalMatched={chart.total_matched} /> : null;
+        return chart.rows ? (
+          <RankedList rows={chart.rows} moreRows={chart.more_rows} currency={currency} totalMatched={chart.total_matched} />
+        ) : null;
       case "progress":
-        return chart.budgets ? <BudgetStatusList budgets={chart.budgets} currency={currency} /> : null;
+        return chart.budgets ? <BudgetStatusList budgets={chart.budgets} currency={currency} elapsed={elapsed} /> : null;
       default:
-        return <FallbackList chart={chart} currency={currency} />;
+        return <FallbackList chart={chart} currency={currency} elapsed={elapsed} />;
     }
   })();
 
   if (!body) return null;
+  // The one surface in an answer: the reply text sits on the app's own
+  // ground, only the data gets a raised tone — no border, no card in a card.
+  // A list's rows already carry their own vertical padding.
   return (
-    <View testID={`chart-analytics-${chart.type}`} style={styles.wrap}>
+    <View testID={`chart-analytics-${chart.type}`} style={[styles.surface, (chart.rows || chart.budgets) && styles.surfaceList]}>
       {body}
     </View>
   );
 }
 
-function FallbackList({ chart, currency }: ChartRendererProps) {
-  if (chart.rows) return <RankedList rows={chart.rows} currency={currency} totalMatched={chart.total_matched} />;
-  if (chart.budgets) return <BudgetStatusList budgets={chart.budgets} currency={currency} />;
+function FallbackList({ chart, currency, elapsed }: ChartRendererProps) {
+  if (chart.rows) {
+    return <RankedList rows={chart.rows} moreRows={chart.more_rows} currency={currency} totalMatched={chart.total_matched} />;
+  }
+  if (chart.budgets) return <BudgetStatusList budgets={chart.budgets} currency={currency} elapsed={elapsed} />;
   const lines = chart.items ?? [];
   return (
     <View style={styles.stack}>
@@ -78,7 +95,7 @@ function FallbackList({ chart, currency }: ChartRendererProps) {
       {lines.map((item) => (
         <View key={item.key} style={styles.fallbackRow}>
           <Text style={styles.fallbackLabel}>{item.label}</Text>
-          <Text style={styles.fallbackAmount}>{formatCurrency(item.amount, currency)}</Text>
+          <AmountText amountCents={item.amount} currency={currency} style={styles.fallbackAmount} />
         </View>
       ))}
     </View>
@@ -86,7 +103,8 @@ function FallbackList({ chart, currency }: ChartRendererProps) {
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginTop: spacing.md },
+  surface: { marginTop: spacing.md, padding: spacing.lg, borderRadius: radii.listCard, backgroundColor: colors.surface },
+  surfaceList: { paddingVertical: spacing.xs },
   stack: { gap: spacing.md },
   fallbackRow: { flexDirection: "row", justifyContent: "space-between", gap: spacing.sm },
   fallbackLabel: { ...typography.label, color: colors.textSecondary, flex: 1 },

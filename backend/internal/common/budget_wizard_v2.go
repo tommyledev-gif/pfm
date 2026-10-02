@@ -24,11 +24,13 @@ const (
 	// force was 500đ, a hundredth of what the spec intended.
 	BudgetWizardMinAmountPerCategoryXu int64 = 5_000_000
 
-	// BudgetWizardIncomeCapXu — 9.999.999.999đ. The previous cap of
-	// 9_999_999_999 was also a đồng figure sitting in a xu field, capping real
-	// income at ~100 triệu/tháng and rejecting anyone above it with a generic
-	// validation error they could not act on (spec.md BS-05).
-	BudgetWizardIncomeCapXu int64 = 999_999_999_900
+	// BudgetWizardIncomeCapXu — 10 tỷ đ. The cap before last (9_999_999_999)
+	// was a đồng figure sitting in a xu field, capping real income at ~100
+	// triệu/tháng and rejecting anyone above it with a generic validation
+	// error they could not act on (spec.md BS-05). Mirrored by the mobile
+	// wizard's INCOME_CAP_XU and the dto tag on BudgetProposalsRequest.Income;
+	// MulDiv keeps every product of it inside int64.
+	BudgetWizardIncomeCapXu int64 = 1_000_000_000_000
 
 	// Share of disposable that may be allocated to categories. The remaining
 	// 12% is the buffer — see BudgetWizardBufferNote.

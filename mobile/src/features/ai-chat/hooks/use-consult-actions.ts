@@ -19,8 +19,9 @@ import { Category } from "@/features/categories/types";
 import { useChatStore } from "@/stores/chat-store";
 
 const RATE_LIMITED = "RATE_LIMITED";
-const LIMIT_REACHED_TEXT =
-  "Bạn đã hỏi nhiều câu tự do trong giờ qua. Các gợi ý bên dưới vẫn dùng được, hoặc thử lại sau nhé.";
+// Ends on "Bạn thử:" like the backend's own fallbacks — the reply's chips
+// are listed right under it as tappable rows (SuggestionRows).
+const LIMIT_REACHED_TEXT = "Bạn đã gõ khá nhiều câu trong giờ qua, thử lại sau nhé. Trong lúc chờ, bạn thử:";
 const PICK_CATEGORY_TEXT = "Ý bạn là hạng mục nào?";
 const GENERIC_ERROR_TEXT = "Xin lỗi, mình chưa trả lời được. Vui lòng thử lại.";
 

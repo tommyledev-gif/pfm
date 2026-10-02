@@ -1,4 +1,5 @@
 import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { CalculatorKeypad } from "@/components/ui/CalculatorKeypad";
@@ -20,6 +21,10 @@ const AMOUNT_COLOR: Record<TransactionKind, string> = {
   income: colors.green,
   transfer: colors.periwinkle,
 };
+
+// Drawer's footer already pads its bottom by this much; the keypad only adds
+// what a home indicator / gesture bar needs beyond it.
+const DRAWER_FOOTER_BOTTOM_PADDING = spacing.xl;
 
 // The same "today" the transaction forms default occurred_at to.
 function todayIso(): string {
@@ -83,7 +88,12 @@ export function TransactionKeypadFooter({
   submitting,
 }: TransactionKeypadFooterProps) {
   const keyboardVisible = useKeyboardVisible();
+  const insets = useSafeAreaInsets();
   const isTransfer = type === "transfer";
+  // The bottom key row must clear the home indicator (iPhone) and the gesture
+  // or 3-button bar (Android). Not while the note's keyboard is up: the
+  // keypad is hidden then, and the keyboard already covers that strip.
+  const safeBottom = keyboardVisible ? 0 : Math.max(0, insets.bottom - DRAWER_FOOTER_BOTTOM_PADDING);
 
   const leading = isTransfer ? (
     <View style={styles.chip}>
@@ -108,7 +118,10 @@ export function TransactionKeypadFooter({
     <KeypadSheetFooter
       leading={leading}
       amount={amount.display}
+      amountAccessibilityLabel={`Số tiền: ${amount.spoken}`}
       amountSuffix={currency}
+      preview={amount.preview}
+      shakeKey={amount.rejectCount}
       amountColor={amount.expression ? AMOUNT_COLOR[type] : colors.textMuted}
       amountTestID="text-transaction-amount"
       onPressAmount={keyboardVisible ? Keyboard.dismiss : undefined}
@@ -126,11 +139,14 @@ export function TransactionKeypadFooter({
         testID="input-transaction-note"
       />
 
+      {amount.notice ? <Text style={styles.notice}>{amount.notice}</Text> : null}
       {submitError ? <Text style={styles.error}>{submitError}</Text> : null}
 
       {keyboardVisible ? null : (
+        <View style={{ paddingBottom: safeBottom }}>
         <CalculatorKeypad
           testID="keypad-transaction-amount"
+          decimalKey={amount.decimals === 0 ? "000" : "."}
           onInsert={amount.insert}
           onBackspace={amount.backspace}
           onClear={amount.clear}
@@ -142,6 +158,7 @@ export function TransactionKeypadFooter({
           dateLabel={shortDateLabel(occurredAt)}
           dateAccessibilityLabel={`Ngày giao dịch: ${formatDateShort(occurredAt)}`}
         />
+        </View>
       )}
     </KeypadSheetFooter>
   );
@@ -174,4 +191,5 @@ const styles = StyleSheet.create({
     ...typography.body,
   },
   error: { ...typography.caption, color: colors.peach },
+  notice: { ...typography.caption, color: colors.mustardSoft },
 });

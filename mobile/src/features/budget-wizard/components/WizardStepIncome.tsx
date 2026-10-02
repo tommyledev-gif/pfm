@@ -19,6 +19,7 @@ import {
 } from "@/features/budget-wizard/fixed-costs";
 import { formatCurrency } from "@/lib/currency";
 import { formatSavedAt } from "@/features/budget-wizard/saved-plan";
+import { WIZARD_MONEY_MAX_XU, WIZARD_MONEY_SCALE } from "@/features/budget-wizard/wizard-money-scale";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 
 interface WizardStepIncomeProps {
@@ -42,9 +43,9 @@ interface WizardStepIncomeProps {
   onNext: () => void;
 }
 
-/** The slider's convenience span: 0–50tr đồng. Typing goes past it freely. */
-const INCOME_SLIDER_CEILING_XU = 50_000_000_00;
-const FIXED_SLIDER_CEILING_XU = 20_000_000_00;
+// Both fields span 0 → 10 tỷ (the income cap) on the same non-linear track,
+// which keeps 0–50tr as fine-grained as it was when 50tr was the slider's end.
+const MONEY_SLIDER = { scale: WIZARD_MONEY_SCALE, max: WIZARD_MONEY_MAX_XU };
 
 const CYCLE_DAY_CHOICES = [1, 5, 10, 15, 20, 25, 28];
 
@@ -133,7 +134,7 @@ export function WizardStepIncome({
           label="Thu nhập hàng tháng"
           value={income}
           onChange={onChangeIncome}
-          sliderCeiling={INCOME_SLIDER_CEILING_XU}
+          sliderScale={MONEY_SLIDER}
         />
         {error?.field === "income" ? <Text style={styles.error}>{error.message}</Text> : null}
 
@@ -146,7 +147,7 @@ export function WizardStepIncome({
           hint={breakdown.length > 0 ? summarizeFixedCosts(breakdown) : "nhà, điện nước, internet, học phí"}
           value={fixed}
           onChange={onChangeFixed}
-          sliderCeiling={FIXED_SLIDER_CEILING_XU}
+          sliderScale={MONEY_SLIDER}
           // Sits on the hint row because it answers the hint: the hint lists
           // what counts as fixed, and this is for the user who reads that list
           // and realises they do not know the total.

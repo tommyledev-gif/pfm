@@ -1,4 +1,5 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { Avatar } from "@/components/ui/Avatar";
@@ -15,6 +16,7 @@ import {
 } from "@/components/ui/Icon";
 import { Screen } from "@/components/shared/Screen";
 import { RevealableAmount } from "@/components/shared/RevealableAmount";
+import { withAlpha } from "@/lib/color";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 import { useSessionStore } from "@/stores/session-store";
 import { useChatStore } from "@/stores/chat-store";
@@ -43,6 +45,10 @@ const SETTINGS_ROWS = [
 ];
 
 const LOGOUT_FLUSH_TIMEOUT_MS = 4000;
+// Dims the app enough to read as "busy, hands off", not so much that the
+// logout button's own spinner — the only progress shown — is lost under it.
+const LOGOUT_OVERLAY_ALPHA = 0.55;
+const LOGOUT_BUSY_OPACITY = 0.7;
 
 function displayNameFromEmail(email: string | null): string {
   if (!email) return "Thành viên";
@@ -56,6 +62,7 @@ export default function SettingsScreen() {
   const role = useSessionStore((s) => s.role);
   const clearSession = useSessionStore((s) => s.clear);
   const clearChat = useChatStore((s) => s.clear);
+  const [loggingOut, setLoggingOut] = useState(false);
   const wallets = useWalletsQuery();
   const summary = useReportSummaryQuery();
   const name = displayNameFromEmail(email);
@@ -68,7 +75,14 @@ export default function SettingsScreen() {
   // LOGOUT_FLUSH_TIMEOUT_MS so a flaky/offline network never makes tapping
   // "Log out" feel stuck (apiClient's own request timeout is 15s, far too
   // long to block a logout button on).
+  //
+  // While it runs, the whole app sits under an overlay and the button shows
+  // its own spinner: the flush can take up to that timeout, and a screen that
+  // still reacted to taps in the meantime invited a second logout, a
+  // navigation away, or an edit that the wipe was about to throw away.
   const logout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
     try {
       await Promise.race([
         useChatStore.getState().flushSync(),
@@ -135,11 +149,26 @@ export default function SettingsScreen() {
         ))}
       </View>
 
-      <Pressable style={styles.logoutRow} onPress={logout}>
-        <LogOutIcon size={20} />
-        <Text style={styles.logoutLabel}>Đăng xuất</Text>
+      <Pressable
+        style={[styles.logoutRow, loggingOut && styles.logoutRowBusy]}
+        onPress={logout}
+        disabled={loggingOut}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: loggingOut, busy: loggingOut }}
+        testID="btn-settings-logout"
+      >
+        {loggingOut ? <ActivityIndicator size="small" color={colors.peach} /> : <LogOutIcon size={20} />}
+        <Text style={styles.logoutLabel}>{loggingOut ? "Đang đăng xuất…" : "Đăng xuất"}</Text>
       </Pressable>
     </ScrollView>
+
+    {/* A Modal, not an absolute View: it has to cover the bottom nav too,
+        which this screen does not own. No content of its own — the button's
+        spinner, still visible through it, is what says what is happening.
+        Back does nothing while it is up: logout cannot be cancelled half-way. */}
+    <Modal visible={loggingOut} transparent animationType="fade" statusBarTranslucent onRequestClose={() => {}}>
+      <View style={styles.logoutOverlay} testID="overlay-settings-logout" />
+    </Modal>
     </Screen>
   );
 }
@@ -190,5 +219,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,158,150,0.35)",
     borderRadius: 16,
   },
+  logoutRowBusy: { opacity: LOGOUT_BUSY_OPACITY },
   logoutLabel: { ...typography.body, color: colors.peach },
+  logoutOverlay: { flex: 1, backgroundColor: withAlpha(colors.bgApp, LOGOUT_OVERLAY_ALPHA) },
 });

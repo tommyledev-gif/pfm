@@ -1,10 +1,10 @@
-import { Animated, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 
-import { initialFor } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
 import { useHoldProgress } from "@/lib/use-hold-progress";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { colors, spacing, typography } from "@/lib/theme";
 import { budgetRowStatus } from "@/features/budgets/budget-pace";
+import { BudgetIconTile } from "@/features/budgets/components/BudgetIconTile";
 import { BudgetProgressBar } from "@/features/budgets/components/BudgetProgressBar";
 import { Budget, BudgetLimit } from "@/features/budgets/types";
 import { Category } from "@/features/categories/types";
@@ -70,17 +70,7 @@ export function BudgetListRow({
       style={[styles.row, highlighted && styles.rowHighlighted]}
     >
       <View style={styles.headRow}>
-        {/* Uniform neutral tile rather than a per-category colored circle:
-            color is what tells this list apart at a glance, and it is spent
-            entirely on pace state here. Two color systems in one row would
-            fight each other. */}
-        <View style={styles.icon}>
-          {iconUrl ? (
-            <Image source={{ uri: iconUrl }} style={styles.iconImage} />
-          ) : (
-            <Text style={styles.iconGlyph}>{icon || initialFor(budget.category_name)}</Text>
-          )}
-        </View>
+        <BudgetIconTile name={budget.category_name} icon={icon} iconUrl={iconUrl} />
         <Animated.Text style={[styles.name, { color: nameColor }]} numberOfLines={1}>
           {budget.category_name}
         </Animated.Text>
@@ -133,19 +123,6 @@ const styles = StyleSheet.create({
   },
   rowHighlighted: { backgroundColor: "rgba(133,255,51,0.06)" },
   headRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
-  icon: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.pill,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  iconImage: { width: 36, height: 36, borderRadius: radii.pill },
-  iconGlyph: { fontSize: 16, color: colors.textPrimary, fontWeight: "700" },
   name: { flex: 1, ...typography.cardTitle },
   headline: { ...typography.body, fontWeight: "700", color: colors.textPrimary, flexShrink: 0 },
   headlineOver: { color: colors.danger },

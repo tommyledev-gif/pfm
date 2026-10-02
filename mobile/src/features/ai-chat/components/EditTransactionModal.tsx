@@ -45,16 +45,18 @@ interface EditTransactionModalProps {
 // longest sheet in the app) are pinned in the Drawer footer.
 export function EditTransactionModal({ visible, payload, onClose, onSave, lockWalletAndType }: EditTransactionModalProps) {
   const [type, setType] = useState<TransactionType>("expense");
-  const amount = useAmountExpression();
-  const { reset: resetAmount } = amount;
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [walletId, setWalletId] = useState<string | null>(null);
+  const wallets = useWalletsQuery();
+  // Declared after the wallet: the keypad's decimals follow its currency.
+  const currency = wallets.data?.find((w) => w.id === walletId)?.currency ?? FALLBACK_CURRENCY;
+  const amount = useAmountExpression(currency);
+  const { reset: resetAmount } = amount;
   const [occurredAt, setOccurredAt] = useState("");
   const [note, setNote] = useState("");
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
 
-  const wallets = useWalletsQuery();
   const categories = useCategoriesQuery(type);
 
   useEffect(() => {
@@ -88,7 +90,10 @@ export function EditTransactionModal({ visible, payload, onClose, onSave, lockWa
   const amountValid = amount.cents !== null && amount.cents > 0;
   const canSave = amountValid && Boolean(categoryId) && Boolean(walletId) && Boolean(occurredAt);
   const errors = submitAttempted
-    ? [categoryId ? undefined : "Vui lòng chọn danh mục", amountValid ? undefined : "Vui lòng nhập số tiền hợp lệ"]
+    ? [
+        categoryId ? undefined : "Vui lòng chọn danh mục",
+        amount.problem ?? (amountValid ? undefined : "Vui lòng nhập số tiền"),
+      ]
     : [];
 
   const submit = () => {
@@ -107,8 +112,6 @@ export function EditTransactionModal({ visible, payload, onClose, onSave, lockWa
       occurred_at: occurredAt,
     });
   };
-
-  const currency = wallets.data?.find((w) => w.id === walletId)?.currency ?? FALLBACK_CURRENCY;
 
   return (
     <>

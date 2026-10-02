@@ -44,6 +44,10 @@ const (
 	AnalyticsBreakdownMaxSlices = 6
 	AnalyticsListMaxRows        = 10
 	AnalyticsListDefaultRows    = 5
+	// Rows a ranked-list answer carries in total — the ones shown plus the
+	// ones its "và N khoản khác" line expands to in place (more_rows). Still
+	// a cap, under the same payload bound as every list above.
+	AnalyticsListExpandMaxRows = 30
 	AnalyticsSeriesMaxCycles    = 6
 	AnalyticsSeriesShortCycles  = 3
 	AnalyticsCustomRangeMaxDays = 366

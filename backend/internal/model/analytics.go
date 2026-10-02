@@ -92,6 +92,7 @@ type AnalyticsExpense struct {
 	ID           uuid.UUID
 	Amount       int64
 	OccurredAt   time.Time
+	CategoryID   uuid.UUID
 	CategoryName string
 	WalletName   string
 }

@@ -54,10 +54,12 @@ func (r *ChatRepository) CreateChatMessage(ctx context.Context, arg CreateChatMe
 // recent first — callers wanting chronological order (e.g. ChatService
 // building AI Service conversation history) must reverse the slice
 // themselves, same convention as leaving pagination/ordering decisions to
-// the caller elsewhere in this codebase.
-func (r *ChatRepository) ListRecentMessagesByConversation(ctx context.Context, conversationID uuid.UUID, limit int32) ([]*model.ChatMessage, error) {
+// the caller elsewhere in this codebase. Only userID's own messages are ever
+// returned, whatever conversationID the caller passes.
+func (r *ChatRepository) ListRecentMessagesByConversation(ctx context.Context, userID, conversationID uuid.UUID, limit int32) ([]*model.ChatMessage, error) {
 	rows, err := r.q.ListRecentChatMessagesByConversation(ctx, sqlc.ListRecentChatMessagesByConversationParams{
 		ConversationID: conversationID,
+		UserID:         userID,
 		Limit:          limit,
 	})
 	if err != nil {

@@ -20,8 +20,8 @@ import { floorToPerDayStep } from "@/lib/currency";
 /** 50.000đ — the smallest amount worth tracking as its own category. */
 export const MIN_AMOUNT_PER_CATEGORY_XU = 5_000_000;
 
-/** 9.999.999.999đ. */
-export const INCOME_CAP_XU = 999_999_999_900;
+/** 10 tỷ đ — mirrors the backend's common.BudgetWizardIncomeCapXu. */
+export const INCOME_CAP_XU = 1_000_000_000_000;
 
 /** 88% of disposable is allocatable; the remaining 12% is the buffer. */
 export const ALLOCATABLE_NUM = 88;
@@ -126,7 +126,8 @@ export function validateIncomeStep(incomeXu: number, fixedXu: number, savingsXu:
     return { ok: false, field: "income", message: "Thu nhập phải lớn hơn 0." };
   }
   if (incomeXu > INCOME_CAP_XU) {
-    return { ok: false, field: "income", message: "Thu nhập vượt mức tối đa app hỗ trợ." };
+    // Names the ceiling: "the maximum the app supports" gave no number to act on.
+    return { ok: false, field: "income", message: "Thu nhập tối đa là 10 tỷ đ." };
   }
   const disposable = disposableXu(incomeXu, fixedXu, savingsXu);
   if (disposable <= 0) {

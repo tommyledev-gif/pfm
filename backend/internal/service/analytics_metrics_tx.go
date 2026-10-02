@@ -24,7 +24,9 @@ func (s *AnalyticsService) computeTopExpenses(ctx context.Context, run *analytic
 		limit = 1
 	}
 	filter := run.analyticsFilter(run.windows.whole)
-	rows, err := s.analytics.ListExpensesByAmount(ctx, run.userID, filter, limit)
+	// Fetched past the answer's own limit so the list can expand in place;
+	// the answer itself is still only the first `limit` rows.
+	rows, err := s.analytics.ListExpensesByAmount(ctx, run.userID, filter, max(limit, common.AnalyticsListExpandMaxRows))
 	if err != nil {
 		return err
 	}
@@ -41,10 +43,17 @@ func (s *AnalyticsService) computeTopExpenses(ctx context.Context, run *analytic
 	}
 	out := make([]dto.AnalyticsTxRow, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, dto.AnalyticsTxRow{ID: r.ID, OccurredAt: r.OccurredAt, Amount: r.Amount, CategoryName: r.CategoryName, WalletName: r.WalletName})
+		out = append(out, dto.AnalyticsTxRow{
+			ID: r.ID, OccurredAt: r.OccurredAt, Amount: r.Amount,
+			CategoryID: r.CategoryID, CategoryName: r.CategoryName, WalletName: r.WalletName,
+		})
 	}
-	run.answer.Chart = dto.AnalyticsChart{Type: string(model.AnalyticsChartTable), Rows: out, TotalMatched: &matched}
-	run.answer.Summary = summaryTop(run, out, matched, s.cycles.Location())
+	shown, more := out, []dto.AnalyticsTxRow(nil)
+	if len(out) > limit {
+		shown, more = out[:limit], out[limit:]
+	}
+	run.answer.Chart = dto.AnalyticsChart{Type: string(model.AnalyticsChartTable), Rows: shown, MoreRows: more, TotalMatched: &matched}
+	run.answer.Summary = summaryTop(run, shown, matched, s.cycles.Location())
 	return nil
 }
 
@@ -145,7 +154,8 @@ func (s *AnalyticsService) computeBudgetStatus(ctx context.Context, run *analyti
 				continue
 			}
 			items = append(items, dto.AnalyticsBudgetItem{
-				BudgetID: b.ID, CategoryName: b.CategoryName, Limit: l.AmountLimit,
+				BudgetID: b.ID, CategoryID: b.CategoryID, CategoryName: b.CategoryName, Icon: b.Icon, IconURL: b.IconURL,
+				Limit: l.AmountLimit,
 				Spent: l.Spent, Remaining: l.Remaining, Exceeded: l.Status == model.BudgetStatusExceeded,
 			})
 		}

@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
 
-import { formatCurrency } from "@/lib/currency";
+import { AmountText } from "@/components/ui/AmountText";
 import { colors, spacing, typography } from "@/lib/theme";
 
 interface NumberStatProps {
@@ -14,7 +14,7 @@ interface NumberStatProps {
 export function NumberStat({ value, currency, caption }: NumberStatProps) {
   return (
     <View style={styles.wrap}>
-      <Text style={styles.value}>{formatCurrency(value, currency)}</Text>
+      <AmountText amountCents={value} currency={currency} style={styles.value} />
       {caption ? <Text style={styles.caption}>{caption}</Text> : null}
     </View>
   );

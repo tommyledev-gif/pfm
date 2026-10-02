@@ -3,6 +3,18 @@ import { LayoutChangeEvent, PanResponder, StyleSheet, View } from "react-native"
 
 import { colors, radii } from "@/lib/theme";
 
+/**
+ * A non-linear track: where along it (0..1) each amount sits, and the snap
+ * step at that amount. For spans too wide to be linear — 0 to 10 tỷ cannot
+ * also give a 20tr salary more than a few pixels. Omitted, the track is linear
+ * over [min, max] with the fixed `step`.
+ */
+export interface SliderScale {
+  toRatio: (value: number) => number;
+  fromRatio: (ratio: number) => number;
+  stepAt: (value: number) => number;
+}
+
 interface MoneySliderProps {
   // All three in xu. `value` is clamped into [min, max] before rendering, so a
   // caller whose max shrank underneath it never draws a thumb off the track.
@@ -16,6 +28,8 @@ interface MoneySliderProps {
   // Fired once when the drag ends, for callers that want to defer expensive
   // work (a server round trip) until the user lets go.
   onSettle?: (value: number) => void;
+  /** Replaces the linear mapping and `step` — see SliderScale. */
+  scale?: SliderScale;
   disabled?: boolean;
   testID?: string;
 }
@@ -25,6 +39,10 @@ const THUMB_SIZE = 24;
 
 function clamp(v: number, min: number, max: number) {
   return Math.min(Math.max(v, min), max);
+}
+
+function snapTo(v: number, step: number) {
+  return Math.round(v / step) * step;
 }
 
 // A money slider built on PanResponder and plain state.
@@ -44,6 +62,7 @@ export function MoneySlider({
   step,
   onChange,
   onSettle,
+  scale,
   disabled = false,
   testID,
 }: MoneySliderProps) {
@@ -51,7 +70,7 @@ export function MoneySlider({
 
   const span = Math.max(max - min, 1);
   const current = clamp(value, min, max);
-  const ratio = clamp((current - min) / span, 0, 1);
+  const ratio = clamp(scale ? scale.toRatio(current) : (current - min) / span, 0, 1);
 
   // The thumb's centre travels over (width − thumb), not the full width: at the
   // extremes the thumb is inset by half its own size. Gesture maths has to use
@@ -62,8 +81,8 @@ export function MoneySlider({
   // PanResponder is built once, so its callbacks close over the FIRST render's
   // props forever. Everything they read therefore has to come from a ref that
   // render keeps current — never from the captured variables.
-  const live = useRef({ min, max, step, usableWidth, value: current, onChange, onSettle });
-  live.current = { min, max, step, usableWidth, value: current, onChange, onSettle };
+  const live = useRef({ min, max, step, scale, usableWidth, value: current, onChange, onSettle });
+  live.current = { min, max, step, scale, usableWidth, value: current, onChange, onSettle };
 
   // ⚠️ Written ONLY in onPanResponderGrant — never during render.
   //
@@ -89,14 +108,20 @@ export function MoneySlider({
       onPanResponderMove: (_evt, gesture) => {
         const g = live.current;
         if (g.usableWidth <= 0) return;
-        const perPx = (g.max - g.min) / g.usableWidth;
-        const raw = dragAnchor.current + gesture.dx * perPx;
-        const snapped = Math.round(raw / g.step) * g.step;
-        g.onChange(clamp(snapped, g.min, g.max));
+        let raw: number;
+        if (g.scale) {
+          // The drag moves along the track, so it is added in ratio space and
+          // only then mapped back to money.
+          const anchorRatio = g.scale.toRatio(dragAnchor.current);
+          raw = g.scale.fromRatio(clamp(anchorRatio + gesture.dx / g.usableWidth, 0, 1));
+        } else {
+          raw = dragAnchor.current + gesture.dx * ((g.max - g.min) / g.usableWidth);
+        }
+        g.onChange(clamp(snapTo(raw, g.scale ? g.scale.stepAt(raw) : g.step), g.min, g.max));
       },
       onPanResponderRelease: () => {
         const g = live.current;
-        g.onSettle?.(clamp(Math.round(g.value / g.step) * g.step, g.min, g.max));
+        g.onSettle?.(clamp(snapTo(g.value, g.scale ? g.scale.stepAt(g.value) : g.step), g.min, g.max));
       },
     }),
   ).current;

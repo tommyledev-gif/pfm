@@ -46,6 +46,10 @@ type AnalyticsChart struct {
 	Items        []AnalyticsChartItem  `json:"items,omitempty"`
 	Compare      *AnalyticsCompare     `json:"compare,omitempty"`
 	Rows         []AnalyticsTxRow      `json:"rows,omitempty"`
+	// MoreRows continues Rows in the same order — what the client reveals
+	// when the User expands "và N khoản khác". Rows alone is still the answer
+	// (the summary describes only Rows); an older client just ignores this.
+	MoreRows     []AnalyticsTxRow      `json:"more_rows,omitempty"`
 	TotalMatched *int64                `json:"total_matched,omitempty"`
 	Budgets      []AnalyticsBudgetItem `json:"budgets,omitempty"`
 }
@@ -73,6 +77,9 @@ type AnalyticsTxRow struct {
 	ID           uuid.UUID `json:"id"`
 	OccurredAt   time.Time `json:"occurred_at"`
 	Amount       int64     `json:"amount"`
+	// CategoryID lets the client draw the Category's own icon and colour —
+	// the same tile this row has everywhere else in the app.
+	CategoryID   uuid.UUID `json:"category_id"`
 	CategoryName string    `json:"category_name"`
 	WalletName   string    `json:"wallet_name"`
 }
@@ -81,7 +88,12 @@ type AnalyticsTxRow struct {
 // the same numbers the Budgets screen shows (spec.md S-AIQ-09).
 type AnalyticsBudgetItem struct {
 	BudgetID     uuid.UUID `json:"budget_id"`
+	CategoryID   uuid.UUID `json:"category_id"`
 	CategoryName string    `json:"category_name"`
+	// The Budget's own icon, which wins over its Category's — the same
+	// precedence as the Budgets screen (specs/wallet-budget-icons/spec.md).
+	Icon    *string `json:"icon,omitempty"`
+	IconURL *string `json:"icon_url,omitempty"`
 	Limit        int64     `json:"limit"`
 	Spent        int64     `json:"spent"`
 	Remaining    int64     `json:"remaining"`

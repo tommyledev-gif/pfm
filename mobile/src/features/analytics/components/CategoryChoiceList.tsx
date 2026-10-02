@@ -31,12 +31,12 @@ export function CategoryChoiceList({ choices, onPick, disabled }: CategoryChoice
 
 const styles = StyleSheet.create({
   list: { marginTop: spacing.md, flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  // Same tonal chip as the suggestion rows — no ring around each choice.
   row: {
     paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
+    backgroundColor: colors.surfaceRaised,
   },
   name: { ...typography.caption, color: colors.textPrimary },
 });

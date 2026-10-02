@@ -1,8 +1,9 @@
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { SendIcon, SparkleIcon } from "@/components/ui/Icon";
 import { CHAT_MODE_META, ChatMode } from "@/features/ai-chat/chat-mode";
+import { withAlpha } from "@/lib/color";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 
 // BottomNav sits flush at the safe-area inset, stands 64 tall, and floats its
@@ -12,6 +13,8 @@ import { colors, radii, spacing, typography } from "@/lib/theme";
 const NAV_CLEARANCE = 104;
 // Small gap between the bar and the top of an open keyboard.
 const KEYBOARD_GAP = spacing.sm;
+// The ring says "typing here", it should not compete with the send button.
+const FOCUS_RING_ALPHA = 0.45;
 
 interface ChatInputBarProps {
   value: string;
@@ -40,6 +43,9 @@ export function ChatInputBar({
   mode,
   quickActions,
 }: ChatInputBarProps) {
+  const [focused, setFocused] = useState(false);
+  const canSend = value.trim().length > 0 && !sending;
+
   return (
     <>
       {quickActions ? (
@@ -62,19 +68,32 @@ export function ChatInputBar({
           // on one that does not it is the full height. Adding it
           // unconditionally left a dead gap a whole keyboard tall.
           { marginBottom: keyboardVisible ? keyboardHeight + KEYBOARD_GAP : bottomInset + NAV_CLEARANCE },
+          focused && styles.inputBarFocused,
         ]}
       >
         <TextInput
           value={value}
           onChangeText={onChangeText}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           placeholder={CHAT_MODE_META[mode].placeholder}
           placeholderTextColor={colors.textMuted}
           style={styles.input}
           multiline
           textAlignVertical="top"
         />
-        <Pressable style={styles.sendButton} onPress={onSend} disabled={!value.trim() || sending}>
-          <SendIcon size={18} />
+        {/* Accent only while there is something to send — a lit button that
+            does nothing when tapped is a promise the screen does not keep. */}
+        <Pressable
+          testID="btn-chat-send"
+          accessibilityRole="button"
+          accessibilityLabel="Gửi"
+          accessibilityState={{ disabled: !canSend }}
+          style={[styles.sendButton, !canSend && styles.sendButtonIdle]}
+          onPress={onSend}
+          disabled={!canSend}
+        >
+          <SendIcon size={18} color={canSend ? colors.onGreen : colors.textMuted} />
         </Pressable>
       </View>
     </>
@@ -102,13 +121,16 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     gap: spacing.sm,
     backgroundColor: colors.surface,
+    // Transparent until focused rather than absent, so the focus ring never
+    // shifts the field by a pixel when it appears.
     borderWidth: 1,
-    borderColor: colors.surfaceBorder,
+    borderColor: "transparent",
     borderRadius: radii.hero,
     paddingLeft: spacing.lg,
     paddingRight: spacing.xs,
     paddingVertical: spacing.xs,
   },
+  inputBarFocused: { borderColor: withAlpha(colors.green, FOCUS_RING_ALPHA) },
   // ~3 lines before it scrolls its own content instead of growing further.
   input: {
     flex: 1,
@@ -126,4 +148,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  sendButtonIdle: { backgroundColor: colors.surfaceRaised },
 });

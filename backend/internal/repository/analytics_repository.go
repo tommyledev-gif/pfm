@@ -48,7 +48,7 @@ func (r *AnalyticsRepository) ListExpensesByAmount(ctx context.Context, userID u
 	for _, row := range rows {
 		out = append(out, model.AnalyticsExpense{
 			ID: row.ID, Amount: row.Amount, OccurredAt: row.OccurredAt,
-			CategoryName: row.CategoryName, WalletName: row.WalletName,
+			CategoryID: row.CategoryID, CategoryName: row.CategoryName, WalletName: row.WalletName,
 		})
 	}
 	return out, nil

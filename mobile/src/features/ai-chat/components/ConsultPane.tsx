@@ -1,17 +1,17 @@
 import { useMemo, useRef, useState } from "react";
-import { FlatList, Text, View } from "react-native";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 
 import { TypingIndicator } from "@/components/shared/TypingIndicator";
-import { ChatBubble } from "@/features/ai-chat/components/ChatBubble";
 import { ChatInputBar } from "@/features/ai-chat/components/ChatInputBar";
 import { ChatThreadList } from "@/features/ai-chat/components/ChatThreadList";
+import { ConsultMessageRow } from "@/features/ai-chat/components/ConsultMessageRow";
 import { chatThreadStyles as styles } from "@/features/ai-chat/components/chat-thread-styles";
 import { isConsultMessage } from "@/features/ai-chat/consult-message";
 import { useConsultActions } from "@/features/ai-chat/hooks/use-consult-actions";
 import { ChatMessage } from "@/features/ai-chat/types";
-import { ConsultReplyCard } from "@/features/analytics/components/ConsultReplyCard";
 import { StarterChipsRow } from "@/features/analytics/components/StarterChipsRow";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
+import { spacing } from "@/lib/theme";
 import { useChatStore } from "@/stores/chat-store";
 
 interface ConsultPaneProps {
@@ -56,21 +56,22 @@ export function ConsultPane({
         listRef={listRef}
         data={messages}
         keyExtractor={(m) => m.id}
-        contentContainerStyle={styles.thread}
+        // Each row spaces itself (ConsultMessageRow) — a uniform gap is what
+        // made every message sit the same distance from every other.
+        contentContainerStyle={[styles.thread, consultStyles.thread]}
         keyboardShouldPersistTaps="handled"
-        renderItem={({ item }) => (
-          <ChatBubble role={item.role} text={item.text}>
-            {item.consult ? <ConsultReplyCard data={item.consult} handlers={consult.handlers} /> : null}
-          </ChatBubble>
-        )}
-        ListEmptyComponent={
-          <Text style={styles.hint}>
-            Hỏi mình về chi tiêu của bạn — vd: &ldquo;Tháng này tiêu bao nhiêu?&rdquo; — hoặc chọn một gợi ý bên dưới.
-          </Text>
-        }
+        renderItem={({ item, index }) => {
+          // Newest first (inverted), so the message before this one is next.
+          const previous = messages[index + 1];
+          const startsTurn = previous !== undefined && (item.role === "user" || previous.role === "assistant");
+          return <ConsultMessageRow message={item} startsTurn={startsTurn} handlers={consult.handlers} />;
+        }}
+        // No quoted example question here: it would look tappable and is
+        // not — the real, tappable ones are the chips right above the input.
+        ListEmptyComponent={<Text style={styles.hint}>Hỏi mình về chi tiêu của bạn, hoặc chọn một gợi ý bên dưới.</Text>}
         ListHeaderComponent={
           consult.sending ? (
-            <View style={styles.typingRow}>
+            <View style={[styles.typingRow, consultStyles.typing]}>
               <TypingIndicator />
             </View>
           ) : null
@@ -95,3 +96,9 @@ export function ConsultPane({
     </>
   );
 }
+
+const consultStyles = StyleSheet.create({
+  thread: { gap: 0 },
+  // The reply-to-be, so it sits as close to the question as the reply will.
+  typing: { marginTop: spacing.sm },
+});

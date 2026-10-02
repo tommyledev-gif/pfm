@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { EmojiGlyph } from "@/components/ui/EmojiGlyph";
-import { SearchIcon } from "@/components/ui/Icon";
+import { SearchField } from "@/components/ui/SearchField";
 import {
   OPENMOJI_GROUPS,
   OPENMOJIS_BY_GROUP,
@@ -11,12 +11,14 @@ import {
   findOpenMoji,
   searchOpenMoji,
 } from "@/lib/openmoji";
+import { withAlpha } from "@/lib/color";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 
 const COLUMNS = 7;
 const GLYPH_SIZE = 30;
 // Inline mode (inside an already-scrolling list) gets a fixed-height box.
 const INLINE_HEIGHT = 240;
+const SELECTED_CELL_ALPHA = 0.18;
 
 interface OpenMojiGridProps {
   value: string;
@@ -60,18 +62,7 @@ export function OpenMojiGrid({ value, onSelect, mode = "fill" }: OpenMojiGridPro
 
   return (
     <View style={mode === "fill" ? styles.fill : undefined}>
-      <View style={styles.searchRow}>
-        <SearchIcon size={16} color={colors.textSecondary} />
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Tìm bằng tiếng Anh, vd: coffee"
-          placeholderTextColor={colors.textMuted}
-          style={styles.searchInput}
-          autoCorrect={false}
-          autoCapitalize="none"
-        />
-      </View>
+      <SearchField value={query} onChangeText={setQuery} placeholder="Tìm bằng tiếng Anh, vd: coffee" autoCorrect={false} />
 
       {!query.trim() ? (
         <ScrollView
@@ -120,30 +111,15 @@ export function OpenMojiGrid({ value, onSelect, mode = "fill" }: OpenMojiGridPro
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  searchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.listCard,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-  },
-  searchInput: { flex: 1, paddingVertical: 10, color: colors.textPrimary, ...typography.body },
   groupScroll: { flexGrow: 0, marginTop: spacing.sm },
   groupRow: { gap: spacing.xs, paddingBottom: spacing.sm },
-  groupChip: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: radii.pill,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-  },
-  groupChipActive: { backgroundColor: colors.green, borderColor: colors.green },
+  // A tab row, not a set of buttons: only the current group gets a fill, in
+  // the same tonal step as every other chip — a neon pill here outshouted the
+  // one action on the sheet that actually needs the accent.
+  groupChip: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radii.pill },
+  groupChipActive: { backgroundColor: colors.surfaceRaised },
   groupLabel: { ...typography.caption, color: colors.textSecondary },
-  groupLabelActive: { color: colors.onGreen },
+  groupLabelActive: { color: colors.textPrimary },
   // A fraction of the row rather than a fixed size, so seven always fit
   // whatever the panel's width.
   cell: {
@@ -153,7 +129,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: radii.listCard - 4,
   },
-  cellActive: { backgroundColor: "rgba(133,255,51,0.18)" },
+  cellActive: { backgroundColor: withAlpha(colors.green, SELECTED_CELL_ALPHA) },
   inlineBox: { height: INLINE_HEIGHT, marginTop: spacing.xs },
   wrap: { flexDirection: "row", flexWrap: "wrap" },
   empty: { ...typography.caption, color: colors.textMuted, textAlign: "center", paddingVertical: spacing.xl },

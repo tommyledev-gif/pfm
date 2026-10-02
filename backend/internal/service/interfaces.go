@@ -154,7 +154,7 @@ type AuditLogRepo interface {
 // isolation.
 type ChatRepo interface {
 	CreateChatMessage(ctx context.Context, arg repository.CreateChatMessageParams) (*model.ChatMessage, error)
-	ListRecentMessagesByConversation(ctx context.Context, conversationID uuid.UUID, limit int32) ([]*model.ChatMessage, error)
+	ListRecentMessagesByConversation(ctx context.Context, userID, conversationID uuid.UUID, limit int32) ([]*model.ChatMessage, error)
 }
 
 // ChatThreadRepo is the repository contract ChatThreadService depends on —

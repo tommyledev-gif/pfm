@@ -22,6 +22,15 @@ const (
 	MaxListLimit     = 100
 )
 
+// Transactions (F-06)
+const (
+	// MaxTransactionAmountCents is the largest amount a transaction may carry:
+	// 999.999.999.999 in major units with two decimals. Mirrored by the dto
+	// `lte` tags on Create/UpdateTransactionRequest and by the mobile keypad's
+	// AMOUNT_MAX_CENTS (mobile/src/lib/calculator/evaluate.ts).
+	MaxTransactionAmountCents int64 = 99_999_999_999_999
+)
+
 // Tokens (F-02)
 const (
 	AccessTokenTTL  = 15 * time.Minute

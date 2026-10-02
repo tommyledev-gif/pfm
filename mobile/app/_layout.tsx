@@ -13,12 +13,16 @@ import { Toast } from "@/components/shared/Toast";
 import { installGlobalErrorLogger } from "@/lib/global-error-logger";
 import { queryClient } from "@/lib/query-client";
 import { colors } from "@/lib/theme";
+import { installSessionScopedReset } from "@/stores/session-scoped-reset";
 import { useSessionStore } from "@/stores/session-store";
 
 // Installed once at module scope, not inside the component — a global
 // error handler must be wired before the very first render, not after an
 // effect runs (specs/mobile-debug-console/spec.md decision #5).
 installGlobalErrorLogger();
+// Same reason: it must be listening before RootLayout's effect calls
+// hydrate(), or a restored session would slip past it.
+installSessionScopedReset();
 
 // The native splash stays up until BrandSplash — its JS continuation, which
 // adds the wordmark — has laid out beneath it and drops it. Module scope, so

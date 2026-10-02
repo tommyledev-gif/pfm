@@ -50,17 +50,24 @@ export interface AnalyticsCompare {
   previous_label: string;
 }
 
+// category_id (and a budget's own icon) arrived after answers were already
+// being stored in threads — optional, so an older stored answer still renders,
+// just without its Category's tile.
 export interface AnalyticsTxRow {
   id: string;
   occurred_at: string;
   amount: number;
+  category_id?: string;
   category_name: string;
   wallet_name: string;
 }
 
 export interface AnalyticsBudgetItem {
   budget_id: string;
+  category_id?: string;
   category_name: string;
+  icon?: string;
+  icon_url?: string;
   limit: number;
   spent: number;
   remaining: number;
@@ -78,6 +85,9 @@ export interface AnalyticsChart {
   items?: AnalyticsChartItem[];
   compare?: AnalyticsCompare;
   rows?: AnalyticsTxRow[];
+  /** Continues `rows` in rank order — revealed when the list is expanded.
+   *  Absent on answers stored before the backend sent it. */
+  more_rows?: AnalyticsTxRow[];
   total_matched?: number;
   budgets?: AnalyticsBudgetItem[];
 }

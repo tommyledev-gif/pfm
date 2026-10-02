@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AmountInput } from "@/components/ui/AmountInput";
-import { MoneySlider } from "@/components/ui/MoneySlider";
+import { MoneySlider, SliderScale } from "@/components/ui/MoneySlider";
 import { roundStepXu } from "@/features/budget-wizard/budget-math";
 import { toCents, toMajorUnits } from "@/lib/currency";
 import { colors, spacing, typography } from "@/lib/theme";
@@ -12,9 +12,12 @@ interface MoneyFieldProps {
   /** xu. */
   value: number;
   onChange: (valueXu: number) => void;
-  /** Upper bound the slider spans. It grows to fit a typed value larger than
-   *  itself, so typing is never capped by the slider's convenience range. */
-  sliderCeiling: number;
+  /** Upper bound a linear slider spans. It grows to fit a typed value larger
+   *  than itself, so typing is never capped by the slider's convenience range.
+   *  Ignored when `sliderScale` is given. */
+  sliderCeiling?: number;
+  /** A non-linear track over [0, max] instead of the linear ceiling. */
+  sliderScale?: { scale: SliderScale; max: number };
   /** Optional helper sitting at the right end of the hint row — for a field
    *  whose value the user would otherwise have to work out themselves. */
   action?: { label: string; onPress: () => void; testID?: string };
@@ -31,12 +34,13 @@ interface MoneyFieldProps {
  * approximate it. So the field is one value with two controls, and neither is
  * the "real" one.
  */
-export function MoneyField({ label, hint, value, onChange, sliderCeiling, action, testID }: MoneyFieldProps) {
+export function MoneyField({ label, hint, value, onChange, sliderCeiling = 0, sliderScale, action, testID }: MoneyFieldProps) {
   // The slider's span follows the value once it goes past the convenience
   // ceiling — otherwise a user who types 80tr sees the thumb pinned at the
   // right edge and dragging it snaps their figure down to the ceiling.
-  const max = Math.max(sliderCeiling, Math.ceil(value / sliderCeiling) * sliderCeiling || sliderCeiling);
-  const step = roundStepXu(max);
+  const linearMax = Math.max(sliderCeiling, Math.ceil(value / sliderCeiling) * sliderCeiling || sliderCeiling);
+  const max = sliderScale ? sliderScale.max : linearMax;
+  const step = sliderScale ? sliderScale.scale.stepAt(value) : roundStepXu(max);
 
   return (
     <View style={styles.field}>
@@ -54,6 +58,7 @@ export function MoneyField({ label, hint, value, onChange, sliderCeiling, action
         min={0}
         max={max}
         step={step}
+        scale={sliderScale?.scale}
         onChange={onChange}
       />
       {/* Hint and helper share one row: the helper is an answer to the hint

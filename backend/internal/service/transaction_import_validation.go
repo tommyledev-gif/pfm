@@ -114,6 +114,11 @@ func resolveRow(rowNumber int, cells map[string]string, lookups importLookups) (
 	if amount <= 0 {
 		return dto.ImportRow{}, "số tiền phải lớn hơn 0"
 	}
+	// Same ceiling POST /transactions enforces — an import must not be a way
+	// around it.
+	if amount > common.MaxTransactionAmountCents {
+		return dto.ImportRow{}, "số tiền vượt quá mức tối đa 999.999.999.999"
+	}
 
 	walletName := strings.TrimSpace(cells["wallet"])
 	walletIDs := lookups.walletsByName[normalizeName(walletName)]

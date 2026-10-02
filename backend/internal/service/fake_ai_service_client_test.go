@@ -15,10 +15,14 @@ type fakeAIServiceClient struct {
 	response *AIExtractResponse
 	err      error
 	calls    int
+	// lastReq is what the most recent Extract call was handed — lets a test
+	// assert exactly which conversation history reached the model.
+	lastReq AIExtractRequest
 }
 
-func (f *fakeAIServiceClient) Extract(_ context.Context, _ AIExtractRequest) (*AIExtractResponse, error) {
+func (f *fakeAIServiceClient) Extract(_ context.Context, req AIExtractRequest) (*AIExtractResponse, error) {
 	f.calls++
+	f.lastReq = req
 	if f.err != nil {
 		return nil, f.err
 	}

@@ -62,7 +62,7 @@ func (s *ChatService) Chat(ctx context.Context, userID uuid.UUID, req dto.ChatRe
 	// includes the message currently being processed — the AI Service gets
 	// only what was actually said *before* now, to disambiguate a follow-up
 	// like "20k" after "mua cà phê ở highlands".
-	history, err := s.buildHistory(ctx, conversationID)
+	history, err := s.buildHistory(ctx, userID, conversationID)
 	if err != nil {
 		return nil, fmt.Errorf("service.Chat: %w", err)
 	}
@@ -140,9 +140,10 @@ func (s *ChatService) Chat(ctx context.Context, userID uuid.UUID, req dto.ChatRe
 // order (oldest first) — ListRecentMessagesByConversation itself returns
 // newest-first, since that's the natural order for "give me the last N",
 // but a transcript handed to the AI Service needs to read top-to-bottom like
-// an actual conversation.
-func (s *ChatService) buildHistory(ctx context.Context, conversationID uuid.UUID) ([]AIChatTurn, error) {
-	recent, err := s.repo.ListRecentMessagesByConversation(ctx, conversationID, common.AIChatHistoryLimit)
+// an actual conversation. Only userID's own messages are read: the
+// conversation id comes from the request, so it is not proof of ownership.
+func (s *ChatService) buildHistory(ctx context.Context, userID, conversationID uuid.UUID) ([]AIChatTurn, error) {
+	recent, err := s.repo.ListRecentMessagesByConversation(ctx, userID, conversationID, common.AIChatHistoryLimit)
 	if err != nil {
 		return nil, err
 	}

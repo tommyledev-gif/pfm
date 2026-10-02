@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Keyboard } from "react-native";
 
 import { TransactionKind } from "@/lib/constants";
+import { newIdempotencyKey } from "@/lib/idempotency-key";
 import { useAmountExpression } from "@/lib/use-amount-expression";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
@@ -10,6 +11,11 @@ import { useCreateTransactionMutation } from "@/features/transactions/api/use-cr
 import { useUpdateTransactionMutation } from "@/features/transactions/api/use-update-transaction-mutation";
 import { useDeleteTransactionMutation } from "@/features/transactions/api/use-delete-transaction-mutation";
 import { Transaction } from "@/features/transactions/types";
+
+// Until a wallet is picked there is no currency of its own; VND is the app's
+// home currency and the strictest one (no decimals), so nothing typed before
+// the wallet is known can be more precise than any wallet allows.
+const FALLBACK_CURRENCY = "VND";
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -39,8 +45,10 @@ export function useTransactionForm({ visible, onClose, editingTransaction }: Use
   const [toWalletId, setToWalletId] = useState<string | null>(null);
   const [categoryId, setCategoryId] = useState<string | null>(null);
   // Typed on the calculator keypad, so it is an expression ("120+45"), not a
-  // number — evaluated exactly to integer cents by calculator-engine.ts.
-  const amount = useAmountExpression();
+  // number — evaluated exactly to integer cents by lib/calculator. Its
+  // decimals follow the selected wallet's currency.
+  const amountCurrency = wallets.data?.find((w) => w.id === walletId)?.currency ?? FALLBACK_CURRENCY;
+  const amount = useAmountExpression(amountCurrency);
   const { reset: resetAmount } = amount;
   const [note, setNote] = useState("");
   const [occurredAt, setOccurredAt] = useState(todayIso());
@@ -52,6 +60,10 @@ export function useTransactionForm({ visible, onClose, editingTransaction }: Use
   // under it, so a stale native text-editing state left over from the
   // previous open can never survive into a fresh "Giao dịch mới".
   const [formKey, setFormKey] = useState(0);
+  // One per open sheet: a double tap on save, or a retry after a dropped
+  // response, reaches the backend as the same create and is deduplicated
+  // there (GetTransactionByIdempotencyKey) instead of booking it twice.
+  const [idempotencyKey, setIdempotencyKey] = useState(newIdempotencyKey);
 
   const createTransaction = useCreateTransactionMutation();
   const updateTransaction = useUpdateTransactionMutation();
@@ -87,7 +99,9 @@ export function useTransactionForm({ visible, onClose, editingTransaction }: Use
   // too would yank focus out from under anyone still typing the note in an
   // open sheet. This one only fires on the true open transition.
   useEffect(() => {
-    if (visible) setFormKey((k) => k + 1);
+    if (!visible) return;
+    setFormKey((k) => k + 1);
+    setIdempotencyKey(newIdempotencyKey());
   }, [visible]);
 
   const amountCents = amount.cents;
@@ -96,7 +110,9 @@ export function useTransactionForm({ visible, onClose, editingTransaction }: Use
     wallet: !isEditing && !walletId ? "Vui lòng chọn ví" : undefined,
     category: !isTransfer && !categoryId ? "Vui lòng chọn danh mục" : undefined,
     toWallet: isTransfer && !isEditing && !toWalletId ? "Vui lòng chọn ví nhận" : undefined,
-    amount: amountInvalid(amountCents) ? "Vui lòng nhập số tiền hợp lệ" : undefined,
+    // The calculator's own reason first (÷0, rounds to 0, not above 0) — it
+    // says what to fix; the generic line is only for an empty amount.
+    amount: amount.problem ?? (amountInvalid(amountCents) ? "Vui lòng nhập số tiền" : undefined),
   };
   const hasErrors = Boolean(errors.wallet || errors.category || errors.toWallet || errors.amount);
 
@@ -121,6 +137,9 @@ export function useTransactionForm({ visible, onClose, editingTransaction }: Use
     // visible, not hidden behind the keyboard.
     Keyboard.dismiss();
     setSubmitAttempted(true);
+    // A second tap while the first request is still in flight is dropped
+    // here; the idempotency key covers the tap that slips past this check.
+    if (mutation.isPending) return;
     // Resolved here rather than read from `amountCents`: the header's "Lưu"
     // can be tapped mid-expression ("120+"), which this trims/evaluates in
     // place so what is saved is exactly what the display then shows.
@@ -150,6 +169,7 @@ export function useTransactionForm({ visible, onClose, editingTransaction }: Use
           type,
           occurred_at: occurredAt,
           note: note || undefined,
+          idempotency_key: idempotencyKey,
         },
         { onSuccess: onClose },
       );

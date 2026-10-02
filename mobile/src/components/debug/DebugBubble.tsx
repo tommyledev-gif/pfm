@@ -1,12 +1,14 @@
 import { useRef, useState } from "react";
-import { Animated, Dimensions, PanResponder, StyleSheet } from "react-native";
+import { Animated, Dimensions, PanResponder, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets, type EdgeInsets } from "react-native-safe-area-context";
 
 import { colors, radii } from "@/lib/theme";
 import { DebugLogViewer } from "@/components/debug/DebugLogViewer";
+import { BugIcon } from "@/components/ui/Icon";
 import { useUiPrefsStore } from "@/stores/ui-prefs-store";
 
 const BUBBLE_SIZE = 48;
+const ICON_SIZE = 24;
 const DEFAULT_BOTTOM_OFFSET = 140; // clears the bottom nav bar
 const DEFAULT_SIDE_OFFSET = 16;
 // Under this many pixels of total movement, a touch counts as a tap (opens
@@ -80,9 +82,18 @@ export function DebugBubble() {
     <>
       <Animated.View
         testID="debug-bubble"
+        accessibilityRole="button"
+        accessibilityLabel="Mở debug console"
         style={[styles.bubble, { transform: pan.getTranslateTransform() }]}
         {...panResponder.panHandlers}
-      />
+      >
+        {/* Never the touch target itself — every touch has to reach the
+            bubble's own PanResponder, or a tap on the glyph would neither
+            drag nor open the viewer. */}
+        <View pointerEvents="none">
+          <BugIcon size={ICON_SIZE} color={colors.bgApp} />
+        </View>
+      </Animated.View>
       <DebugLogViewer visible={viewerOpen} onClose={() => setViewerOpen(false)} />
     </>
   );
@@ -97,6 +108,8 @@ const styles = StyleSheet.create({
     height: BUBBLE_SIZE,
     borderRadius: radii.pill,
     backgroundColor: colors.lavender,
+    alignItems: "center",
+    justifyContent: "center",
     opacity: 0.85,
     zIndex: 9999,
     elevation: 9999,

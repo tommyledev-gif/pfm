@@ -28,6 +28,13 @@ export function formatCurrency(amountCents: number, currency: string = "VND"): s
   return currencyFormat(currency).format(amountCents / 100);
 }
 
+// formatCurrency, split into its pieces in display order — for a caller that
+// styles the symbol apart from the digits (components/ui/AmountText.tsx)
+// without re-deriving where the symbol goes for this currency.
+export function formatCurrencyToParts(amountCents: number, currency: string = "VND"): Intl.NumberFormatPart[] {
+  return currencyFormat(currency).formatToParts(amountCents / 100);
+}
+
 // Inverse of the above — converts a form input collected in the wallet's
 // display currency (e.g. a User typing "1000000" VND) into the integer cents
 // the API expects. Never multiply by 100 inline in a component.
@@ -52,16 +59,16 @@ export function toMajorUnits(amountCents: number): number {
 // tell 7.08m and 7.1m apart — the leading "~" says plainly that this is a
 // rounded display value, not the exact figure (long-press callers pair this
 // with AmountRevealPopup for the exact one).
-// Magnitude shorthand: k / triệu / tỷ. Named rather than inlined because
+// Magnitude shorthand: k / m / tỷ. Named rather than inlined because
 // several screens render these — the Insights donut and stat cards, the
 // Transactions type tabs, Settings' three figures — and an abbreviation that
 // differs between them reads as a different unit, not a different style.
 //
-// ⚠️ Thousands are "k", never "ng". "ng" abbreviates nghìn only in writing
-// that spells the rest out too; jammed against a compacted figure it reads as
-// a stray syllable ("7tr100ng"). "k" is what a Vietnamese reader already sees
-// on every price tag ("50k").
-const MAGNITUDE_SUFFIX = { thousand: "k", million: "tr", billion: "tỷ" } as const;
+// ⚠️ Thousands are "k", never "ng", and millions are "m", never "tr" — the
+// pair has to match: "7tr100k" mixes a Vietnamese syllable with a Latin
+// letter in one figure, and "7tr100ng" reads as stray syllables. "k" is what
+// a reader already sees on every price tag ("50k"); "m" is its pair.
+const MAGNITUDE_SUFFIX = { thousand: "k", million: "m", billion: "tỷ" } as const;
 
 export function formatCurrencyCompact(amountCents: number, currency: string = "VND"): string {
   const amount = Math.round(amountCents / 100);

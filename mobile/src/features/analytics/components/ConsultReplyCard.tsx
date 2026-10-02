@@ -4,6 +4,8 @@ import { CategoryBanner } from "@/features/analytics/components/CategoryBanner";
 import { CategoryChoiceList } from "@/features/analytics/components/CategoryChoiceList";
 import { ChartRenderer } from "@/features/analytics/components/ChartRenderer";
 import { SuggestionChips } from "@/features/analytics/components/SuggestionChips";
+import { SuggestionRows } from "@/features/analytics/components/SuggestionRows";
+import { periodElapsed } from "@/features/analytics/period-elapsed";
 import { AnalyticsPeriodInfo, AnalyticsQuery, ConsultCategoryRef, ConsultMessageData } from "@/features/analytics/types";
 import { colors, radii, spacing, typography } from "@/lib/theme";
 
@@ -40,29 +42,29 @@ function periodText(period: AnalyticsPeriodInfo): string {
 
 // Everything under an analysis reply's text: the answer's period and chart,
 // its notices and follow-ups — or, for a reply that is not an answer, the
-// Category picker, the switch-mode button or the fallback chips. The reply
-// text itself (the summary or the explanation) is the bubble's own text.
+// Category picker, the switch-mode button or the questions to try instead.
+// The reply text itself (the summary or the explanation) sits above this,
+// as the message's own first line — answer first, metadata under it.
 export function ConsultReplyCard({ data, handlers }: ConsultReplyCardProps) {
   const answer = data.answer;
   const chips = answer ? answer.follow_ups : data.chips;
 
   return (
-    <View testID={answer ? "card-analytics-answer" : undefined} style={styles.wrap}>
-      {answer && data.banner_categories?.length ? (
-        <CategoryBanner categories={data.banner_categories} onChange={() => handlers.onChangeCategories(answer.query)} />
-      ) : null}
-
+    <View testID={answer ? "card-analytics-answer" : undefined}>
       {answer ? (
         <>
           <Text testID="text-analytics-period" style={styles.period}>
             {periodText(answer.period)} · {answer.tx_count} giao dịch
           </Text>
-          <ChartRenderer chart={answer.chart} currency={answer.currency} />
+          <ChartRenderer chart={answer.chart} currency={answer.currency} elapsed={periodElapsed(answer.period)} />
           {answer.notices.map((n) => (
             <Text key={n.code} testID={`text-analytics-notice-${n.code}`} style={styles.notice}>
               {n.message}
             </Text>
           ))}
+          {data.banner_categories?.length ? (
+            <CategoryBanner categories={data.banner_categories} onChange={() => handlers.onChangeCategories(answer.query)} />
+          ) : null}
         </>
       ) : null}
 
@@ -80,21 +82,32 @@ export function ConsultReplyCard({ data, handlers }: ConsultReplyCardProps) {
         </Pressable>
       ) : null}
 
-      <View style={styles.chips}>
-        <SuggestionChips
+      {/* An answer's follow-ups are optional next questions — a light row of
+          chips. A reply that could not answer has nothing else to offer, so
+          its questions are the reply: whole tappable rows. */}
+      {answer ? (
+        <View style={styles.chips}>
+          <SuggestionChips
+            chips={chips}
+            disabled={handlers.busy}
+            testIDPrefix="chip-followup"
+            onPress={(chip) => handlers.onAskQuery(chip.query, chip.label)}
+          />
+        </View>
+      ) : (
+        <SuggestionRows
           chips={chips}
           disabled={handlers.busy}
           testIDPrefix="chip-followup"
           onPress={(chip) => handlers.onAskQuery(chip.query, chip.label)}
         />
-      </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginTop: spacing.sm },
-  period: { ...typography.caption, color: colors.textMuted },
+  period: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs },
   notice: { ...typography.caption, color: colors.mustardSoft, marginTop: spacing.sm },
   switch: {
     marginTop: spacing.md,
@@ -105,5 +118,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.green,
   },
   switchLabel: { ...typography.caption, color: colors.onGreen },
-  chips: { marginTop: spacing.sm },
+  chips: { marginTop: spacing.md },
 });

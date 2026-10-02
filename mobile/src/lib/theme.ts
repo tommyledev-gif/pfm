@@ -9,6 +9,9 @@ export const colors = {
   // splash exactly, or the handoff between the two shows as a flicker.
   splashBg: "#050B15",
   surface: "#12161F",
+  // One tonal step above `surface` — separates a control (a chip, the
+  // user's own chat bubble) from the ground it sits on without a border.
+  surfaceRaised: "#1B202B",
   surfaceBorder: "rgba(255,255,255,0.08)",
   textPrimary: "#F5F6F8",
   textSecondary: "rgba(255,255,255,0.55)",

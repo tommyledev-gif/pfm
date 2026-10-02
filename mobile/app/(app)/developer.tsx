@@ -2,8 +2,9 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { ChevronLeftIcon } from "@/components/ui/Icon";
+import { Toggle } from "@/components/ui/Toggle";
 import { Screen } from "@/components/shared/Screen";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { colors, spacing, typography } from "@/lib/theme";
 import { useUiPrefsStore } from "@/stores/ui-prefs-store";
 
 // Entry point: profile.tsx's "Developer" row. Only toggles DebugBubble's own
@@ -31,14 +32,12 @@ export default function DeveloperScreen() {
             Vẫn ghi log API/điều hướng ngay cả khi ẩn — nút chỉ ẩn giao diện nổi.
           </Text>
         </View>
-        <Pressable
-          onPress={() => setBubbleVisible(!bubbleVisible)}
-          style={[styles.toggle, bubbleVisible && styles.toggleActive]}
-        >
-          <Text style={[styles.toggleLabel, bubbleVisible && styles.toggleLabelActive]}>
-            {bubbleVisible ? "Bật" : "Tắt"}
-          </Text>
-        </Pressable>
+        <Toggle
+          testID="toggle-debug-bubble"
+          value={bubbleVisible}
+          onValueChange={setBubbleVisible}
+          accessibilityLabel="Hiển thị Debug Bubble"
+        />
       </View>
     </Screen>
   );
@@ -69,15 +68,4 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, gap: spacing.xs },
   rowLabel: { ...typography.body, color: colors.textPrimary },
   rowHint: { ...typography.caption, color: colors.textSecondary },
-  toggle: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radii.pill,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-  },
-  toggleActive: { backgroundColor: colors.green, borderColor: colors.green },
-  toggleLabel: { ...typography.label, color: colors.textSecondary },
-  toggleLabelActive: { color: colors.onGreen },
 });

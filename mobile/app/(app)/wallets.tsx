@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, SectionList, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { ChevronLeftIcon, PlusIcon } from "@/components/ui/Icon";
@@ -16,6 +16,7 @@ import { WalletCardSkeleton } from "@/features/wallets/components/WalletCardSkel
 import { WalletCarousel } from "@/features/wallets/components/WalletCarousel";
 import { WalletFormModal } from "@/features/wallets/components/WalletFormModal";
 import { WalletListItem } from "@/features/wallets/components/WalletListItem";
+import { WalletRecentTransactions } from "@/features/wallets/components/WalletRecentTransactions";
 
 const TYPE_LABEL: Record<WalletType, string> = {
   cash: "Tiền mặt",
@@ -33,6 +34,8 @@ const VIEW_MODES: { label: string; value: WalletsViewMode }[] = [
 // can fail once or twice before its layout lands.
 const SCROLL_RETRY_MS = 120;
 const MAX_SCROLL_RETRIES = 3;
+// Clears the floating bottom nav, so the last row is never hidden under it.
+const BOTTOM_NAV_CLEARANCE = 140;
 
 interface WalletSection {
   type: WalletType;
@@ -130,7 +133,12 @@ export default function WalletsScreen() {
       <SegmentedTabs style={styles.modeTabs} options={VIEW_MODES} value={viewMode} onChange={setViewMode} />
 
       {viewMode === "carousel" ? (
-        <View style={styles.cardsBody}>
+        // Centred in the space below the tabs rather than pinned to the top:
+        // with only a card, its actions and a hint, a top-aligned column
+        // left half the screen empty under it. flexGrow + center keeps it in
+        // the middle while it is short, and lets it scroll from the top once
+        // the recent list makes it taller than the screen.
+        <ScrollView contentContainerStyle={styles.cardsBody} showsVerticalScrollIndicator={false}>
           {wallets.isLoading ? (
             <WalletCardSkeleton />
           ) : (
@@ -147,9 +155,10 @@ export default function WalletsScreen() {
             <>
               <WalletActiveActions wallet={activeWallet} onEdit={() => openEditor(activeWallet)} />
               <Text style={styles.hint}>Vuốt hoặc chạm thẻ bên cạnh để đổi ví · chạm thẻ giữa để sửa</Text>
+              <WalletRecentTransactions wallet={activeWallet} />
             </>
           ) : null}
-        </View>
+        </ScrollView>
       ) : wallets.isLoading ? (
         <ActivityIndicator color={colors.green} style={styles.loader} />
       ) : (
@@ -212,9 +221,16 @@ const styles = StyleSheet.create({
   modeTabs: { marginHorizontal: spacing.xl, marginBottom: spacing.md },
   // Same horizontal padding Home gives the carousel's section, which the
   // carousel cancels to run full-bleed.
-  cardsBody: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm, gap: spacing.lg },
+  cardsBody: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+    paddingBottom: BOTTOM_NAV_CLEARANCE,
+    gap: spacing.lg,
+  },
   hint: { ...typography.tiny, color: colors.textMuted, textAlign: "center" },
-  list: { paddingHorizontal: spacing.xl, paddingBottom: 140 },
+  list: { paddingHorizontal: spacing.xl, paddingBottom: BOTTOM_NAV_CLEARANCE },
   loader: { marginTop: spacing.xxl },
   sectionHeader: {
     flexDirection: "row",

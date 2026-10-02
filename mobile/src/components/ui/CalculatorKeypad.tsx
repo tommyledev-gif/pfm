@@ -2,15 +2,35 @@ import { ReactNode } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { BackspaceIcon, CalendarIcon, CheckIcon } from "@/components/ui/Icon";
+import { KeypadKey } from "@/lib/calculator/input";
+import { withAlpha } from "@/lib/color";
 import { colors, typography } from "@/lib/theme";
 
-const DIGIT_ROWS: { digits: string[]; operator: string }[] = [
+const DIGIT_ROWS: { digits: KeypadKey[]; operator: KeypadKey }[] = [
   { digits: ["7", "8", "9"], operator: "+" },
   { digits: ["4", "5", "6"], operator: "−" },
   { digits: ["1", "2", "3"], operator: "×" },
 ];
-const LAST_ROW_DIGITS = [".", "0"];
-const LAST_ROW_OPERATOR = "÷";
+const LAST_ROW_OPERATOR: KeypadKey = "÷";
+
+// What a screen reader says for each non-digit key — "×" read as "x" and "−"
+// as "dash" (or not at all) is the default otherwise.
+const SPOKEN_KEY: Partial<Record<KeypadKey, string>> = {
+  "+": "cộng",
+  "−": "trừ",
+  "×": "nhân",
+  "÷": "chia",
+  ".": "dấu thập phân",
+  "000": "ba số không",
+};
+
+// Keys are a fixed 48pt tall: past this the system font scale stops growing
+// their labels, so 200% text never spills out of — or clips inside — a key.
+const KEY_LABEL_MAX_FONT_SCALE = 1.4;
+const DATE_LABEL_MAX_FONT_SCALE = 1.2;
+const OPERATOR_IDLE_ALPHA = 0.06;
+const OPERATOR_BORDER_ALPHA = 0.4;
+const OPERATOR_PRESSED_ALPHA = 0.18;
 
 const KEY_HEIGHT = 48;
 const KEY_RADIUS = 12;
@@ -18,7 +38,10 @@ const GAP = 6;
 const DIGIT_BLOCK_COLUMNS = 4;
 
 interface CalculatorKeypadProps {
-  onInsert: (token: string) => void;
+  onInsert: (key: KeypadKey) => void;
+  /** "." for a currency with decimals; "000" for one without (VND), where a
+   *  decimal point could only ever produce an amount that does not exist. */
+  decimalKey?: "." | "000";
   onBackspace: () => void;
   /** Long-press on backspace — empties the whole amount. */
   onClear?: () => void;
@@ -54,6 +77,7 @@ function KeyColumn({ children }: { children: ReactNode }) {
  */
 export function CalculatorKeypad({
   onInsert,
+  decimalKey = ".",
   onBackspace,
   onClear,
   onConfirm,
@@ -66,30 +90,38 @@ export function CalculatorKeypad({
 }: CalculatorKeypadProps) {
   const keyId = (name: string) => (testID ? `${testID}-key-${name}` : undefined);
 
-  const digitKey = (label: string) => (
-    <KeyColumn key={label}>
+  const digitKey = (key: KeypadKey) => (
+    <KeyColumn key={key}>
       <Pressable
-        testID={keyId(label)}
+        testID={keyId(key)}
         accessibilityRole="button"
-        accessibilityLabel={label}
-        onPress={() => onInsert(label)}
+        accessibilityLabel={SPOKEN_KEY[key] ?? key}
+        onPress={() => onInsert(key)}
         style={({ pressed }) => [styles.key, styles.digitKey, pressed && styles.digitKeyPressed]}
       >
-        <Text style={styles.digitLabel}>{label}</Text>
+        <Text
+          style={[styles.digitLabel, key === "000" && styles.thousandsLabel]}
+          maxFontSizeMultiplier={KEY_LABEL_MAX_FONT_SCALE}
+          numberOfLines={1}
+        >
+          {key}
+        </Text>
       </Pressable>
     </KeyColumn>
   );
 
-  const operatorKey = (glyph: string) => (
+  const operatorKey = (glyph: KeypadKey) => (
     <KeyColumn key={glyph}>
       <Pressable
         testID={keyId(glyph)}
         accessibilityRole="button"
-        accessibilityLabel={glyph}
+        accessibilityLabel={SPOKEN_KEY[glyph] ?? glyph}
         onPress={() => onInsert(glyph)}
         style={({ pressed }) => [styles.key, styles.operatorKey, pressed && styles.operatorKeyPressed]}
       >
-        <Text style={styles.operatorLabel}>{glyph}</Text>
+        <Text style={styles.operatorLabel} maxFontSizeMultiplier={KEY_LABEL_MAX_FONT_SCALE}>
+          {glyph}
+        </Text>
       </Pressable>
     </KeyColumn>
   );
@@ -106,12 +138,13 @@ export function CalculatorKeypad({
           </View>
         ))}
         <View style={styles.row}>
-          {LAST_ROW_DIGITS.map(digitKey)}
+          {digitKey(decimalKey)}
+          {digitKey("0")}
           <KeyColumn>
             <Pressable
               testID={keyId("backspace")}
               accessibilityRole="button"
-              accessibilityLabel="Xóa một ký tự"
+              accessibilityLabel="Xóa"
               accessibilityHint={onClear ? "Nhấn giữ để xóa hết" : undefined}
               onPress={onBackspace}
               onLongPress={onClear}
@@ -135,7 +168,7 @@ export function CalculatorKeypad({
           >
             <CalendarIcon size={16} color={colors.onGreen} strokeWidth={2.25} />
             {dateLabel ? (
-              <Text style={styles.dateLabel} numberOfLines={2}>
+              <Text style={styles.dateLabel} numberOfLines={2} maxFontSizeMultiplier={DATE_LABEL_MAX_FONT_SCALE}>
                 {dateLabel}
               </Text>
             ) : null}
@@ -182,8 +215,12 @@ const styles = StyleSheet.create({
   digitKey: { backgroundColor: "rgba(255,255,255,0.06)", borderColor: colors.surfaceBorder },
   digitKeyPressed: { backgroundColor: "rgba(255,255,255,0.14)" },
   digitLabel: { ...typography.title, color: colors.textPrimary },
-  operatorKey: { backgroundColor: `${colors.green}0F`, borderColor: `${colors.green}66` },
-  operatorKeyPressed: { backgroundColor: `${colors.green}2E` },
+  thousandsLabel: { ...typography.cardTitle },
+  operatorKey: {
+    backgroundColor: withAlpha(colors.green, OPERATOR_IDLE_ALPHA),
+    borderColor: withAlpha(colors.green, OPERATOR_BORDER_ALPHA),
+  },
+  operatorKeyPressed: { backgroundColor: withAlpha(colors.green, OPERATOR_PRESSED_ALPHA) },
   operatorLabel: { ...typography.title, color: colors.green },
   actionKey: {
     flex: 1,

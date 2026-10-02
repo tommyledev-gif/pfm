@@ -39,25 +39,29 @@ func (q *Queries) CreateChatMessage(ctx context.Context, arg CreateChatMessagePa
 const listRecentChatMessagesByConversation = `-- name: ListRecentChatMessagesByConversation :many
 SELECT id, user_id, conversation_id, role, content, intent, transaction_ids, created_at FROM chat_messages
 WHERE conversation_id = $1
+  AND user_id = $2
 ORDER BY created_at DESC
-LIMIT $2
+LIMIT $3
 `
 
 type ListRecentChatMessagesByConversationParams struct {
 	ConversationID uuid.UUID
+	UserID         uuid.UUID
 	Limit          int32
 }
 
-// Most-recent-first, capped at $2 — ChatService reverses this back to
+// Most-recent-first, capped at $3 — ChatService reverses this back to
 // chronological order before handing it to the AI Service as conversation
 // history, so a follow-up message (e.g. "20k" after "mua cà phê") can be
 // disambiguated using what was already said instead of being judged in
-// isolation. Not scoped by user_id: conversation_id is a server-generated
-// UUIDv4 ChatService itself created and only ever hands back to its own
-// caller (see Chat()'s own conversationID handling) — there is no path by
-// which a caller can supply another user's conversation_id.
+// isolation.
+// ⚠️ Scoped by user_id on purpose. conversation_id is NOT server-only: the
+// request DTO accepts it (dto.ChatRequest.ConversationID) and ChatService
+// uses it as given, so without this filter anyone holding another User's
+// conversation_id would get that User's messages fed into their own model
+// context — and read back to them by the model.
 func (q *Queries) ListRecentChatMessagesByConversation(ctx context.Context, arg ListRecentChatMessagesByConversationParams) ([]ChatMessage, error) {
-	rows, err := q.db.Query(ctx, listRecentChatMessagesByConversation, arg.ConversationID, arg.Limit)
+	rows, err := q.db.Query(ctx, listRecentChatMessagesByConversation, arg.ConversationID, arg.UserID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}

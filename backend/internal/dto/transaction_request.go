@@ -20,7 +20,11 @@ type CreateTransactionRequest struct {
 	// system transfer Category (model.SystemKeyTransfer) — so it is only
 	// required for income/expense.
 	CategoryID uuid.UUID `json:"category_id" validate:"required_unless=Type transfer"`
-	Amount     int64     `json:"amount" validate:"required,gt=0"`
+	// Integer cents, at most 99_999_999_999_999 (common.MaxTransactionAmountCents;
+	// a tag cannot reference the constant, so keep the two in step) — the same
+	// ceiling the mobile keypad stops at, so the client never offers an amount
+	// the server would refuse. Never trusted from the client either way.
+	Amount     int64     `json:"amount" validate:"required,gt=0,lte=99999999999999"`
 	Type       string    `json:"type" validate:"required,oneof=income expense transfer"`
 	// ToWalletID is the destination Wallet of a transfer (WalletID is the
 	// source). Required for a transfer, rejected by the service otherwise.
@@ -44,7 +48,7 @@ type CreateTransactionRequest struct {
 // precedent. OccurredAt is a string for the same reason as
 // CreateTransactionRequest's.
 type UpdateTransactionRequest struct {
-	Amount     *int64     `json:"amount" validate:"omitempty,gt=0"`
+	Amount     *int64     `json:"amount" validate:"omitempty,gt=0,lte=99999999999999"`
 	CategoryID *uuid.UUID `json:"category_id"`
 	OccurredAt *string    `json:"occurred_at"`
 	Note       *string    `json:"note" validate:"omitempty,max=500"`

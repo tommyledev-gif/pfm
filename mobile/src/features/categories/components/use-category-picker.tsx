@@ -34,6 +34,10 @@ export function useCategoryPicker({
 }: UseCategoryPickerOptions) {
   const [visible, setVisible] = useState(false);
   const [draft, setDraft] = useState<string[]>(selectedIds);
+  // Creating a category takes the whole panel: the list, its search and the
+  // footer step aside, and the header's back returns to the list instead of
+  // closing — leaving mid-form must not throw the User out of the picker.
+  const [creating, setCreating] = useState(false);
 
   // No effect resyncs `draft` from `selectedIds` — open() below already seeds
   // it at the only moment it matters, and an effect doing the same job was an
@@ -44,6 +48,7 @@ export function useCategoryPicker({
   // transaction form).
   const open = useCallback(() => {
     setDraft(selectedIds);
+    setCreating(false);
     setVisible(true);
   }, [selectedIds]);
 
@@ -71,12 +76,21 @@ export function useCategoryPicker({
 
   const child: DrawerChild = {
     visible,
-    onClose: close,
-    title,
+    onClose: creating ? () => setCreating(false) : close,
+    title: creating ? "Danh mục mới" : title,
     children: (
-      <CategoryPickerList categories={categories} selectedIds={draft} onToggle={toggle} multiple={multiple} />
+      <CategoryPickerList
+        categories={categories}
+        selectedIds={draft}
+        onToggle={toggle}
+        multiple={multiple}
+        creating={creating}
+        onCreatingChange={setCreating}
+      />
     ),
-    footer: (
+    // Nothing to confirm while the form is open — and every pixel it frees
+    // is one the keyboard does not have to take from the form.
+    footer: creating ? undefined : (
       <>
         <PillButton label="Bỏ chọn" variant="outline" onPress={() => setDraft([])} style={{ flex: 1 }} />
         <PillButton

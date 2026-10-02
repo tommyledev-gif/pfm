@@ -55,8 +55,22 @@ interface SavedPlanState {
   // deciding a user has no saved plan — treating "not loaded yet" as "nothing
   // saved" would silently start them from zero on a cold launch.
   hydrated: boolean;
+  /**
+   * The User this device's plan belongs to. AsyncStorage is per device, not
+   * per account: without it, whoever logs in next on the same phone would be
+   * offered the previous User's income and costs. null = saved before this
+   * field existed.
+   */
+  ownerId: string | null;
   savePlan: (plan: SavedBudgetPlan) => void;
   clearPlan: () => void;
+  /**
+   * Hands the store to `userId` (stores/session-scoped-reset.ts, at every
+   * session start). Someone else's plan is dropped; an unowned one is kept
+   * only when `adoptUnowned` — a session restored on launch is the same
+   * person who saved it, a fresh login could be anyone.
+   */
+  claimFor: (userId: string, adoptUnowned: boolean) => void;
 }
 
 export const useSavedBudgetPlanStore = create<SavedPlanState>()(
@@ -64,19 +78,28 @@ export const useSavedBudgetPlanStore = create<SavedPlanState>()(
     (set) => ({
       plan: null,
       hydrated: false,
+      ownerId: null,
       savePlan: (plan) => set({ plan }),
       clearPlan: () => set({ plan: null }),
+      claimFor: (userId, adoptUnowned) =>
+        set((state) => {
+          if (state.ownerId === userId) return state;
+          const keep = state.ownerId === null && adoptUnowned;
+          return { ownerId: userId, plan: keep ? state.plan : null };
+        }),
     }),
     {
       name: "pfm_budget_plan",
       storage: createJSONStorage(() => AsyncStorage),
+      // A plan persisted before ownerId existed simply rehydrates with the
+      // default null (persist's shallow merge), so no version bump is owed.
       version: 1,
-      partialize: (state) => ({ plan: state.plan }),
+      partialize: (state) => ({ plan: state.plan, ownerId: state.ownerId }),
       onRehydrateStorage: () => (state) => {
         // `state` is the store after rehydration — undefined only if reading
         // storage threw, in which case there is nothing to restore and the
         // wizard should stop waiting for one.
-        useSavedBudgetPlanStore.setState({ hydrated: true, plan: state?.plan ?? null });
+        useSavedBudgetPlanStore.setState({ hydrated: true, plan: state?.plan ?? null, ownerId: state?.ownerId ?? null });
       },
     },
   ),

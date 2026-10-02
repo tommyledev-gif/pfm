@@ -1,7 +1,11 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useMemo, useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
 
-import { Avatar } from "@/components/ui/Avatar";
+import { CategoryOptionRow } from "@/components/shared/CategoryOptionRow";
 import { Drawer } from "@/components/shared/Drawer";
+import { DrawerHeader } from "@/components/shared/DrawerHeader";
+import { SearchField } from "@/components/ui/SearchField";
+import { matchesSearch } from "@/lib/search-text";
 import { colors, spacing, typography } from "@/lib/theme";
 
 export interface CategoryPickerOption {
@@ -20,39 +24,55 @@ interface CategoryPickerDrawerProps {
   onSelect: (id: string) => void;
 }
 
+// Below this many options a search field is one more thing to look past;
+// above it, scanning the list by eye is slower than typing two letters.
+const SEARCH_MIN_OPTIONS = 8;
+
 // Opened by a 2s hold on a Spending legend row or Budget card (README:
 // "hold 2s ... display a Drawer slideup display list of categories like in
-// transactions.tsx when filtered categories") — visually modeled on
-// CategoryFilterModal's Drawer + Avatar-plus-label row, but single-select:
-// tapping a row acts immediately and closes, there's no checkbox/Apply step.
+// transactions.tsx when filtered categories") — single-select: tapping a row
+// acts immediately and closes, there's no checkbox/Apply step.
+//
+// Same row, search and header as the form's category picker
+// (CategoryPickerList), so the two never read as different lists.
 export function CategoryPickerDrawer({ visible, onClose, title = "Chọn danh mục", categories, onSelect }: CategoryPickerDrawerProps) {
+  const [search, setSearch] = useState("");
+  const shown = useMemo(() => categories.filter((c) => matchesSearch(c.name, search)), [categories, search]);
+
+  const close = () => {
+    setSearch("");
+    onClose();
+  };
+
   return (
-    <Drawer visible={visible} onClose={onClose}>
-      <Text style={styles.title}>{title}</Text>
-      <View style={styles.section}>
-        {categories.map((c) => (
-          <Pressable
-            key={c.id}
-            style={styles.row}
-            onPress={() => {
-              onSelect(c.id);
-              onClose();
-            }}
-          >
-            <Avatar name={c.name} color={c.color} size={36} icon={c.icon} iconUrl={c.iconUrl} />
-            <Text style={styles.rowLabel} numberOfLines={1}>
-              {c.name}
-            </Text>
-          </Pressable>
-        ))}
+    <Drawer visible={visible} onClose={close}>
+      <DrawerHeader title={title} actions={[{ label: "Đóng", variant: "secondary", onPress: close }]} />
+      {categories.length >= SEARCH_MIN_OPTIONS ? (
+        <SearchField value={search} onChangeText={setSearch} placeholder="Tìm danh mục" />
+      ) : null}
+      <View>
+        {shown.length === 0 ? (
+          <Text style={styles.empty}>Không có danh mục nào khớp.</Text>
+        ) : (
+          shown.map((c) => (
+            <CategoryOptionRow
+              key={c.id}
+              name={c.name}
+              color={c.color}
+              icon={c.icon}
+              iconUrl={c.iconUrl}
+              onPress={() => {
+                onSelect(c.id);
+                close();
+              }}
+            />
+          ))
+        )}
       </View>
     </Drawer>
   );
 }
 
 const styles = StyleSheet.create({
-  title: { ...typography.title, color: colors.textPrimary },
-  section: { gap: spacing.xs },
-  row: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm },
-  rowLabel: { flex: 1, ...typography.body, color: colors.textPrimary },
+  empty: { ...typography.body, color: colors.textSecondary, textAlign: "center", paddingVertical: spacing.xxl },
 });

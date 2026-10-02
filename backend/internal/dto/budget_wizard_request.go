@@ -35,12 +35,14 @@ type CategoryIntentRequest struct {
 
 // BudgetProposalsRequest is the body of POST /ai/budget-proposals.
 //
-// ⚠️ Every amount is xu. The income cap is 999_999_999_900 xu = 9.999.999.999đ.
-// v1's tag read `lte=9999999999`, which is that figure in đồng sitting in a xu
-// field — so the real ceiling was about 100 triệu/tháng, and anyone above it was
-// rejected with a validation error they had no way to interpret.
+// ⚠️ Every amount is xu. The income cap is 1_000_000_000_000 xu = 10 tỷ đ
+// (common.BudgetWizardIncomeCapXu — a tag cannot reference the constant, so
+// keep the two in step). v1's tag read `lte=9999999999`, which is a đồng figure
+// sitting in a xu field — so the real ceiling was about 100 triệu/tháng, and
+// anyone above it was rejected with a validation error they had no way to
+// interpret.
 type BudgetProposalsRequest struct {
-	Income        int64 `json:"income" validate:"required,gt=0,lte=999999999900"`
+	Income        int64 `json:"income" validate:"required,gt=0,lte=1000000000000"`
 	FixedTotal    int64 `json:"fixed_total" validate:"gte=0"`
 	SavingsTarget int64 `json:"savings_target" validate:"gte=0"`
 

@@ -45,6 +45,31 @@ func TestChatService_Chat_ZeroWallets_ShortCircuits(t *testing.T) {
 	}
 }
 
+// A conversation_id is client-supplied, so it is not proof of ownership:
+// sending another User's conversation_id must never pull that User's
+// messages into this caller's model context.
+func TestChatService_Chat_ForeignConversationID_HistoryNotLeaked(t *testing.T) {
+	ai := &fakeAIServiceClient{err: errFakeAIServiceUnavailable}
+	svc, chatRepo, walletRepo, _ := newTestChatService(t, ai)
+	victimID := uuid.New()
+	attackerID := uuid.New()
+	conversationID := uuid.New()
+	walletID := uuid.New()
+	walletRepo.wallets[walletID] = &model.Wallet{ID: walletID, UserID: attackerID, Name: "Cash", IsDefault: true, Currency: "VND"}
+	chatRepo.messages = append(chatRepo.messages, &model.ChatMessage{
+		ID: uuid.New(), UserID: victimID, ConversationID: conversationID, Role: model.ChatRoleUser, Content: "luong thang nay 40tr",
+	})
+
+	_, _ = svc.Chat(context.Background(), attackerID, dto.ChatRequest{Message: "an trua 50k", ConversationID: &conversationID})
+
+	if ai.calls != 1 {
+		t.Fatalf("expected the AI Service to be called once, got %d", ai.calls)
+	}
+	if len(ai.lastReq.History) != 0 {
+		t.Fatalf("expected no history from another User's conversation, got %+v", ai.lastReq.History)
+	}
+}
+
 // S-AI-10: an AI Service failure surfaces as ErrAIServiceUnavailable, never a
 // raw error, and the user's message is still persisted.
 func TestChatService_Chat_AIServiceUnavailable(t *testing.T) {
