@@ -2,6 +2,7 @@ import { useId } from "react";
 import { Defs, LinearGradient, Stop } from "react-native-svg";
 
 import { Circle, IconProps, Line, Path, Svg, base } from "@/components/ui/icons/primitives";
+import { colors } from "@/lib/theme";
 
 // Chat-mode glyphs (features/ai-chat/chat-mode.ts) — each one says what its
 // mode is FOR rather than being a generic shape: a receipt for recording, a
@@ -16,7 +17,7 @@ function useGradientId(prefix: string) {
 }
 
 /** Ghi giao dịch — a receipt with a "+" badge. */
-export function ReceiptIcon({ size, color = "#fff", strokeWidth = 1.8 }: IconProps) {
+export function ReceiptIcon({ size, color = colors.textPrimary, strokeWidth = 1.8 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Path
@@ -36,7 +37,7 @@ export function ReceiptIcon({ size, color = "#fff", strokeWidth = 1.8 }: IconPro
 }
 
 /** Lập ngân sách — a target with an arrow in its centre. */
-export function TargetIcon({ size, color = "#fff", strokeWidth = 1.8 }: IconProps) {
+export function TargetIcon({ size, color = colors.textPrimary, strokeWidth = 1.8 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Circle cx="11" cy="13" r="8" stroke={color} strokeWidth={strokeWidth} />
@@ -60,7 +61,7 @@ interface InsightIconProps extends IconProps {
 }
 
 /** Hỏi phân tích — rising bars with a lightbulb: AI insight on your data. */
-export function InsightIcon({ size, color = "#fff", toColor, strokeWidth = 1.8 }: InsightIconProps) {
+export function InsightIcon({ size, color = colors.textPrimary, toColor, strokeWidth = 1.8 }: InsightIconProps) {
   const gradientId = useGradientId("insight");
   const paint = toColor ? `url(#${gradientId})` : color;
   return (
@@ -91,7 +92,7 @@ export function InsightIcon({ size, color = "#fff", toColor, strokeWidth = 1.8 }
 }
 
 /** A small check inside a filled circle — the "selected" mark. */
-export function CheckCircleIcon({ size, color = "#85FF33", checkColor = "#06130A" }: IconProps & { checkColor?: string }) {
+export function CheckCircleIcon({ size, color = colors.green, checkColor = colors.onGreen }: IconProps & { checkColor?: string }) {
   return (
     <Svg {...base(size)} fill="none">
       <Circle cx="12" cy="12" r="10" fill={color} />
@@ -101,7 +102,7 @@ export function CheckCircleIcon({ size, color = "#85FF33", checkColor = "#06130A
 }
 
 /** The keypad's delete-last key: a left-pointing key cap with an ×. */
-export function BackspaceIcon({ size, color = "#F5F6F8", strokeWidth = 1.8 }: IconProps) {
+export function BackspaceIcon({ size, color = colors.textPrimary, strokeWidth = 1.8 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Path

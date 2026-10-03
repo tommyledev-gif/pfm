@@ -1,10 +1,10 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
-import { Animated, BackHandler, Dimensions, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Animated, BackHandler, Dimensions, Pressable, ScrollView, View } from "react-native";
 
 import { DrawerChildPanel } from "@/components/shared/DrawerChildPanel";
 import { SheetHandle } from "@/components/shared/SheetHandle";
 import { useSheetDrag } from "@/components/shared/use-sheet-drag";
-import { colors, radii, spacing } from "@/lib/theme";
+import { radii, spacing, createStyles } from "@/lib/theme";
 import { useKeyboardHeight } from "@/lib/use-keyboard-height";
 import { useSheetStore } from "@/stores/sheet-store";
 
@@ -86,6 +86,7 @@ interface DrawerProps {
 const OFFSCREEN_Y = Dimensions.get("window").height;
 
 export function Drawer({ visible, onClose, children, footer, child }: DrawerProps) {
+  const styles = useStyles();
   const keyboardHeight = useKeyboardHeight();
   // Kept mounted for the duration of the close animation — flipping
   // straight to `if (!visible) return null` would unmount mid-slide-down
@@ -219,7 +220,7 @@ export function Drawer({ visible, onClose, children, footer, child }: DrawerProp
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   anchor: { position: "absolute", left: 0, top: 0, width: 0, height: 0 },
   overlay: { position: "absolute", zIndex: 1000, elevation: 1000 },
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
@@ -252,4 +253,4 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.surfaceBorder,
   },
-});
+}));

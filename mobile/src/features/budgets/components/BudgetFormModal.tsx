@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { AmountInput } from "@/components/ui/AmountInput";
 import { Avatar } from "@/components/ui/Avatar";
@@ -13,7 +13,8 @@ import { TrashIcon } from "@/components/ui/Icon";
 import { getErrorMessage } from "@/lib/axios";
 import { colorForCategory } from "@/lib/category-color";
 import { toCents, toMajorUnits } from "@/lib/currency";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useCategoryPicker } from "@/features/categories/components/use-category-picker";
 import { useCreateBudgetMutation } from "@/features/budgets/api/use-create-budget-mutation";
@@ -51,6 +52,8 @@ interface BudgetFormModalProps {
 // before — that row rendered every expense category at once with no way to find
 // one, which is unusable past a dozen.
 export function BudgetFormModal({ visible, onClose, currency, editingBudget }: BudgetFormModalProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const isEditing = Boolean(editingBudget);
   const categories = useCategoriesQuery("expense");
   const createBudget = useCreateBudgetMutation();
@@ -193,7 +196,7 @@ export function BudgetFormModal({ visible, onClose, currency, editingBudget }: B
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   label: { ...typography.caption, color: colors.textSecondary },
   iconHint: { ...typography.tiny, color: colors.textMuted },
   lockedCategory: {
@@ -202,7 +205,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     padding: spacing.md,
     borderRadius: radii.listCard,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     opacity: 0.7,
@@ -213,4 +216,4 @@ const styles = StyleSheet.create({
   flexButton: { flex: 1 },
   deleteRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, paddingVertical: spacing.sm },
   deleteLabel: { ...typography.body, color: colors.peach },
-});
+}));

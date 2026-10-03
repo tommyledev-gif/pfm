@@ -1,11 +1,11 @@
 import { useMemo } from "react";
-import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, SectionList, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { ChevronLeftIcon } from "@/components/ui/Icon";
 import { Screen } from "@/components/shared/Screen";
 import { dayLabelVi, formatDateViShort } from "@/lib/format-date";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { AuditLogRow } from "@/features/audit-logs/components/AuditLogRow";
 import { useAuditLogsQuery } from "@/features/audit-logs/api/use-audit-logs-query";
 import { AuditLogEntry } from "@/features/audit-logs/types";
@@ -25,6 +25,8 @@ interface DaySection {
 // Read-only by design: no undo/restore affordance anywhere on this screen —
 // the log is history, not a time machine (that spec's Out of Scope).
 export default function AuditLogsScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const auditLogs = useAuditLogsQuery();
   const categories = useCategoriesQuery();
@@ -122,7 +124,7 @@ export default function AuditLogsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bgApp },
   header: {
     flexDirection: "row",
@@ -141,4 +143,4 @@ const styles = StyleSheet.create({
   dayHeaderDate: { ...typography.tiny, color: colors.textMuted },
   loader: { marginVertical: spacing.lg },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xxl },
-});
+}));

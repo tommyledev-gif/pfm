@@ -1,6 +1,7 @@
 import { Animated, StyleSheet, View } from "react-native";
 
-import { colors } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { colors, createStyles } from "@/lib/theme";
 import { useEntryAnimation } from "@/lib/use-entry-animation";
 
 interface BudgetProgressBarProps {
@@ -18,11 +19,6 @@ interface BudgetProgressBarProps {
 // thing this bar exists to show — has to be inferred from a colour change.
 const SEAM_WIDTH = 2;
 
-// The budget's own share of the bar once it is overspent, drawn soft; the
-// overspend after it is drawn solid, so the loud part is the part that's wrong.
-const OVER_BASE_COLOR = "rgba(255,158,150,0.45)";
-const OVER_EXCESS_COLOR = colors.danger;
-
 // A budget bar, which the plain ProgressBar can't express: it shows how much
 // is spent, where the period's pace marker sits (so "80% used" reads
 // differently on the 5th than on the 25th), and how far past the limit an
@@ -37,6 +33,7 @@ const OVER_EXCESS_COLOR = colors.danger;
 // is the overspend (solid red). Scale is relative to what was spent, so the
 // red share IS the overspent share. No pattern — solid colour carries it.
 export function BudgetProgressBar({ ratio, pace, color, height = 8 }: BudgetProgressBarProps) {
+  const styles = useStyles();
   const over = ratio > 1;
   const fill = Math.max(0, Math.min(1, ratio));
   // Where the limit falls along a full, overspent bar.
@@ -57,12 +54,14 @@ export function BudgetProgressBar({ ratio, pace, color, height = 8 }: BudgetProg
         style={[styles.spend, { borderRadius: radius, transform: [{ scaleX: grow }] }]}
       >
         {over ? (
+          // The budget's own share drawn soft, the overspend after it solid —
+          // so the loud part is the part that's wrong.
           <>
             <View
-              style={[styles.segment, { left: 0, width: `${limitMark * 100}%`, backgroundColor: OVER_BASE_COLOR }]}
+              style={[styles.segment, { left: 0, width: `${limitMark * 100}%`, backgroundColor: withAlpha(colors.peach, 0.45) }]}
             />
             <View
-              style={[styles.segment, { left: `${limitMark * 100}%`, right: 0, backgroundColor: OVER_EXCESS_COLOR }]}
+              style={[styles.segment, { left: `${limitMark * 100}%`, right: 0, backgroundColor: colors.danger }]}
             />
             <View
               pointerEvents="none"
@@ -93,7 +92,7 @@ export function BudgetProgressBar({ ratio, pace, color, height = 8 }: BudgetProg
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   track: { width: "100%", backgroundColor: colors.trackMuted, overflow: "visible", justifyContent: "center" },
   // Clips the square segment ends to the bar's rounded shape.
   spend: { ...StyleSheet.absoluteFillObject, overflow: "hidden", transformOrigin: "left" },
@@ -105,4 +104,4 @@ const styles = StyleSheet.create({
   // Sits proud of the bar on both edges so it stays legible over a filled
   // section as well as over the empty track.
   pace: { position: "absolute", width: 2, backgroundColor: colors.textSecondary, borderRadius: 1 },
-});
+}));

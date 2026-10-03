@@ -1,6 +1,7 @@
-import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
+import { Pressable, ScrollView, Text } from "react-native";
 
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
 
 interface WalletChipRowProps {
@@ -13,6 +14,7 @@ interface WalletChipRowProps {
 // A horizontally scrolling single-select row of wallet chips — the source
 // wallet on every transaction form, and the destination on a transfer.
 export function WalletChipRow({ wallets, selectedId, onSelect, locked }: WalletChipRowProps) {
+  const styles = useStyles();
   return (
     <ScrollView
       horizontal
@@ -33,7 +35,7 @@ export function WalletChipRow({ wallets, selectedId, onSelect, locked }: WalletC
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   // flexGrow 0: a horizontal ScrollView otherwise grows along the column.
   scroll: { flexGrow: 0 },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
@@ -46,7 +48,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 14,
     borderRadius: radii.pill,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
   },
@@ -54,4 +56,4 @@ const styles = StyleSheet.create({
   chipDisabled: { opacity: 0.5 },
   label: { ...typography.caption, color: colors.textSecondary },
   labelActive: { color: colors.onGreen },
-});
+}));

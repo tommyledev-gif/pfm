@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { StyleSheet, Text, TextInput, View } from "react-native";
+import { Text, TextInput, View } from "react-native";
 
 import { Drawer } from "@/components/shared/Drawer";
 import { PillButton } from "@/components/ui/PillButton";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 interface EditMessageModalProps {
   visible: boolean;
@@ -26,6 +27,8 @@ interface EditMessageModalProps {
 // animation even settled). autoFocus is dropped for the same reason no other
 // form in the app uses it — the user taps in deliberately.
 export function EditMessageModal({ visible, initialText, onCancel, onSave }: EditMessageModalProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const [text, setText] = useState(initialText);
 
   useEffect(() => {
@@ -57,12 +60,12 @@ export function EditMessageModal({ visible, initialText, onCancel, onSave }: Edi
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   title: { ...typography.title, color: colors.textPrimary },
   input: {
     minHeight: 44,
     maxHeight: 160,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     borderRadius: radii.listCard,
@@ -73,4 +76,4 @@ const styles = StyleSheet.create({
   },
   actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
   flexButton: { flex: 1 },
-});
+}));

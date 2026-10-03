@@ -1,6 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { colors, radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { BudgetPaceState } from "@/features/budgets/budget-pace";
 
 export type BudgetFilterKey = "all" | "at-risk" | "over";
@@ -17,9 +17,9 @@ export const BUDGET_FILTERS: {
    *  disagrees with the rows beneath it contradicts the screen. */
   color: string;
 }[] = [
-  { key: "all", label: "Tất cả", states: null, color: colors.green },
-  { key: "at-risk", label: "Sắp vượt", states: ["at-risk"], color: colors.mustard },
-  { key: "over", label: "Đã vượt", states: ["over"], color: colors.peach },
+  { key: "all", label: "Tất cả", states: null, get color() { return colors.green; } },
+  { key: "at-risk", label: "Sắp vượt", states: ["at-risk"], get color() { return colors.mustard; } },
+  { key: "over", label: "Đã vượt", states: ["over"], get color() { return colors.peach; } },
 ];
 
 interface BudgetFilterChipsProps {
@@ -39,6 +39,8 @@ interface BudgetFilterChipsProps {
  * Colour is never the only signal — every chip keeps its label and its count.
  */
 export function BudgetFilterChips({ value, onChange, counts }: BudgetFilterChipsProps) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.row}>
       {BUDGET_FILTERS.map((filter) => {
@@ -76,7 +78,7 @@ export function BudgetFilterChips({ value, onChange, counts }: BudgetFilterChips
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   row: { flexDirection: "row", gap: spacing.sm, paddingVertical: spacing.lg },
   chip: {
     paddingVertical: 8,
@@ -104,4 +106,4 @@ const styles = StyleSheet.create({
   },
   badgeLabel: { ...typography.tiny, color: colors.textSecondary },
   badgeLabelActive: { color: colors.onGreen },
-});
+}));

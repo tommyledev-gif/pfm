@@ -1,7 +1,7 @@
-import { Pressable, StyleSheet, TextInput, View } from "react-native";
+import { Pressable, TextInput, View } from "react-native";
 
 import { CloseIcon, SearchIcon } from "@/components/ui/Icon";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 interface SearchFieldProps {
   value: string;
@@ -21,6 +21,8 @@ const FIELD_HEIGHT = 44;
  * something to clear.
  */
 export function SearchField({ value, onChangeText, placeholder, testID, autoCorrect }: SearchFieldProps) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.field}>
       <SearchIcon size={18} color={colors.textMuted} />
@@ -44,7 +46,7 @@ export function SearchField({ value, onChangeText, placeholder, testID, autoCorr
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   field: {
     flexDirection: "row",
     alignItems: "center",
@@ -55,4 +57,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceRaised,
   },
   input: { flex: 1, paddingVertical: 0, color: colors.textPrimary, ...typography.body },
-});
+}));

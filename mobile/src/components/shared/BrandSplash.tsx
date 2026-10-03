@@ -3,7 +3,7 @@ import { Animated, Image, StyleSheet } from "react-native";
 import * as SplashScreen from "expo-splash-screen";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles } from "@/lib/theme";
 
 const LOGO = require("../../../assets/splash-icon.png");
 
@@ -37,6 +37,7 @@ const FADE_OUT_MS = 260;
  * bare background with no logo on it.
  */
 export function BrandSplash({ ready }: { ready: boolean }) {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const opacity = useRef(new Animated.Value(1)).current;
   const wordmarkOpacity = useRef(new Animated.Value(0)).current;
@@ -85,7 +86,7 @@ export function BrandSplash({ ready }: { ready: boolean }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   root: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: colors.splashBg,
@@ -105,4 +106,4 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     color: colors.textPrimary,
   },
-});
+}));

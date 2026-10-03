@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { DateData } from "react-native-calendars";
 
 import { Drawer } from "@/components/shared/Drawer";
 import { MonthYearCalendar } from "@/components/shared/MonthYearCalendar";
 import { PillButton } from "@/components/ui/PillButton";
 import { formatDateShort } from "@/lib/format-date";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 interface SingleDatePickerModalProps {
   visible: boolean;
@@ -21,6 +21,8 @@ interface SingleDatePickerModalProps {
 // "YYYY-MM-DD" string directly (backend/internal/dto/transaction_request.go),
 // no time suffix needed.
 export function SingleDatePickerModal({ visible, onClose, value, onApply }: SingleDatePickerModalProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const [selected, setSelected] = useState(value);
 
   // ⚠️ Re-seeded from the caller's applied value on every open. Without this a
@@ -56,10 +58,10 @@ export function SingleDatePickerModal({ visible, onClose, value, onApply }: Sing
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   title: { ...typography.title, color: colors.textPrimary },
   subtitle: { ...typography.caption, color: colors.textSecondary },
   calendar: { borderRadius: radii.listCard },
   actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
   flexButton: { flex: 1 },
-});
+}));

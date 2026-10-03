@@ -1,9 +1,8 @@
-import { StyleSheet, View } from "react-native";
+import { View } from "react-native";
 import { Stack, usePathname } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 
 import { BottomNav } from "@/components/shared/BottomNav";
-import { colors } from "@/lib/theme";
+import { createStyles } from "@/lib/theme";
 import { useKeyboardVisible } from "@/lib/use-keyboard-height";
 import { usePrefetchRecordIcons } from "@/lib/use-prefetch-record-icons";
 import { useSheetStore } from "@/stores/sheet-store";
@@ -16,6 +15,7 @@ import { useSheetStore } from "@/stores/sheet-store";
 const ROUTES_WITHOUT_NAV = ["/notifications", "/pending"];
 
 export default function AppLayout() {
+  const styles = useStyles();
   const pathname = usePathname();
   // Signed-in area only — the lists it reads need a session.
   usePrefetchRecordIcons();
@@ -36,7 +36,6 @@ export default function AppLayout() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
       {/* Tab-to-tab switching (and its fade) lives in (tabs)/_layout.tsx;
           this stack only carries the pushed sub-screens above the tabs. */}
       <Stack screenOptions={{ headerShown: false, animation: "fade" }} />
@@ -45,6 +44,6 @@ export default function AppLayout() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   container: { flex: 1, backgroundColor: colors.bgApp },
-});
+}));

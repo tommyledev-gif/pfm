@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { AmountPromptModal } from "@/components/ui/AmountPromptModal";
 import {
@@ -9,7 +9,8 @@ import {
   roundStepXu,
 } from "@/features/budget-wizard/budget-math";
 import { formatCurrency } from "@/lib/currency";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 
 interface WizardSavingsFieldProps {
   currency: string;
@@ -36,6 +37,7 @@ export function WizardSavingsField({
   onChange,
   errorMessage,
 }: WizardSavingsFieldProps) {
+  const styles = useStyles();
   const [promptOpen, setPromptOpen] = useState(false);
 
   return (
@@ -104,7 +106,7 @@ export function WizardSavingsField({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   field: { gap: spacing.xs },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
   label: { ...typography.caption, color: colors.textSecondary },
@@ -118,9 +120,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
   },
-  chipActive: { borderColor: colors.green, backgroundColor: "rgba(133,255,51,0.08)" },
+  chipActive: { borderColor: colors.green, backgroundColor: withAlpha(colors.green, 0.08) },
   chipLabel: { ...typography.caption, color: colors.textSecondary },
   chipLabelActive: { color: colors.green },
   hint: { ...typography.tiny, color: colors.textMuted },
   error: { ...typography.caption, color: colors.mustard },
-});
+}));

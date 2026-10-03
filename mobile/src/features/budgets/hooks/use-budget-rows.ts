@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 
+import { useThemeName } from "@/lib/theme";
 import { WalletCurrency } from "@/lib/constants";
 import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary-query";
 import { Budget } from "@/features/budgets/types";
@@ -84,6 +85,8 @@ export function useBudgetRows({
   }, [resolvedRange]);
 
 
+  // A dependency of the memo below: each row's status carries a resolved color.
+  const themeName = useThemeName();
   const rows = useMemo(() => {
     const all = (budgets ?? [])
       .flatMap((budget) => budget.limits.map((limit) => ({ budget, limit })))
@@ -126,7 +129,9 @@ export function useBudgetRows({
     // something that changes at midnight every row's tick would freeze at
     // whatever it was when the screen mounted.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [budgets, currency, paceElapsed, rangeActive, rangeDayCount, rangeElapsed, spentByCategory]);
+    // themeName is read only through budgetRowStatus's colors.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [budgets, currency, paceElapsed, rangeActive, rangeDayCount, rangeElapsed, spentByCategory, themeName]);
 
   const counts = useMemo(
     () => ({

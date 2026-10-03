@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -9,7 +9,8 @@ import { ChevronLeftIcon, CheckIcon } from "@/components/ui/Icon";
 import { PillButton } from "@/components/ui/PillButton";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { formatCurrency } from "@/lib/currency";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { EditTransactionModal } from "@/features/ai-chat/components/EditTransactionModal";
 import { PendingReviewCard } from "@/features/ai-chat/components/PendingReviewCard";
 import { useTransactionRemoval } from "@/features/ai-chat/components/use-transaction-removal";
@@ -36,6 +37,8 @@ type TypeFilter = "all" | "expense" | "income";
  * thread — see use-transaction-removal.
  */
 export default function PendingReviewScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const thread = useChatStore((s) => s.thread);
@@ -168,7 +171,7 @@ export default function PendingReviewScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -188,7 +191,7 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: radii.pill,
-    backgroundColor: "rgba(133,255,51,0.1)",
+    backgroundColor: withAlpha(colors.green, 0.1),
     alignItems: "center",
     justifyContent: "center",
     marginBottom: spacing.sm,
@@ -208,4 +211,4 @@ const styles = StyleSheet.create({
   footerSummary: { flex: 1, minWidth: 0, gap: 2 },
   footerLabel: { ...typography.tiny, color: colors.textSecondary },
   footerNet: { ...typography.cardTitle, color: colors.textPrimary },
-});
+}));

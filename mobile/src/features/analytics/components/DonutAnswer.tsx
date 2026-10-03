@@ -4,7 +4,7 @@ import { DonutChart, DonutSegment } from "@/components/shared/DonutChart";
 import { ANALYTICS_OTHER_KEY } from "@/features/analytics/constants";
 import { AnalyticsChartItem } from "@/features/analytics/types";
 import { buildCategoryColorMap } from "@/lib/category-color";
-import { colors } from "@/lib/theme";
+import { useColors } from "@/lib/theme";
 
 interface DonutAnswerProps {
   items: AnalyticsChartItem[];
@@ -18,6 +18,7 @@ const DONUT_SIZE = 168;
 // places. The "Other" slice is a fold of small Categories, not a Category,
 // so it gets a neutral colour instead of a palette slot.
 export function DonutAnswer({ items, currency }: DonutAnswerProps) {
+  const colors = useColors();
   const [selected, setSelected] = useState<string | null>(null);
 
   const segments = useMemo<DonutSegment[]>(() => {
@@ -28,7 +29,7 @@ export function DonutAnswer({ items, currency }: DonutAnswerProps) {
       amount: item.amount,
       color: item.key === ANALYTICS_OTHER_KEY ? colors.textMuted : colorMap.get(item.key) ?? colors.periwinkle,
     }));
-  }, [items]);
+  }, [items, colors]);
 
   return (
     <DonutChart

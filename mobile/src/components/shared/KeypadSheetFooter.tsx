@@ -1,8 +1,8 @@
 import { ReactNode, useEffect, useRef } from "react";
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Pressable, Text, View } from "react-native";
 
 import { useReduceMotion } from "@/lib/use-reduce-motion";
-import { colors, spacing, typography } from "@/lib/theme";
+import { colors, spacing, typography, createStyles } from "@/lib/theme";
 
 interface KeypadSheetFooterProps {
   /** Left of the amount: a summary chip or a compact picker. */
@@ -52,6 +52,7 @@ export function KeypadSheetFooter({
   errors = [],
   children,
 }: KeypadSheetFooterProps) {
+  const styles = useStyles();
   const reduceMotion = useReduceMotion();
   const shake = useRef(new Animated.Value(0)).current;
   const firstShakeKey = useRef(shakeKey);
@@ -108,7 +109,7 @@ export function KeypadSheetFooter({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   container: { gap: spacing.sm },
   summaryRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: spacing.sm },
   // The chip yields first: the amount is the one thing on this row that must
@@ -120,4 +121,4 @@ const styles = StyleSheet.create({
   preview: { ...typography.label, color: colors.textSecondary, textAlign: "right", fontVariant: ["tabular-nums"] },
   previewError: { color: colors.peach },
   error: { ...typography.caption, color: colors.peach },
-});
+}));

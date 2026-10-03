@@ -11,7 +11,7 @@ import { useCategoryLookup } from "@/features/categories/api/use-category-lookup
 import { Category } from "@/features/categories/types";
 import { formatCurrency } from "@/lib/currency";
 import { WalletCurrency } from "@/lib/constants";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles } from "@/lib/theme";
 
 interface BudgetStatusListProps {
   budgets: AnalyticsBudgetItem[];
@@ -43,6 +43,7 @@ function asBudgetLimit(b: AnalyticsBudgetItem, currency: string): BudgetLimit {
 // name for an answer stored before category_id was sent (those also carry no
 // icon of their own, which is what left them showing a bare initial).
 export function BudgetStatusList({ budgets, currency, elapsed }: BudgetStatusListProps) {
+  const styles = useStyles();
   const categories = useCategoryLookup();
   const categoryByName = useMemo(() => {
     const map = new Map<string, Category>();
@@ -103,7 +104,7 @@ export function BudgetStatusList({ budgets, currency, elapsed }: BudgetStatusLis
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   row: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md, paddingVertical: spacing.md },
   divider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.surfaceBorder },
   body: { flex: 1, gap: spacing.sm },
@@ -112,4 +113,4 @@ const styles = StyleSheet.create({
   remaining: { ...typography.body, color: colors.textPrimary },
   over: { ...typography.body, color: colors.danger },
   meta: { ...typography.caption, color: colors.textSecondary },
-});
+}));

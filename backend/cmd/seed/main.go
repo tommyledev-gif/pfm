@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/example/pfm/backend/internal/common"
 	"github.com/example/pfm/backend/internal/repository/sqlc"
 )
 
@@ -26,7 +27,9 @@ func main() {
 		log.Fatal("seed: DATABASE_URL is required")
 	}
 
-	email := os.Getenv("SEED_ADMIN_EMAIL")
+	// Normalized like every other write path — migration 023's CHECK
+	// constraint rejects a mixed-case email outright.
+	email := common.NormalizeEmail(os.Getenv("SEED_ADMIN_EMAIL"))
 	password := os.Getenv("SEED_ADMIN_PASSWORD")
 	if email == "" || password == "" {
 		log.Println("seed: SEED_ADMIN_EMAIL/SEED_ADMIN_PASSWORD not set, skipping admin bootstrap")

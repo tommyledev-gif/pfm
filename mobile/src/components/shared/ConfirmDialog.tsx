@@ -1,7 +1,7 @@
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, Text, View } from "react-native";
 
 import { PillButton } from "@/components/ui/PillButton";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 
 interface ConfirmDialogProps {
   visible: boolean;
@@ -34,6 +34,7 @@ export function ConfirmDialog({
   loading,
   tone = "destructive",
 }: ConfirmDialogProps) {
+  const styles = useStyles();
   const isDestructive = tone === "destructive";
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
@@ -57,7 +58,7 @@ export function ConfirmDialog({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center", padding: spacing.xl },
   card: {
     width: "100%",
@@ -75,4 +76,4 @@ const styles = StyleSheet.create({
   flexButton: { flex: 1 },
   destructive: { backgroundColor: colors.peach },
   destructiveLabel: { color: colors.bgApp },
-});
+}));

@@ -5,21 +5,20 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 
 import { BarChartIcon, HomeIcon, ListIcon, SparkleIcon, UserIcon } from "@/components/ui/Icon";
-import { colors } from "@/lib/theme";
+import { useColors } from "@/lib/theme";
 import {
   BALL_SIZE,
   BOB_DISTANCE,
   BOB_DURATION,
   HAIRLINE,
   ICON_BOUNCE_SCALE,
-  INACTIVE_COLOR,
   LINE_LEFT_END,
   LINE_RIGHT_START,
   PILL_HEIGHT,
   RIM_PATH,
   AURA_LEFT_OFFSET,
   AURA_TOP,
-  styles,
+  useStyles,
 } from "@/components/shared/bottom-nav-styles";
 
 export const TABS = [
@@ -51,6 +50,8 @@ const SETTINGS_SUB_ROUTES = ["/wallets", "/categories", "/users", "/audit-logs",
 // (dark cutout) behind it — they read the same Animated.Value, offset by a
 // static left, so they can never drift out of sync with each other.
 export function BottomNav() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
@@ -218,7 +219,7 @@ export function BottomNav() {
               hitSlop={8}
             >
               <Animated.View style={{ opacity: rowOpacities[index] }}>
-                <Icon size={22} color={INACTIVE_COLOR} />
+                <Icon size={22} color={colors.textSecondary} />
               </Animated.View>
             </Pressable>
           ))}

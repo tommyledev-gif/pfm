@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { RefreshControl } from "react-native";
 
-import { colors } from "@/lib/theme";
+import { useColors } from "@/lib/theme";
 
 // The only part of a TanStack Query result this needs. Typed structurally
 // rather than as UseQueryResult so a screen can mix plain queries and
@@ -33,6 +33,7 @@ interface Refetchable {
 // literal on every render (they always will) without the returned callback
 // changing identity.
 export function useRefresh(queries: Refetchable[]) {
+  const colors = useColors();
   const [refreshing, setRefreshing] = useState(false);
   const queriesRef = useRef(queries);
   queriesRef.current = queries;

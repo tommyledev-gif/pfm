@@ -2,7 +2,7 @@ import { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Avatar } from "@/components/ui/Avatar";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles } from "@/lib/theme";
 
 interface CategoryOptionRowProps {
   name: string;
@@ -29,6 +29,7 @@ export const CATEGORY_OPTION_ROW_HEIGHT = 60;
  * hairline, not boxed or tinted: selection is the trailing mark's job.
  */
 export function CategoryOptionRow({ name, color, icon, iconUrl, onPress, trailing, selected, testID }: CategoryOptionRowProps) {
+  const styles = useStyles();
   return (
     <Pressable
       testID={testID}
@@ -46,7 +47,7 @@ export function CategoryOptionRow({ name, color, icon, iconUrl, onPress, trailin
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -59,4 +60,4 @@ const styles = StyleSheet.create({
   label: { flex: 1, ...typography.body, color: colors.textPrimary },
   labelSelected: { fontWeight: "700" },
   trailing: { minWidth: 24, alignItems: "flex-end" },
-});
+}));

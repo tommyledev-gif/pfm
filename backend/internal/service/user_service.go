@@ -2,10 +2,12 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
 
 	"github.com/example/pfm/backend/internal/common"
@@ -29,6 +31,7 @@ func NewUserService(repo UserRepo, email EmailSender, logger *zap.Logger) *UserS
 // detached context so a slow/failing send never blocks or fails the 201
 // response — the send failure is only logged (spec.md S-USR-08).
 func (s *UserService) InviteUser(ctx context.Context, adminID uuid.UUID, email, roleStr string) (*model.User, error) {
+	email = common.NormalizeEmail(email)
 	role := model.UserRoleMember
 	if roleStr != "" {
 		role = model.UserRole(roleStr)
@@ -62,6 +65,51 @@ func (s *UserService) InviteUser(ctx context.Context, adminID uuid.UUID, email, 
 	go s.dispatchActivationEmail(user.Email, token)
 
 	return user, nil
+}
+
+// ResendInvite re-sends the activation email of a still-pending user with a
+// fresh token, subject to common.InviteResendAvailableAt's cooldown. The
+// cooldown is checked here against the row as read, and enforced against
+// concurrent resends by the repository's conditional UPDATE.
+func (s *UserService) ResendInvite(ctx context.Context, userID uuid.UUID) (*model.User, error) {
+	user, err := s.repo.GetUserByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, common.ErrNotFound
+		}
+		return nil, fmt.Errorf("service.ResendInvite: %w", err)
+	}
+	if user.Status != model.UserStatusPending {
+		return nil, common.ErrUserNotPending
+	}
+
+	now := time.Now()
+	sentAt := user.CreatedAt
+	if user.InviteSentAt != nil {
+		sentAt = *user.InviteSentAt
+	}
+	if availableAt := common.InviteResendAvailableAt(sentAt, user.InviteResendCount); now.Before(availableAt) {
+		return nil, common.NewInviteResendCooldownError(availableAt)
+	}
+
+	token, err := generateInviteToken()
+	if err != nil {
+		return nil, fmt.Errorf("service.ResendInvite: %w", err)
+	}
+
+	updated, err := s.repo.ResendInvite(ctx, userID, token, user.InviteResendCount)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			// Lost the race to another resend (or the user activated in
+			// between) — either way this request must not send a second email.
+			return nil, common.NewInviteResendCooldownError(common.InviteResendAvailableAt(now, user.InviteResendCount+1))
+		}
+		return nil, fmt.Errorf("service.ResendInvite: %w", err)
+	}
+
+	go s.dispatchActivationEmail(updated.Email, token)
+
+	return updated, nil
 }
 
 func (s *UserService) dispatchActivationEmail(email, token string) {

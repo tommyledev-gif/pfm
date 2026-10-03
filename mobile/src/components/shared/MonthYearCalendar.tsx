@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text } from "react-native";
+import { Pressable, Text } from "react-native";
 import { Calendar, CalendarProps } from "react-native-calendars";
 
 import { MonthYearWheelSheet } from "@/components/shared/MonthYearWheelSheet";
-import { CALENDAR_THEME } from "@/lib/calendar-theme";
-import { colors, typography } from "@/lib/theme";
+import { useCalendarTheme } from "@/lib/calendar-theme";
+import { typography, createStyles } from "@/lib/theme";
 
 // react-native-calendars' `renderHeader` hands back its internal `XDate`
 // instance — no `@types/xdate` package exists, so this is just the sliver of
@@ -41,6 +41,8 @@ type MonthYearCalendarProps = Omit<CalendarProps, "initialDate" | "renderHeader"
  * window (see that file for why it must not live inside the host sheet).
  */
 export function MonthYearCalendar({ initialDate, ...calendarProps }: MonthYearCalendarProps) {
+  const calendarTheme = useCalendarTheme();
+  const styles = useStyles();
   // Calendar re-reads `initialDate` on every change (unlike `current`), which
   // is what lets a picked month move the grid.
   const [jumpDate, setJumpDate] = useState(initialDate ?? todayIso());
@@ -62,7 +64,7 @@ export function MonthYearCalendar({ initialDate, ...calendarProps }: MonthYearCa
     <>
       <Calendar
         {...calendarProps}
-        theme={CALENDAR_THEME}
+        theme={calendarTheme}
         initialDate={jumpDate}
         // ⚠️ Always six week rows. A month spans 4, 5 or 6 weeks, and without
         // this the calendar — and the whole sheet around it — shrank and grew
@@ -102,8 +104,8 @@ export function MonthYearCalendar({ initialDate, ...calendarProps }: MonthYearCa
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   headerButton: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "center", paddingVertical: 6 },
   headerLabel: { ...typography.body, fontWeight: "700", color: colors.textPrimary },
   headerCaret: { ...typography.caption, color: colors.textSecondary },
-});
+}));

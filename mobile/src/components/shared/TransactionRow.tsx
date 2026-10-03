@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { AmountRevealPopup } from "@/components/ui/AmountRevealPopup";
 import { TintedIconTile } from "@/components/ui/TintedIconTile";
 import { colorForCategory } from "@/lib/category-color";
 import { formatCurrencyTruncated } from "@/lib/currency";
 import { formatDateDMY } from "@/lib/format-date";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { Transaction } from "@/features/transactions/types";
 
 const ICON_SIZE = 44;
@@ -32,6 +32,8 @@ export function TransactionRow({
   currency?: string;
   category?: { icon: string | null; icon_url: string | null };
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   const isIncome = transaction.type === "income";
   const isTransfer = transaction.type === "transfer";
   const label = transaction.note?.trim() || transaction.category_name;
@@ -87,7 +89,7 @@ export function TransactionRow({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   row: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm },
   middle: { flex: 1, gap: 2 },
   title: { ...typography.body, color: colors.textPrimary },
@@ -98,4 +100,4 @@ const styles = StyleSheet.create({
   right: { alignItems: "flex-end", gap: 2 },
   amount: { ...typography.body, fontWeight: "700" },
   time: { ...typography.tiny, color: colors.textMuted },
-});
+}));

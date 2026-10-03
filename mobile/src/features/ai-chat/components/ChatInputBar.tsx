@@ -1,10 +1,10 @@
 import { ReactNode, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, Text, TextInput, View } from "react-native";
 
 import { SendIcon, SparkleIcon } from "@/components/ui/Icon";
 import { CHAT_MODE_META, ChatMode } from "@/features/ai-chat/chat-mode";
 import { withAlpha } from "@/lib/color";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 // BottomNav sits flush at the safe-area inset, stands 64 tall, and floats its
 // active-tab ball another 24 above that — this is how far above the screen's
@@ -47,6 +47,8 @@ export function ChatInputBar({
   mode,
   quickActions,
 }: ChatInputBarProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const [focused, setFocused] = useState(false);
   const canSend = value.trim().length > 0 && !sending;
   const tint = CHAT_MODE_META[mode].tint;
@@ -105,7 +107,7 @@ export function ChatInputBar({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   quickActionRow: { marginHorizontal: spacing.xl, flexDirection: "row" },
   // A column, not a row: what goes here (the starter chips) bleeds past this
   // margin to the screen edges by itself, which a stretched column child
@@ -154,4 +156,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-});
+}));

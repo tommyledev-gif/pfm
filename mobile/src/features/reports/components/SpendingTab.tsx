@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 
 import { CalendarIcon } from "@/components/ui/Icon";
 import { AmountRevealPopup } from "@/components/ui/AmountRevealPopup";
@@ -13,7 +13,7 @@ import { buildCategoryColorMap } from "@/lib/category-color";
 import { formatCurrencyCompact } from "@/lib/currency";
 import { monthRange } from "@/lib/date-range";
 import { formatDateRange } from "@/lib/format-date";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { daysInRange, proratedLimit } from "@/features/budgets/budget-pace";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
@@ -34,6 +34,8 @@ interface SpendingTabProps {
 }
 
 export function SpendingTab({ focusCategoryId, focusNonce }: SpendingTabProps = {}) {
+  const colors = useColors();
+  const styles = useStyles();
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
   const [pickerOpen, setPickerOpen] = useState(false);
   const summary = useReportSummaryQuery(dateRange);
@@ -216,7 +218,7 @@ export function SpendingTab({ focusCategoryId, focusNonce }: SpendingTabProps = 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   container: { gap: spacing.md, flex: 1 },
   rangeButton: {
     flexDirection: "row",
@@ -239,4 +241,4 @@ const styles = StyleSheet.create({
   donutCard: { alignItems: "center", paddingVertical: spacing.xl, gap: spacing.sm },
   budgetHint: { ...typography.tiny, color: colors.textMuted, textAlign: "center" },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
-});
+}));

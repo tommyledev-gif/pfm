@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Dimensions, LayoutChangeEvent, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Dimensions, LayoutChangeEvent, Modal, Pressable, Text, View } from "react-native";
 
 import { formatCurrency, toMajorUnits } from "@/lib/currency";
 import { numberToWordsVi } from "@/lib/number-to-words-vi";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 
 /** A target's box in screen coordinates — `measure()`'s pageX/pageY plus its size. */
 export interface AnchorRect {
@@ -45,6 +45,7 @@ const clamp = (value: number, min: number, max: number) => Math.min(Math.max(val
  * on an edge-to-edge app — instead of starting below the status bar.
  */
 export function AmountTooltip({ visible, anchor, amountCents, currency, label, onClose }: AmountTooltipProps) {
+  const styles = useStyles();
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const window = Dimensions.get("window");
 
@@ -108,7 +109,7 @@ export function AmountTooltip({ visible, anchor, amountCents, currency, label, o
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)" },
   bubble: {
     position: "absolute",
@@ -144,4 +145,4 @@ const styles = StyleSheet.create({
   },
   arrowDown: { bottom: -ARROW_SIZE / 2, borderRightWidth: 1, borderBottomWidth: 1 },
   arrowUp: { top: -ARROW_SIZE / 2, borderLeftWidth: 1, borderTopWidth: 1 },
-});
+}));

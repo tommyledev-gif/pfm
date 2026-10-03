@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 
 import { MoneyField } from "@/features/budget-wizard/components/MoneyField";
 import { WizardSavingsField } from "@/features/budget-wizard/components/WizardSavingsField";
@@ -20,7 +20,8 @@ import {
 import { formatCurrency } from "@/lib/currency";
 import { formatSavedAt } from "@/features/budget-wizard/saved-plan";
 import { WIZARD_MONEY_MAX_XU, WIZARD_MONEY_SCALE } from "@/features/budget-wizard/wizard-money-scale";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 
 interface WizardStepIncomeProps {
   currency: string;
@@ -79,6 +80,7 @@ export function WizardStepIncome({
   restoredFromSavedAt,
   onDiscardSavedPlan,
 }: WizardStepIncomeProps) {
+  const styles = useStyles();
   const savings = savingsAmount(savingsChoice, income);
   const disposable = disposableXu(income, fixed, savings);
   const days = daysInCycle(cycleStartDay);
@@ -229,7 +231,7 @@ mỗi ngày` : ""}
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   container: { flex: 1 },
   scroll: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl, gap: spacing.lg },
   title: { ...typography.title, color: colors.textPrimary, marginBottom: spacing.xs },
@@ -245,7 +247,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
   },
-  chipActive: { borderColor: colors.green, backgroundColor: "rgba(133,255,51,0.08)" },
+  chipActive: { borderColor: colors.green, backgroundColor: withAlpha(colors.green, 0.08) },
   chipLabel: { ...typography.caption, color: colors.textSecondary },
   chipLabelActive: { color: colors.green },
   result: {
@@ -271,7 +273,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.listCard,
     borderLeftWidth: 2,
     borderLeftColor: colors.green,
-    backgroundColor: "rgba(133,255,51,0.06)",
+    backgroundColor: withAlpha(colors.green, 0.06),
   },
   restoredText: { flex: 1, ...typography.tiny, color: colors.textSecondary },
   restoredAction: { ...typography.tiny, color: colors.green },
@@ -285,4 +287,4 @@ const styles = StyleSheet.create({
   },
   primaryBtnDisabled: { opacity: 0.35 },
   primaryLabel: { ...typography.body, color: colors.onGreen },
-});
+}));

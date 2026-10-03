@@ -1,9 +1,9 @@
-import { Animated, StyleSheet, Text, View } from "react-native";
+import { Animated, Text, View } from "react-native";
 
 import { AmountText } from "@/components/ui/AmountText";
 import { AnalyticsCompare } from "@/features/analytics/types";
 import { withAlpha } from "@/lib/color";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useEntryAnimation } from "@/lib/use-entry-animation";
 
 interface CompareBarsProps {
@@ -27,6 +27,8 @@ function changeText(pct: number, previousLabel: string): string {
 // the previous period was zero — then no percentage is shown at all
 // (spec.md S-AIQ-08).
 export function CompareBars({ compare, currency }: CompareBarsProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const max = Math.max(compare.current, compare.previous, 1);
   const grow = useEntryAnimation();
   const rows = [
@@ -68,7 +70,7 @@ export function CompareBars({ compare, currency }: CompareBarsProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   wrap: { gap: spacing.lg },
   row: { gap: spacing.sm },
   head: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: spacing.md },
@@ -79,4 +81,4 @@ const styles = StyleSheet.create({
   // Spending up is the cautionary direction, down the reassuring one.
   up: { color: colors.peach },
   down: { color: colors.mint },
-});
+}));

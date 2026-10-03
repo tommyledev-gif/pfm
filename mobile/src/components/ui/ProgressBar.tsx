@@ -1,6 +1,6 @@
 import { Animated, StyleSheet, View } from "react-native";
 
-import { colors } from "@/lib/theme";
+import { useColors } from "@/lib/theme";
 import { useEntryAnimation } from "@/lib/use-entry-animation";
 
 interface ProgressBarProps {
@@ -10,12 +10,13 @@ interface ProgressBarProps {
   height?: number;
 }
 
-export function ProgressBar({ progress, color, trackColor = colors.trackMuted, height = 8 }: ProgressBarProps) {
+export function ProgressBar({ progress, color, trackColor, height = 8 }: ProgressBarProps) {
+  const colors = useColors();
   const clamped = Math.max(0, Math.min(1, progress));
   // Grows from empty to its value on first render (scaled from the left edge).
   const grow = useEntryAnimation();
   return (
-    <View style={[styles.track, { backgroundColor: trackColor, height, borderRadius: height / 2 }]}>
+    <View style={[styles.track, { backgroundColor: trackColor ?? colors.trackMuted, height, borderRadius: height / 2 }]}>
       <Animated.View
         style={[
           styles.fill,

@@ -2,7 +2,7 @@ import { ReactNode } from "react";
 import { StyleProp, ViewStyle } from "react-native";
 import { Edge, SafeAreaView } from "react-native-safe-area-context";
 
-import { colors } from "@/lib/theme";
+import { useColors } from "@/lib/theme";
 
 interface ScreenProps {
   children: ReactNode;
@@ -15,6 +15,7 @@ interface ScreenProps {
 // edge is deliberately excluded by default — BottomNav already reserves
 // `insets.bottom` itself, and screens' own bottom padding accounts for it.
 export function Screen({ children, edges = ["top"], style }: ScreenProps) {
+  const colors = useColors();
   return (
     <SafeAreaView edges={edges} style={[{ flex: 1, backgroundColor: colors.bgApp }, style]}>
       {children}

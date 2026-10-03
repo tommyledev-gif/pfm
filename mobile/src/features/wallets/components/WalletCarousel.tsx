@@ -1,6 +1,6 @@
-import { Animated, StyleSheet, Text, View } from "react-native";
+import { Animated, Text, View } from "react-native";
 
-import { colors, spacing, typography, walletAccentPalette } from "@/lib/theme";
+import { spacing, typography, walletAccentPalette, createStyles } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
 import { CARD_HEIGHT, CARD_OVERLAP, WalletStackCard } from "@/features/wallets/components/WalletStackCard";
 import { SNAP_INTERVAL, useWalletCarousel } from "@/features/wallets/components/use-wallet-carousel";
@@ -60,6 +60,7 @@ export function WalletCarousel({
   highlightWalletId,
   highlightOpacity,
 }: WalletCarouselProps) {
+  const styles = useStyles();
   const {
     scrollRef,
     scrollX,
@@ -174,10 +175,10 @@ export function WalletCarousel({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   // A fixed height regardless of wallet count, so content below does not shift
   // as the wallets load. Full-bleed: the section's own horizontal padding is
   // cancelled so a neighbour can sit under the screen edge.
   container: { height: CARD_HEIGHT, marginHorizontal: -spacing.xl },
   empty: { ...typography.caption, color: colors.textSecondary, paddingVertical: spacing.md },
-});
+}));

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import { Pressable, Text, Vibration, View } from "react-native";
 
 import { AmountRevealPopup } from "@/components/ui/AmountRevealPopup";
 import { Avatar } from "@/components/ui/Avatar";
@@ -12,7 +12,7 @@ import { ProgressBar } from "@/components/ui/ProgressBar";
 import { colorForCategory } from "@/lib/category-color";
 import { formatCurrencyTruncated } from "@/lib/currency";
 import { formatDateShort } from "@/lib/format-date";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { ChatAction } from "@/features/ai-chat/types";
 
 // Share of the budget at which the bar stops being neutral and starts
@@ -73,6 +73,8 @@ export function TransactionActionCard({
   onEdit,
   onDelete,
 }: TransactionActionCardProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const { payload } = action;
   const isIncome = payload.type === "income";
 
@@ -244,7 +246,7 @@ export function TransactionActionCard({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   card: { gap: spacing.md, marginTop: spacing.sm },
   editedBadge: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start" },
   editedLabel: { ...typography.tiny, color: colors.lavender },
@@ -265,4 +267,4 @@ const styles = StyleSheet.create({
   tagRow: { flexDirection: "row", gap: spacing.sm },
   actionRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   confirmButton: { flex: 1 },
-});
+}));

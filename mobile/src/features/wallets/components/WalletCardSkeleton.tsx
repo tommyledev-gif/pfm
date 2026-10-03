@@ -1,13 +1,14 @@
-import { StyleSheet, View } from "react-native";
+import { View } from "react-native";
 
 import { SkeletonBlock } from "@/components/ui/SkeletonBlock";
-import { colors, radii, spacing } from "@/lib/theme";
+import { radii, spacing, createStyles } from "@/lib/theme";
 import { CARD_HEIGHT, CARD_WIDTH } from "@/features/wallets/components/WalletStackCard";
 
 // Mirrors the carousel's own geometry — one centred card at the same width,
 // height and padding — so swapping in the real cards causes no layout shift
 // (specs/mobile-loading-skeletons/spec.md Edge Case #2).
 export function WalletCardSkeleton() {
+  const styles = useStyles();
   return (
     <View style={styles.container}>
       <View style={styles.card}>
@@ -27,7 +28,7 @@ export function WalletCardSkeleton() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   // Matches WalletCarousel's own full-bleed container, so the placeholder and
   // the loaded carousel occupy the same box.
   container: { height: CARD_HEIGHT, marginHorizontal: -spacing.xl, alignItems: "center" },
@@ -45,4 +46,4 @@ const styles = StyleSheet.create({
   topRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   identity: { gap: 4 },
   balanceBlock: { gap: 4 },
-});
+}));

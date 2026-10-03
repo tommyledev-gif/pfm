@@ -1,8 +1,8 @@
 import { ReactNode } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import { UserBubble } from "@/features/ai-chat/components/UserBubble";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 
 interface ChatBubbleProps {
   role: "user" | "assistant";
@@ -19,6 +19,7 @@ interface ChatBubbleProps {
 // analysis pane), right-aligned, dark text. AI messages = dark surface
 // bubble, left-aligned, white text.
 export function ChatBubble({ role, text, children }: ChatBubbleProps) {
+  const styles = useStyles();
   if (role === "user") {
     return (
       <View style={[styles.row, styles.rowUser]}>
@@ -36,11 +37,11 @@ export function ChatBubble({ role, text, children }: ChatBubbleProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   row: { width: "100%", flexDirection: "row" },
   rowUser: { justifyContent: "flex-end" },
   rowAssistant: { justifyContent: "flex-start" },
   bubble: { maxWidth: "82%", borderRadius: radii.listCard, padding: spacing.lg },
   bubbleAssistant: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.surfaceBorder, borderBottomLeftRadius: 4 },
   textAssistant: { ...typography.body, color: colors.textPrimary },
-});
+}));

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, Text, TextInput, View } from "react-native";
 
 import { Drawer } from "@/components/shared/Drawer";
 import { PillButton } from "@/components/ui/PillButton";
 import { getErrorMessage } from "@/lib/axios";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { USER_ROLES, UserRole } from "@/lib/constants";
 import { useInviteUserMutation } from "@/features/users/api/use-invite-user-mutation";
 
@@ -19,6 +20,8 @@ interface InviteUserModalProps {
 // /admin/users/invite) — activation happens via the emailed link, same as
 // frontend/src/features/users/components/invite-user-dialog.tsx.
 export function InviteUserModal({ visible, onClose }: InviteUserModalProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<UserRole>(DEFAULT_ROLE);
   const inviteUser = useInviteUserMutation();
@@ -80,7 +83,7 @@ export function InviteUserModal({ visible, onClose }: InviteUserModalProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   title: { ...typography.title, color: colors.textPrimary },
   description: { ...typography.caption, color: colors.textSecondary },
   label: { ...typography.caption, color: colors.textSecondary },
@@ -89,7 +92,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: radii.pill,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
   },
@@ -97,7 +100,7 @@ const styles = StyleSheet.create({
   chipLabel: { ...typography.caption, color: colors.textSecondary },
   chipLabelActive: { color: colors.onGreen },
   input: {
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     borderRadius: radii.listCard,
@@ -109,4 +112,4 @@ const styles = StyleSheet.create({
   error: { color: colors.peach, ...typography.caption },
   actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
   flexButton: { flex: 1 },
-});
+}));

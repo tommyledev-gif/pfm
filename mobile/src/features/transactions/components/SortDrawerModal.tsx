@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { Drawer } from "@/components/shared/Drawer";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 import { DEFAULT_SORT_KEY, SORT_OPTIONS, SortKey } from "@/features/transactions/sort";
 
 interface SortDrawerModalProps {
@@ -18,6 +18,7 @@ interface SortDrawerModalProps {
 // options in sequence stamps each with a priority number, so amount + date
 // can combine (e.g. highest amount first, most recent as the tiebreaker).
 export function SortDrawerModal({ visible, onClose, selected, onApply }: SortDrawerModalProps) {
+  const styles = useStyles();
   const [order, setOrder] = useState<SortKey[]>([]);
 
   // An empty `selected` doesn't mean "unsorted" — it means the list is on the
@@ -79,7 +80,7 @@ export function SortDrawerModal({ visible, onClose, selected, onApply }: SortDra
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   section: { gap: spacing.xs },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: spacing.sm },
   rowDisabled: { opacity: 0.4 },
@@ -96,4 +97,4 @@ const styles = StyleSheet.create({
   },
   badgeActive: { backgroundColor: colors.green, borderColor: colors.green },
   badgeText: { ...typography.tiny, color: colors.onGreen, fontWeight: "700" },
-});
+}));

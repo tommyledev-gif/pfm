@@ -45,6 +45,8 @@ interface ChatModeMeta {
   iconToColor?: string;
 }
 
+// Getters, not values: read at render time so they follow a theme switch
+// (see src/theme/active-palette.ts).
 export const CHAT_MODE_META: Record<ChatMode, ChatModeMeta> = {
   transaction: {
     label: "Ghi giao dịch",
@@ -53,8 +55,8 @@ export const CHAT_MODE_META: Record<ChatMode, ChatModeMeta> = {
     description: "Ghi chi tiêu, thu nhập nhanh chỉ bằng một câu.",
     placeholder: "Mô tả một giao dịch…",
     icon: ReceiptIcon,
-    tint: colors.green,
-    accentTo: colors.mint,
+    get tint() { return colors.green; },
+    get accentTo() { return colors.mint; },
   },
   budget: {
     label: "Lập ngân sách",
@@ -62,8 +64,8 @@ export const CHAT_MODE_META: Record<ChatMode, ChatModeMeta> = {
     description: "Tạo kế hoạch tài chính thông minh dựa trên thói quen của bạn.",
     placeholder: "Mô tả một giao dịch…",
     icon: TargetIcon,
-    tint: colors.lavender,
-    accentTo: colors.periwinkle,
+    get tint() { return colors.lavender; },
+    get accentTo() { return colors.periwinkle; },
   },
   consult: {
     label: "Hỏi phân tích",
@@ -71,9 +73,9 @@ export const CHAT_MODE_META: Record<ChatMode, ChatModeMeta> = {
     description: "Nhận phân tích sâu về thói quen chi tiêu của bạn.",
     placeholder: "Hỏi về chi tiêu của bạn…",
     icon: InsightIcon,
-    tint: colors.mint,
-    accentTo: colors.info,
-    iconToColor: colors.info,
+    get tint() { return colors.mint; },
+    get accentTo() { return colors.info; },
+    get iconToColor() { return colors.info; },
   },
 };
 

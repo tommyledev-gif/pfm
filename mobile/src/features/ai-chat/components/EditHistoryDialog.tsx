@@ -1,8 +1,8 @@
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 
 import { PillButton } from "@/components/ui/PillButton";
 import { formatCurrencyTruncated } from "@/lib/currency";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 import { EditHistoryEntry } from "@/features/ai-chat/types";
 
 interface EditHistoryDialogProps {
@@ -20,6 +20,7 @@ interface EditHistoryDialogProps {
 // renders newest-first — only the display order is reversed, not the
 // underlying array or its "Lần sửa N" numbering.
 export function EditHistoryDialog({ visible, history, currency, onClose }: EditHistoryDialogProps) {
+  const styles = useStyles();
   const newestFirst = history
     .map((entry, index) => ({ entry, label: entry.source === "created" ? "Tạo đề xuất" : `Lần sửa ${index}` }))
     .reverse();
@@ -59,7 +60,7 @@ export function EditHistoryDialog({ visible, history, currency, onClose }: EditH
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center", padding: spacing.xl },
   card: {
     width: "100%",
@@ -85,4 +86,4 @@ const styles = StyleSheet.create({
   rowTime: { ...typography.tiny, color: colors.textMuted },
   rowDetail: { ...typography.body, color: colors.textPrimary },
   closeButton: { marginTop: spacing.sm },
-});
+}));

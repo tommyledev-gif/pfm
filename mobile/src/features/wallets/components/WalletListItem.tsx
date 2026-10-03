@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Pressable, Text, View } from "react-native";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { ChevronRightIcon } from "@/components/ui/Icon";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { colorForCategory } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
 import { useSetDefaultWalletMutation } from "@/features/wallets/api/use-set-default-wallet-mutation";
 
@@ -25,6 +25,8 @@ interface WalletListItemProps {
 }
 
 export function WalletListItem({ wallet, onPress, highlightOpacity }: WalletListItemProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const setDefault = useSetDefaultWalletMutation();
   // Setting a new default silently swapped it under the user with no way to
   // back out of an accidental tap — a confirm step first, same convention as
@@ -80,7 +82,7 @@ export function WalletListItem({ wallet, onPress, highlightOpacity }: WalletList
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -118,4 +120,4 @@ const styles = StyleSheet.create({
     borderColor: colors.surfaceBorder,
   },
   defaultButtonLabel: { ...typography.tiny, color: colors.textSecondary },
-});
+}));

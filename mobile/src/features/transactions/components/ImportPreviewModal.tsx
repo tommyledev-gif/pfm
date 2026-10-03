@@ -1,9 +1,10 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 
 import { Drawer } from "@/components/shared/Drawer";
 import { PillButton } from "@/components/ui/PillButton";
 import { formatCurrency } from "@/lib/currency";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { ImportPreview, ImportResult } from "@/features/transactions/types";
 
 interface ImportPreviewModalProps {
@@ -42,6 +43,8 @@ export function ImportPreviewModal({
   onConfirm,
   onClose,
 }: ImportPreviewModalProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const validCount = preview?.valid.length ?? 0;
   const total = validCount + (preview?.duplicates.length ?? 0) + (preview?.errors.length ?? 0);
   const validTotal = preview?.valid.reduce((sum, row) => sum + row.amount, 0) ?? 0;
@@ -107,6 +110,8 @@ export function ImportPreviewModal({
 }
 
 function ImportResultSummary({ result }: { result: ImportResult }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.body} testID="text-import-result">
       <Text style={styles.title}>Đã nhập xong</Text>
@@ -131,6 +136,7 @@ function SummaryTile({
   tone: string;
   testID?: string;
 }) {
+  const styles = useStyles();
   return (
     <View style={styles.tile}>
       <Text testID={testID} style={[styles.tileValue, { color: tone }]}>
@@ -152,6 +158,7 @@ function IssueList({
   tone: string;
   testID?: string;
 }) {
+  const styles = useStyles();
   if (issues.length === 0) return null;
   const listed = issues.slice(0, MAX_LISTED_ROWS);
   const hidden = issues.length - listed.length;
@@ -171,7 +178,7 @@ function IssueList({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   body: { gap: spacing.md },
   title: { ...typography.title, color: colors.textPrimary },
   subtitle: { ...typography.caption, color: colors.textSecondary },
@@ -182,7 +189,7 @@ const styles = StyleSheet.create({
     gap: 2,
     paddingVertical: spacing.md,
     borderRadius: radii.listCard,
-    backgroundColor: "rgba(255,255,255,0.04)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.04),
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
   },
@@ -198,4 +205,4 @@ const styles = StyleSheet.create({
   issueMore: { ...typography.tiny, color: colors.textMuted },
   actions: { flexDirection: "row", gap: spacing.sm },
   flexButton: { flex: 1 },
-});
+}));

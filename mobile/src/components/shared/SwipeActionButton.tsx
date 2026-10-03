@@ -3,7 +3,7 @@ import { Animated, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } fro
 
 import { IconProps } from "@/components/ui/icons/primitives";
 import { FADE_LEAD, SWIPE_ARM_RATIO } from "@/components/shared/use-swipe-actions";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 export interface SwipeAction {
   Icon: ComponentType<IconProps>;
@@ -35,6 +35,8 @@ interface SwipeActionButtonProps {
 // label and a tap target — which is the whole behavioural change this
 // component exists for. Releasing used to act; now it reveals this.
 export function SwipeActionButton({ action, progress, width, parked, positionStyle }: SwipeActionButtonProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const { Icon } = action;
 
   const indicatorOpacity = progress.interpolate({
@@ -99,7 +101,7 @@ export function SwipeActionButton({ action, progress, width, parked, positionSty
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   strip: { position: "absolute", top: 0, bottom: 0, alignItems: "center", justifyContent: "center" },
   indicator: {
     width: 32,
@@ -121,4 +123,4 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.sm,
   },
   parkedLabel: { ...typography.caption, color: colors.onGreen },
-});
+}));

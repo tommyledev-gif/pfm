@@ -5,7 +5,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WHEEL_ITEM_HEIGHT, WHEEL_VISIBLE_ROWS, WheelColumn } from "@/components/shared/WheelColumn";
 import { CloseIcon } from "@/components/ui/Icon";
 import { PillButton } from "@/components/ui/PillButton";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 const MONTH_LABELS = Array.from({ length: 12 }, (_, i) => `Tháng ${i + 1}`);
 
@@ -31,6 +32,8 @@ interface MonthYearWheelSheetProps {
  * above the wheels, so a vertical drag has exactly one place to go.
  */
 export function MonthYearWheelSheet({ visible, years, month, year, onClose, onApply }: MonthYearWheelSheetProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const [draftMonth, setDraftMonth] = useState(month);
   const [draftYearIndex, setDraftYearIndex] = useState(Math.max(0, years.indexOf(year)));
@@ -79,7 +82,7 @@ export function MonthYearWheelSheet({ visible, years, month, year, onClose, onAp
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   root: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.55)" },
   sheet: {
     backgroundColor: colors.surface,
@@ -94,7 +97,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "rgba(255,255,255,0.28)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.28),
   },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   title: { ...typography.cardTitle, color: colors.textPrimary },
@@ -102,7 +105,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: radii.pill,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.08),
     alignItems: "center",
     justifyContent: "center",
   },
@@ -114,8 +117,8 @@ const styles = StyleSheet.create({
     top: WHEEL_ITEM_HEIGHT * ((WHEEL_VISIBLE_ROWS - 1) / 2),
     height: WHEEL_ITEM_HEIGHT,
     borderRadius: radii.listCard,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.05),
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
   },
-});
+}));

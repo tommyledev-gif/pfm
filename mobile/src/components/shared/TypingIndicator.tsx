@@ -1,10 +1,11 @@
 import { useEffect, useRef } from "react";
-import { Animated, StyleSheet, View } from "react-native";
+import { Animated, View } from "react-native";
 
-import { colors, radii } from "@/lib/theme";
+import { radii, createStyles } from "@/lib/theme";
 
 // AI Chat's typing indicator — "3 pulsing dots" (README).
 export function TypingIndicator() {
+  const styles = useStyles();
   const values = useRef([0, 1, 2].map(() => new Animated.Value(0.3))).current;
 
   useEffect(() => {
@@ -31,7 +32,7 @@ export function TypingIndicator() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   row: { flexDirection: "row", gap: 5, paddingVertical: 4 },
   dot: { width: 7, height: 7, borderRadius: radii.pill, backgroundColor: colors.textSecondary },
-});
+}));

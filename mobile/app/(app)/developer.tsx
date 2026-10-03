@@ -1,10 +1,10 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { ChevronLeftIcon } from "@/components/ui/Icon";
 import { Toggle } from "@/components/ui/Toggle";
 import { Screen } from "@/components/shared/Screen";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles } from "@/lib/theme";
 import { useUiPrefsStore } from "@/stores/ui-prefs-store";
 
 // Entry point: profile.tsx's "Developer" row. Only toggles DebugBubble's own
@@ -12,6 +12,7 @@ import { useUiPrefsStore } from "@/stores/ui-prefs-store";
 // logger.ts, NavigationLogger) runs unconditionally regardless of this
 // toggle, see ui-prefs-store.ts's debugBubbleVisible field comment.
 export default function DeveloperScreen() {
+  const styles = useStyles();
   const router = useRouter();
   const bubbleVisible = useUiPrefsStore((s) => s.debugBubbleVisible);
   const setBubbleVisible = useUiPrefsStore((s) => s.setDebugBubbleVisible);
@@ -43,7 +44,7 @@ export default function DeveloperScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bgApp },
   header: {
     flexDirection: "row",
@@ -68,4 +69,4 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, gap: spacing.xs },
   rowLabel: { ...typography.body, color: colors.textPrimary },
   rowHint: { ...typography.caption, color: colors.textSecondary },
-});
+}));

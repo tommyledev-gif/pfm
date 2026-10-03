@@ -1,8 +1,9 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { colorForCategory } from "@/lib/category-color";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 import { Category } from "@/features/categories/types";
 
 interface CategorySelectFieldProps {
@@ -22,6 +23,7 @@ interface CategorySelectFieldProps {
 // the underlined link is the one fixed place to tap to change it, whether
 // something is selected yet or not.
 export function CategorySelectField({ categories, onPress, placeholder = "Chưa chọn danh mục" }: CategorySelectFieldProps) {
+  const styles = useStyles();
   return (
     <View style={styles.box}>
       {categories.length === 0 ? (
@@ -46,12 +48,12 @@ export function CategorySelectField({ categories, onPress, placeholder = "Chưa 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   box: {
     gap: spacing.sm,
     padding: spacing.md,
     borderRadius: radii.listCard,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     alignItems: "flex-start",
@@ -71,4 +73,4 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline",
     textDecorationColor: colors.green,
   },
-});
+}));

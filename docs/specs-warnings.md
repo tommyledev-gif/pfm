@@ -12,3 +12,12 @@ Feature chưa có spec (khác với "spec chưa làm"): F-08 Financial Goal, F-0
 Muốn m viết spec bổ sung cho 3 US còn thiếu của v2, hay chạy /renew-features để refresh features.md trước?
 
 
+ok đây là list cần làm:
+cloudflare r2 cron job auto backup db data, retetion 30-60d
+log retention 30d các log thường, 60d các log nguy hiểm, nghiêm trọng
+fix bảo mật chat history filter user_id
+fix cái này (Rate limit IP bị Cloudflare che → 20 user dùng chung 1 bộ đếm)
+thêm recover middleware để handle panic
+fix invite resend (dc thì enable tính năng resend invitation (lần đầu 1p, từ lần 2 thì 30p mới dc resend)
+fix Email case-sensitive → User@gmail.com ≠ user@gmail.com
+fix refresh token

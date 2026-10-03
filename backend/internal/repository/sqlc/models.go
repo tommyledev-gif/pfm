@@ -10,19 +10,21 @@ import (
 // row shape sqlc would generate. Repository code converts this into
 // model.User; nothing outside internal/repository should ever see this type.
 type User struct {
-	ID              uuid.UUID
-	Email           string
-	FullName        *string
-	PasswordHash    *string
-	Status          string
-	Role            string
-	InvitedBy       *uuid.UUID
-	InviteToken     *string
-	InviteExpiresAt *time.Time
-	ActivatedAt     *time.Time
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	DeletedAt       *time.Time
+	ID                uuid.UUID
+	Email             string
+	FullName          *string
+	PasswordHash      *string
+	Status            string
+	Role              string
+	InvitedBy         *uuid.UUID
+	InviteToken       *string
+	InviteExpiresAt   *time.Time
+	ActivatedAt       *time.Time
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	DeletedAt         *time.Time
+	InviteSentAt      *time.Time
+	InviteResendCount int32
 }
 
 // RevokedToken mirrors the revoked_tokens table exactly.

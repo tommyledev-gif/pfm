@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/example/pfm/backend/internal/common"
 	"github.com/example/pfm/backend/internal/model"
 )
 
@@ -36,6 +37,11 @@ type UserResponse struct {
 	Role        string     `json:"role"`
 	ActivatedAt *time.Time `json:"activated_at"`
 	CreatedAt   time.Time  `json:"created_at"`
+	// InviteResendAvailableAt is set only for pending users: the earliest
+	// moment POST /admin/users/:id/resend-invite will accept, so a client can
+	// show a countdown instead of a button that 429s. Not sensitive — it
+	// reveals timing only, never the token or its expiry.
+	InviteResendAvailableAt *time.Time `json:"invite_resend_available_at"`
 }
 
 func NewUserResponse(u *model.User) UserResponse {
@@ -47,7 +53,21 @@ func NewUserResponse(u *model.User) UserResponse {
 		Role:        string(u.Role),
 		ActivatedAt: u.ActivatedAt,
 		CreatedAt:   u.CreatedAt,
+
+		InviteResendAvailableAt: inviteResendAvailableAt(u),
 	}
+}
+
+func inviteResendAvailableAt(u *model.User) *time.Time {
+	if u.Status != model.UserStatusPending {
+		return nil
+	}
+	sentAt := u.CreatedAt
+	if u.InviteSentAt != nil {
+		sentAt = *u.InviteSentAt
+	}
+	at := common.InviteResendAvailableAt(sentAt, u.InviteResendCount).UTC()
+	return &at
 }
 
 type PaginationResponse struct {

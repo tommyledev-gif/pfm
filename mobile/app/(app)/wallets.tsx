@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, SectionList, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, SectionList, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { ChevronLeftIcon, PlusIcon } from "@/components/ui/Icon";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { Screen } from "@/components/shared/Screen";
 import { WALLET_TYPES, WalletType } from "@/lib/constants";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useHighlightFade } from "@/lib/use-highlight-fade";
 import { useUiPrefsStore, WalletsViewMode } from "@/stores/ui-prefs-store";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
@@ -44,6 +44,8 @@ interface WalletSection {
 }
 
 export default function WalletsScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   // Set by Home when one of its wallet cards is tapped: open on that wallet
   // and flash a border on it. `focusedAt` is a nonce, so tapping the same
@@ -210,7 +212,7 @@ export default function WalletsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -253,4 +255,4 @@ const styles = StyleSheet.create({
   },
   sectionHeaderCount: { ...typography.tiny, color: colors.textMuted },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
-});
+}));

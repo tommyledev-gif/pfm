@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Pressable, Text, View } from "react-native";
 
 import { AmountText } from "@/components/ui/AmountText";
 import { AnalyticsChartItem } from "@/features/analytics/types";
 import { withAlpha } from "@/lib/color";
 import { formatCurrency } from "@/lib/currency";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useEntryAnimation } from "@/lib/use-entry-animation";
 
 interface ColumnBarsProps {
@@ -52,6 +52,8 @@ function peakIndex(items: AnalyticsChartItem[]): number {
 // line states the selected column in full — the peak by default — and
 // tapping a column moves it there.
 export function ColumnBars({ items, currency }: ColumnBarsProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const [selected, setSelected] = useState(() => peakIndex(items));
   const [touched, setTouched] = useState(false);
   // Every bar rises from the baseline to its value on first render.
@@ -108,7 +110,7 @@ export function ColumnBars({ items, currency }: ColumnBarsProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   wrap: { gap: spacing.md },
   readout: { gap: 2 },
   readoutLabel: { ...typography.caption, color: colors.textSecondary },
@@ -120,4 +122,4 @@ const styles = StyleSheet.create({
   label: { ...typography.caption, color: colors.textMuted },
   labelActive: { color: colors.textPrimary },
   hint: { ...typography.caption, color: colors.textMuted },
-});
+}));

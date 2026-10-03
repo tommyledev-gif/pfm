@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { PlusIcon } from "@/components/ui/Icon";
@@ -9,7 +9,7 @@ import { Screen } from "@/components/shared/Screen";
 import { TopBar } from "@/components/shared/TopBar";
 import { TransactionRow } from "@/components/shared/TransactionRow";
 import { previousPeriodLabel } from "@/lib/date-range";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useRefresh } from "@/lib/use-refresh";
 import { PendingConfirmationsSection } from "@/features/ai-chat/components/PendingConfirmationsSection";
 import { useTransactionRemoval } from "@/features/ai-chat/components/use-transaction-removal";
@@ -44,6 +44,8 @@ const PERIODS: { label: string; value: HomePeriod }[] = [
 ];
 
 export default function HomeScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
 
   const thread = useChatStore((s) => s.thread);
@@ -220,7 +222,7 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bgApp },
   content: { paddingBottom: 140, paddingHorizontal: spacing.xl, gap: spacing.md },
   header: { gap: spacing.xl },
@@ -247,4 +249,4 @@ const styles = StyleSheet.create({
   sectionAction: { ...typography.caption, color: colors.green },
   addWalletAction: { flexDirection: "row", alignItems: "center", gap: 4 },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
-});
+}));

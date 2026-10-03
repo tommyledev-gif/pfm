@@ -1,10 +1,10 @@
 import { ReactNode } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 
 import { BackspaceIcon, CalendarIcon, CheckIcon } from "@/components/ui/Icon";
 import { KeypadKey } from "@/lib/calculator/input";
 import { withAlpha } from "@/lib/color";
-import { colors, typography } from "@/lib/theme";
+import { typography, createStyles, useColors } from "@/lib/theme";
 
 const DIGIT_ROWS: { digits: KeypadKey[]; operator: KeypadKey }[] = [
   { digits: ["7", "8", "9"], operator: "+" },
@@ -65,6 +65,7 @@ interface CalculatorKeypadProps {
  * one (reference-ui/CalculatorKeypad.tsx's KeyColumn, same reason).
  */
 function KeyColumn({ children }: { children: ReactNode }) {
+  const styles = useStyles();
   return <View style={styles.column}>{children}</View>;
 }
 
@@ -88,6 +89,8 @@ export function CalculatorKeypad({
   dateAccessibilityLabel,
   testID,
 }: CalculatorKeypadProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const keyId = (name: string) => (testID ? `${testID}-key-${name}` : undefined);
 
   const digitKey = (key: KeypadKey) => (
@@ -198,7 +201,7 @@ export function CalculatorKeypad({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   row: { flexDirection: "row", gap: GAP },
   // flexBasis carries the block's own inner gaps, so its four columns and the
   // action column beside it all resolve to the same width.
@@ -212,8 +215,8 @@ const styles = StyleSheet.create({
     borderRadius: KEY_RADIUS,
     borderWidth: 1,
   },
-  digitKey: { backgroundColor: "rgba(255,255,255,0.06)", borderColor: colors.surfaceBorder },
-  digitKeyPressed: { backgroundColor: "rgba(255,255,255,0.14)" },
+  digitKey: { backgroundColor: withAlpha(colors.overlayBase, 0.06), borderColor: colors.surfaceBorder },
+  digitKeyPressed: { backgroundColor: withAlpha(colors.overlayBase, 0.14) },
   digitLabel: { ...typography.title, color: colors.textPrimary },
   thousandsLabel: { ...typography.cardTitle },
   operatorKey: {
@@ -235,5 +238,5 @@ const styles = StyleSheet.create({
   dateKey: { backgroundColor: colors.green, borderColor: colors.green },
   dateLabel: { ...typography.tiny, fontWeight: "700", color: colors.onGreen, textAlign: "center" },
   confirmKey: { backgroundColor: colors.green, borderColor: colors.green },
-  confirmKeyDisabled: { backgroundColor: "rgba(255,255,255,0.06)", borderColor: colors.surfaceBorder },
-});
+  confirmKeyDisabled: { backgroundColor: withAlpha(colors.overlayBase, 0.06), borderColor: colors.surfaceBorder },
+}));

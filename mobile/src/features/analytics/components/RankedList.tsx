@@ -8,7 +8,7 @@ import { AnalyticsTxRow } from "@/features/analytics/types";
 import { useCategoryLookup } from "@/features/categories/api/use-category-lookup";
 import { Category } from "@/features/categories/types";
 import { colorForCategory } from "@/lib/category-color";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 interface RankedListProps {
   rows: AnalyticsTxRow[];
@@ -38,6 +38,8 @@ function shortDate(iso: string): string {
 // same Category has the same colour and icon here as in the Transactions list.
 // No rank number: the order is the ranking, and the column only added noise.
 export function RankedList({ rows, moreRows = [], currency, totalMatched }: RankedListProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const categories = useCategoryLookup();
   const [expanded, setExpanded] = useState(false);
   const visible = expanded ? [...rows, ...moreRows] : rows;
@@ -93,6 +95,7 @@ export function RankedList({ rows, moreRows = [], currency, totalMatched }: Rank
 // ⚠️ The fallback must be a six-digit hex token: TintedIconTile appends an
 // alpha suffix to it, which turns an rgba() token into an invalid colour.
 function CategoryTile({ row, category }: { row: AnalyticsTxRow; category?: Category }) {
+  const colors = useColors();
   return (
     <TintedIconTile
       color={row.category_id ? colorForCategory(row.category_id) : colors.textPrimary}
@@ -104,7 +107,7 @@ function CategoryTile({ row, category }: { row: AnalyticsTxRow; category?: Categ
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   row: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.md },
   divider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.surfaceBorder },
   middle: { flex: 1 },
@@ -115,4 +118,4 @@ const styles = StyleSheet.create({
   toggleLabel: { ...typography.label, color: colors.textSecondary },
   chevronUp: { transform: [{ rotate: "180deg" }] },
   more: { ...typography.caption, color: colors.textSecondary, paddingBottom: spacing.md },
-});
+}));

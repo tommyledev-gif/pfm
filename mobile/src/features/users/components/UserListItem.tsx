@@ -1,17 +1,21 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { PillTag } from "@/components/ui/PillTag";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { colors, radii, spacing, typography, createStyles } from "@/lib/theme";
 import { User } from "@/features/users/types";
+import { ResendInviteButton } from "@/features/users/components/ResendInviteButton";
 
+// Getters, not values: read at render time so they follow a theme switch
+// (see src/theme/active-palette.ts).
 const STATUS_COLOR: Record<User["status"], string> = {
-  active: colors.green,
-  pending: colors.mustard,
-  disabled: colors.peach,
+  get active() { return colors.green; },
+  get pending() { return colors.mustard; },
+  get disabled() { return colors.peach; },
 };
 
 export function UserListItem({ user }: { user: User }) {
+  const styles = useStyles();
   const displayName = user.full_name ?? user.email.split("@")[0];
 
   return (
@@ -19,19 +23,20 @@ export function UserListItem({ user }: { user: User }) {
       <Avatar name={displayName} size={40} fallback="initial" />
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>{displayName}</Text>
-        <Text style={styles.email} numberOfLines={1}>{user.email}</Text>    
+        <Text style={styles.email} numberOfLines={1}>{user.email}</Text>
+        {user.status === "pending" && user.invite_resend_available_at ? (
+          <ResendInviteButton userId={user.id} availableAt={user.invite_resend_available_at} />
+        ) : null}
       </View>
-     <View style={
-  styles.tags}>
-
-      <PillTag color={user.role === "admin" ? "success" : "info"} label={user.role === "admin" ? "Admin" : "Member"} />
+      <View style={styles.tags}>
+        <PillTag color={user.role === "admin" ? "success" : "info"} label={user.role === "admin" ? "Admin" : "Member"} />
         <Text style={[styles.status, { color: STATUS_COLOR[user.status] }]}>{user.status}</Text>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -48,4 +53,4 @@ const styles = StyleSheet.create({
   email: { ...typography.tiny, color: colors.textSecondary },
   tags: { alignItems: "flex-end", gap: spacing.xs },
   status: { ...typography.tiny, textTransform: "capitalize" },
-});
+}));

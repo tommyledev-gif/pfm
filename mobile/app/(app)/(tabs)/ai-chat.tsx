@@ -12,7 +12,7 @@ import { ChatModeHeader } from "@/features/ai-chat/components/ChatModeHeader";
 import { ChatModePicker } from "@/features/ai-chat/components/ChatModePicker";
 import { ChatThreadList } from "@/features/ai-chat/components/ChatThreadList";
 import { ChatOverlays } from "@/features/ai-chat/components/ChatOverlays";
-import { chatThreadStyles } from "@/features/ai-chat/components/chat-thread-styles";
+import { useChatThreadStyles } from "@/features/ai-chat/components/chat-thread-styles";
 import { ConsultPane } from "@/features/ai-chat/components/ConsultPane";
 import { useTransactionRemoval } from "@/features/ai-chat/components/use-transaction-removal";
 import { ChatMode, useChatModeStore } from "@/features/ai-chat/chat-mode";
@@ -35,6 +35,7 @@ const FOCUS_SCROLL_DELAY_MS = 50;
 const FOCUS_RETRY_DELAY_MS = 100;
 
 export default function AiChatScreen() {
+  const chatThreadStyles = useChatThreadStyles();
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<ChatMessage>>(null);
 

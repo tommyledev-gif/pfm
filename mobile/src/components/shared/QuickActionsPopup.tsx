@@ -1,8 +1,8 @@
 import { useRef } from "react";
-import { Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Platform, Pressable, Text, View } from "react-native";
 
 import { SwipeAction } from "@/components/shared/SwipeActionButton";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 interface QuickActionsPopupProps {
   visible: boolean;
@@ -22,6 +22,8 @@ interface QuickActionsPopupProps {
 // delete ConfirmDialog) while this one is still animating out is silently
 // dropped there. Android has no onDismiss and no such problem.
 export function QuickActionsPopup({ visible, onClose, title, actions }: QuickActionsPopupProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const pending = useRef<(() => void) | null>(null);
 
   const choose = (onPress: () => void) => {
@@ -65,7 +67,7 @@ export function QuickActionsPopup({ visible, onClose, title, actions }: QuickAct
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center", padding: spacing.xl },
   card: {
     width: "100%",
@@ -90,4 +92,4 @@ const styles = StyleSheet.create({
   },
   pressed: { opacity: 0.85 },
   actionLabel: { ...typography.body, fontWeight: "700", color: colors.onGreen },
-});
+}));

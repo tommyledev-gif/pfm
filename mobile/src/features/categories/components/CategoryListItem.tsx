@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { TrashIcon } from "@/components/ui/Icon";
 import { colorForCategory } from "@/lib/category-color";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 import { Category } from "@/features/categories/types";
 import { useDeleteCategoryMutation } from "@/features/categories/api/use-delete-category-mutation";
 
@@ -13,6 +13,7 @@ import { useDeleteCategoryMutation } from "@/features/categories/api/use-delete-
 // circle gets a "System" tag instead of a delete action, and tapping it
 // doesn't open the edit form.
 export function CategoryListItem({ category, onPress }: { category: Category; onPress: () => void }) {
+  const styles = useStyles();
   const isSystem = category.user_id === null;
   const deleteCategory = useDeleteCategoryMutation();
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
@@ -61,7 +62,7 @@ export function CategoryListItem({ category, onPress }: { category: Category; on
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -77,4 +78,4 @@ const styles = StyleSheet.create({
   name: { ...typography.body, color: colors.textPrimary },
   sub: { ...typography.tiny, color: colors.textSecondary },
   deleteButton: { padding: spacing.xs },
-});
+}));

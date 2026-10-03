@@ -1,7 +1,7 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 
 interface WizardResultFooterProps {
   submitting: boolean;
@@ -32,6 +32,7 @@ export function WizardResultFooter({
   planSaved,
   canSubmit,
 }: WizardResultFooterProps) {
+  const styles = useStyles();
   return (
     <View style={styles.footer}>
       {/* Ghost on the left, commit on the right — the ordinary reading order
@@ -79,7 +80,7 @@ export function WizardResultFooter({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   footer: { gap: spacing.xs },
   actionRow: {
     flexDirection: "row",
@@ -114,4 +115,4 @@ const styles = StyleSheet.create({
   },
   primaryBtnDisabled: { opacity: 0.5 },
   primaryLabel: { ...typography.body, color: colors.onGreen },
-});
+}));

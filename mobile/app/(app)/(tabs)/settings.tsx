@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { Avatar } from "@/components/ui/Avatar";
@@ -17,12 +17,13 @@ import {
 import { Screen } from "@/components/shared/Screen";
 import { RevealableAmount } from "@/components/shared/RevealableAmount";
 import { withAlpha } from "@/lib/color";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useSessionStore } from "@/stores/session-store";
 import { useChatStore } from "@/stores/chat-store";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { totalBalance } from "@/features/wallets/wallet-totals";
 import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary-query";
+import { ThemePicker } from "@/features/settings/components/ThemePicker";
 
 // Security/Help & Support have no mobile screens yet — out of the design
 // handoff's scope (it maps them as entry points only). Wallets/Categories/
@@ -57,6 +58,8 @@ function displayNameFromEmail(email: string | null): string {
 }
 
 export default function SettingsScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const email = useSessionStore((s) => s.email);
   const role = useSessionStore((s) => s.role);
@@ -139,6 +142,8 @@ export default function SettingsScreen() {
         />
       </View>
 
+      <ThemePicker />
+
       <View style={styles.settingsGroup}>
         {SETTINGS_ROWS.filter((row) => !row.adminOnly || role === "admin").map(({ label, Icon, href }) => (
           <Pressable key={label} style={styles.row} onPress={href ? () => router.push(href) : undefined} disabled={!href}>
@@ -173,7 +178,7 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bgApp },
   content: { paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: 140, gap: spacing.xl },
   identity: { alignItems: "center", gap: spacing.xs },
@@ -214,12 +219,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: spacing.sm,
     paddingVertical: spacing.md,
-    backgroundColor: "rgba(255,158,150,0.12)",
+    backgroundColor: withAlpha(colors.peach, 0.12),
     borderWidth: 1,
-    borderColor: "rgba(255,158,150,0.35)",
+    borderColor: withAlpha(colors.peach, 0.35),
     borderRadius: 16,
   },
   logoutRowBusy: { opacity: LOGOUT_BUSY_OPACITY },
   logoutLabel: { ...typography.body, color: colors.peach },
   logoutOverlay: { flex: 1, backgroundColor: withAlpha(colors.bgApp, LOGOUT_OVERLAY_ALPHA) },
-});
+}));

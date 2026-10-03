@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
-import { Animated, PanResponder, Pressable, StyleSheet, View } from "react-native";
+import { Animated, PanResponder, Pressable, View } from "react-native";
 
-import { colors } from "@/lib/theme";
+import { createStyles } from "@/lib/theme";
 
 export const WHEEL_ITEM_HEIGHT = 44;
 // Rows visible at once — the selected one plus two either side.
@@ -41,6 +41,7 @@ interface WheelColumnProps {
  * `onChange` fires once, when the wheel settles.
  */
 export function WheelColumn({ items, selectedIndex, onChange, testID }: WheelColumnProps) {
+  const styles = useStyles();
   // Offset of the list in px: `index * WHEEL_ITEM_HEIGHT` puts that row in the middle.
   const offset = useRef(new Animated.Value(selectedIndex * WHEEL_ITEM_HEIGHT)).current;
   const current = useRef(selectedIndex * WHEEL_ITEM_HEIGHT);
@@ -173,7 +174,7 @@ export function WheelColumn({ items, selectedIndex, onChange, testID }: WheelCol
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   // Clips the rows moved out of the window.
   column: { flex: 1, height: WHEEL_ITEM_HEIGHT * WHEEL_VISIBLE_ROWS, overflow: "hidden" },
   // Blank space above the first row, so row 0 can sit in the middle.
@@ -186,4 +187,4 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: colors.textPrimary,
   },
-});
+}));

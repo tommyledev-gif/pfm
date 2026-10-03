@@ -83,9 +83,10 @@ func LoginRateLimiter(logger *zap.Logger) fiber.Handler {
 	return limiter.New(limiter.Config{
 		Max:        common.LoginRateLimit,
 		Expiration: common.LoginRateLimitWindow,
-		KeyGenerator: func(c *fiber.Ctx) string {
-			return c.IP()
-		},
+		// ClientIP, not c.IP(): behind Cloudflare Tunnel c.IP() is the
+		// cloudflared container for every user, so all of them shared one
+		// 10-attempt bucket and one attacker could lock everyone out.
+		KeyGenerator: ClientIP,
 		LimitReached: func(c *fiber.Ctx) error {
 			return response.Error(c, logger, common.ErrRateLimited)
 		},

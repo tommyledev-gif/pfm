@@ -1,7 +1,7 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { Avatar } from "@/components/ui/Avatar";
-import { colors, spacing, typography } from "@/lib/theme";
+import { colors, spacing, typography, createStyles } from "@/lib/theme";
 import { BudgetProgressBar } from "@/features/budgets/components/BudgetProgressBar";
 
 const AVATAR_SIZE = 24;
@@ -49,6 +49,7 @@ export function SnapshotProgressRow({
   onPress,
   testID,
 }: SnapshotProgressRowProps) {
+  const styles = useStyles();
   // Pressable only where there is somewhere to go — a row that highlights on
   // touch and then does nothing reads as a broken link.
   const Container = onPress ? Pressable : View;
@@ -71,7 +72,7 @@ export function SnapshotProgressRow({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   row: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.xs },
   // minWidth 0 so a long category name shrinks and ellipsizes instead of
   // pushing the percentage out of the card.
@@ -79,4 +80,4 @@ const styles = StyleSheet.create({
   meterHeader: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: spacing.xs },
   name: { ...typography.caption, color: colors.textPrimary, flexShrink: 1 },
   percent: { ...typography.tiny, flexShrink: 0 },
-});
+}));

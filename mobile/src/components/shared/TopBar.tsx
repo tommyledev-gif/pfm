@@ -1,14 +1,16 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { BellIcon } from "@/components/ui/Icon";
 import { useNotificationsQuery } from "@/features/notifications/api/use-notifications-query";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 // Home screen's header: wordmark + bell (unread dot, opens Notifications) +
 // avatar (opens Settings) — mobile/design_handoff_pfm_app/README.md "Home".
 export function TopBar({ userName }: { userName: string }) {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const unread = useNotificationsQuery(true);
   const hasUnread = (unread.data?.data.length ?? 0) > 0;
@@ -29,7 +31,7 @@ export function TopBar({ userName }: { userName: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -52,4 +54,4 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.bgApp,
   },
-});
+}));

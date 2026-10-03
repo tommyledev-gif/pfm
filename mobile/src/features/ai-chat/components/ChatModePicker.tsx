@@ -1,8 +1,9 @@
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, Text, View } from "react-native";
 
 import { CheckCircleIcon } from "@/components/ui/Icon";
 import { CHAT_MODE_META, CHAT_MODE_ORDER, ChatMode } from "@/features/ai-chat/chat-mode";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 interface ChatModePickerProps {
   visible: boolean;
@@ -28,6 +29,8 @@ interface ChatModePickerProps {
  * previous "elevated card" version looked like on device.
  */
 export function ChatModePicker({ visible, mode, onClose, onSelect }: ChatModePickerProps) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
@@ -79,7 +82,7 @@ export function ChatModePicker({ visible, mode, onClose, onSelect }: ChatModePic
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.6)",
@@ -112,7 +115,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "transparent",
   },
-  rowPressed: { backgroundColor: "rgba(255,255,255,0.04)" },
+  rowPressed: { backgroundColor: withAlpha(colors.overlayBase, 0.04) },
   iconTile: {
     width: 42,
     height: 42,
@@ -124,4 +127,4 @@ const styles = StyleSheet.create({
   label: { ...typography.body, color: colors.textPrimary },
   description: { ...typography.caption, fontWeight: "500", color: colors.textSecondary },
   checkSlot: { width: 20, height: 20 },
-});
+}));

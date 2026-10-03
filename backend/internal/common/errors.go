@@ -1,6 +1,9 @@
 package common
 
-import "net/http"
+import (
+	"net/http"
+	"time"
+)
 
 // Error code constants returned in the API's { error_code, message, details? }
 // response shape (CLAUDE.md API Design). Never construct these as raw strings
@@ -17,6 +20,11 @@ const (
 	ErrCodeInvalidCredentials  = "INVALID_CREDENTIALS"
 	ErrCodeAccountNotActivated = "ACCOUNT_NOT_ACTIVATED"
 	ErrCodeAccountDisabled     = "ACCOUNT_DISABLED"
+	// ErrCodeUserNotPending/ErrCodeInviteResendCooldown back
+	// POST /admin/users/:id/resend-invite: the user already activated (or
+	// was disabled), vs. the resend cooldown has not elapsed yet.
+	ErrCodeUserNotPending       = "USER_NOT_PENDING"
+	ErrCodeInviteResendCooldown = "INVITE_RESEND_COOLDOWN"
 	// ErrCodeUnauthenticated is used for missing/invalid/expired JWTs. Neither
 	// spec.md nor plan.md names a specific code for this case (their Error
 	// Flows tables show "—"), so this is an implementation-level choice made
@@ -166,6 +174,7 @@ var (
 	ErrRateLimited                = &AppError{Code: ErrCodeRateLimited, Status: http.StatusTooManyRequests, Message: "quá nhiều yêu cầu, vui lòng thử lại sau"}
 	ErrInvalidCredentials         = &AppError{Code: ErrCodeInvalidCredentials, Status: http.StatusUnauthorized, Message: "email hoặc mật khẩu không đúng"}
 	ErrAccountNotActive           = &AppError{Code: ErrCodeAccountNotActivated, Status: http.StatusUnauthorized, Message: "tài khoản này chưa được kích hoạt"}
+	ErrUserNotPending             = &AppError{Code: ErrCodeUserNotPending, Status: http.StatusConflict, Message: "người dùng này không còn ở trạng thái chờ kích hoạt"}
 	ErrAccountDisabled            = &AppError{Code: ErrCodeAccountDisabled, Status: http.StatusUnauthorized, Message: "tài khoản này đã bị vô hiệu hóa"}
 	ErrPasswordMismatch           = &AppError{Code: ErrCodePasswordMismatch, Status: http.StatusBadRequest, Message: "mật khẩu và xác nhận mật khẩu không khớp"}
 	ErrUnauthenticated            = &AppError{Code: ErrCodeUnauthenticated, Status: http.StatusUnauthorized, Message: "yêu cầu xác thực"}
@@ -217,6 +226,17 @@ func NewInvalidInputErrorWithDetails(message string, details interface{}) *AppEr
 // NewWeakPasswordError builds a 400 WEAK_PASSWORD error — kept distinct from
 // INVALID_INPUT because spec.md treats "too short" and "missing" as different
 // codes (S-USR-13 vs S-USR-14).
+// NewInviteResendCooldownError carries when the next resend is allowed, so a
+// client that raced past its own countdown can resync instead of guessing.
+func NewInviteResendCooldownError(availableAt time.Time) *AppError {
+	return &AppError{
+		Code:    ErrCodeInviteResendCooldown,
+		Status:  http.StatusTooManyRequests,
+		Message: "vừa gửi lời mời gần đây, vui lòng đợi rồi thử lại",
+		Details: map[string]interface{}{"available_at": availableAt.UTC()},
+	}
+}
+
 func NewWeakPasswordError(message string) *AppError {
 	return &AppError{Code: ErrCodeWeakPassword, Status: http.StatusBadRequest, Message: message}
 }

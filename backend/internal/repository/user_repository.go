@@ -70,6 +70,21 @@ func (r *UserRepository) ActivateUser(ctx context.Context, inviteToken string, f
 	return toModel(row), nil
 }
 
+// ResendInvite rotates the invite token of a still-pending user. It returns
+// pgx.ErrNoRows when the user is no longer pending or a concurrent resend
+// already moved invite_resend_count past expectedResendCount.
+func (r *UserRepository) ResendInvite(ctx context.Context, id uuid.UUID, inviteToken string, expectedResendCount int32) (*model.User, error) {
+	row, err := r.q.ResendInvite(ctx, sqlc.ResendInviteParams{
+		ID:                id,
+		InviteToken:       inviteToken,
+		InviteResendCount: expectedResendCount,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("repository.ResendInvite: %w", err)
+	}
+	return toModel(row), nil
+}
+
 func (r *UserRepository) GetUserByEmail(ctx context.Context, email string) (*model.User, error) {
 	row, err := r.q.GetUserByEmail(ctx, email)
 	if err != nil {
@@ -125,18 +140,20 @@ func (r *UserRepository) CountUsers(ctx context.Context, status, role *string) (
 
 func toModel(row sqlc.User) *model.User {
 	return &model.User{
-		ID:              row.ID,
-		Email:           row.Email,
-		FullName:        row.FullName,
-		PasswordHash:    row.PasswordHash,
-		Status:          model.UserStatus(row.Status),
-		Role:            model.UserRole(row.Role),
-		InvitedBy:       row.InvitedBy,
-		InviteToken:     row.InviteToken,
-		InviteExpiresAt: row.InviteExpiresAt,
-		ActivatedAt:     row.ActivatedAt,
-		CreatedAt:       row.CreatedAt,
-		UpdatedAt:       row.UpdatedAt,
-		DeletedAt:       row.DeletedAt,
+		ID:                row.ID,
+		Email:             row.Email,
+		FullName:          row.FullName,
+		PasswordHash:      row.PasswordHash,
+		Status:            model.UserStatus(row.Status),
+		Role:              model.UserRole(row.Role),
+		InvitedBy:         row.InvitedBy,
+		InviteToken:       row.InviteToken,
+		InviteExpiresAt:   row.InviteExpiresAt,
+		ActivatedAt:       row.ActivatedAt,
+		CreatedAt:         row.CreatedAt,
+		UpdatedAt:         row.UpdatedAt,
+		DeletedAt:         row.DeletedAt,
+		InviteSentAt:      row.InviteSentAt,
+		InviteResendCount: row.InviteResendCount,
 	}
 }

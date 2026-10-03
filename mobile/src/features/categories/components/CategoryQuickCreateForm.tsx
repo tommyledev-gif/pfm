@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Keyboard, Pressable, Text, TextInput, View } from "react-native";
 
 import { OpenMojiGrid } from "@/components/shared/OpenMojiGrid";
 import { EmojiGlyph } from "@/components/ui/EmojiGlyph";
@@ -9,7 +9,7 @@ import { SegmentedTabOption, SegmentedTabs } from "@/components/ui/SegmentedTabs
 import { useCreateCategoryMutation } from "@/features/categories/api/use-create-category-mutation";
 import { getErrorMessage } from "@/lib/axios";
 import { CATEGORY_NAME_MAX_LENGTH, CategoryType } from "@/lib/constants";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 interface CategoryQuickCreateFormProps {
   /** What the User was searching for — usually the very name they wanted. */
@@ -43,6 +43,8 @@ const TYPE_OPTIONS: SegmentedTabOption<CategoryType>[] = [
  * permission flow and a round trip; the full form in Settings still owns that.
  */
 export function CategoryQuickCreateForm({ initialName, onCreated, onCancel }: CategoryQuickCreateFormProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const [name, setName] = useState(initialName);
   const [icon, setIcon] = useState("");
   const [type, setType] = useState<CategoryType>("expense");
@@ -147,7 +149,7 @@ export function CategoryQuickCreateForm({ initialName, onCreated, onCancel }: Ca
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   fill: { flex: 1 },
   form: { gap: spacing.xl },
   group: { gap: spacing.sm },
@@ -178,4 +180,4 @@ const styles = StyleSheet.create({
   pickerHead: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingBottom: spacing.md },
   pickerTitle: { flex: 1, ...typography.cardTitle, color: colors.textPrimary },
   textAction: { ...typography.label, color: colors.textSecondary },
-});
+}));

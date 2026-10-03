@@ -1,7 +1,7 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { formatDateViShort } from "@/lib/format-date";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 import { Transaction } from "@/features/transactions/types";
 
 interface FutureTransactionsCardProps {
@@ -20,6 +20,7 @@ interface FutureTransactionsCardProps {
  * and cost nothing until asked for.
  */
 export function FutureTransactionsCard({ transactions, onPress }: FutureTransactionsCardProps) {
+  const styles = useStyles();
   if (transactions.length === 0) return null;
   const next = transactions[0];
 
@@ -36,7 +37,7 @@ export function FutureTransactionsCard({ transactions, onPress }: FutureTransact
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   card: {
     flexDirection: "row",
     alignItems: "center",
@@ -57,4 +58,4 @@ const styles = StyleSheet.create({
   title: { ...typography.label, color: colors.textPrimary },
   subtitle: { ...typography.tiny, color: colors.textSecondary },
   chevron: { ...typography.title, color: colors.textMuted },
-});
+}));

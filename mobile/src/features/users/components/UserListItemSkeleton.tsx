@@ -1,11 +1,12 @@
-import { StyleSheet, View } from "react-native";
+import { View } from "react-native";
 
 import { SkeletonBlock } from "@/components/ui/SkeletonBlock";
-import { colors, radii, spacing } from "@/lib/theme";
+import { radii, spacing, createStyles } from "@/lib/theme";
 
 // Mirrors UserListItem's own StyleSheet (40px avatar circle, listCard
 // radius, gap md).
 export function UserListItemSkeleton() {
+  const styles = useStyles();
   return (
     <View style={styles.row}>
       <SkeletonBlock width={40} height={40} borderRadius={20} />
@@ -18,7 +19,7 @@ export function UserListItemSkeleton() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -31,4 +32,4 @@ const styles = StyleSheet.create({
     borderRadius: radii.listCard,
   },
   info: { flex: 1, gap: 4 },
-});
+}));

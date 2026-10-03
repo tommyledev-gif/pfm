@@ -1,11 +1,12 @@
-import { StyleSheet, View } from "react-native";
+import { View } from "react-native";
 
 import { SkeletonBlock } from "@/components/ui/SkeletonBlock";
-import { colors, spacing } from "@/lib/theme";
+import { spacing, createStyles } from "@/lib/theme";
 
 // Mirrors BudgetListRow's own StyleSheet (36px icon tile, name + headline
 // figure, one full-width bar, then the caption/amounts pair).
 export function BudgetCardSkeleton() {
+  const styles = useStyles();
   return (
     <View style={styles.row}>
       <View style={styles.headRow}>
@@ -23,7 +24,7 @@ export function BudgetCardSkeleton() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   row: {
     gap: spacing.sm,
     paddingVertical: spacing.lg,
@@ -33,4 +34,4 @@ const styles = StyleSheet.create({
   headRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   spacer: { flex: 1 },
   footRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-});
+}));

@@ -1,6 +1,6 @@
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, View } from "react-native";
 
-import { colors } from "@/lib/theme";
+import { createStyles } from "@/lib/theme";
 
 export interface BarSegment {
   key: string;
@@ -43,6 +43,7 @@ const SEGMENT_GAP = 2;
 // is spent yet and every block is a plan. Merging them would mean a component
 // with two mutually exclusive halves.
 export function SegmentedBar({ segments, height = 8, onPressSegment, activeKey }: SegmentedBarProps) {
+  const styles = useStyles();
   // Fully rounded ends, same derivation as BudgetProgressBar — the two bars
   // appear on adjacent screens and a different corner treatment reads as a
   // mistake rather than a distinction.
@@ -81,7 +82,7 @@ export function SegmentedBar({ segments, height = 8, onPressSegment, activeKey }
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   track: {
     width: "100%",
     flexDirection: "row",
@@ -103,4 +104,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.textMuted,
     transform: [{ rotate: "30deg" }],
   },
-});
+}));

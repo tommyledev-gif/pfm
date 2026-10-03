@@ -52,6 +52,7 @@ func (f *fakeUserRepo) CreatePendingUser(_ context.Context, email string, role m
 		InvitedBy:       &invitedBy,
 		InviteToken:     &inviteToken,
 		InviteExpiresAt: &expiresAt,
+		InviteSentAt:    &now,
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	}
@@ -99,6 +100,47 @@ func (f *fakeUserRepo) ActivateUser(_ context.Context, inviteToken string, fullN
 
 	cp := *u
 	return &cp, nil
+}
+
+// ResendInvite mirrors the real conditional UPDATE, including its
+// invite_resend_count optimistic-concurrency check.
+func (f *fakeUserRepo) ResendInvite(_ context.Context, id uuid.UUID, inviteToken string, expectedResendCount int32) (*model.User, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	for _, u := range f.byEmail {
+		if u.ID != id {
+			continue
+		}
+		if u.Status != model.UserStatusPending || u.InviteResendCount != expectedResendCount {
+			return nil, pgx.ErrNoRows
+		}
+		if u.InviteToken != nil {
+			delete(f.byToken, *u.InviteToken)
+		}
+		now := time.Now().UTC()
+		expiresAt := now.Add(72 * time.Hour)
+		u.InviteToken = &inviteToken
+		u.InviteExpiresAt = &expiresAt
+		u.InviteSentAt = &now
+		u.InviteResendCount++
+		f.byToken[inviteToken] = u
+		cp := *u
+		return &cp, nil
+	}
+	return nil, pgx.ErrNoRows
+}
+
+// backdateInviteSentAt lets cooldown tests skip ahead without sleeping.
+func (f *fakeUserRepo) backdateInviteSentAt(id uuid.UUID, by time.Duration) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, u := range f.byEmail {
+		if u.ID == id && u.InviteSentAt != nil {
+			t := u.InviteSentAt.Add(-by)
+			u.InviteSentAt = &t
+		}
+	}
 }
 
 func (f *fakeUserRepo) GetUserByEmail(_ context.Context, email string) (*model.User, error) {

@@ -1,7 +1,7 @@
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, Text, View } from "react-native";
 
 import { PillButton } from "@/components/ui/PillButton";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 
 interface WizardBackConfirmDialogProps {
   visible: boolean;
@@ -25,6 +25,7 @@ interface WizardBackConfirmDialogProps {
  * change, so keeping the categories cannot keep the numbers.
  */
 export function WizardBackConfirmDialog({ visible, onKeep, onDiscard, onCancel }: WizardBackConfirmDialogProps) {
+  const styles = useStyles();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <Pressable style={styles.backdrop} onPress={onCancel}>
@@ -47,7 +48,7 @@ export function WizardBackConfirmDialog({ visible, onKeep, onDiscard, onCancel }
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.6)",
@@ -71,4 +72,4 @@ const styles = StyleSheet.create({
   action: { width: "100%" },
   cancelRow: { alignItems: "center", paddingTop: spacing.xs },
   cancelLabel: { ...typography.caption, color: colors.textMuted },
-});
+}));

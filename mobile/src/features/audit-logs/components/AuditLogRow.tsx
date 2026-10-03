@@ -1,8 +1,8 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import { formatCurrency } from "@/lib/currency";
 import { formatDateShort, formatTime } from "@/lib/format-date";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { colors, radii, spacing, typography, createStyles } from "@/lib/theme";
 import { AuditAction, AuditLogEntry, AuditSnapshot } from "@/features/audit-logs/types";
 
 const ACTION_LABEL: Record<AuditAction, string> = {
@@ -11,10 +11,12 @@ const ACTION_LABEL: Record<AuditAction, string> = {
   delete: "Đã xóa",
 };
 
+// Getters, not values: read at render time so they follow a theme switch
+// (see src/theme/active-palette.ts).
 const ACTION_COLOR: Record<AuditAction, string> = {
-  create: colors.green,
-  update: colors.mustard,
-  delete: colors.peach,
+  get create() { return colors.green; },
+  get update() { return colors.mustard; },
+  get delete() { return colors.peach; },
 };
 
 const FIELD_LABEL: Record<string, string> = {
@@ -41,6 +43,7 @@ interface AuditLogRowProps {
 // create/delete (a full snapshot rather than a diff) it renders the snapshot
 // as a compact summary line instead of a list of arrows.
 export function AuditLogRow({ entry, resolveCategoryName, resolveWalletName, currency }: AuditLogRowProps) {
+  const styles = useStyles();
   const formatValue = (field: string, value: unknown): string => {
     if (value === null || value === undefined) return "—";
     switch (field) {
@@ -121,7 +124,7 @@ export function AuditLogRow({ entry, resolveCategoryName, resolveWalletName, cur
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   row: {
     gap: spacing.sm,
     padding: spacing.md,
@@ -144,4 +147,4 @@ const styles = StyleSheet.create({
   removedNote: { ...typography.tiny, color: colors.peach },
   fieldLabel: { color: colors.textMuted },
   newValue: { color: colors.textPrimary, fontWeight: "700" },
-});
+}));

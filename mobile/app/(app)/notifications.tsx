@@ -1,18 +1,20 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, SectionList, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { ChevronLeftIcon, SearchIcon } from "@/components/ui/Icon";
 import { Screen } from "@/components/shared/Screen";
 import { NotificationRow } from "@/features/notifications/components/NotificationRow";
 import { dayLabel } from "@/lib/format-date";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useNotificationsQuery } from "@/features/notifications/api/use-notifications-query";
 import { useMarkNotificationReadMutation } from "@/features/notifications/api/use-mark-notification-read-mutation";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { Notification } from "@/features/notifications/types";
 
 export default function NotificationsScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [searchInput, setSearchInput] = useState("");
@@ -126,7 +128,7 @@ export default function NotificationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bgApp },
   header: {
     flexDirection: "row",
@@ -172,4 +174,4 @@ const styles = StyleSheet.create({
   sectionHeader: { ...typography.caption, color: colors.textMuted, paddingHorizontal: spacing.sm, paddingVertical: spacing.sm },
   loader: { marginTop: spacing.xxl },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
-});
+}));

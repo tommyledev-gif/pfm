@@ -8,7 +8,8 @@ import { SnapshotProgressRow } from "@/components/shared/SnapshotProgressRow";
 import { RowPlaceholders, SnapshotHeader } from "@/features/reports/components/SnapshotColumnParts";
 import { colorForCategory } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { Budget } from "@/features/budgets/types";
 import { BudgetRowStatus } from "@/features/budgets/budget-pace";
 import { Category } from "@/features/categories/types";
@@ -81,6 +82,8 @@ export function HomeSnapshotCard({
   onOpenBudgets,
   onOpenInsights,
 }: HomeSnapshotCardProps) {
+  const colors = useColors();
+  const styles = useStyles();
   // Measured rather than assumed — see RING_MIN_SIZE. Zero until the first
   // layout pass, which clamps to the floor for that one frame.
   const [ringColumnWidth, setRingColumnWidth] = useState(0);
@@ -262,7 +265,7 @@ export function HomeSnapshotCard({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   card: { gap: spacing.md },
   body: { gap: spacing.md },
   hidden: { opacity: 0 },
@@ -277,14 +280,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.navBorder,
   },
-  trendNegative: { backgroundColor: "rgba(255,158,150,0.12)", borderColor: "rgba(255,158,150,0.35)" },
-  trendPositive: { backgroundColor: "rgba(133,255,51,0.1)", borderColor: "rgba(133,255,51,0.3)" },
+  trendNegative: { backgroundColor: withAlpha(colors.peach, 0.12), borderColor: withAlpha(colors.peach, 0.35) },
+  trendPositive: { backgroundColor: withAlpha(colors.green, 0.1), borderColor: withAlpha(colors.green, 0.3) },
   trendLabel: { ...typography.tiny },
   row: { flexDirection: "row", gap: spacing.md, alignItems: "flex-start",  },
-  // A 4/8 split, widened from 3/9: the meters are still the thing being read,
-  // but 3/12 left the ring column narrower than its own contents. Both need a
-  // zero minimum — with no floor, a long category name would widen the right
-  // column and squeeze the left one below its measured width.
+  // Widened from 3/9 (the ring column was narrower than its contents). Both
+  // need a zero minimum, or a long category name widens the right column and
+  // squeezes the left one below its measured width.
   left: { flex: 6, minWidth: 0, alignItems: "center", gap: 2 },
   right: { flex: 6, gap: 2, minWidth: 0 },
   // Stepped down and centered: at 3/12 the column is about eleven characters.
@@ -296,4 +298,4 @@ const styles = StyleSheet.create({
   // block into one undifferentiated paragraph.
   status: { ...typography.tiny, color: colors.textMuted, textAlign: "center" },
   emptyRight: { ...typography.tiny, color: colors.textMuted, position: "absolute", top: spacing.sm, left: 0, right: 0 },
-});
+}));

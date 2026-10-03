@@ -1,8 +1,8 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { ChevronRightIcon } from "@/components/ui/Icon";
 import { formatCurrency } from "@/lib/currency";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { DaySection } from "@/features/transactions/day-sections";
 
 // One calendar day's section header in the Transactions list: a collapse
@@ -10,6 +10,8 @@ import { DaySection } from "@/features/transactions/day-sections";
 // anywhere on the row folds the day away — the count in parentheses then says
 // how many rows are hidden.
 export function TransactionDayHeader({ section, onToggle }: { section: DaySection; onToggle: () => void }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <Pressable style={styles.row} onPress={onToggle} hitSlop={6}>
       <View style={styles.left}>
@@ -35,7 +37,7 @@ export function TransactionDayHeader({ section, onToggle }: { section: DaySectio
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -54,4 +56,4 @@ const styles = StyleSheet.create({
   count: { ...typography.tiny, color: colors.textMuted },
   totals: { alignItems: "flex-end", flexShrink: 0 },
   subtotal: { ...typography.label, fontWeight: "700" },
-});
+}));

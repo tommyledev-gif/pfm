@@ -1,7 +1,7 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import { formatCurrency } from "@/lib/currency";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { MonthPace } from "@/features/budgets/budget-pace";
 import { BudgetProgressBar } from "@/features/budgets/components/BudgetProgressBar";
 
@@ -33,6 +33,8 @@ export function BudgetMonthSummary({
   currency,
   overCount = 0,
 }: BudgetMonthSummaryProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const remaining = totalLimit - totalSpent;
   const ratio = totalLimit > 0 ? totalSpent / totalLimit : 0;
   const over = remaining < 0;
@@ -83,7 +85,7 @@ export function BudgetMonthSummary({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   container: { gap: spacing.sm },
   headRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   month: { ...typography.cardTitle, color: colors.textPrimary },
@@ -95,4 +97,4 @@ const styles = StyleSheet.create({
   amountLimit: { color: colors.textPrimary },
   paceLabel: { ...typography.tiny, color: colors.textMuted, textAlign: "center" },
   overNote: { ...typography.caption, color: colors.mustard },
-});
+}));

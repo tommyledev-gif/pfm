@@ -1,10 +1,11 @@
 import { useRef, useState } from "react";
-import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Keyboard, Pressable, Text, TextInput, View } from "react-native";
 
 import { PillButton } from "@/components/ui/PillButton";
 import { EyeIcon, EyeOffIcon } from "@/components/ui/Icon";
 import { getErrorMessage } from "@/lib/axios";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useLoginMutation } from "@/features/auth/api/use-login-mutation";
 
 // Backend error messages are lowercase sentence fragments (e.g. "invalid
@@ -15,6 +16,8 @@ function capitalize(text: string): string {
 }
 
 export function LoginForm() {
+  const colors = useColors();
+  const styles = useStyles();
   const [email, setEmail] = useState("owner@example.com");
   const [password, setPassword] = useState("000000");
   const [showPassword, setShowPassword] = useState(false);
@@ -87,7 +90,7 @@ export function LoginForm() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   form: { width: "100%", gap: spacing.md },
   input: {
     backgroundColor: colors.surface,
@@ -118,12 +121,12 @@ const styles = StyleSheet.create({
   eyeButton: { padding: spacing.xs },
   button: { marginTop: spacing.sm, backgroundColor: colors.greenDark },
   errorBox: {
-    backgroundColor: "rgba(255,158,150,0.12)",
+    backgroundColor: withAlpha(colors.peach, 0.12),
     borderWidth: 1,
-    borderColor: "rgba(255,158,150,0.35)",
+    borderColor: withAlpha(colors.peach, 0.35),
     borderRadius: radii.listCard,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
   },
   error: { color: colors.peach, ...typography.caption },
-});
+}));

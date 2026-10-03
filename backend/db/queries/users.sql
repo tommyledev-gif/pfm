@@ -1,6 +1,6 @@
 -- name: CreatePendingUser :one
-INSERT INTO users (email, role, invited_by, invite_token, invite_expires_at)
-VALUES ($1, $2, $3, $4, NOW() + INTERVAL '72 hours')
+INSERT INTO users (email, role, invited_by, invite_token, invite_expires_at, invite_sent_at)
+VALUES ($1, $2, $3, $4, NOW() + INTERVAL '72 hours', NOW())
 RETURNING *;
 
 -- name: GetUserByInviteToken :one
@@ -26,6 +26,25 @@ SET
 WHERE invite_token = $1
   AND status = 'pending'
   AND invite_expires_at > NOW()
+RETURNING *;
+
+-- name: ResendInvite :one
+-- Rotates the token (the previous email's link stops working) and restarts
+-- the 72h expiry, so an already-expired invite can be revived too. The
+-- invite_resend_count = $3 condition is the optimistic-concurrency check:
+-- UserService passes the count it based its cooldown decision on, so of two
+-- concurrent resends only one matches and the other gets pgx.ErrNoRows.
+UPDATE users
+SET
+    invite_token        = $2,
+    invite_expires_at   = NOW() + INTERVAL '72 hours',
+    invite_sent_at      = NOW(),
+    invite_resend_count = invite_resend_count + 1,
+    updated_at          = NOW()
+WHERE id = $1
+  AND status = 'pending'
+  AND deleted_at IS NULL
+  AND invite_resend_count = $3
 RETURNING *;
 
 -- name: GetUserByEmail :one

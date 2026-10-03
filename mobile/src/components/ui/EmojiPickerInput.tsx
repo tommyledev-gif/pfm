@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { EmojiGlyph } from "@/components/ui/EmojiGlyph";
 import { OpenMojiGrid } from "@/components/shared/OpenMojiGrid";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 
 interface EmojiPickerInputProps {
   value: string;
@@ -23,6 +24,7 @@ interface EmojiPickerInputProps {
 // fixed-height inline mode — this field lives inside lists that already
 // scroll. Forms that own a Drawer use use-icon-picker's panel instead.
 export function EmojiPickerInput({ value, onChange, placeholder = "Chọn emoji" }: EmojiPickerInputProps) {
+  const styles = useStyles();
   const [open, setOpen] = useState(false);
 
   return (
@@ -54,11 +56,11 @@ export function EmojiPickerInput({ value, onChange, placeholder = "Chọn emoji"
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   row: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   flex: { flex: 1 },
   input: {
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     borderRadius: radii.listCard,
@@ -74,9 +76,9 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     marginTop: spacing.sm,
     padding: spacing.sm,
-    backgroundColor: "rgba(255,255,255,0.04)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.04),
     borderRadius: radii.listCard,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
   },
-});
+}));

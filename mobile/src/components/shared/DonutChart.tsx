@@ -4,7 +4,7 @@ import Svg, { Path } from "react-native-svg";
 
 import { formatCurrency, formatCurrencyCompact } from "@/lib/currency";
 import { useEntryAnimation } from "@/lib/use-entry-animation";
-import { colors, typography } from "@/lib/theme";
+import { typography, createStyles } from "@/lib/theme";
 
 export interface DonutSegment {
   key: string;
@@ -121,6 +121,7 @@ export function DonutChart({
   budgetTotal = null,
   onPressDetails,
 }: DonutChartProps) {
+  const styles = useStyles();
   const tooltipHeight = onPressDetails ? TOOLTIP_HEIGHT_WITH_LINK : TOOLTIP_HEIGHT;
   const radius = (size - STROKE_WIDTH) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -278,7 +279,7 @@ export function DonutChart({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   wrapper: { alignItems: "center", justifyContent: "center" },
   center: { position: "absolute", alignItems: "center", gap: 2, paddingHorizontal: 24 },
   centerLabel: { ...typography.caption, color: colors.textSecondary },
@@ -312,4 +313,4 @@ const styles = StyleSheet.create({
     textDecorationColor: colors.green,
     marginTop: 2,
   },
-});
+}));

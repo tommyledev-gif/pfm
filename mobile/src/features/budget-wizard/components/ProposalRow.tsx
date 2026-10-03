@@ -1,7 +1,7 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { formatCurrency } from "@/lib/currency";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles } from "@/lib/theme";
 import { ConfidenceBadge, ProposalEntry, confidenceBadge } from "@/features/budget-wizard/types";
 
 interface ProposalRowProps {
@@ -37,6 +37,7 @@ export function ProposalRow({
   onRemove,
   onPressConfidence,
 }: ProposalRowProps) {
+  const styles = useStyles();
   const badge = confidenceBadge(entry.source);
 
   return (
@@ -83,7 +84,7 @@ export function ProposalRow({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -99,4 +100,4 @@ const styles = StyleSheet.create({
   amount: { ...typography.label, color: colors.textPrimary },
   band: { ...typography.tiny, color: colors.textMuted },
   remove: { ...typography.body, color: colors.textMuted, paddingLeft: spacing.xs },
-});
+}));

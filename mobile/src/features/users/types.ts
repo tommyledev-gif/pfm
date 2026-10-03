@@ -10,6 +10,10 @@ export interface User {
   role: UserRole;
   activated_at: string | null;
   created_at: string;
+  // Pending users only: the earliest moment POST
+  // /admin/users/:id/resend-invite accepts (1 minute after the invite, then
+  // 30 minutes after each resend). null for active/disabled users.
+  invite_resend_available_at: string | null;
 }
 
 export interface PaginationInfo {

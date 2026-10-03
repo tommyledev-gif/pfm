@@ -1,7 +1,8 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { CheckIcon, SparkleIcon } from "@/components/ui/Icon";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 interface BudgetWizardCardProps {
   // Client-side-only state (spec.md US-02 Edge Cases #2) — not persisted,
@@ -18,6 +19,8 @@ interface BudgetWizardCardProps {
 // prompt before the wizard has been run from this card, a compact read-only
 // row once it has (S-BWZ-06).
 export function BudgetWizardCard({ submitted, createdCount, onPress }: BudgetWizardCardProps) {
+  const colors = useColors();
+  const styles = useStyles();
   if (submitted) {
     return (
       <View style={styles.compactRow}>
@@ -35,7 +38,7 @@ export function BudgetWizardCard({ submitted, createdCount, onPress }: BudgetWiz
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   card: {
     flexDirection: "row",
     alignItems: "center",
@@ -43,11 +46,11 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     padding: spacing.md,
     borderRadius: radii.listCard,
-    backgroundColor: "rgba(133,255,51,0.1)",
+    backgroundColor: withAlpha(colors.green, 0.1),
     borderWidth: 1,
     borderColor: colors.green,
   },
   label: { ...typography.body, color: colors.textPrimary },
   compactRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.sm },
   compactLabel: { ...typography.caption, color: colors.textSecondary },
-});
+}));

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 
 import { SegmentedBar } from "@/components/shared/SegmentedBar";
 import { EditAmountModal } from "@/features/budget-wizard/components/EditAmountModal";
@@ -15,7 +15,8 @@ import { buildProposalSegments, segmentLegendEntry } from "@/features/budget-wiz
 import { BudgetProposalsResponse, ConfidenceBadge, ProposalEntry } from "@/features/budget-wizard/types";
 import { buildCategoryColorMap } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 interface WizardStepResultProps {
   currency: string;
@@ -90,6 +91,8 @@ export function WizardStepResult({
   planSaved,
   canSubmit,
 }: WizardStepResultProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const [editing, setEditing] = useState<ProposalEntry | null>(null);
   // Which block of the allocation bar the user is asking about, and which
   // row's figure they are asking the provenance of. Both are transient
@@ -254,7 +257,7 @@ export function WizardStepResult({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   container: { flex: 1 },
   centered: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.md, padding: spacing.xl },
   errorText: { ...typography.body, color: colors.textSecondary, textAlign: "center" },
@@ -262,7 +265,7 @@ const styles = StyleSheet.create({
   notice: {
     borderLeftWidth: 2,
     borderLeftColor: colors.green,
-    backgroundColor: "rgba(133,255,51,0.06)",
+    backgroundColor: withAlpha(colors.green, 0.06),
     borderRadius: 8,
     padding: spacing.md,
   },
@@ -291,4 +294,4 @@ const styles = StyleSheet.create({
     borderColor: colors.surfaceBorder,
   },
   secondaryLabel: { ...typography.body, color: colors.textPrimary },
-});
+}));

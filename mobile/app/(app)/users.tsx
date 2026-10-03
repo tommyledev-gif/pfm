@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { ChevronLeftIcon, PlusIcon } from "@/components/ui/Icon";
 import { Screen } from "@/components/shared/Screen";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useUsersQuery } from "@/features/users/api/use-users-query";
 import { UserListItem } from "@/features/users/components/UserListItem";
 import { UserListItemSkeleton } from "@/features/users/components/UserListItemSkeleton";
@@ -16,6 +16,8 @@ const LIST_SKELETON_COUNT = 4;
 // GET/POST /admin/users* (403 for members); mobile does not add a
 // client-side gate, same precedent as frontend/src/app/app/users/page.tsx.
 export default function UsersScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const users = useUsersQuery();
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -60,7 +62,7 @@ export default function UsersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -81,4 +83,4 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl },
   skeletonSpacing: { marginTop: spacing.sm },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
-});
+}));

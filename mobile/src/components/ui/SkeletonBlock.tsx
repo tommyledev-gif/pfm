@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AccessibilityInfo, Animated, StyleProp, ViewStyle } from "react-native";
 
-import { colors } from "@/lib/theme";
+import { useColors } from "@/lib/theme";
 
 interface SkeletonBlockProps {
   width: number | `${number}%`;
@@ -21,6 +21,7 @@ const STATIC_OPACITY = 0.6;
 // Finding #3), not shared/hoisted, so unmounting one skeleton never
 // disrupts another's animation loop.
 export function SkeletonBlock({ width, height, borderRadius = 8, style }: SkeletonBlockProps) {
+  const colors = useColors();
   const opacity = useRef(new Animated.Value(MIN_OPACITY)).current;
   const [reduceMotion, setReduceMotion] = useState(false);
 

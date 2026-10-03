@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { FlatList, Modal, Pressable, Share, StyleSheet, Text, View } from "react-native";
+import { FlatList, Modal, Pressable, Share, Text, View } from "react-native";
 import { usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 import { LogEntry, useDebugLogStore } from "@/stores/debug-log-store";
 
 interface DebugLogViewerProps {
@@ -25,6 +25,7 @@ function serializeLog(entries: LogEntry[]): string {
 // specs/mobile-debug-console/spec.md. Reverse-chronological, newest first,
 // tap an entry to expand its detail.
 export function DebugLogViewer({ visible, onClose }: DebugLogViewerProps) {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const entries = useDebugLogStore((s) => s.entries);
@@ -88,7 +89,7 @@ export function DebugLogViewer({ visible, onClose }: DebugLogViewerProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   container: { flex: 1, backgroundColor: colors.bgApp },
   header: {
     flexDirection: "row",
@@ -128,4 +129,4 @@ const styles = StyleSheet.create({
   summary: { ...typography.label, color: colors.textPrimary },
   detail: { ...typography.tiny, color: colors.textSecondary, marginTop: spacing.xs },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
-});
+}));

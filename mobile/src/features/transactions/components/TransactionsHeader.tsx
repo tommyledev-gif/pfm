@@ -1,11 +1,12 @@
 import { ReactNode } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
 import { CalendarIcon, DownloadIcon, SearchIcon, SortIcon, TagIcon, UploadIcon } from "@/components/ui/Icon";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { FilterPill } from "@/features/transactions/components/FilterPill";
 import { formatCurrency, formatCurrencyCompact } from "@/lib/currency";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { TransactionKind } from "@/lib/constants";
 import { ReportTotal } from "@/features/reports/types";
 
@@ -72,6 +73,8 @@ export function TransactionsHeader({
   importing,
   children,
 }: TransactionsHeaderProps) {
+  const colors = useColors();
+  const styles = useStyles();
   // The summary line's figure follows whichever tab is active: on Thu nhập
   // it's the income figure (green, the positive register used for income
   // everywhere else in the app), otherwise the expense figure in the danger
@@ -203,7 +206,7 @@ export function TransactionsHeader({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   header: { gap: spacing.md },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   titleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
@@ -214,7 +217,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "rgba(133,255,51,0.3)",
+    borderColor: withAlpha(colors.green, 0.3),
   },
   countBadgeLabel: { ...typography.tiny, color: colors.green, fontWeight: "700" },
   periodNote: { ...typography.tiny, color: colors.textMuted, marginTop: 2 },
@@ -250,4 +253,4 @@ const styles = StyleSheet.create({
     borderColor: colors.bgApp,
   },
   sortBadgeText: { fontSize: 10, fontWeight: "700", color: colors.onGreen },
-});
+}));

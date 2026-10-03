@@ -1,11 +1,11 @@
 import { useMemo } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 
 import { Drawer } from "@/components/shared/Drawer";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
 import { formatCurrencyTruncated } from "@/lib/currency";
 import { formatDateShort, formatTime } from "@/lib/format-date";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useAuditLogsQuery } from "@/features/audit-logs/api/use-audit-logs-query";
 import { AuditAction, AuditLogEntry } from "@/features/audit-logs/types";
 import { TombstoneKind } from "@/features/ai-chat/tombstone";
@@ -55,6 +55,8 @@ export function TransactionHistoryDrawer({
   resolveWalletName,
   onClose,
 }: TransactionHistoryDrawerProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const transactionId = kind === "deleted" ? message?.transactionId : undefined;
   const auditLogs = useAuditLogsQuery(transactionId, Boolean(transactionId));
 
@@ -167,7 +169,7 @@ export function TransactionHistoryDrawer({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   body: { gap: spacing.md },
   notice: { ...typography.caption, color: colors.textMuted, lineHeight: 18 },
   loader: { marginVertical: spacing.lg },
@@ -187,4 +189,4 @@ const styles = StyleSheet.create({
   entryDetail: { ...typography.caption, color: colors.textSecondary },
   fieldLabel: { color: colors.textMuted },
   newValue: { color: colors.textPrimary, fontWeight: "700" },
-});
+}));

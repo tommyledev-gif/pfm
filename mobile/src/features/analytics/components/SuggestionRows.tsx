@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { ChevronRightIcon } from "@/components/ui/Icon";
 import { AnalyticsFollowUp } from "@/features/analytics/types";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 interface SuggestionRowsProps {
   chips: AnalyticsFollowUp[];
@@ -23,6 +23,8 @@ const DISABLED_OPACITY = 0.5;
  * The same chip data the backend sends, so nothing here invents a question.
  */
 export function SuggestionRows({ chips, onPress, disabled, testIDPrefix }: SuggestionRowsProps) {
+  const colors = useColors();
+  const styles = useStyles();
   if (chips.length === 0) return null;
   return (
     <View style={styles.list}>
@@ -43,7 +45,7 @@ export function SuggestionRows({ chips, onPress, disabled, testIDPrefix }: Sugge
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   list: { marginTop: spacing.md, borderRadius: radii.listCard, backgroundColor: colors.surface, overflow: "hidden" },
   row: {
     flexDirection: "row",
@@ -56,4 +58,4 @@ const styles = StyleSheet.create({
   pressed: { backgroundColor: colors.surfaceRaised },
   label: { ...typography.body, color: colors.textPrimary, flex: 1 },
   disabled: { opacity: DISABLED_OPACITY },
-});
+}));

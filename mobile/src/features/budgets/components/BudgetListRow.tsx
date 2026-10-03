@@ -1,8 +1,9 @@
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Pressable, Text, View } from "react-native";
 
 import { formatCurrency } from "@/lib/currency";
 import { useHoldProgress } from "@/lib/use-hold-progress";
-import { colors, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { budgetRowStatus } from "@/features/budgets/budget-pace";
 import { BudgetIconTile } from "@/features/budgets/components/BudgetIconTile";
 import { BudgetProgressBar } from "@/features/budgets/components/BudgetProgressBar";
@@ -48,6 +49,8 @@ export function BudgetListRow({
   onPressBar,
   highlighted,
 }: BudgetListRowProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const status = budgetRowStatus(limit, periodElapsed);
   const { progress, start, cancel } = useHoldProgress();
   const nameColor = progress.interpolate({ inputRange: [0, 1], outputRange: [colors.textPrimary, colors.green] });
@@ -114,14 +117,14 @@ export function BudgetListRow({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   row: {
     gap: spacing.sm,
     paddingVertical: spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.surfaceBorder,
   },
-  rowHighlighted: { backgroundColor: "rgba(133,255,51,0.06)" },
+  rowHighlighted: { backgroundColor: withAlpha(colors.green, 0.06) },
   headRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   name: { flex: 1, ...typography.cardTitle },
   headline: { ...typography.body, fontWeight: "700", color: colors.textPrimary, flexShrink: 0 },
@@ -136,4 +139,4 @@ const styles = StyleSheet.create({
   drillLink: { ...typography.tiny, color: colors.green, paddingTop: spacing.xs },
   caption: { ...typography.caption, flexShrink: 1 },
   amounts: { ...typography.caption, color: colors.textMuted, flexShrink: 1 },
-});
+}));

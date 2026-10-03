@@ -1,7 +1,7 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import { AmountText } from "@/components/ui/AmountText";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles } from "@/lib/theme";
 
 interface NumberStatProps {
   value: number;
@@ -12,6 +12,7 @@ interface NumberStatProps {
 // Q1/Q10/Q11's single figure. The sentence above already states it; this is
 // the glanceable version.
 export function NumberStat({ value, currency, caption }: NumberStatProps) {
+  const styles = useStyles();
   return (
     <View style={styles.wrap}>
       <AmountText amountCents={value} currency={currency} style={styles.value} />
@@ -20,8 +21,8 @@ export function NumberStat({ value, currency, caption }: NumberStatProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   wrap: { gap: spacing.xs },
   value: { ...typography.title, color: colors.textPrimary },
   caption: { ...typography.caption, color: colors.textSecondary },
-});
+}));

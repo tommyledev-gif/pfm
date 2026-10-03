@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
-import { Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
+import { Pressable, StyleProp, Text, View, ViewStyle } from "react-native";
 
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 
 export interface SegmentedTabOption<T extends string> {
   value: T;
@@ -28,6 +28,7 @@ interface SegmentedTabsProps<T extends string> {
 // reference's "grid grid-cols-N" segmented control instead of Chip's
 // gap-separated pill row, which reads as multi-select even when it isn't.
 export function SegmentedTabs<T extends string>({ options, value, onChange, style }: SegmentedTabsProps<T>) {
+  const styles = useStyles();
   return (
     <View style={[styles.track, style]}>
       {options.map((option) => {
@@ -49,7 +50,7 @@ export function SegmentedTabs<T extends string>({ options, value, onChange, styl
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   track: {
     flexDirection: "row",
     gap: 4,
@@ -71,4 +72,4 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: colors.green },
   label: { ...typography.label, color: colors.textSecondary },
   labelActive: { color: colors.onGreen },
-});
+}));

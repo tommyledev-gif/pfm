@@ -1,8 +1,8 @@
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, Text, View } from "react-native";
 
 import { ChevronDownIcon } from "@/components/ui/Icon";
 import { CHAT_MODE_META, ChatMode } from "@/features/ai-chat/chat-mode";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 
 const BRAND_LOGO = require("../../../../assets/simple-budgest-logo.png");
 
@@ -22,6 +22,7 @@ interface ChatModeHeaderProps {
  * gives it the "glow" that marks it as the screen's key control.
  */
 export function ChatModeHeader({ mode, onPressMode }: ChatModeHeaderProps) {
+  const styles = useStyles();
   const meta = CHAT_MODE_META[mode];
   const ModeIcon = meta.icon;
 
@@ -63,7 +64,7 @@ export function ChatModeHeader({ mode, onPressMode }: ChatModeHeaderProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   // A banner strip: its own edge at the bottom, and clear space before the
   // thread starts, so header and conversation read as separate zones.
   header: {
@@ -112,4 +113,4 @@ const styles = StyleSheet.create({
   },
   modePillPressed: { opacity: 0.7 },
   modeLabel: { ...typography.caption, fontWeight: "700" },
-});
+}));

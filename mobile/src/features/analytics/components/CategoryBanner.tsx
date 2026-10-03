@@ -1,7 +1,7 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { ConsultCategoryRef } from "@/features/analytics/types";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles } from "@/lib/theme";
 
 interface CategoryBannerProps {
   categories: ConsultCategoryRef[];
@@ -16,6 +16,7 @@ interface CategoryBannerProps {
 // with a text link — a reading the System is sure of needs no echo, the
 // answer's own sentence already says what it covers.
 export function CategoryBanner({ categories, onChange }: CategoryBannerProps) {
+  const styles = useStyles();
   return (
     <View style={styles.line}>
       <Text style={styles.text}>
@@ -28,9 +29,9 @@ export function CategoryBanner({ categories, onChange }: CategoryBannerProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   line: { flexDirection: "row", alignItems: "baseline", gap: spacing.sm, marginTop: spacing.md },
   text: { ...typography.caption, color: colors.textSecondary, flexShrink: 1 },
   names: { color: colors.textPrimary },
   change: { ...typography.caption, color: colors.green },
-});
+}));

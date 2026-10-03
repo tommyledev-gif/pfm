@@ -1,9 +1,9 @@
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Image, Text, View } from "react-native";
 import { Image as CachedImage } from "expo-image";
 
 import { EmojiGlyph } from "@/components/ui/EmojiGlyph";
 import { initialFor } from "@/lib/category-color";
-import { colors } from "@/lib/theme";
+import { colors, createStyles } from "@/lib/theme";
 
 const DEFAULT_ICON = require("../../../assets/simple-budgest-logo.png");
 
@@ -32,6 +32,7 @@ interface AvatarProps {
 // with initials" predates category icon uploads, so the initial fallback
 // stays for wallets/users, which have neither icon nor iconUrl).
 export function Avatar({ name, color = colors.lavender, size = 44, icon, iconUrl, fallback = "logo" }: AvatarProps) {
+  const styles = useStyles();
   return (
     <View style={[styles.circle, { width: size, height: size, borderRadius: size / 2, backgroundColor: color }]}>
       {iconUrl ? (
@@ -52,7 +53,7 @@ export function Avatar({ name, color = colors.lavender, size = 44, icon, iconUrl
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   circle: { alignItems: "center", justifyContent: "center", overflow: "hidden" },
   initial: { color: colors.onGreen, fontWeight: "800" },
-});
+}));

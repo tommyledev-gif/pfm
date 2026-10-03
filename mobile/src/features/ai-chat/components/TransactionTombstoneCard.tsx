@@ -1,9 +1,9 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { HistoryIcon, TrashIcon } from "@/components/ui/Icon";
 import { formatCurrencyTruncated } from "@/lib/currency";
 import { formatDateShort, formatTime } from "@/lib/format-date";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { TombstoneKind } from "@/features/ai-chat/tombstone";
 import { TransactionActionPayload } from "@/features/ai-chat/types";
 
@@ -42,6 +42,8 @@ export function TransactionTombstoneCard({
   removedAt,
   onPressHistory,
 }: TransactionTombstoneCardProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const label = payload.note || categoryName;
 
   return (
@@ -81,7 +83,7 @@ export function TransactionTombstoneCard({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   // No box of its own: it already sits inside the chat bubble, and a dashed
   // border + padding here nested a second card inside it. The strikethrough
   // and muted colours carry "this was removed" on their own.
@@ -95,4 +97,4 @@ const styles = StyleSheet.create({
   meta: { ...typography.tiny, color: colors.textMuted },
   historyLink: { flexDirection: "row", alignItems: "center", gap: 4 },
   historyLabel: { ...typography.tiny, color: colors.lavender },
-});
+}));

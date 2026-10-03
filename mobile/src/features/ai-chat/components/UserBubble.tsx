@@ -1,9 +1,9 @@
 import { ReactNode } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import { GradientFill } from "@/components/ui/GradientFill";
 import { CHAT_MODE_META, useChatModeStore } from "@/features/ai-chat/chat-mode";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 
 interface UserBubbleProps {
   text: string;
@@ -18,6 +18,7 @@ interface UserBubbleProps {
  * taking it as a prop, so neither pane has to thread it down to every row.
  */
 export function UserBubble({ text, children }: UserBubbleProps) {
+  const styles = useStyles();
   const mode = useChatModeStore((s) => s.mode);
   const meta = CHAT_MODE_META[mode];
 
@@ -30,7 +31,7 @@ export function UserBubble({ text, children }: UserBubbleProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   bubble: {
     maxWidth: "82%",
     paddingVertical: spacing.md,
@@ -42,4 +43,4 @@ const styles = StyleSheet.create({
   },
   // Every mode's pair is a light pastel, so dark text reads on all of them.
   text: { ...typography.body, color: colors.onGreen },
-});
+}));

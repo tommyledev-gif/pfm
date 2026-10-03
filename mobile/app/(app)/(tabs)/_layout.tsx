@@ -1,7 +1,7 @@
 import { Animated, Easing } from "react-native";
 import { Tabs } from "expo-router";
 
-import { colors } from "@/lib/theme";
+import { useColors } from "@/lib/theme";
 
 // Short and plain: a quick opacity cross-fade and nothing else. The earlier
 // version also scaled both scenes (98% → 100%), which on top of the fade
@@ -33,6 +33,7 @@ function fadeInterpolator({ current }: { current: { progress: Animated.Value } }
 // parent (app) layout so it also shows on pushed sub-screens; the navigator's
 // built-in bar is switched off.
 export default function TabsLayout() {
+  const colors = useColors();
   return (
     <Tabs
       tabBar={() => null}

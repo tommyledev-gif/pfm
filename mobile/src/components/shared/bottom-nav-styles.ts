@@ -1,6 +1,6 @@
-import { StyleSheet } from "react-native";
 
-import { colors } from "@/lib/theme";
+
+import { createStyles } from "@/lib/theme";
 
 // Geometry and styles for BottomNav.tsx, split out to keep that file under
 // the 300-line limit. The ball / aura / hairline numbers are interdependent —
@@ -47,13 +47,12 @@ export const RIM_PATH =
   `A ${SOCKET_RADIUS} ${SOCKET_RADIUS} 0 1 0 ${RIM_CX + SOCKET_HALF_CHORD} ${HAIRLINE / 2}`;
 // Tab-switch "bounce" on the ball's icon: up to this scale, then back to 1.
 export const ICON_BOUNCE_SCALE = 1.15;
-export const INACTIVE_COLOR = "rgba(255,255,255,0.5)";
 // Idle float: the ball drifts this many px above its resting spot and back,
 // forever. Kept tiny (and slow) so it reads as "alive", not as motion.
 export const BOB_DISTANCE = 4;
 export const BOB_DURATION = 1600;
 
-export const styles = StyleSheet.create({
+export const useStyles = createStyles((colors) => ({
   wrapper: {
     position: "absolute",
     left: 0,
@@ -91,7 +90,7 @@ export const styles = StyleSheet.create({
     width: AURA_OUTER,
     height: AURA_OUTER,
     borderRadius: AURA_OUTER / 2,
-    backgroundColor: "rgba(0,0,0,0.22)",
+    backgroundColor: colors.navSocketOuter,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -99,7 +98,7 @@ export const styles = StyleSheet.create({
     width: AURA_MID,
     height: AURA_MID,
     borderRadius: AURA_MID / 2,
-    backgroundColor: "rgba(0,0,0,0.42)",
+    backgroundColor: colors.navSocketMid,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -107,7 +106,7 @@ export const styles = StyleSheet.create({
     width: AURA_CORE,
     height: AURA_CORE,
     borderRadius: AURA_CORE / 2,
-    backgroundColor: "rgba(0,0,0,0.65)",
+    backgroundColor: colors.navSocketCore,
   },
   ball: {
     position: "absolute",
@@ -125,4 +124,4 @@ export const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 8,
   },
-});
+}));

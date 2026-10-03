@@ -1,19 +1,10 @@
 import { RefObject, useEffect, useRef, useState } from "react";
-import {
-  Animated,
-  FlatList,
-  FlatListProps,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  Pressable,
-  StyleSheet,
-  View,
-} from "react-native";
+import { Animated, FlatList, FlatListProps, NativeScrollEvent, NativeSyntheticEvent, Pressable, View } from "react-native";
 
 import { ChevronDownIcon } from "@/components/ui/Icon";
-import { chatThreadStyles } from "@/features/ai-chat/components/chat-thread-styles";
+import { useChatThreadStyles } from "@/features/ai-chat/components/chat-thread-styles";
 import { ChatMessage } from "@/features/ai-chat/types";
-import { colors, radii, spacing } from "@/lib/theme";
+import { radii, spacing, createStyles, useColors } from "@/lib/theme";
 
 interface ChatThreadListProps extends Omit<FlatListProps<ChatMessage>, "inverted" | "onScroll" | "scrollEventThrottle"> {
   listRef: RefObject<FlatList<ChatMessage> | null>;
@@ -36,6 +27,9 @@ const FAB_SIZE = 40;
  * recording and analysis panes.
  */
 export function ChatThreadList({ listRef, style, ...listProps }: ChatThreadListProps) {
+  const colors = useColors();
+  const styles = useStyles();
+  const chatThreadStyles = useChatThreadStyles();
   const [awayFromLatest, setAwayFromLatest] = useState(false);
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -87,7 +81,7 @@ export function ChatThreadList({ listRef, style, ...listProps }: ChatThreadListP
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   wrap: { flex: 1 },
   // Anchored by explicit right/bottom offsets: an absolute view without its
   // own offsets gets placed by the parent's alignment instead.
@@ -102,4 +96,4 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
   },
-});
+}));

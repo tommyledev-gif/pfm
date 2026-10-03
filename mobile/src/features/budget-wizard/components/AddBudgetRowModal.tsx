@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, Text, TextInput, View } from "react-native";
 
 import { Drawer } from "@/components/shared/Drawer";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
@@ -9,7 +9,8 @@ import { MIN_AMOUNT_PER_CATEGORY_XU, roundStepXu } from "@/features/budget-wizar
 import { findSimilarCategories } from "@/features/budget-wizard/category-match";
 import { Category } from "@/features/categories/types";
 import { formatCurrency, toCents, toMajorUnits } from "@/lib/currency";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 export interface AddBudgetRowResult {
   /** Set when the user reused an existing category; null when they insisted on a new one. */
@@ -53,6 +54,8 @@ export function AddBudgetRowModal({
   onClose,
   onConfirm,
 }: AddBudgetRowModalProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const [name, setName] = useState("");
   const [amount, setAmount] = useState(0);
   // Null while entering; set once the user submits a name with lookalikes.
@@ -199,11 +202,11 @@ export function AddBudgetRowModal({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   body: { gap: spacing.sm, paddingBottom: spacing.md },
   label: { ...typography.caption, color: colors.textSecondary },
   nameInput: {
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     borderRadius: radii.listCard,
@@ -234,4 +237,4 @@ const styles = StyleSheet.create({
   matchMeta: { ...typography.tiny, color: colors.textMuted },
   createAnyway: { paddingVertical: spacing.sm, alignItems: "center" },
   createAnywayLabel: { ...typography.caption, color: colors.green },
-});
+}));

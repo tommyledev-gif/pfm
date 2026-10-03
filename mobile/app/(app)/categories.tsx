@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { ChevronLeftIcon, PlusIcon } from "@/components/ui/Icon";
 import { Chip } from "@/components/ui/Chip";
 import { Screen } from "@/components/shared/Screen";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { CategoryType } from "@/lib/constants";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { Category } from "@/features/categories/types";
@@ -16,6 +16,8 @@ import { CategoryListItemSkeleton } from "@/features/categories/components/Categ
 const LIST_SKELETON_COUNT = 6;
 
 export default function CategoriesScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const [type, setType] = useState<CategoryType>("expense");
   const categories = useCategoriesQuery(type);
@@ -91,7 +93,7 @@ export default function CategoriesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -113,4 +115,4 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: spacing.xl, paddingBottom: 140 },
   skeletonSpacing: { marginTop: spacing.sm },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
-});
+}));

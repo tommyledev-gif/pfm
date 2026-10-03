@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { SwipeableRow } from "@/components/shared/SwipeableRow";
 import { CheckIcon, EditIcon, HistoryIcon, TrashIcon } from "@/components/ui/Icon";
 import { formatCurrency } from "@/lib/currency";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { Category } from "@/features/categories/types";
 import { ChatMessage } from "@/features/ai-chat/types";
 
@@ -38,6 +39,8 @@ export function PendingConfirmationsSection({
   onOpenMessage,
   onRequestRemove,
 }: PendingConfirmationsSectionProps) {
+  const colors = useColors();
+  const styles = useStyles();
   // Bumped whenever the rendered set changes, so a parked row never stays
   // open over a row that has moved underneath it.
   const [closeSignal, setCloseSignal] = useState(0);
@@ -119,7 +122,7 @@ export function PendingConfirmationsSection({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   section: { gap: spacing.sm },
   headerRow: {
     flexDirection: "row",
@@ -154,16 +157,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     // A gold outline rather than the neutral border every other card uses —
     // this row's own cue that it is awaiting action.
-    borderColor: "rgba(242,201,76,0.4)",
+    borderColor: withAlpha(colors.mustard, 0.4),
     borderRadius: radii.listCard,
   },
   iconTile: {
     width: 40,
     height: 40,
     borderRadius: radii.listCard - 2,
-    backgroundColor: "rgba(242,201,76,0.12)",
+    backgroundColor: withAlpha(colors.mustard, 0.12),
     borderWidth: 1,
-    borderColor: "rgba(242,201,76,0.3)",
+    borderColor: withAlpha(colors.mustard, 0.3),
     alignItems: "center",
     justifyContent: "center",
   },
@@ -179,4 +182,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-});
+}));

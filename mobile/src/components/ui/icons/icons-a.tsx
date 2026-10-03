@@ -1,6 +1,7 @@
 import { base, Circle, IconProps, Line, Path, Rect, Svg } from "@/components/ui/icons/primitives";
+import { colors } from "@/lib/theme";
 
-export function HomeIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
+export function HomeIcon({ size, color = colors.textPrimary, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Path
@@ -14,7 +15,7 @@ export function HomeIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
   );
 }
 
-export function ListIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
+export function ListIcon({ size, color = colors.textPrimary, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Line x1="8" y1="7" x2="20" y2="7" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
@@ -27,7 +28,7 @@ export function ListIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
   );
 }
 
-export function BarChartIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
+export function BarChartIcon({ size, color = colors.textPrimary, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Rect x="5" y="12" width="3.4" height="8" rx="1" fill={color} />
@@ -37,7 +38,7 @@ export function BarChartIcon({ size, color = "#fff", strokeWidth = 2 }: IconProp
   );
 }
 
-export function UserIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
+export function UserIcon({ size, color = colors.textPrimary, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Circle cx="12" cy="8.2" r="3.4" stroke={color} strokeWidth={strokeWidth} />
@@ -51,7 +52,7 @@ export function UserIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
   );
 }
 
-export function SparkleIcon({ size, color = "#7EEBC0" }: IconProps) {
+export function SparkleIcon({ size, color = colors.mint }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Path
@@ -62,7 +63,7 @@ export function SparkleIcon({ size, color = "#7EEBC0" }: IconProps) {
   );
 }
 
-export function BellIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
+export function BellIcon({ size, color = colors.textPrimary, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Path
@@ -76,7 +77,7 @@ export function BellIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
   );
 }
 
-export function ChevronLeftIcon({ size, color = "#fff", strokeWidth = 2.2 }: IconProps) {
+export function ChevronLeftIcon({ size, color = colors.textPrimary, strokeWidth = 2.2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Path d="M15 5.5 8 12l7 6.5" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
@@ -84,7 +85,7 @@ export function ChevronLeftIcon({ size, color = "#fff", strokeWidth = 2.2 }: Ico
   );
 }
 
-export function ChevronRightIcon({ size, color = "#fff", strokeWidth = 2.2 }: IconProps) {
+export function ChevronRightIcon({ size, color = colors.textPrimary, strokeWidth = 2.2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Path d="M9 5.5 16 12l-7 6.5" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
@@ -92,7 +93,7 @@ export function ChevronRightIcon({ size, color = "#fff", strokeWidth = 2.2 }: Ic
   );
 }
 
-export function ChevronDownIcon({ size, color = "#fff", strokeWidth = 2.2 }: IconProps) {
+export function ChevronDownIcon({ size, color = colors.textPrimary, strokeWidth = 2.2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Path d="M5.5 9 12 16l6.5-7" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
@@ -100,7 +101,7 @@ export function ChevronDownIcon({ size, color = "#fff", strokeWidth = 2.2 }: Ico
   );
 }
 
-export function SendIcon({ size, color = "#06130A" }: IconProps) {
+export function SendIcon({ size, color = colors.onGreen }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Path d="M4 12 20 4l-6.5 16-2.5-6.5L4 12Z" fill={color} />
@@ -108,7 +109,7 @@ export function SendIcon({ size, color = "#06130A" }: IconProps) {
   );
 }
 
-export function PlusIcon({ size, color = "#06130A", strokeWidth = 2.4 }: IconProps) {
+export function PlusIcon({ size, color = colors.onGreen, strokeWidth = 2.4 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Line x1="12" y1="5" x2="12" y2="19" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
@@ -117,7 +118,7 @@ export function PlusIcon({ size, color = "#06130A", strokeWidth = 2.4 }: IconPro
   );
 }
 
-export function EditIcon({ size, color = "#06130A", strokeWidth = 2 }: IconProps) {
+export function EditIcon({ size, color = colors.onGreen, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Path
@@ -130,7 +131,7 @@ export function EditIcon({ size, color = "#06130A", strokeWidth = 2 }: IconProps
   );
 }
 
-export function CheckIcon({ size, color = "#06130A", strokeWidth = 2.4 }: IconProps) {
+export function CheckIcon({ size, color = colors.onGreen, strokeWidth = 2.4 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Path d="M4.5 12.5 9 17l10.5-11" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
@@ -138,7 +139,7 @@ export function CheckIcon({ size, color = "#06130A", strokeWidth = 2.4 }: IconPr
   );
 }
 
-export function WalletIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
+export function WalletIcon({ size, color = colors.textPrimary, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Rect x="3.5" y="6" width="17" height="12" rx="2.5" stroke={color} strokeWidth={strokeWidth} />
@@ -147,7 +148,7 @@ export function WalletIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps)
   );
 }
 
-export function TagIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
+export function TagIcon({ size, color = colors.textPrimary, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Path
@@ -161,7 +162,7 @@ export function TagIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
   );
 }
 
-export function UsersIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
+export function UsersIcon({ size, color = colors.textPrimary, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Circle cx="9" cy="8" r="3" stroke={color} strokeWidth={strokeWidth} />
@@ -172,7 +173,7 @@ export function UsersIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) 
   );
 }
 
-export function ShieldIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
+export function ShieldIcon({ size, color = colors.textPrimary, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Path
@@ -185,7 +186,7 @@ export function ShieldIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps)
   );
 }
 
-export function HelpIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
+export function HelpIcon({ size, color = colors.textPrimary, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Circle cx="12" cy="12" r="8.2" stroke={color} strokeWidth={strokeWidth} />
@@ -195,7 +196,7 @@ export function HelpIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
   );
 }
 
-export function CalendarIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
+export function CalendarIcon({ size, color = colors.textPrimary, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Rect x="4" y="5.5" width="16" height="14.5" rx="2" stroke={color} strokeWidth={strokeWidth} />
@@ -204,7 +205,7 @@ export function CalendarIcon({ size, color = "#fff", strokeWidth = 2 }: IconProp
   );
 }
 
-export function TrashIcon({ size, color = "#FF9E96", strokeWidth = 2 }: IconProps) {
+export function TrashIcon({ size, color = colors.peach, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Path d="M5 7h14M9.5 7V5.2a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1V7M7 7l1 12.5a1 1 0 0 0 1 .9h6a1 1 0 0 0 1-.9L17 7"
@@ -213,7 +214,7 @@ export function TrashIcon({ size, color = "#FF9E96", strokeWidth = 2 }: IconProp
   );
 }
 
-export function LogOutIcon({ size, color = "#FF9E96", strokeWidth = 2 }: IconProps) {
+export function LogOutIcon({ size, color = colors.peach, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Path d="M9 4H6a1.5 1.5 0 0 0-1.5 1.5v13A1.5 1.5 0 0 0 6 20h3" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />

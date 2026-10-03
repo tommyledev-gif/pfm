@@ -1,10 +1,10 @@
 import { ComponentType } from "react";
-import { Pressable, StyleProp, StyleSheet, ViewStyle } from "react-native";
+import { Pressable, StyleProp, ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { IconProps } from "@/components/ui/icons/primitives";
 import { PlusIcon } from "@/components/ui/Icon";
-import { colors, radii, spacing } from "@/lib/theme";
+import { radii, spacing, createStyles, useColors } from "@/lib/theme";
 
 // BottomNav's bar height (components/shared/BottomNav.tsx PILL_HEIGHT). The
 // FAB floats this far up plus the safe-area inset, so it always clears the
@@ -37,6 +37,8 @@ export function useFabClearance(): number {
  * overlay paints over it rather than under it.
  */
 export function Fab({ onPress, Icon = PlusIcon, accessibilityLabel, testID, style }: FabProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   return (
     <Pressable
@@ -57,7 +59,7 @@ export function Fab({ onPress, Icon = PlusIcon, accessibilityLabel, testID, styl
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   fab: {
     position: "absolute",
     right: spacing.xl,
@@ -74,4 +76,4 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   pressed: { opacity: 0.85, transform: [{ scale: 0.95 }] },
-});
+}));

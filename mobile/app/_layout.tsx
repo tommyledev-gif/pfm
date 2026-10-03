@@ -1,20 +1,23 @@
-import { useEffect } from "react";
-import { StyleSheet, View } from "react-native";
+import { useEffect, useMemo } from "react";
+import { View } from "react-native";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
-import { DarkTheme, Theme, ThemeProvider } from "@react-navigation/native";
+import { DarkTheme, DefaultTheme, Theme, ThemeProvider } from "@react-navigation/native";
 
 import { DebugBubble } from "@/components/debug/DebugBubble";
 import { BrandSplash } from "@/components/shared/BrandSplash";
 import { NavigationLogger } from "@/components/debug/NavigationLogger";
+import { ThemeTransitionHost } from "@/components/shared/ThemeTransitionHost";
 import { Toast } from "@/components/shared/Toast";
 import { installGlobalErrorLogger } from "@/lib/global-error-logger";
 import { queryClient } from "@/lib/query-client";
-import { colors } from "@/lib/theme";
+import { createStyles, useThemeDefinition } from "@/lib/theme";
 import { installSessionScopedReset } from "@/stores/session-scoped-reset";
 import { useSessionStore } from "@/stores/session-store";
+import { useThemeStore } from "@/stores/theme-store";
 
 // Installed once at module scope, not inside the component — a global
 // error handler must be wired before the very first render, not after an
@@ -45,21 +48,34 @@ setTimeout(() => {
 // default theme, whose background is near-white. Mid-transition (the tab
 // cross-fade, a stack fade) both screens are partly transparent, so that
 // white showed through as a flash on every tab switch. Every navigator
-// surface is pinned to the app's own dark tokens here instead.
-const NAVIGATION_THEME: Theme = {
-  ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    background: colors.bgApp,
-    card: colors.surface,
-    border: colors.surfaceBorder,
-    primary: colors.green,
-    text: colors.textPrimary,
-  },
-};
+// surface is pinned to the active app theme's tokens instead.
+function useNavigationTheme(): Theme {
+  const { palette, isDark } = useThemeDefinition();
+  return useMemo(() => {
+    const base = isDark ? DarkTheme : DefaultTheme;
+    return {
+      ...base,
+      colors: {
+        ...base.colors,
+        background: palette.bgApp,
+        card: palette.surface,
+        border: palette.surfaceBorder,
+        primary: palette.green,
+        text: palette.textPrimary,
+      },
+    };
+  }, [palette, isDark]);
+}
 
 export default function RootLayout() {
-  const isHydrated = useSessionStore((s) => s.isHydrated);
+  const styles = useStyles();
+  const navigationTheme = useNavigationTheme();
+  const { isDark } = useThemeDefinition();
+  const sessionHydrated = useSessionStore((s) => s.isHydrated);
+  // The stored theme is read asynchronously too; the splash holds until it
+  // is known so a light-theme user never sees a dark first frame.
+  const themeHydrated = useThemeStore((s) => s.isHydrated);
+  const isHydrated = sessionHydrated && themeHydrated;
   const hasSession = useSessionStore((s) => s.accessToken !== null);
   const hydrate = useSessionStore((s) => s.hydrate);
 
@@ -72,7 +88,10 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <ThemeProvider value={NAVIGATION_THEME}>
+      <ThemeProvider value={navigationTheme}>
+        {/* One for the whole app — icons must contrast the active theme's
+            ground on every screen, logged in or not. */}
+        <StatusBar style={isDark ? "light" : "dark"} />
         <QueryClientProvider client={queryClient}>
           {/* Nothing but the background until the session is known — BrandSplash
               covers this anyway, and keeps covering it until it fades out. */}
@@ -94,12 +113,13 @@ export default function RootLayout() {
           <DebugBubble />
           <Toast />
           <BrandSplash ready={isHydrated} />
+          <ThemeTransitionHost />
         </QueryClientProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   splash: { flex: 1, backgroundColor: colors.splashBg },
-});
+}));

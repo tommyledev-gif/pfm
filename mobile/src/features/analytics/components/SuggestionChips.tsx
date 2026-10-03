@@ -1,8 +1,8 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 
 import { EdgeFade } from "@/components/ui/EdgeFade";
 import { AnalyticsFollowUp } from "@/features/analytics/types";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 interface SuggestionChipsProps {
   chips: AnalyticsFollowUp[];
@@ -34,6 +34,8 @@ const DISABLED_OPACITY = 0.5;
 // Tonal fill, no border, no icon: these sit in a thread that is already all
 // text, and a ring around every chip was most of what made it look busy.
 export function SuggestionChips({ chips, onPress, disabled, testIDPrefix, bleed }: SuggestionChipsProps) {
+  const colors = useColors();
+  const styles = useStyles();
   if (chips.length === 0) return null;
   const bleeds = bleed !== undefined;
   return (
@@ -64,7 +66,7 @@ export function SuggestionChips({ chips, onPress, disabled, testIDPrefix, bleed 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   // Grows to its parent's width in a row parent (the input bar's
   // quick-action slot) as well as a column one, so the fade always sits at
   // the visible right edge.
@@ -79,4 +81,4 @@ const styles = StyleSheet.create({
   chipPressed: { backgroundColor: colors.surface },
   label: { ...typography.caption, color: colors.textSecondary },
   disabled: { opacity: DISABLED_OPACITY },
-});
+}));

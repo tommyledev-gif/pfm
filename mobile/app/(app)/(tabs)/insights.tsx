@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 
 import { Screen } from "@/components/shared/Screen";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles } from "@/lib/theme";
 import { SpendingTab } from "@/features/reports/components/SpendingTab";
 import { BudgetsTab } from "@/features/budgets/components/BudgetsTab";
 
@@ -16,6 +16,7 @@ const SUB_TABS = [
 type SubTab = (typeof SUB_TABS)[number]["key"];
 
 export default function InsightsScreen() {
+  const styles = useStyles();
   const [tab, setTab] = useState<SubTab>("Spending");
   // Deep link from a budget notification (app/(app)/notifications.tsx): force
   // the Spending tab and hand the category down so its donut segment opens
@@ -65,7 +66,7 @@ export default function InsightsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bgApp, paddingHorizontal: spacing.xl, paddingTop: spacing.md, gap: spacing.lg },
   title: { ...typography.title, color: colors.textPrimary },
   tabRow: { flexDirection: "row", gap: spacing.xl, borderBottomWidth: 1, borderBottomColor: colors.surfaceBorder },
@@ -74,4 +75,4 @@ const styles = StyleSheet.create({
   tabLabelActive: { color: colors.textPrimary },
   tabUnderline: { height: 2, width: "100%", backgroundColor: colors.green, borderRadius: 1 },
   body: { flex: 1 },
-});
+}));

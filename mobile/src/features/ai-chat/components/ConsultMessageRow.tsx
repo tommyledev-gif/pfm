@@ -1,9 +1,9 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import { UserBubble } from "@/features/ai-chat/components/UserBubble";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { ConsultHandlers, ConsultReplyCard } from "@/features/analytics/components/ConsultReplyCard";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles } from "@/lib/theme";
 
 interface ConsultMessageRowProps {
   message: ChatMessage;
@@ -29,6 +29,7 @@ const IN_TURN_GAP = spacing.sm;
  * a different job.
  */
 export function ConsultMessageRow({ message, startsTurn, handlers }: ConsultMessageRowProps) {
+  const styles = useStyles();
   const gap = { marginTop: startsTurn ? TURN_GAP : IN_TURN_GAP };
 
   if (message.role === "user") {
@@ -47,7 +48,7 @@ export function ConsultMessageRow({ message, startsTurn, handlers }: ConsultMess
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   userRow: { flexDirection: "row", justifyContent: "flex-end" },
   assistantText: { ...typography.body, color: colors.textPrimary, lineHeight: 22 },
-});
+}));

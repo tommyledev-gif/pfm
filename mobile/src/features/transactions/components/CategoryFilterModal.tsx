@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { CheckIcon } from "@/components/ui/Icon";
 import { Drawer } from "@/components/shared/Drawer";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
 import { colorForCategory } from "@/lib/category-color";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 import { Category } from "@/features/categories/types";
 
 interface CategoryFilterModalProps {
@@ -24,6 +24,7 @@ interface CategoryFilterModalProps {
 // useCategoriesQuery call) since a flat alphabetical list would mix the two
 // with no visual cue.
 export function CategoryFilterModal({ visible, onClose, categories, selectedIds, onApply }: CategoryFilterModalProps) {
+  const styles = useStyles();
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -82,6 +83,7 @@ export function CategoryFilterModal({ visible, onClose, categories, selectedIds,
 }
 
 function CategoryRow({ category, active, onPress }: { category: Category; active: boolean; onPress: () => void }) {
+  const styles = useStyles();
   return (
     <Pressable style={styles.row} onPress={onPress}>
       <Avatar
@@ -101,7 +103,7 @@ function CategoryRow({ category, active, onPress }: { category: Category; active
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   section: { gap: spacing.xs },
   sectionLabel: { ...typography.caption, color: colors.textSecondary },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.xs },
@@ -116,4 +118,4 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   checkboxActive: { backgroundColor: colors.green, borderColor: colors.green },
-});
+}));

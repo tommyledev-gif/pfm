@@ -1,9 +1,9 @@
-import { Animated, StyleSheet, Text, View } from "react-native";
+import { Animated, Text, View } from "react-native";
 
 import { AmountText } from "@/components/ui/AmountText";
 import { ANALYTICS_OTHER_KEY } from "@/features/analytics/constants";
 import { AnalyticsChartItem } from "@/features/analytics/types";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 import { useEntryAnimation } from "@/lib/use-entry-animation";
 
 interface BarListProps {
@@ -18,6 +18,7 @@ const BAR_HEIGHT = 6;
 // amount, so nothing has to be cut to fit; the bar under it is scaled to the
 // largest row.
 export function BarList({ items, currency }: BarListProps) {
+  const styles = useStyles();
   const grow = useEntryAnimation();
   const max = Math.max(...items.map((i) => i.amount), 1);
 
@@ -45,7 +46,7 @@ export function BarList({ items, currency }: BarListProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   wrap: { gap: spacing.lg },
   row: { gap: spacing.sm },
   head: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: spacing.md },
@@ -53,4 +54,4 @@ const styles = StyleSheet.create({
   amount: { ...typography.body, color: colors.textPrimary },
   bar: { height: BAR_HEIGHT, borderRadius: radii.pill, backgroundColor: colors.periwinkle, transformOrigin: "left" },
   barOther: { backgroundColor: colors.trackMuted },
-});
+}));

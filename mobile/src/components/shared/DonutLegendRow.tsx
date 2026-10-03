@@ -1,10 +1,10 @@
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Pressable, Text, View } from "react-native";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { formatCurrency } from "@/lib/currency";
 import { useHoldProgress } from "@/lib/use-hold-progress";
-import { colors, typography } from "@/lib/theme";
+import { typography, createStyles, useColors } from "@/lib/theme";
 import { DonutSegment } from "@/components/shared/DonutChart";
 
 // Legend row lives in its own file so it can sit in a normal ScrollView list
@@ -28,6 +28,8 @@ export function DonutLegendRow({
   onPress: () => void;
   onHoldCategory?: (key: string) => void;
 }) {
+  const colors = useColors();
+  const legendStyles = useLegendStyles();
   const { progress, start, cancel } = useHoldProgress();
   const nameColor = progress.interpolate({ inputRange: [0, 1], outputRange: [colors.textPrimary, colors.green] });
 
@@ -57,10 +59,10 @@ export function DonutLegendRow({
   );
 }
 
-const legendStyles = StyleSheet.create({
+const useLegendStyles = createStyles((colors) => ({
   row: { gap: 6, paddingVertical: 8 },
   rowSelected: { opacity: 1 },
   headRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   name: { flex: 1, ...typography.label },
   value: { ...typography.tiny, color: colors.textSecondary },
-});
+}));

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import { AmountInput } from "@/components/ui/AmountInput";
 import { MoneySlider } from "@/components/ui/MoneySlider";
@@ -7,7 +7,7 @@ import { Drawer } from "@/components/shared/Drawer";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
 import { MIN_AMOUNT_PER_CATEGORY_XU, maxEditableAmount, roundStepXu } from "@/features/budget-wizard/budget-math";
 import { formatCurrency, toCents, toMajorUnits } from "@/lib/currency";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles } from "@/lib/theme";
 
 interface EditAmountModalProps {
   visible: boolean;
@@ -47,6 +47,7 @@ export function EditAmountModal({
   onClose,
   onConfirm,
 }: EditAmountModalProps) {
+  const styles = useStyles();
   const max = maxEditableAmount(amount, buffer);
   const [draft, setDraft] = useState(amount);
 
@@ -117,7 +118,7 @@ export function EditAmountModal({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   body: { gap: spacing.md, paddingBottom: spacing.md },
   input: { textAlign: "right" },
   meta: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
@@ -125,4 +126,4 @@ const styles = StyleSheet.create({
   metaValue: { ...typography.label, color: colors.textPrimary },
   metaValueTight: { color: colors.mustard },
   explain: { ...typography.tiny, color: colors.textMuted },
-});
+}));

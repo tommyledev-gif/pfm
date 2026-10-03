@@ -12,7 +12,8 @@ import {
   totalFixedCosts,
 } from "@/features/budget-wizard/fixed-costs";
 import { formatCurrency, toCents, toMajorUnits } from "@/lib/currency";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 interface FixedCostsModalProps {
   visible: boolean;
@@ -80,6 +81,8 @@ export function FixedCostsModal({
   onClose,
   onConfirm,
 }: FixedCostsModalProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const [text, setText] = useState(initialText);
   // Prompt rows are keyed by their stable prompt key; custom rows are their own
   // list because their labels are editable.
@@ -290,7 +293,7 @@ export function FixedCostsModal({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   // Above the wizard's own overlay (zIndex 40) so it covers the progress header
   // too — a panel that leaves the step chrome visible reads as a stuck layer.
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.bgApp, zIndex: 50 },
@@ -314,7 +317,7 @@ const styles = StyleSheet.create({
   textArea: {
     minHeight: 96,
     textAlignVertical: "top",
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     borderRadius: radii.listCard,
@@ -343,7 +346,7 @@ const styles = StyleSheet.create({
   rowInput: { width: 120, textAlign: "right", paddingVertical: 6 },
   customLabelInput: {
     flex: 1,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     borderRadius: radii.listCard,
@@ -369,4 +372,4 @@ const styles = StyleSheet.create({
   totalLabel: { ...typography.label, color: colors.textPrimary },
   totalValue: { ...typography.label, color: colors.green },
   empty: { ...typography.tiny, color: colors.textMuted, paddingTop: spacing.xs },
-});
+}));

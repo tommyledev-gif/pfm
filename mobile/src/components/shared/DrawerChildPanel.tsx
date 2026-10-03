@@ -1,10 +1,10 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Pressable, Text, View } from "react-native";
 
 import { SheetHandle } from "@/components/shared/SheetHandle";
 import { useSheetDrag } from "@/components/shared/use-sheet-drag";
 import { ChevronLeftIcon, CloseIcon } from "@/components/ui/Icon";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 interface DrawerChildPanelProps {
   visible: boolean;
@@ -40,6 +40,8 @@ export function DrawerChildPanel({
   width,
   bottomInset,
 }: DrawerChildPanelProps) {
+  const colors = useColors();
+  const styles = useStyles();
   // Same keep-mounted-through-the-close-animation trick as Drawer itself:
   // unmounting on `visible === false` would make the panel vanish instead of
   // sliding back out.
@@ -101,7 +103,7 @@ export function DrawerChildPanel({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   // elevation alongside zIndex: on Android the sibling backdrop can otherwise
   // paint over a later sibling regardless of document order.
   panel: { position: "absolute", left: 0, right: 0, top: TOP_INSET, zIndex: 1, elevation: 1 },
@@ -135,4 +137,4 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.surfaceBorder,
   },
-});
+}));

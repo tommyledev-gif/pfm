@@ -1,6 +1,6 @@
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, Text, View } from "react-native";
 
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 import { ConfidenceBadge } from "@/features/budget-wizard/types";
 
 const MAX_LEVEL = 3;
@@ -21,6 +21,7 @@ interface ConfidencePopupProps {
  * they are a summary of something stated rather than a glyph to be decoded.
  */
 export function ConfidencePopup({ visible, categoryName, badge, onClose }: ConfidencePopupProps) {
+  const styles = useStyles();
   return (
     <Modal visible={visible && badge !== null} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
@@ -52,7 +53,7 @@ export function ConfidencePopup({ visible, categoryName, badge, onClose }: Confi
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.6)",
@@ -85,4 +86,4 @@ const styles = StyleSheet.create({
   explanation: { ...typography.caption, color: colors.textSecondary, lineHeight: 18 },
   closeRow: { alignSelf: "flex-end", paddingTop: spacing.xs },
   closeLabel: { ...typography.label, color: colors.green },
-});
+}));

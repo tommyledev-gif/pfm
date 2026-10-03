@@ -1,6 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles } from "@/lib/theme";
 
 export interface DrawerHeaderAction {
   label: string;
@@ -24,6 +24,7 @@ export interface DrawerHeaderAction {
 // just to cancel. Anchoring them to the title keeps both actions in view from
 // the moment the sheet opens.
 export function DrawerHeader({ title, actions = [] }: { title: string; actions?: DrawerHeaderAction[] }) {
+  const styles = useStyles();
   return (
     <View style={styles.row}>
       <Text style={styles.title} numberOfLines={1}>
@@ -54,7 +55,7 @@ export function DrawerHeader({ title, actions = [] }: { title: string; actions?:
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   row: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   title: { flex: 1, ...typography.title, color: colors.textPrimary },
   actions: { flexDirection: "row", alignItems: "center", gap: spacing.lg },
@@ -62,4 +63,4 @@ const styles = StyleSheet.create({
   actionPrimary: { color: colors.green },
   actionSecondary: { color: colors.textSecondary },
   actionDisabled: { color: colors.textMuted, opacity: 0.6 },
-});
+}));

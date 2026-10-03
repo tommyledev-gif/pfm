@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import { CategoryOptionRow } from "@/components/shared/CategoryOptionRow";
 import { Drawer } from "@/components/shared/Drawer";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
 import { SearchField } from "@/components/ui/SearchField";
 import { matchesSearch } from "@/lib/search-text";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles } from "@/lib/theme";
 
 export interface CategoryPickerOption {
   id: string;
@@ -36,6 +36,7 @@ const SEARCH_MIN_OPTIONS = 8;
 // Same row, search and header as the form's category picker
 // (CategoryPickerList), so the two never read as different lists.
 export function CategoryPickerDrawer({ visible, onClose, title = "Chọn danh mục", categories, onSelect }: CategoryPickerDrawerProps) {
+  const styles = useStyles();
   const [search, setSearch] = useState("");
   const shown = useMemo(() => categories.filter((c) => matchesSearch(c.name, search)), [categories, search]);
 
@@ -73,6 +74,6 @@ export function CategoryPickerDrawer({ visible, onClose, title = "Chọn danh m�
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   empty: { ...typography.body, color: colors.textSecondary, textAlign: "center", paddingVertical: spacing.xxl },
-});
+}));

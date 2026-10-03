@@ -1,9 +1,10 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 
 import { CheckIcon } from "@/components/ui/Icon";
 import { WizardAmbientGlow } from "@/features/budget-wizard/components/WizardAmbientGlow";
 import { PRESET_OPTIONS, PresetKey } from "@/features/budget-wizard/types";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { colors, radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 interface WizardStepProfileProps {
   selected: PresetKey | null;
@@ -15,13 +16,15 @@ interface WizardStepProfileProps {
 // only: the SELECTED row is always the primary green, because "this is the one
 // I picked" is a single meaning and should have a single color everywhere in
 // the app, not a different one per option.
+// Getters, not values: read at render time so they follow a theme switch
+// (see src/theme/active-palette.ts).
 const PRESET_TINT: Record<PresetKey, string> = {
-  rented_eating_out: colors.periwinkle,
-  with_family: colors.mint,
-  couple_no_kids: colors.peach,
-  own_family: colors.lavender,
-  student: colors.mustard,
-  retired: colors.mint,
+  get rented_eating_out() { return colors.periwinkle; },
+  get with_family() { return colors.mint; },
+  get couple_no_kids() { return colors.peach; },
+  get own_family() { return colors.lavender; },
+  get student() { return colors.mustard; },
+  get retired() { return colors.mint; },
 };
 
 const ICON_TILE_SIZE = 44;
@@ -54,6 +57,8 @@ const ROW_MIN_HEIGHT = 72;
  * of dead space above the footer and made the screen look unfinished.
  */
 export function WizardStepProfile({ selected, onSelect }: WizardStepProfileProps) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.root}>
       <WizardAmbientGlow />
@@ -117,7 +122,7 @@ export function WizardStepProfile({ selected, onSelect }: WizardStepProfileProps
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   root: { flex: 1 },
   // flexGrow + centre, not a plain top-aligned stack: when the six rows are
   // shorter than the viewport they sit in the middle of it, and when they are
@@ -149,7 +154,7 @@ const styles = StyleSheet.create({
     height: ICON_TILE_SIZE,
     borderRadius: radii.listCard,
     borderWidth: 1,
-    backgroundColor: "rgba(255,255,255,0.04)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.04),
     alignItems: "center",
     justifyContent: "center",
   },
@@ -166,4 +171,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-});
+}));

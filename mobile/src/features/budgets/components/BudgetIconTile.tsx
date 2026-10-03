@@ -1,8 +1,9 @@
-import { Image, StyleSheet, View } from "react-native";
+import { Image, View } from "react-native";
 import { Image as CachedImage } from "expo-image";
 
 import { EmojiGlyph } from "@/components/ui/EmojiGlyph";
-import { colors, radii } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, createStyles } from "@/lib/theme";
 
 const DEFAULT_ICON = require("../../../../assets/simple-budgest-logo.png");
 
@@ -26,6 +27,7 @@ const LOGO_SIZE = 22;
 // OpenMoji artwork) → app logo. Never the name's first letter: a lone "Ă" in
 // a circle read as a broken icon, not as the Category.
 export function BudgetIconTile({ name, icon, iconUrl }: BudgetIconTileProps) {
+  const styles = useStyles();
   return (
     <View style={styles.tile}>
       {iconUrl ? (
@@ -45,12 +47,12 @@ export function BudgetIconTile({ name, icon, iconUrl }: BudgetIconTileProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   tile: {
     width: TILE_SIZE,
     height: TILE_SIZE,
     borderRadius: radii.pill,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     alignItems: "center",
@@ -59,4 +61,4 @@ const styles = StyleSheet.create({
   },
   image: { width: TILE_SIZE, height: TILE_SIZE, borderRadius: radii.pill },
   logo: { width: LOGO_SIZE, height: LOGO_SIZE },
-});
+}));

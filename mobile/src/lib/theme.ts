@@ -1,49 +1,53 @@
-// Design tokens ported 1:1 from mobile/design_handoff_pfm_app/README.md
-// ("Design tokens" section) — the dark "Noctis" theme. This is the only
+import { StyleSheet } from "react-native";
+
+import { colors } from "@/theme/active-palette";
+import { Palette, THEMES, ThemeDefinition, ThemeName } from "@/theme/palettes";
+import { useThemeStore } from "@/stores/theme-store";
+
+// Design tokens. Colors live per theme in src/theme/palettes.ts; radii,
+// spacing and typography below are theme-independent. This is the only
 // place hex values / radii / spacing should be hardcoded; screens and
 // components must reference these, never inline a color literal.
-export const colors = {
-  bgApp: "#050B14",
-  // The native splash's own background (app.json → expo-splash-screen
-  // backgroundColor), one step off bgApp. BrandSplash has to match the native
-  // splash exactly, or the handoff between the two shows as a flicker.
-  splashBg: "#050B15",
-  surface: "#12161F",
-  // One tonal step above `surface` — separates a control (a chip, the
-  // user's own chat bubble) from the ground it sits on without a border.
-  surfaceRaised: "#1B202B",
-  surfaceBorder: "rgba(255,255,255,0.08)",
-  textPrimary: "#F5F6F8",
-  textSecondary: "rgba(255,255,255,0.55)",
-  textMuted: "rgba(255,255,255,0.4)",
+//
+// How a component gets theme-aware colors:
+//   - styles: `const useStyles = createStyles((colors) => ({ ... }))` at
+//     module scope, then `const styles = useStyles()` in the component —
+//     never a module-scope StyleSheet.create reading `colors`, which would
+//     freeze whichever theme was active when the file loaded.
+//   - inline: `const colors = useColors()` in the component.
+// Both subscribe the component to theme changes, which is what re-renders it.
+export { colors };
+export type { Palette, ThemeName };
 
-  green: "#85FF33",
-  greenDark: "#0a521e",
-  blueDark: "#207ca1",
-  onGreen: "#06130A",
-  lavender: "#B49AFF",
-  mint: "#7EEBC0",
-  peach: "#FF9E96",
-  mustard: "#F2C94C",
-  // Same amber as `mustard`, pulled back — for "đang tới gần ngưỡng"
-  // states that share the warning's meaning but not its urgency.
-  mustardSoft: "rgba(242,201,76,0.65)",
-  periwinkle: "#9FB3FF",
+export function useThemeName(): ThemeName {
+  return useThemeStore((s) => s.themeName);
+}
 
-  trackMuted: "rgba(255,255,255,0.22)",
-  // Fully opaque — the translucent blur let scrolling content show through
-  // the bar, which read as the nav being washed out.
-  navBg: "#0F1116",
-  navBorder: "rgba(255,255,255,0.08)",
-  error: "#FF9E96",
-  // Solid fill for destructive buttons that must read as "this deletes" at a
-  // glance. `peach` is too light to carry white text; this red is not.
-  danger: "#E5484D",
-  onDanger: "#FFFFFF",
-  info: "#5dbde3",
-  warning: "#F2C94C",
-  
-} as const;
+export function useThemeDefinition(): ThemeDefinition {
+  return THEMES[useThemeName()];
+}
+
+export function useColors(): Palette {
+  return THEMES[useThemeName()].palette;
+}
+
+// Returns a hook. Each theme's sheet is built once, on first use, and shared
+// by every instance of every component calling that hook — the same "create
+// once at module scope" cost model StyleSheet.create had, per theme.
+export function createStyles<T extends StyleSheet.NamedStyles<T> | StyleSheet.NamedStyles<any>>(
+  factory: (colors: Palette) => T & StyleSheet.NamedStyles<any>,
+): () => T {
+  const cache = new Map<ThemeName, T>();
+  return function useStyles(): T {
+    const name = useThemeName();
+    let sheet = cache.get(name);
+    if (!sheet) {
+      sheet = StyleSheet.create(factory(THEMES[name].palette));
+      cache.set(name, sheet);
+    }
+    return sheet;
+  };
+}
 
 // Deterministic palette used to color category/wallet icon tiles and
 // donut-chart segments — the backend has no `color` field (categories only

@@ -1,7 +1,7 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import { formatCurrency } from "@/lib/currency";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles } from "@/lib/theme";
 
 interface WizardPlanSummaryRowsProps {
   currency: string;
@@ -31,6 +31,7 @@ export function WizardPlanSummaryRows({
   overCommitted,
   shortfall,
 }: WizardPlanSummaryRowsProps) {
+  const styles = useStyles();
   return (
     <>
       {buffer > 0 ? (
@@ -62,7 +63,7 @@ export function WizardPlanSummaryRows({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   bufferRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -79,4 +80,4 @@ const styles = StyleSheet.create({
   // Amber, not red — the plan is over-committed, which is a constraint the
   // user can resolve, not a system fault.
   warn: { ...typography.caption, color: colors.mustard },
-});
+}));

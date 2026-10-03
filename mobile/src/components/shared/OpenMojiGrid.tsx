@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, ScrollView, Text, View } from "react-native";
 
 import { EmojiGlyph } from "@/components/ui/EmojiGlyph";
 import { SearchField } from "@/components/ui/SearchField";
@@ -12,7 +12,7 @@ import {
   searchOpenMoji,
 } from "@/lib/openmoji";
 import { withAlpha } from "@/lib/color";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 
 const COLUMNS = 7;
 const GLYPH_SIZE = 30;
@@ -39,6 +39,7 @@ interface OpenMojiGridProps {
  * already lives.
  */
 export function OpenMojiGrid({ value, onSelect, mode = "fill" }: OpenMojiGridProps) {
+  const styles = useStyles();
   const initialGroup = findOpenMoji(value)?.group ?? OPENMOJI_GROUPS[0].key;
   const [group, setGroup] = useState<OpenMojiGroupKey>(initialGroup);
   const [query, setQuery] = useState("");
@@ -109,7 +110,7 @@ export function OpenMojiGrid({ value, onSelect, mode = "fill" }: OpenMojiGridPro
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   fill: { flex: 1 },
   groupScroll: { flexGrow: 0, marginTop: spacing.sm },
   groupRow: { gap: spacing.xs, paddingBottom: spacing.sm },
@@ -134,4 +135,4 @@ const styles = StyleSheet.create({
   wrap: { flexDirection: "row", flexWrap: "wrap" },
   empty: { ...typography.caption, color: colors.textMuted, textAlign: "center", paddingVertical: spacing.xl },
   credit: { ...typography.tiny, color: colors.textMuted, textAlign: "center", marginTop: spacing.xs },
-});
+}));

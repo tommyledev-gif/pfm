@@ -1,6 +1,7 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
-import { colors, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { spacing, typography, createStyles } from "@/lib/theme";
 
 interface WizardProgressHeaderProps {
   step: number;
@@ -15,6 +16,7 @@ interface WizardProgressHeaderProps {
 // BudgetWizardModal — split out purely to keep that file under the
 // project's 300-line cap.
 export function WizardProgressHeader({ step, totalSteps, onClose, onBack }: WizardProgressHeaderProps) {
+  const styles = useStyles();
   return (
     <View style={styles.header}>
       {/* Leading, before the progress pills: back moves along the same axis the
@@ -42,7 +44,7 @@ export function WizardProgressHeader({ step, totalSteps, onClose, onBack }: Wiza
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -52,8 +54,8 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
   },
   progressTrack: { flex: 1, flexDirection: "row", gap: spacing.xs },
-  progressPill: { flex: 1, height: 4, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.08)" },
+  progressPill: { flex: 1, height: 4, borderRadius: 2, backgroundColor: withAlpha(colors.overlayBase, 0.08) },
   progressPillOn: { backgroundColor: colors.green },
   backLabel: { ...typography.title, color: colors.textSecondary, lineHeight: 22 },
   closeLabel: { ...typography.body, color: colors.textSecondary },
-});
+}));

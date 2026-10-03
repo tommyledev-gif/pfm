@@ -7,10 +7,12 @@ import { colors } from "@/lib/theme";
 // the layer's width, and its peak opacity. Positioned to land in the gaps
 // *between* the option rows rather than behind their text — the point is depth
 // in the negative space, not a tint over the content.
+// Getters, not values: read at render time so they follow a theme switch
+// (see src/theme/active-palette.ts).
 const BLOBS = [
-  { id: "cool", cx: 0.12, cy: 0.16, r: 0.58, color: colors.periwinkle, opacity: 0.16 },
-  { id: "violet", cx: 0.92, cy: 0.46, r: 0.52, color: colors.lavender, opacity: 0.14 },
-  { id: "warm", cx: 0.28, cy: 0.88, r: 0.5, color: colors.peach, opacity: 0.12 },
+  { id: "cool", cx: 0.12, cy: 0.16, r: 0.58, get color() { return colors.periwinkle; }, opacity: 0.16 },
+  { id: "violet", cx: 0.92, cy: 0.46, r: 0.52, get color() { return colors.lavender; }, opacity: 0.14 },
+  { id: "warm", cx: 0.28, cy: 0.88, r: 0.5, get color() { return colors.peach; }, opacity: 0.12 },
 ] as const;
 
 /**

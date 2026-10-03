@@ -1,8 +1,8 @@
 import { useRef, useState } from "react";
-import { Animated, Dimensions, PanResponder, StyleSheet, View } from "react-native";
+import { Animated, Dimensions, PanResponder, View } from "react-native";
 import { useSafeAreaInsets, type EdgeInsets } from "react-native-safe-area-context";
 
-import { colors, radii } from "@/lib/theme";
+import { radii, createStyles, useColors } from "@/lib/theme";
 import { DebugLogViewer } from "@/components/debug/DebugLogViewer";
 import { BugIcon } from "@/components/ui/Icon";
 import { useUiPrefsStore } from "@/stores/ui-prefs-store";
@@ -33,6 +33,8 @@ function clamp(value: number, min: number, max: number): number {
 // Uses only React Native core's PanResponder/Animated — no
 // react-native-gesture-handler/reanimated dependency (spec.md decision #2).
 export function DebugBubble() {
+  const colors = useColors();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const [viewerOpen, setViewerOpen] = useState(false);
   const bubbleVisible = useUiPrefsStore((s) => s.debugBubbleVisible);
@@ -99,7 +101,7 @@ export function DebugBubble() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   bubble: {
     position: "absolute",
     top: 0,
@@ -114,4 +116,4 @@ const styles = StyleSheet.create({
     zIndex: 9999,
     elevation: 9999,
   },
-});
+}));

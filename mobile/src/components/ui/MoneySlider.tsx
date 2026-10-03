@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
-import { LayoutChangeEvent, PanResponder, StyleSheet, View } from "react-native";
+import { LayoutChangeEvent, PanResponder, View } from "react-native";
 
-import { colors, radii } from "@/lib/theme";
+import { radii, createStyles } from "@/lib/theme";
 
 /**
  * A non-linear track: where along it (0..1) each amount sits, and the snap
@@ -66,6 +66,7 @@ export function MoneySlider({
   disabled = false,
   testID,
 }: MoneySliderProps) {
+  const styles = useStyles();
   const [trackWidth, setTrackWidth] = useState(0);
 
   const span = Math.max(max - min, 1);
@@ -143,7 +144,7 @@ export function MoneySlider({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   // Tall enough to be a comfortable drag target even though the track it draws
   // is only 6px — a 6px touch target is unusable on a phone.
   wrapper: { height: THUMB_SIZE + 12, justifyContent: "center" },
@@ -170,4 +171,4 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
   },
-});
+}));

@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import { AmountInput } from "@/components/ui/AmountInput";
 import { MoneySlider } from "@/components/ui/MoneySlider";
 import { Drawer } from "@/components/shared/Drawer";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
 import { formatCurrency, toCents, toMajorUnits } from "@/lib/currency";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles } from "@/lib/theme";
 
 interface AmountPromptModalProps {
   visible: boolean;
@@ -41,6 +41,7 @@ export function AmountPromptModal({
   onConfirm,
   testID,
 }: AmountPromptModalProps) {
+  const styles = useStyles();
   const [draft, setDraft] = useState(value);
 
   // Re-seed on open. Without this the drawer shows the previous invocation's
@@ -76,10 +77,10 @@ export function AmountPromptModal({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   body: { gap: spacing.md, paddingBottom: spacing.md },
   input: { textAlign: "right" },
   meta: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   metaLabel: { ...typography.caption, color: colors.textSecondary },
   metaValue: { ...typography.label, color: colors.textPrimary },
-});
+}));

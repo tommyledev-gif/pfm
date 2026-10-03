@@ -15,6 +15,7 @@ import (
 	"github.com/example/pfm/backend/internal/common"
 	"github.com/example/pfm/backend/internal/config"
 	"github.com/example/pfm/backend/internal/handler"
+	"github.com/example/pfm/backend/internal/middleware"
 	"github.com/example/pfm/backend/internal/repository"
 	"github.com/example/pfm/backend/internal/repository/sqlc"
 	"github.com/example/pfm/backend/internal/response"
@@ -109,6 +110,7 @@ func main() {
 			return response.Error(c, logger, err)
 		},
 	})
+	app.Use(middleware.Recover(logger))
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: cfg.CORSAllowedOrigins,
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",

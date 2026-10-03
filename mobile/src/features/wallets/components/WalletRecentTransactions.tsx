@@ -1,11 +1,11 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import { TransactionRow } from "@/components/shared/TransactionRow";
 import { useCategoryLookup } from "@/features/categories/api/use-category-lookup";
 import { useTransactionsQuery } from "@/features/transactions/api/use-transactions-query";
 import { TransactionRowSkeleton } from "@/features/transactions/components/TransactionRowSkeleton";
 import { Wallet } from "@/features/wallets/types";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles } from "@/lib/theme";
 
 interface WalletRecentTransactionsProps {
   wallet: Wallet;
@@ -21,6 +21,7 @@ const RECENT_LIMIT = 3;
  * balance. Follows the carousel: a different card, a different list.
  */
 export function WalletRecentTransactions({ wallet }: WalletRecentTransactionsProps) {
+  const styles = useStyles();
   const transactions = useTransactionsQuery({ wallet_id: wallet.id, limit: RECENT_LIMIT });
   const categories = useCategoryLookup();
   const items = (transactions.data?.pages[0]?.data ?? []).slice(0, RECENT_LIMIT);
@@ -48,8 +49,8 @@ export function WalletRecentTransactions({ wallet }: WalletRecentTransactionsPro
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   section: { gap: spacing.xs },
   title: { ...typography.label, color: colors.textSecondary, marginBottom: spacing.xs },
   empty: { ...typography.body, color: colors.textSecondary, paddingVertical: spacing.lg },
-});
+}));

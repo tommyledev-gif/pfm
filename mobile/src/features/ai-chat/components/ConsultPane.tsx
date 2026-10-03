@@ -5,7 +5,7 @@ import { TypingIndicator } from "@/components/shared/TypingIndicator";
 import { ChatInputBar } from "@/features/ai-chat/components/ChatInputBar";
 import { ChatThreadList } from "@/features/ai-chat/components/ChatThreadList";
 import { ConsultMessageRow } from "@/features/ai-chat/components/ConsultMessageRow";
-import { chatThreadStyles as styles } from "@/features/ai-chat/components/chat-thread-styles";
+import { useChatThreadStyles } from "@/features/ai-chat/components/chat-thread-styles";
 import { isConsultMessage } from "@/features/ai-chat/consult-message";
 import { useConsultActions } from "@/features/ai-chat/hooks/use-consult-actions";
 import { ChatMessage } from "@/features/ai-chat/types";
@@ -33,6 +33,7 @@ export function ConsultPane({
   bottomInset,
   onSwitchToRecording,
 }: ConsultPaneProps) {
+  const styles = useChatThreadStyles();
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
   const thread = useChatStore((s) => s.thread);

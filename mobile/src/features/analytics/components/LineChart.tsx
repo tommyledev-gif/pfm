@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Animated, LayoutChangeEvent, StyleSheet, Text, View } from "react-native";
+import { Animated, LayoutChangeEvent, Text, View } from "react-native";
 import Svg, { Circle, Polyline } from "react-native-svg";
 
 import { AnalyticsChartItem } from "@/features/analytics/types";
 import { formatCurrencyCompact } from "@/lib/currency";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useEntryAnimation } from "@/lib/use-entry-animation";
 
 interface LineChartProps {
@@ -21,6 +21,8 @@ const STROKE_WIDTH = 2;
 // first and last labels plus the peak are enough to read a trend inside a
 // chat bubble, and anything more crowds it.
 export function LineChart({ items, currency }: LineChartProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const [width, setWidth] = useState(0);
   // First render: the line draws itself left to right. A clip window slides
   // in from the left while its content slides the opposite way by the same
@@ -76,11 +78,11 @@ export function LineChart({ items, currency }: LineChartProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   wrap: { width: "100%", gap: spacing.xs },
   placeholder: { height: HEIGHT },
   clip: { height: HEIGHT, overflow: "hidden" },
   labels: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   label: { ...typography.tiny, color: colors.textMuted },
   peak: { ...typography.tiny, color: colors.textSecondary },
-});
+}));

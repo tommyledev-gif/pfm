@@ -4,7 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { daysInCycle, perDayXu } from "@/features/budget-wizard/budget-math";
 import { formatCurrency } from "@/lib/currency";
-import { colors, spacing } from "@/lib/theme";
+import { spacing, createStyles } from "@/lib/theme";
 import { useSheetStore } from "@/stores/sheet-store";
 import { BUDGET_WIZARD_TOTAL_STEPS, useBudgetWizardState } from "@/features/budget-wizard/hooks/use-budget-wizard-state";
 import { FixedCostsModal } from "@/features/budget-wizard/components/FixedCostsModal";
@@ -35,6 +35,7 @@ interface BudgetWizardModalProps {
  * on the Android hardware back button.
  */
 export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizardModalProps) {
+  const styles = useStyles();
   const wizard = useBudgetWizardState(visible, onClose, onCompleted);
 
   useEffect(() => {
@@ -173,8 +174,8 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.bgApp, zIndex: 40 },
   safeArea: { flex: 1 },
   body: { flex: 1, paddingTop: spacing.sm },
-});
+}));

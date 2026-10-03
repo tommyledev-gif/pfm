@@ -1,7 +1,8 @@
 import { ReactNode } from "react";
-import { ActivityIndicator, Pressable, StyleProp, StyleSheet, Text, TextStyle, ViewStyle } from "react-native";
+import { ActivityIndicator, Pressable, StyleProp, Text, TextStyle, ViewStyle } from "react-native";
 
-import { colors, radii, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, typography, createStyles, useColors } from "@/lib/theme";
 
 interface PillButtonProps {
   label?: string;
@@ -52,6 +53,8 @@ export function PillButton({
   textStyle,
   testID,
 }: PillButtonProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const isOutline = variant === "outline";
   return (
     <Pressable
@@ -82,7 +85,7 @@ export function PillButton({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   base: {
     flexDirection: "row",
     alignItems: "center",
@@ -94,9 +97,9 @@ const styles = StyleSheet.create({
   },
   solid: { backgroundColor: colors.green },
   outline: {
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
+    borderColor: withAlpha(colors.overlayBase, 0.18),
   },
   pressed: { opacity: 0.85 },
   disabled: { opacity: 0.4 },
@@ -107,4 +110,4 @@ const styles = StyleSheet.create({
   label: { ...typography.body, fontWeight: "700", textAlign: "center", flexShrink: 1 },
   solidLabel: { color: colors.onGreen },
   outlineLabel: { color: colors.textPrimary },
-});
+}));

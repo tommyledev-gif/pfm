@@ -1,9 +1,9 @@
 import { useRef, useState } from "react";
-import { Animated, Easing, Pressable, StyleProp, StyleSheet, Text, TextStyle, View, ViewStyle } from "react-native";
+import { Animated, Easing, Pressable, StyleProp, Text, TextStyle, View, ViewStyle } from "react-native";
 
 import { AmountTooltip, AnchorRect } from "@/components/ui/AmountTooltip";
 import { formatCurrencyCompact } from "@/lib/currency";
-import { colors } from "@/lib/theme";
+import { createStyles } from "@/lib/theme";
 
 // Longer than RN's ~500ms default. A figure is something the eye rests on, and
 // at the default delay a slow tap on a stat card popped a modal the user never
@@ -53,6 +53,7 @@ export function RevealableAmount({
   labelStyle,
   containerStyle,
 }: RevealableAmountProps) {
+  const styles = useStyles();
   const targetRef = useRef<View>(null);
   const holdProgress = useRef(new Animated.Value(0)).current;
   const [anchor, setAnchor] = useState<AnchorRect | null>(null);
@@ -124,9 +125,9 @@ export function RevealableAmount({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   // Clips the hold bar to the container's rounded corners.
   target: { overflow: "hidden" },
   // Grows out from the middle as the hold progresses (scaleX 0 → 1).
   holdBar: { position: "absolute", left: 0, right: 0, bottom: 0, height: 3, backgroundColor: colors.green },
-});
+}));

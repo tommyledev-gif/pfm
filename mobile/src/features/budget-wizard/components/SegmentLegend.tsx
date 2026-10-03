@@ -1,7 +1,8 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import { formatCurrency } from "@/lib/currency";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 
 export interface SegmentLegendEntry {
   key: string;
@@ -31,6 +32,7 @@ interface SegmentLegendProps {
  * missing was the link from a block to its row, and that is one line.
  */
 export function SegmentLegend({ entry, currency }: SegmentLegendProps) {
+  const styles = useStyles();
   if (!entry) {
     return (
       <View style={styles.row}>
@@ -55,7 +57,7 @@ export function SegmentLegend({ entry, currency }: SegmentLegendProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   row: {
     minHeight: 30,
     flexDirection: "row",
@@ -64,10 +66,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     borderRadius: radii.listCard,
   },
-  rowActive: { backgroundColor: "rgba(255,255,255,0.05)" },
+  rowActive: { backgroundColor: withAlpha(colors.overlayBase, 0.05) },
   hint: { ...typography.tiny, color: colors.textMuted },
   dot: { width: 8, height: 8, borderRadius: 2 },
   name: { flex: 1, ...typography.caption, color: colors.textPrimary },
   share: { ...typography.caption, color: colors.textSecondary },
   amount: { ...typography.caption, color: colors.textPrimary, fontWeight: "700" },
-});
+}));

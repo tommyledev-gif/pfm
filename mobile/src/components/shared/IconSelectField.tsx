@@ -1,9 +1,10 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { ChevronRightIcon } from "@/components/ui/Icon";
 import { findOpenMoji } from "@/lib/openmoji";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 interface IconSelectFieldProps {
   name: string;
@@ -17,6 +18,8 @@ interface IconSelectFieldProps {
 // The form row for a record's icon: a preview of what is set now and what it
 // is, tapping through to the picker panel (use-icon-picker).
 export function IconSelectField({ name, color, icon, iconUrl, uploading, onPress }: IconSelectFieldProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const description = iconUrl
     ? "Ảnh đã tải lên"
     : icon
@@ -43,14 +46,14 @@ export function IconSelectField({ name, color, icon, iconUrl, uploading, onPress
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   row: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
     padding: spacing.md,
     borderRadius: radii.listCard,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
   },
@@ -58,4 +61,4 @@ const styles = StyleSheet.create({
   textCol: { flex: 1, minWidth: 0, gap: 2 },
   value: { ...typography.body, color: colors.textPrimary },
   hint: { ...typography.tiny, color: colors.textMuted },
-});
+}));

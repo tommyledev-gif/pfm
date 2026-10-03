@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 
 import { Fab, useFabClearance } from "@/components/ui/Fab";
 import { CalendarIcon } from "@/components/ui/Icon";
@@ -9,7 +9,7 @@ import { BudgetFormModal } from "@/features/budgets/components/BudgetFormModal";
 import { colorForCategory } from "@/lib/category-color";
 import { monthRange } from "@/lib/date-range";
 import { formatDateRange } from "@/lib/format-date";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useRefresh } from "@/lib/use-refresh";
 import { WalletCurrency } from "@/lib/constants";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
@@ -45,6 +45,8 @@ interface BudgetsTabProps {
 }
 
 export function BudgetsTab({ initialRange, rangeNonce }: BudgetsTabProps = {}) {
+  const colors = useColors();
+  const styles = useStyles();
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>(initialRange ?? {});
   const [rangePickerOpen, setRangePickerOpen] = useState(false);
   const budgets = useBudgetsQuery();
@@ -255,7 +257,7 @@ export function BudgetsTab({ initialRange, rangeNonce }: BudgetsTabProps = {}) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   container: { flex: 1 },
   skeletonList: { gap: spacing.md },
   rangeRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
@@ -265,4 +267,4 @@ const styles = StyleSheet.create({
   rangeNote: { ...typography.tiny, color: colors.textMuted, paddingBottom: spacing.xs },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
   fab: { right: 0 },
-});
+}));

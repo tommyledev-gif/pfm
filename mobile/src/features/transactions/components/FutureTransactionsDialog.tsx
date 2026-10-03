@@ -1,11 +1,11 @@
 import { Fragment, useMemo } from "react";
-import { Pressable, StyleSheet, Text } from "react-native";
+import { Pressable, Text } from "react-native";
 
 import { Drawer } from "@/components/shared/Drawer";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
 import { TransactionRow } from "@/components/shared/TransactionRow";
 import { dayLabelVi, formatDateViShort } from "@/lib/format-date";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles } from "@/lib/theme";
 import { Category } from "@/features/categories/types";
 import { Transaction } from "@/features/transactions/types";
 
@@ -32,6 +32,7 @@ export function FutureTransactionsDialog({
   categoryById,
   onSelect,
 }: FutureTransactionsDialogProps) {
+  const styles = useStyles();
   // Grouped by day like the main list, so a month of scheduled rows does not
   // arrive as one undifferentiated column of dates.
   const days = useMemo(() => {
@@ -78,8 +79,8 @@ export function FutureTransactionsDialog({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   note: { ...typography.tiny, color: colors.textSecondary },
   dayLabel: { ...typography.caption, color: colors.textMuted, paddingTop: spacing.sm },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", paddingVertical: spacing.xl },
-});
+}));

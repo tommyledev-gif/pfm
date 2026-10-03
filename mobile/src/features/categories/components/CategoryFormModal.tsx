@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, Text, TextInput, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -11,7 +11,8 @@ import { PillButton } from "@/components/ui/PillButton";
 import { TrashIcon } from "@/components/ui/Icon";
 import { getErrorMessage } from "@/lib/axios";
 import { colorForCategory } from "@/lib/category-color";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { CATEGORY_NAME_MAX_LENGTH, CATEGORY_TYPES, CategoryType } from "@/lib/constants";
 import { useCreateCategoryMutation } from "@/features/categories/api/use-create-category-mutation";
 import { useUpdateCategoryMutation } from "@/features/categories/api/use-update-category-mutation";
@@ -31,6 +32,8 @@ interface CategoryFormModalProps {
 // set. `type` can't change after creation (UpdateCategoryRequest doesn't
 // accept it), so it's fixed once editing.
 export function CategoryFormModal({ visible, onClose, editingCategory }: CategoryFormModalProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const isEditing = Boolean(editingCategory);
   const createCategory = useCreateCategoryMutation();
   const updateCategory = useUpdateCategoryMutation();
@@ -210,7 +213,7 @@ export function CategoryFormModal({ visible, onClose, editingCategory }: Categor
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   title: { ...typography.title, color: colors.textPrimary },
   label: { ...typography.caption, color: colors.textSecondary },
   chipRow: { flexDirection: "row", gap: spacing.sm },
@@ -218,7 +221,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: radii.pill,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
   },
@@ -227,7 +230,7 @@ const styles = StyleSheet.create({
   chipLabel: { ...typography.caption, color: colors.textSecondary },
   chipLabelActive: { color: colors.onGreen },
   input: {
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     borderRadius: radii.listCard,
@@ -241,4 +244,4 @@ const styles = StyleSheet.create({
   flexButton: { flex: 1 },
   deleteRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, paddingVertical: spacing.sm },
   deleteLabel: { ...typography.body, color: colors.peach },
-});
+}));

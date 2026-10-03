@@ -1,11 +1,12 @@
 import { ReactNode, useEffect, useRef } from "react";
-import { Animated, StyleSheet, Text, View } from "react-native";
+import { Animated, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CheckIcon } from "@/components/ui/Icon";
 import { PillButton } from "@/components/ui/PillButton";
 import { useReduceMotion } from "@/lib/use-reduce-motion";
-import { colors, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 interface WizardStepSuccessProps {
   createdCount: number | null;
@@ -44,6 +45,8 @@ const HALO_DURATION = 620;
  * out rather than bundled in unannounced. The one call site is marked below.
  */
 export function WizardStepSuccess({ createdCount, dailyAllowance, onDone }: WizardStepSuccessProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const reduceMotion = useReduceMotion();
 
@@ -179,7 +182,7 @@ function Rise({
 const BADGE_SIZE = 96;
 const CIRCLE_SIZE = 76;
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   root: { flex: 1, paddingHorizontal: spacing.xl },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.sm },
   footer: { paddingTop: spacing.lg },
@@ -204,9 +207,9 @@ const styles = StyleSheet.create({
     borderRadius: CIRCLE_SIZE / 2,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(133,255,51,0.12)",
+    backgroundColor: withAlpha(colors.green, 0.12),
   },
   title: { ...typography.title, color: colors.textPrimary, textAlign: "center" },
   amount: { color: colors.green },
   subtitle: { ...typography.body, color: colors.textSecondary, textAlign: "center" },
-});
+}));

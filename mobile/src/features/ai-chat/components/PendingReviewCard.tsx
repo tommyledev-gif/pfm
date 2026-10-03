@@ -1,11 +1,12 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { CheckIcon } from "@/components/ui/Icon";
 import { colorForCategory } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
 import { formatDateShort } from "@/lib/format-date";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { Category } from "@/features/categories/types";
 import { ChatMessage } from "@/features/ai-chat/types";
 
@@ -40,6 +41,8 @@ export function PendingReviewCard({
   onEdit,
   onRemove,
 }: PendingReviewCardProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const payload = message.action?.payload;
   if (!payload) return null;
 
@@ -110,7 +113,7 @@ export function PendingReviewCard({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   card: {
     padding: spacing.lg,
     gap: spacing.md,
@@ -139,9 +142,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   actionPressed: { opacity: 0.75 },
-  dismiss: { backgroundColor: "rgba(255,255,255,0.06)" },
+  dismiss: { backgroundColor: withAlpha(colors.overlayBase, 0.06) },
   dismissLabel: { ...typography.caption, color: colors.textSecondary },
   approve: { backgroundColor: colors.green },
   approveLabel: { ...typography.caption, fontWeight: "700", color: colors.onGreen },
   locked: { opacity: 0.4 },
-});
+}));

@@ -4,7 +4,8 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 
 import { TintedIconTile } from "@/components/ui/TintedIconTile";
 import { formatCurrency } from "@/lib/currency";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
 
 const TYPE_LABEL: Record<Wallet["type"], string> = {
@@ -69,6 +70,7 @@ export function WalletStackCard({
   onPress,
   highlightOpacity,
 }: WalletStackCardProps) {
+  const styles = useStyles();
   // SVG gradient ids must be unique on screen — the loop copies render the
   // same wallet several times. useId's colons are not valid in url(#…).
   const gradientId = `wallet-grad-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
@@ -139,7 +141,7 @@ export function WalletStackCard({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   card: {
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
@@ -147,7 +149,7 @@ const styles = StyleSheet.create({
     // Barely-there hairline: the gradient and the drop shadow already separate
     // the cards, so a full-strength border only added noise.
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.04)",
+    borderColor: withAlpha(colors.overlayBase, 0.04),
     overflow: "hidden",
     // Opaque, not translucent: the neighbouring cards now pass UNDERNEATH this
     // one, and a see-through surface would show their edges through it.
@@ -185,4 +187,4 @@ const styles = StyleSheet.create({
   balanceBlock: { gap: 1 },
   balanceLabel: { ...typography.tiny, color: colors.textSecondary },
   balance: { ...typography.title, color: colors.textPrimary },
-});
+}));

@@ -4,7 +4,7 @@ import { Animated, Dimensions, StyleSheet, View } from "react-native";
 import { SwipeAction, SwipeActionButton } from "@/components/shared/SwipeActionButton";
 import { DELETE_SWIPE_RATIO, EDIT_SWIPE_RATIO, useSwipeActions } from "@/components/shared/use-swipe-actions";
 import { EditIcon, TrashIcon } from "@/components/ui/Icon";
-import { colors } from "@/lib/theme";
+import { useColors } from "@/lib/theme";
 
 // Which way this row must be dragged to reveal its edit action — the opposite
 // edge from wherever the bubble already sits, same convention as Messenger's
@@ -49,6 +49,7 @@ export function SwipeableMessageRow({
   onTriggerDelete,
   closeSignal,
 }: SwipeableMessageRowProps) {
+  const colors = useColors();
   // Edit occupies the vacated edge; delete takes the other one, which is the
   // edge the bubble itself sits against.
   const editSide: SwipeDirection = direction === "left" ? "right" : "left";

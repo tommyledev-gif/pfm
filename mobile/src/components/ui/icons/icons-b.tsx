@@ -1,6 +1,7 @@
 import { base, Circle, IconProps, Line, Path, Svg } from "@/components/ui/icons/primitives";
+import { colors } from "@/lib/theme";
 
-export function SearchIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
+export function SearchIcon({ size, color = colors.textPrimary, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Circle cx="10.5" cy="10.5" r="6.5" stroke={color} strokeWidth={strokeWidth} />
@@ -9,7 +10,7 @@ export function SearchIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps)
   );
 }
 
-export function EyeIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
+export function EyeIcon({ size, color = colors.textPrimary, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" stroke={color} strokeWidth={strokeWidth} strokeLinejoin="round" />
@@ -18,7 +19,7 @@ export function EyeIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
   );
 }
 
-export function SortIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
+export function SortIcon({ size, color = colors.textPrimary, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Path d="M7 4v16M7 20l-3.5-3.5M7 20l3.5-3.5" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
@@ -27,7 +28,7 @@ export function SortIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
   );
 }
 
-export function CloseIcon({ size, color = "#06130A", strokeWidth = 2.2 }: IconProps) {
+export function CloseIcon({ size, color = colors.onGreen, strokeWidth = 2.2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Path d="M5.5 5.5 18.5 18.5M18.5 5.5 5.5 18.5" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
@@ -35,7 +36,7 @@ export function CloseIcon({ size, color = "#06130A", strokeWidth = 2.2 }: IconPr
   );
 }
 
-export function HistoryIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
+export function HistoryIcon({ size, color = colors.textPrimary, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Path
@@ -50,7 +51,7 @@ export function HistoryIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps
   );
 }
 
-export function CodeIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
+export function CodeIcon({ size, color = colors.textPrimary, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Path
@@ -65,7 +66,7 @@ export function CodeIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
 }
 
 /** A bug — the debug console (DebugBubble). Shape adapted from Lucide's "bug" (ISC). */
-export function BugIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
+export function BugIcon({ size, color = colors.textPrimary, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Path
@@ -79,7 +80,7 @@ export function BugIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
   );
 }
 
-export function EyeOffIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
+export function EyeOffIcon({ size, color = colors.textPrimary, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Path
@@ -97,7 +98,7 @@ export function EyeOffIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps)
 // arrow's direction carrying the whole distinction: up and out of the tray
 // for export, down and into it for import. Deliberately one shape in two
 // mirrorings rather than two unrelated glyphs, since they sit side by side.
-export function UploadIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
+export function UploadIcon({ size, color = colors.textPrimary, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Path
@@ -111,7 +112,7 @@ export function UploadIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps)
   );
 }
 
-export function DownloadIcon({ size, color = "#fff", strokeWidth = 2 }: IconProps) {
+export function DownloadIcon({ size, color = colors.textPrimary, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
       <Path

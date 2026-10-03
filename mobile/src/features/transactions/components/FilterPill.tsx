@@ -1,8 +1,8 @@
 import { ReactNode } from "react";
-import { Pressable, StyleSheet, Text } from "react-native";
+import { Pressable, Text } from "react-native";
 
 import { IconProps } from "@/components/ui/Icon";
-import { colors, radii, typography } from "@/lib/theme";
+import { radii, typography, createStyles, useColors } from "@/lib/theme";
 
 interface FilterPillProps {
   // Filled-green state, for a pill that reflects an applied filter. Action
@@ -23,6 +23,8 @@ interface FilterPillProps {
 // carries, so they share this one shape rather than five near-identical
 // Pressables.
 export function FilterPill({ active, label, icon: Icon, onPress, children, testID }: FilterPillProps) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <Pressable testID={testID} style={[styles.pill, active && styles.pillActive]} onPress={onPress}>
       <Icon size={16} color={active ? colors.onGreen : colors.textSecondary} />
@@ -34,7 +36,7 @@ export function FilterPill({ active, label, icon: Icon, onPress, children, testI
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   pill: {
     // Anchors the sort pill's absolutely-positioned count badge.
     position: "relative",
@@ -51,4 +53,4 @@ const styles = StyleSheet.create({
   pillActive: { backgroundColor: colors.green, borderColor: colors.green },
   label: { ...typography.tiny, color: colors.textSecondary },
   labelActive: { color: colors.onGreen },
-});
+}));

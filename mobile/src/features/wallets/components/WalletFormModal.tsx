@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, Text, TextInput, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 
 import { AmountInput } from "@/components/ui/AmountInput";
@@ -10,7 +10,8 @@ import { FieldError } from "@/components/ui/FieldError";
 import { PillButton } from "@/components/ui/PillButton";
 import { getErrorMessage } from "@/lib/axios";
 import { toCents } from "@/lib/currency";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { WALLET_CURRENCIES, WALLET_TYPES, WalletCurrency, WalletType } from "@/lib/constants";
 import { useCreateWalletMutation } from "@/features/wallets/api/use-create-wallet-mutation";
 import { useUpdateWalletMutation } from "@/features/wallets/api/use-update-wallet-mutation";
@@ -37,6 +38,8 @@ interface WalletFormModalProps {
 // Icon picker mirrors CategoryFormModal.tsx's pattern exactly
 // (specs/wallet-budget-icons/spec.md US-01/US-02).
 export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormModalProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const isEditing = Boolean(editingWallet);
   const createWallet = useCreateWalletMutation();
   const updateWallet = useUpdateWalletMutation();
@@ -200,7 +203,7 @@ export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormM
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   title: { ...typography.title, color: colors.textPrimary },
   label: { ...typography.caption, color: colors.textSecondary },
   chipRow: { flexDirection: "row", gap: spacing.sm, flexWrap: "wrap" },
@@ -208,7 +211,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: radii.pill,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
   },
@@ -217,7 +220,7 @@ const styles = StyleSheet.create({
   chipLabel: { ...typography.caption, color: colors.textSecondary },
   chipLabelActive: { color: colors.onGreen },
   input: {
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     borderRadius: radii.listCard,
@@ -229,4 +232,4 @@ const styles = StyleSheet.create({
   error: { color: colors.peach, ...typography.caption },
   actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
   flexButton: { flex: 1 },
-});
+}));

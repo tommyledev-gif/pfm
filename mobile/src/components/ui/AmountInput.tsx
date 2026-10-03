@@ -1,6 +1,7 @@
 import { TextInput, TextInputProps } from "react-native";
 
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { createStyles, radii, spacing, typography, useColors } from "@/lib/theme";
 
 interface AmountInputProps {
   value: string;
@@ -41,6 +42,8 @@ function formatWithThousands(clean: string): string {
 // own Math.round was never the bug; there was just never a decimal point
 // to round).
 export function AmountInput({ value, onChangeText, placeholder = "0", style, testID }: AmountInputProps) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <TextInput
       testID={testID}
@@ -54,9 +57,9 @@ export function AmountInput({ value, onChangeText, placeholder = "0", style, tes
   );
 }
 
-const styles = {
+const useStyles = createStyles((colors) => ({
   input: {
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     borderRadius: radii.listCard,
@@ -65,4 +68,4 @@ const styles = {
     color: colors.textPrimary,
     ...typography.body,
   },
-} as const;
+}));

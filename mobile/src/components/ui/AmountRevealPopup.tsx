@@ -1,8 +1,8 @@
-import { Modal, Pressable, StyleSheet, Text } from "react-native";
+import { Modal, Pressable, Text } from "react-native";
 
 import { formatCurrency, toMajorUnits } from "@/lib/currency";
 import { numberToWordsVi } from "@/lib/number-to-words-vi";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 
 interface AmountRevealPopupProps {
   visible: boolean;
@@ -19,6 +19,7 @@ interface AmountRevealPopupProps {
 // room to spell the amount out in words underneath, which an anchored
 // bubble wouldn't.
 export function AmountRevealPopup({ visible, onClose, amountCents, currency }: AmountRevealPopupProps) {
+  const styles = useStyles();
   const words = numberToWordsVi(toMajorUnits(amountCents));
 
   return (
@@ -33,7 +34,7 @@ export function AmountRevealPopup({ visible, onClose, amountCents, currency }: A
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center", padding: spacing.xl },
   card: {
     maxWidth: 320,
@@ -48,4 +49,4 @@ const styles = StyleSheet.create({
   },
   amount: { ...typography.body, color: colors.textPrimary, textAlign: "center" },
   words: { ...typography.tiny, color: colors.textSecondary, textAlign: "center" },
-});
+}));

@@ -107,7 +107,7 @@ func (s *AuthService) Activate(ctx context.Context, token, fullName, password, p
 // "email not found" vs. "wrong password" pair must be timing-equivalent,
 // which the dummyPasswordHash compare below provides.
 func (s *AuthService) Login(ctx context.Context, email, password string) (string, string, error) {
-	user, err := s.userRepo.GetUserByEmail(ctx, email)
+	user, err := s.userRepo.GetUserByEmail(ctx, common.NormalizeEmail(email))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(password))

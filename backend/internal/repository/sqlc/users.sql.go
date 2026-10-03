@@ -8,9 +8,9 @@ import (
 )
 
 const createPendingUser = `-- name: CreatePendingUser :one
-INSERT INTO users (email, role, invited_by, invite_token, invite_expires_at)
-VALUES ($1, $2, $3, $4, NOW() + INTERVAL '72 hours')
-RETURNING id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at
+INSERT INTO users (email, role, invited_by, invite_token, invite_expires_at, invite_sent_at)
+VALUES ($1, $2, $3, $4, NOW() + INTERVAL '72 hours', NOW())
+RETURNING id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at, invite_sent_at, invite_resend_count
 `
 
 type CreatePendingUserParams struct {
@@ -26,13 +26,13 @@ func (q *Queries) CreatePendingUser(ctx context.Context, arg CreatePendingUserPa
 	err := row.Scan(
 		&i.ID, &i.Email, &i.FullName, &i.PasswordHash, &i.Status, &i.Role,
 		&i.InvitedBy, &i.InviteToken, &i.InviteExpiresAt, &i.ActivatedAt,
-		&i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
+		&i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.InviteSentAt, &i.InviteResendCount,
 	)
 	return i, err
 }
 
 const getUserByInviteToken = `-- name: GetUserByInviteToken :one
-SELECT id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at FROM users
+SELECT id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at, invite_sent_at, invite_resend_count FROM users
 WHERE invite_token = $1
   AND status = 'pending'
   AND deleted_at IS NULL
@@ -45,7 +45,7 @@ func (q *Queries) GetUserByInviteToken(ctx context.Context, inviteToken string) 
 	err := row.Scan(
 		&i.ID, &i.Email, &i.FullName, &i.PasswordHash, &i.Status, &i.Role,
 		&i.InvitedBy, &i.InviteToken, &i.InviteExpiresAt, &i.ActivatedAt,
-		&i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
+		&i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.InviteSentAt, &i.InviteResendCount,
 	)
 	return i, err
 }
@@ -63,7 +63,7 @@ SET
 WHERE invite_token = $1
   AND status = 'pending'
   AND invite_expires_at > NOW()
-RETURNING id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at
+RETURNING id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at, invite_sent_at, invite_resend_count
 `
 
 type ActivateUserParams struct {
@@ -82,13 +82,48 @@ func (q *Queries) ActivateUser(ctx context.Context, arg ActivateUserParams) (Use
 	err := row.Scan(
 		&i.ID, &i.Email, &i.FullName, &i.PasswordHash, &i.Status, &i.Role,
 		&i.InvitedBy, &i.InviteToken, &i.InviteExpiresAt, &i.ActivatedAt,
-		&i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
+		&i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.InviteSentAt, &i.InviteResendCount,
+	)
+	return i, err
+}
+
+const resendInvite = `-- name: ResendInvite :one
+UPDATE users
+SET
+    invite_token        = $2,
+    invite_expires_at   = NOW() + INTERVAL '72 hours',
+    invite_sent_at      = NOW(),
+    invite_resend_count = invite_resend_count + 1,
+    updated_at          = NOW()
+WHERE id = $1
+  AND status = 'pending'
+  AND deleted_at IS NULL
+  AND invite_resend_count = $3
+RETURNING id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at, invite_sent_at, invite_resend_count
+`
+
+type ResendInviteParams struct {
+	ID                uuid.UUID
+	InviteToken       string
+	InviteResendCount int32
+}
+
+// ResendInvite returns pgx.ErrNoRows when the user is no longer pending, or
+// when a concurrent resend already bumped invite_resend_count past the value
+// the caller read.
+func (q *Queries) ResendInvite(ctx context.Context, arg ResendInviteParams) (User, error) {
+	row := q.db.QueryRow(ctx, resendInvite, arg.ID, arg.InviteToken, arg.InviteResendCount)
+	var i User
+	err := row.Scan(
+		&i.ID, &i.Email, &i.FullName, &i.PasswordHash, &i.Status, &i.Role,
+		&i.InvitedBy, &i.InviteToken, &i.InviteExpiresAt, &i.ActivatedAt,
+		&i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.InviteSentAt, &i.InviteResendCount,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at FROM users
+SELECT id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at, invite_sent_at, invite_resend_count FROM users
 WHERE email = $1
   AND deleted_at IS NULL
 LIMIT 1
@@ -100,13 +135,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 	err := row.Scan(
 		&i.ID, &i.Email, &i.FullName, &i.PasswordHash, &i.Status, &i.Role,
 		&i.InvitedBy, &i.InviteToken, &i.InviteExpiresAt, &i.ActivatedAt,
-		&i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
+		&i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.InviteSentAt, &i.InviteResendCount,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at FROM users
+SELECT id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at, invite_sent_at, invite_resend_count FROM users
 WHERE id = $1
   AND deleted_at IS NULL
 LIMIT 1
@@ -118,7 +153,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 	err := row.Scan(
 		&i.ID, &i.Email, &i.FullName, &i.PasswordHash, &i.Status, &i.Role,
 		&i.InvitedBy, &i.InviteToken, &i.InviteExpiresAt, &i.ActivatedAt,
-		&i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
+		&i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.InviteSentAt, &i.InviteResendCount,
 	)
 	return i, err
 }
@@ -137,7 +172,7 @@ func (q *Queries) CountUserByEmailAnyStatus(ctx context.Context, email string) (
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at FROM users
+SELECT id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at, invite_sent_at, invite_resend_count FROM users
 WHERE deleted_at IS NULL
   AND ($2::text IS NULL OR status = $2)
   AND ($3::text IS NULL OR role = $3)
@@ -171,7 +206,7 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 		if err := rows.Scan(
 			&i.ID, &i.Email, &i.FullName, &i.PasswordHash, &i.Status, &i.Role,
 			&i.InvitedBy, &i.InviteToken, &i.InviteExpiresAt, &i.ActivatedAt,
-			&i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
+			&i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.InviteSentAt, &i.InviteResendCount,
 		); err != nil {
 			return nil, err
 		}
@@ -211,7 +246,7 @@ DO UPDATE SET
     full_name     = EXCLUDED.full_name,
     updated_at    = NOW()
 WHERE users.role = 'admin'
-RETURNING id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at
+RETURNING id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at, invite_sent_at, invite_resend_count
 `
 
 type SeedAdminUserParams struct {
@@ -229,7 +264,7 @@ func (q *Queries) SeedAdminUser(ctx context.Context, arg SeedAdminUserParams) (U
 	err := row.Scan(
 		&i.ID, &i.Email, &i.FullName, &i.PasswordHash, &i.Status, &i.Role,
 		&i.InvitedBy, &i.InviteToken, &i.InviteExpiresAt, &i.ActivatedAt,
-		&i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
+		&i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.InviteSentAt, &i.InviteResendCount,
 	)
 	return i, err
 }

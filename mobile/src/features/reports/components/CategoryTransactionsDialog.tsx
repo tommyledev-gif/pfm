@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { Drawer } from "@/components/shared/Drawer";
@@ -8,7 +8,7 @@ import { TransactionRow } from "@/components/shared/TransactionRow";
 import { TransactionRowSkeleton } from "@/features/transactions/components/TransactionRowSkeleton";
 import { formatCurrency } from "@/lib/currency";
 import { formatDateRange } from "@/lib/format-date";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useTransactionsQuery } from "@/features/transactions/api/use-transactions-query";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
@@ -56,6 +56,8 @@ export function CategoryTransactionsDialog({
   currency,
   total,
 }: CategoryTransactionsDialogProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const wallets = useWalletsQuery();
   const categories = useCategoriesQuery();
 
@@ -140,7 +142,7 @@ export function CategoryTransactionsDialog({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   summary: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   summaryText: { flex: 1, gap: 2 },
   summaryName: { ...typography.body, color: colors.textPrimary },
@@ -149,4 +151,4 @@ const styles = StyleSheet.create({
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", paddingVertical: spacing.xl },
   moreButton: { alignItems: "center", paddingVertical: spacing.sm },
   moreLabel: { ...typography.label, color: colors.green },
-});
+}));

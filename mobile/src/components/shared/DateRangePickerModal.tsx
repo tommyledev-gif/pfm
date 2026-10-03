@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { DateData } from "react-native-calendars";
 import { MarkingProps } from "react-native-calendars/src/calendar/day/marking";
 
@@ -7,7 +7,7 @@ import { Drawer } from "@/components/shared/Drawer";
 import { MonthYearCalendar } from "@/components/shared/MonthYearCalendar";
 import { formatDateShort } from "@/lib/format-date";
 import { PillButton } from "@/components/ui/PillButton";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { colors, radii, spacing, typography, createStyles } from "@/lib/theme";
 
 interface DateRangePickerModalProps {
   visible: boolean;
@@ -68,6 +68,7 @@ function addDaysIso(iso: string, days: number): string {
 // (MonthYearCalendar) — react-native-calendars' own header only has
 // prev/next arrows.
 export function DateRangePickerModal({ visible, onClose, from, to, onApply }: DateRangePickerModalProps) {
+  const styles = useStyles();
   const [start, setStart] = useState<string | null>(from ?? null);
   const [end, setEnd] = useState<string | null>(to ?? null);
 
@@ -146,11 +147,11 @@ export function DateRangePickerModal({ visible, onClose, from, to, onApply }: Da
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   title: { ...typography.title, color: colors.textPrimary },
   subtitle: { ...typography.caption, color: colors.textSecondary },
   calendar: { borderRadius: radii.listCard },
   maxRangeHint: { ...typography.tiny, color: colors.textMuted, textAlign: "center" },
   actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
   flexButton: { flex: 1 },
-});
+}));

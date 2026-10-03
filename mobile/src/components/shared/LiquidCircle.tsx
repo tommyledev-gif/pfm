@@ -1,8 +1,9 @@
 import { useEffect, useRef } from "react";
-import { Animated, Easing, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, Text, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 
-import { colors, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { colors, typography, createStyles } from "@/lib/theme";
 
 // Home snapshot's "liquid fill" circle — a wavy-surfaced fill clipped to a
 // circle, reading as a level of liquid rather than a plain progress ring.
@@ -20,15 +21,6 @@ const WAVE_LOOP_MS = 3200;
 // label at the very top of the circle, at 0%/100% progress respectively.
 const MIN_FILL = 0.08;
 const MAX_FILL = 0.92;
-// ⚠️ The label sits on a near-black track at low fill and on a bright liquid
-// at high fill, and at intermediate levels the wave crosses the text itself.
-// A scrim behind the label is the only treatment that holds in all three: a
-// threshold that flips the text color cannot serve a line that is half on each
-// side, and deciding per frame from the animated wave position would strobe as
-// the surface moves. Tuned dark enough to carry white text over the lightest
-// palette color a caller can pass, light enough that the fill still reads
-// through it — the circle's whole job is showing a level.
-const LABEL_SCRIM_COLOR = "rgba(5,11,20,0.62)";
 // The empty part of the circle is transparent — only an outline ring marks
 // its boundary, with a small gap between the ring and the liquid so the ring
 // still reads as a separate edge once the liquid rises against it.
@@ -65,6 +57,7 @@ export function LiquidCircle({
   topLabel,
   topValue,
 }: LiquidCircleProps) {
+  const styles = useStyles();
   const size = outerSize - 2 * (OUTLINE_WIDTH + OUTLINE_GAP);
   const clamped = Math.min(MAX_FILL, Math.max(MIN_FILL, progress));
   const waterY = size * (1 - clamped);
@@ -121,7 +114,7 @@ export function LiquidCircle({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   outline: { alignItems: "center", justifyContent: "center", borderWidth: OUTLINE_WIDTH },
   wrapper: { alignItems: "center", justifyContent: "center", overflow: "hidden" },
   wave: { position: "absolute", left: 0, top: 0 },
@@ -132,8 +125,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 3,
     borderRadius: 6,
-    backgroundColor: LABEL_SCRIM_COLOR,
+    // ⚠️ The label sits on the bare track at low fill and on a bright liquid
+    // at high fill, and at intermediate levels the wave crosses the text
+    // itself. A scrim behind the label is the only treatment that holds in all
+    // three: a threshold that flips the text color cannot serve a line that is
+    // half on each side, and deciding per frame from the animated wave position
+    // would strobe as the surface moves. It is the theme's own ground, so it
+    // carries the theme's text color over the lightest palette color a caller
+    // can pass, and translucent enough that the fill still reads through it —
+    // the circle's whole job is showing a level.
+    backgroundColor: withAlpha(colors.bgApp, 0.62),
   },
   caption: { ...typography.caption, color: colors.textSecondary },
   value: { ...typography.title, color: colors.textPrimary },
-});
+}));

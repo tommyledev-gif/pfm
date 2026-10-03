@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Drawer } from "@/components/shared/Drawer";
@@ -9,7 +9,8 @@ import { TrashIcon } from "@/components/ui/Icon";
 import { SingleDatePickerModal } from "@/components/shared/SingleDatePickerModal";
 import { getErrorMessage } from "@/lib/axios";
 import { formatCurrency } from "@/lib/currency";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { TRANSACTION_KIND_LABELS, TRANSACTION_KINDS } from "@/lib/constants";
 import { Transaction } from "@/features/transactions/types";
 import { TransactionKeypadFooter } from "@/features/transactions/components/TransactionKeypadFooter";
@@ -34,6 +35,8 @@ interface TransactionFormModalProps {
 // keypad instead of the OS keyboard — sits in the pinned footer with the
 // category chip, the note, the date key and the ✓ key that saves.
 export function TransactionFormModal({ visible, onClose, editingTransaction }: TransactionFormModalProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const {
     isEditing,
     wallets,
@@ -204,7 +207,7 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   label: { ...typography.caption, color: colors.textSecondary },
   balanceHint: { ...typography.tiny, color: colors.textMuted },
   chipRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
@@ -217,7 +220,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 14,
     borderRadius: radii.pill,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
   },
@@ -227,4 +230,4 @@ const styles = StyleSheet.create({
   chipLabelActive: { color: colors.onGreen },
   deleteButton: { backgroundColor: colors.danger, marginTop: spacing.sm },
   deleteLabel: { color: colors.onDanger, fontWeight: "800" },
-});
+}));

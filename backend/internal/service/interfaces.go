@@ -19,6 +19,7 @@ type UserRepo interface {
 	CreatePendingUser(ctx context.Context, email string, role model.UserRole, invitedBy uuid.UUID, inviteToken string) (*model.User, error)
 	GetUserByInviteToken(ctx context.Context, token string) (*model.User, error)
 	ActivateUser(ctx context.Context, inviteToken string, fullName *string, passwordHash string) (*model.User, error)
+	ResendInvite(ctx context.Context, id uuid.UUID, inviteToken string, expectedResendCount int32) (*model.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*model.User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (*model.User, error)
 	CountUserByEmailAnyStatus(ctx context.Context, email string) (int64, error)

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Keyboard, Pressable, StyleSheet, Text, View } from "react-native";
+import { Keyboard, Pressable, Text, View } from "react-native";
 
 import { Drawer } from "@/components/shared/Drawer";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
 import { SingleDatePickerModal } from "@/components/shared/SingleDatePickerModal";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 import { TRANSACTION_TYPES, TransactionType } from "@/lib/constants";
 import { useAmountExpression } from "@/lib/use-amount-expression";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
@@ -44,6 +45,7 @@ interface EditTransactionModalProps {
 // key (which replaced the inline calendar that used to make this the
 // longest sheet in the app) are pinned in the Drawer footer.
 export function EditTransactionModal({ visible, payload, onClose, onSave, lockWalletAndType }: EditTransactionModalProps) {
+  const styles = useStyles();
   const [type, setType] = useState<TransactionType>("expense");
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [walletId, setWalletId] = useState<string | null>(null);
@@ -185,7 +187,7 @@ export function EditTransactionModal({ visible, payload, onClose, onSave, lockWa
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   fieldGroup: { gap: spacing.xs },
   label: { ...typography.caption, color: colors.textSecondary },
   chipRow: { flexDirection: "row", gap: spacing.sm, flexWrap: "wrap" },
@@ -195,7 +197,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 14,
     borderRadius: radii.pill,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
   },
@@ -204,4 +206,4 @@ const styles = StyleSheet.create({
   chipLabel: { ...typography.caption, color: colors.textSecondary },
   chipLabelActive: { color: colors.onGreen },
   lockedHint: { ...typography.tiny, color: colors.textMuted },
-});
+}));

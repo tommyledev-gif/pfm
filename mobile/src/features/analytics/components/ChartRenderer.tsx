@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import { AmountText } from "@/components/ui/AmountText";
 import { BarList } from "@/features/analytics/components/BarList";
@@ -10,7 +10,7 @@ import { LineChart } from "@/features/analytics/components/LineChart";
 import { NumberStat } from "@/features/analytics/components/NumberStat";
 import { RankedList } from "@/features/analytics/components/RankedList";
 import { AnalyticsChart } from "@/features/analytics/types";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 
 interface ChartRendererProps {
   chart: AnalyticsChart;
@@ -27,6 +27,7 @@ const MIN_LINE_POINTS = 3;
 // stored by a newer app version) falls back to a plain list of whatever
 // figures it carries, never a blank bubble (spec.md S-AIQ-43).
 export function ChartRenderer({ chart, currency, elapsed }: ChartRendererProps) {
+  const styles = useStyles();
   const body = (() => {
     switch (chart.type) {
       case "none":
@@ -84,6 +85,7 @@ export function ChartRenderer({ chart, currency, elapsed }: ChartRendererProps) 
 }
 
 function FallbackList({ chart, currency, elapsed }: ChartRendererProps) {
+  const styles = useStyles();
   if (chart.rows) {
     return <RankedList rows={chart.rows} moreRows={chart.more_rows} currency={currency} totalMatched={chart.total_matched} />;
   }
@@ -102,11 +104,11 @@ function FallbackList({ chart, currency, elapsed }: ChartRendererProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   surface: { marginTop: spacing.md, padding: spacing.lg, borderRadius: radii.listCard, backgroundColor: colors.surface },
   surfaceList: { paddingVertical: spacing.xs },
   stack: { gap: spacing.md },
   fallbackRow: { flexDirection: "row", justifyContent: "space-between", gap: spacing.sm },
   fallbackLabel: { ...typography.label, color: colors.textSecondary, flex: 1 },
   fallbackAmount: { ...typography.label, color: colors.textPrimary },
-});
+}));

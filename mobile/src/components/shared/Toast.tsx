@@ -1,9 +1,9 @@
 import { useEffect, useRef } from "react";
-import { Animated, Dimensions, PanResponder, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Dimensions, PanResponder, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CloseIcon } from "@/components/ui/Icon";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { colors, radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useToastStore, type ToastVariant } from "@/stores/toast-store";
 
 const AUTO_DISMISS_MS = 5000;
@@ -18,10 +18,12 @@ const HORIZONTAL_DISMISS_RATIO = 0.85;
 const VERTICAL_DISMISS_PX = 24;
 const OFFSCREEN_Y = -160;
 
+// Getters, not values: read at render time so they follow a theme switch
+// (see src/theme/active-palette.ts).
 const VARIANT_ACCENT: Record<ToastVariant, string> = {
-  error: colors.error,
-  warning: colors.warning,
-  info: colors.info,
+  get error() { return colors.error; },
+  get warning() { return colors.warning; },
+  get info() { return colors.info; },
 };
 
 // Slides down from above the screen to rest just under the safe area,
@@ -32,6 +34,8 @@ const VARIANT_ACCENT: Record<ToastVariant, string> = {
 // comment) — no react-native-gesture-handler/reanimated dependency, plain
 // core PanResponder + Animated, same as SwipeableMessageRow/DebugBubble.
 export function Toast() {
+  const colors = useColors();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const visible = useToastStore((s) => s.visible);
   const message = useToastStore((s) => s.message);
@@ -143,7 +147,7 @@ export function Toast() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   container: {
     position: "absolute",
     left: CARD_MARGIN,
@@ -164,4 +168,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   message: { flex: 1, ...typography.label, color: colors.textPrimary },
-});
+}));

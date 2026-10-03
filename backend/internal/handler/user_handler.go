@@ -51,6 +51,22 @@ func (h *UserHandler) InviteUser(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusCreated, "user invited successfully", dto.NewInviteUserResponse(user))
 }
 
+// ResendInvite handles POST /admin/users/:id/resend-invite (registered
+// behind JWTAuth + RequireRole("admin")). The cooldown is a service rule.
+func (h *UserHandler) ResendInvite(c *fiber.Ctx) error {
+	userID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, h.logger, common.NewInvalidInputError("id must be a valid UUID"))
+	}
+
+	user, err := h.userService.ResendInvite(c.Context(), userID)
+	if err != nil {
+		return response.Error(c, h.logger, err)
+	}
+
+	return response.Success(c, fiber.StatusOK, "invitation resent successfully", dto.NewUserResponse(user))
+}
+
 // ListUsers handles GET /admin/users (registered behind JWTAuth + RequireRole("admin")).
 func (h *UserHandler) ListUsers(c *fiber.Ctx) error {
 	var q dto.ListUsersQuery

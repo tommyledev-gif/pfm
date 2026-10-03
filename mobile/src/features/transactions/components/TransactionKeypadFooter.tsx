@@ -1,4 +1,4 @@
-import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Keyboard, Pressable, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Avatar } from "@/components/ui/Avatar";
@@ -8,7 +8,8 @@ import { KeypadSheetFooter } from "@/components/shared/KeypadSheetFooter";
 import { colorForCategory } from "@/lib/category-color";
 import { TRANSACTION_NOTE_MAX_LENGTH, TransactionKind } from "@/lib/constants";
 import { formatDateShort } from "@/lib/format-date";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { colors, radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { AmountExpression } from "@/lib/use-amount-expression";
 import { useKeyboardVisible } from "@/lib/use-keyboard-height";
 import { Category } from "@/features/categories/types";
@@ -16,10 +17,12 @@ import { Wallet } from "@/features/wallets/types";
 
 // Same tones TransactionRow paints a stored amount in, so the figure being
 // typed already reads as the row it is about to become.
+// Getters, not values: read at render time so they follow a theme switch
+// (see src/theme/active-palette.ts).
 const AMOUNT_COLOR: Record<TransactionKind, string> = {
-  expense: colors.peach,
-  income: colors.green,
-  transfer: colors.periwinkle,
+  get expense() { return colors.peach; },
+  get income() { return colors.green; },
+  get transfer() { return colors.periwinkle; },
 };
 
 // Drawer's footer already pads its bottom by this much; the keypad only adds
@@ -87,6 +90,8 @@ export function TransactionKeypadFooter({
   onSubmit,
   submitting,
 }: TransactionKeypadFooterProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const keyboardVisible = useKeyboardVisible();
   const insets = useSafeAreaInsets();
   const isTransfer = type === "transfer";
@@ -164,7 +169,7 @@ export function TransactionKeypadFooter({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   chip: {
     flexDirection: "row",
     alignItems: "center",
@@ -172,7 +177,7 @@ const styles = StyleSheet.create({
     height: 36,
     paddingHorizontal: spacing.md,
     borderRadius: radii.pill,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     alignSelf: "flex-start",
@@ -181,7 +186,7 @@ const styles = StyleSheet.create({
   chipLabel: { ...typography.caption, color: colors.textPrimary, flexShrink: 1 },
   chipPlaceholder: { color: colors.textMuted },
   noteInput: {
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     borderRadius: radii.listCard,
@@ -192,4 +197,4 @@ const styles = StyleSheet.create({
   },
   error: { ...typography.caption, color: colors.peach },
   notice: { ...typography.caption, color: colors.mustardSoft },
-});
+}));

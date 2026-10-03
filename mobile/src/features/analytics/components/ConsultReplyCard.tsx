@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { CategoryBanner } from "@/features/analytics/components/CategoryBanner";
 import { CategoryChoiceList } from "@/features/analytics/components/CategoryChoiceList";
@@ -7,7 +7,7 @@ import { SuggestionChips } from "@/features/analytics/components/SuggestionChips
 import { SuggestionRows } from "@/features/analytics/components/SuggestionRows";
 import { periodElapsed } from "@/features/analytics/period-elapsed";
 import { AnalyticsPeriodInfo, AnalyticsQuery, ConsultCategoryRef, ConsultMessageData } from "@/features/analytics/types";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 
 export interface ConsultHandlers {
   onAskQuery: (query: AnalyticsQuery, label: string) => void;
@@ -46,6 +46,7 @@ function periodText(period: AnalyticsPeriodInfo): string {
 // The reply text itself (the summary or the explanation) sits above this,
 // as the message's own first line — answer first, metadata under it.
 export function ConsultReplyCard({ data, handlers }: ConsultReplyCardProps) {
+  const styles = useStyles();
   const answer = data.answer;
   const chips = answer ? answer.follow_ups : data.chips;
 
@@ -109,7 +110,7 @@ export function ConsultReplyCard({ data, handlers }: ConsultReplyCardProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   period: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs },
   notice: { ...typography.caption, color: colors.mustardSoft, marginTop: spacing.sm },
   switch: {
@@ -122,4 +123,4 @@ const styles = StyleSheet.create({
   },
   switchLabel: { ...typography.caption, color: colors.onGreen },
   chips: { marginTop: spacing.md },
-});
+}));

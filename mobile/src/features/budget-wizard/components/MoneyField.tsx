@@ -1,10 +1,10 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { AmountInput } from "@/components/ui/AmountInput";
 import { MoneySlider, SliderScale } from "@/components/ui/MoneySlider";
 import { roundStepXu } from "@/features/budget-wizard/budget-math";
 import { toCents, toMajorUnits } from "@/lib/currency";
-import { colors, spacing, typography } from "@/lib/theme";
+import { spacing, typography, createStyles } from "@/lib/theme";
 
 interface MoneyFieldProps {
   label: string;
@@ -35,6 +35,7 @@ interface MoneyFieldProps {
  * the "real" one.
  */
 export function MoneyField({ label, hint, value, onChange, sliderCeiling = 0, sliderScale, action, testID }: MoneyFieldProps) {
+  const styles = useStyles();
   // The slider's span follows the value once it goes past the convenience
   // ceiling — otherwise a user who types 80tr sees the thumb pinned at the
   // right edge and dragging it snaps their figure down to the ceiling.
@@ -80,11 +81,11 @@ export function MoneyField({ label, hint, value, onChange, sliderCeiling = 0, sl
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   field: { gap: spacing.xs },
   label: { ...typography.caption, color: colors.textSecondary },
   input: { textAlign: "right" },
   footerRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.sm },
   hint: { flex: 1, ...typography.tiny, color: colors.textMuted },
   actionLabel: { ...typography.tiny, color: colors.green, textAlign: "right" },
-});
+}));

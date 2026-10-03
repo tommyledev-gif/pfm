@@ -41,6 +41,10 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	admin := v1.Group("/admin", middleware.JWTAuth(tokens, logger), middleware.RequireRole(string(model.UserRoleAdmin), logger))
 	admin.Post("/users/invite", middleware.InviteRateLimiter(logger), userHandler.InviteUser)
 	admin.Get("/users", userHandler.ListUsers)
+	// No InviteRateLimiter here: the per-user cooldown in
+	// UserService.ResendInvite already bounds how often any one inbox can be
+	// emailed, which is what that limiter exists to protect.
+	admin.Post("/users/:id/resend-invite", userHandler.ResendInvite)
 
 	// F-03 Wallet Management — no RequireRole gate: every active user manages
 	// only their own wallets (plan.md Security & Actor Resolution).

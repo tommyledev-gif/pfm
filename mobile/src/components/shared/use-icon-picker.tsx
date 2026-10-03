@@ -1,10 +1,11 @@
 import { useCallback, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { DrawerChild } from "@/components/shared/Drawer";
 import { OpenMojiGrid } from "@/components/shared/OpenMojiGrid";
 import { UploadIcon } from "@/components/ui/Icon";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 interface UseIconPickerOptions {
   icon: string;
@@ -23,6 +24,8 @@ interface UseIconPickerOptions {
  * Picking closes the panel straight away — a single choice needs no confirm.
  */
 export function useIconPicker({ icon, onPickEmoji, onUpload }: UseIconPickerOptions) {
+  const colors = useColors();
+  const styles = useStyles();
   const [visible, setVisible] = useState(false);
   const open = useCallback(() => setVisible(true), []);
   const close = useCallback(() => setVisible(false), []);
@@ -60,7 +63,7 @@ export function useIconPicker({ icon, onPickEmoji, onUpload }: UseIconPickerOpti
   return { child, open };
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   body: { flex: 1, gap: spacing.md },
   uploadRow: {
     flexDirection: "row",
@@ -71,8 +74,8 @@ const styles = StyleSheet.create({
     borderRadius: radii.listCard,
     borderWidth: 1,
     borderStyle: "dashed",
-    borderColor: "rgba(133,255,51,0.45)",
-    backgroundColor: "rgba(133,255,51,0.06)",
+    borderColor: withAlpha(colors.green, 0.45),
+    backgroundColor: withAlpha(colors.green, 0.06),
   },
   uploadLabel: { ...typography.body, color: colors.green },
-});
+}));

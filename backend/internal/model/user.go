@@ -38,4 +38,9 @@ type User struct {
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	DeletedAt       *time.Time
+	// InviteSentAt is when the current invite email went out (nil for rows
+	// that were never pending); InviteResendCount is how many times it has
+	// been resent. Together they drive common.InviteResendAvailableAt.
+	InviteSentAt      *time.Time
+	InviteResendCount int32
 }

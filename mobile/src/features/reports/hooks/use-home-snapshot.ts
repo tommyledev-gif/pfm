@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 
+import { useThemeName } from "@/lib/theme";
 import { currentPeriodRange, monthRange, previousPeriodRange } from "@/lib/date-range";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { budgetTotals } from "@/features/budgets/budget-totals";
@@ -77,6 +78,8 @@ export function useHomeSnapshot(homePeriod: HomePeriod) {
    * Beside today's number the useful thing to see is not what you spend most
    * on in general — it is which limit is about to stop you.
    */
+  // A dependency of the memo below: each row's status carries a resolved color.
+  const themeName = useThemeName();
   const atRiskBudgets: AtRiskBudgetRow[] = useMemo(() => {
     const rows = (budgets.data ?? [])
       .flatMap((budget) => budget.limits.map((limit) => ({ budget, limit })))
@@ -89,7 +92,9 @@ export function useHomeSnapshot(homePeriod: HomePeriod) {
       })
       .filter((row) => row.status.state === "over" || row.status.state === "at-risk");
     return rows.sort((a, b) => b.status.ratio - a.status.ratio).slice(0, TOP_CATEGORIES_COUNT);
-  }, [budgets.data, currency]);
+    // themeName is read only through budgetRowStatus's colors.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [budgets.data, currency, themeName]);
 
   const topCategories = useMemo(() => {
     const expenses = thisMonthSummary.data?.by_category.filter((c) => c.type === "expense") ?? [];

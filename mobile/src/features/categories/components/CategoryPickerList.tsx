@@ -8,7 +8,7 @@ import { CategoryQuickCreateForm } from "@/features/categories/components/Catego
 import { Category } from "@/features/categories/types";
 import { colorForCategory } from "@/lib/category-color";
 import { matchesSearch } from "@/lib/search-text";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 interface CategoryPickerListProps {
   categories: Category[];
@@ -43,6 +43,8 @@ export function CategoryPickerList({
   creating,
   onCreatingChange,
 }: CategoryPickerListProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const [search, setSearch] = useState("");
 
   const visible = useMemo(() => categories.filter((c) => matchesSearch(c.name, search)), [categories, search]);
@@ -126,6 +128,8 @@ export function CategoryPickerList({
 // every other row is noise. Multi-select keeps a box on each row, because
 // "you can tick several" has to be visible before anything is ticked.
 function SelectionMark({ active, multiple }: { active: boolean; multiple?: boolean }) {
+  const colors = useColors();
+  const styles = useStyles();
   if (!multiple) return active ? <CheckIcon size={20} color={colors.green} /> : null;
   return (
     <View style={[styles.checkbox, active && styles.checkboxActive]}>
@@ -134,7 +138,7 @@ function SelectionMark({ active, multiple }: { active: boolean; multiple?: boole
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   container: { flex: 1, gap: spacing.sm },
   list: { flex: 1 },
   listContent: { paddingBottom: spacing.lg },
@@ -167,4 +171,4 @@ const styles = StyleSheet.create({
   },
   checkboxActive: { backgroundColor: colors.green, borderColor: colors.green },
   empty: { ...typography.body, color: colors.textSecondary, textAlign: "center", paddingVertical: spacing.xxl },
-});
+}));

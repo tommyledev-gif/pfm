@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import { CheckIcon, EditIcon } from "@/components/ui/Icon";
 import { PillButton } from "@/components/ui/PillButton";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { colors, radii, spacing, typography } from "@/lib/theme";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
 import { useSetDefaultWalletMutation } from "@/features/wallets/api/use-set-default-wallet-mutation";
 
@@ -15,6 +15,8 @@ import { useSetDefaultWalletMutation } from "@/features/wallets/api/use-set-defa
  * time. Set-default keeps the list row's confirm step.
  */
 export function WalletActiveActions({ wallet, onEdit }: { wallet: Wallet; onEdit: () => void }) {
+  const colors = useColors();
+  const styles = useStyles();
   const setDefault = useSetDefaultWalletMutation();
   const [confirmDefaultOpen, setConfirmDefaultOpen] = useState(false);
 
@@ -62,7 +64,7 @@ export function WalletActiveActions({ wallet, onEdit }: { wallet: Wallet; onEdit
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   row: { flexDirection: "row", gap: spacing.sm },
   flex: { flex: 1 },
   // Same footprint as the PillButton it stands in for, so the row does not
@@ -80,4 +82,4 @@ const styles = StyleSheet.create({
     backgroundColor: `${colors.green}12`,
   },
   defaultLabel: { ...typography.body, fontWeight: "700", color: colors.green },
-});
+}));

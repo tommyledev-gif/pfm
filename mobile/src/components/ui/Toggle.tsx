@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { Animated, Pressable, StyleSheet } from "react-native";
 
 import { useReduceMotion } from "@/lib/use-reduce-motion";
-import { colors, radii } from "@/lib/theme";
+import { radii, createStyles } from "@/lib/theme";
 
 interface ToggleProps {
   value: boolean;
@@ -29,6 +29,7 @@ const DISABLED_OPACITY = 0.4;
  * native driver, a colour would not.
  */
 export function Toggle({ value, onValueChange, disabled, accessibilityLabel, testID }: ToggleProps) {
+  const styles = useStyles();
   const reduceMotion = useReduceMotion();
   const progress = useRef(new Animated.Value(value ? 1 : 0)).current;
 
@@ -60,7 +61,7 @@ export function Toggle({ value, onValueChange, disabled, accessibilityLabel, tes
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((colors) => ({
   track: {
     width: TRACK_WIDTH,
     height: TRACK_HEIGHT,
@@ -77,4 +78,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.textPrimary,
   },
   disabled: { opacity: DISABLED_OPACITY },
-});
+}));
