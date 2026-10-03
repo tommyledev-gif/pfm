@@ -159,14 +159,16 @@ Skill definitions: `.claude/skills/agents/{ba,plan,dev,qc}.md`
 > **Do not ever git commit — commit is done by me.**
 
 ⚠️ Keep this section, and anything else you want to survive, ABOVE the
-`<!-- gitnexus:start -->` marker. Everything between those markers is
+GitNexus start marker below. Everything between the GitNexus markers is
 regenerated wholesale by `npx gitnexus analyze`; this rule used to live in
-there and was silently deleted on the first re-index (2026-09-26).
+there and was silently deleted on the first re-index (2026-09-26). Do not
+spell the literal marker in this prose — analyze matches it and truncates
+this paragraph (happened 2026-10-03).
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **pfm** (5835 symbols, 12348 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **pfm** (7308 symbols, 16381 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 

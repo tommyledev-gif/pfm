@@ -52,7 +52,7 @@ export function WalletActiveActions({ wallet, onEdit }: { wallet: Wallet; onEdit
         tone="default"
         title="Đặt ví mặc định?"
         message={`"${wallet.name}" sẽ trở thành ví mặc định của bạn.`}
-        confirmLabel="Đặt mặc định"
+        confirmLabel="Lưu"
         onCancel={() => setConfirmDefaultOpen(false)}
         onConfirm={() => {
           setConfirmDefaultOpen(false);

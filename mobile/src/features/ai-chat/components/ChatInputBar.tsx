@@ -33,6 +33,11 @@ interface ChatInputBarProps {
   mode: ChatMode;
   /** Replaces the default quick-action row — analysis mode's starter chips. */
   quickActions?: ReactNode;
+  /** Rendered directly above the field — the recording pane's phrase suggestions. */
+  aboveInput?: ReactNode;
+  /** Focus the field as soon as it mounts (switching in from analysis mode). */
+  autoFocus?: boolean;
+  onFocusChange?: (focused: boolean) => void;
 }
 
 export function ChatInputBar({
@@ -46,6 +51,9 @@ export function ChatInputBar({
   onOpenBudgetWizard,
   mode,
   quickActions,
+  aboveInput,
+  autoFocus,
+  onFocusChange,
 }: ChatInputBarProps) {
   const colors = useColors();
   const styles = useStyles();
@@ -53,18 +61,27 @@ export function ChatInputBar({
   const canSend = value.trim().length > 0 && !sending;
   const tint = CHAT_MODE_META[mode].tint;
 
+  const handleFocusChange = (next: boolean) => {
+    setFocused(next);
+    onFocusChange?.(next);
+  };
+
   return (
     <>
       {quickActions ? (
         <View style={styles.quickActionSlot}>{quickActions}</View>
       ) : !keyboardVisible && onOpenBudgetWizard ? (
-        <View style={styles.quickActionRow}>
+        // box-none: the row floats over the thread, and its empty width must
+        // not swallow taps meant for the message beneath it.
+        <View style={styles.quickActionRow} pointerEvents="box-none">
           <Pressable testID="btn-open-budget-wizard" style={styles.quickActionChip} onPress={onOpenBudgetWizard}>
             <SparkleIcon size={14} />
             <Text style={styles.quickActionLabel}>Lập ngân sách</Text>
           </Pressable>
         </View>
       ) : null}
+
+      {aboveInput}
 
       <View
         style={[
@@ -81,8 +98,9 @@ export function ChatInputBar({
         <TextInput
           value={value}
           onChangeText={onChangeText}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
+          onFocus={() => handleFocusChange(true)}
+          onBlur={() => handleFocusChange(false)}
+          autoFocus={autoFocus}
           placeholder={CHAT_MODE_META[mode].placeholder}
           placeholderTextColor={colors.textMuted}
           style={styles.input}

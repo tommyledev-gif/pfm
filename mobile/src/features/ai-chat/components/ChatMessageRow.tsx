@@ -1,16 +1,18 @@
+import { ActionPopover } from "@/components/shared/ActionPopover";
+import { FALLBACK_CURRENCY } from "@/lib/constants";
 import { BudgetWizardCard } from "@/features/ai-chat/components/BudgetWizardCard";
 import { ChatBubble } from "@/features/ai-chat/components/ChatBubble";
 import { SwipeableMessageRow } from "@/features/ai-chat/components/SwipeableMessageRow";
 import { TransactionActionCard } from "@/features/ai-chat/components/TransactionActionCard";
 import { TransactionTombstoneCard } from "@/features/ai-chat/components/TransactionTombstoneCard";
+import { useHoldMenu } from "@/features/ai-chat/hooks/use-hold-menu";
+import { useMessageActions } from "@/features/ai-chat/hooks/use-message-actions";
 import { isEditLocked } from "@/features/ai-chat/edit-lock";
 import { isRemovable, tombstoneKind } from "@/features/ai-chat/tombstone";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { Category } from "@/features/categories/types";
 import { Wallet } from "@/features/wallets/types";
 import { ManualEntryButton } from "@/features/ai-chat/components/ManualEntryButton";
-
-const FALLBACK_CURRENCY = "VND";
 
 interface ChatMessageRowProps {
   message: ChatMessage;
@@ -59,6 +61,20 @@ export function ChatMessageRow({
     : undefined;
   const category = message.action ? categoryById.get(message.action.payload.category_id) : undefined;
   const kind = tombstoneKind(message);
+  const walletName = message.action ? walletById.get(message.action.payload.wallet_id)?.name ?? "Ví" : "Ví";
+  const categoryName = category?.name ?? "Danh mục";
+  const onEdit = isEditLocked(message) ? undefined : () => onTriggerEdit(message);
+  const onDelete = isRemovable(message) ? () => onTriggerDelete(message) : undefined;
+
+  const menu = useHoldMenu();
+  const menuActions = useMessageActions({
+    message,
+    proposal: message.action ? { categoryName, walletName, currency } : undefined,
+    onEdit,
+    onDelete,
+    // Only the User's own words make sense as a phrase to type again.
+    phraseActions: message.role === "user",
+  });
 
   return (
     <SwipeableMessageRow
@@ -67,16 +83,22 @@ export function ChatMessageRow({
       direction={message.role === "user" ? "left" : "right"}
       disabled={isEditLocked(message)}
       onTriggerEdit={() => onTriggerEdit(message)}
-      onTriggerDelete={isRemovable(message) ? () => onTriggerDelete(message) : undefined}
+      onTriggerDelete={onDelete}
       closeSignal={closeSignal}
+      locked={menu.visible}
     >
       {/* A tombstone speaks for itself — see ChatBubble on the empty text. */}
-      <ChatBubble role={message.role} text={kind ? "" : message.text}>
+      <ChatBubble
+        role={message.role}
+        text={kind ? "" : message.text}
+        testID={`msg-chat-${message.id}`}
+        onLongPress={menuActions.length > 0 ? menu.open : undefined}
+      >
         {kind && message.action ? (
           <TransactionTombstoneCard
             kind={kind}
             payload={message.action.payload}
-            categoryName={category?.name ?? "Danh mục"}
+            categoryName={categoryName}
             currency={currency}
             removedAt={message.removedAt}
             onPressHistory={() => onPressHistory(message)}
@@ -86,8 +108,8 @@ export function ChatMessageRow({
             action={message.action}
             budgetLimit={budget?.amount_limit}
             budgetSpent={budget?.spent}
-            walletName={walletById.get(message.action.payload.wallet_id)?.name ?? "Ví"}
-            categoryName={category?.name ?? "Danh mục"}
+            walletName={walletName}
+            categoryName={categoryName}
             categoryIcon={category?.icon}
             categoryIconUrl={category?.icon_url}
             currency={currency}
@@ -96,9 +118,6 @@ export function ChatMessageRow({
             onConfirm={() => onConfirm(message)}
             edited={message.edited}
             onPressHistory={message.editHistory ? () => onPressHistory(message) : undefined}
-            // Same availability rules as the swipe on this row.
-            onEdit={isEditLocked(message) ? undefined : () => onTriggerEdit(message)}
-            onDelete={isRemovable(message) ? () => onTriggerDelete(message) : undefined}
           />
         ) : message.actionType === "budget_wizard" ? (
           <BudgetWizardCard
@@ -110,6 +129,13 @@ export function ChatMessageRow({
           <ManualEntryButton onPress={onOpenManualEntry} />
         ) : null}
       </ChatBubble>
+      <ActionPopover
+        visible={menu.visible}
+        anchor={menu.anchor}
+        align={message.role === "user" ? "right" : "left"}
+        onClose={menu.close}
+        actions={menuActions}
+      />
     </SwipeableMessageRow>
   );
 }

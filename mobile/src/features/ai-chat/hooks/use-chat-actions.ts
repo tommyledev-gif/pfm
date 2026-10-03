@@ -57,6 +57,7 @@ export function useChatActions({ onSent }: UseChatActionsOptions) {
         intent: response.intent === "ambiguous" ? "ambiguous" : undefined,
         actionType: response.action_type,
         edited,
+        sourceText: message,
         editHistory: action ? [{ payload: action.payload, timestamp: Date.now(), source: "created" }] : undefined,
       };
     } catch (err) {

@@ -1,9 +1,12 @@
 import { useState } from "react";
 
 import { getErrorCode, getErrorMessage } from "@/lib/axios";
+import { userIdFromAccessToken } from "@/lib/jwt";
 import { useCreateTransactionMutation } from "@/features/transactions/api/use-create-transaction-mutation";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { useChatStore } from "@/stores/chat-store";
+import { useRecentPhrasesStore } from "@/stores/recent-phrases-store";
+import { useSessionStore } from "@/stores/session-store";
 import { useToastStore } from "@/stores/toast-store";
 
 /**
@@ -28,6 +31,11 @@ export function useConfirmProposal() {
         idempotency_key,
       });
       updateMessage(message.id, { confirmed: true, transactionId: transaction.id });
+      // Every confirm path (chat, pending review, confirm-all) runs through
+      // here, and only a confirm does — so a discarded proposal's wording
+      // never becomes a suggestion.
+      const userId = userIdFromAccessToken(useSessionStore.getState().accessToken);
+      if (userId && message.sourceText) useRecentPhrasesStore.getState().record(userId, message.sourceText);
       return true;
     } catch (error) {
       if (getErrorCode(error) === "INSUFFICIENT_BALANCE") {

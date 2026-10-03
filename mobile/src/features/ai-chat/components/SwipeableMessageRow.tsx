@@ -27,6 +27,10 @@ interface SwipeableMessageRowProps {
   onTriggerDelete?: () => void;
   /** Bumped by the thread on scroll or content change — closes a parked row. */
   closeSignal?: number | string;
+  /** Turns the whole gesture off — while the message's hold popover is open.
+   *  The finger that opened it is usually still down, and dragging it must
+   *  not start swiping the row underneath the menu. */
+  locked?: boolean;
 }
 
 /**
@@ -48,6 +52,7 @@ export function SwipeableMessageRow({
   onTriggerEdit,
   onTriggerDelete,
   closeSignal,
+  locked,
 }: SwipeableMessageRowProps) {
   const colors = useColors();
   // Edit occupies the vacated edge; delete takes the other one, which is the
@@ -62,14 +67,16 @@ export function SwipeableMessageRow({
     right: (editSide === "right" && !disabled) || (deleteSide === "right" && onTriggerDelete)
       ? { ratio: editSide === "right" ? EDIT_SWIPE_RATIO : DELETE_SWIPE_RATIO }
       : undefined,
-    // Only fully disabled when neither side has anything to offer.
-    disabled: disabled && !onTriggerDelete,
+    // Fully disabled when neither side has anything to offer, or while locked.
+    disabled: Boolean(locked) || (disabled && !onTriggerDelete),
   });
 
   const { close } = swipe;
+  // Locking also closes a row left parked open, so the popover never sits
+  // beside a half-revealed Edit/Delete button offering the same actions.
   useEffect(() => {
     close();
-  }, [closeSignal, close]);
+  }, [closeSignal, locked, close]);
 
   const editAction: SwipeAction | null = disabled
     ? null

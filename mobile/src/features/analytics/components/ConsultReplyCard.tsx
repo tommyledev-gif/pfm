@@ -13,13 +13,17 @@ export interface ConsultHandlers {
   onAskQuery: (query: AnalyticsQuery, label: string) => void;
   onPickCategory: (pending: AnalyticsQuery, category: ConsultCategoryRef) => void;
   onChangeCategories: (query: AnalyticsQuery) => void;
-  onSwitchToRecording: () => void;
+  /** `prefill` is the question the reply answered, carried into the recording
+   *  input; undefined for replies from before it was remembered. */
+  onSwitchToRecording: (prefill?: string) => void;
   busy: boolean;
 }
 
 interface ConsultReplyCardProps {
   data: ConsultMessageData;
   handlers: ConsultHandlers;
+  /** The User message this reply answered. */
+  sourceText?: string;
 }
 
 const SO_FAR_SUFFIX = " (đến hôm nay)";
@@ -45,7 +49,7 @@ function periodText(period: AnalyticsPeriodInfo): string {
 // Category picker, the switch-mode button or the questions to try instead.
 // The reply text itself (the summary or the explanation) sits above this,
 // as the message's own first line — answer first, metadata under it.
-export function ConsultReplyCard({ data, handlers }: ConsultReplyCardProps) {
+export function ConsultReplyCard({ data, handlers, sourceText }: ConsultReplyCardProps) {
   const styles = useStyles();
   const answer = data.answer;
   const chips = answer ? answer.follow_ups : data.chips;
@@ -78,7 +82,7 @@ export function ConsultReplyCard({ data, handlers }: ConsultReplyCardProps) {
       ) : null}
 
       {data.switch_to_recording ? (
-        <Pressable testID="btn-analytics-switch-recording" style={styles.switch} onPress={handlers.onSwitchToRecording}>
+        <Pressable testID="btn-analytics-switch-recording" style={styles.switch} onPress={() => handlers.onSwitchToRecording(sourceText)}>
           <Text style={styles.switchLabel}>Chuyển sang Ghi giao dịch</Text>
         </Pressable>
       ) : null}

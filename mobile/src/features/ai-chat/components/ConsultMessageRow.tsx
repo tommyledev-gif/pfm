@@ -1,8 +1,13 @@
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
+import { ActionPopover } from "@/components/shared/ActionPopover";
 import { UserBubble } from "@/features/ai-chat/components/UserBubble";
+import { useHoldMenu } from "@/features/ai-chat/hooks/use-hold-menu";
+import { useMessageActions } from "@/features/ai-chat/hooks/use-message-actions";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { ConsultHandlers, ConsultReplyCard } from "@/features/analytics/components/ConsultReplyCard";
+import { useAnchoredLongPress } from "@/features/ai-chat/hooks/use-anchored-long-press";
+import { MESSAGE_HOLD_MS } from "@/lib/gestures";
 import { spacing, typography, createStyles } from "@/lib/theme";
 
 interface ConsultMessageRowProps {
@@ -31,19 +36,50 @@ const IN_TURN_GAP = spacing.sm;
 export function ConsultMessageRow({ message, startsTurn, handlers }: ConsultMessageRowProps) {
   const styles = useStyles();
   const gap = { marginTop: startsTurn ? TURN_GAP : IN_TURN_GAP };
+  const menu = useHoldMenu();
+  // Analysis messages are never swiped, so Copy is all a hold offers.
+  const menuActions = useMessageActions({ message });
+  const onLongPress = menuActions.length > 0 ? menu.open : undefined;
+  // The assistant's text has no bubble of its own, so it measures itself here.
+  const assistantText = useAnchoredLongPress(onLongPress);
+  const popup = (
+    <ActionPopover
+      visible={menu.visible}
+      anchor={menu.anchor}
+      align={message.role === "user" ? "right" : "left"}
+      onClose={menu.close}
+      actions={menuActions}
+    />
+  );
 
   if (message.role === "user") {
     return (
       <View style={[styles.userRow, gap]}>
-        <UserBubble text={message.text} />
+        <UserBubble text={message.text} onLongPress={onLongPress} testID={`msg-consult-${message.id}`} />
+        {popup}
       </View>
     );
   }
 
   return (
     <View style={gap}>
-      {message.text ? <Text style={styles.assistantText}>{message.text}</Text> : null}
-      {message.consult ? <ConsultReplyCard data={message.consult} handlers={handlers} /> : null}
+      {/* Only the text is the hold target — the chart and chips below it
+          have taps of their own. */}
+      {message.text ? (
+        <Pressable
+          ref={assistantText.ref}
+          testID={`msg-consult-${message.id}`}
+          onLongPress={assistantText.handleLongPress}
+          delayLongPress={MESSAGE_HOLD_MS}
+          disabled={!onLongPress}
+        >
+          <Text style={styles.assistantText}>{message.text}</Text>
+        </Pressable>
+      ) : null}
+      {message.consult ? (
+        <ConsultReplyCard data={message.consult} handlers={handlers} sourceText={message.sourceText} />
+      ) : null}
+      {popup}
     </View>
   );
 }

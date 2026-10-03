@@ -5,3 +5,4 @@ export type { IconProps } from "@/components/ui/icons/primitives";
 export * from "@/components/ui/icons/icons-a";
 export * from "@/components/ui/icons/icons-b";
 export * from "@/components/ui/icons/icons-c";
+export * from "@/components/ui/icons/icons-d";

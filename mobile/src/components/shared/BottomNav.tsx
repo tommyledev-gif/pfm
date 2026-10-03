@@ -16,8 +16,7 @@ import {
   LINE_RIGHT_START,
   PILL_HEIGHT,
   RIM_PATH,
-  AURA_LEFT_OFFSET,
-  AURA_TOP,
+  SOCKET_FILL_PATH,
   useStyles,
 } from "@/components/shared/bottom-nav-styles";
 
@@ -34,7 +33,7 @@ export const TABS = [
 // showing Settings as active while on any of these instead of freezing on
 // whichever tab was active before the push, which read as the nav losing
 // track of where you are.
-const SETTINGS_SUB_ROUTES = ["/wallets", "/categories", "/users", "/audit-logs", "/developer"];
+const SETTINGS_SUB_ROUTES = ["/appearance", "/wallets", "/categories", "/users", "/audit-logs", "/developer"];
 
 // Bottom nav — mobile/design_handoff_pfm_app/README.md "Design tokens" (nav)
 // + "Interactions summary". The bar itself sits flush against the screen's
@@ -192,17 +191,6 @@ export function BottomNav() {
   return (
     <View style={[styles.wrapper, { height: PILL_HEIGHT + insets.bottom }]} pointerEvents="box-none">
       <View style={[styles.pill, { paddingBottom: insets.bottom }]}>
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.auraOuter,
-            { left: AURA_LEFT_OFFSET, top: AURA_TOP, opacity: ballOpacity, transform: [{ translateX: ballX }] },
-          ]}
-        >
-          <View style={styles.auraMid}>
-            <View style={styles.auraCore} />
-          </View>
-        </Animated.View>
         <View style={styles.tabRow}>
           {TABS.map(({ href, Icon }, index) => (
             <Pressable
@@ -225,10 +213,10 @@ export function BottomNav() {
           ))}
         </View>
       </View>
-      {/* Top hairline: two straight halves that stop at the socket's edges,
-          joined by the rim arc that dips around the socket — see
-          SOCKET_HALF_CHORD / RIM_PATH. All three are translated by the same
-          ballX as the ball, so the dip tracks it on the native driver. */}
+      {/* Top hairline: two straight halves that stop where the hollow's
+          rounded corners begin, joined by the hollow's own outline — see
+          RIM_PATH. All three are translated by the same ballX as the ball, so
+          the hollow tracks it on the native driver. */}
       <Animated.View
         pointerEvents="none"
         style={[
@@ -248,6 +236,7 @@ export function BottomNav() {
         style={[styles.rim, { opacity: ballOpacity, transform: [{ translateX: ballX }] }]}
       >
         <Svg width="100%" height="100%">
+          <Path d={SOCKET_FILL_PATH} fill={colors.navSocketOuter} />
           <Path d={RIM_PATH} stroke={colors.navBorder} strokeWidth={HAIRLINE} fill="none" />
         </Svg>
       </Animated.View>

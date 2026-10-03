@@ -49,6 +49,17 @@ WHERE t.id = $1
   AND t.deleted_at IS NULL
 LIMIT 1;
 
+-- name: GetTransactionOwnerIncludingDeleted :one
+-- Ownership lookup for reading a Transaction's audit history
+-- (specs/mobile-ux-batch-2026-10 US-13). Deliberately NOT filtered on
+-- deleted_at: a removed Transaction's history must stay viewable by its owner.
+-- Not scoped by user_id either — the service compares the owner to the caller
+-- and decides 403 vs. 404, same as GetTransactionByID.
+SELECT user_id
+FROM transactions
+WHERE id = $1
+LIMIT 1;
+
 -- name: ListTransactionsByUser :many
 -- Cursor-paginated on (occurred_at, created_at, id) — occurred_at DESC
 -- primary (spec.md Edge Cases US-02 #1), created_at DESC as the tie-break for

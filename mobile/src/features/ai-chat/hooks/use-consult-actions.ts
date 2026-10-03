@@ -30,7 +30,7 @@ interface UseConsultActionsOptions {
   onSent: () => void;
   /** The User's Categories, for the "Change" picker under a banner. */
   categories: Category[];
-  onSwitchToRecording: () => void;
+  onSwitchToRecording: (prefill?: string) => void;
 }
 
 /**
@@ -62,7 +62,7 @@ export function useConsultActions({ onSent, categories, onSwitchToRecording }: U
     if (elapsed < MIN_TYPING_MS) {
       await new Promise((resolve) => setTimeout(resolve, MIN_TYPING_MS - elapsed));
     }
-    addMessage(reply);
+    addMessage({ ...reply, sourceText: userText });
     setSending(false);
   };
 

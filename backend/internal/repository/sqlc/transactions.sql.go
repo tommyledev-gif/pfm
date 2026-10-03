@@ -141,6 +141,23 @@ func (q *Queries) GetTransactionByID(ctx context.Context, id uuid.UUID) (GetTran
 	return i, err
 }
 
+const getTransactionOwnerIncludingDeleted = `-- name: GetTransactionOwnerIncludingDeleted :one
+SELECT user_id
+FROM transactions
+WHERE id = $1
+LIMIT 1
+`
+
+// GetTransactionOwnerIncludingDeleted is deliberately NOT filtered on
+// deleted_at — a removed Transaction's audit history stays viewable by its
+// owner. The service decides 403 vs. 404.
+func (q *Queries) GetTransactionOwnerIncludingDeleted(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, getTransactionOwnerIncludingDeleted, id)
+	var user_id uuid.UUID
+	err := row.Scan(&user_id)
+	return user_id, err
+}
+
 const listTransactionsByUser = `-- name: ListTransactionsByUser :many
 SELECT
     t.id, t.user_id, t.wallet_id, t.category_id, t.amount, t.type, t.note,

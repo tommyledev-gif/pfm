@@ -2,7 +2,7 @@ import { ComponentType } from "react";
 import { Animated, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
 
 import { IconProps } from "@/components/ui/icons/primitives";
-import { FADE_LEAD, SWIPE_ARM_RATIO } from "@/components/shared/use-swipe-actions";
+import { ARMED_TRANSITION_SPAN, PARK_THRESHOLD_RATIO } from "@/components/shared/use-swipe-actions";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 export interface SwipeAction {
@@ -34,13 +34,17 @@ interface SwipeActionButtonProps {
 // Once the row parks there is a decision, so it becomes a real button with a
 // label and a tap target — which is the whole behavioural change this
 // component exists for. Releasing used to act; now it reveals this.
+// Where the indicator shifts from resting to armed styling.
+const ARMED_RANGE = [PARK_THRESHOLD_RATIO, PARK_THRESHOLD_RATIO + ARMED_TRANSITION_SPAN];
+
 export function SwipeActionButton({ action, progress, width, parked, positionStyle }: SwipeActionButtonProps) {
   const colors = useColors();
   const styles = useStyles();
   const { Icon } = action;
 
+  // Visible from the start of the drag, solid by the park threshold.
   const indicatorOpacity = progress.interpolate({
-    inputRange: [SWIPE_ARM_RATIO - FADE_LEAD, SWIPE_ARM_RATIO],
+    inputRange: [0, PARK_THRESHOLD_RATIO],
     outputRange: [0, 1],
     extrapolate: "clamp",
   });
@@ -48,22 +52,22 @@ export function SwipeActionButton({ action, progress, width, parked, positionSty
   // one: the icon's color lands on an SVG stroke, which a plain Animated
   // value cannot drive without wrapping the icon in createAnimatedComponent.
   const armedGlyphOpacity = progress.interpolate({
-    inputRange: [SWIPE_ARM_RATIO, 1],
+    inputRange: ARMED_RANGE,
     outputRange: [0, 1],
     extrapolate: "clamp",
   });
   const backgroundColor = progress.interpolate({
-    inputRange: [SWIPE_ARM_RATIO, 1],
+    inputRange: ARMED_RANGE,
     outputRange: [colors.surface, action.color],
     extrapolate: "clamp",
   });
   const borderColor = progress.interpolate({
-    inputRange: [SWIPE_ARM_RATIO, 1],
+    inputRange: ARMED_RANGE,
     outputRange: [colors.surfaceBorder, action.color],
     extrapolate: "clamp",
   });
   const scale = progress.interpolate({
-    inputRange: [SWIPE_ARM_RATIO, 1],
+    inputRange: ARMED_RANGE,
     outputRange: [1, 1.15],
     extrapolate: "clamp",
   });

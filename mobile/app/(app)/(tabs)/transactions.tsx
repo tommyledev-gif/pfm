@@ -22,6 +22,7 @@ import { FutureTransactionsDialog } from "@/features/transactions/components/Fut
 import { TransactionFormModal } from "@/features/transactions/components/TransactionFormModal";
 import { TransactionRowSkeleton } from "@/features/transactions/components/TransactionRowSkeleton";
 import { TransactionDayHeader } from "@/features/transactions/components/TransactionDayHeader";
+import { useCollapsedDays } from "@/features/transactions/hooks/use-collapsed-days";
 import { TransactionsHeader, TypeFilterValue } from "@/features/transactions/components/TransactionsHeader";
 import { CategoryFilterModal } from "@/features/transactions/components/CategoryFilterModal";
 import { SortDrawerModal } from "@/features/transactions/components/SortDrawerModal";
@@ -50,7 +51,7 @@ export default function TransactionsScreen() {
   // deliberately not persisted — collapsing is a "get this out of my way
   // while I look at something else" gesture, not a setting. Keys that stop
   // matching after a filter change are simply never looked up again.
-  const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set());
+  const { collapsedDays, toggleDay } = useCollapsedDays();
   const wallets = useWalletsQuery();
   const categories = useCategoriesQuery();
 
@@ -123,14 +124,6 @@ export default function TransactionsScreen() {
     () => buildDaySections(upToToday, { grouped: !hasAmountSort, walletCurrencyMap, collapsedDays }),
     [upToToday, hasAmountSort, walletCurrencyMap, collapsedDays],
   );
-
-  const toggleDay = (dayKey: string) =>
-    setCollapsedDays((prev) => {
-      const next = new Set(prev);
-      if (next.has(dayKey)) next.delete(dayKey);
-      else next.add(dayKey);
-      return next;
-    });
 
   const now = new Date();
   const currentMonthLabel = `Tháng ${now.getMonth() + 1}, ${now.getFullYear()}`;

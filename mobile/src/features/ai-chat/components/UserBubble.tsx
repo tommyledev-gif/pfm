@@ -1,13 +1,18 @@
 import { ReactNode } from "react";
-import { Text, View } from "react-native";
+import { Pressable, Text } from "react-native";
 
+import { PopoverAnchor } from "@/components/shared/ActionPopover";
 import { GradientFill } from "@/components/ui/GradientFill";
 import { CHAT_MODE_META, useChatModeStore } from "@/features/ai-chat/chat-mode";
+import { useAnchoredLongPress } from "@/features/ai-chat/hooks/use-anchored-long-press";
+import { MESSAGE_HOLD_MS } from "@/lib/gestures";
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
 
 interface UserBubbleProps {
   text: string;
   children?: ReactNode;
+  onLongPress?: (anchor: PopoverAnchor) => void;
+  testID?: string;
 }
 
 /**
@@ -17,17 +22,25 @@ interface UserBubbleProps {
  * mistaken for the assistant's grey text. Reads the mode itself rather than
  * taking it as a prop, so neither pane has to thread it down to every row.
  */
-export function UserBubble({ text, children }: UserBubbleProps) {
+export function UserBubble({ text, children, onLongPress, testID }: UserBubbleProps) {
   const styles = useStyles();
   const mode = useChatModeStore((s) => s.mode);
   const meta = CHAT_MODE_META[mode];
+  const { ref, handleLongPress } = useAnchoredLongPress(onLongPress);
 
   return (
-    <View style={styles.bubble}>
+    <Pressable
+      ref={ref}
+      testID={testID}
+      style={styles.bubble}
+      onLongPress={handleLongPress}
+      delayLongPress={MESSAGE_HOLD_MS}
+      disabled={!onLongPress}
+    >
       <GradientFill from={meta.tint} to={meta.accentTo} />
       {text ? <Text style={styles.text}>{text}</Text> : null}
       {children}
-    </View>
+    </Pressable>
   );
 }
 

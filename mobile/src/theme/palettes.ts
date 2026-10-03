@@ -53,10 +53,9 @@ const dark = {
   // dark ground lightens; the light theme's dark ink darkens by the same
   // alpha — never a literal rgba(255,255,255,a), which vanishes on white.
   overlayBase: "#FFFFFF",
-  // BottomNav's "hollow socket" behind the active ball, outer → core ring.
-  navSocketOuter: "rgba(0,0,0,0.22)",
-  navSocketMid: "rgba(0,0,0,0.42)",
-  navSocketCore: "rgba(0,0,0,0.65)",
+  // BottomNav's hollow behind the active ball — one flat tint, the old
+  // middle ring's depth, now that it is the only layer.
+  navSocketOuter: "rgba(0,0,0,0.42)",
 };
 
 export type Palette = { [K in keyof typeof dark]: string };
@@ -102,9 +101,7 @@ const light: Palette = {
 
   overlayBase: "#0F172A",
   // A black hole punched into a white bar reads as a stain, not depth.
-  navSocketOuter: "rgba(15,23,42,0.04)",
-  navSocketMid: "rgba(15,23,42,0.07)",
-  navSocketCore: "rgba(15,23,42,0.11)",
+  navSocketOuter: "rgba(15,23,42,0.07)",
 };
 
 export type ThemeName = "dark" | "light";

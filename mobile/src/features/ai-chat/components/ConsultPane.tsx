@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
 
 import { TypingIndicator } from "@/components/shared/TypingIndicator";
+import { ChatComposer } from "@/features/ai-chat/components/ChatComposer";
 import { ChatInputBar } from "@/features/ai-chat/components/ChatInputBar";
 import { ChatThreadList } from "@/features/ai-chat/components/ChatThreadList";
 import { ConsultMessageRow } from "@/features/ai-chat/components/ConsultMessageRow";
@@ -18,7 +19,8 @@ interface ConsultPaneProps {
   keyboardVisible: boolean;
   keyboardHeight: number;
   bottomInset: number;
-  onSwitchToRecording: () => void;
+  /** `prefill` = the question to carry into the recording input. */
+  onSwitchToRecording: (prefill?: string) => void;
 }
 
 /**
@@ -39,6 +41,8 @@ export function ConsultPane({
   const thread = useChatStore((s) => s.thread);
 
   const [input, setInput] = useState("");
+  // Measured height of the floating composer, reserved inside the thread.
+  const [composerHeight, setComposerHeight] = useState(0);
 
   const categories = useCategoriesQuery();
 
@@ -52,7 +56,7 @@ export function ConsultPane({
   const messages = useMemo(() => thread.filter(isConsultMessage).reverse(), [thread]);
 
   return (
-    <>
+    <View style={consultStyles.pane}>
       <ChatThreadList
         listRef={listRef}
         data={messages}
@@ -61,6 +65,7 @@ export function ConsultPane({
         // made every message sit the same distance from every other.
         contentContainerStyle={[styles.thread, consultStyles.thread]}
         keyboardShouldPersistTaps="handled"
+        reservedBottom={composerHeight}
         renderItem={({ item, index }) => {
           // Newest first (inverted), so the message before this one is next.
           const previous = messages[index + 1];
@@ -79,26 +84,30 @@ export function ConsultPane({
         }
       />
 
-      <ChatInputBar
-        value={input}
-        onChangeText={setInput}
-        onSend={() => {
-          const text = input;
-          setInput("");
-          consult.sendConsult(text);
-        }}
-        sending={consult.sending}
-        keyboardVisible={keyboardVisible}
-        keyboardHeight={keyboardHeight}
-        bottomInset={bottomInset}
-        mode="consult"
-        quickActions={<StarterChipsRow onAsk={consult.askQuery} disabled={consult.sending} />}
-      />
-    </>
+      <ChatComposer onHeightChange={setComposerHeight}>
+        <ChatInputBar
+          value={input}
+          onChangeText={setInput}
+          onSend={() => {
+            const text = input;
+            setInput("");
+            consult.sendConsult(text);
+          }}
+          sending={consult.sending}
+          keyboardVisible={keyboardVisible}
+          keyboardHeight={keyboardHeight}
+          bottomInset={bottomInset}
+          mode="consult"
+          quickActions={<StarterChipsRow onAsk={consult.askQuery} disabled={consult.sending} />}
+        />
+      </ChatComposer>
+    </View>
   );
 }
 
 const consultStyles = StyleSheet.create({
+  // The composer is positioned against this box.
+  pane: { flex: 1 },
   thread: { gap: 0 },
   // The reply-to-be, so it sits as close to the question as the reply will.
   typing: { marginTop: spacing.sm },

@@ -2,7 +2,13 @@ import { Animated, Text, View } from "react-native";
 
 import { spacing, typography, walletAccentPalette, createStyles } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
-import { CARD_HEIGHT, CARD_OVERLAP, WalletStackCard } from "@/features/wallets/components/WalletStackCard";
+import {
+  CARD_HEIGHT,
+  CARD_OVERLAP,
+  CAROUSEL_SHADOW_BLEED_BOTTOM,
+  CAROUSEL_SHADOW_BLEED_TOP,
+  WalletStackCard,
+} from "@/features/wallets/components/WalletStackCard";
 import { SNAP_INTERVAL, useWalletCarousel } from "@/features/wallets/components/use-wallet-carousel";
 
 // How far a neighbour leans further inward on top of the overlap, so the
@@ -94,7 +100,7 @@ export function WalletCarousel({
         directionalLockEnabled
         // No gap: the overlap is carried by each card's negative right margin
         // below, which Yoga will not accept as a negative `gap`.
-        contentContainerStyle={{ paddingHorizontal: sidePadding }}
+        contentContainerStyle={{ paddingHorizontal: sidePadding, paddingTop: CAROUSEL_SHADOW_BLEED_TOP, paddingBottom: CAROUSEL_SHADOW_BLEED_BOTTOM }}
         scrollEventThrottle={16}
         onContentSizeChange={onContentSizeChange}
         onMomentumScrollEnd={onMomentumEnd}
@@ -178,7 +184,16 @@ export function WalletCarousel({
 const useStyles = createStyles((colors) => ({
   // A fixed height regardless of wallet count, so content below does not shift
   // as the wallets load. Full-bleed: the section's own horizontal padding is
-  // cancelled so a neighbour can sit under the screen edge.
-  container: { height: CARD_HEIGHT, marginHorizontal: -spacing.xl },
+  // cancelled so a neighbour can sit under the screen edge. Taller than a card
+  // by the shadow bleed, so shadows are not clipped.
+  container: {
+    height: CARD_HEIGHT + CAROUSEL_SHADOW_BLEED_TOP + CAROUSEL_SHADOW_BLEED_BOTTOM,
+    marginHorizontal: -spacing.xl,
+    // Pulled back into the surrounding gap, but never past it — the bleed
+    // area is still part of a scroll view and would steal taps meant for the
+    // section header or the next section.
+    marginTop: -Math.min(CAROUSEL_SHADOW_BLEED_TOP, spacing.md),
+    marginBottom: -Math.min(CAROUSEL_SHADOW_BLEED_BOTTOM, spacing.md),
+  },
   empty: { ...typography.caption, color: colors.textSecondary, paddingVertical: spacing.md },
 }));

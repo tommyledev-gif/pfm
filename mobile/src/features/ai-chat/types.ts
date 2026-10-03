@@ -112,4 +112,9 @@ export interface ChatMessage {
   // A user message sent in analysis mode (or a tapped chip). Marked so the
   // edit path never re-sends it as a transaction description.
   consultQuestion?: boolean;
+  // On an assistant reply: the exact (trimmed) user message that produced it.
+  // Client-only, carried in the synced payload as-is. Lets "Switch to
+  // recording" carry the question over, and lets a confirmed proposal's
+  // wording become a recent phrase. Absent on replies from older versions.
+  sourceText?: string;
 }

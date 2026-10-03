@@ -41,6 +41,9 @@ export type WalletType = (typeof WALLET_TYPES)[number];
 // MVP currency allow-list — mirrors the 004_wallets.sql CHECK constraint.
 export const WALLET_CURRENCIES = ["VND", "USD"] as const;
 export type WalletCurrency = (typeof WALLET_CURRENCIES)[number];
+// What an amount is formatted in when its Wallet is unknown (not loaded yet,
+// or deleted) — the app's home currency.
+export const FALLBACK_CURRENCY: WalletCurrency = "VND";
 
 export const CATEGORY_TYPES = ["income", "expense"] as const;
 export type CategoryType = (typeof CATEGORY_TYPES)[number];

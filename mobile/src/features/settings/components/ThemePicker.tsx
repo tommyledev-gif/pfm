@@ -7,7 +7,7 @@ import { useSwitchTheme } from "@/theme/use-switch-theme";
 
 const SWATCH_HEIGHT = 64;
 
-// Settings → Giao diện. One tile per entry in THEMES, each a miniature of
+// Settings → Giao diện screen. One tile per entry in THEMES, each a miniature of
 // that theme painted in its OWN palette (ground, a card, the primary) — not
 // the active one — so every option previews what it switches to. Tiles wrap,
 // so adding a palette needs nothing here.
@@ -18,7 +18,8 @@ export function ThemePicker() {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>Giao diện</Text>
+      {/* The screen is already titled "Giao diện"; this names the choice. */}
+      <Text style={styles.title}>Chủ đề</Text>
       <View style={styles.options}>
         {THEME_NAMES.map((name) => (
           <ThemeOption

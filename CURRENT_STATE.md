@@ -1,6 +1,6 @@
 # PFM — Current Project State
 
-_Last updated: 2026-09-26_
+_Last updated: 2026-10-03_
 _Command: /cook-state_
 
 > ⚡ Load file này đầu tiên khi bắt đầu session mới.
@@ -10,51 +10,49 @@ _Command: /cook-state_
 
 ## TL;DR — Project Health
 
-- **Phase:** MVP done (F-01→F-07, F-10 on backend + web + mobile). Release-1 AI work in progress: F-13.1 AI Budget Wizard v2 mostly shipped on mobile; Feature-12 AI Chat has US-01 only.
-- **Overall completion:** MVP 100%. F-13.1 (`specs/ai-budget-wizard-v2/`): US-01, US-02, US-05→US-08 done; **US-03, US-04, US-09 zero code**. Feature-12: US-01 done, US-02/US-03/US-04 unbuilt.
-- **Last feature shipped:** AI Chat **mode picker** (commit `f8770eb`, 2026-09-26) — `mobile/src/features/ai-chat/chat-mode.ts` with modes `transaction | budget | consult`; `consult` renders disabled (`CONSULT_MODE_ENABLED = false`) because `POST /ai/consult` does not exist yet.
-- **Currently in progress:** BA/plan for **Feature-12 US-03 Query Spending via Chat** (brief: `docs/new-tasks.md` Phần II, internal nickname "F-14" — not an SRS feature id).
-- **Next up:** (1) `/cook-ba` + `/cook-plan` for Feature-12 US-03 → (2) `/cook-implementation specs/ai-budget-wizard-v2/` to close **I-1 (US-03 cycle window + `AppTimezone`)** + I-4 race → (3) implement US-03 analytics → then US-05 Scenario (needs SRS entry first) → US-04 Evaluate.
-- **Blockers:** Analytics implementation (not spec/plan) is blocked by F-13.1 US-03: `backend/db/queries/transactions.sql:217` still uses `date_trunc('month', NOW())` (UTC calendar month); `common.AppTimezone` (`common/budget_wizard_v2.go`) has zero importers; user-chosen `cycle_start_day` is ignored server-side.
+- **Phase:** MVP done (F-01→F-07, F-10 on backend + web + mobile). Release-1 AI work: Feature-12 US-01 (create-via-chat) + **US-03 Query Spending (consult mode) shipped**; F-13.1 Budget Wizard v2 mostly shipped. Web (`frontend/`) is frozen — all new client work is mobile-only.
+- **Overall completion:** MVP 100%. Feature-12: US-01 ✅, US-03 ✅ (`/analytics/query`, `/analytics/consult`), US-02 edit-via-chat / US-04 advice unbuilt. F-13.1: US-03/US-04/US-09 still zero code.
+- **Last feature shipped:** Mobile light theme (commit `43e30b8`, 2026-10-03) — `ThemePicker` rendered inline on Settings; before that AI consult screen UI polish (`540c502`).
+- **Currently in progress:** **Mobile UX batch 2026-10** (`specs/mobile-ux-batch-2026-10/`) — implemented 2026-10-03, awaiting on-device manual checklist (plan §10) and commit. Item 2 (image → Transactions) is research only (`research.md`).
+- **Next up:** implement that batch (after user review) → F-13.1 I-1 cycle window + `AppTimezone` → Feature-12 US-04.
+- **Blockers:** none for the UX batch. Known bug in scope: viewing history of a soft-deleted TX from chat → 404.
 
 ---
 
 ## What's Actually Working (Code + DB + UI)
 
-| Feature | Backend | Web (frontend/) | Mobile |
+| Feature | Backend | Web (frontend/, frozen) | Mobile |
 |---|---|---|---|
-| F-01 User Management | ✅ | ✅ | ✅ (`app/(app)/users.tsx`) |
-| F-02 System Security (JWT, `/auth/refresh`) | ✅ | ✅ | ✅ silent refresh (`lib/axios.ts`, `specs/mobile-session-refresh/`) |
-| F-03 Wallet Management (+ icon upload) | ✅ | ✅ (no icon upload) | ✅ |
-| F-04 Category Management (+ icon upload, `system_key`) | ✅ | ✅ | ✅ |
-| F-05 Budget Management (+ icon, bulk) | ✅ | ✅ (no icon upload) | ✅ |
-| F-06 Transaction Management (+ sort/filter, CSV export/import, audit log, delete guardrails) | ✅ | ✅ (core only) | ✅ |
-| F-07 Financial Reporting (`GET /reports/summary`) | ✅ | ✅ | ✅ (Insights: donut + legend) |
-| F-10 Notification Handling (in-app only, `budget_exceeded` only) | ✅ | ✅ | ✅ |
-| Feature-12 AI Chat US-01 (create-via-chat, thread sync) | ✅ | ✅ | ✅ + mode picker |
-| F-13 v1 → **F-13.1 v2** AI Budget Wizard (int64 deterministic engine, 3-screen flow) | ✅ (partial, see below) | ❌ (out of scope) | ✅ |
+| F-01 User Management (+ resend invite, mig 024) | ✅ | ✅ | ✅ (`app/(app)/users.tsx`) |
+| F-02 System Security (JWT, `/auth/refresh`) | ✅ | ✅ | ✅ silent refresh |
+| F-03 Wallet Management (+ icon) | ✅ | ✅ | ✅ (carousel on Home + Wallets) |
+| F-04 Category Management (+ icon, `system_key`) | ✅ | ✅ | ✅ |
+| F-05 Budget Management (+ icon, bulk) | ✅ | ✅ | ✅ |
+| F-06 Transaction Management (+ **transfer type** mig 022, sort/filter, export, audit log, delete guardrails) | ✅ | ✅ (core) | ✅ (import pill commented out) |
+| F-07 Financial Reporting | ✅ | ✅ | ✅ (Insights) |
+| F-10 Notification Handling (in-app, `budget_exceeded` only) | ✅ | ✅ | ✅ |
+| Feature-12 US-01 AI Chat create-TX (thread sync) | ✅ | ✅ | ✅ |
+| Feature-12 US-03 Query Spending (consult mode, `intent_parse_log` mig 021) | ✅ | ❌ | ✅ (`ConsultPane`) |
+| F-13.1 AI Budget Wizard v2 | ✅ partial | ❌ | ✅ |
+| Theming (dark + light, `features/settings/ThemePicker`) | — | — | ✅ |
 
 ---
 
 ## Partial / In Progress
 
-- 🔶 **F-13.1 AI Budget Wizard v2** (`specs/ai-budget-wizard-v2/`) — open items (numbering from `docs/new-tasks.md` §I.2):
-  - **I-1 / US-03 Cycle window + timezone** — no `CycleWindow` helper, no `SumExpenseByUserCycle`. 🔴 blocks Feature-12 US-03 implementation.
-  - **I-2 / US-04 Plan versioning** — `budget_plans` table exists (mig 020) but no query, no Go code writes it.
-  - **I-3 / US-09 Budget impact at moment of spend** — `budget_impact` 0 hits; `TransactionActionCard.tsx:84-93` computes a pre-confirm bar client-side (not the DoD).
-  - **I-4 First-submit race** — `budgets.sql:96-99` `FOR UPDATE` locks 0 rows when the user has no budget yet.
-  - **I-5** — not verified on a real device.
-- 🔶 **Feature-12 AI Chat** — US-01 only. `ai-service/app/schemas/extract_schema.py` intent enum is `create_transaction | ambiguous | budget_wizard`. US-02 (edit), US-03 (query spending), US-04 (advice) unbuilt at every layer.
-- 🔶 **F-10 Notifications** — no push (`expo-notifications` not installed); `notifications` CHECK hardcoded to `budget_exceeded`.
-- 🔶 **F-11 Dashboard** — real mobile home screen (`app/(app)/index.tsx`), never specced.
-- 🔶 **QC coverage** — only `specs/security/` and `specs/user-management/` have `test_cases.md`.
+- 🔶 **F-13.1 Budget Wizard v2** — I-1 cycle window/timezone, I-2 plan versioning (`budget_plans` unwritten), I-3 US-09 server-side budget impact, I-4 first-submit race.
+- 🔶 **Feature-12** — US-02 edit-via-chat (only client-side edit of proposal), US-04 advice unbuilt.
+- 🔶 **F-10** — no push notifications.
+- 🔶 **F-11 Dashboard** — real Home screen exists, never specced.
+- 🔶 **Transaction import** — backend + mobile code exist, UI pill commented out in `TransactionsHeader.tsx`.
+- 🔶 **QC coverage** — `test_cases.md` only for `security/`, `user-management/`.
 
 ---
 
 ## Specced, Not Yet Coded
 
-- 📋 **F-13.1 US-03 / US-04 / US-09** — `specs/ai-budget-wizard-v2/spec.md` + `plan.md` (see above).
-- 📋 **Feature-12 US-03 / US-04 / US-05 (Scenario)** — brief only (`docs/new-tasks.md` Phần II); no `specs/` folder yet. SRS §6 already has US-03 (line ~742) and US-04 (line ~758); US-05 must be added to SRS before its BA pass.
+- 📋 **F-13.1 US-03 / US-04 / US-09** — `specs/ai-budget-wizard-v2/`.
+- 📋 **Mobile UX batch 2026-10** — `specs/mobile-ux-batch-2026-10/` (being written).
 
 ---
 
@@ -62,38 +60,38 @@ _Command: /cook-state_
 
 | Decision | Value | Reason |
 |----------|-------|--------|
-| Money storage | BIGINT xu (integer cents), everywhere incl. wizard engine; overflow-safe via `common/money.go` (`bits.Mul64/Div64`) | Float precision |
-| JWT strategy | access 15m + refresh 7d, `revoked_tokens` table; `POST /auth/refresh` exists, mobile refreshes silently | Session UX on mobile |
-| DB access | sqlc only; local sqlc CLI version differs → new queries hand-written into generated files | Avoid unreviewable regen diff |
-| Error format | `{error_code, message, details?}` | Consistent across handlers |
+| Money storage | BIGINT xu everywhere; overflow-safe `common/money.go` | Float precision |
+| JWT strategy | access 15m + refresh 7d, `revoked_tokens`; mobile refreshes silently | Session UX |
+| DB access | sqlc only; local sqlc CLI version differs → hand-write new queries into generated files | Avoid unreviewable regen diff |
+| Error format | `{error_code, message, details?}` | Consistent |
 | Cursor pagination | `{id, created_at}` base64 cursor | Scale-ready |
-| Budget scope | 1 active budget per (user, category), per-currency limits in `budget_limits`; `period` monthly-only | See `project_budgets_monthly_only` |
-| Category identity | `categories.system_key` (mig 019) + `ClassForSystemKey()` → 3-tier class `fixed/essential/discretion` (`common/budget_wizard_v2.go`) | Deterministic wizard cut order |
-| Report aggregates | `ReportRepository` reuses queries in `transactions.sql`, no reports table | Accepted cross-repo exception |
-| AI Chat routing | User picks mode in UI (`chat-mode.ts`), no LLM intent classification between create-TX and consult | Wrong guess silently turns a transaction into an analytics answer |
-| AI extraction | Groq (`openai/gpt-oss-120b`) primary, Anthropic fallback, tool calling (flat schema, no nested `$ref`) | Prose JSON schemas unreliable |
-| Mobile | Expo SDK 54 pinned; TanStack Query + Zustand; direct axios to backend (no BFF) | CLAUDE.md |
-| Frontend priority | `frontend/` web is feature-complete-first, but F-13.1 and new AI chat work are mobile-first by decision | `docs/features.md` |
+| Budget scope | 1 active budget per (user, category), per-currency limits; monthly-only | — |
+| Transfers | one row with `to_wallet_id`, not an expense+income pair (mig 022) | Reports never show phantom spend/earn |
+| AI Chat routing | User picks mode (`chat-mode.ts`: transaction / budget / consult), no LLM intent routing between them | Wrong guess silently mis-files a message |
+| Analytics rate limit | `/analytics/*` outside `/ai` group; only `/analytics/consult` limited (own limiter) | Don't burn create-TX quota |
+| AI extraction | Groq primary, Anthropic fallback, tool calling (flat schema) | Prose JSON unreliable |
+| Mobile | Expo SDK 54 pinned; TanStack Query + Zustand; direct axios; **no reanimated / no gesture-handler** (core `Animated` + `PanResponder`) | Expo Go compatibility |
+| Client priority | `frontend/` web frozen; client work goes to `mobile/` | User decision |
 
 ---
 
 ## Established Patterns (follow these)
 
 ### Backend
-- Handler: parse + shape validation → service. Service: business rules + DB tx. Repository: sqlc only.
-- Each service has `fake_*_repo_test.go` in-memory fakes for unit tests.
-- Route comments in `routes.go` cite the spec/plan finding justifying auth/order decisions — keep the trail. Literal-path GETs must precede `/:id`.
-- AI Service calls go through `service/ai_service_client.go` / `ai_budget_client.go` (internal REST to `http://ai-service:8000`).
-- Migrations: new file needs a mount line in **both** `docker-compose.yml` and `backend/docker-compose.yml`; `cmd/migrate` runs on deploy, so migrations must be re-runnable (`IF EXISTS`/`IF NOT EXISTS`).
+- Handler: parse + shape validation → service (business rules + DB tx) → repository (sqlc).
+- `fake_*_repo_test.go` in-memory fakes per service.
+- `routes.go` comments cite spec/plan findings; literal-path GETs before `/:id`.
+- Migrations: mount in **both** compose files; re-runnable (`IF NOT EXISTS`).
 
 ### Mobile (`mobile/`, React Native + Expo)
 - `app/` thin routes → `src/features/{feature}/{api,components,hooks}` + `types.ts`.
-- Shared primitives: `src/components/ui/` (`MoneySlider`, `Icon`…), `src/components/shared/` (`DonutChart`, `SegmentedBar`…).
-- Server data in TanStack Query only; Zustand for client state (session, chat mode).
-- All user-facing copy in Vietnamese.
+- Styles via `createStyles((colors) => …)` + `useColors()` (theme-reactive); tokens in `src/lib/theme`.
+- Shared primitives: `src/components/ui/`, `src/components/shared/` (`SwipeableRow`, `QuickActionsPopup`, `BottomNav`…).
+- Chat thread lives in `stores/chat-store.ts` (persisted + server-synced as opaque payload); mode in `chat-mode.ts` (not persisted).
+- All user-facing copy in Vietnamese. File > 300 lines → split.
 
 ### SQL
-- Money `BIGINT NOT NULL`; timestamps `TIMESTAMPTZ`; soft delete `deleted_at`; `uuid_generate_v4()`; every query scoped `AND user_id = $n`.
+- Money `BIGINT NOT NULL`; `TIMESTAMPTZ`; soft delete `deleted_at`; `uuid_generate_v4()`; every query `AND user_id = $n`.
 
 ---
 
@@ -104,23 +102,27 @@ _Command: /cook-state_
 | 001 | init | `users`, uuid-ossp + pgvector |
 | 002 | seed_admin | admin seed |
 | 003 | revoked_tokens | token revocation |
-| 004 | wallets | one-default-per-user partial unique idx |
+| 004 | wallets | one-default-per-user idx |
 | 005 | categories | owner+name+type unique idx |
 | 006 | seed_categories | system categories |
-| 007 | budgets | `budgets` + `budget_limits`; `CHECK (period IN ('monthly'))` |
-| 008 | transactions | no balance-floor constraint by design |
-| 009 | notifications | dedup cols, `budget_exceeded`-only CHECK |
-| 010 | transactions_idempotency_key | idempotency key + partial unique idx |
-| 011 | chat_messages | AI context log (never read by client) |
-| 012 | categories_icon_url | category icon upload |
+| 007 | budgets | `budgets` + `budget_limits`; monthly-only CHECK |
+| 008 | transactions | no balance-floor constraint |
+| 009 | notifications | `budget_exceeded`-only CHECK |
+| 010 | transactions_idempotency_key | idempotency key |
+| 011 | chat_messages | AI context log |
+| 012 | categories_icon_url | category icon |
 | 013 | wallets_icon | wallet icon |
 | 014 | budgets_icon | budget icon |
-| 015 | chat_thread_sync | `chat_thread_messages` opaque `payload TEXT` (client-rendered thread) |
-| 016 | transactions_created_at_sort_index | `idx_transactions_user_occurred_at` incl. created_at tie-break |
-| 017 | seed_savings_category | "Tiết kiệm" system category |
+| 015 | chat_thread_sync | `chat_thread_messages` opaque payload |
+| 016 | transactions_created_at_sort_index | sort index |
+| 017 | seed_savings_category | "Tiết kiệm" |
 | 018 | transaction_audit_logs | audit log table |
-| 019 | categories_system_key | `system_key` + Vietnamese system categories |
-| 020 | budget_plans | plan layer + `effective_from` (**no code writes it yet**) |
+| 019 | categories_system_key | `system_key` |
+| 020 | budget_plans | plan layer (no code writes it) |
+| 021 | intent_parse_log | analytics question log, hard-deleted by retention job |
+| 022 | transaction_transfer | `type='transfer'` + `to_wallet_id` |
+| 023 | users_email_lowercase | case-insensitive email |
+| 024 | users_invite_resend | resend-invite cooldown cols |
 
 ---
 
@@ -130,48 +132,47 @@ _Command: /cook-state_
 |--------|------|------|---------|
 | GET | /activate | No | ActivatePageHandler (HTML) |
 | GET | /api/v1/health | No | inline |
-| POST | /api/v1/auth/activate · /login (rate-limited) · /logout · /refresh | No | AuthHandler |
-| POST · GET | /api/v1/admin/users/invite · /admin/users | admin | UserHandler |
+| POST | /auth/activate · /login · /logout · /refresh | No | AuthHandler |
+| POST · GET · POST | /admin/users/invite · /admin/users · /admin/users/:id/resend-invite | admin | UserHandler |
 | POST · GET · GET · PATCH · POST | /wallets/icon · / · /:id · /:id · /:id/set-default | JWT | WalletHandler |
 | POST · POST · GET · GET · PATCH · DELETE | /categories/icon · / · / · /:id · /:id · /:id | JWT | CategoryHandler |
-| POST · POST · POST · GET · GET · PATCH · DELETE | /budgets/icon · /bulk · / · / · /:id · /:id · /:id | JWT | BudgetHandler |
+| POST ×3 · GET ×2 · PATCH · DELETE | /budgets/icon · /bulk · / · / · /:id · /:id · /:id | JWT | BudgetHandler |
 | POST · GET | /transactions/ | JWT | TransactionHandler |
 | GET | /transactions/audit-logs | JWT | AuditLogHandler |
-| GET · POST · POST | /transactions/export · /import/preview · /import/commit | JWT | TransactionExport/ImportHandler |
+| GET · POST · POST | /transactions/export · /import/preview · /import/commit | JWT | Export/ImportHandler |
 | GET · PATCH · DELETE | /transactions/:id | JWT | TransactionHandler |
 | GET | /reports/summary | JWT | ReportHandler |
 | GET · GET · POST | /notifications/ · /:id · /:id/read | JWT | NotificationHandler |
-| POST · GET · POST | /ai/chat · /ai/chat/thread · /ai/chat/thread/sync | JWT + AIChatRateLimiter (30/h, whole `/ai` group) | ChatHandler |
+| POST · GET · POST | /ai/chat · /ai/chat/thread · /ai/chat/thread/sync | JWT + AIChatRateLimiter | ChatHandler |
 | GET · POST · POST | /ai/budget-wizard/prefill · /ai/budget-proposals · /ai/suggest-category-name | JWT + AIChatRateLimiter | BudgetWizardHandler |
+| POST · POST | /analytics/query · /analytics/consult (AIConsultRateLimiter) | JWT | AnalyticsHandler |
 
-All paths under `/api/v1`. No `RequireRole` except `/admin/*`. Notifications are produced only by the background scheduler in `main.go`.
+All under `/api/v1`.
 
 ---
 
 ## Active TODOs / Known Issues
 
-- [ ] F-13.1 I-1 cycle window + `AppTimezone` (blocking for AI analytics) and I-4 race — `/cook-implementation specs/ai-budget-wizard-v2/`
-- [ ] F-13.1 I-2 plan versioning, I-3 US-09 moment-of-spend
-- [ ] All period boundaries UTC (`transactions.sql:217`, `report_service.go`, `notification_service.go`) — month rolls over at 07:00 GMT+7
-- [ ] `AIChatRateLimiter` applies to the whole `/ai` group — any new consult endpoint must not share it with create-TX
-- [ ] Files over 300 lines: `backend/internal/service/chat_service.go` (339), `backend/internal/repository/budget_repository.go` (323)
-- [ ] `test_cases.md` missing for most specs
-- [ ] `docs/features.md` stale (2026-09-13: still says F-13.1 SPEC_ONLY) — run `/renew-features`
-- [ ] Stray `mobile/pfm/` scaffold causes ~40 unrelated tsc errors — leave alone
-- [ ] Mobile not verified on real device for recent work
-- [ ] No `// TODO:` markers found in `backend/internal`, `ai-service/app`, `mobile/src`, `mobile/app`
+- [x] 🐞 History of a soft-deleted TX → 404 — fixed in UX batch (US-13), pending device check.
+- [x] 🐞 Pending row currency ($) — fixed in UX batch (US-10), pending device check.
+- [ ] `FALLBACK_CURRENCY = "VND"` still duplicated in ~7 files; shared constant now in `mobile/src/lib/constants.ts`.
+- [ ] F-13.1 I-1 cycle window + `AppTimezone`, I-2, I-3, I-4.
+- [ ] Period boundaries are UTC (month rolls over at 07:00 GMT+7).
+- [ ] Files over 300 lines: `backend/internal/service/chat_service.go` (340).
+- [ ] `test_cases.md` missing for most specs; `docs/features.md` stale → `/renew-features`.
+- [ ] Stray `mobile/pfm/` scaffold → ~40 unrelated tsc errors — leave alone.
+- [ ] No `// TODO:` markers in `backend/internal`, `ai-service/app`, `mobile/src`, `mobile/app`.
 
 ---
 
 ## Environment / Infra Notes
 
-- Local dev: Docker Compose (root `docker-compose.yml` + `backend/docker-compose.yml`) — backend, ai-service, postgres, web
-- DB: PostgreSQL 16-alpine, `${POSTGRES_PORT}` (5432)
-- Backend: Go Fiber, `${BACKEND_PORT}` (8090 in `.env.example`, 8080 in container)
-- Web: Next.js `${WEB_FRONTEND_PORT}` (8082), BFF proxy
-- Mobile: not containerized — `npx expo start`, `EXPO_PUBLIC_API_BASE_URL`; APK via local Gradle/EAS
-- AI Service: FastAPI, internal-only `http://ai-service:8000`; Groq `openai/gpt-oss-120b` (`ai-service/app/core/config.py`)
-- GitNexus: MCP configured in `.mcp.json`, index at `.gitnexus/` (repo name `pfm` — pass `repo: "pfm"`, several repos are indexed)
+- Local dev: Docker Compose (root + `backend/docker-compose.yml`) — backend, ai-service, postgres, web
+- DB: PostgreSQL 16-alpine, 5432
+- Backend: Go Fiber, 8090 host / 8080 container
+- Mobile: `npx expo start`, `EXPO_PUBLIC_API_BASE_URL`; APK via EAS/Gradle
+- AI Service: FastAPI internal `http://ai-service:8000`; Groq `openai/gpt-oss-120b` + Anthropic fallback
+- GitNexus: repo `pfm` (pass `repo: "pfm"`), no embeddings; re-indexed 2026-10-03
 
 ---
 
@@ -179,9 +180,9 @@ All paths under `/api/v1`. No `RequireRole` except `/admin/*`. Notifications are
 
 | Task | Files to read |
 |------|--------------|
-| Add new backend feature | `routes.go`, `service/interfaces.go`, closest handler+service+repo (`report_*` for read-only aggregates, `transaction_*` for CRUD, `budget_wizard_*` for AI-adjacent) |
-| Add AI chat capability | `service/chat_service.go`, `ai_service_client.go`, `ai-service/app/services/extract_service.py`, `mobile/src/features/ai-chat/chat-mode.ts`, `mobile/app/(app)/ai-chat.tsx` |
-| Add new mobile feature | Closest `mobile/src/features/{feature}` (`budget-wizard` most recent) |
-| Fix a bug | Relevant `*_service_test.go` / `fake_*_repo_test.go` |
-| Update DB schema | `020_budget_plans.sql` + both compose files + `backend/db/queries/*.sql` |
-| BA/spec new feature | `SRS.md` §6, `docs/features.md`, `docs/new-tasks.md`, closest spec (`ai-budget-wizard-v2`, `financial-reporting`) |
+| Add backend feature | `routes.go`, `service/interfaces.go`, closest handler+service+repo |
+| AI chat (record mode) | `mobile/app/(app)/(tabs)/ai-chat.tsx`, `features/ai-chat/{chat-mode.ts,hooks/use-chat-actions.ts,components/ChatMessageRow.tsx}`, `stores/chat-store.ts`, `service/chat_service.go` |
+| AI chat (consult mode) | `features/ai-chat/components/ConsultPane.tsx`, `hooks/use-consult-actions.ts`, `features/analytics/*`, `handler/analytics_handler.go` |
+| Mobile UI primitive | `src/components/shared/*`, `src/lib/theme` |
+| Update DB schema | latest migration + both compose files + `backend/db/queries/*.sql` |
+| BA/spec | `SRS.md` §6, `docs/features.md`, closest `specs/*/spec.md` |

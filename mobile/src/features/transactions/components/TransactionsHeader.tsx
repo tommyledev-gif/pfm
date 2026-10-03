@@ -162,7 +162,14 @@ export function TransactionsHeader({
 
       <SegmentedTabs options={typeOptions} value={typeFilter} onChange={onChangeTypeFilter} />
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+      {/* Bleeds through the screen's side padding so pills scroll out to the
+          screen edge instead of being cut off at the margin. */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterScroll}
+        contentContainerStyle={styles.filterRow}
+      >
         <FilterPill
           active={Boolean(dateRangeLabel)}
           label={dateRangeLabel ?? "Khoảng thời gian"}
@@ -237,7 +244,9 @@ const useStyles = createStyles((colors) => ({
   },
   searchInput: { flex: 1, ...typography.body, color: colors.textPrimary, padding: 0 },
   clearSearch: { ...typography.body, color: colors.textSecondary },
-  filterRow: { flexDirection: "row", gap: spacing.sm },
+  // Matches the Transactions screen's own horizontal padding.
+  filterScroll: { marginHorizontal: -spacing.xl },
+  filterRow: { flexDirection: "row", gap: spacing.sm, paddingHorizontal: spacing.xl },
   sortBadge: {
     position: "absolute",
     top: -4,

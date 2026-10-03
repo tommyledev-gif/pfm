@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Dimensions, PanResponder, Vibration } from "react-native";
+import { Animated, Dimensions, Keyboard, PanResponder, Vibration } from "react-native";
 
 export type SwipeSide = "left" | "right";
 
@@ -16,17 +16,14 @@ const SCREEN_WIDTH = Dimensions.get("window").width;
 export const EDIT_SWIPE_RATIO = 0.2;
 export const DELETE_SWIPE_RATIO = 0.3;
 
-// Where the indicator becomes fully opaque. Below it the row just slides;
-// from here to the cap the indicator is solid, which is what tells the user
-// that letting go will park.
-const ARM_RATIO = 0.9;
-// The indicator fades in over this much travel before ARM_RATIO, so it
-// arrives rather than blinking into existence.
-export const FADE_LEAD = 0.15;
-// Floating-point slack on the "held at the cap" test — the clamped offset
-// lands on the cap exactly in practice, but a sub-pixel miss must not
-// swallow the whole gesture.
-const CAP_EPSILON = 0.5;
+// Share of the travel past which letting go parks the row open; below it the
+// row snaps closed. The indicator fades in from the first pixel of the drag
+// and is fully visible by here, where the "armed" tick also fires — so the
+// User sees the action early and never has to drag the whole way.
+export const PARK_THRESHOLD_RATIO = 0.5;
+// Past the threshold, the indicator takes on its armed fill over this much
+// more travel, so arming reads as a change rather than a blink.
+export const ARMED_TRANSITION_SPAN = 0.15;
 // Minimum horizontal travel before this row claims the gesture away from a
 // parent list's vertical scroll and any inner Pressable. Small enough that
 // the swipe still feels immediate, large enough that an ordinary scroll or
@@ -71,9 +68,9 @@ export interface SwipeActionsState {
 /**
  * The park-and-confirm swipe gesture.
  *
- * ⚠️ It takes no action callback, and that is the point. Releasing at the cap
- * parks the row open and nothing else; the caller renders a button in the
- * revealed space and decides what tapping it does. Firing on release is what
+ * ⚠️ It takes no action callback, and that is the point. Releasing past the
+ * park threshold parks the row open and nothing else; the caller renders a
+ * button in the revealed space and decides what tapping it does. Firing on release is what
  * made an accidental flick destroy a record, and no amount of confirmation
  * downstream fixes a gesture that has already acted.
  *
@@ -91,7 +88,7 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
   const [parkedSide, setParkedSide] = useState<SwipeSide | null>(null);
 
   const armedRef = useRef(false);
-  const atCapRef = useRef(false);
+  const pastThresholdRef = useRef(false);
   const activeSideRef = useRef<SwipeSide | null>(null);
   // PanResponder zeroes gesture.dx on every grant, so a drag that continues
   // from an already-parked position must be measured from where the row is.
@@ -118,7 +115,7 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
       Animated.timing(leftProgress, { toValue: 0, duration: 180, useNativeDriver: false }).start();
       Animated.timing(rightProgress, { toValue: 0, duration: 180, useNativeDriver: false }).start();
       armedRef.current = false;
-      atCapRef.current = false;
+      pastThresholdRef.current = false;
       activeSideRef.current = null;
       offsetRef.current = 0;
       baseRef.current = 0;
@@ -152,7 +149,7 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
     const release = () => {
       // Re-checked here and not only at grant time: a row that becomes
       // disabled mid-drag must release into nothing.
-      if (!atCapRef.current || disabledRef.current) {
+      if (!pastThresholdRef.current || disabledRef.current) {
         close();
         return;
       }
@@ -178,6 +175,10 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
       onShouldBlockNativeResponder: () => true,
       onPanResponderGrant: () => {
         baseRef.current = offsetRef.current;
+        // A swipe the User started must not be half-hidden behind the
+        // keyboard. Safe mid-gesture: termination is refused above, so the
+        // layout shift as the keyboard closes cannot steal this gesture.
+        Keyboard.dismiss();
       },
       onPanResponderMove: (_, gesture) => {
         const total = baseRef.current + gesture.dx;
@@ -193,14 +194,16 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
         leftProgress.setValue(side === "left" ? fraction : 0);
         rightProgress.setValue(side === "right" ? fraction : 0);
 
-        if (fraction >= ARM_RATIO && !armedRef.current) {
+        if (fraction >= PARK_THRESHOLD_RATIO && !armedRef.current) {
           armedRef.current = true;
           Vibration.vibrate(ARM_VIBRATION_MS);
-        } else if (fraction < ARM_RATIO && armedRef.current) {
+        } else if (fraction < PARK_THRESHOLD_RATIO && armedRef.current) {
           armedRef.current = false;
         }
 
-        atCapRef.current = cap > 0 && Math.abs(clamped) >= cap - CAP_EPSILON;
+        // No velocity shortcut: where the finger is on release decides,
+        // which keeps the outcome predictable.
+        pastThresholdRef.current = cap > 0 && fraction >= PARK_THRESHOLD_RATIO;
       },
       onPanResponderRelease: release,
       // A stolen gesture is not a deliberate release, so it never parks.
@@ -225,4 +228,3 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
   };
 }
 
-export const SWIPE_ARM_RATIO = ARM_RATIO;

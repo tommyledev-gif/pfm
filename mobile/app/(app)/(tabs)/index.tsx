@@ -146,7 +146,7 @@ export default function HomeScreen() {
             <PendingConfirmationsSection
               messages={pendingConfirmations}
               categoryById={categoryById}
-              currency={snapshot.currency}
+              walletCurrencyById={walletCurrencyMap}
               onViewAll={() => router.push("/pending")}
               onOpenMessage={goToPendingMessage}
               onRequestRemove={removal.request}

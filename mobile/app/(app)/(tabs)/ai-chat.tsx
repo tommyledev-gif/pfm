@@ -1,19 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { FlatList, StyleSheet, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Screen } from "@/components/shared/Screen";
-import { TypingIndicator } from "@/components/shared/TypingIndicator";
-import { ChatInputBar } from "@/features/ai-chat/components/ChatInputBar";
-import { ChatMessageRow } from "@/features/ai-chat/components/ChatMessageRow";
 import { ChatModeBackdrop } from "@/features/ai-chat/components/ChatModeBackdrop";
 import { ChatModeHeader } from "@/features/ai-chat/components/ChatModeHeader";
 import { ChatModePicker } from "@/features/ai-chat/components/ChatModePicker";
-import { ChatThreadList } from "@/features/ai-chat/components/ChatThreadList";
 import { ChatOverlays } from "@/features/ai-chat/components/ChatOverlays";
-import { useChatThreadStyles } from "@/features/ai-chat/components/chat-thread-styles";
 import { ConsultPane } from "@/features/ai-chat/components/ConsultPane";
+import { RecordingPane } from "@/features/ai-chat/components/RecordingPane";
 import { useTransactionRemoval } from "@/features/ai-chat/components/use-transaction-removal";
 import { ChatMode, useChatModeStore } from "@/features/ai-chat/chat-mode";
 import { isConsultMessage } from "@/features/ai-chat/consult-message";
@@ -21,7 +17,6 @@ import { useChatActions } from "@/features/ai-chat/hooks/use-chat-actions";
 import { useChatOverlays } from "@/features/ai-chat/hooks/use-chat-overlays";
 import { isTombstone } from "@/features/ai-chat/tombstone";
 import { useKeyboardHeight, useKeyboardVisible } from "@/lib/use-keyboard-height";
-import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useChatThreadQuery } from "@/features/ai-chat/api/use-chat-thread-sync";
@@ -29,13 +24,10 @@ import { ChatMessage } from "@/features/ai-chat/types";
 import { useChatStore } from "@/stores/chat-store";
 
 // A beat for the list to finish its mount/measure pass before scrolling to a
-// deep-linked message, then a longer one to retry if the row still was not
-// measured — onScrollToIndexFailed covers the miss, this avoids the stutter.
+// deep-linked message — RecordingPane retries if the row still was not measured.
 const FOCUS_SCROLL_DELAY_MS = 50;
-const FOCUS_RETRY_DELAY_MS = 100;
 
 export default function AiChatScreen() {
-  const chatThreadStyles = useChatThreadStyles();
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
@@ -53,6 +45,9 @@ export default function AiChatScreen() {
   const [modePickerOpen, setModePickerOpen] = useState(false);
 
   const [input, setInput] = useState("");
+  // Set when "Switch to recording" carries a question over, so the recording
+  // input mounts focused; cleared once it has taken focus.
+  const [focusRecordingInput, setFocusRecordingInput] = useState(false);
   // Bumped on any scroll or thread change, so a parked swipe row is never left
   // open over content that has moved underneath it.
   const [closeSignal, setCloseSignal] = useState(0);
@@ -90,9 +85,6 @@ export default function AiChatScreen() {
 
   const wallets = useWalletsQuery();
   const categories = useCategoriesQuery();
-  // Read only, so an unconfirmed proposal can say what saving it would do to
-  // the category's budget. The card never writes budgets.
-  const budgets = useBudgetsQuery();
 
   const chat = useChatActions({
     onSent: () => listRef.current?.scrollToOffset({ offset: 0, animated: true }),
@@ -105,21 +97,6 @@ export default function AiChatScreen() {
   const invertedThread = useMemo(() => thread.filter((m) => !isConsultMessage(m)).reverse(), [thread]);
   const walletById = useMemo(() => new Map(wallets.data?.map((w) => [w.id, w])), [wallets.data]);
   const categoryById = useMemo(() => new Map(categories.data?.map((c) => [c.id, c])), [categories.data]);
-
-  // Keyed "categoryId|currency": a budget carries a separate limit per
-  // currency, and a proposal in one must never be measured against another.
-  const budgetByCategoryCurrency = useMemo(() => {
-    const map = new Map<string, { amount_limit: number; spent: number }>();
-    for (const budget of budgets.data ?? []) {
-      for (const limit of budget.limits) {
-        map.set(`${budget.category_id}|${limit.currency}`, {
-          amount_limit: limit.amount_limit,
-          spent: limit.spent,
-        });
-      }
-    }
-    return map;
-  }, [budgets.data]);
 
   useEffect(() => {
     setCloseSignal((n) => n + 1);
@@ -150,6 +127,16 @@ export default function AiChatScreen() {
     setModePickerOpen(false);
     if (next === "budget") overlays.openBudgetWizard(null);
   };
+  // Never sends: the carried question lands in the input for the User to
+  // check and send themselves. A reply with no remembered question just
+  // switches, leaving the draft alone.
+  const handleSwitchToRecording = (prefill?: string) => {
+    setMode("transaction");
+    const text = prefill?.trim();
+    if (!text) return;
+    setInput(text);
+    setFocusRecordingInput(true);
+  };
   const handleCloseBudgetWizard = () => {
     overlays.setBudgetWizardOpen(false);
     if (mode === "budget") setMode("transaction");
@@ -167,82 +154,31 @@ export default function AiChatScreen() {
             keyboardVisible={keyboardVisible}
             keyboardHeight={keyboardHeight}
             bottomInset={insets.bottom}
-            onSwitchToRecording={() => setMode("transaction")}
+            onSwitchToRecording={handleSwitchToRecording}
           />
         ) : (
-          <>
-            <ChatThreadList
-              listRef={listRef}
-              data={invertedThread}
-              keyExtractor={(m) => m.id}
-              contentContainerStyle={chatThreadStyles.thread}
-              // The default eats the first touch on any row below a focused
-              // input, so a swipe silently did nothing while the keyboard was open.
-              keyboardShouldPersistTaps="handled"
-              onScrollBeginDrag={() => setCloseSignal((n) => n + 1)}
-              onScrollToIndexFailed={(info) => {
-                setTimeout(() => {
-                  listRef.current?.scrollToIndex({
-                    index: info.index,
-                    animated: true,
-                    viewPosition: 0.5,
-                  });
-                }, FOCUS_RETRY_DELAY_MS);
-              }}
-              renderItem={({ item }) => (
-                <ChatMessageRow
-                  message={item}
-                  walletById={walletById}
-                  categoryById={categoryById}
-                  budgetByCategoryCurrency={budgetByCategoryCurrency}
-                  confirming={chat.confirmingId === item.id}
-                  closeSignal={closeSignal}
-                  onConfirm={chat.confirmAction}
-                  onTriggerEdit={overlays.triggerEdit}
-                  onTriggerDelete={removal.request}
-                  onPressHistory={overlays.openHistory}
-                  onOpenBudgetWizard={(message) => overlays.openBudgetWizard(message.id)}
-                  onOpenManualEntry={() => overlays.setManualEntryOpen(true)}
-                />
-              )}
-              // No counter-transform on these: the list already composes its own
-              // inversion onto the header/empty slots, so a second one would
-              // render them upside down.
-              ListEmptyComponent={
-                <Text style={chatThreadStyles.hint}>
-                  Cho mình biết bạn đã chi hay thu gì — vd: &ldquo;Cà phê 50k tiền mặt&rdquo; — mình sẽ soạn sẵn giao
-                  dịch cho bạn.
-                </Text>
-              }
-              // Header, not footer: on an inverted list the header renders at the
-              // visual bottom, which is where the typing dots belong.
-              ListHeaderComponent={
-                chat.sending ? (
-                  <View style={chatThreadStyles.typingRow}>
-                    <TypingIndicator />
-                  </View>
-                ) : null
-              }
-            />
-
-            <ChatInputBar
-              value={input}
-              onChangeText={setInput}
-              onSend={() => {
-                const text = input;
-                setInput("");
-                void chat.send(text);
-              }}
-              sending={chat.sending}
-              keyboardVisible={keyboardVisible}
-              keyboardHeight={keyboardHeight}
-              bottomInset={insets.bottom}
-              onOpenBudgetWizard={() => overlays.openBudgetWizard(null)}
-              // The real mode, not "transaction": while the budget wizard is
-              // open the screen behind it takes the wizard's colour too.
-              mode={mode}
-            />
-          </>
+          <RecordingPane
+            listRef={listRef}
+            messages={invertedThread}
+            walletById={walletById}
+            categoryById={categoryById}
+            chat={chat}
+            closeSignal={closeSignal}
+            onScrollBeginDrag={() => setCloseSignal((n) => n + 1)}
+            input={input}
+            onChangeInput={setInput}
+            autoFocusInput={focusRecordingInput}
+            onInputFocused={() => setFocusRecordingInput(false)}
+            keyboardVisible={keyboardVisible}
+            keyboardHeight={keyboardHeight}
+            bottomInset={insets.bottom}
+            mode={mode}
+            onTriggerEdit={overlays.triggerEdit}
+            onTriggerDelete={removal.request}
+            onPressHistory={overlays.openHistory}
+            onOpenBudgetWizard={overlays.openBudgetWizard}
+            onOpenManualEntry={() => overlays.setManualEntryOpen(true)}
+          />
         )}
       </View>
 

@@ -8,6 +8,10 @@ import { radii, spacing, createStyles, useColors } from "@/lib/theme";
 
 interface ChatThreadListProps extends Omit<FlatListProps<ChatMessage>, "inverted" | "onScroll" | "scrollEventThrottle"> {
   listRef: RefObject<FlatList<ChatMessage> | null>;
+  /** Height of whatever floats over the list's bottom edge (the composer).
+   *  Reserved inside the scroll content, so the newest message rests fully
+   *  above it while older ones can still scroll beneath it. */
+  reservedBottom?: number;
 }
 
 // How far from the newest message (px) before the jump-to-latest button
@@ -26,7 +30,7 @@ const FAB_SIZE = 40;
  * the newest message and fades out when they are back. Shared by the
  * recording and analysis panes.
  */
-export function ChatThreadList({ listRef, style, ...listProps }: ChatThreadListProps) {
+export function ChatThreadList({ listRef, style, reservedBottom = 0, contentContainerStyle, ...listProps }: ChatThreadListProps) {
   const colors = useColors();
   const styles = useStyles();
   const chatThreadStyles = useChatThreadStyles();
@@ -59,13 +63,15 @@ export function ChatThreadList({ listRef, style, ...listProps }: ChatThreadListP
         style={[chatThreadStyles.list, style]}
         onScroll={handleScroll}
         scrollEventThrottle={SCROLL_THROTTLE_MS}
+        // Inverted: paddingTop renders at the visual bottom.
+        contentContainerStyle={[contentContainerStyle, { paddingTop: reservedBottom + spacing.md }]}
         {...listProps}
       />
       <Animated.View
         // Hidden but still mounted, so it can fade out; never catches taps meant
         // for the bubble underneath it.
         pointerEvents={awayFromLatest ? "auto" : "none"}
-        style={[styles.fabWrap, { opacity, transform: [{ translateY }] }]}
+        style={[styles.fabWrap, { bottom: reservedBottom + spacing.md, opacity, transform: [{ translateY }] }]}
       >
         <Pressable
           testID="btn-chat-scroll-latest"
@@ -83,9 +89,9 @@ export function ChatThreadList({ listRef, style, ...listProps }: ChatThreadListP
 
 const useStyles = createStyles((colors) => ({
   wrap: { flex: 1 },
-  // Anchored by explicit right/bottom offsets: an absolute view without its
-  // own offsets gets placed by the parent's alignment instead.
-  fabWrap: { position: "absolute", right: spacing.xl, bottom: spacing.md },
+  // Anchored by explicit right/bottom offsets: bottom is set inline from
+  // reservedBottom so the button always clears the composer.
+  fabWrap: { position: "absolute", right: spacing.xl },
   fab: {
     width: FAB_SIZE,
     height: FAB_SIZE,

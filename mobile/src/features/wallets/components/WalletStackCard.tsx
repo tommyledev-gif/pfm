@@ -31,6 +31,11 @@ export const CARD_HEIGHT = 132;
 // them, which read as a filmstrip of unrelated tiles; overlapping them makes
 // the row read as one stack of cards with the active one lifted off the top.
 export const CARD_OVERLAP = 56;
+// Vertical room the card's drop shadow needs beyond the card (radius 14,
+// pushed 6 down, so more below than above). The carousel's scroll box clips
+// anything outside its bounds, so it reserves this much on each side.
+export const CAROUSEL_SHADOW_BLEED_TOP = 10;
+export const CAROUSEL_SHADOW_BLEED_BOTTOM = 22;
 
 interface WalletStackCardProps {
   wallet: Wallet;

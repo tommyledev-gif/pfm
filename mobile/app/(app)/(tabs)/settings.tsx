@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
@@ -9,6 +9,7 @@ import {
   HelpIcon,
   HistoryIcon,
   LogOutIcon,
+  PaletteIcon,
   ShieldIcon,
   TagIcon,
   UsersIcon,
@@ -23,7 +24,6 @@ import { useChatStore } from "@/stores/chat-store";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { totalBalance } from "@/features/wallets/wallet-totals";
 import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary-query";
-import { ThemePicker } from "@/features/settings/components/ThemePicker";
 
 // Security/Help & Support have no mobile screens yet — out of the design
 // handoff's scope (it maps them as entry points only). Wallets/Categories/
@@ -36,6 +36,7 @@ import { ThemePicker } from "@/features/settings/components/ThemePicker";
 // The server-side gate remains the actual authorization boundary; this is
 // just not advertising a door the user can't open.
 const SETTINGS_ROWS = [
+  { label: "Giao diện", Icon: PaletteIcon, href: "/appearance" as const, adminOnly: false, testID: "row-settings-appearance" },
   { label: "Ví của bạn", Icon: WalletIcon, href: "/wallets" as const, adminOnly: false },
   { label: "Danh mục", Icon: TagIcon, href: "/categories" as const, adminOnly: false },
   { label: "Thành viên gia đình", Icon: UsersIcon, href: "/users" as const, adminOnly: true },
@@ -44,6 +45,9 @@ const SETTINGS_ROWS = [
   { label: "Trợ giúp & hỗ trợ", Icon: HelpIcon, href: null, adminOnly: false },
   { label: "Nhà phát triển", Icon: CodeIcon, href: "/developer" as const, adminOnly: false },
 ];
+type SettingsHref = NonNullable<(typeof SETTINGS_ROWS)[number]["href"]>;
+// Taps on a menu row closer together than this count as one.
+const ROW_TAP_GUARD_MS = 600;
 
 const LOGOUT_FLUSH_TIMEOUT_MS = 4000;
 // Dims the app enough to read as "busy, hands off", not so much that the
@@ -61,6 +65,7 @@ export default function SettingsScreen() {
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
+  const lastPushAt = useRef(0);
   const email = useSessionStore((s) => s.email);
   const role = useSessionStore((s) => s.role);
   const clearSession = useSessionStore((s) => s.clear);
@@ -83,6 +88,15 @@ export default function SettingsScreen() {
   // its own spinner: the flush can take up to that timeout, and a screen that
   // still reacted to taps in the meantime invited a second logout, a
   // navigation away, or an edit that the wipe was about to throw away.
+  // One push per burst of taps: a quick double tap fires twice before the
+  // route has changed, and would otherwise stack the same screen twice.
+  const openRow = (href: SettingsHref) => {
+    const now = Date.now();
+    if (now - lastPushAt.current < ROW_TAP_GUARD_MS) return;
+    lastPushAt.current = now;
+    router.push(href);
+  };
+
   const logout = async () => {
     if (loggingOut) return;
     setLoggingOut(true);
@@ -142,11 +156,15 @@ export default function SettingsScreen() {
         />
       </View>
 
-      <ThemePicker />
-
       <View style={styles.settingsGroup}>
-        {SETTINGS_ROWS.filter((row) => !row.adminOnly || role === "admin").map(({ label, Icon, href }) => (
-          <Pressable key={label} style={styles.row} onPress={href ? () => router.push(href) : undefined} disabled={!href}>
+        {SETTINGS_ROWS.filter((row) => !row.adminOnly || role === "admin").map(({ label, Icon, href, testID }) => (
+          <Pressable
+            key={label}
+            testID={testID}
+            style={styles.row}
+            onPress={href ? () => openRow(href) : undefined}
+            disabled={!href}
+          >
             <Icon size={20} color={colors.textSecondary} />
             <Text style={styles.rowLabel}>{label}</Text>
             <ChevronRightIcon size={18} color={colors.textMuted} />

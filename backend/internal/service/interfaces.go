@@ -128,6 +128,9 @@ type TransactionRepo interface {
 	ListTransactionsByUser(ctx context.Context, userID uuid.UUID, filter repository.ListTransactionsFilter) ([]*model.Transaction, error)
 	CountTransactionsByUser(ctx context.Context, userID uuid.UUID, filter repository.ListTransactionsFilter) (int64, error)
 	GetTransactionByID(ctx context.Context, id uuid.UUID) (*model.Transaction, error)
+	// GetTransactionOwnerIncludingDeleted ignores deleted_at on purpose — it
+	// authorizes reading a removed Transaction's audit history.
+	GetTransactionOwnerIncludingDeleted(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
 	UpdateTransaction(ctx context.Context, tx pgx.Tx, arg repository.UpdateTransactionParams) (*model.Transaction, error)
 	SoftDeleteTransaction(ctx context.Context, tx pgx.Tx, id, userID uuid.UUID) (*model.Transaction, error)
 	// InsertAuditLog was added by specs/transaction-audit-log/plan.md — it

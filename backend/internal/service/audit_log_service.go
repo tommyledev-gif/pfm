@@ -2,10 +2,12 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
 
 	"github.com/example/pfm/backend/internal/common"
@@ -48,7 +50,7 @@ func (s *AuditLogService) ListAuditLogs(ctx context.Context, userID uuid.UUID, t
 		// GET /transactions/{id} checks it (403 for someone else's, 404 for
 		// absent) — filtering by another user's Transaction must not quietly
 		// return an empty page as if they simply had no history.
-		if _, err := s.getOwnedTransactionForAudit(ctx, userID, parsed); err != nil {
+		if err := s.authorizeTransactionForAudit(ctx, userID, parsed); err != nil {
 			return nil, nil, 0, err
 		}
 		transactionID = &parsed
@@ -100,17 +102,22 @@ func (s *AuditLogService) ListAuditLogs(ctx context.Context, userID uuid.UUID, t
 	return logs, nextCursor, total, nil
 }
 
-// getOwnedTransactionForAudit mirrors TransactionService.getOwnedTransaction's
-// 403-vs-404 split — duplicated rather than shared for the same reason that
-// helper is itself duplicated across services (each owns its own repository
-// dependency), see TransactionService.getOwnedWallet's note.
-func (s *AuditLogService) getOwnedTransactionForAudit(ctx context.Context, userID, transactionID uuid.UUID) (*model.Transaction, error) {
-	transaction, err := s.transactionRepo.GetTransactionByID(ctx, transactionID)
+// authorizeTransactionForAudit keeps TransactionService.getOwnedTransaction's
+// 403-vs-404 split, but checks ownership on removed Transactions too: viewing
+// a deleted Transaction's history ("did I actually delete this?") is the
+// point of the audit log (specs/mobile-ux-batch-2026-10 US-13). Only an
+// unknown id is 404 — any other repository failure is a 500, never masked
+// as "not found".
+func (s *AuditLogService) authorizeTransactionForAudit(ctx context.Context, userID, transactionID uuid.UUID) error {
+	ownerID, err := s.transactionRepo.GetTransactionOwnerIncludingDeleted(ctx, transactionID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return common.ErrTransactionNotFound
+	}
 	if err != nil {
-		return nil, common.ErrTransactionNotFound
+		return fmt.Errorf("service.authorizeTransactionForAudit: %w", err)
 	}
-	if transaction.UserID != userID {
-		return nil, common.ErrTransactionAccessDenied
+	if ownerID != userID {
+		return common.ErrTransactionAccessDenied
 	}
-	return transaction, nil
+	return nil
 }

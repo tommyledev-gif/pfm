@@ -1,18 +1,25 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
-import { SwipeableRow } from "@/components/shared/SwipeableRow";
-import { CheckIcon, EditIcon, HistoryIcon, TrashIcon } from "@/components/ui/Icon";
-import { formatCurrency } from "@/lib/currency";
-import { withAlpha } from "@/lib/color";
+import { ChevronRightIcon } from "@/components/ui/Icon";
+import { FALLBACK_CURRENCY } from "@/lib/constants";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { Category } from "@/features/categories/types";
+import { PendingRow } from "@/features/ai-chat/components/PendingRow";
+import { sortProposalsNewestFirst } from "@/features/ai-chat/proposal-time";
 import { ChatMessage } from "@/features/ai-chat/types";
+
+// From this many pending proposals on, only the newest few render and a
+// summary row stands in for the rest. Below it everything shows: a summary
+// replacing a single row would save no space.
+const PENDING_COLLAPSE_FROM = 4;
+const PENDING_VISIBLE_WHEN_COLLAPSED = 2;
 
 interface PendingConfirmationsSectionProps {
   messages: ChatMessage[];
   categoryById: Map<string, Category>;
-  currency: string;
+  /** Wallet id → currency, so each row is formatted in its own Wallet's currency. */
+  walletCurrencyById: Map<string, string>;
   /** Opens the full pending-review screen. */
   onViewAll: () => void;
   onOpenMessage: (messageId: string, openEdit?: boolean) => void;
@@ -21,20 +28,13 @@ interface PendingConfirmationsSectionProps {
 }
 
 /**
- * Home's "awaiting confirmation" list.
- *
- * Extracted from the home screen so that file stays under the 300-line limit,
- * and so the swipe behaviour lives beside the row it acts on.
- *
- * ⚠️ Swiping reveals a button; it no longer acts on release. The previous
- * version discarded the proposal the instant the finger lifted at the drag
- * cap — and discarded it by deleting the message from the thread outright,
- * which destroyed the only record that the proposal had ever existed.
+ * Home's "awaiting confirmation" list — the newest proposals, and a summary
+ * row leading to the full review screen once there are too many to list.
  */
 export function PendingConfirmationsSection({
   messages,
   categoryById,
-  currency,
+  walletCurrencyById,
   onViewAll,
   onOpenMessage,
   onRequestRemove,
@@ -44,7 +44,12 @@ export function PendingConfirmationsSection({
   // Bumped whenever the rendered set changes, so a parked row never stays
   // open over a row that has moved underneath it.
   const [closeSignal, setCloseSignal] = useState(0);
-  const idKey = messages.map((m) => m.id).join(",");
+
+  const sorted = useMemo(() => sortProposalsNewestFirst(messages), [messages]);
+  const collapsed = sorted.length >= PENDING_COLLAPSE_FROM;
+  const visible = collapsed ? sorted.slice(0, PENDING_VISIBLE_WHEN_COLLAPSED) : sorted;
+  const hiddenCount = sorted.length - visible.length;
+  const idKey = visible.map((m) => m.id).join(",");
 
   useEffect(() => {
     setCloseSignal((n) => n + 1);
@@ -61,63 +66,38 @@ export function PendingConfirmationsSection({
             <Text style={styles.countBadgeLabel}>{messages.length}</Text>
           </View>
         </View>
-        {/* Replaces the old "Bỏ qua", which only hid this section for the
-            session — it read as "discard all", and hiding pending work is
-            the opposite of what the section is for. */}
         <Pressable onPress={onViewAll} hitSlop={8} testID="btn-pending-view-all">
           <Text style={styles.action}>Xem tất cả</Text>
         </Pressable>
       </View>
 
-      {messages.map((message) => (
-        <SwipeableRow
-          key={message.id}
-          closeSignal={closeSignal}
-          leftAction={{
-            Icon: EditIcon,
-            color: colors.green,
-            label: "Sửa",
-            testID: "btn-pending-edit",
-            onPress: () => onOpenMessage(message.id, true),
-          }}
-          rightAction={{
-            Icon: TrashIcon,
-            color: colors.peach,
-            label: "Bỏ",
-            destructive: true,
-            testID: "btn-pending-discard",
-            onPress: () => onRequestRemove(message),
-          }}
+      {visible.map((message) => {
+        const payload = message.action?.payload;
+        return (
+          <PendingRow
+            key={message.id}
+            message={message}
+            label={payload?.note || categoryById.get(payload?.category_id ?? "")?.name || "Giao dịch"}
+            currency={walletCurrencyById.get(payload?.wallet_id ?? "") ?? FALLBACK_CURRENCY}
+            closeSignal={closeSignal}
+            onOpen={(openEdit) => onOpenMessage(message.id, openEdit)}
+            onRequestRemove={() => onRequestRemove(message)}
+          />
+        );
+      })}
+
+      {/* A link to the rest, not a fourth proposal: no amount, no swipe. */}
+      {hiddenCount > 0 ? (
+        <Pressable
+          testID="btn-pending-overflow"
+          accessibilityRole="link"
+          onPress={onViewAll}
+          style={({ pressed }) => [styles.overflowRow, pressed && styles.overflowPressed]}
         >
-          <Pressable style={styles.row} onPress={() => onOpenMessage(message.id)}>
-            <View style={styles.iconTile}>
-              <HistoryIcon size={18} color={colors.mustard} />
-            </View>
-            <View style={styles.textCol}>
-              <Text style={styles.label} numberOfLines={1}>
-                {message.action?.payload.note ||
-                  categoryById.get(message.action?.payload.category_id ?? "")?.name ||
-                  "Giao dịch"}
-              </Text>
-              <Text style={styles.hint} numberOfLines={1}>
-                Chạm để duyệt mục {message.action?.payload.type === "income" ? "thu" : "chi"}
-              </Text>
-            </View>
-            <Text
-              style={[
-                styles.amount,
-                { color: message.action?.payload.type === "income" ? colors.green : colors.peach },
-              ]}
-              numberOfLines={1}
-            >
-              {formatCurrency(message.action?.payload.amount ?? 0, currency)}
-            </Text>
-            <View style={styles.checkButton}>
-              <CheckIcon size={16} color={colors.onGreen} />
-            </View>
-          </Pressable>
-        </SwipeableRow>
-      ))}
+          <Text style={styles.overflowLabel}>+{hiddenCount} giao dịch khác đang chờ xác nhận</Text>
+          <ChevronRightIcon size={16} color={colors.textMuted} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -148,38 +128,13 @@ const useStyles = createStyles((colors) => ({
     justifyContent: "center",
   },
   countBadgeLabel: { fontSize: 10, fontWeight: "800", color: colors.onGreen },
-  row: {
+  overflowRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    // A gold outline rather than the neutral border every other card uses —
-    // this row's own cue that it is awaiting action.
-    borderColor: withAlpha(colors.mustard, 0.4),
-    borderRadius: radii.listCard,
+    justifyContent: "space-between",
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
   },
-  iconTile: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.listCard - 2,
-    backgroundColor: withAlpha(colors.mustard, 0.12),
-    borderWidth: 1,
-    borderColor: withAlpha(colors.mustard, 0.3),
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  textCol: { flex: 1, minWidth: 0, gap: 2 },
-  label: { ...typography.body, color: colors.textPrimary },
-  hint: { ...typography.tiny, color: colors.textSecondary },
-  amount: { ...typography.body, fontWeight: "700" },
-  checkButton: {
-    width: 28,
-    height: 28,
-    borderRadius: radii.pill,
-    backgroundColor: colors.green,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  overflowPressed: { opacity: 0.6 },
+  overflowLabel: { ...typography.caption, color: colors.textSecondary },
 }));

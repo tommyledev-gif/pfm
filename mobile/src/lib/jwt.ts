@@ -71,3 +71,8 @@ export function roleFromAccessToken(token: string | null): UserRole | null {
   const role = decodeAccessTokenClaims(token)?.role;
   return role === "admin" || role === "member" ? role : null;
 }
+
+export function userIdFromAccessToken(token: string | null): string | null {
+  const userId = decodeAccessTokenClaims(token)?.user_id;
+  return typeof userId === "string" && userId.length > 0 ? userId : null;
+}
