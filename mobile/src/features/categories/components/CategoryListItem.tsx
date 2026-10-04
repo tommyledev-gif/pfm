@@ -5,6 +5,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { TrashIcon } from "@/components/ui/Icon";
 import { colorForCategory } from "@/lib/category-color";
+import { useRequireOnline } from "@/lib/connectivity";
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
 import { Category } from "@/features/categories/types";
 import { useDeleteCategoryMutation } from "@/features/categories/api/use-delete-category-mutation";
@@ -14,6 +15,7 @@ import { useDeleteCategoryMutation } from "@/features/categories/api/use-delete-
 // doesn't open the edit form.
 export function CategoryListItem({ category, onPress }: { category: Category; onPress: () => void }) {
   const styles = useStyles();
+  const requireOnline = useRequireOnline();
   const isSystem = category.user_id === null;
   const deleteCategory = useDeleteCategoryMutation();
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
@@ -41,7 +43,7 @@ export function CategoryListItem({ category, onPress }: { category: Category; on
           </Text>
         </View>
         {!isSystem ? (
-          <Pressable onPress={() => setConfirmDeleteOpen(true)} hitSlop={8} style={styles.deleteButton}>
+          <Pressable onPress={() => requireOnline(() => setConfirmDeleteOpen(true))} hitSlop={8} style={styles.deleteButton}>
             <TrashIcon size={18} />
           </Pressable>
         ) : null}

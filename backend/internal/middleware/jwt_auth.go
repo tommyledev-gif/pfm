@@ -45,6 +45,7 @@ func JWTAuth(tokens *service.TokenService, logger *zap.Logger) fiber.Handler {
 
 		c.Locals(common.LocalsUserID, claims.UserID)
 		c.Locals(common.LocalsRole, claims.Role)
+		c.Locals(common.LocalsTokenIssuedAt, claims.IssuedAt)
 		return c.Next()
 	}
 }

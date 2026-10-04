@@ -5,6 +5,8 @@ import { PillTag } from "@/components/ui/PillTag";
 import { colors, radii, spacing, typography, createStyles } from "@/lib/theme";
 import { User } from "@/features/users/types";
 import { ResendInviteButton } from "@/features/users/components/ResendInviteButton";
+import { RevokeSessionsButton } from "@/features/users/components/RevokeSessionsButton";
+import { useCurrentUserId } from "@/stores/use-current-user-id";
 
 // Getters, not values: read at render time so they follow a theme switch
 // (see src/theme/active-palette.ts).
@@ -16,6 +18,7 @@ const STATUS_COLOR: Record<User["status"], string> = {
 
 export function UserListItem({ user }: { user: User }) {
   const styles = useStyles();
+  const currentUserId = useCurrentUserId();
   const displayName = user.full_name ?? user.email.split("@")[0];
 
   return (
@@ -26,6 +29,11 @@ export function UserListItem({ user }: { user: User }) {
         <Text style={styles.email} numberOfLines={1}>{user.email}</Text>
         {user.status === "pending" && user.invite_resend_available_at ? (
           <ResendInviteButton userId={user.id} availableAt={user.invite_resend_available_at} />
+        ) : null}
+        {/* Active Users other than yourself only (spec AC-42); you sign
+            yourself out from the Security screen. */}
+        {user.status === "active" && user.id !== currentUserId ? (
+          <RevokeSessionsButton userId={user.id} email={user.email} />
         ) : null}
       </View>
       <View style={styles.tags}>

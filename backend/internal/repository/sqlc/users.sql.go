@@ -141,7 +141,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at, invite_sent_at, invite_resend_count FROM users
+SELECT id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at, invite_sent_at, invite_resend_count, tokens_valid_after FROM users
 WHERE id = $1
   AND deleted_at IS NULL
 LIMIT 1
@@ -154,6 +154,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.ID, &i.Email, &i.FullName, &i.PasswordHash, &i.Status, &i.Role,
 		&i.InvitedBy, &i.InviteToken, &i.InviteExpiresAt, &i.ActivatedAt,
 		&i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.InviteSentAt, &i.InviteResendCount,
+		&i.TokensValidAfter,
 	)
 	return i, err
 }
@@ -267,4 +268,20 @@ func (q *Queries) SeedAdminUser(ctx context.Context, arg SeedAdminUserParams) (U
 		&i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.InviteSentAt, &i.InviteResendCount,
 	)
 	return i, err
+}
+
+const setUserTokensValidAfter = `-- name: SetUserTokensValidAfter :execrows
+UPDATE users
+SET tokens_valid_after = $2,
+    updated_at         = NOW()
+WHERE id = $1
+  AND deleted_at IS NULL
+`
+
+func (q *Queries) SetUserTokensValidAfter(ctx context.Context, id uuid.UUID, tokensValidAfter time.Time) (int64, error) {
+	result, err := q.db.Exec(ctx, setUserTokensValidAfter, id, tokensValidAfter)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

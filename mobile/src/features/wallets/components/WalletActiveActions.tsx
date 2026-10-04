@@ -4,6 +4,7 @@ import { Text, View } from "react-native";
 import { CheckIcon, EditIcon } from "@/components/ui/Icon";
 import { PillButton } from "@/components/ui/PillButton";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { useRequireOnline } from "@/lib/connectivity";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
 import { useSetDefaultWalletMutation } from "@/features/wallets/api/use-set-default-wallet-mutation";
@@ -17,6 +18,7 @@ import { useSetDefaultWalletMutation } from "@/features/wallets/api/use-set-defa
 export function WalletActiveActions({ wallet, onEdit }: { wallet: Wallet; onEdit: () => void }) {
   const colors = useColors();
   const styles = useStyles();
+  const requireOnline = useRequireOnline();
   const setDefault = useSetDefaultWalletMutation();
   const [confirmDefaultOpen, setConfirmDefaultOpen] = useState(false);
 
@@ -32,7 +34,7 @@ export function WalletActiveActions({ wallet, onEdit }: { wallet: Wallet; onEdit
           <PillButton
             label="Đặt mặc định"
             variant="outline"
-            onPress={() => setConfirmDefaultOpen(true)}
+            onPress={() => requireOnline(() => setConfirmDefaultOpen(true))}
             loading={setDefault.isPending}
             style={styles.flex}
             testID="btn-wallet-set-default"

@@ -25,12 +25,14 @@ type UserRepo interface {
 	CountUserByEmailAnyStatus(ctx context.Context, email string) (int64, error)
 	ListUsers(ctx context.Context, p repository.ListUsersParams) ([]*model.User, error)
 	CountUsers(ctx context.Context, status, role *string) (int64, error)
+	SetTokensValidAfter(ctx context.Context, id uuid.UUID, at time.Time) (bool, error)
 }
 
 // RevokedTokenRepo is the repository contract AuthService.Logout depends on.
 type RevokedTokenRepo interface {
 	Revoke(ctx context.Context, tokenJTI string, userID *uuid.UUID, expiresAt time.Time) error
 	IsRevoked(ctx context.Context, tokenJTI string) (bool, error)
+	Claim(ctx context.Context, tokenJTI string, userID *uuid.UUID, expiresAt time.Time) (bool, error)
 }
 
 // WalletRepo is the repository contract WalletService depends on (F-03).

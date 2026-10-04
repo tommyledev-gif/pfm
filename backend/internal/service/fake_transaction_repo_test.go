@@ -123,7 +123,8 @@ func (f *fakeTransactionRepo) CreateTransaction(_ context.Context, _ pgx.Tx, arg
 }
 
 // GetTransactionByIdempotencyKey mirrors the real query's pgx.ErrNoRows
-// signal for a fresh key (specs/ai-chat-assistant/spec.md S-AI-13).
+// signal for a fresh key (specs/ai-chat-assistant/spec.md S-AI-13). Like the
+// real query it matches soft-deleted rows too (BR-OFF-B01).
 func (f *fakeTransactionRepo) GetTransactionByIdempotencyKey(_ context.Context, userID, idempotencyKey uuid.UUID) (*model.Transaction, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -133,7 +134,7 @@ func (f *fakeTransactionRepo) GetTransactionByIdempotencyKey(_ context.Context, 
 		return nil, pgx.ErrNoRows
 	}
 	t, ok := f.transactions[id]
-	if !ok || t.DeletedAt != nil {
+	if !ok {
 		return nil, pgx.ErrNoRows
 	}
 	cp := *t

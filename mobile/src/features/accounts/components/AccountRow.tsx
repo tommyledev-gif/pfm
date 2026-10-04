@@ -1,0 +1,76 @@
+import { Pressable, Text, View } from "react-native";
+
+import { Avatar } from "@/components/ui/Avatar";
+import { colorForCategory } from "@/lib/category-color";
+import { createStyles, spacing, typography } from "@/lib/theme";
+import { accountDisplayName, isAccountExpired } from "@/features/accounts/account-registry-store";
+import { SavedAccount } from "@/features/accounts/types";
+
+interface AccountRowProps {
+  account: SavedAccount;
+  isActive: boolean;
+  onPress: (account: SavedAccount) => void;
+  /** Omitted for the active row — it leaves via "Đăng xuất" (AC-17). */
+  onRemove?: (account: SavedAccount) => void;
+  testID: string;
+}
+
+const AVATAR_SIZE = 40;
+export const ACCOUNT_STATUS_COPY = {
+  active: "Đang dùng",
+  expired: "Đã hết hạn — đăng nhập lại",
+} as const;
+const REMOVE_LABEL = "Gỡ khỏi thiết bị";
+
+/** One saved account in the switch dialog / login chooser (spec US-02 step 4). */
+export function AccountRow({ account, isActive, onPress, onRemove, testID }: AccountRowProps) {
+  const styles = useStyles();
+  const expired = !isActive && isAccountExpired(account);
+  const status = isActive ? ACCOUNT_STATUS_COPY.active : expired ? ACCOUNT_STATUS_COPY.expired : null;
+
+  return (
+    <View style={styles.row}>
+      <Pressable
+        style={styles.main}
+        onPress={() => onPress(account)}
+        disabled={isActive}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: isActive, selected: isActive }}
+        testID={testID}
+      >
+        <Avatar
+          name={accountDisplayName(account)}
+          color={colorForCategory(account.userId)}
+          size={AVATAR_SIZE}
+          fallback="initial"
+        />
+        <View style={styles.info}>
+          <Text style={styles.name} numberOfLines={1}>{accountDisplayName(account)}</Text>
+          <Text style={styles.email} numberOfLines={1}>{account.email}</Text>
+          {status ? <Text style={[styles.status, isActive && styles.statusActive]}>{status}</Text> : null}
+        </View>
+      </Pressable>
+      {onRemove && !isActive ? (
+        <Pressable
+          onPress={() => onRemove(account)}
+          hitSlop={8}
+          accessibilityRole="button"
+          testID={`btn-account-remove-${account.userId}`}
+        >
+          <Text style={styles.remove}>{REMOVE_LABEL}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+const useStyles = createStyles((colors) => ({
+  row: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.md },
+  main: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.md },
+  info: { flex: 1, gap: 2 },
+  name: { ...typography.body, color: colors.textPrimary },
+  email: { ...typography.caption, color: colors.textSecondary },
+  status: { ...typography.tiny, color: colors.mustard },
+  statusActive: { color: colors.green },
+  remove: { ...typography.caption, color: colors.textSecondary },
+}));

@@ -10,6 +10,8 @@ export const RECENT_PHRASES_LIMIT = 50;
 interface RecentPhrasesState {
   byUser: PhrasesByUser;
   record: (userId: string, text: string) => void;
+  /** Drops every phrase of a User removed from this device. */
+  removeUser: (userId: string) => void;
 }
 
 /**
@@ -32,6 +34,11 @@ export const useRecentPhrasesStore = create<RecentPhrasesState>()(
           },
         }));
       },
+      removeUser: (userId) =>
+        set((s) => {
+          const { [userId]: _dropped, ...rest } = s.byUser;
+          return { byUser: rest };
+        }),
     }),
     { name: "pfm_recent_phrases", storage: createJSONStorage(() => AsyncStorage) },
   ),

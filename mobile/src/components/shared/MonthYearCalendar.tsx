@@ -4,6 +4,7 @@ import { Calendar, CalendarProps } from "react-native-calendars";
 
 import { MonthYearWheelSheet } from "@/components/shared/MonthYearWheelSheet";
 import { useCalendarTheme } from "@/lib/calendar-theme";
+import { todayDateOnly } from "@/lib/date-range";
 import { typography, createStyles } from "@/lib/theme";
 
 // react-native-calendars' `renderHeader` hands back its internal `XDate`
@@ -19,10 +20,6 @@ interface CalendarMonth {
 // into early next year.
 const YEARS_BACK = 15;
 const YEARS_AHEAD = 1;
-
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function monthStartIso(year: number, month: number): string {
   return `${year}-${String(month + 1).padStart(2, "0")}-01`;
@@ -45,14 +42,14 @@ export function MonthYearCalendar({ initialDate, ...calendarProps }: MonthYearCa
   const styles = useStyles();
   // Calendar re-reads `initialDate` on every change (unlike `current`), which
   // is what lets a picked month move the grid.
-  const [jumpDate, setJumpDate] = useState(initialDate ?? todayIso());
+  const [jumpDate, setJumpDate] = useState(initialDate ?? todayDateOnly());
   const [wheelOpen, setWheelOpen] = useState(false);
   // The month the grid is showing right now (it changes with the arrows too),
   // which is what the wheel should open on.
   const [shown, setShown] = useState({ year: new Date().getFullYear(), month: new Date().getMonth() });
 
   useEffect(() => {
-    setJumpDate(initialDate ?? todayIso());
+    setJumpDate(initialDate ?? todayDateOnly());
   }, [initialDate]);
 
   const years = useMemo(() => {

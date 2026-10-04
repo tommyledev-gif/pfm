@@ -63,7 +63,7 @@ export function ChatOverlays({
   onBudgetWizardCompleted,
 }: ChatOverlaysProps) {
   const currencyFor = (message: ChatMessage | null): string =>
-    message?.action ? walletById.get(message.action.payload.wallet_id)?.currency ?? FALLBACK_CURRENCY : FALLBACK_CURRENCY;
+    message?.action ? walletById.get(message.action.payload.wallet_id ?? "")?.currency ?? FALLBACK_CURRENCY : FALLBACK_CURRENCY;
 
   const removalCopy = removalDialogCopy(removal.target, removal.targetIsPersisted, {
     currency: currencyFor(removal.target),
@@ -83,6 +83,7 @@ export function ChatOverlays({
         visible={Boolean(editingActionMessage)}
         payload={editingActionMessage?.action?.payload ?? null}
         lockWalletAndType={Boolean(editingActionMessage?.confirmed)}
+        vndOnly={!editingActionMessage?.confirmed}
         onClose={onCloseEditingAction}
         onSave={onSaveEditingAction}
       />

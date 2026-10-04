@@ -12,6 +12,7 @@ import { withAlpha } from "@/lib/color";
 import { colors, radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { AmountExpression } from "@/lib/use-amount-expression";
 import { useKeyboardVisible } from "@/lib/use-keyboard-height";
+import { todayDateOnly } from "@/lib/date-range";
 import { Category } from "@/features/categories/types";
 import { Wallet } from "@/features/wallets/types";
 
@@ -30,16 +31,12 @@ const AMOUNT_COLOR: Record<TransactionKind, string> = {
 const DRAWER_FOOTER_BOTTOM_PADDING = spacing.xl;
 
 // The same "today" the transaction forms default occurred_at to.
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 // Short enough for one keypad key: "Hôm nay", "24/09", or "24/09/25" outside
 // the current year.
 function shortDateLabel(isoDate: string): string {
-  if (isoDate === todayIso()) return "Hôm nay";
+  if (isoDate === todayDateOnly()) return "Hôm nay";
   const [year, month, day] = isoDate.split("-");
-  return year === todayIso().slice(0, 4) ? `${day}/${month}` : `${day}/${month}/${year.slice(2)}`;
+  return year === todayDateOnly().slice(0, 4) ? `${day}/${month}` : `${day}/${month}/${year.slice(2)}`;
 }
 
 interface TransactionKeypadFooterProps {

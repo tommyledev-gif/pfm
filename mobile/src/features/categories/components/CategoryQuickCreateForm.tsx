@@ -9,6 +9,7 @@ import { SegmentedTabOption, SegmentedTabs } from "@/components/ui/SegmentedTabs
 import { useCreateCategoryMutation } from "@/features/categories/api/use-create-category-mutation";
 import { getErrorMessage } from "@/lib/axios";
 import { CATEGORY_NAME_MAX_LENGTH, CategoryType } from "@/lib/constants";
+import { useRequireOnline } from "@/lib/connectivity";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 interface CategoryQuickCreateFormProps {
@@ -45,6 +46,7 @@ const TYPE_OPTIONS: SegmentedTabOption<CategoryType>[] = [
 export function CategoryQuickCreateForm({ initialName, onCreated, onCancel }: CategoryQuickCreateFormProps) {
   const colors = useColors();
   const styles = useStyles();
+  const requireOnline = useRequireOnline();
   const [name, setName] = useState(initialName);
   const [icon, setIcon] = useState("");
   const [type, setType] = useState<CategoryType>("expense");
@@ -112,7 +114,7 @@ export function CategoryQuickCreateForm({ initialName, onCreated, onCancel }: Ca
             autoFocus
             maxLength={CATEGORY_NAME_MAX_LENGTH}
             returnKeyType="done"
-            onSubmitEditing={submit}
+            onSubmitEditing={() => requireOnline(submit)}
             testID="input-category-picker-new-name"
           />
         </View>
@@ -138,7 +140,7 @@ export function CategoryQuickCreateForm({ initialName, onCreated, onCancel }: Ca
         <PillButton label="Hủy" variant="outline" onPress={onCancel} style={styles.flexButton} />
         <PillButton
           label="Tạo danh mục"
-          onPress={submit}
+          onPress={() => requireOnline(submit)}
           loading={createCategory.isPending}
           disabled={!name.trim()}
           style={styles.flexButton}

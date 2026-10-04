@@ -1,9 +1,16 @@
+import { onlineManager } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
 import { create } from "zustand";
 
 import { refreshTokenRequest } from "@/features/auth/api/use-refresh-mutation";
-import { roleFromAccessToken, type UserRole } from "@/lib/jwt";
+import { roleFromAccessToken, userIdFromAccessToken, type UserRole } from "@/lib/jwt";
 import { queryClient } from "@/lib/query-client";
-import { cancelScheduledRefresh, remainingDelayMs, scheduleRefresh } from "@/lib/refresh-scheduler";
+import {
+  cancelScheduledRefresh,
+  markRefreshDue,
+  remainingDelayMs,
+  scheduleRefresh,
+} from "@/lib/refresh-scheduler";
 import { secureStorage } from "@/lib/secure-storage";
 import { useToastStore } from "@/stores/toast-store";
 import {
@@ -11,7 +18,25 @@ import {
   SECURE_STORE_EMAIL_KEY,
   SECURE_STORE_ISSUED_AT_KEY,
   SECURE_STORE_REFRESH_TOKEN_KEY,
+  REFRESH_RETRY_DELAY_SECONDS,
 } from "@/lib/constants";
+
+// The server answered and refused the refresh token (expired, revoked,
+// malformed, User disabled) — the only failure that really ends a session.
+function isRefreshRejected(err: unknown): boolean {
+  const status = isAxiosError(err) ? err.response?.status : undefined;
+  return status === 400 || status === 401 || status === 403;
+}
+
+// Every scheduled renewal (proactive, post-hydration, retry) goes through
+// here. Offline it does nothing: the renewal stays due in refresh-scheduler,
+// and session-resume.ts sends it the moment connectivity returns — so no
+// renewal request is ever fired into a known-offline network
+// (specs/mobile-offline-support AC-OFF-03, BR-OFF-P01).
+function runDueRefresh(): void {
+  if (!onlineManager.isOnline()) return;
+  useSessionStore.getState().refreshSession().catch(() => {});
+}
 
 // Module-level, not store state — a single in-flight refresh must be shared
 // by every caller (the proactive timer below and lib/axios.ts's reactive
@@ -46,8 +71,9 @@ interface SessionState {
   clear: () => Promise<void>;
   // Refreshes the current session, de-duplicated across concurrent callers
   // (see the module-level refreshPromise above). Resolves with the new
-  // access token; on any failure it force-clears the session (spec.md
-  // decision #5) and rejects.
+  // access token. Rejects on any failure, but force-clears the session
+  // (spec.md decision #5) only when the server refused the token — a
+  // network/server failure keeps the session and schedules a retry.
   refreshSession: () => Promise<string>;
 }
 
@@ -72,9 +98,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     // shipped) is treated as "already due" — the safe default, since we
     // have no better information (S-REF-13).
     const issuedAtMs = issuedAtRaw ? Number(issuedAtRaw) : 0;
-    scheduleRefresh(() => {
-      get().refreshSession().catch(() => {});
-    }, remainingDelayMs(issuedAtMs));
+    scheduleRefresh(runDueRefresh, remainingDelayMs(issuedAtMs));
   },
 
   async setTokens(accessToken, refreshToken, email) {
@@ -90,15 +114,19 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     // account renders the previous account's cached data for a moment
     // before the first refetch overwrites it. Cleared before the session
     // state flips so no protected screen can mount against stale data.
-    queryClient.clear();
+    // Only when the User actually changes: a proactive rotation (every ~12
+    // min) keeps the same User, and clearing there wiped the whole cache
+    // mid-session for nothing.
+    const previousUserId = userIdFromAccessToken(get().accessToken);
+    if (previousUserId === null || previousUserId !== userIdFromAccessToken(accessToken)) {
+      queryClient.clear();
+    }
     set({ accessToken, refreshToken, email, role: roleFromAccessToken(accessToken) });
 
     // Every new pair (login, activate, or a rotation) reschedules the next
     // proactive refresh from scratch — never stacked with a prior pending
     // timer (specs/mobile-session-refresh/spec.md Edge Case #3).
-    scheduleRefresh(() => {
-      get().refreshSession().catch(() => {});
-    });
+    scheduleRefresh(runDueRefresh);
   },
 
   async clear() {
@@ -121,12 +149,35 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       return Promise.reject(new Error("no refresh token to refresh with"));
     }
 
+    // Stale-result guard (specs/mobile-account-switch plan.md Finding #4):
+    // an account switch, add-account or "sign out everywhere" can replace
+    // the session while this request is in flight. Its late answer then
+    // belongs to a session that is gone — committing it would silently
+    // switch back to the previous User, and its refusal must not clear the
+    // new User's session. Both paths only act while the session still holds
+    // the refresh token this request was made with.
+    const isStale = () => get().refreshToken !== refreshToken;
     refreshPromise = refreshTokenRequest(refreshToken)
       .then(async (pair) => {
+        // Rejecting (not answering with the new User's token) also stops a
+        // request of the previous User from being retried as the new one.
+        if (isStale()) throw new Error("session changed during refresh");
         await setTokens(pair.access_token, pair.refresh_token, email ?? "");
         return pair.access_token;
       })
       .catch(async (err) => {
+        if (isStale()) throw err;
+        // Offline, timeout or a 5xx says nothing about the refresh token
+        // itself — keep the session (the app works from cache and the next
+        // request/foreground retries) instead of logging the User out.
+        // The renewal stays owed (markRefreshDue) so session-resume.ts
+        // renews at once on reconnect / foreground instead of waiting out
+        // the retry delay.
+        if (!isRefreshRejected(err)) {
+          scheduleRefresh(runDueRefresh, REFRESH_RETRY_DELAY_SECONDS * 1000);
+          markRefreshDue();
+          throw err;
+        }
         await clear();
         // Only this path (the refresh token itself was rejected — expired or
         // revoked) counts as a session actually "ending" out from under the

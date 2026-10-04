@@ -43,4 +43,7 @@ type User struct {
 	// been resent. Together they drive common.InviteResendAvailableAt.
 	InviteSentAt      *time.Time
 	InviteResendCount int32
+	// TokensValidAfter is the sign-out-everywhere point (mig 025, UTC, whole
+	// seconds; nil = never used). Populated only by GetUserByID.
+	TokensValidAfter *time.Time
 }

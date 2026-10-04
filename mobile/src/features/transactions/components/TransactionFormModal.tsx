@@ -8,6 +8,7 @@ import { PillButton } from "@/components/ui/PillButton";
 import { TrashIcon } from "@/components/ui/Icon";
 import { SingleDatePickerModal } from "@/components/shared/SingleDatePickerModal";
 import { getErrorMessage } from "@/lib/axios";
+import { useRequireOnline } from "@/lib/connectivity";
 import { formatCurrency } from "@/lib/currency";
 import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
@@ -70,6 +71,7 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
     submit,
     categoryPicker,
   } = useTransactionForm({ visible, onClose, editingTransaction });
+  const requireOnline = useRequireOnline();
 
   const activeError = mutation.isError ? mutation.error : deleteTransaction.isError ? deleteTransaction.error : null;
   const lockedSuffix = isEditing ? " (khóa sau khi tạo)" : "";
@@ -177,7 +179,7 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
           <PillButton
             label="Xóa giao dịch"
             icon={<TrashIcon size={18} color={colors.onDanger} />}
-            onPress={() => setConfirmDeleteOpen(true)}
+            onPress={() => requireOnline(() => setConfirmDeleteOpen(true))}
             loading={deleteTransaction.isPending}
             style={styles.deleteButton}
             textStyle={styles.deleteLabel}

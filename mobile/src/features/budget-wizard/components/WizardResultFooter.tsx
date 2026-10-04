@@ -1,6 +1,7 @@
 import { Pressable, Text, View } from "react-native";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { useRequireOnline } from "@/lib/connectivity";
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
 
 interface WizardResultFooterProps {
@@ -33,6 +34,9 @@ export function WizardResultFooter({
   canSubmit,
 }: WizardResultFooterProps) {
   const styles = useStyles();
+  // Both submit paths write budgets on the server (AC-OFF-08); saving the
+  // plan locally stays available offline.
+  const requireOnline = useRequireOnline();
   return (
     <View style={styles.footer}>
       {/* Ghost on the left, commit on the right — the ordinary reading order
@@ -53,7 +57,7 @@ export function WizardResultFooter({
 
         <Pressable
           testID="btn-wizard-submit"
-          onPress={onSubmit}
+          onPress={() => requireOnline(onSubmit)}
           disabled={submitting || !canSubmit}
           style={[styles.primaryBtn, (submitting || !canSubmit) && styles.primaryBtnDisabled]}
         >
@@ -73,7 +77,7 @@ export function WizardResultFooter({
         message="Kế hoạch này sẽ thay thế toàn bộ ngân sách hiện tại của bạn. Các hạn mức cũ sẽ không khôi phục được."
         confirmLabel="Ghi đè"
         onCancel={onCancelOverwrite}
-        onConfirm={onConfirmOverwrite}
+        onConfirm={() => requireOnline(onConfirmOverwrite)}
         loading={submitting}
       />
     </View>

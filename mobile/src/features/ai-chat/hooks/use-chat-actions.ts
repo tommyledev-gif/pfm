@@ -5,6 +5,7 @@ import { useSendChatMessageMutation } from "@/features/ai-chat/api/use-send-chat
 import { useUpdateTransactionMutation } from "@/features/transactions/api/use-update-transaction-mutation";
 import { ChatMessage, EditHistoryEntry, TransactionActionPayload } from "@/features/ai-chat/types";
 import { nextMessageId, newIdempotencyKey } from "@/features/ai-chat/message-id";
+import { toReplyMessages } from "@/features/ai-chat/reply-fanout";
 import { useConfirmProposal } from "@/features/ai-chat/hooks/use-confirm-proposal";
 import { useChatStore } from "@/stores/chat-store";
 
@@ -39,8 +40,9 @@ export function useChatActions({ onSent }: UseChatActionsOptions) {
   // Shared by a fresh send and a resend-after-editing flow — same pacing
   // either way, only the resulting message's `edited` flag differs. A
   // rate-limit or service-unavailable failure gets its own copy plus a
-  // manual-entry offer, instead of the generic failure text.
-  const requestAssistantReply = async (message: string, edited?: boolean): Promise<ChatMessage> => {
+  // manual-entry offer, instead of the generic failure text. A reply with
+  // several proposals becomes one message per proposal (reply-fanout.ts).
+  const requestAssistantReply = async (message: string, edited?: boolean): Promise<ChatMessage[]> => {
     const startedAt = Date.now();
     try {
       const response = await sendMessage.mutateAsync({ message });
@@ -48,28 +50,19 @@ export function useChatActions({ onSent }: UseChatActionsOptions) {
       if (elapsed < MIN_TYPING_MS) {
         await new Promise((resolve) => setTimeout(resolve, MIN_TYPING_MS - elapsed));
       }
-      const action = response.actions[0];
-      return {
-        id: nextMessageId(),
-        role: "assistant",
-        text: response.message,
-        action,
-        intent: response.intent === "ambiguous" ? "ambiguous" : undefined,
-        actionType: response.action_type,
-        edited,
-        sourceText: message,
-        editHistory: action ? [{ payload: action.payload, timestamp: Date.now(), source: "created" }] : undefined,
-      };
+      return toReplyMessages(response, { sourceText: message, edited });
     } catch (err) {
       const code = getErrorCode(err);
       const isBusy = code === "RATE_LIMITED" || code === "AI_SERVICE_UNAVAILABLE";
-      return {
-        id: nextMessageId(),
-        role: "assistant",
-        text: isBusy ? "Hệ thống đang bận, vui lòng thử lại sau." : "Xin lỗi, mình chưa xử lý được. Vui lòng thử lại.",
-        offerManualEntry: isBusy,
-        edited,
-      };
+      return [
+        {
+          id: nextMessageId(),
+          role: "assistant",
+          text: isBusy ? "Hệ thống đang bận, vui lòng thử lại sau." : "Xin lỗi, mình chưa xử lý được. Vui lòng thử lại.",
+          offerManualEntry: isBusy,
+          edited,
+        },
+      ];
     }
   };
 
@@ -79,28 +72,29 @@ export function useChatActions({ onSent }: UseChatActionsOptions) {
     addMessage({ id: nextMessageId(), role: "user", text: trimmed });
     onSent();
     setSending(true);
-    addMessage(await requestAssistantReply(trimmed));
+    (await requestAssistantReply(trimmed)).forEach(addMessage);
     setSending(false);
   };
 
   // Editing a user message patches its text in place but re-runs extraction on
   // the correction rather than leaving the old reply attached to stale input.
   // The new reply is appended, never substituted, so nothing visible is
-  // destroyed. If the reply after it was an unconfirmed proposal, that
-  // proposal is superseded so its Confirm cannot save the stale guess.
+  // destroyed. Every unconfirmed proposal of the old reply — all messages up to
+  // the next user message — is superseded so no Confirm can save a stale
+  // guess; confirmed ones stay as they are (spec AC-39).
   const editUserMessage = async (target: ChatMessage, newText: string) => {
     const trimmed = newText.trim();
     if (!trimmed || sending) return;
     updateMessage(target.id, { text: trimmed });
 
     const index = thread.findIndex((m) => m.id === target.id);
-    const next = thread[index + 1];
-    if (next?.role === "assistant" && next.action && !next.confirmed) {
-      updateMessage(next.id, { superseded: true });
+    for (const next of index < 0 ? [] : thread.slice(index + 1)) {
+      if (next.role === "user") break;
+      if (next.action && !next.confirmed && !next.removalState) updateMessage(next.id, { superseded: true });
     }
 
     setSending(true);
-    addMessage(await requestAssistantReply(trimmed, true));
+    (await requestAssistantReply(trimmed, true)).forEach(addMessage);
     setSending(false);
   };
 

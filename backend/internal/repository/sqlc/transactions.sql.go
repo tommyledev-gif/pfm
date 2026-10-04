@@ -55,7 +55,6 @@ JOIN categories c ON c.id = t.category_id
 LEFT JOIN wallets tw ON tw.id = t.to_wallet_id
 WHERE t.user_id = $1
   AND t.idempotency_key = $2
-  AND t.deleted_at IS NULL
 LIMIT 1
 `
 

@@ -14,6 +14,7 @@ import { getErrorMessage } from "@/lib/axios";
 import { colorForCategory } from "@/lib/category-color";
 import { toCents, toMajorUnits } from "@/lib/currency";
 import { withAlpha } from "@/lib/color";
+import { useRequireOnline } from "@/lib/connectivity";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useCategoryPicker } from "@/features/categories/components/use-category-picker";
@@ -54,6 +55,7 @@ interface BudgetFormModalProps {
 export function BudgetFormModal({ visible, onClose, currency, editingBudget }: BudgetFormModalProps) {
   const colors = useColors();
   const styles = useStyles();
+  const requireOnline = useRequireOnline();
   const isEditing = Boolean(editingBudget);
   const categories = useCategoriesQuery("expense");
   const createBudget = useCreateBudgetMutation();
@@ -131,7 +133,7 @@ export function BudgetFormModal({ visible, onClose, currency, editingBudget }: B
             <PillButton label="Hủy" variant="outline" onPress={onClose} style={styles.flexButton} />
             <PillButton
               label={isEditing ? "Lưu" : "Tạo"}
-              onPress={submit}
+              onPress={() => requireOnline(submit)}
               loading={mutation.isPending}
               disabled={submitAttempted && hasErrors}
               style={styles.flexButton}
@@ -174,7 +176,7 @@ export function BudgetFormModal({ visible, onClose, currency, editingBudget }: B
         ) : null}
 
         {isEditing ? (
-          <Pressable style={styles.deleteRow} onPress={() => setConfirmDeleteOpen(true)} disabled={deleteBudget.isPending}>
+          <Pressable style={styles.deleteRow} onPress={() => requireOnline(() => setConfirmDeleteOpen(true))} disabled={deleteBudget.isPending}>
             <TrashIcon size={18} />
             <Text style={styles.deleteLabel}>Xóa ngân sách</Text>
           </Pressable>

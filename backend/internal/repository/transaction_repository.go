@@ -73,8 +73,9 @@ func (r *TransactionRepository) CreateTransaction(ctx context.Context, tx pgx.Tx
 
 // GetTransactionByIdempotencyKey backs the AI Chat confirm-step replay check
 // (specs/ai-chat-assistant/spec.md Resolved design decision #5, S-AI-13) —
-// returns pgx.ErrNoRows when no non-deleted Transaction matches
-// (user_id, idempotency_key), the signal that the key is fresh.
+// returns pgx.ErrNoRows when no Transaction matches (user_id, idempotency_key),
+// the signal that the key is fresh. Soft-deleted rows DO match (BR-OFF-B01):
+// a used key never becomes fresh again.
 func (r *TransactionRepository) GetTransactionByIdempotencyKey(ctx context.Context, userID, idempotencyKey uuid.UUID) (*model.Transaction, error) {
 	row, err := r.q.GetTransactionByIdempotencyKey(ctx, userID, idempotencyKey)
 	if err != nil {

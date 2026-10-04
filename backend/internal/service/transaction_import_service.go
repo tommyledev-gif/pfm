@@ -16,6 +16,14 @@ import (
 	"github.com/example/pfm/backend/internal/dto"
 )
 
+// Import preview duplicate reasons. A derived key can resolve to a Transaction
+// that still exists or to one the User has since deleted
+// (specs/mobile-offline-support BR-OFF-B03); each gets its own reason.
+const (
+	importReasonAlreadyImported     = "đã được nhập trước đó"
+	importReasonImportedThenDeleted = "Đã nhập trước đó (đã bị xoá)"
+)
+
 // TransactionImportService owns the two halves of the import flow
 // (specs/transaction-export-import/spec.md US-02, US-03): PreviewImport
 // parses and validates a workbook without writing anything, and CommitImport
@@ -102,12 +110,16 @@ func (s *TransactionImportService) PreviewImport(ctx context.Context, userID uui
 		// actually guarantees a duplicate can't be written is
 		// CreateTransaction's own replay path at commit time, which catches
 		// anything that raced in between.
-		duplicate, err := s.isAlreadyImported(ctx, userID, row.IdempotencyKey)
+		found, deleted, err := s.isAlreadyImported(ctx, userID, row.IdempotencyKey)
 		if err != nil {
 			return nil, err
 		}
-		if duplicate {
-			result.Duplicates = append(result.Duplicates, dto.ImportRowIssue{Row: rowNumber, Reason: "đã được nhập trước đó"})
+		if found {
+			reason := importReasonAlreadyImported
+			if deleted {
+				reason = importReasonImportedThenDeleted
+			}
+			result.Duplicates = append(result.Duplicates, dto.ImportRowIssue{Row: rowNumber, Reason: reason})
 			continue
 		}
 		result.Valid = append(result.Valid, row)
@@ -172,15 +184,17 @@ func (s *TransactionImportService) CommitImport(ctx context.Context, userID uuid
 }
 
 // isAlreadyImported reports whether this derived key has already produced a
-// Transaction for this user.
-func (s *TransactionImportService) isAlreadyImported(ctx context.Context, userID, key uuid.UUID) (bool, error) {
-	if _, err := s.repo.GetTransactionByIdempotencyKey(ctx, userID, key); err != nil {
+// Transaction for this user (found) and whether that Transaction has since
+// been soft-deleted (deleted) — the lookup matches deleted rows on purpose.
+func (s *TransactionImportService) isAlreadyImported(ctx context.Context, userID, key uuid.UUID) (found, deleted bool, err error) {
+	existing, err := s.repo.GetTransactionByIdempotencyKey(ctx, userID, key)
+	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return false, nil
+			return false, false, nil
 		}
-		return false, fmt.Errorf("service.isAlreadyImported: %w", err)
+		return false, false, fmt.Errorf("service.isAlreadyImported: %w", err)
 	}
-	return true, nil
+	return true, existing.DeletedAt != nil, nil
 }
 
 // commitFailureReason surfaces a domain error's own user-facing message

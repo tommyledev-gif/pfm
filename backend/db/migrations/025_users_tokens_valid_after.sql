@@ -1,0 +1,15 @@
+-- Sign out everywhere (specs/mobile-account-switch US-08/US-09).
+--
+-- tokens_valid_after is the user's "sign-out-everywhere point": NULL until
+-- first used, then the UTC moment (whole seconds) of the latest
+-- "Đăng xuất mọi thiết bị". POST /auth/refresh and POST /auth/switch refuse
+-- any refresh/switch token whose `iat` is before it; POST /auth/switch-token
+-- and POST /auth/sessions/revoke-all refuse a caller whose access token was
+-- issued before it.
+--
+-- ⚠️ Apply BEFORE the backend that reads this column starts: GetUserByID
+-- selects it, so without this column every refresh/switch fails (42703).
+-- Deploy: cmd/migrate (backend/deploy.sh) applies it. Local: psql by hand
+-- (not mounted into docker-entrypoint-initdb.d, same as 022–024).
+-- IF NOT EXISTS keeps it re-runnable, same convention as 021/022.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS tokens_valid_after TIMESTAMPTZ NULL;

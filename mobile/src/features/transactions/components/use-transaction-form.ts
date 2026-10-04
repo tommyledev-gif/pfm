@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Keyboard } from "react-native";
 
+import { useRequireOnline } from "@/lib/connectivity";
 import { TransactionKind } from "@/lib/constants";
 import { newIdempotencyKey } from "@/lib/idempotency-key";
 import { useAmountExpression } from "@/lib/use-amount-expression";
@@ -10,16 +11,13 @@ import { useCategoryPicker } from "@/features/categories/components/use-category
 import { useCreateTransactionMutation } from "@/features/transactions/api/use-create-transaction-mutation";
 import { useUpdateTransactionMutation } from "@/features/transactions/api/use-update-transaction-mutation";
 import { useDeleteTransactionMutation } from "@/features/transactions/api/use-delete-transaction-mutation";
+import { todayDateOnly } from "@/lib/date-range";
 import { Transaction } from "@/features/transactions/types";
 
 // Until a wallet is picked there is no currency of its own; VND is the app's
 // home currency and the strictest one (no decimals), so nothing typed before
 // the wallet is known can be more precise than any wallet allows.
 const FALLBACK_CURRENCY = "VND";
-
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 interface UseTransactionFormOptions {
   visible: boolean;
@@ -51,7 +49,7 @@ export function useTransactionForm({ visible, onClose, editingTransaction }: Use
   const amount = useAmountExpression(amountCurrency);
   const { reset: resetAmount } = amount;
   const [note, setNote] = useState("");
-  const [occurredAt, setOccurredAt] = useState(todayIso());
+  const [occurredAt, setOccurredAt] = useState(todayDateOnly());
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
@@ -68,6 +66,7 @@ export function useTransactionForm({ visible, onClose, editingTransaction }: Use
   const createTransaction = useCreateTransactionMutation();
   const updateTransaction = useUpdateTransactionMutation();
   const deleteTransaction = useDeleteTransactionMutation();
+  const requireOnline = useRequireOnline();
   const mutation = isEditing ? updateTransaction : createTransaction;
 
   useEffect(() => {
@@ -88,7 +87,7 @@ export function useTransactionForm({ visible, onClose, editingTransaction }: Use
       setToWalletId(null);
       resetAmount(null);
       setNote("");
-      setOccurredAt(todayIso());
+      setOccurredAt(todayDateOnly());
     }
     setSubmitAttempted(false);
   }, [visible, editingTransaction, wallets.data, resetAmount]);
@@ -147,18 +146,22 @@ export function useTransactionForm({ visible, onClose, editingTransaction }: Use
     const otherErrors = Boolean(errors.wallet || errors.category || errors.toWallet);
     if (otherErrors || amountInvalid(cents) || cents === null || !walletId) return;
     if (isEditing && editingTransaction) {
-      updateTransaction.mutate(
-        {
-          id: editingTransaction.id,
-          // A transfer's category is fixed server-side (and rejected if sent).
-          body: {
-            amount: cents,
-            category_id: isTransfer ? undefined : categoryId ?? undefined,
-            occurred_at: occurredAt,
-            note: note || undefined,
+      // Editing is online-only (AC-OFF-08); only a new Transaction may be
+      // saved without a connection, once the outbox exists.
+      requireOnline(() =>
+        updateTransaction.mutate(
+          {
+            id: editingTransaction.id,
+            // A transfer's category is fixed server-side (and rejected if sent).
+            body: {
+              amount: cents,
+              category_id: isTransfer ? undefined : categoryId ?? undefined,
+              occurred_at: occurredAt,
+              note: note || undefined,
+            },
           },
-        },
-        { onSuccess: onClose },
+          { onSuccess: onClose },
+        ),
       );
     } else {
       createTransaction.mutate(

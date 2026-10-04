@@ -13,6 +13,13 @@ function toDateOnly(d: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+// Today's local calendar date as YYYY-MM-DD — the default occurred_at of a
+// new Transaction and the "Hôm nay" reference. Never toISOString(): before
+// 07:00 in UTC+7 that still reads yesterday.
+export function todayDateOnly(now: Date = new Date()): string {
+  return toDateOnly(now);
+}
+
 // The user-selectable Day/Month/Year snapshot range, always ending "today".
 //
 // Day collapses to a single date (from === to), which is the point: the

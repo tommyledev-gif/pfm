@@ -50,9 +50,13 @@ Software Requirement Specification (SRS)
   - [Feature-01: User Management](#feature-01-user-management)
     - [US-01: Register a User [MVP]](#us-01-register-a-user-mvp)
     - [US-02: Update a User Profile](#us-02-update-a-user-profile)
+    - [US-03: Sign a Member Out of All Devices [Release 1]](#us-03-sign-a-member-out-of-all-devices-release-1)
   - [Feature-02: System Security](#feature-02-system-security)
     - [US-01: Login [MVP]](#us-01-login-mvp)
     - [US-02: Logout [MVP]](#us-02-logout-mvp)
+    - [US-03: Switch Between Saved Accounts [Release 1]](#us-03-switch-between-saved-accounts-release-1)
+    - [US-04: Require Device Unlock Before Switching [Release 1]](#us-04-require-device-unlock-before-switching-release-1)
+    - [US-05: Log Out of All Devices [Release 1]](#us-05-log-out-of-all-devices-release-1)
   - [Feature-03: Wallet Management](#feature-03-wallet-management)
     - [US-01: Create a Wallet [MVP]](#us-01-create-a-wallet-mvp)
     - [US-02: View a list of Wallets [MVP]](#us-02-view-a-list-of-wallets-mvp)
@@ -105,12 +109,19 @@ Software Requirement Specification (SRS)
     - [US-02: Edit a Transaction via Chat [MVP]](#us-02-edit-a-transaction-via-chat-mvp)
     - [US-03: Query Spending via Chat [MVP]](#us-03-query-spending-via-chat-mvp)
     - [US-04: General Financial Advice [Post-MVP]](#us-04-general-financial-advice-post-mvp)
+    - [US-05: Record Transactions from an Image [Release 1]](#us-05-record-transactions-from-an-image-release-1)
   - [Feature-13: AI Budget Setup Wizard](#feature-13-ai-budget-setup-wizard)
     - [US-01: Start the Wizard from a Quick Action [Release 1]](#us-01-start-the-wizard-from-a-quick-action-release-1)
     - [US-02: Start the Wizard from a Chat Message [Release 1]](#us-02-start-the-wizard-from-a-chat-message-release-1)
     - [US-03: Select Categories and Spending Preferences [Release 1]](#us-03-select-categories-and-spending-preferences-release-1)
     - [US-04: Review the AI-Proposed Budget Allocation [Release 1]](#us-04-review-the-ai-proposed-budget-allocation-release-1)
     - [US-05: Confirm and Create Budgets in Bulk [Release 1]](#us-05-confirm-and-create-budgets-in-bulk-release-1)
+  - [Feature-14: Offline Use](#feature-14-offline-use)
+    - [US-01: Stay Signed In and Read Data Offline [Release 1]](#us-01-stay-signed-in-and-read-data-offline-release-1)
+    - [US-02: Record a Transaction Offline [Release 1]](#us-02-record-a-transaction-offline-release-1)
+    - [US-03: Sync Queued Transactions Automatically [Release 1]](#us-03-sync-queued-transactions-automatically-release-1)
+    - [US-04: Manage Queued Transactions [Release 1]](#us-04-manage-queued-transactions-release-1)
+    - [US-05: Sign Out with Unsynced Transactions [Release 1]](#us-05-sign-out-with-unsynced-transactions-release-1)
 - [Feature-level Release (Overview)](#feature-level-release-overview)
 
 # 1. Introduction – Personal Finance Management (PFM) {#1-introduction-personal-finance-management-pfm}
@@ -257,6 +268,8 @@ The System shall provide a conversational (chat-based) interface that allows Use
 
 The AI shall resolve messages against the User's own Wallets and Categories, and shall require **explicit User confirmation** before any Transaction is created or modified. The AI shall not bypass the validation and ownership rules enforced by Transaction Management (FR-02).
 
+The same interface shall accept **a photo** (receipt, handwritten note, or spreadsheet screenshot) in place of a typed message and propose the Transactions it contains under the same confirmation rule. The photo shall be used only for that reading and never stored.
+
 ## FR-10: AI-Assisted Budget Setup {#fr-10-ai-assisted-budget-setup}
 
 The System shall let Users set up or replace their Budgets (FR-04) for a period through a guided, AI-assisted flow — entering income and selecting Categories and desired spending levels — instead of creating each Budget one at a time.
@@ -296,6 +309,8 @@ The System shall ensure that **personal and financial data of Users are not shar
 The System shall **operate reliably during normal usage** and handle common User actions without unexpected failures.
 
 User data should remain consistent and accurate even when the application is restarted or temporarily unavailable.
+
+On mobile, losing the network shall not sign the User out or lose a recorded Transaction: the User can read last-known data and record Transactions offline, which are sent automatically when the connection returns and are never booked twice (see Feature-14: Offline Use).
 
 Error responses shall accurately reflect the real failure condition — correct HTTP status and a matching error code — including routing-level failures (not-found, method-not-allowed). A User or operator must never see a generic internal-error response for a condition that is not actually an internal error, since that hides the real cause from both diagnosis and the client's own handling logic.
 
@@ -476,14 +491,137 @@ The User Stories of this feature are described below.
 
 ### US-02: Update a User Profile {#us-02-update-a-user-profile}
 
+### US-03: Sign a Member Out of All Devices [Release 1] {#us-03-sign-a-member-out-of-all-devices-release-1}
+
+*As an Admin*  
+*I want to sign a member out of every device at once*  
+*so that I can cut off access from a lost or shared phone without deactivating the member's account.*
+
+  **Background**:  
+    **Given** the Admin is logged in  
+     And member "Bình" is logged in on two devices and saved for account switching on a third
+
+  **Scenario: Sign a member out of all devices**  
+    **When** the Admin opens "Bình" in the User list  
+     And the Admin taps "Đăng xuất khỏi tất cả thiết bị" and confirms  
+    **Then** the System ends every session of "Bình"  
+     And "Bình" can no longer be switched to on any device without a password  
+     And the account of "Bình" stays active, so "Bình" can log in again with a password
+
+  **Scenario: Reject the action for a non-admin**  
+    **Given** the User is logged in with role "member"  
+    **When** the User attempts to sign another User out of all devices  
+    **Then** the System rejects the request  
+     And no session of the other User is ended
+
 ## Feature-02: System Security {#feature-02-system-security}
 
-Ensures secure access to the System by allowing Users to log in and log out safely, protecting personal financial data. Moreover, each User is authorized to see only his/her financial data.  
+Ensures secure access to the System by allowing Users to log in and log out safely, protecting personal financial data. Moreover, each User is authorized to see only his/her financial data. On mobile, several Users sharing one device can switch between their accounts without logging out or re-entering a password, protected by the device's own unlock.  
 The User Stories of this feature are described below.
 
 ### US-01: Login [MVP] {#us-01-login-mvp}
 
 ### US-02: Logout [MVP] {#us-02-logout-mvp}
+
+### US-03: Switch Between Saved Accounts [Release 1] {#us-03-switch-between-saved-accounts-release-1}
+
+*As a User*  
+*I want to switch to another account that has already logged in on this device*  
+*so that people sharing a phone can move between accounts without logging out or typing a password.*
+
+  **Background**:  
+    **Given** User "An" and User "Bình" have each logged in on this device before  
+     And User "An" is currently logged in
+
+  **Scenario: Remember every account that logs in automatically**  
+    **Given** no account is saved on this device  
+    **When** User "An" logs in with email and password  
+    **Then** the System saves "An" to this device's account list  
+     And the login screen offers no "remember me" choice
+
+  **Scenario: Switch to another saved account without a password**  
+    **When** the User taps "Chuyển tài khoản" in Settings and selects "Bình"  
+     And the device unlock succeeds (see US-04)  
+    **Then** the System signs "Bình" in within 10 seconds without asking for a password  
+     And no data of "An" is shown to, or saved under, "Bình"  
+     And "An" stays in the account list and can be switched back to without a password
+
+  **Scenario: Keep at most 5 accounts per device**  
+    **Given** 5 accounts are saved on this device  
+    **When** a 6th User logs in on this device  
+    **Then** the System saves the new account  
+     And the System removes the least recently used account that is not currently logged in
+
+  **Scenario: Require a password again after 180 days without use**  
+    **Given** "Bình" has not been used on this device for more than 180 days  
+    **When** the User selects "Bình" in the account list  
+    **Then** the System does not switch  
+     And the System marks "Bình" as expired and asks for the password of "Bình"
+
+  **Scenario: Keep the current account when a switch fails**  
+    **Given** the device is offline  
+    **When** the User selects "Bình"  
+    **Then** the System keeps "An" logged in exactly as before  
+     And the System shows error "Cần kết nối mạng để chuyển tài khoản."
+
+  **Scenario: Remove a saved account from the device**  
+    **When** the User removes "Bình" from the account list and confirms  
+    **Then** "Bình" can no longer be entered from this device without a password
+
+  **Scenario: Offer saved accounts after logging out**  
+    **When** "An" logs out  
+    **Then** "An" is removed from this device's account list  
+     And the login screen offers "Tiếp tục với…" for "Bình"
+
+### US-04: Require Device Unlock Before Switching [Release 1] {#us-04-require-device-unlock-before-switching-release-1}
+
+*As a User*  
+*I want switching into a saved account to require the device's fingerprint, face or passcode*  
+*so that someone holding the unlocked phone cannot enter an account just by tapping it.*
+
+  **Background**:  
+    **Given** User "An" is logged in  
+     And User "Bình" is saved on this device
+
+  **Scenario: Require device unlock by default**  
+    **Given** the switching protection under "Bảo mật" has not been changed  
+    **When** the User selects "Bình" in the account list  
+    **Then** the System asks for the device's biometric or passcode  
+    **When** the device confirms the unlock  
+    **Then** the System switches to "Bình"
+
+  **Scenario: Do not switch when device unlock fails or is cancelled**  
+    **When** the User selects "Bình"  
+     And the device unlock fails or is cancelled  
+    **Then** the System does not switch  
+     And "An" stays logged in exactly as before
+
+  **Scenario: Turn off device unlock for switching**  
+    **Given** the User has turned off the switching protection under "Bảo mật"  
+    **When** the User selects "Bình"  
+    **Then** the System switches to "Bình" without asking for device unlock
+
+### US-05: Log Out of All Devices [Release 1] {#us-05-log-out-of-all-devices-release-1}
+
+*As a User*  
+*I want to log my account out of every other device at once*  
+*so that a lost or shared phone can no longer reach my financial data.*
+
+  **Background**:  
+    **Given** User "An" is logged in on this phone and on another device  
+     And "An" is saved for account switching on a third device
+
+  **Scenario: Log out of all other devices**  
+    **When** the User taps "Đăng xuất khỏi tất cả thiết bị" under "Bảo mật" and confirms  
+    **Then** the System ends every other session of "An"  
+     And "An" can no longer be switched to on any other device without a password  
+     And this device stays logged in
+
+  **Scenario: Another device is signed out on its next contact**  
+    **Given** "An" was logged out of all devices from another phone  
+    **When** this device next contacts the System  
+    **Then** the System signs "An" out on this device  
+     And the System shows the login screen
 
 ## Feature-03: Wallet Management {#feature-03-wallet-management}
 
@@ -671,7 +809,7 @@ The User Stories of this feature are described below.
 
 ## Feature-12: AI Chat Assistant {#feature-12-ai-chat-assistant}
 
-Provides a conversational interface, backed by the AI Service (see CLAUDE.md architecture), that lets Users record, edit, and query Transactions using natural-language (Vietnamese) messages instead of manual forms. All AI-proposed writes require explicit User confirmation before being persisted, and go through the same ownership and validation rules as manual Transaction entry (FR-02).  
+Provides a conversational interface, backed by the AI Service (see CLAUDE.md architecture), that lets Users record, edit, and query Transactions using natural-language (Vietnamese) messages — or a photo of a receipt, note or spreadsheet — instead of manual forms. All AI-proposed writes require explicit User confirmation before being persisted, and go through the same ownership and validation rules as manual Transaction entry (FR-02).  
 The User Stories of this feature are described below.
 
 ### US-01: Create a Transaction via Chat [MVP] {#us-01-create-a-transaction-via-chat-mvp}
@@ -760,6 +898,68 @@ The User Stories of this feature are described below.
 *As a User*  
 *I want to ask the AI for general personal-finance guidance*  
 *so that I get direction on managing my spending, based on my own recorded data.*
+
+### US-05: Record Transactions from an Image [Release 1] {#us-05-record-transactions-from-an-image-release-1}
+
+*As a User*  
+*I want to send a photo of a receipt, a handwritten note, or a spreadsheet screenshot in the AI Chat*  
+*so that the System proposes the matching Transactions without me typing them.*
+
+This release reads VND amounts only and records them into VND Wallets, without currency conversion. The image is used only for one reading and is never stored by the System; only Transactions the User confirms are saved.
+
+  **Background**:  
+    **Given** the User is logged in and the device is online  
+     And the User has a default Wallet "Cash Wallet" in VND  
+     And the User has a Category "Food" (type Expense)
+
+  **Scenario: Propose the total of a printed receipt**  
+    **Given** the User is on the "AI Chat" screen  
+    **When** the User attaches a photo of a receipt showing total 145,000, cash given 200,000 and change 55,000  
+     And the User taps "Send"  
+    **Then** the System proposes 1 expense Transaction: amount 145,000, category "Food", wallet "Cash Wallet", dated as printed on the receipt  
+     And the System does not propose the cash given or the change  
+     And nothing is created until the User confirms the proposal
+
+  **Scenario: Propose one Transaction per handwritten entry or spreadsheet row**  
+    **When** the User sends a photo of a handwritten note "cafe 45k, xăng 80k"  
+    **Then** the System proposes 2 Transactions of 45,000 and 80,000, each on its own confirmation card  
+    **When** the User sends a screenshot of a sheet with a header row, 5 data rows and a total row  
+    **Then** the System proposes exactly 5 Transactions
+
+  **Scenario: Flag a proposal for review when no date is visible**  
+    **When** the User sends a receipt photo with no readable date  
+    **Then** the System proposes the Transaction dated today  
+     And the proposal is marked "needs review"
+
+  **Scenario: Confirm each proposal independently and only once**  
+    **Given** the System proposed 2 Transactions from one image  
+    **When** the User confirms the first proposal twice in a row  
+    **Then** the System creates exactly 1 Transaction and updates the wallet balance once  
+     And the second proposal stays pending until the User confirms, edits or discards it
+
+  **Scenario: Propose nothing when the image shows no expense or income**  
+    **When** the User sends a photo of a landscape  
+    **Then** the System proposes no Transaction  
+     And the System suggests a clearer photo or typing the Transaction instead
+
+  **Scenario: Read at most 20 entries per image**  
+    **When** the User sends a screenshot of a sheet with 30 data rows  
+    **Then** the System proposes only the first 20 rows  
+     And the System says the remaining rows were not read
+
+  **Scenario: Enforce the image limits**  
+    **Given** the User has already sent 10 images in the past hour  
+    **When** the User sends another image  
+    **Then** the System does not read it and asks the User to try again later  
+     And typed chat messages still work  
+    **When** the User enters a caption longer than 300 characters  
+    **Then** the System does not send the image  
+     And the System shows a validation error
+
+  **Scenario: Image capture needs a connection**  
+    **Given** the device is offline  
+    **When** the User opens the AI Chat  
+    **Then** the attach-image action is unavailable, with a short explanation
 
 ## Feature-13: AI Budget Setup Wizard {#feature-13-ai-budget-setup-wizard}
 
@@ -864,6 +1064,169 @@ The User Stories of this feature are described below.
     **Then** the System does not create any Budget from this confirmation  
      And the System shows error "Category no longer exists"
 
+## Feature-14: Offline Use {#feature-14-offline-use}
+
+Lets Users keep using the mobile app when the network is unavailable, in support of NFR-06 Reliability. The User stays logged in, sees the last-known data saved on the device, and can record new Transactions, which wait in a visible per-User queue and are sent automatically when the connection returns — never lost and never booked twice. Only creating a Transaction works offline; every other change needs a connection. The System remains the only source of balances, totals and Budget usage.  
+The User Stories of this feature are described below.
+
+### US-01: Stay Signed In and Read Data Offline [Release 1] {#us-01-stay-signed-in-and-read-data-offline-release-1}
+
+*As a User*  
+*I want to stay logged in and see my last-known data when my phone has no network*  
+*so that I can still check my Wallets and spending anywhere.*
+
+  **Background**:  
+    **Given** the User has logged in on this device  
+     And the User has opened the app online within the last 7 days
+
+  **Scenario: Stay logged in when the network is lost**  
+    **Given** the device is offline  
+    **When** the User opens the app  
+    **Then** the System keeps the User logged in  
+     And the System shows an offline indicator with the time the data was last updated
+
+  **Scenario: Show last-known data offline**  
+    **Given** the device is offline  
+    **When** the User opens Wallets, Categories, Budgets, the report summary or recent Transactions  
+    **Then** the System shows the last-known data saved on this device for this User  
+     And actions that need a connection are shown as unavailable
+
+  **Scenario: Do not show saved data older than 7 days**  
+    **Given** the data saved on this device is more than 7 days old  
+    **When** the User opens the app offline  
+    **Then** the System does not show that data  
+     And the System asks the User to connect to refresh it
+
+  **Scenario: Refresh when the connection returns**  
+    **When** the device reconnects  
+    **Then** the System hides the offline indicator  
+     And the System refreshes the data shown
+
+  **Scenario: End the session only when the System refuses it**  
+    **Given** the device is online  
+     And the User's session has expired or was revoked  
+    **When** the app tries to renew the session  
+    **Then** the System logs the User out  
+     And any queued Transactions of the User are kept on this device
+
+### US-02: Record a Transaction Offline [Release 1] {#us-02-record-a-transaction-offline-release-1}
+
+*As a User*  
+*I want to save a new income, expense or transfer when I have no connection*  
+*so that I can record spending the moment it happens and trust it will reach my account later.*
+
+  **Background**:  
+    **Given** the User is logged in and the device is offline  
+     And Wallet "Cash Wallet" and Category "Food" are saved on this device
+
+  **Scenario: Queue a Transaction recorded offline**  
+    **When** the User creates an expense of 50,000 in category "Food" from "Cash Wallet" and taps "Save"  
+    **Then** the System validates the form exactly as online  
+     And the System saves the Transaction in this User's queue on the device, marked "waiting to sync"  
+     And the System shows message "Saved on the device — will sync when online"  
+     And the balance of "Cash Wallet" is not changed on the device, with a hint that 1 Transaction is not counted yet
+
+  **Scenario: Queue a Transaction when the server does not answer**  
+    **Given** the device reports a connection but the System does not answer  
+    **When** the User saves a new Transaction  
+    **Then** the System adds the Transaction to the queue instead of losing it
+
+  **Scenario: Refuse to queue more than 200 Transactions**  
+    **Given** the User already has 200 queued Transactions  
+    **When** the User saves another Transaction offline  
+    **Then** the System does not queue it  
+     And the System asks the User to connect and sync first
+
+  **Scenario: Keep every other change online-only**  
+    **When** the User tries to edit or delete a Transaction, or change a Wallet, Category or Budget, while offline  
+    **Then** the System does not perform the change  
+     And the System explains that a connection is needed
+
+### US-03: Sync Queued Transactions Automatically [Release 1] {#us-03-sync-queued-transactions-automatically-release-1}
+
+*As a User*  
+*I want my queued Transactions to be sent by themselves when I am back online*  
+*so that my Wallets and reports catch up without me doing anything.*
+
+  **Background**:  
+    **Given** the User is logged in  
+     And the User has 3 queued Transactions
+
+  **Scenario: Sync when the connection returns**  
+    **When** the device reconnects  
+    **Then** the System sends the queued Transactions one at a time, oldest first  
+     And each accepted Transaction is removed from the queue  
+     And balances, reports and Budgets are refreshed from the System  
+     And the System shows message "3 Transactions synced"
+
+  **Scenario: Never book a Transaction twice**  
+    **Given** a queued Transaction already reached the System but the reply was lost  
+    **When** the System sends it again  
+    **Then** the System does not create a second Transaction  
+     And the wallet balance changes only once
+
+  **Scenario: Keep a refused Transaction for review**  
+    **Given** the balance of the Wallet is too low for the second queued Transaction  
+    **When** the queue syncs  
+    **Then** the second Transaction is marked "Failed" with the reason and kept in the queue  
+     And the other Transactions are still sent
+
+  **Scenario: Never send one User's queue as another User**  
+    **Given** User "An" kept queued Transactions on this device and logged out  
+    **When** User "Bình" logs in on this device  
+    **Then** the queued Transactions of "An" are neither shown to "Bình" nor sent for "Bình"  
+     And they are sent the next time "An" logs in on this device
+
+### US-04: Manage Queued Transactions [Release 1] {#us-04-manage-queued-transactions-release-1}
+
+*As a User*  
+*I want to see which Transactions are still waiting or have failed, and fix or discard them*  
+*so that I always know which records have not reached my account yet.*
+
+  **Background**:  
+    **Given** the User is logged in  
+     And the User has 1 waiting and 1 failed queued Transaction
+
+  **Scenario: View queued Transactions**  
+    **When** the User opens the Transactions list  
+    **Then** the System shows a "Waiting to sync" section above the list  
+     And each queued Transaction is marked "Waiting", "Sending" or "Failed" with its reason
+
+  **Scenario: Fix and resend a failed Transaction**  
+    **When** the User edits the failed Transaction and saves it  
+    **Then** the Transaction becomes "Waiting" again  
+     And it is booked at most once when sent
+
+  **Scenario: Discard a queued Transaction**  
+    **When** the User discards a queued Transaction and confirms  
+    **Then** the System removes it from the queue  
+     And a queued Transaction is never removed without such a User action
+
+### US-05: Sign Out with Unsynced Transactions [Release 1] {#us-05-sign-out-with-unsynced-transactions-release-1}
+
+*As a User*  
+*I want to be warned before logging out while some Transactions are not synced*  
+*so that I do not lose records by accident.*
+
+  **Background**:  
+    **Given** the User is logged in  
+     And the User has 2 queued Transactions
+
+  **Scenario: Warn before logging out**  
+    **When** the User taps "Logout"  
+    **Then** the System shows "2 Transactions are not synced yet"  
+     And the System offers "Sync now", "Keep and log out", "Discard and log out" and "Cancel"
+
+  **Scenario: Keep queued Transactions for the next login**  
+    **When** the User chooses "Keep and log out"  
+    **Then** the System logs the User out  
+     And the queued Transactions stay on this device and are sent the next time this User logs in here
+
+  **Scenario: Discard queued Transactions only after a second confirmation**  
+    **When** the User chooses "Discard and log out"  
+    **Then** the System asks for a second confirmation before discarding  
+     And the System discards only this User's queued Transactions
+
 # Feature-level Release (Overview) {#feature-level-release-overview}
 
 The following table shows how the complete product scope defined in the SRS is delivered incrementally.
@@ -873,7 +1236,7 @@ The MVP includes eight core features to ensure a usable and valuable first relea
 | No. | Feature | MVP | Release 1 | Release 2 | Note |
 | :---: | ----- | :---: | :---: | :---: | ----- |
 | 1 | **User Management** | ✔ | ✔ | ✔ | Core user identity and profile management |
-| 2 | **System Security** | ✔ | ✔ | ✔ | Authentication, authorization, and data protection |
+| 2 | **System Security** | ✔ | ✔ | ✔ | Authentication, authorization, and data protection; Release 1 adds mobile account switching (device-unlock protected) and log out of all devices |
 | 3 | **Wallet Management** | ✔ | ✔ | ✔ | Core financial structure |
 | 4 | **Category Management** | ✔ | ✔ |  | Basic categorization is sufficient for early stages |
 | 5 | **Budget Management** | ✔ | ✔ | ✔ | Essential for spending control and planning |
@@ -883,6 +1246,7 @@ The MVP includes eight core features to ensure a usable and valuable first relea
 | 9 | **Investment Management** |  |  | ✔ | Advanced feature for mature users |
 | 10 | **Notification Handling** | ✔ | ✔ | ✔ | User feedback and engagement |
 | 11 | **Data Overview Dashboard** |  | ✔ | ✔ | High-level financial insights |
-| 12 | **AI Chat Assistant** |  | ✔ | ✔ | Conversational transaction entry/edit/query; depends on stable Transaction Management (F-06); all AI-proposed writes require explicit User confirmation |
+| 12 | **AI Chat Assistant** |  | ✔ | ✔ | Conversational transaction entry/edit/query; depends on stable Transaction Management (F-06); all AI-proposed writes require explicit User confirmation; Release 1 adds recording from a photo (receipt, note, spreadsheet screenshot) |
 | 13 | **AI Budget Setup Wizard** |  | ✔ | ✔ | Guided Budget setup via AI Chat; depends on Budget Management (F-05) and AI Chat Assistant (Feature-12); all AI-proposed Budgets require explicit User confirmation |
+| 14 | **Offline Use** |  | ✔ | ✔ | Mobile only; supports NFR-06 Reliability — read last-known data and queue Transactions offline, synced automatically and never booked twice |
 

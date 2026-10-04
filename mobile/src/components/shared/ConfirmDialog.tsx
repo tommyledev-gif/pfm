@@ -16,6 +16,7 @@ interface ConfirmDialogProps {
   // action, for a confirmation that isn't undoing/removing anything (e.g.
   // WalletListItem's "set as default wallet").
   tone?: "destructive" | "default";
+  testID?: string;
 }
 
 // Centered destructive-action confirmation — replaces native Alert.alert
@@ -33,13 +34,14 @@ export function ConfirmDialog({
   onCancel,
   loading,
   tone = "destructive",
+  testID,
 }: ConfirmDialogProps) {
   const styles = useStyles();
   const isDestructive = tone === "destructive";
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <Pressable style={styles.backdrop} onPress={onCancel}>
-        <Pressable onPress={() => {}} style={styles.card}>
+        <Pressable onPress={() => {}} style={styles.card} testID={testID}>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.message}>{message}</Text>
           <View style={styles.actions}>

@@ -24,6 +24,20 @@ export const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
 // Open Question #1). Reactive refresh-on-401 (lib/axios.ts) is the fallback
 // for whenever this proactive timer couldn't fire (e.g. app backgrounded).
 export const PROACTIVE_REFRESH_LEAD_SECONDS = 3 * 60;
+// When POST /auth/refresh fails without the server rejecting the token
+// (offline, timeout, 5xx), the session is kept and the refresh is retried
+// after this delay instead of logging the User out.
+export const REFRESH_RETRY_DELAY_SECONDS = 30;
+
+// Offline support (specs/mobile-offline-support). Copy lives here, not in
+// each component, because the same sentence is shown from several places
+// (every getErrorMessage caller, every useRequireOnline surface).
+export const NETWORK_ERROR_MESSAGE = "Không thể kết nối máy chủ. Vui lòng kiểm tra mạng và thử lại.";
+export const NEEDS_CONNECTION_MESSAGE = "Cần kết nối mạng để thực hiện thao tác này.";
+export const OFFLINE_REFRESH_MESSAGE = "Đang ngoại tuyến — chưa thể làm mới.";
+// A connectivity drop shorter than this never shows the offline banner, so
+// a flapping connection does not make it flicker (EC-OFF-04).
+export const OFFLINE_BANNER_SHOW_DELAY_MS = 1500;
 
 // Mirrors common.DefaultListLimit / common.MaxListLimit.
 export const DEFAULT_PAGE_SIZE = 20;
@@ -44,6 +58,9 @@ export type WalletCurrency = (typeof WALLET_CURRENCIES)[number];
 // What an amount is formatted in when its Wallet is unknown (not loaded yet,
 // or deleted) — the app's home currency.
 export const FALLBACK_CURRENCY: WalletCurrency = "VND";
+// The only currency an AI proposal may be saved to — the AI reads every
+// amount as VND and never converts. Mirrors the backend's proposalCurrency.
+export const PROPOSAL_CURRENCY: WalletCurrency = "VND";
 
 export const CATEGORY_TYPES = ["income", "expense"] as const;
 export type CategoryType = (typeof CATEGORY_TYPES)[number];
@@ -85,3 +102,32 @@ export const IMPORT_MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 // the user cannot act on.
 export const CATEGORY_NAME_MAX_LENGTH = 50;
 export const CATEGORY_ICON_MAX_LENGTH = 32;
+
+// Account switching (specs/mobile-account-switch). Key names: the registry
+// index (no secrets) and one SecureStore key per saved account's switch
+// token, so every value stays far under SecureStore's ~2 KB guidance.
+export const SECURE_STORE_ACCOUNTS_KEY = "pfm_accounts";
+export const SECURE_STORE_SWITCH_TOKEN_KEY_PREFIX = "pfm_account_st_";
+// Device-wide security preferences (identity check) — AsyncStorage, not a secret.
+export const SECURITY_PREFS_STORAGE_KEY = "pfm_security_prefs";
+export const MAX_SAVED_ACCOUNTS = 5;
+// Settings row: avatars shown before the "+N" circle (spec AC-05).
+export const AVATAR_GROUP_MAX_VISIBLE = 3;
+// Mirrors common.AccountSwitchTokenTTL (180 days).
+export const ACCOUNT_SWITCH_TOKEN_TTL_SECONDS = 180 * 24 * 60 * 60;
+// The active account's switch token is renewed at most this often (US-06).
+export const SWITCH_TOKEN_RENEW_AFTER_SECONDS = 24 * 60 * 60;
+// A switch completes within 10 s in every outcome (AC-08): the outgoing
+// User's chat gets this long to sync, the switch request this long to answer.
+export const SWITCH_CHAT_FLUSH_TIMEOUT_MS = 3000;
+export const SWITCH_REQUEST_TIMEOUT_MS = 6000;
+// Logout's server calls + last chat sync share this cap (moved from settings).
+export const LOGOUT_FLUSH_TIMEOUT_MS = 4000;
+
+// HTTP statuses the account-switch / security flows branch on.
+export const HTTP_STATUS = {
+  badRequest: 400,
+  unauthorized: 401,
+  notFound: 404,
+  tooManyRequests: 429,
+} as const;

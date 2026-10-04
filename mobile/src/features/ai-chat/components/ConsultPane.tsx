@@ -12,6 +12,7 @@ import { useConsultActions } from "@/features/ai-chat/hooks/use-consult-actions"
 import { ChatMessage } from "@/features/ai-chat/types";
 import { StarterChipsRow } from "@/features/analytics/components/StarterChipsRow";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
+import { useRequireOnline } from "@/lib/connectivity";
 import { spacing } from "@/lib/theme";
 import { useChatStore } from "@/stores/chat-store";
 
@@ -37,6 +38,7 @@ export function ConsultPane({
 }: ConsultPaneProps) {
   const styles = useChatThreadStyles();
   const listRef = useRef<FlatList<ChatMessage>>(null);
+  const requireOnline = useRequireOnline();
 
   const thread = useChatStore((s) => s.thread);
 
@@ -88,17 +90,25 @@ export function ConsultPane({
         <ChatInputBar
           value={input}
           onChangeText={setInput}
-          onSend={() => {
-            const text = input;
-            setInput("");
-            consult.sendConsult(text);
-          }}
+          // Online-only (AC-OFF-08): offline, the typed text stays in the box.
+          onSend={() =>
+            requireOnline(() => {
+              const text = input;
+              setInput("");
+              consult.sendConsult(text);
+            })
+          }
           sending={consult.sending}
           keyboardVisible={keyboardVisible}
           keyboardHeight={keyboardHeight}
           bottomInset={bottomInset}
           mode="consult"
-          quickActions={<StarterChipsRow onAsk={consult.askQuery} disabled={consult.sending} />}
+          quickActions={
+            <StarterChipsRow
+              onAsk={(query, label) => requireOnline(() => consult.askQuery(query, label))}
+              disabled={consult.sending}
+            />
+          }
         />
       </ChatComposer>
     </View>

@@ -29,6 +29,12 @@
       "expo-router",
       "expo-secure-store",
       [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Budgest dùng Face ID để xác minh trước khi chuyển sang tài khoản đã lưu."
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "Budgest accesses your photos so you can set a custom category icon.",

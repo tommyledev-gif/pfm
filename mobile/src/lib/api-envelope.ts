@@ -1,4 +1,6 @@
-import axios from "axios";
+import { isAxiosError } from "axios";
+
+import { NETWORK_ERROR_MESSAGE } from "@/lib/constants";
 
 // Split out of axios.ts so the plain response envelope helpers have no
 // dependency on session-store.ts — use-refresh-mutation.ts needs these too,
@@ -24,8 +26,23 @@ export function unwrap<T>(envelope: ApiEnvelope<T>): T {
   return envelope.data;
 }
 
+// Axios codes that mean the request never got an answer. ERR_CANCELED is
+// deliberately absent: a request the app itself aborted is not a network
+// problem and must not show the network message.
+const NO_ANSWER_ERROR_CODES: readonly string[] = ["ERR_NETWORK", "ECONNABORTED", "ETIMEDOUT"];
+
+// True only when the server never answered (offline, DNS failure, timeout,
+// server unreachable). An error that carries a response — any 4xx/5xx — is
+// never a network error, whatever its code says (BR-OFF-P03).
+export function isNetworkError(error: unknown): boolean {
+  if (!isAxiosError(error) || error.response) return false;
+  if (error.code === "ERR_CANCELED") return false;
+  return Boolean(error.request) || NO_ANSWER_ERROR_CODES.includes(error.code ?? "");
+}
+
 export function getErrorMessage(error: unknown, fallback: string): string {
-  if (axios.isAxiosError<ApiEnvelope<unknown>>(error)) {
+  if (isNetworkError(error)) return NETWORK_ERROR_MESSAGE;
+  if (isAxiosError<ApiEnvelope<unknown>>(error)) {
     return error.response?.data?.message ?? fallback;
   }
   return fallback;
@@ -33,9 +50,9 @@ export function getErrorMessage(error: unknown, fallback: string): string {
 
 // Lets a caller branch on a specific backend failure (e.g. "RATE_LIMITED" vs
 // "AI_SERVICE_UNAVAILABLE") instead of just displaying a message — same
-// axios.isAxiosError guard as getErrorMessage above.
+// isAxiosError guard as getErrorMessage above.
 export function getErrorCode(error: unknown): string | undefined {
-  if (axios.isAxiosError<ApiEnvelope<unknown>>(error)) {
+  if (isAxiosError<ApiEnvelope<unknown>>(error)) {
     return error.response?.data?.error_code;
   }
   return undefined;

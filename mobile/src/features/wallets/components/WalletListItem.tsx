@@ -6,6 +6,7 @@ import { ChevronRightIcon } from "@/components/ui/Icon";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { colorForCategory } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
+import { useRequireOnline } from "@/lib/connectivity";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
 import { useSetDefaultWalletMutation } from "@/features/wallets/api/use-set-default-wallet-mutation";
@@ -27,6 +28,7 @@ interface WalletListItemProps {
 export function WalletListItem({ wallet, onPress, highlightOpacity }: WalletListItemProps) {
   const colors = useColors();
   const styles = useStyles();
+  const requireOnline = useRequireOnline();
   const setDefault = useSetDefaultWalletMutation();
   // Setting a new default silently swapped it under the user with no way to
   // back out of an accidental tap — a confirm step first, same convention as
@@ -55,7 +57,7 @@ export function WalletListItem({ wallet, onPress, highlightOpacity }: WalletList
         </View>
         {!wallet.is_default ? (
           <Pressable
-            onPress={() => setConfirmDefaultOpen(true)}
+            onPress={() => requireOnline(() => setConfirmDefaultOpen(true))}
             disabled={setDefault.isPending}
             style={styles.defaultButton}
           >

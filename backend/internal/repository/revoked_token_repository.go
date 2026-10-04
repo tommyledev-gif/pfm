@@ -40,3 +40,18 @@ func (r *RevokedTokenRepository) IsRevoked(ctx context.Context, tokenJTI string)
 	}
 	return revoked, nil
 }
+
+// Claim records the jti and reports whether THIS call recorded it. Only one
+// of several concurrent callers can ever get true (UNIQUE token_jti), which
+// is what makes a switch token single-use (account-switch Finding #5).
+func (r *RevokedTokenRepository) Claim(ctx context.Context, tokenJTI string, userID *uuid.UUID, expiresAt time.Time) (bool, error) {
+	affected, err := r.q.ClaimTokenJTI(ctx, sqlc.RevokeTokenParams{
+		TokenJTI:  tokenJTI,
+		UserID:    userID,
+		ExpiresAt: expiresAt,
+	})
+	if err != nil {
+		return false, fmt.Errorf("repository.ClaimTokenJTI: %w", err)
+	}
+	return affected > 0, nil
+}

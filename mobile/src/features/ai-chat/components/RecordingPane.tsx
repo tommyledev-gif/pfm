@@ -15,6 +15,7 @@ import { ChatMessage } from "@/features/ai-chat/types";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { Category } from "@/features/categories/types";
 import { Wallet } from "@/features/wallets/types";
+import { useRequireOnline } from "@/lib/connectivity";
 import { useCurrentUserId } from "@/stores/use-current-user-id";
 
 // The suggestion area may take at most this share of the pane's height.
@@ -76,6 +77,7 @@ export function RecordingPane({
 }: RecordingPaneProps) {
   const chatThreadStyles = useChatThreadStyles();
   const userId = useCurrentUserId();
+  const requireOnline = useRequireOnline();
   const [composerHeight, setComposerHeight] = useState(0);
   const [paneHeight, setPaneHeight] = useState(0);
   const [inputFocused, setInputFocused] = useState(false);
@@ -127,7 +129,7 @@ export function RecordingPane({
             budgetByCategoryCurrency={budgetByCategoryCurrency}
             confirming={chat.confirmingId === item.id}
             closeSignal={closeSignal}
-            onConfirm={chat.confirmAction}
+            onConfirm={(message) => requireOnline(() => chat.confirmAction(message))}
             onTriggerEdit={onTriggerEdit}
             onTriggerDelete={onTriggerDelete}
             onPressHistory={onPressHistory}
@@ -158,11 +160,14 @@ export function RecordingPane({
         <ChatInputBar
           value={input}
           onChangeText={onChangeInput}
-          onSend={() => {
-            const text = input;
-            onChangeInput("");
-            void chat.send(text);
-          }}
+          // Online-only (AC-OFF-08): offline, the typed text stays in the box.
+          onSend={() =>
+            requireOnline(() => {
+              const text = input;
+              onChangeInput("");
+              void chat.send(text);
+            })
+          }
           sending={chat.sending}
           keyboardVisible={keyboardVisible}
           keyboardHeight={keyboardHeight}

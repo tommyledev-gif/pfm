@@ -25,7 +25,12 @@ type AccessClaims struct {
 // refreshClaims only needs a jti (for revocation) and the standard registered
 // claims — the refresh token itself carries no role, since it's never used
 // for authorization, only to identify itself for revocation at logout.
+//
+// Purpose is never set on a real refresh token; it exists only so
+// ParseRefreshToken can see — and refuse — a switch token, which carries
+// jti/sub/exp too (specs/mobile-account-switch plan.md Finding #1).
 type refreshClaims struct {
+	Purpose string `json:"purpose,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -119,8 +124,9 @@ func (s *TokenService) ParseAccessToken(tokenString string) (*AccessClaims, erro
 // any claim is trusted. ⚠️ Refresh mints a new pair for the token's subject,
 // so an unverified parse there let anyone forge a token for any user. The
 // jti requirement also rejects access and import tokens (they carry none),
-// which share the signing key.
-func (s *TokenService) ParseRefreshToken(tokenString string) (jti string, subject string, expiresAt time.Time, err error) {
+// which share the signing key; the purpose check rejects switch tokens.
+// issuedAt is returned for the sign-out-everywhere check.
+func (s *TokenService) ParseRefreshToken(tokenString string) (jti string, subject string, expiresAt time.Time, issuedAt *jwt.NumericDate, err error) {
 	claims := &refreshClaims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -129,12 +135,12 @@ func (s *TokenService) ParseRefreshToken(tokenString string) (jti string, subjec
 		return s.signingKey, nil
 	}, jwt.WithExpirationRequired())
 	if err != nil {
-		return "", "", time.Time{}, fmt.Errorf("service.ParseRefreshToken: %w", err)
+		return "", "", time.Time{}, nil, fmt.Errorf("service.ParseRefreshToken: %w", err)
 	}
-	if !token.Valid || claims.ID == "" || claims.Subject == "" {
-		return "", "", time.Time{}, fmt.Errorf("service.ParseRefreshToken: not a valid refresh token")
+	if !token.Valid || claims.ID == "" || claims.Subject == "" || claims.Purpose != "" {
+		return "", "", time.Time{}, nil, fmt.Errorf("service.ParseRefreshToken: not a valid refresh token")
 	}
-	return claims.ID, claims.Subject, claims.ExpiresAt.Time, nil
+	return claims.ID, claims.Subject, claims.ExpiresAt.Time, claims.IssuedAt, nil
 }
 
 // ParseRefreshTokenUnverified extracts the jti and expiry from a refresh

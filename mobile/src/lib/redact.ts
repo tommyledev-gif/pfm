@@ -11,6 +11,8 @@ const REDACTED_KEYS = new Set([
   "access_token",
   "refresh_token",
   "import_token",
+  // 180-day account-switch credential (specs/mobile-account-switch BR-10).
+  "switch_token",
   "email",
   "password",
 ]);

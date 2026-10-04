@@ -22,6 +22,16 @@ export const queryClient = new QueryClient({
       retry: 3,
       staleTime: 30_000,
     },
+    // TanStack's default "online" mode PAUSES a mutation while offline: the
+    // button would sit pending forever and the write would silently fire on
+    // reconnect — even a delete the User has long forgotten. "always" makes
+    // an offline mutation fail fast with a network error instead, shown via
+    // getErrorMessage's network branch (specs/mobile-offline-support
+    // AC-OFF-08, EC-OFF-05). Queries keep "online": paused, showing the data
+    // they already have.
+    mutations: {
+      networkMode: "always",
+    },
   },
 });
 

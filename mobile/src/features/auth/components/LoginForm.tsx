@@ -7,6 +7,22 @@ import { getErrorMessage } from "@/lib/axios";
 import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useLoginMutation } from "@/features/auth/api/use-login-mutation";
+import { completeLogin, LoginOutcome } from "@/features/accounts/complete-login";
+
+export type LoginFormMode = "login" | "add-account";
+
+interface LoginFormProps {
+  /** "add-account" logs a second User in while another is active (US-03). */
+  mode?: LoginFormMode;
+  /** Only ever the email of an expired saved account being renewed (EC-10). */
+  initialEmail?: string;
+  onDone?: (outcome: LoginOutcome) => void;
+}
+
+const SUBMIT_LABEL: Record<LoginFormMode, string> = {
+  login: "Log In",
+  "add-account": "Thêm tài khoản",
+};
 
 // Backend error messages are lowercase sentence fragments (e.g. "invalid
 // email or password" — backend/internal/common/errors.go) meant to be
@@ -15,10 +31,10 @@ function capitalize(text: string): string {
   return text.length ? text.charAt(0).toUpperCase() + text.slice(1) : text;
 }
 
-export function LoginForm() {
+export function LoginForm({ mode = "login", initialEmail, onDone }: LoginFormProps) {
   const colors = useColors();
   const styles = useStyles();
-  const [email, setEmail] = useState("owner@example.com");
+  const [email, setEmail] = useState(initialEmail ?? "");
   const [password, setPassword] = useState("000000");
   const [showPassword, setShowPassword] = useState(false);
   const login = useLoginMutation();
@@ -26,7 +42,10 @@ export function LoginForm() {
 
   const submit = () => {
     if (!email || !password) return;
-    login.mutate({ email, password });
+    login.mutate(
+      { email, password },
+      { onSuccess: async (pair) => onDone?.(await completeLogin(pair, email)) },
+    );
   };
 
   return (
@@ -78,7 +97,7 @@ export function LoginForm() {
         </View>
       ) : null}
       <PillButton
-        label="Log In"
+        label={SUBMIT_LABEL[mode]}
         loading={login.isPending}
         variant="outline"
         disabled={!email || !password}

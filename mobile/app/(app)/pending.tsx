@@ -8,6 +8,7 @@ import { Screen } from "@/components/shared/Screen";
 import { ChevronLeftIcon, CheckIcon } from "@/components/ui/Icon";
 import { PillButton } from "@/components/ui/PillButton";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
+import { useRequireOnline } from "@/lib/connectivity";
 import { formatCurrency } from "@/lib/currency";
 import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
@@ -17,6 +18,7 @@ import { useTransactionRemoval } from "@/features/ai-chat/components/use-transac
 import { useChatActions } from "@/features/ai-chat/hooks/use-chat-actions";
 import { useConfirmProposal } from "@/features/ai-chat/hooks/use-confirm-proposal";
 import { isPendingProposal } from "@/features/ai-chat/pending";
+import { isSavableProposal, NO_WALLET_LABEL } from "@/features/ai-chat/proposal-wallet";
 import { removalDialogCopy } from "@/features/ai-chat/removal-copy";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
@@ -41,6 +43,7 @@ export default function PendingReviewScreen() {
   const styles = useStyles();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const requireOnline = useRequireOnline();
   const thread = useChatStore((s) => s.thread);
   const wallets = useWalletsQuery();
   const categories = useCategoriesQuery();
@@ -111,11 +114,19 @@ export default function PendingReviewScreen() {
           <PendingReviewCard
             message={item}
             category={categoryById.get(item.action?.payload.category_id ?? "")}
-            walletName={walletById.get(item.action?.payload.wallet_id ?? "")?.name ?? "Ví"}
+            walletName={
+              walletById.get(item.action?.payload.wallet_id ?? "")?.name ??
+              (item.action?.payload.wallet_id === null ? NO_WALLET_LABEL : "Ví")
+            }
             currency={currencyOf(item)}
             confirming={proposals.confirmingId === item.id}
             locked={proposals.confirmingAll}
-            onConfirm={() => proposals.confirm(item)}
+            // No VND Wallet yet: Confirm opens the edit form instead (spec AC-31).
+            onConfirm={() =>
+              item.action && !isSavableProposal(item.action.payload, walletById)
+                ? setEditing(item)
+                : requireOnline(() => proposals.confirm(item))
+            }
             onEdit={() => setEditing(item)}
             onRemove={() => removal.request(item)}
           />
@@ -141,7 +152,7 @@ export default function PendingReviewScreen() {
           </View>
           <PillButton
             label={`Duyệt tất cả · ${visible.length}`}
-            onPress={() => proposals.confirmAll(visible)}
+            onPress={() => requireOnline(() => proposals.confirmAll(visible))}
             loading={proposals.confirmingAll}
             testID="btn-pending-review-confirm-all"
           />
@@ -151,6 +162,7 @@ export default function PendingReviewScreen() {
       <EditTransactionModal
         visible={Boolean(editing)}
         payload={editing?.action?.payload ?? null}
+        vndOnly
         onClose={() => setEditing(null)}
         onSave={(payload) => {
           if (editing) editAction(editing, payload);

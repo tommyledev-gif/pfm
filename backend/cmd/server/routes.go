@@ -14,7 +14,7 @@ import (
 // (/api/v1). Auth/rate-limit middleware ordering matters: JWTAuth must run
 // before RequireRole (role comes from the token) and before
 // InviteRateLimiter (keyed by the caller's user ID from that same token).
-func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, transactionExportHandler *handler.TransactionExportHandler, transactionImportHandler *handler.TransactionImportHandler, auditLogHandler *handler.AuditLogHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, chatHandler *handler.ChatHandler, budgetWizardHandler *handler.BudgetWizardHandler, analyticsHandler *handler.AnalyticsHandler, tokens *service.TokenService, logger *zap.Logger) {
+func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, transactionExportHandler *handler.TransactionExportHandler, transactionImportHandler *handler.TransactionImportHandler, auditLogHandler *handler.AuditLogHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, chatHandler *handler.ChatHandler, budgetWizardHandler *handler.BudgetWizardHandler, analyticsHandler *handler.AnalyticsHandler, accountSwitchHandler *handler.AccountSwitchHandler, sessionRevocationHandler *handler.SessionRevocationHandler, tokens *service.TokenService, logger *zap.Logger) {
 	// Serves the invite-activation form at the backend's own domain — see
 	// handler.ActivatePageHandler doc comment for why this lives here instead
 	// of on the (currently undeployed) frontend/ Next.js app.
@@ -37,6 +37,14 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	// refresh token itself is the credential, so there is no
 	// password-guessing surface like /auth/login has.
 	auth.Post("/refresh", authHandler.Refresh)
+	// Account switching (specs/mobile-account-switch). Issuing needs a
+	// session; switching and revoking do not (the switch token is the
+	// credential). Only /switch is rate-limited (S-ASW-20).
+	auth.Post("/switch-token", middleware.JWTAuth(tokens, logger), accountSwitchHandler.IssueSwitchToken)
+	auth.Post("/switch-token/revoke", accountSwitchHandler.RevokeSwitchToken)
+	auth.Post("/switch", middleware.SwitchRateLimiter(logger), accountSwitchHandler.Switch)
+	// Sign out everywhere, self (US-08) — the device gets a fresh pair.
+	auth.Post("/sessions/revoke-all", middleware.JWTAuth(tokens, logger), sessionRevocationHandler.RevokeAllSelf)
 
 	admin := v1.Group("/admin", middleware.JWTAuth(tokens, logger), middleware.RequireRole(string(model.UserRoleAdmin), logger))
 	admin.Post("/users/invite", middleware.InviteRateLimiter(logger), userHandler.InviteUser)
@@ -45,6 +53,9 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	// UserService.ResendInvite already bounds how often any one inbox can be
 	// emailed, which is what that limiter exists to protect.
 	admin.Post("/users/:id/resend-invite", userHandler.ResendInvite)
+	// Sign out everywhere for another user (account-switch US-09); the
+	// self-target refusal lives in the service.
+	admin.Post("/users/:id/sessions/revoke-all", sessionRevocationHandler.RevokeAllForUser)
 
 	// F-03 Wallet Management — no RequireRole gate: every active user manages
 	// only their own wallets (plan.md Security & Actor Resolution).

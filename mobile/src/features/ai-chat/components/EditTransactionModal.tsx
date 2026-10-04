@@ -6,13 +6,14 @@ import { DrawerHeader } from "@/components/shared/DrawerHeader";
 import { SingleDatePickerModal } from "@/components/shared/SingleDatePickerModal";
 import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
-import { TRANSACTION_TYPES, TransactionType } from "@/lib/constants";
+import { PROPOSAL_CURRENCY, TRANSACTION_TYPES, TransactionType } from "@/lib/constants";
 import { useAmountExpression } from "@/lib/use-amount-expression";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useCategoryPicker } from "@/features/categories/components/use-category-picker";
 import { TransactionKeypadFooter } from "@/features/transactions/components/TransactionKeypadFooter";
 import { WalletChipRow } from "@/features/transactions/components/WalletChipRow";
+import { NO_VND_WALLET_HINT } from "@/features/ai-chat/proposal-wallet";
 import { TransactionActionPayload } from "@/features/ai-chat/types";
 
 const FALLBACK_CURRENCY = "VND";
@@ -30,6 +31,10 @@ interface EditTransactionModalProps {
   // the form honest about what an edit can actually change, instead of
   // silently dropping a wallet/type change the user thinks they made.
   lockWalletAndType?: boolean;
+  // An unconfirmed AI proposal: its amount was read as VND, so only VND
+  // Wallets are offered and Save stays disabled until one is chosen (spec
+  // AC-33). Off for confirmed proposals, whose Wallet is locked anyway.
+  vndOnly?: boolean;
 }
 
 // Lets the user correct a proposal the AI got wrong (wrong category, wrong
@@ -44,14 +49,24 @@ interface EditTransactionModalProps {
 // scroll in the body; the amount keypad, category chip, note and the date
 // key (which replaced the inline calendar that used to make this the
 // longest sheet in the app) are pinned in the Drawer footer.
-export function EditTransactionModal({ visible, payload, onClose, onSave, lockWalletAndType }: EditTransactionModalProps) {
+export function EditTransactionModal({
+  visible,
+  payload,
+  onClose,
+  onSave,
+  lockWalletAndType,
+  vndOnly,
+}: EditTransactionModalProps) {
   const styles = useStyles();
   const [type, setType] = useState<TransactionType>("expense");
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [walletId, setWalletId] = useState<string | null>(null);
   const wallets = useWalletsQuery();
+  const selectableWallets = (wallets.data ?? []).filter((w) => !vndOnly || w.currency === PROPOSAL_CURRENCY);
+  // A proposal kept on a non-VND Wallet (or none) starts with nothing chosen.
+  const chosenWalletId = selectableWallets.some((w) => w.id === walletId) ? walletId : null;
   // Declared after the wallet: the keypad's decimals follow its currency.
-  const currency = wallets.data?.find((w) => w.id === walletId)?.currency ?? FALLBACK_CURRENCY;
+  const currency = wallets.data?.find((w) => w.id === chosenWalletId)?.currency ?? FALLBACK_CURRENCY;
   const amount = useAmountExpression(currency);
   const { reset: resetAmount } = amount;
   const [occurredAt, setOccurredAt] = useState("");
@@ -90,7 +105,7 @@ export function EditTransactionModal({ visible, payload, onClose, onSave, lockWa
   });
 
   const amountValid = amount.cents !== null && amount.cents > 0;
-  const canSave = amountValid && Boolean(categoryId) && Boolean(walletId) && Boolean(occurredAt);
+  const canSave = amountValid && Boolean(categoryId) && Boolean(chosenWalletId) && Boolean(occurredAt);
   const errors = submitAttempted
     ? [
         categoryId ? undefined : "Vui lòng chọn danh mục",
@@ -104,9 +119,9 @@ export function EditTransactionModal({ visible, payload, onClose, onSave, lockWa
     // Trims/evaluates an expression still being typed ("120+"), so what is
     // saved is exactly what the amount display then shows.
     const cents = amount.resolve();
-    if (cents === null || cents <= 0 || !categoryId || !walletId || !occurredAt) return;
+    if (cents === null || cents <= 0 || !categoryId || !chosenWalletId || !occurredAt) return;
     onSave({
-      wallet_id: walletId,
+      wallet_id: chosenWalletId,
       category_id: categoryId,
       amount: cents,
       type,
@@ -166,11 +181,16 @@ export function EditTransactionModal({ visible, payload, onClose, onSave, lockWa
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Ví</Text>
           <WalletChipRow
-            wallets={wallets.data ?? []}
-            selectedId={walletId}
+            wallets={selectableWallets}
+            selectedId={chosenWalletId}
             onSelect={setWalletId}
             locked={lockWalletAndType}
           />
+          {vndOnly && wallets.data && selectableWallets.length === 0 ? (
+            <Text testID="txt-edit-no-vnd-wallet" style={styles.lockedHint}>
+              {NO_VND_WALLET_HINT}
+            </Text>
+          ) : null}
           {lockWalletAndType ? (
             <Text style={styles.lockedHint}>Không thể đổi loại và ví của giao dịch đã lưu</Text>
           ) : null}

@@ -6,6 +6,7 @@ import { ChevronLeftIcon, SearchIcon } from "@/components/ui/Icon";
 import { Screen } from "@/components/shared/Screen";
 import { NotificationRow } from "@/features/notifications/components/NotificationRow";
 import { dayLabel } from "@/lib/format-date";
+import { useRequireOnline } from "@/lib/connectivity";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useNotificationsQuery } from "@/features/notifications/api/use-notifications-query";
 import { useMarkNotificationReadMutation } from "@/features/notifications/api/use-mark-notification-read-mutation";
@@ -15,6 +16,7 @@ import { Notification } from "@/features/notifications/types";
 export default function NotificationsScreen() {
   const colors = useColors();
   const styles = useStyles();
+  const requireOnline = useRequireOnline();
   const router = useRouter();
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [searchInput, setSearchInput] = useState("");
@@ -37,7 +39,7 @@ export default function NotificationsScreen() {
   // deselecting the segment would hand Insights an unchanged param and do
   // nothing.
   const openNotification = (item: Notification) => {
-    if (!item.is_read) markRead.mutate(item.id);
+    if (!item.is_read) requireOnline(() => markRead.mutate(item.id));
 
     const categoryId = item.related_budget_id ? categoryIdByBudgetId.get(item.related_budget_id) : undefined;
     if (!categoryId) return;

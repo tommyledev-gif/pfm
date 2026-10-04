@@ -8,7 +8,9 @@ export interface ChatRequest {
 }
 
 export interface TransactionActionPayload {
-  wallet_id: string;
+  // null only when the User owns no VND Wallet — such a proposal must be
+  // edited onto a VND Wallet before it can be saved (proposal-wallet.ts).
+  wallet_id: string | null;
   category_id: string;
   amount: number;
   type: TransactionType;

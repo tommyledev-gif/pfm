@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 
 import { getErrorCode, getErrorMessage } from "@/lib/axios";
+import { useRequireOnline } from "@/lib/connectivity";
 import { useDeleteTransactionMutation } from "@/features/transactions/api/use-delete-transaction-mutation";
 import { hasPersistedTransaction } from "@/features/ai-chat/tombstone";
 import { ChatMessage } from "@/features/ai-chat/types";
@@ -40,6 +41,7 @@ export function useTransactionRemoval(): TransactionRemoval {
   const updateMessage = useChatStore((s) => s.updateMessage);
   const [target, setTarget] = useState<ChatMessage | null>(null);
   const deleteTransaction = useDeleteTransactionMutation();
+  const requireOnline = useRequireOnline();
 
   const markRemoved = useCallback(
     (message: ChatMessage, removalState: "deleted" | "discarded") => {
@@ -81,7 +83,13 @@ export function useTransactionRemoval(): TransactionRemoval {
     target,
     targetIsPersisted: target ? hasPersistedTransaction(target) : false,
     deleting: deleteTransaction.isPending,
-    request: setTarget,
+    // Deleting a saved Transaction needs the server (AC-OFF-08) — refused
+    // before the confirmation opens. Discarding an unconfirmed proposal is
+    // local only and stays available offline.
+    request: (message: ChatMessage) => {
+      if (hasPersistedTransaction(message)) requireOnline(() => setTarget(message));
+      else setTarget(message);
+    },
     // Guarded so tapping the backdrop mid-request cannot leave a second
     // confirmation able to fire the same delete again.
     cancel: () => {

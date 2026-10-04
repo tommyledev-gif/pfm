@@ -122,8 +122,9 @@ apiClient.interceptors.response.use(
         config.headers = { ...config.headers, Authorization: `Bearer ${newAccessToken}` };
         return apiClient.request(config);
       } catch {
-        // refreshSession() already force-cleared the session on failure —
-        // fall through to reject the original request below.
+        // refreshSession() already force-cleared the session if the token
+        // was refused, or kept it and scheduled a retry if the network
+        // failed — either way, reject the original request below.
       }
     } else if (error.response?.status === 401) {
       await useSessionStore.getState().clear();

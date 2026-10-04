@@ -8,6 +8,7 @@ import { TransactionTombstoneCard } from "@/features/ai-chat/components/Transact
 import { useHoldMenu } from "@/features/ai-chat/hooks/use-hold-menu";
 import { useMessageActions } from "@/features/ai-chat/hooks/use-message-actions";
 import { isEditLocked } from "@/features/ai-chat/edit-lock";
+import { isSavableProposal, NO_WALLET_LABEL } from "@/features/ai-chat/proposal-wallet";
 import { isRemovable, tombstoneKind } from "@/features/ai-chat/tombstone";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { Category } from "@/features/categories/types";
@@ -53,15 +54,17 @@ export function ChatMessageRow({
   onOpenBudgetWizard,
   onOpenManualEntry,
 }: ChatMessageRowProps) {
-  const currency = message.action
-    ? walletById.get(message.action.payload.wallet_id)?.currency ?? FALLBACK_CURRENCY
-    : FALLBACK_CURRENCY;
+  const wallet = message.action ? walletById.get(message.action.payload.wallet_id ?? "") : undefined;
+  const currency = wallet?.currency ?? FALLBACK_CURRENCY;
   const budget = message.action
     ? budgetByCategoryCurrency.get(`${message.action.payload.category_id}|${currency}`)
     : undefined;
   const category = message.action ? categoryById.get(message.action.payload.category_id) : undefined;
   const kind = tombstoneKind(message);
-  const walletName = message.action ? walletById.get(message.action.payload.wallet_id)?.name ?? "Ví" : "Ví";
+  const walletName = wallet?.name ?? (message.action?.payload.wallet_id === null ? NO_WALLET_LABEL : "Ví");
+  // A proposal without a VND Wallet opens the edit form instead of saving
+  // (spec AC-31, AC-32).
+  const walletRequired = message.action ? !isSavableProposal(message.action.payload, walletById) : false;
   const categoryName = category?.name ?? "Danh mục";
   const onEdit = isEditLocked(message) ? undefined : () => onTriggerEdit(message);
   const onDelete = isRemovable(message) ? () => onTriggerDelete(message) : undefined;
@@ -115,7 +118,9 @@ export function ChatMessageRow({
             currency={currency}
             confirmed={Boolean(message.confirmed)}
             saving={confirming}
-            onConfirm={() => onConfirm(message)}
+            onConfirm={() => (walletRequired ? onTriggerEdit(message) : onConfirm(message))}
+            walletRequired={walletRequired}
+            testIDSuffix={message.id}
             edited={message.edited}
             onPressHistory={message.editHistory ? () => onPressHistory(message) : undefined}
           />

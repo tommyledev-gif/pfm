@@ -33,7 +33,7 @@ export const TABS = [
 // showing Settings as active while on any of these instead of freezing on
 // whichever tab was active before the push, which read as the nav losing
 // track of where you are.
-const SETTINGS_SUB_ROUTES = ["/appearance", "/wallets", "/categories", "/users", "/audit-logs", "/developer"];
+const SETTINGS_SUB_ROUTES = ["/appearance", "/wallets", "/categories", "/users", "/audit-logs", "/developer", "/security"];
 
 // Bottom nav — mobile/design_handoff_pfm_app/README.md "Design tokens" (nav)
 // + "Interactions summary". The bar itself sits flush against the screen's

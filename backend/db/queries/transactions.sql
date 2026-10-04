@@ -14,7 +14,10 @@ RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, 
 -- for the same reason GetTransactionByID is (display names), and uses the same
 -- plain (non-deleted_at-filtered) categories join as GetTransactionByID
 -- (Finding #6 precedent) so a replayed response never breaks on a since-deleted
--- category.
+-- category. Deliberately NOT filtered by t.deleted_at: a key always resolves to
+-- its original Transaction, even after a soft delete, so a late replay is
+-- answered as "already created" and never resurrects it
+-- (specs/mobile-offline-support BR-OFF-B01).
 SELECT
     t.id, t.user_id, t.wallet_id, t.category_id, t.amount, t.type, t.note,
     t.occurred_at, t.created_at, t.updated_at, t.deleted_at,
@@ -26,7 +29,6 @@ JOIN categories c ON c.id = t.category_id
 LEFT JOIN wallets tw ON tw.id = t.to_wallet_id
 WHERE t.user_id = $1
   AND t.idempotency_key = $2
-  AND t.deleted_at IS NULL
 LIMIT 1;
 
 -- name: GetTransactionByID :one

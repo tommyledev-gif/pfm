@@ -126,3 +126,19 @@ func TestJWTAuth_MalformedHeader(t *testing.T) {
 		t.Fatalf("expected 401, got %d", resp.StatusCode)
 	}
 }
+
+// specs/mobile-account-switch S-ASW-22 / plan Finding #2: a switch token
+// carries no user_id/role claims, so it can never act as an access token.
+func TestJWTAuth_RejectsSwitchToken(t *testing.T) {
+	tokens := service.NewTokenService(testSigningKey)
+	app := newProtectedTestApp(tokens)
+	switchToken, _, err := tokens.IssueSwitchToken(uuid.New())
+	if err != nil {
+		t.Fatalf("failed to issue switch token: %v", err)
+	}
+
+	resp := doGetWithAuth(t, app, "Bearer "+switchToken)
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", resp.StatusCode)
+	}
+}

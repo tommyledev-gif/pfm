@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { getErrorMessage } from "@/lib/axios";
+import { useRequireOnline } from "@/lib/connectivity";
 import { IMPORT_MAX_UPLOAD_BYTES, XLSX_MIME_TYPE } from "@/lib/constants";
 import { useToastStore } from "@/stores/toast-store";
 import { useExportTransactionsMutation } from "@/features/transactions/api/use-export-transactions-mutation";
@@ -27,6 +28,7 @@ export interface TransactionIOProps {
 // modal has to render as a sibling of the list, not inside its header. Those
 // two can't be one component, but they must share one piece of state.
 export function useTransactionIO({ range, walletId, currency }: TransactionIOProps) {
+  const requireOnline = useRequireOnline();
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -107,8 +109,10 @@ export function useTransactionIO({ range, walletId, currency }: TransactionIOPro
   };
 
   return {
-    onExport,
-    onImport,
+    // Export and import both need the server; checked before the file
+    // picker opens so the User is not walked through it for nothing.
+    onExport: () => requireOnline(onExport),
+    onImport: () => requireOnline(onImport),
     exporting: exportMutation.isPending,
     importing: previewMutation.isPending,
     modal: (
@@ -118,7 +122,7 @@ export function useTransactionIO({ range, walletId, currency }: TransactionIOPro
         result={result}
         committing={commitMutation.isPending}
         currency={currency}
-        onConfirm={onConfirm}
+        onConfirm={() => requireOnline(onConfirm)}
         onClose={closeModal}
       />
     ),

@@ -150,7 +150,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (accessToken string, newRefreshToken string, err error) {
 	// Signature, expiry and token kind are all checked here; a forged,
 	// expired or non-refresh token is simply unauthenticated.
-	jti, subject, expiresAt, err := s.tokens.ParseRefreshToken(refreshToken)
+	jti, subject, expiresAt, issuedAt, err := s.tokens.ParseRefreshToken(refreshToken)
 	if errors.Is(err, jwt.ErrTokenMalformed) {
 		return "", "", common.NewInvalidInputError("refresh token is malformed")
 	}
@@ -178,6 +178,11 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (accessT
 		return "", "", fmt.Errorf("service.Refresh: %w", err)
 	}
 	if user.Status != model.UserStatusActive {
+		return "", "", common.ErrUnauthenticated
+	}
+	// Sign out everywhere (specs/mobile-account-switch BR-11): a refresh
+	// chain started before the user's sign-out point ends here.
+	if issuedBeforeRevocation(issuedAt, user.TokensValidAfter) {
 		return "", "", common.ErrUnauthenticated
 	}
 

@@ -2,23 +2,31 @@ import { View } from "react-native";
 import { Stack, usePathname } from "expo-router";
 
 import { BottomNav } from "@/components/shared/BottomNav";
+import { OfflineBanner } from "@/components/shared/OfflineBanner";
 import { createStyles } from "@/lib/theme";
 import { useKeyboardVisible } from "@/lib/use-keyboard-height";
 import { usePrefetchRecordIcons } from "@/lib/use-prefetch-record-icons";
 import { useSheetStore } from "@/stores/sheet-store";
+import { useSwitchTokenRenewal } from "@/features/accounts/hooks/use-switch-token-renewal";
 
 // Notifications is a full-screen overlay without the bottom nav (README:
 // bell opens a "full-screen Notifications overlay"). AI Chat keeps the nav
 // visible — its input bar floats just above the pill (README: "Input bar:
 // floating pill above the bottom nav").
 // Pending review has its own pinned "Duyệt tất cả" footer where the nav would sit.
-const ROUTES_WITHOUT_NAV = ["/notifications", "/pending"];
+// Add-account is a focused login form (specs/mobile-account-switch AS-T23).
+const ROUTES_WITHOUT_NAV = ["/notifications", "/pending", "/add-account"];
+// Screens whose own input floats just above the nav — the offline banner
+// docks at the top there instead of covering that input.
+const ROUTES_WITH_FLOATING_INPUT = ["/ai-chat"];
 
 export default function AppLayout() {
   const styles = useStyles();
   const pathname = usePathname();
   // Signed-in area only — the lists it reads need a session.
   usePrefetchRecordIcons();
+  // Keeps the active account's switch token fresh (spec US-06).
+  useSwitchTokenRenewal();
   // BottomNav is an absolutely-positioned overlay outside any screen's own
   // keyboard handling, so it never moves out of the way on its own — a
   // focused input (AI Chat's, but any future one too) can end up sharing the
@@ -40,6 +48,7 @@ export default function AppLayout() {
           this stack only carries the pushed sub-screens above the tabs. */}
       <Stack screenOptions={{ headerShown: false, animation: "fade" }} />
       {showNav ? <BottomNav /> : null}
+      <OfflineBanner navVisible={showNav} dockTop={ROUTES_WITH_FLOATING_INPUT.includes(pathname)} />
     </View>
   );
 }

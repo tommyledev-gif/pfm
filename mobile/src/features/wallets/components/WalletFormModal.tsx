@@ -11,6 +11,7 @@ import { PillButton } from "@/components/ui/PillButton";
 import { getErrorMessage } from "@/lib/axios";
 import { toCents } from "@/lib/currency";
 import { withAlpha } from "@/lib/color";
+import { useRequireOnline } from "@/lib/connectivity";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { WALLET_CURRENCIES, WALLET_TYPES, WalletCurrency, WalletType } from "@/lib/constants";
 import { useCreateWalletMutation } from "@/features/wallets/api/use-create-wallet-mutation";
@@ -40,6 +41,7 @@ interface WalletFormModalProps {
 export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormModalProps) {
   const colors = useColors();
   const styles = useStyles();
+  const requireOnline = useRequireOnline();
   const isEditing = Boolean(editingWallet);
   const createWallet = useCreateWalletMutation();
   const updateWallet = useUpdateWalletMutation();
@@ -105,7 +107,7 @@ export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormM
       setIcon(emoji);
       setIconUrl((prev) => (prev ? null : prev));
     },
-    onUpload: pickIcon,
+    onUpload: () => requireOnline(pickIcon),
   });
 
   const errors = {
@@ -193,7 +195,7 @@ export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormM
         <PillButton label="Hủy" variant="outline" onPress={onClose} style={styles.flexButton} />
         <PillButton
           label={isEditing ? "Lưu" : "Tạo"}
-          onPress={submit}
+          onPress={() => requireOnline(submit)}
           loading={mutation.isPending}
           disabled={submitAttempted && Boolean(errors.name)}
           style={styles.flexButton}

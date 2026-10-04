@@ -60,6 +60,10 @@ const (
 const (
 	LocalsUserID = "userID"
 	LocalsRole   = "role"
+	// LocalsTokenIssuedAt holds the access token's `iat` (*jwt.NumericDate)
+	// so "sign out everywhere" can refuse stale access (account-switch
+	// Finding #19).
+	LocalsTokenIssuedAt = "tokenIssuedAt"
 )
 
 // Wallets (F-03). Name length mirrored by frontend/src/lib/constants.ts so

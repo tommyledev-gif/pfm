@@ -11,6 +11,7 @@ import { colorForCategory } from "@/lib/category-color";
 import { formatCurrencyTruncated } from "@/lib/currency";
 import { formatDateShort } from "@/lib/format-date";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { WALLET_REQUIRED_MESSAGE } from "@/features/ai-chat/proposal-wallet";
 import { ChatAction } from "@/features/ai-chat/types";
 
 // Share of the budget at which the bar stops being neutral and starts
@@ -38,6 +39,10 @@ interface TransactionActionCardProps {
    *  Both in xu; `spent` is the cycle's spend BEFORE this proposal. */
   budgetLimit?: number;
   budgetSpent?: number;
+  /** No VND Wallet yet: the caller routes Confirm to the edit form instead. */
+  walletRequired?: boolean;
+  /** The message id, for per-card testIDs. */
+  testIDSuffix?: string;
 }
 
 // Renders inside an AI assistant chat bubble once a transaction has been
@@ -62,6 +67,8 @@ export function TransactionActionCard({
   onPressHistory,
   budgetLimit,
   budgetSpent,
+  walletRequired,
+  testIDSuffix,
 }: TransactionActionCardProps) {
   const colors = useColors();
   const styles = useStyles();
@@ -183,6 +190,11 @@ export function TransactionActionCard({
             <PillTag label={categoryName} />
             <PillTag label={walletName} />
           </View>
+          {walletRequired ? (
+            <Text testID={`txt-wallet-required-${testIDSuffix}`} style={styles.walletRequired}>
+              {WALLET_REQUIRED_MESSAGE}
+            </Text>
+          ) : null}
           <View style={styles.actionRow}>
             <PillButton
               label="Xác nhận & Lưu"
@@ -223,6 +235,7 @@ const useStyles = createStyles((colors) => ({
   impactPercent: { ...typography.tiny, minWidth: 30, textAlign: "right" },
   dateLabel: { ...typography.tiny, color: colors.textSecondary },
   tagRow: { flexDirection: "row", gap: spacing.sm },
+  walletRequired: { ...typography.caption, color: colors.mustard },
   actionRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   confirmButton: { flex: 1 },
 }));

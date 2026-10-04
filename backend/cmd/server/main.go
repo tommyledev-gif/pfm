@@ -64,6 +64,8 @@ func main() {
 	cycleResolver := service.NewCycleResolver(budgetPlanRepo)
 	userService := service.NewUserService(userRepo, emailSender, logger)
 	authService := service.NewAuthService(userRepo, revokedRepo, tokenService, logger)
+	accountSwitchService := service.NewAccountSwitchService(userRepo, revokedRepo, tokenService, logger)
+	sessionRevocationService := service.NewSessionRevocationService(userRepo, accountSwitchService, logger)
 	walletService := service.NewWalletService(walletRepo, logger)
 	categoryService := service.NewCategoryService(categoryRepo, logger)
 	budgetService := service.NewBudgetService(budgetRepo, cycleResolver, logger)
@@ -92,6 +94,8 @@ func main() {
 
 	userHandler := handler.NewUserHandler(userService, logger)
 	authHandler := handler.NewAuthHandler(authService, logger)
+	accountSwitchHandler := handler.NewAccountSwitchHandler(accountSwitchService, logger)
+	sessionRevocationHandler := handler.NewSessionRevocationHandler(sessionRevocationService, logger)
 	walletHandler := handler.NewWalletHandler(walletService, iconUploader, logger)
 	categoryHandler := handler.NewCategoryHandler(categoryService, iconUploader, logger)
 	budgetHandler := handler.NewBudgetHandler(budgetService, iconUploader, logger)
@@ -116,7 +120,7 @@ func main() {
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 		AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 	}))
-	registerRoutes(app, userHandler, authHandler, walletHandler, categoryHandler, budgetHandler, transactionHandler, transactionExportHandler, transactionImportHandler, auditLogHandler, reportHandler, notificationHandler, chatHandler, budgetWizardHandler, analyticsHandler, tokenService, logger)
+	registerRoutes(app, userHandler, authHandler, walletHandler, categoryHandler, budgetHandler, transactionHandler, transactionExportHandler, transactionImportHandler, auditLogHandler, reportHandler, notificationHandler, chatHandler, budgetWizardHandler, analyticsHandler, accountSwitchHandler, sessionRevocationHandler, tokenService, logger)
 
 	go func() {
 		if err := app.Listen(":" + cfg.Port); err != nil {

@@ -10,13 +10,15 @@ import (
 // take when the client turns around and calls POST /transactions — mirrors
 // CreateTransactionRequest's fields (minus IdempotencyKey, carried alongside
 // it in ChatActionResponse instead of duplicated inside the payload).
+// WalletID is null only when the caller owns no VND Wallet — the client must
+// have the User pick one before confirming (ai-chat-image-capture BR-13).
 type TransactionActionPayload struct {
-	WalletID   uuid.UUID `json:"wallet_id"`
-	CategoryID uuid.UUID `json:"category_id"`
-	Amount     int64     `json:"amount"`
-	Type       string    `json:"type"`
-	Note       *string   `json:"note"`
-	OccurredAt time.Time `json:"occurred_at"`
+	WalletID   *uuid.UUID `json:"wallet_id"`
+	CategoryID uuid.UUID  `json:"category_id"`
+	Amount     int64      `json:"amount"`
+	Type       string     `json:"type"`
+	Note       *string    `json:"note"`
+	OccurredAt time.Time  `json:"occurred_at"`
 }
 
 // ChatActionResponse is one proposed Transaction the User must explicitly

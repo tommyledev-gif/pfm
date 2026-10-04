@@ -115,8 +115,8 @@ func TestChatService_Chat_HappyPath_ResolvesDefaultWallet(t *testing.T) {
 		t.Fatalf("expected 1 action, got %d", len(resp.Actions))
 	}
 	action := resp.Actions[0]
-	if action.Payload.WalletID != walletID {
-		t.Fatalf("expected default wallet %s resolved, got %s", walletID, action.Payload.WalletID)
+	if action.Payload.WalletID == nil || *action.Payload.WalletID != walletID {
+		t.Fatalf("expected default wallet %s resolved, got %v", walletID, action.Payload.WalletID)
 	}
 	// The AI Service's amount_vnd (50000, a plain "50k VND" reading) must be
 	// converted to this app's BIGINT-cents storage convention (5000000) —

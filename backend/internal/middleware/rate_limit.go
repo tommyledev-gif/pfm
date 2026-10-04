@@ -92,3 +92,18 @@ func LoginRateLimiter(logger *zap.Logger) fiber.Handler {
 		},
 	})
 }
+
+// SwitchRateLimiter caps POST /auth/switch per client IP
+// (specs/mobile-account-switch S-ASW-20: 20 per 15 minutes). Keyed by
+// ClientIP for the same Cloudflare-Tunnel reason as LoginRateLimiter — the
+// route is unauthenticated, so there is no user id to key on.
+func SwitchRateLimiter(logger *zap.Logger) fiber.Handler {
+	return limiter.New(limiter.Config{
+		Max:          common.SwitchRateLimit,
+		Expiration:   common.SwitchRateLimitWindow,
+		KeyGenerator: ClientIP,
+		LimitReached: func(c *fiber.Ctx) error {
+			return response.Error(c, logger, common.ErrRateLimited)
+		},
+	})
+}

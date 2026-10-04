@@ -1,7 +1,10 @@
 import { useCallback, useRef, useState } from "react";
 import { RefreshControl } from "react-native";
+import { onlineManager } from "@tanstack/react-query";
 
+import { OFFLINE_REFRESH_MESSAGE } from "@/lib/constants";
 import { useColors } from "@/lib/theme";
+import { useToastStore } from "@/stores/toast-store";
 
 // The only part of a TanStack Query result this needs. Typed structurally
 // rather than as UseQueryResult so a screen can mix plain queries and
@@ -39,6 +42,12 @@ export function useRefresh(queries: Refetchable[]) {
   queriesRef.current = queries;
 
   const onRefresh = useCallback(async () => {
+    // Offline, a refetch would just pause — and the spinner with it, until
+    // the network returns. End at once and say why (AC-OFF-06).
+    if (!onlineManager.isOnline()) {
+      useToastStore.getState().show(OFFLINE_REFRESH_MESSAGE, "warning");
+      return;
+    }
     setRefreshing(true);
     try {
       // allSettled, not all: one failing query (an expired token on the

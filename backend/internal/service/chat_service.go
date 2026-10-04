@@ -38,17 +38,6 @@ func NewChatService(repo ChatRepo, walletRepo WalletRepo, categoryRepo CategoryR
 	return &ChatService{repo: repo, walletRepo: walletRepo, categoryRepo: categoryRepo, aiClient: aiClient, logger: logger}
 }
 
-// dropReason tracks why a proposed transaction never made it into actions[] —
-// used only to pick a more specific ambiguous message (spec.md S-AI-06 vs
-// S-AI-07), never surfaced to the client as structured data.
-type dropReason int
-
-const (
-	dropReasonNone dropReason = iota
-	dropReasonNoWallet
-	dropReasonOther
-)
-
 // Chat implements US-01's propose step (POST /ai/chat). Never writes to
 // transactions — every surviving action is only a proposal until the client
 // calls the existing POST /transactions confirm step.
@@ -111,7 +100,7 @@ func (s *ChatService) Chat(ctx context.Context, userID uuid.UUID, req dto.ChatRe
 		return s.respondBudgetWizard(ctx, userID, conversationID)
 	}
 
-	actions, sawWalletDrop := s.resolveActions(userID, wallets, categories, extractResp.Transactions)
+	actions, _, sawWalletDrop := resolveActions(wallets, categories, extractResp.Transactions)
 	if len(actions) == 0 {
 		message := "Mình chưa hiểu giao dịch này, bạn mô tả rõ hơn giúp mình nhé?"
 		if sawWalletDrop {
@@ -167,146 +156,6 @@ func (s *ChatService) respondAmbiguous(ctx context.Context, userID, conversation
 		Actions:        []dto.ChatActionResponse{},
 		ConversationID: conversationID,
 	}, nil
-}
-
-// resolveActions filters+resolves the AI Service's raw proposals into
-// confirmable actions: type/category structural validity, category/wallet
-// ownership re-validation (spec.md Resolved design decision #4),
-// default-Wallet resolution, and per-item idempotency-key generation. Deliberately
-// does NOT gate on Confidence — a below-threshold guess still becomes a
-// confirmable action (renderConfirmMessage frames the reply as a guess
-// instead of a confident proposal when that happens), so the AI's own
-// self-reported uncertainty is surfaced to the user rather than silently
-// discarded. A structurally invalid item (bad type/category/amount/wallet)
-// is simply omitted — never a distinct error (spec.md S-AI-08/S-AI-09).
-//
-// Deliberately takes no context.Context and issues no repository calls — the
-// caller's own Wallets/Categories are already fully loaded in memory
-// (ListWalletsByUser/ListCategoriesForUser in Chat), and membership in those
-// slices already IS the ownership/visibility check, so re-querying per item
-// would be an avoidable N+1 (one query per proposed transaction) for no
-// additional correctness.
-func (s *ChatService) resolveActions(userID uuid.UUID, wallets []*model.Wallet, categories []*model.Category, proposed []AIProposedTransaction) ([]dto.ChatActionResponse, bool) {
-	walletByID := indexWalletsByID(wallets)
-	categoryByID := indexCategoriesByID(categories)
-
-	actions := make([]dto.ChatActionResponse, 0, len(proposed))
-	sawWalletDrop := false
-
-	for _, p := range proposed {
-		if p.TxType != string(model.TransactionTypeIncome) && p.TxType != string(model.TransactionTypeExpense) {
-			continue
-		}
-		categoryID, err := uuid.Parse(p.CategoryID)
-		if err != nil {
-			continue
-		}
-		// The category must not just be visible to the caller — its Type
-		// must match the proposed Transaction's type, exactly like
-		// TransactionService's own category-type-match check
-		// (transaction-management/spec.md S-TRX-14). Caught here too, not
-		// only at confirm time, so the client never renders a card that is
-		// guaranteed to fail with 422 CATEGORY_TYPE_MISMATCH on confirm
-		// (found via live testing against the real Groq API).
-		category, ok := categoryByID[categoryID]
-		if !ok || string(category.Type) != p.TxType {
-			continue
-		}
-		if p.AmountVND <= 0 {
-			continue
-		}
-
-		walletID, reason := resolveWallet(wallets, walletByID, p.WalletID)
-		if walletID == nil {
-			sawWalletDrop = sawWalletDrop || reason == dropReasonNoWallet
-			continue
-		}
-
-		occurredAt, err := parseFlexibleTimestamp(p.OccurredAt)
-		if err != nil {
-			occurredAt = time.Now().UTC()
-		}
-
-		actions = append(actions, dto.ChatActionResponse{
-			Type: "create_transaction",
-			Payload: dto.TransactionActionPayload{
-				WalletID:   *walletID,
-				CategoryID: categoryID,
-				// The AI Service returns a plain VND integer (e.g. 50000 for
-				// "50k") — this app's amount fields are BIGINT integer cents
-				// everywhere else (CLAUDE.md: "Money trong API: integer
-				// cents"; the manual create-transaction form's toCents()
-				// helper does this same conversion at its own client
-				// boundary). Found via live testing: omitting this made
-				// every AI-proposed amount display 100x too small.
-				Amount:     p.AmountVND * common.VNDToCentsFactor,
-				Type:       p.TxType,
-				Note:       p.Note,
-				OccurredAt: occurredAt,
-			},
-			IdempotencyKey: uuid.New(),
-			Confidence:     p.Confidence,
-		})
-	}
-	return actions, sawWalletDrop
-}
-
-// resolveWallet returns the caller-owned Wallet ID an item should use — the
-// AI's explicit wallet_id if it names one of the caller's already-loaded
-// Wallets, else the caller's default Wallet, else nil (dropReasonNoWallet) if
-// neither exists (spec.md Main Flow step 7, S-AI-05/S-AI-06). walletByID is
-// built from the same caller-owned slice ListWalletsByUser already returned —
-// membership in it already is the ownership check.
-func resolveWallet(wallets []*model.Wallet, walletByID map[uuid.UUID]*model.Wallet, walletIDStr *string) (*uuid.UUID, dropReason) {
-	if walletIDStr != nil {
-		walletID, err := uuid.Parse(*walletIDStr)
-		if err != nil {
-			return nil, dropReasonOther
-		}
-		if _, ok := walletByID[walletID]; !ok {
-			return nil, dropReasonOther
-		}
-		return &walletID, dropReasonNone
-	}
-	for _, w := range wallets {
-		if w.IsDefault {
-			id := w.ID
-			return &id, dropReasonNone
-		}
-	}
-	return nil, dropReasonNoWallet
-}
-
-func indexWalletsByID(wallets []*model.Wallet) map[uuid.UUID]*model.Wallet {
-	out := make(map[uuid.UUID]*model.Wallet, len(wallets))
-	for _, w := range wallets {
-		out[w.ID] = w
-	}
-	return out
-}
-
-func indexCategoriesByID(categories []*model.Category) map[uuid.UUID]*model.Category {
-	out := make(map[uuid.UUID]*model.Category, len(categories))
-	for _, c := range categories {
-		out[c.ID] = c
-	}
-	return out
-}
-
-func toAIWalletContexts(wallets []*model.Wallet) []AIWalletContext {
-	out := make([]AIWalletContext, 0, len(wallets))
-	for _, w := range wallets {
-		out = append(out, AIWalletContext{ID: w.ID, Name: w.Name, IsDefault: w.IsDefault, Currency: w.Currency})
-	}
-	return out
-}
-
-func toAICategoryContexts(categories []*model.Category) []AICategoryContext {
-	out := make([]AICategoryContext, 0, len(categories))
-	for _, c := range categories {
-		out = append(out, AICategoryContext{ID: c.ID, Name: c.Name, Type: string(c.Type)})
-	}
-	return out
 }
 
 // renderConfirmMessage is deliberately simple and data-driven, not a second

@@ -14,6 +14,8 @@ interface SavedPhrasesState {
   byUser: PhrasesByUser;
   save: (userId: string, text: string) => SavePhraseResult;
   remove: (userId: string, text: string) => void;
+  /** Drops every phrase of a User removed from this device. */
+  removeUser: (userId: string) => void;
 }
 
 /**
@@ -40,6 +42,11 @@ export const useSavedPhrasesStore = create<SavedPhrasesState>()(
             [userId]: (s.byUser[userId] ?? NO_PHRASES).filter((p) => !samePhrase(p.text, text)),
           },
         })),
+      removeUser: (userId) =>
+        set((s) => {
+          const { [userId]: _dropped, ...rest } = s.byUser;
+          return { byUser: rest };
+        }),
     }),
     { name: "pfm_saved_phrases", storage: createJSONStorage(() => AsyncStorage) },
   ),

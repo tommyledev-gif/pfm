@@ -1,7 +1,7 @@
 # Feasibility: Recording Transactions from an Image
 
 > Item 2 of the 2026-10-03 request: "AI looks at a receipt, a handwritten note, or an Excel screenshot with matching columns, and creates the matching Transaction proposals — like `TransactionActionCard`."
-> Status: **Research only — no code, no spec.** Verdict at the bottom.
+> Status: **Research — reviewed against code 2026-10-04 (corrections folded into §3).** Verdict at the bottom.
 
 ---
 
@@ -40,12 +40,17 @@ The existing pipeline already supports the hard part on the output side: `ChatRe
 ## 3. Option C — facts checked
 
 **Groq (primary, already integrated):**
-- Vision model currently listed: `qwen/qwen3.8-27b` — text + image input, **supports tool use and JSON mode**, 131K context. Llama-4 Scout/Maverick are also referenced by third parties but not on Groq's own vision page today.
-- Limits: **max 3 images per request**, **each image ≈ 2048 input tokens**, request with an image URL ≤ 20 MB.
+- Vision models on Groq's own vision page (re-checked 2026-10-04): `qwen/qwen3.8-27b` (max **3** images/request) and `meta-llama/llama-4-scout-17b-16e-instruct` (max **5**) — both text + image, **tool use and JSON mode**. Two candidates = a same-provider fallback.
+- `qwen3.8` has thinking/instruct modes with tunable reasoning effort: run it in instruct / low-effort mode, since hidden reasoning tokens count against the free-tier budget (same trap as `groq_model`, `config.py:54`).
+- Limits: **each image ≈ 2048 input tokens**; image **URL** request ≤ 20 MB; ⚠️ **base64 request ≤ 4 MB (413 above it)**. The image is never stored server-side, so it can only travel as base64 → the **4 MB limit is the binding one**: downscaling on device (~1600 px long edge, JPEG, target < 1 MB) is mandatory, not optional.
 - ⚠️ Groq rotates vision models roughly quarterly (this project already lost `llama-3.3-70b-versatile` on 2026-08-16). The model id **must be an env setting** (like `groq_model` today), with its own name, e.g. `groq_vision_model`.
 
 **Anthropic (fallback):**
-- Current fallback is `claude-3-5-haiku-20241022` (`ai-service/app/core/config.py`). Its vision support and remaining lifetime must be verified before relying on it; a current Haiku-class model (e.g. Claude Haiku 4.5) supports image input + tool use. Fallback key is not configured in this environment today, so in practice Groq is the only live path.
+- Current fallback is `claude-3-5-haiku-20241022` (`ai-service/app/core/config.py:37`). For images, use `claude-haiku-4-5-20251001` (image input + tool use) via its own setting (e.g. `anthropic_vision_model`). Fallback key is not configured in this environment today, so in practice Groq is the only live path.
+
+**Spreadsheets — an existing path already covers real files:** the backend has `.xlsx` import (`POST /transactions/import/preview` + `/commit`, excelize, deterministic per-row idempotency keys). A real Excel file should go through import (exact); a *screenshot* of a sheet is the fallback case for this feature only.
+
+**Offline:** image capture needs network end-to-end — disabled while offline (see `research-offline.md`).
 
 **Mobile (Expo Go compatible, no new native code):**
 - `expo-image-picker` **is already installed** (camera + gallery, returns base64 or a file URI) and works in Expo Go.

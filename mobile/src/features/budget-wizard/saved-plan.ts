@@ -50,27 +50,60 @@ export interface SavedBudgetPlan {
 }
 
 interface SavedPlanState {
+  /** The active User's plan — derived from byUser, kept for the wizard's selectors. */
   plan: SavedBudgetPlan | null;
   // False until AsyncStorage has been read back. The wizard checks it before
   // deciding a user has no saved plan — treating "not loaded yet" as "nothing
   // saved" would silently start them from zero on a cold launch.
   hydrated: boolean;
   /**
-   * The User this device's plan belongs to. AsyncStorage is per device, not
-   * per account: without it, whoever logs in next on the same phone would be
-   * offered the previous User's income and costs. null = saved before this
-   * field existed.
+   * One plan per User. AsyncStorage is per device, not per account, and
+   * several accounts can now take turns on one phone
+   * (specs/mobile-account-switch AC-09, S-ASW-14): switching A → B → A must
+   * give A back their plan and never show it to B.
    */
-  ownerId: string | null;
+  byUser: Record<string, SavedBudgetPlan>;
+  /** A plan saved before plans had an owner (v0/v1 with ownerId null). */
+  unowned: SavedBudgetPlan | null;
+  /** Whose plan `plan` currently is; null while nobody is signed in. */
+  activeUserId: string | null;
   savePlan: (plan: SavedBudgetPlan) => void;
   clearPlan: () => void;
   /**
    * Hands the store to `userId` (stores/session-scoped-reset.ts, at every
-   * session start). Someone else's plan is dropped; an unowned one is kept
-   * only when `adoptUnowned` — a session restored on launch is the same
-   * person who saved it, a fresh login could be anyone.
+   * session start or user change). An unowned plan is adopted only when
+   * `adoptUnowned` — a session restored on launch is the same person who
+   * saved it, a fresh login could be anyone.
    */
   claimFor: (userId: string, adoptUnowned: boolean) => void;
+  /** Drops a User's plan from this device (saved account removed). */
+  removeUser: (userId: string) => void;
+}
+
+interface PersistedPlanV1 {
+  plan?: SavedBudgetPlan | null;
+  ownerId?: string | null;
+}
+
+interface PersistedPlanV2 {
+  byUser: Record<string, SavedBudgetPlan>;
+  unowned: SavedBudgetPlan | null;
+  activeUserId: string | null;
+}
+
+const PLAN_STORE_VERSION = 2;
+
+// v1 held one slot + its owner; v2 keys plans by User.
+function migratePlan(persisted: unknown, version: number): PersistedPlanV2 {
+  if (version >= PLAN_STORE_VERSION) return persisted as PersistedPlanV2;
+  const v1 = (persisted ?? {}) as PersistedPlanV1;
+  const plan = v1.plan ?? null;
+  const ownerId = v1.ownerId ?? null;
+  return {
+    byUser: plan && ownerId ? { [ownerId]: plan } : {},
+    unowned: plan && !ownerId ? plan : null,
+    activeUserId: ownerId,
+  };
 }
 
 export const useSavedBudgetPlanStore = create<SavedPlanState>()(
@@ -78,28 +111,62 @@ export const useSavedBudgetPlanStore = create<SavedPlanState>()(
     (set) => ({
       plan: null,
       hydrated: false,
-      ownerId: null,
-      savePlan: (plan) => set({ plan }),
-      clearPlan: () => set({ plan: null }),
+      byUser: {},
+      unowned: null,
+      activeUserId: null,
+      savePlan: (plan) =>
+        set((state) =>
+          state.activeUserId
+            ? { plan, byUser: { ...state.byUser, [state.activeUserId]: plan } }
+            : { plan, unowned: plan },
+        ),
+      clearPlan: () =>
+        set((state) => {
+          if (!state.activeUserId) return { plan: null, unowned: null };
+          const { [state.activeUserId]: _dropped, ...rest } = state.byUser;
+          return { plan: null, byUser: rest };
+        }),
       claimFor: (userId, adoptUnowned) =>
         set((state) => {
-          if (state.ownerId === userId) return state;
-          const keep = state.ownerId === null && adoptUnowned;
-          return { ownerId: userId, plan: keep ? state.plan : null };
+          const adopt = adoptUnowned && state.unowned !== null && !state.byUser[userId];
+          const byUser = adopt && state.unowned ? { ...state.byUser, [userId]: state.unowned } : state.byUser;
+          return {
+            activeUserId: userId,
+            byUser,
+            unowned: adopt ? null : state.unowned,
+            plan: byUser[userId] ?? null,
+          };
+        }),
+      removeUser: (userId) =>
+        set((state) => {
+          const { [userId]: _dropped, ...rest } = state.byUser;
+          const isActive = state.activeUserId === userId;
+          return { byUser: rest, plan: isActive ? null : state.plan };
         }),
     }),
     {
       name: "pfm_budget_plan",
       storage: createJSONStorage(() => AsyncStorage),
-      // A plan persisted before ownerId existed simply rehydrates with the
-      // default null (persist's shallow merge), so no version bump is owed.
-      version: 1,
-      partialize: (state) => ({ plan: state.plan, ownerId: state.ownerId }),
+      version: PLAN_STORE_VERSION,
+      migrate: migratePlan,
+      partialize: (state): PersistedPlanV2 => ({
+        byUser: state.byUser,
+        unowned: state.unowned,
+        activeUserId: state.activeUserId,
+      }),
       onRehydrateStorage: () => (state) => {
         // `state` is the store after rehydration — undefined only if reading
         // storage threw, in which case there is nothing to restore and the
         // wizard should stop waiting for one.
-        useSavedBudgetPlanStore.setState({ hydrated: true, plan: state?.plan ?? null, ownerId: state?.ownerId ?? null });
+        const byUser = state?.byUser ?? {};
+        const activeUserId = state?.activeUserId ?? null;
+        useSavedBudgetPlanStore.setState({
+          hydrated: true,
+          byUser,
+          unowned: state?.unowned ?? null,
+          activeUserId,
+          plan: activeUserId ? (byUser[activeUserId] ?? null) : null,
+        });
       },
     },
   ),

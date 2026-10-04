@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { getErrorCode, getErrorMessage } from "@/lib/axios";
 import { userIdFromAccessToken } from "@/lib/jwt";
 import { useCreateTransactionMutation } from "@/features/transactions/api/use-create-transaction-mutation";
+import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
+import { isSavableProposal } from "@/features/ai-chat/proposal-wallet";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { useChatStore } from "@/stores/chat-store";
 import { useRecentPhrasesStore } from "@/stores/recent-phrases-store";
@@ -19,14 +21,25 @@ export function useConfirmProposal() {
   const updateMessage = useChatStore((s) => s.updateMessage);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [confirmingAll, setConfirmingAll] = useState(false);
+  const wallets = useWalletsQuery();
   const createTransaction = useCreateTransactionMutation();
 
+  const walletById = useMemo(() => new Map(wallets.data?.map((w) => [w.id, w])), [wallets.data]);
+
+  /**
+   * ⚠️ A proposal without a VND Wallet is never sent (spec BR-13, AC-34): it
+   * returns false with no request, so confirm-all counts it as not saved and
+   * it stays pending until the User edits a VND Wallet onto it. Nothing is
+   * sent before the Wallet list has loaded, so the currency check is real.
+   */
   const save = async (message: ChatMessage): Promise<boolean> => {
-    if (!message.action) return false;
+    if (!message.action || !wallets.data) return false;
     const { payload, idempotency_key } = message.action;
+    if (payload.wallet_id === null || !isSavableProposal(payload, walletById)) return false;
     try {
       const transaction = await createTransaction.mutateAsync({
         ...payload,
+        wallet_id: payload.wallet_id,
         note: payload.note ?? undefined,
         idempotency_key,
       });

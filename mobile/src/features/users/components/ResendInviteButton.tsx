@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, Text } from "react-native";
 
 import { getErrorMessage } from "@/lib/axios";
 import { withAlpha } from "@/lib/color";
+import { useRequireOnline } from "@/lib/connectivity";
 import { createStyles, radii, spacing, typography, useColors } from "@/lib/theme";
 import { useToastStore } from "@/stores/toast-store";
 import { useResendInviteMutation } from "@/features/users/api/use-resend-invite-mutation";
@@ -23,6 +24,7 @@ function formatWait(ms: number): string {
 export function ResendInviteButton({ userId, availableAt }: { userId: string; availableAt: string }) {
   const colors = useColors();
   const styles = useStyles();
+  const requireOnline = useRequireOnline();
   const resend = useResendInviteMutation();
   const showToast = useToastStore((s) => s.show);
   const availableAtMs = new Date(availableAt).getTime();
@@ -49,7 +51,7 @@ export function ResendInviteButton({ userId, availableAt }: { userId: string; av
   return (
     <Pressable
       style={[styles.button, disabled && styles.buttonDisabled]}
-      onPress={onPress}
+      onPress={() => requireOnline(onPress)}
       disabled={disabled}
       hitSlop={6}
       accessibilityRole="button"

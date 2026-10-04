@@ -12,6 +12,7 @@ import { TrashIcon } from "@/components/ui/Icon";
 import { getErrorMessage } from "@/lib/axios";
 import { colorForCategory } from "@/lib/category-color";
 import { withAlpha } from "@/lib/color";
+import { useRequireOnline } from "@/lib/connectivity";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { CATEGORY_NAME_MAX_LENGTH, CATEGORY_TYPES, CategoryType } from "@/lib/constants";
 import { useCreateCategoryMutation } from "@/features/categories/api/use-create-category-mutation";
@@ -34,6 +35,7 @@ interface CategoryFormModalProps {
 export function CategoryFormModal({ visible, onClose, editingCategory }: CategoryFormModalProps) {
   const colors = useColors();
   const styles = useStyles();
+  const requireOnline = useRequireOnline();
   const isEditing = Boolean(editingCategory);
   const createCategory = useCreateCategoryMutation();
   const updateCategory = useUpdateCategoryMutation();
@@ -97,7 +99,7 @@ export function CategoryFormModal({ visible, onClose, editingCategory }: Categor
       setIcon(emoji);
       setIconUrl((prev) => (prev ? null : prev));
     },
-    onUpload: pickIcon,
+    onUpload: () => requireOnline(pickIcon),
   });
 
   // Categories' PATCH has no explicit-null path (COALESCE on a plain
@@ -183,7 +185,7 @@ export function CategoryFormModal({ visible, onClose, editingCategory }: Categor
           <PillButton label="Hủy" variant="outline" onPress={onClose} style={styles.flexButton} />
           <PillButton
             label={isEditing ? "Lưu" : "Tạo"}
-            onPress={submit}
+            onPress={() => requireOnline(submit)}
             loading={mutation.isPending}
             disabled={submitAttempted && Boolean(errors.name)}
             style={styles.flexButton}
@@ -191,7 +193,7 @@ export function CategoryFormModal({ visible, onClose, editingCategory }: Categor
         </View>
 
         {isEditing ? (
-          <Pressable style={styles.deleteRow} onPress={() => setConfirmDeleteOpen(true)} disabled={deleteCategory.isPending}>
+          <Pressable style={styles.deleteRow} onPress={() => requireOnline(() => setConfirmDeleteOpen(true))} disabled={deleteCategory.isPending}>
             <TrashIcon size={18} />
             <Text style={styles.deleteLabel}>Xóa danh mục</Text>
           </Pressable>

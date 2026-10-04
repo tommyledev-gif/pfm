@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { useRef } from "react";
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { Avatar } from "@/components/ui/Avatar";
@@ -15,17 +15,20 @@ import {
   UsersIcon,
   WalletIcon,
 } from "@/components/ui/Icon";
+import { BusyOverlay } from "@/components/shared/BusyOverlay";
 import { Screen } from "@/components/shared/Screen";
 import { RevealableAmount } from "@/components/shared/RevealableAmount";
 import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useSessionStore } from "@/stores/session-store";
-import { useChatStore } from "@/stores/chat-store";
+import { accountDisplayName } from "@/features/accounts/account-registry-store";
+import { AccountSwitchRow } from "@/features/accounts/components/AccountSwitchRow";
+import { useLogout } from "@/features/accounts/hooks/use-logout";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { totalBalance } from "@/features/wallets/wallet-totals";
 import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary-query";
 
-// Security/Help & Support have no mobile screens yet — out of the design
+// Help & Support has no mobile screen yet — out of the design
 // handoff's scope (it maps them as entry points only). Wallets/Categories/
 // Household Members now navigate to real management screens.
 //
@@ -41,7 +44,7 @@ const SETTINGS_ROWS = [
   { label: "Danh mục", Icon: TagIcon, href: "/categories" as const, adminOnly: false },
   { label: "Thành viên gia đình", Icon: UsersIcon, href: "/users" as const, adminOnly: true },
   { label: "Nhật ký giao dịch", Icon: HistoryIcon, href: "/audit-logs" as const, adminOnly: false },
-  { label: "Bảo mật", Icon: ShieldIcon, href: null, adminOnly: false },
+  { label: "Bảo mật", Icon: ShieldIcon, href: "/security" as const, adminOnly: false, testID: "row-settings-security" },
   { label: "Trợ giúp & hỗ trợ", Icon: HelpIcon, href: null, adminOnly: false },
   { label: "Nhà phát triển", Icon: CodeIcon, href: "/developer" as const, adminOnly: false },
 ];
@@ -49,16 +52,10 @@ type SettingsHref = NonNullable<(typeof SETTINGS_ROWS)[number]["href"]>;
 // Taps on a menu row closer together than this count as one.
 const ROW_TAP_GUARD_MS = 600;
 
-const LOGOUT_FLUSH_TIMEOUT_MS = 4000;
-// Dims the app enough to read as "busy, hands off", not so much that the
-// logout button's own spinner — the only progress shown — is lost under it.
-const LOGOUT_OVERLAY_ALPHA = 0.55;
 const LOGOUT_BUSY_OPACITY = 0.7;
 
 function displayNameFromEmail(email: string | null): string {
-  if (!email) return "Thành viên";
-  const local = email.split("@")[0] ?? email;
-  return local.charAt(0).toUpperCase() + local.slice(1);
+  return email ? accountDisplayName({ email, fullName: null }) : "Thành viên";
 }
 
 export default function SettingsScreen() {
@@ -68,9 +65,7 @@ export default function SettingsScreen() {
   const lastPushAt = useRef(0);
   const email = useSessionStore((s) => s.email);
   const role = useSessionStore((s) => s.role);
-  const clearSession = useSessionStore((s) => s.clear);
-  const clearChat = useChatStore((s) => s.clear);
-  const [loggingOut, setLoggingOut] = useState(false);
+  const { loggingOut, logout } = useLogout();
   const wallets = useWalletsQuery();
   const summary = useReportSummaryQuery();
   const name = displayNameFromEmail(email);
@@ -78,16 +73,6 @@ export default function SettingsScreen() {
   const netWorth = wallets.data ? totalBalance(wallets.data) : null;
   const primaryTotal = summary.data?.totals[0];
 
-  // Gives chat-store.ts's debounced autosave one last chance to land on the
-  // server before clearChat() wipes the local copy — capped at
-  // LOGOUT_FLUSH_TIMEOUT_MS so a flaky/offline network never makes tapping
-  // "Log out" feel stuck (apiClient's own request timeout is 15s, far too
-  // long to block a logout button on).
-  //
-  // While it runs, the whole app sits under an overlay and the button shows
-  // its own spinner: the flush can take up to that timeout, and a screen that
-  // still reacted to taps in the meantime invited a second logout, a
-  // navigation away, or an edit that the wipe was about to throw away.
   // One push per burst of taps: a quick double tap fires twice before the
   // route has changed, and would otherwise stack the same screen twice.
   const openRow = (href: SettingsHref) => {
@@ -95,22 +80,6 @@ export default function SettingsScreen() {
     if (now - lastPushAt.current < ROW_TAP_GUARD_MS) return;
     lastPushAt.current = now;
     router.push(href);
-  };
-
-  const logout = async () => {
-    if (loggingOut) return;
-    setLoggingOut(true);
-    try {
-      await Promise.race([
-        useChatStore.getState().flushSync(),
-        new Promise((resolve) => setTimeout(resolve, LOGOUT_FLUSH_TIMEOUT_MS)),
-      ]);
-    } catch {
-      // Best-effort — proceed with logout either way; the next login
-      // restores whatever the server last had via GET /ai/chat/thread.
-    }
-    clearChat();
-    clearSession();
   };
 
   return (
@@ -172,6 +141,9 @@ export default function SettingsScreen() {
         ))}
       </View>
 
+      {/* Directly above "Đăng xuất" (specs/mobile-account-switch AC-05). */}
+      <AccountSwitchRow />
+
       <Pressable
         style={[styles.logoutRow, loggingOut && styles.logoutRowBusy]}
         onPress={logout}
@@ -185,13 +157,10 @@ export default function SettingsScreen() {
       </Pressable>
     </ScrollView>
 
-    {/* A Modal, not an absolute View: it has to cover the bottom nav too,
-        which this screen does not own. No content of its own — the button's
-        spinner, still visible through it, is what says what is happening.
-        Back does nothing while it is up: logout cannot be cancelled half-way. */}
-    <Modal visible={loggingOut} transparent animationType="fade" statusBarTranslucent onRequestClose={() => {}}>
-      <View style={styles.logoutOverlay} testID="overlay-settings-logout" />
-    </Modal>
+    {/* Logout: flush + server calls run up to LOGOUT_FLUSH_TIMEOUT_MS
+        (features/accounts/hooks/use-logout.ts); nothing may be tapped
+        meanwhile — the button's own spinner says what is happening. */}
+    <BusyOverlay visible={loggingOut} testID="overlay-settings-logout" />
     </Screen>
   );
 }
@@ -244,5 +213,4 @@ const useStyles = createStyles((colors) => ({
   },
   logoutRowBusy: { opacity: LOGOUT_BUSY_OPACITY },
   logoutLabel: { ...typography.body, color: colors.peach },
-  logoutOverlay: { flex: 1, backgroundColor: withAlpha(colors.bgApp, LOGOUT_OVERLAY_ALPHA) },
 }));

@@ -138,6 +138,16 @@ func (r *UserRepository) CountUsers(ctx context.Context, status, role *string) (
 	return count, nil
 }
 
+// SetTokensValidAfter moves the user's sign-out-everywhere point. Returns
+// false when no row matched (unknown or soft-deleted user).
+func (r *UserRepository) SetTokensValidAfter(ctx context.Context, id uuid.UUID, at time.Time) (bool, error) {
+	affected, err := r.q.SetUserTokensValidAfter(ctx, id, at)
+	if err != nil {
+		return false, fmt.Errorf("repository.SetTokensValidAfter: %w", err)
+	}
+	return affected > 0, nil
+}
+
 func toModel(row sqlc.User) *model.User {
 	return &model.User{
 		ID:                row.ID,
@@ -155,5 +165,6 @@ func toModel(row sqlc.User) *model.User {
 		DeletedAt:         row.DeletedAt,
 		InviteSentAt:      row.InviteSentAt,
 		InviteResendCount: row.InviteResendCount,
+		TokensValidAfter:  row.TokensValidAfter,
 	}
 }

@@ -5,6 +5,7 @@ import { Drawer } from "@/components/shared/Drawer";
 import { PillButton } from "@/components/ui/PillButton";
 import { getErrorMessage } from "@/lib/axios";
 import { withAlpha } from "@/lib/color";
+import { useRequireOnline } from "@/lib/connectivity";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { USER_ROLES, UserRole } from "@/lib/constants";
 import { useInviteUserMutation } from "@/features/users/api/use-invite-user-mutation";
@@ -22,6 +23,7 @@ interface InviteUserModalProps {
 export function InviteUserModal({ visible, onClose }: InviteUserModalProps) {
   const colors = useColors();
   const styles = useStyles();
+  const requireOnline = useRequireOnline();
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<UserRole>(DEFAULT_ROLE);
   const inviteUser = useInviteUserMutation();
@@ -73,7 +75,7 @@ export function InviteUserModal({ visible, onClose }: InviteUserModalProps) {
         <PillButton label="Cancel" variant="outline" onPress={onClose} style={styles.flexButton} />
         <PillButton
           label="Send invite"
-          onPress={submit}
+          onPress={() => requireOnline(submit)}
           loading={inviteUser.isPending}
           disabled={!email.trim()}
           style={styles.flexButton}
