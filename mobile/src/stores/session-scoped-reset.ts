@@ -1,5 +1,6 @@
 import { useSavedBudgetPlanStore } from "@/features/budget-wizard/saved-plan";
 import { userIdFromAccessToken } from "@/lib/jwt";
+import { flushOutbox } from "@/features/transactions/outbox/flush-outbox";
 import { useChatStore } from "@/stores/chat-store";
 import { useSessionStore } from "@/stores/session-store";
 
@@ -45,6 +46,13 @@ interface SessionUserChange {
  * - Saved budget plan: local only and kept per User (never wiped on logout —
  *   a refresh token expiring after a week away must not cost the User their
  *   plan); the store is simply pointed at the new User.
+ * - Saved query cache (specs/mobile-offline-support BR-OFF-P05): detached by
+ *   session-store itself, because that must happen BEFORE the cache clear
+ *   that precedes this call; UserScopedQueryPersistence re-attaches it for
+ *   the next User. Switch keeps the previous User's copy, logout removes it.
+ * - Outbox: per User and NEVER cleared here — not on logout, forced logout,
+ *   revoke-all or switch (BR-OFF-09). The incoming User's own queue is synced
+ *   (US-05 step 1); the flusher's owner guard keeps everyone else's untouched.
  */
 export function handleSessionUserChange({ nextUserId, isRestore }: SessionUserChange): void {
   if (nextUserId === null) {
@@ -53,6 +61,7 @@ export function handleSessionUserChange({ nextUserId, isRestore }: SessionUserCh
   }
   if (!isRestore) afterHydration(useChatStore, () => useChatStore.getState().clear());
   afterHydration(useSavedBudgetPlanStore, () => useSavedBudgetPlanStore.getState().claimFor(nextUserId, isRestore));
+  void flushOutbox("session");
 }
 
 /**

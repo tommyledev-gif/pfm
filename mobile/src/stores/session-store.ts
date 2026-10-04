@@ -5,6 +5,7 @@ import { create } from "zustand";
 import { refreshTokenRequest } from "@/features/auth/api/use-refresh-mutation";
 import { roleFromAccessToken, userIdFromAccessToken, type UserRole } from "@/lib/jwt";
 import { queryClient } from "@/lib/query-client";
+import { detachQueryPersistence } from "@/lib/query-persistence/query-persistence";
 import {
   cancelScheduledRefresh,
   markRefreshDue,
@@ -119,6 +120,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     // mid-session for nothing.
     const previousUserId = userIdFromAccessToken(get().accessToken);
     if (previousUserId === null || previousUserId !== userIdFromAccessToken(accessToken)) {
+      // Detached first, or the clear would be saved as the previous User's
+      // cache. Kept on the device (remove: false) for switching back to them
+      // (specs/mobile-offline-support BR-OFF-P05, EC-OFF-09). The outbox is
+      // per User and is never touched here.
+      await detachQueryPersistence({ remove: false });
       queryClient.clear();
     }
     set({ accessToken, refreshToken, email, role: roleFromAccessToken(accessToken) });
@@ -137,6 +143,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       secureStorage.removeItem(SECURE_STORE_EMAIL_KEY),
       secureStorage.removeItem(SECURE_STORE_ISSUED_AT_KEY),
     ]);
+    // Sign-out (tapped or forced) removes this User's saved cache (S-OFF-18)
+    // but never their outbox (BR-OFF-09).
+    await detachQueryPersistence({ remove: true });
     queryClient.clear();
     set({ accessToken: null, refreshToken: null, email: null, role: null });
   },

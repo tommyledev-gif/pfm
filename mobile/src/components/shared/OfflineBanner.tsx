@@ -8,6 +8,8 @@ import { useIsOnline } from "@/lib/connectivity";
 import { OFFLINE_BANNER_SHOW_DELAY_MS } from "@/lib/constants";
 import { formatTime } from "@/lib/format-date";
 import { createStyles, radii, spacing, typography } from "@/lib/theme";
+import { useOutboxCount } from "@/stores/outbox-store";
+import { useCurrentUserId } from "@/stores/use-current-user-id";
 
 interface OfflineBannerProps {
   // Whether the BottomNav is currently rendered beneath the banner.
@@ -21,6 +23,7 @@ interface OfflineBannerProps {
 const OFFLINE_LABEL = "Đang ngoại tuyến";
 const LAST_UPDATED_LABEL = "dữ liệu lúc";
 const SEPARATOR = " · ";
+const queuedLabel = (count: number) => `${count} giao dịch chờ đồng bộ`;
 // The "last updated" time stands for the whole saved snapshot; Wallets are
 // what every main screen leads with, so their fetch time is the reference.
 const LAST_UPDATED_QUERY_KEY = ["wallets"] as const;
@@ -37,16 +40,21 @@ export function OfflineBanner({ navVisible, dockTop }: OfflineBannerProps) {
   const insets = useSafeAreaInsets();
   const isOnline = useIsOnline();
   const queryClient = useQueryClient();
+  const queuedCount = useOutboxCount(useCurrentUserId());
   const [showOffline, setShowOffline] = useState(false);
 
   const lastUpdatedMs = Math.max(
     0,
     ...queryClient.getQueryCache().findAll({ queryKey: LAST_UPDATED_QUERY_KEY }).map((q) => q.state.dataUpdatedAt),
   );
-  const message =
-    lastUpdatedMs > 0
-      ? `${OFFLINE_LABEL}${SEPARATOR}${LAST_UPDATED_LABEL} ${formatLastUpdated(lastUpdatedMs)}`
-      : OFFLINE_LABEL;
+  // S-OFF-13: the waiting count joins the line only while there is one.
+  const message = [
+    OFFLINE_LABEL,
+    lastUpdatedMs > 0 ? `${LAST_UPDATED_LABEL} ${formatLastUpdated(lastUpdatedMs)}` : null,
+    queuedCount > 0 ? queuedLabel(queuedCount) : null,
+  ]
+    .filter(Boolean)
+    .join(SEPARATOR);
   const position = dockTop
     ? { top: insets.top + spacing.xs }
     : { bottom: (navVisible ? NAV_CLEARANCE : spacing.sm) + insets.bottom };
@@ -68,7 +76,7 @@ export function OfflineBanner({ navVisible, dockTop }: OfflineBannerProps) {
     <View style={[styles.wrapper, position]} pointerEvents="none">
       <View style={styles.pill} testID="banner-offline">
         <View style={styles.dot} />
-        <Text style={styles.text} numberOfLines={1}>
+        <Text style={styles.text} numberOfLines={2}>
           {message}
         </Text>
       </View>

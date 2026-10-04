@@ -16,11 +16,13 @@ import { Toast } from "@/components/shared/Toast";
 import { installConnectivity } from "@/lib/connectivity";
 import { installGlobalErrorLogger } from "@/lib/global-error-logger";
 import { queryClient } from "@/lib/query-client";
+import { UserScopedQueryPersistence } from "@/lib/query-persistence/UserScopedQueryPersistence";
 import { createStyles, useThemeDefinition } from "@/lib/theme";
 import { installSessionResume } from "@/stores/session-resume";
 import { installSessionScopedReset } from "@/stores/session-scoped-reset";
 import { useSessionStore } from "@/stores/session-store";
 import { useThemeStore } from "@/stores/theme-store";
+import { installOutboxSync } from "@/features/transactions/outbox/install-outbox-sync";
 import { useAccountRegistryStore } from "@/features/accounts/account-registry-store";
 import { useSwitchProgressStore } from "@/features/accounts/switch-progress-store";
 
@@ -35,6 +37,8 @@ installSessionScopedReset();
 // onlineManager that installConnectivity() feeds (specs/mobile-offline-support).
 installConnectivity();
 installSessionResume();
+// After connectivity too: its reconnect trigger listens to the same manager.
+installOutboxSync();
 
 // The native splash stays up until BrandSplash — its JS continuation, which
 // adds the wordmark — has laid out beneath it and drops it. Module scope, so
@@ -112,14 +116,16 @@ export default function RootLayout() {
           {!isHydrated ? (
             <View style={styles.splash} />
           ) : (
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Protected guard={hasSession}>
-                <Stack.Screen name="(app)" />
-              </Stack.Protected>
-              <Stack.Protected guard={!hasSession}>
-                <Stack.Screen name="(auth)" />
-              </Stack.Protected>
-            </Stack>
+            <UserScopedQueryPersistence>
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Protected guard={hasSession}>
+                  <Stack.Screen name="(app)" />
+                </Stack.Protected>
+                <Stack.Protected guard={!hasSession}>
+                  <Stack.Screen name="(auth)" />
+                </Stack.Protected>
+              </Stack>
+            </UserScopedQueryPersistence>
           )}
           {/* Rendered above everything, on every screen including login —
               specs/mobile-debug-console/spec.md decision #4. */}

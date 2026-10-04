@@ -7,6 +7,7 @@ import { formatCurrency } from "@/lib/currency";
 import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
+import { PendingBalanceHint, usePendingWalletCount } from "@/features/wallets/components/PendingBalanceHint";
 
 const TYPE_LABEL: Record<Wallet["type"], string> = {
   cash: "Tiền mặt",
@@ -76,6 +77,7 @@ export function WalletStackCard({
   highlightOpacity,
 }: WalletStackCardProps) {
   const styles = useStyles();
+  const pendingCount = usePendingWalletCount(wallet.id);
   // SVG gradient ids must be unique on screen — the loop copies render the
   // same wallet several times. useId's colons are not valid in url(#…).
   const gradientId = `wallet-grad-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
@@ -134,9 +136,15 @@ export function WalletStackCard({
         </View>
 
         <View style={styles.balanceBlock}>
-          <Text style={styles.balanceLabel} numberOfLines={1}>
-            {BALANCE_LABEL[wallet.type]}
-          </Text>
+          {/* The card has no room for a third line: while queued Transactions
+              exist, the "not counted yet" hint takes the label's place. */}
+          {pendingCount > 0 ? (
+            <PendingBalanceHint count={pendingCount} style={styles.balanceLabel} />
+          ) : (
+            <Text style={styles.balanceLabel} numberOfLines={1}>
+              {BALANCE_LABEL[wallet.type]}
+            </Text>
+          )}
           <Text style={styles.balance} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
             {formatCurrency(wallet.balance, wallet.currency)}
           </Text>

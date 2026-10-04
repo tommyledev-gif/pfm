@@ -38,6 +38,28 @@ export const OFFLINE_REFRESH_MESSAGE = "Đang ngoại tuyến — chưa thể l�
 // A connectivity drop shorter than this never shows the offline banner, so
 // a flapping connection does not make it flicker (EC-OFF-04).
 export const OFFLINE_BANNER_SHOW_DELAY_MS = 1500;
+export const OFFLINE_NO_DATA_MESSAGE = "Chưa có dữ liệu đã lưu cho mục này. Kết nối mạng để tải.";
+
+// Per-User saved query cache (US-03). Keep age confirmed by the product owner
+// (spec decision #8); also the gcTime of every allow-listed query, so a
+// restored entry is not garbage-collected before a screen reads it.
+export const QUERY_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+// Part of the persistence buster — bump when a cached response shape changes.
+export const QUERY_CACHE_SCHEMA_VERSION = 1;
+export const QUERY_CACHE_STORAGE_KEY_PREFIX = "pfm_query_cache:";
+export const QUERY_CACHE_PERSIST_THROTTLE_MS = 1000;
+// Transactions lists kept (first page each, most recently fetched first) —
+// bounds the stored blob below Android's ~2 MB AsyncStorage row limit.
+export const MAX_PERSISTED_TRANSACTION_QUERIES = 5;
+
+// Outbox of Transactions recorded offline (US-04..US-07). Cap confirmed by
+// the product owner (spec decision #8).
+export const OUTBOX_STORAGE_KEY = "pfm_outbox";
+export const OUTBOX_MAX_ITEMS_PER_USER = 200;
+// 5xx answers on the same item before it is marked Failed (US-05 step 6).
+export const OUTBOX_MAX_SYSTEM_ERRORS = 5;
+// Minimum gap between flushes started by "a request just succeeded".
+export const OUTBOX_FLUSH_MIN_INTERVAL_MS = 10_000;
 
 // Mirrors common.DefaultListLimit / common.MaxListLimit.
 export const DEFAULT_PAGE_SIZE = 20;
@@ -129,5 +151,7 @@ export const HTTP_STATUS = {
   badRequest: 400,
   unauthorized: 401,
   notFound: 404,
+  requestTimeout: 408,
   tooManyRequests: 429,
+  serverErrorMin: 500,
 } as const;

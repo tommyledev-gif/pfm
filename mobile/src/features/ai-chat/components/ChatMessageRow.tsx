@@ -1,3 +1,5 @@
+import { memo } from "react";
+
 import { ActionPopover } from "@/components/shared/ActionPopover";
 import { FALLBACK_CURRENCY } from "@/lib/constants";
 import { BudgetWizardCard } from "@/features/ai-chat/components/BudgetWizardCard";
@@ -39,8 +41,11 @@ interface ChatMessageRowProps {
  * Extracted from the screen so ai-chat.tsx stays under the 300-line limit and
  * so the swipe/tombstone decision tree lives next to the components it picks
  * between, rather than inside a render callback.
+ *
+ * Memoized (export below): callers pass stable callbacks, so a row re-renders
+ * only when its own message or flags change.
  */
-export function ChatMessageRow({
+function ChatMessageRowView({
   message,
   walletById,
   categoryById,
@@ -144,3 +149,5 @@ export function ChatMessageRow({
     </SwipeableMessageRow>
   );
 }
+
+export const ChatMessageRow = memo(ChatMessageRowView);

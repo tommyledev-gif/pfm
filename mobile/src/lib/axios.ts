@@ -1,6 +1,7 @@
-import axios from "axios";
+import axios, { CanceledError } from "axios";
 
 import { Config } from "@/lib/config";
+import { userIdFromAccessToken } from "@/lib/jwt";
 import { redact } from "@/lib/redact";
 import { useDebugLogStore } from "@/stores/debug-log-store";
 import { useSessionStore } from "@/stores/session-store";
@@ -16,8 +17,28 @@ export const apiClient = axios.create({
   timeout: 15_000,
 });
 
+// A request made on behalf of one specific User (the outbox flusher) names
+// them here. Optional, so every other request is unaffected.
+declare module "axios" {
+  interface AxiosRequestConfig {
+    ownerUserId?: string;
+  }
+}
+
+export const OWNER_MISMATCH_MESSAGE = "request owner is not the signed-in user";
+
+// ⚠️ Owner guard (specs/mobile-offline-support BR-OFF-P06, plan Finding #7):
+// a queued item of User A must never be booked with User B's session — an
+// account switch between enqueue and send makes this a real path.
+function ownerMismatch(ownerUserId: string | undefined, accessToken: string | null): boolean {
+  return ownerUserId !== undefined && userIdFromAccessToken(accessToken) !== ownerUserId;
+}
+
 apiClient.interceptors.request.use((config) => {
   const { accessToken } = useSessionStore.getState();
+  if (ownerMismatch(config.ownerUserId, accessToken)) {
+    throw new CanceledError(OWNER_MISMATCH_MESSAGE);
+  }
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }
@@ -118,6 +139,9 @@ apiClient.interceptors.response.use(
     if (canRetryWithRefresh) {
       try {
         const newAccessToken = await useSessionStore.getState().refreshSession();
+        // The refresh may have landed on another User's session; the request
+        // is then rejected with its original 401 instead of being re-sent.
+        if (ownerMismatch(config.ownerUserId, newAccessToken)) return Promise.reject(error);
         config._retried = true;
         config.headers = { ...config.headers, Authorization: `Bearer ${newAccessToken}` };
         return apiClient.request(config);

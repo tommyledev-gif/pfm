@@ -1,5 +1,8 @@
 import { QueryClient } from "@tanstack/react-query";
 
+import { QUERY_CACHE_MAX_AGE_MS } from "@/lib/constants";
+import { PERSISTED_QUERY_ROOTS } from "@/lib/query-persistence/persist-policy";
+
 // Single QueryClient instance, provided once in app/_layout.tsx — mirrors
 // frontend/src/lib/query-client.ts. All server state (wallets, transactions,
 // etc., once those features exist) flows through TanStack Query here, never
@@ -34,6 +37,12 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+// Saved-for-offline queries live as long as their saved copy may be shown
+// (specs/mobile-offline-support BR-OFF-P08): with the default 5-minute gcTime
+// a restored entry that no screen has mounted yet would be dropped — and the
+// next save would then erase it from the device as well.
+PERSISTED_QUERY_ROOTS.forEach((root) => queryClient.setQueryDefaults([root], { gcTime: QUERY_CACHE_MAX_AGE_MS }));
 
 // Home's snapshot card (wallets/budgets/report-summary/categories) is read
 // far more often than it changes — a 5-minute staleTime well past the

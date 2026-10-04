@@ -14,6 +14,8 @@ import { formatCurrencyCompact } from "@/lib/currency";
 import { monthRange } from "@/lib/date-range";
 import { formatDateRange } from "@/lib/format-date";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
+import { isWaitingForNetwork } from "@/lib/query-status";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { daysInRange, proratedLimit } from "@/features/budgets/budget-pace";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
@@ -61,6 +63,7 @@ export function SpendingTab({ focusCategoryId, focusNonce }: SpendingTabProps = 
   if (summary.isLoading) {
     return <SpendingTabSkeleton />;
   }
+  if (isWaitingForNetwork(summary)) return <OfflinePlaceholder />;
   if (!summary.data) {
     return <Text style={styles.empty}>Không thể tải báo cáo.</Text>;
   }

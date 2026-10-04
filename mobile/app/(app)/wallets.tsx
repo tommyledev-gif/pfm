@@ -7,6 +7,8 @@ import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { Screen } from "@/components/shared/Screen";
 import { WALLET_TYPES, WalletType } from "@/lib/constants";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
+import { isWaitingForNetwork } from "@/lib/query-status";
 import { useHighlightFade } from "@/lib/use-highlight-fade";
 import { useUiPrefsStore, WalletsViewMode } from "@/stores/ui-prefs-store";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
@@ -144,6 +146,8 @@ export default function WalletsScreen() {
           <View style={styles.cardsPinned}>
             {wallets.isLoading ? (
               <WalletCardSkeleton />
+            ) : isWaitingForNetwork(wallets) ? (
+              <OfflinePlaceholder />
             ) : (
               <WalletCarousel
                 wallets={wallets.data ?? []}
@@ -173,6 +177,8 @@ export default function WalletsScreen() {
         </View>
       ) : wallets.isLoading ? (
         <ActivityIndicator color={colors.green} style={styles.loader} />
+      ) : isWaitingForNetwork(wallets) ? (
+        <OfflinePlaceholder />
       ) : (
         <SectionList
           ref={listRef}

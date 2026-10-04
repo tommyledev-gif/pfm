@@ -6,6 +6,8 @@ import { useTransactionsQuery } from "@/features/transactions/api/use-transactio
 import { TransactionRowSkeleton } from "@/features/transactions/components/TransactionRowSkeleton";
 import { Wallet } from "@/features/wallets/types";
 import { spacing, typography, createStyles } from "@/lib/theme";
+import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
+import { isWaitingForNetwork } from "@/lib/query-status";
 
 interface WalletRecentTransactionsProps {
   wallet: Wallet;
@@ -31,6 +33,8 @@ export function WalletRecentTransactions({ wallet }: WalletRecentTransactionsPro
       <Text style={styles.title}>Gần đây trong ví này</Text>
       {transactions.isLoading ? (
         Array.from({ length: RECENT_LIMIT }).map((_, i) => <TransactionRowSkeleton key={i} />)
+      ) : isWaitingForNetwork(transactions) ? (
+        <OfflinePlaceholder />
       ) : transactions.isError ? (
         <Text style={styles.empty}>Không tải được giao dịch của ví này.</Text>
       ) : items.length === 0 ? (

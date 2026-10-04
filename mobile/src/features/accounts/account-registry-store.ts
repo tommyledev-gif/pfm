@@ -5,6 +5,7 @@ import {
   SECURE_STORE_ACCOUNTS_KEY,
   SECURE_STORE_SWITCH_TOKEN_KEY_PREFIX,
 } from "@/lib/constants";
+import { removeUserQueryCache } from "@/lib/query-persistence/user-cache-persister";
 import { secureStorage } from "@/lib/secure-storage";
 import { useSavedBudgetPlanStore } from "@/features/budget-wizard/saved-plan";
 import { useRecentPhrasesStore } from "@/stores/recent-phrases-store";
@@ -67,6 +68,9 @@ function removeLocalUserData(userId: string): void {
   useSavedBudgetPlanStore.getState().removeUser(userId);
   useSavedPhrasesStore.getState().removeUser(userId);
   useRecentPhrasesStore.getState().removeUser(userId);
+  // Their saved read cache goes too — but never their outbox, which only the
+  // owner may discard (specs/mobile-offline-support BR-OFF-09).
+  void removeUserQueryCache(userId);
 }
 
 /**

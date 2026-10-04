@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, SectionList, Text, View } from "react-native";
+import { Pressable, SectionList } from "react-native";
 
 import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
 import { Screen } from "@/components/shared/Screen";
@@ -8,7 +8,7 @@ import { TransactionRow } from "@/components/shared/TransactionRow";
 import { monthRange } from "@/lib/date-range";
 import { formatDateRange } from "@/lib/format-date";
 import { useRefresh } from "@/lib/use-refresh";
-import { spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { spacing, createStyles } from "@/lib/theme";
 import { TransactionKind } from "@/lib/constants";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useTransactionsQuery } from "@/features/transactions/api/use-transactions-query";
@@ -20,7 +20,10 @@ import { rangeTargetsFuture, splitFutureTransactions } from "@/features/transact
 import { FutureTransactionsCard } from "@/features/transactions/components/FutureTransactionsCard";
 import { FutureTransactionsDialog } from "@/features/transactions/components/FutureTransactionsDialog";
 import { TransactionFormModal } from "@/features/transactions/components/TransactionFormModal";
-import { TransactionRowSkeleton } from "@/features/transactions/components/TransactionRowSkeleton";
+import { ManualDraftEditor } from "@/features/transactions/components/ManualDraftEditor";
+import { TransactionsListEmpty, TransactionsListFooter } from "@/features/transactions/components/TransactionsListStates";
+import { PendingSyncSection } from "@/features/transactions/components/PendingSyncSection";
+import { PendingSyncEditor } from "@/features/transactions/components/PendingSyncEditor";
 import { TransactionDayHeader } from "@/features/transactions/components/TransactionDayHeader";
 import { useCollapsedDays } from "@/features/transactions/hooks/use-collapsed-days";
 import { TransactionsHeader, TypeFilterValue } from "@/features/transactions/components/TransactionsHeader";
@@ -29,11 +32,9 @@ import { SortDrawerModal } from "@/features/transactions/components/SortDrawerMo
 import { isDefaultSort, sortTransactions, SORT_OPTIONS, SortKey } from "@/features/transactions/sort";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 
-const LIST_SKELETON_COUNT = 6;
 const SEARCH_DEBOUNCE_MS = 400;
 
 export default function TransactionsScreen() {
-  const colors = useColors();
   const styles = useStyles();
   const [filter, setFilter] = useState<TransactionKind | undefined>(undefined);
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
@@ -193,6 +194,7 @@ export default function TransactionsScreen() {
             exporting={transactionIO.exporting}
             importing={transactionIO.importing}
           >
+            <PendingSyncSection />
             <FutureTransactionsCard transactions={future} onPress={() => setFutureOpen(true)} />
           </TransactionsHeader>
         }
@@ -213,20 +215,8 @@ export default function TransactionsScreen() {
             />
           </Pressable>
         )}
-        ListEmptyComponent={
-          transactions.isLoading ? (
-            <View>
-              {Array.from({ length: LIST_SKELETON_COUNT }).map((_, i) => (
-                <TransactionRowSkeleton key={i} />
-              ))}
-            </View>
-          ) : (
-            <Text style={styles.empty}>Không tìm thấy giao dịch nào.</Text>
-          )
-        }
-        ListFooterComponent={
-          transactions.isFetchingNextPage ? <ActivityIndicator color={colors.green} style={styles.loader} /> : null
-        }
+        ListEmptyComponent={<TransactionsListEmpty query={transactions} />}
+        ListFooterComponent={<TransactionsListFooter query={transactions} />}
       />
 
       <Fab
@@ -280,6 +270,8 @@ export default function TransactionsScreen() {
         }}
       />
 
+      <PendingSyncEditor />
+      <ManualDraftEditor />
       {transactionIO.modal}
     </Screen>
   );
@@ -288,6 +280,4 @@ export default function TransactionsScreen() {
 const useStyles = createStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bgApp },
   content: { paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: 140, gap: spacing.md },
-  loader: { marginVertical: spacing.lg },
-  empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
 }));

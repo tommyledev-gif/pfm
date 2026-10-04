@@ -10,6 +10,7 @@ import { useRequireOnline } from "@/lib/connectivity";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
 import { useSetDefaultWalletMutation } from "@/features/wallets/api/use-set-default-wallet-mutation";
+import { PendingBalanceHint, usePendingWalletCount } from "@/features/wallets/components/PendingBalanceHint";
 
 const TYPE_LABEL: Record<Wallet["type"], string> = {
   cash: "Tiền mặt",
@@ -30,6 +31,7 @@ export function WalletListItem({ wallet, onPress, highlightOpacity }: WalletList
   const styles = useStyles();
   const requireOnline = useRequireOnline();
   const setDefault = useSetDefaultWalletMutation();
+  const pendingCount = usePendingWalletCount(wallet.id);
   // Setting a new default silently swapped it under the user with no way to
   // back out of an accidental tap — a confirm step first, same convention as
   // CategoryListItem's delete prompt, just non-destructive (tone="default").
@@ -54,6 +56,7 @@ export function WalletListItem({ wallet, onPress, highlightOpacity }: WalletList
           <Text style={styles.sub}>
             {TYPE_LABEL[wallet.type]} · {formatCurrency(wallet.balance, wallet.currency)}
           </Text>
+          <PendingBalanceHint count={pendingCount} style={styles.sub} />
         </View>
         {!wallet.is_default ? (
           <Pressable

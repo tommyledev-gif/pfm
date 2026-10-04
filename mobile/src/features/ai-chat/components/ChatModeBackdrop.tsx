@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Animated, StyleSheet } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 
@@ -26,17 +26,27 @@ export function ChatModeBackdrop({ mode }: { mode: ChatMode }) {
     >,
   ).current;
 
+  // Only the washes actually visible are mounted: the current one, plus the
+  // outgoing one while it fades. Three full-screen SVG gradients drawn at once
+  // were a large part of what made the tab slow to show.
+  const [mounted, setMounted] = useState<ChatMode[]>([mode]);
+
   useEffect(() => {
-    Animated.parallel(
+    setMounted((prev) => (prev.includes(mode) ? prev : [...prev, mode]));
+    const fade = Animated.parallel(
       CHAT_MODE_ORDER.map((m) =>
         Animated.timing(opacities[m], { toValue: m === mode ? 1 : 0, duration: CROSSFADE_MS, useNativeDriver: true }),
       ),
-    ).start();
+    );
+    fade.start(({ finished }) => {
+      if (finished) setMounted([mode]);
+    });
+    return () => fade.stop();
   }, [mode, opacities]);
 
   return (
     <>
-      {CHAT_MODE_ORDER.map((m) => (
+      {CHAT_MODE_ORDER.filter((m) => mounted.includes(m)).map((m) => (
         <Animated.View key={m} pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: opacities[m] }]}>
           <ModeWash mode={m} />
         </Animated.View>

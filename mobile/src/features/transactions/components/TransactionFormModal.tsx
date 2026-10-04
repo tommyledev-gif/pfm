@@ -14,6 +14,8 @@ import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { TRANSACTION_KIND_LABELS, TRANSACTION_KINDS } from "@/lib/constants";
 import { Transaction } from "@/features/transactions/types";
+import { OutboxItem } from "@/features/transactions/outbox/outbox-types";
+import { TransactionDraft } from "@/features/transactions/draft-from-text";
 import { TransactionKeypadFooter } from "@/features/transactions/components/TransactionKeypadFooter";
 import { WalletChipRow } from "@/features/transactions/components/WalletChipRow";
 import { useTransactionForm } from "@/features/transactions/components/use-transaction-form";
@@ -24,7 +26,11 @@ interface TransactionFormModalProps {
   visible: boolean;
   onClose: () => void;
   editingTransaction?: Transaction | null;
+  editingQueued?: OutboxItem | null;
+  draft?: TransactionDraft | null;
 }
+
+const NO_SAVED_WALLETS_MESSAGE = "Kết nối mạng để tải danh sách ví.";
 
 // Manual "Add/Edit Transaction" form — the AI Chat screen was previously the
 // only way to create a transaction on mobile. Backend PATCH doesn't accept
@@ -35,7 +41,7 @@ interface TransactionFormModalProps {
 // wallets) scroll in the body, while the amount — typed on a calculator
 // keypad instead of the OS keyboard — sits in the pinned footer with the
 // category chip, the note, the date key and the ✓ key that saves.
-export function TransactionFormModal({ visible, onClose, editingTransaction }: TransactionFormModalProps) {
+export function TransactionFormModal({ visible, onClose, editingTransaction, editingQueued, draft }: TransactionFormModalProps) {
   const colors = useColors();
   const styles = useStyles();
   const {
@@ -62,6 +68,8 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
     formKey,
     deleteTransaction,
     mutation,
+    saving,
+    noSavedWallets,
     errors,
     hasErrors,
     selectedWallet,
@@ -70,7 +78,7 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
     transferTarget,
     submit,
     categoryPicker,
-  } = useTransactionForm({ visible, onClose, editingTransaction });
+  } = useTransactionForm({ visible, onClose, editingTransaction, editingQueued, draft });
   const requireOnline = useRequireOnline();
 
   const activeError = mutation.isError ? mutation.error : deleteTransaction.isError ? deleteTransaction.error : null;
@@ -98,18 +106,18 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
             errors={submitAttempted ? [errors.category, errors.amount] : []}
             submitError={activeError ? getErrorMessage(activeError, "Không thể lưu giao dịch") : null}
             onSubmit={submit}
-            submitting={mutation.isPending}
+            submitting={saving}
           />
         }
       >
         <DrawerHeader
-          title={isEditing ? "Sửa giao dịch" : "Giao dịch mới"}
+          title={isEditing || editingQueued ? "Sửa giao dịch" : "Giao dịch mới"}
           actions={[
             { label: "Hủy", onPress: onClose, variant: "secondary" },
             {
               label: isEditing ? "Lưu" : "Tạo",
               onPress: submit,
-              disabled: mutation.isPending || (submitAttempted && hasErrors),
+              disabled: saving || noSavedWallets || (submitAttempted && hasErrors),
               testID: "btn-transaction-submit",
             },
           ]}
@@ -148,6 +156,7 @@ export function TransactionFormModal({ visible, onClose, editingTransaction }: T
             setToWalletId(null);
           }}
         />
+        {noSavedWallets ? <Text style={styles.balanceHint}>{NO_SAVED_WALLETS_MESSAGE}</Text> : null}
         {submitAttempted ? <FieldError message={errors.wallet} /> : null}
         {selectedWallet ? (
           <Text style={styles.balanceHint}>

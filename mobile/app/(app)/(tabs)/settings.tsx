@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
@@ -21,6 +21,9 @@ import { RevealableAmount } from "@/components/shared/RevealableAmount";
 import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useSessionStore } from "@/stores/session-store";
+import { outboxItemsFor } from "@/stores/outbox-store";
+import { useCurrentUserId } from "@/stores/use-current-user-id";
+import { LogoutGuardDialog } from "@/features/settings/components/LogoutGuardDialog";
 import { accountDisplayName } from "@/features/accounts/account-registry-store";
 import { AccountSwitchRow } from "@/features/accounts/components/AccountSwitchRow";
 import { useLogout } from "@/features/accounts/hooks/use-logout";
@@ -65,6 +68,8 @@ export default function SettingsScreen() {
   const lastPushAt = useRef(0);
   const email = useSessionStore((s) => s.email);
   const role = useSessionStore((s) => s.role);
+  const userId = useCurrentUserId();
+  const [logoutGuardOpen, setLogoutGuardOpen] = useState(false);
   const { loggingOut, logout } = useLogout();
   const wallets = useWalletsQuery();
   const summary = useReportSummaryQuery();
@@ -81,6 +86,9 @@ export default function SettingsScreen() {
     lastPushAt.current = now;
     router.push(href);
   };
+
+  // Unsynced Transactions first get a choice (specs/mobile-offline-support US-07).
+  const requestLogout = () => (outboxItemsFor(userId).length > 0 ? setLogoutGuardOpen(true) : logout());
 
   return (
     <Screen>
@@ -146,7 +154,7 @@ export default function SettingsScreen() {
 
       <Pressable
         style={[styles.logoutRow, loggingOut && styles.logoutRowBusy]}
-        onPress={logout}
+        onPress={requestLogout}
         disabled={loggingOut}
         accessibilityRole="button"
         accessibilityState={{ disabled: loggingOut, busy: loggingOut }}
@@ -160,6 +168,14 @@ export default function SettingsScreen() {
     {/* Logout: flush + server calls run up to LOGOUT_FLUSH_TIMEOUT_MS
         (features/accounts/hooks/use-logout.ts); nothing may be tapped
         meanwhile — the button's own spinner says what is happening. */}
+    <LogoutGuardDialog
+      visible={logoutGuardOpen && !loggingOut}
+      onCancel={() => setLogoutGuardOpen(false)}
+      onLogout={() => {
+        setLogoutGuardOpen(false);
+        logout();
+      }}
+    />
     <BusyOverlay visible={loggingOut} testID="overlay-settings-logout" />
     </Screen>
   );

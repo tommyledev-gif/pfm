@@ -1,18 +1,21 @@
 import { useEffect, useState } from "react";
 import { Keyboard } from "react-native";
 
-import { useRequireOnline } from "@/lib/connectivity";
+import { useIsOnline, useRequireOnline } from "@/lib/connectivity";
 import { TransactionKind } from "@/lib/constants";
 import { newIdempotencyKey } from "@/lib/idempotency-key";
 import { useAmountExpression } from "@/lib/use-amount-expression";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useCategoryPicker } from "@/features/categories/components/use-category-picker";
-import { useCreateTransactionMutation } from "@/features/transactions/api/use-create-transaction-mutation";
 import { useUpdateTransactionMutation } from "@/features/transactions/api/use-update-transaction-mutation";
 import { useDeleteTransactionMutation } from "@/features/transactions/api/use-delete-transaction-mutation";
 import { todayDateOnly } from "@/lib/date-range";
 import { Transaction } from "@/features/transactions/types";
+import { TransactionDraft } from "@/features/transactions/draft-from-text";
+import { OutboxItem, OutboxPayload } from "@/features/transactions/outbox/outbox-types";
+import { buildQueuedDisplay } from "@/features/transactions/outbox/queued-display";
+import { useSaveOrQueue } from "@/features/transactions/components/use-save-or-queue";
 
 // Until a wallet is picked there is no currency of its own; VND is the app's
 // home currency and the strictest one (no decimals), so nothing typed before
@@ -23,6 +26,10 @@ interface UseTransactionFormOptions {
   visible: boolean;
   onClose: () => void;
   editingTransaction?: Transaction | null;
+  // A not-yet-synced item of the outbox: edited as the create it still is.
+  editingQueued?: OutboxItem | null;
+  // A new Transaction pre-filled from typed text (the AI chat's offline hand-over).
+  draft?: TransactionDraft | null;
 }
 
 /**
@@ -30,7 +37,7 @@ interface UseTransactionFormOptions {
  * modal file stays under the 300-line limit once transfers added their own
  * destination wallet and rules. The modal only lays out what this returns.
  */
-export function useTransactionForm({ visible, onClose, editingTransaction }: UseTransactionFormOptions) {
+export function useTransactionForm({ visible, onClose, editingTransaction, editingQueued, draft }: UseTransactionFormOptions) {
   const isEditing = Boolean(editingTransaction);
   const wallets = useWalletsQuery();
   const [walletId, setWalletId] = useState<string | null>(null);
@@ -63,11 +70,15 @@ export function useTransactionForm({ visible, onClose, editingTransaction }: Use
   // there (GetTransactionByIdempotencyKey) instead of booking it twice.
   const [idempotencyKey, setIdempotencyKey] = useState(newIdempotencyKey);
 
-  const createTransaction = useCreateTransactionMutation();
+  const { createTransaction, save, saveQueued, queueing } = useSaveOrQueue();
+  const isOnline = useIsOnline();
   const updateTransaction = useUpdateTransactionMutation();
   const deleteTransaction = useDeleteTransactionMutation();
   const requireOnline = useRequireOnline();
   const mutation = isEditing ? updateTransaction : createTransaction;
+  const saving = mutation.isPending || queueing;
+  // Offline before any Wallet was ever loaded: nothing to pick (S-OFF-27).
+  const noSavedWallets = !isOnline && !wallets.data?.length;
 
   useEffect(() => {
     if (!visible) return;
@@ -79,18 +90,27 @@ export function useTransactionForm({ visible, onClose, editingTransaction }: Use
       resetAmount(editingTransaction.amount);
       setNote(editingTransaction.note ?? "");
       setOccurredAt(editingTransaction.occurred_at.slice(0, 10));
+    } else if (editingQueued) {
+      const queued = editingQueued.payload;
+      setWalletId(queued.wallet_id);
+      setType(queued.type);
+      setCategoryId(queued.category_id ?? null);
+      setToWalletId(queued.to_wallet_id ?? null);
+      resetAmount(queued.amount);
+      setNote(queued.note ?? "");
+      setOccurredAt(queued.occurred_at ?? todayDateOnly());
     } else {
       const defaultWallet = wallets.data?.find((w) => w.is_default) ?? wallets.data?.[0];
       setWalletId(defaultWallet?.id ?? null);
       setType("expense");
       setCategoryId(null);
       setToWalletId(null);
-      resetAmount(null);
-      setNote("");
+      resetAmount(draft?.amountCents ?? null);
+      setNote(draft?.note ?? "");
       setOccurredAt(todayDateOnly());
     }
     setSubmitAttempted(false);
-  }, [visible, editingTransaction, wallets.data, resetAmount]);
+  }, [visible, editingTransaction, editingQueued, draft, wallets.data, resetAmount]);
 
   // Separate from the reset above on purpose: that effect also re-runs
   // whenever `wallets.data` refetches in the background (e.g. right after
@@ -138,7 +158,7 @@ export function useTransactionForm({ visible, onClose, editingTransaction }: Use
     setSubmitAttempted(true);
     // A second tap while the first request is still in flight is dropped
     // here; the idempotency key covers the tap that slips past this check.
-    if (mutation.isPending) return;
+    if (saving || noSavedWallets) return;
     // Resolved here rather than read from `amountCents`: the header's "Lưu"
     // can be tapped mid-expression ("120+"), which this trims/evaluates in
     // place so what is saved is exactly what the display then shows.
@@ -164,18 +184,19 @@ export function useTransactionForm({ visible, onClose, editingTransaction }: Use
         ),
       );
     } else {
-      createTransaction.mutate(
-        {
-          wallet_id: walletId,
-          ...(isTransfer ? { to_wallet_id: toWalletId ?? undefined } : { category_id: categoryId ?? undefined }),
-          amount: cents,
-          type,
-          occurred_at: occurredAt,
-          note: note || undefined,
-          idempotency_key: idempotencyKey,
-        },
-        { onSuccess: onClose },
-      );
+      // occurred_at is always the picked date, never the sync time (S-OFF-29).
+      const payload: OutboxPayload = {
+        wallet_id: walletId,
+        ...(isTransfer ? { to_wallet_id: toWalletId ?? undefined } : { category_id: categoryId ?? undefined }),
+        amount: cents,
+        type,
+        occurred_at: occurredAt,
+        note: note || undefined,
+        idempotency_key: editingQueued?.idempotency_key ?? idempotencyKey,
+      };
+      const display = buildQueuedDisplay(payload, wallets.data, categories.data);
+      if (editingQueued) saveQueued(editingQueued.idempotency_key, payload, display, onClose);
+      else save(payload, display, onClose);
     }
   };
 
@@ -209,6 +230,8 @@ export function useTransactionForm({ visible, onClose, editingTransaction }: Use
     formKey,
     deleteTransaction,
     mutation,
+    saving,
+    noSavedWallets,
     errors,
     hasErrors,
     selectedWallet,

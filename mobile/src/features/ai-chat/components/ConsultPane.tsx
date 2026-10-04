@@ -5,6 +5,7 @@ import { TypingIndicator } from "@/components/shared/TypingIndicator";
 import { ChatComposer } from "@/features/ai-chat/components/ChatComposer";
 import { ChatInputBar } from "@/features/ai-chat/components/ChatInputBar";
 import { ChatThreadList } from "@/features/ai-chat/components/ChatThreadList";
+import { KeyboardLiftView } from "@/features/ai-chat/components/KeyboardLiftView";
 import { ConsultMessageRow } from "@/features/ai-chat/components/ConsultMessageRow";
 import { useChatThreadStyles } from "@/features/ai-chat/components/chat-thread-styles";
 import { isConsultMessage } from "@/features/ai-chat/consult-message";
@@ -18,7 +19,6 @@ import { useChatStore } from "@/stores/chat-store";
 
 interface ConsultPaneProps {
   keyboardVisible: boolean;
-  keyboardHeight: number;
   bottomInset: number;
   /** `prefill` = the question to carry into the recording input. */
   onSwitchToRecording: (prefill?: string) => void;
@@ -32,7 +32,6 @@ interface ConsultPaneProps {
  */
 export function ConsultPane({
   keyboardVisible,
-  keyboardHeight,
   bottomInset,
   onSwitchToRecording,
 }: ConsultPaneProps) {
@@ -59,58 +58,59 @@ export function ConsultPane({
 
   return (
     <View style={consultStyles.pane}>
-      <ChatThreadList
-        listRef={listRef}
-        data={messages}
-        keyExtractor={(m) => m.id}
-        // Each row spaces itself (ConsultMessageRow) — a uniform gap is what
-        // made every message sit the same distance from every other.
-        contentContainerStyle={[styles.thread, consultStyles.thread]}
-        keyboardShouldPersistTaps="handled"
-        reservedBottom={composerHeight}
-        renderItem={({ item, index }) => {
-          // Newest first (inverted), so the message before this one is next.
-          const previous = messages[index + 1];
-          const startsTurn = previous !== undefined && (item.role === "user" || previous.role === "assistant");
-          return <ConsultMessageRow message={item} startsTurn={startsTurn} handlers={consult.handlers} />;
-        }}
-        // No quoted example question here: it would look tappable and is
-        // not — the real, tappable ones are the chips right above the input.
-        ListEmptyComponent={<Text style={styles.hint}>Hỏi mình về chi tiêu của bạn, hoặc chọn một gợi ý bên dưới.</Text>}
-        ListHeaderComponent={
-          consult.sending ? (
-            <View style={[styles.typingRow, consultStyles.typing]}>
-              <TypingIndicator />
-            </View>
-          ) : null
-        }
-      />
-
-      <ChatComposer onHeightChange={setComposerHeight}>
-        <ChatInputBar
-          value={input}
-          onChangeText={setInput}
-          // Online-only (AC-OFF-08): offline, the typed text stays in the box.
-          onSend={() =>
-            requireOnline(() => {
-              const text = input;
-              setInput("");
-              consult.sendConsult(text);
-            })
-          }
-          sending={consult.sending}
-          keyboardVisible={keyboardVisible}
-          keyboardHeight={keyboardHeight}
-          bottomInset={bottomInset}
-          mode="consult"
-          quickActions={
-            <StarterChipsRow
-              onAsk={(query, label) => requireOnline(() => consult.askQuery(query, label))}
-              disabled={consult.sending}
-            />
+      <KeyboardLiftView>
+        <ChatThreadList
+          listRef={listRef}
+          data={messages}
+          keyExtractor={(m) => m.id}
+          // Each row spaces itself (ConsultMessageRow) — a uniform gap is what
+          // made every message sit the same distance from every other.
+          contentContainerStyle={[styles.thread, consultStyles.thread]}
+          keyboardShouldPersistTaps="handled"
+          reservedBottom={composerHeight}
+          renderItem={({ item, index }) => {
+            // Newest first (inverted), so the message before this one is next.
+            const previous = messages[index + 1];
+            const startsTurn = previous !== undefined && (item.role === "user" || previous.role === "assistant");
+            return <ConsultMessageRow message={item} startsTurn={startsTurn} handlers={consult.handlers} />;
+          }}
+          // No quoted example question here: it would look tappable and is
+          // not — the real, tappable ones are the chips right above the input.
+          ListEmptyComponent={<Text style={styles.hint}>Hỏi mình về chi tiêu của bạn, hoặc chọn một gợi ý bên dưới.</Text>}
+          ListHeaderComponent={
+            consult.sending ? (
+              <View style={[styles.typingRow, consultStyles.typing]}>
+                <TypingIndicator />
+              </View>
+            ) : null
           }
         />
-      </ChatComposer>
+
+        <ChatComposer onHeightChange={setComposerHeight}>
+          <ChatInputBar
+            value={input}
+            onChangeText={setInput}
+            // Online-only (AC-OFF-08): offline, the typed text stays in the box.
+            onSend={() =>
+              requireOnline(() => {
+                const text = input;
+                setInput("");
+                consult.sendConsult(text);
+              })
+            }
+            sending={consult.sending}
+            keyboardVisible={keyboardVisible}
+            bottomInset={bottomInset}
+            mode="consult"
+            quickActions={
+              <StarterChipsRow
+                onAsk={(query, label) => requireOnline(() => consult.askQuery(query, label))}
+                disabled={consult.sending}
+              />
+            }
+          />
+        </ChatComposer>
+      </KeyboardLiftView>
     </View>
   );
 }

@@ -23,6 +23,11 @@ const FADE_MS = 200;
 const RISE_DISTANCE = 8;
 const SCROLL_THROTTLE_MS = 16;
 const FAB_SIZE = 40;
+// Screens' worth of rows kept rendered around the viewport. FlatList's default
+// (21) keeps ten screens above and below mounted; chat rows carry swipe
+// handlers, cards and icons, and that much of the thread made the tab slow to
+// show and the JS thread slow to answer taps.
+const THREAD_WINDOW_SIZE = 7;
 
 /**
  * A chat thread (inverted: offset 0 is the newest message) with a
@@ -63,6 +68,7 @@ export function ChatThreadList({ listRef, style, reservedBottom = 0, contentCont
         style={[chatThreadStyles.list, style]}
         onScroll={handleScroll}
         scrollEventThrottle={SCROLL_THROTTLE_MS}
+        windowSize={THREAD_WINDOW_SIZE}
         // Inverted: paddingTop renders at the visual bottom.
         contentContainerStyle={[contentContainerStyle, { paddingTop: reservedBottom + spacing.md }]}
         {...listProps}

@@ -3,16 +3,10 @@ import { Pressable, Text, TextInput, View } from "react-native";
 
 import { SendIcon, SparkleIcon } from "@/components/ui/Icon";
 import { CHAT_MODE_META, ChatMode } from "@/features/ai-chat/chat-mode";
+import { COMPOSER_NAV_CLEARANCE } from "@/features/ai-chat/components/chat-composer-metrics";
 import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
-// BottomNav sits flush at the safe-area inset, stands 64 tall, and floats its
-// active-tab ball another 24 above that — this is how far above the screen's
-// bottom edge the input bar must sit to clear the ball while the keyboard is
-// closed.
-const NAV_CLEARANCE = 104;
-// Small gap between the bar and the top of an open keyboard.
-const KEYBOARD_GAP = spacing.sm;
 // The field's fill is only one step off the ground, so without an edge of
 // its own the input area all but disappears; a faint ring in the mode's
 // colour marks it out. Focus brightens it to say "typing here" — still short
@@ -26,7 +20,6 @@ interface ChatInputBarProps {
   onSend: () => void;
   sending: boolean;
   keyboardVisible: boolean;
-  keyboardHeight: number;
   bottomInset: number;
   /** The recording pane's "Lập ngân sách" chip; omitted in analysis mode. */
   onOpenBudgetWizard?: () => void;
@@ -46,7 +39,6 @@ export function ChatInputBar({
   onSend,
   sending,
   keyboardVisible,
-  keyboardHeight,
   bottomInset,
   onOpenBudgetWizard,
   mode,
@@ -86,12 +78,11 @@ export function ChatInputBar({
       <View
         style={[
           styles.inputBar,
-          // keyboardHeight is what still needs reserving after the OS has had
-          // its say: on a device whose window really does shrink around the
-          // keyboard it comes back near zero and only the gap is added, while
-          // on one that does not it is the full height. Adding it
-          // unconditionally left a dead gap a whole keyboard tall.
-          { marginBottom: keyboardVisible ? keyboardHeight + KEYBOARD_GAP : bottomInset + NAV_CLEARANCE },
+          // Always the resting clearance: the pane's KeyboardLiftView raises
+          // the whole composer with the keyboard, frame by frame. Switching
+          // this margin on keyboard events made the bar jump after the
+          // keyboard instead of moving with it.
+          { marginBottom: bottomInset + COMPOSER_NAV_CLEARANCE },
           { borderColor: withAlpha(tint, focused ? FOCUS_RING_ALPHA : IDLE_RING_ALPHA) },
         ]}
       >

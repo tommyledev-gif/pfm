@@ -152,7 +152,6 @@ export default function AiChatScreen() {
         {mode === "consult" ? (
           <ConsultPane
             keyboardVisible={keyboardVisible}
-            keyboardHeight={keyboardHeight}
             bottomInset={insets.bottom}
             onSwitchToRecording={handleSwitchToRecording}
           />

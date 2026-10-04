@@ -5,13 +5,16 @@ import { useRouter } from "expo-router";
 import { PlusIcon } from "@/components/ui/Icon";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
 import { Screen } from "@/components/shared/Screen";
 import { TopBar } from "@/components/shared/TopBar";
 import { TransactionRow } from "@/components/shared/TransactionRow";
 import { previousPeriodLabel } from "@/lib/date-range";
+import { isWaitingForNetwork } from "@/lib/query-status";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useRefresh } from "@/lib/use-refresh";
 import { PendingConfirmationsSection } from "@/features/ai-chat/components/PendingConfirmationsSection";
+import { HomePendingSyncSection } from "@/features/transactions/components/HomePendingSyncSection";
 import { useTransactionRemoval } from "@/features/ai-chat/components/use-transaction-removal";
 import { removalDialogCopy } from "@/features/ai-chat/removal-copy";
 import { isPendingProposal } from "@/features/ai-chat/pending";
@@ -152,6 +155,8 @@ export default function HomeScreen() {
               onRequestRemove={removal.request}
             />
 
+            <HomePendingSyncSection />
+
             <View style={styles.section}>
               <View style={styles.sectionHeaderRow}>
                 <View style={styles.sectionTitleRow}>
@@ -165,6 +170,8 @@ export default function HomeScreen() {
               </View>
               {wallets.isLoading ? (
                 <WalletCardSkeleton />
+              ) : isWaitingForNetwork(wallets) ? (
+                <OfflinePlaceholder />
               ) : (
                 <WalletCarousel wallets={wallets.data ?? []} onPressWallet={openWallet} />
               )}
@@ -194,6 +201,8 @@ export default function HomeScreen() {
                 <TransactionRowSkeleton key={i} />
               ))}
             </View>
+          ) : isWaitingForNetwork(recent) ? (
+            <OfflinePlaceholder />
           ) : (
             <Text style={styles.empty}>Chưa có giao dịch nào.</Text>
           )

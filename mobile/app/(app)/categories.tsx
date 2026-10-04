@@ -6,6 +6,8 @@ import { ChevronLeftIcon, PlusIcon } from "@/components/ui/Icon";
 import { Chip } from "@/components/ui/Chip";
 import { Screen } from "@/components/shared/Screen";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
+import { isWaitingForNetwork } from "@/lib/query-status";
 import { CategoryType } from "@/lib/constants";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { Category } from "@/features/categories/types";
@@ -61,7 +63,9 @@ export default function CategoriesScreen() {
         <Chip label="Income" active={type === "income"} onPress={() => setType("income")} />
       </View>
 
-      {categories.isLoading ? (
+      {isWaitingForNetwork(categories) ? (
+        <OfflinePlaceholder />
+      ) : categories.isLoading ? (
         <View style={styles.list}>
           {Array.from({ length: LIST_SKELETON_COUNT }).map((_, i) => (
             <View key={i} style={i > 0 ? styles.skeletonSpacing : undefined}>

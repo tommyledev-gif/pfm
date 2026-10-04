@@ -10,6 +10,8 @@ import { colorForCategory } from "@/lib/category-color";
 import { monthRange } from "@/lib/date-range";
 import { formatDateRange } from "@/lib/format-date";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
+import { isWaitingForNetwork } from "@/lib/query-status";
 import { useRefresh } from "@/lib/use-refresh";
 import { WalletCurrency } from "@/lib/constants";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
@@ -118,6 +120,7 @@ export function BudgetsTab({ initialRange, rangeNonce }: BudgetsTabProps = {}) {
     setModalOpen(true);
   };
 
+  if (isWaitingForNetwork(budgets)) return <OfflinePlaceholder />;
   if (budgets.isLoading) {
     return (
       <View style={styles.skeletonList}>
