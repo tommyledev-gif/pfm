@@ -8,9 +8,11 @@ import (
 )
 
 const createTransaction = `-- name: CreateTransaction :one
-INSERT INTO transactions (user_id, wallet_id, category_id, amount, type, note, occurred_at, idempotency_key, to_wallet_id)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, created_at, updated_at, deleted_at, idempotency_key, to_wallet_id
+INSERT INTO transactions (user_id, wallet_id, category_id, amount, type, note, occurred_at, idempotency_key, to_wallet_id,
+                          location_lat, location_lng, location_name, location_note)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, created_at, updated_at, deleted_at, idempotency_key, to_wallet_id,
+          location_lat, location_lng, location_name, location_note
 `
 
 type CreateTransactionParams struct {
@@ -27,18 +29,24 @@ type CreateTransactionParams struct {
 	IdempotencyKey *uuid.UUID
 	// ToWalletID is set only for a transfer.
 	ToWalletID *uuid.UUID
+	// Location* are all nil for a Transaction recorded without a map pin
+	// (026_transactions_location.sql).
+	LocationLat  *float64
+	LocationLng  *float64
+	LocationName *string
+	LocationNote *string
 }
 
 func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionParams) (Transaction, error) {
 	row := q.db.QueryRow(ctx, createTransaction,
 		arg.UserID, arg.WalletID, arg.CategoryID, arg.Amount, arg.Type, arg.Note, arg.OccurredAt, arg.IdempotencyKey,
-		arg.ToWalletID,
+		arg.ToWalletID, arg.LocationLat, arg.LocationLng, arg.LocationName, arg.LocationNote,
 	)
 	var i Transaction
 	err := row.Scan(
 		&i.ID, &i.UserID, &i.WalletID, &i.CategoryID, &i.Amount, &i.Type,
 		&i.Note, &i.OccurredAt, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.IdempotencyKey,
-		&i.ToWalletID,
+		&i.ToWalletID, &i.LocationLat, &i.LocationLng, &i.LocationName, &i.LocationNote,
 	)
 	return i, err
 }
@@ -48,7 +56,8 @@ SELECT
     t.id, t.user_id, t.wallet_id, t.category_id, t.amount, t.type, t.note,
     t.occurred_at, t.created_at, t.updated_at, t.deleted_at,
     w.name AS wallet_name, c.name AS category_name,
-    t.to_wallet_id, tw.name AS to_wallet_name
+    t.to_wallet_id, tw.name AS to_wallet_name,
+    t.location_lat, t.location_lng, t.location_name, t.location_note
 FROM transactions t
 JOIN wallets w ON w.id = t.wallet_id
 JOIN categories c ON c.id = t.category_id
@@ -74,6 +83,10 @@ type GetTransactionByIdempotencyKeyRow struct {
 	CategoryName string
 	ToWalletID   *uuid.UUID
 	ToWalletName *string
+	LocationLat  *float64
+	LocationLng  *float64
+	LocationName *string
+	LocationNote *string
 }
 
 // GetTransactionByIdempotencyKey backs the AI Chat confirm-step replay check
@@ -87,6 +100,7 @@ func (q *Queries) GetTransactionByIdempotencyKey(ctx context.Context, userID uui
 		&i.ID, &i.UserID, &i.WalletID, &i.CategoryID, &i.Amount, &i.Type,
 		&i.Note, &i.OccurredAt, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
 		&i.WalletName, &i.CategoryName, &i.ToWalletID, &i.ToWalletName,
+		&i.LocationLat, &i.LocationLng, &i.LocationName, &i.LocationNote,
 	)
 	return i, err
 }
@@ -96,7 +110,8 @@ SELECT
     t.id, t.user_id, t.wallet_id, t.category_id, t.amount, t.type, t.note,
     t.occurred_at, t.created_at, t.updated_at, t.deleted_at,
     w.name AS wallet_name, c.name AS category_name,
-    t.to_wallet_id, tw.name AS to_wallet_name
+    t.to_wallet_id, tw.name AS to_wallet_name,
+    t.location_lat, t.location_lng, t.location_name, t.location_note
 FROM transactions t
 JOIN wallets w ON w.id = t.wallet_id
 JOIN categories c ON c.id = t.category_id
@@ -122,6 +137,10 @@ type GetTransactionByIDRow struct {
 	CategoryName string
 	ToWalletID   *uuid.UUID
 	ToWalletName *string
+	LocationLat  *float64
+	LocationLng  *float64
+	LocationName *string
+	LocationNote *string
 }
 
 // GetTransactionByID is deliberately NOT scoped by user_id, same precedent as
@@ -136,6 +155,7 @@ func (q *Queries) GetTransactionByID(ctx context.Context, id uuid.UUID) (GetTran
 		&i.ID, &i.UserID, &i.WalletID, &i.CategoryID, &i.Amount, &i.Type,
 		&i.Note, &i.OccurredAt, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
 		&i.WalletName, &i.CategoryName, &i.ToWalletID, &i.ToWalletName,
+		&i.LocationLat, &i.LocationLng, &i.LocationName, &i.LocationNote,
 	)
 	return i, err
 }
@@ -162,7 +182,8 @@ SELECT
     t.id, t.user_id, t.wallet_id, t.category_id, t.amount, t.type, t.note,
     t.occurred_at, t.created_at, t.updated_at, t.deleted_at,
     w.name AS wallet_name, c.name AS category_name,
-    t.to_wallet_id, tw.name AS to_wallet_name
+    t.to_wallet_id, tw.name AS to_wallet_name,
+    t.location_lat, t.location_lng, t.location_name, t.location_note
 FROM transactions t
 JOIN wallets w ON w.id = t.wallet_id
 JOIN categories c ON c.id = t.category_id
@@ -217,6 +238,10 @@ type ListTransactionsByUserRow struct {
 	CategoryName string
 	ToWalletID   *uuid.UUID
 	ToWalletName *string
+	LocationLat  *float64
+	LocationLng  *float64
+	LocationName *string
+	LocationNote *string
 }
 
 // ListTransactionsByUser is cursor-paginated on (occurred_at, created_at, id)
@@ -240,6 +265,7 @@ func (q *Queries) ListTransactionsByUser(ctx context.Context, arg ListTransactio
 			&i.ID, &i.UserID, &i.WalletID, &i.CategoryID, &i.Amount, &i.Type,
 			&i.Note, &i.OccurredAt, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt,
 			&i.WalletName, &i.CategoryName, &i.ToWalletID, &i.ToWalletName,
+			&i.LocationLat, &i.LocationLng, &i.LocationName, &i.LocationNote,
 		); err != nil {
 			return nil, err
 		}
@@ -294,15 +320,20 @@ func (q *Queries) CountTransactionsByUser(ctx context.Context, arg CountTransact
 const updateTransaction = `-- name: UpdateTransaction :one
 UPDATE transactions
 SET
-    amount      = COALESCE($3, amount),
-    category_id = COALESCE($4, category_id),
-    occurred_at = COALESCE($5, occurred_at),
-    note        = COALESCE($6, note),
-    updated_at  = NOW()
+    amount        = COALESCE($3, amount),
+    category_id   = COALESCE($4, category_id),
+    occurred_at   = COALESCE($5, occurred_at),
+    note          = COALESCE($6, note),
+    location_note = CASE
+        WHEN $7::text IS NULL THEN location_note
+        ELSE NULLIF($7::text, '')
+    END,
+    updated_at    = NOW()
 WHERE id = $1
   AND user_id = $2
   AND deleted_at IS NULL
-RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, created_at, updated_at, deleted_at, idempotency_key, to_wallet_id
+RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, created_at, updated_at, deleted_at, idempotency_key, to_wallet_id,
+          location_lat, location_lng, location_name, location_note
 `
 
 type UpdateTransactionParams struct {
@@ -312,21 +343,25 @@ type UpdateTransactionParams struct {
 	CategoryID *uuid.UUID
 	OccurredAt *time.Time
 	Note       *string
+	// LocationNote: nil leaves the column unchanged, "" clears it to NULL,
+	// anything else sets it (026_transactions_location.sql).
+	LocationNote *string
 }
 
 // UpdateTransaction returns every column explicitly — the Scan below includes
-// IdempotencyKey (010_transactions_idempotency_key.sql) and ToWalletID
-// (022_transaction_transfer.sql) as the trailing columns, even though this
-// statement never touches either.
+// IdempotencyKey (010_transactions_idempotency_key.sql), ToWalletID
+// (022_transaction_transfer.sql) and the Location* columns
+// (026_transactions_location.sql) as the trailing columns; of those, this
+// statement only ever touches location_note.
 func (q *Queries) UpdateTransaction(ctx context.Context, arg UpdateTransactionParams) (Transaction, error) {
 	row := q.db.QueryRow(ctx, updateTransaction,
-		arg.ID, arg.UserID, arg.Amount, arg.CategoryID, arg.OccurredAt, arg.Note,
+		arg.ID, arg.UserID, arg.Amount, arg.CategoryID, arg.OccurredAt, arg.Note, arg.LocationNote,
 	)
 	var i Transaction
 	err := row.Scan(
 		&i.ID, &i.UserID, &i.WalletID, &i.CategoryID, &i.Amount, &i.Type,
 		&i.Note, &i.OccurredAt, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.IdempotencyKey,
-		&i.ToWalletID,
+		&i.ToWalletID, &i.LocationLat, &i.LocationLng, &i.LocationName, &i.LocationNote,
 	)
 	return i, err
 }
@@ -337,7 +372,8 @@ SET deleted_at = NOW()
 WHERE id = $1
   AND user_id = $2
   AND deleted_at IS NULL
-RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, created_at, updated_at, deleted_at, idempotency_key, to_wallet_id
+RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, created_at, updated_at, deleted_at, idempotency_key, to_wallet_id,
+          location_lat, location_lng, location_name, location_note
 `
 
 type SoftDeleteTransactionParams struct {
@@ -353,7 +389,7 @@ func (q *Queries) SoftDeleteTransaction(ctx context.Context, arg SoftDeleteTrans
 	err := row.Scan(
 		&i.ID, &i.UserID, &i.WalletID, &i.CategoryID, &i.Amount, &i.Type,
 		&i.Note, &i.OccurredAt, &i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.IdempotencyKey,
-		&i.ToWalletID,
+		&i.ToWalletID, &i.LocationLat, &i.LocationLng, &i.LocationName, &i.LocationNote,
 	)
 	return i, err
 }

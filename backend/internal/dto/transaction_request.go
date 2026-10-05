@@ -24,8 +24,8 @@ type CreateTransactionRequest struct {
 	// a tag cannot reference the constant, so keep the two in step) — the same
 	// ceiling the mobile keypad stops at, so the client never offers an amount
 	// the server would refuse. Never trusted from the client either way.
-	Amount     int64     `json:"amount" validate:"required,gt=0,lte=99999999999999"`
-	Type       string    `json:"type" validate:"required,oneof=income expense transfer"`
+	Amount int64  `json:"amount" validate:"required,gt=0,lte=99999999999999"`
+	Type   string `json:"type" validate:"required,oneof=income expense transfer"`
 	// ToWalletID is the destination Wallet of a transfer (WalletID is the
 	// source). Required for a transfer, rejected by the service otherwise.
 	ToWalletID *uuid.UUID `json:"to_wallet_id" validate:"required_if=Type transfer"`
@@ -38,6 +38,26 @@ type CreateTransactionRequest struct {
 	// time. Reusing a previously-used key returns the original Transaction
 	// (200) instead of creating a duplicate.
 	IdempotencyKey *uuid.UUID `json:"idempotency_key"`
+	// Location is the optional map pin the Transaction was recorded at — any
+	// type may carry one. Omitted or null means no location. Fixed once
+	// created: only its note is editable afterwards (UpdateTransactionRequest.
+	// LocationNote). No tag needed: validator dives into a non-nil pointer to
+	// a struct and skips a nil one.
+	Location *TransactionLocationRequest `json:"location"`
+}
+
+// TransactionLocationRequest is CreateTransactionRequest.location.
+// Latitude/Longitude are pointers so that 0 (the equator / prime meridian)
+// still satisfies `required` — validator only checks a pointer for nil. They
+// are float64 deliberately: a coordinate is a measurement, not money.
+// PlaceName/Note that are empty or whitespace-only are stored as NULL — the
+// service normalizes them, not this struct. Note's max=500 repeats
+// common.TransactionNoteMaxLength as a literal, same caveat as Note above.
+type TransactionLocationRequest struct {
+	Latitude  *float64 `json:"latitude" validate:"required,gte=-90,lte=90"`
+	Longitude *float64 `json:"longitude" validate:"required,gte=-180,lte=180"`
+	PlaceName *string  `json:"place_name" validate:"omitempty,max=200"`
+	Note      *string  `json:"note" validate:"omitempty,max=500"`
 }
 
 // UpdateTransactionRequest is the body of PATCH /transactions/{id}.
@@ -52,12 +72,19 @@ type UpdateTransactionRequest struct {
 	CategoryID *uuid.UUID `json:"category_id"`
 	OccurredAt *string    `json:"occurred_at"`
 	Note       *string    `json:"note" validate:"omitempty,max=500"`
+	// LocationNote edits the note on the Transaction's location — the only
+	// part of a location that can change after creation (coordinates and
+	// place_name never can). Absent (or null) leaves it unchanged, a
+	// non-empty string sets it, "" clears it. Rejected by the service when
+	// the Transaction has no location.
+	LocationNote *string `json:"location_note" validate:"omitempty,max=500"`
 }
 
 // HasUpdates reports whether at least one field was supplied — an empty body
-// is a client mistake (400), not a no-op 200 (spec.md S-TRX-46).
+// is a client mistake (400), not a no-op 200 (spec.md S-TRX-46). A
+// location_note of "" counts: clearing the note is an update.
 func (r UpdateTransactionRequest) HasUpdates() bool {
-	return r.Amount != nil || r.CategoryID != nil || r.OccurredAt != nil || r.Note != nil
+	return r.Amount != nil || r.CategoryID != nil || r.OccurredAt != nil || r.Note != nil || r.LocationNote != nil
 }
 
 // ListTransactionsQuery is the query-string binding for GET /transactions.

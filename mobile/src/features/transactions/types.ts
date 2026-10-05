@@ -19,6 +19,30 @@ export interface Transaction {
   // are then the SOURCE wallet.
   to_wallet_id: string | null;
   to_wallet_name: string | null;
+  // Where it was pinned when created; null when it was not. Optional only
+  // because a copy saved on the device before locations existed has no such
+  // field — the server always sends it.
+  location?: TransactionLocation | null;
+}
+
+// Mirrors the `location` object of backend dto.TransactionResponse.
+// Coordinates are degrees, not money — plain numbers are fine here.
+export interface TransactionLocation {
+  latitude: number;
+  longitude: number;
+  // Reverse-geocoded area, e.g. "Quận 1, TP. Hồ Chí Minh" — null when the
+  // pin was dropped offline, where no geocoder answers.
+  place_name: string | null;
+  // The User's own words about the place (directions, which gate…).
+  note: string | null;
+}
+
+// What a create sends: same shape, the optional parts left out when empty.
+export interface TransactionLocationInput {
+  latitude: number;
+  longitude: number;
+  place_name?: string;
+  note?: string;
 }
 
 export interface ListTransactionsResult {
@@ -57,6 +81,7 @@ export interface CreateTransactionRequest {
   occurred_at?: string;
   note?: string;
   idempotency_key?: string;
+  location?: TransactionLocationInput;
 }
 
 // wallet_id and type are never accepted by PATCH (backend dto.
@@ -67,6 +92,9 @@ export interface UpdateTransactionRequest {
   category_id?: string;
   occurred_at?: string;
   note?: string;
+  // Only for a Transaction that has a location; "" clears it. Coordinates and
+  // place name are fixed once created.
+  location_note?: string;
 }
 
 // --- Export / Import (specs/transaction-export-import) ---------------------

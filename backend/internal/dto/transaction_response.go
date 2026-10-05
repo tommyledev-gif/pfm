@@ -34,6 +34,30 @@ type TransactionResponse struct {
 	// income and expense.
 	ToWalletID   *uuid.UUID `json:"to_wallet_id"`
 	ToWalletName *string    `json:"to_wallet_name"`
+	// Location is null — never omitted — when the Transaction was recorded
+	// without a map pin, so a client can always read the key.
+	Location *TransactionLocationResponse `json:"location"`
+}
+
+// TransactionLocationResponse is TransactionResponse.location. PlaceName and
+// Note are null when absent, never "".
+type TransactionLocationResponse struct {
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+	PlaceName *string `json:"place_name"`
+	Note      *string `json:"note"`
+}
+
+func newTransactionLocationResponse(l *model.TransactionLocation) *TransactionLocationResponse {
+	if l == nil {
+		return nil
+	}
+	return &TransactionLocationResponse{
+		Latitude:  l.Latitude,
+		Longitude: l.Longitude,
+		PlaceName: l.PlaceName,
+		Note:      l.Note,
+	}
 }
 
 func NewTransactionResponse(t *model.Transaction) TransactionResponse {
@@ -51,6 +75,7 @@ func NewTransactionResponse(t *model.Transaction) TransactionResponse {
 		UpdatedAt:    t.UpdatedAt,
 		ToWalletID:   t.ToWalletID,
 		ToWalletName: t.ToWalletName,
+		Location:     newTransactionLocationResponse(t.Location),
 	}
 }
 

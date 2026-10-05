@@ -17,7 +17,8 @@ import (
 
 // UpdateTransaction implements US-04. wallet_id and type are structurally
 // excluded from dto.UpdateTransactionRequest (Context #5) — only amount,
-// category_id, occurred_at, and note can ever change. Always opens one DB
+// category_id, occurred_at, note and location_note can ever change (a
+// location's coordinates and place name are fixed at creation). Always opens one DB
 // transaction (plan.md Finding #13), even when amount is unchanged, so the
 // balance adjustment (when present) and the row update never observably
 // split. The insufficient-balance floor does NOT apply here (spec.md
@@ -27,7 +28,7 @@ import (
 // (if amount changed) the Wallet's new balance").
 func (s *TransactionService) UpdateTransaction(ctx context.Context, userID, transactionID uuid.UUID, req dto.UpdateTransactionRequest) (*model.Transaction, *int64, error) {
 	if !req.HasUpdates() {
-		return nil, nil, common.NewInvalidInputError("at least one of amount, category_id, occurred_at, or note must be provided")
+		return nil, nil, common.NewInvalidInputError("at least one of amount, category_id, occurred_at, note, or location_note must be provided")
 	}
 
 	existing, err := s.getOwnedTransaction(ctx, userID, transactionID)
@@ -51,6 +52,11 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, userID, tran
 		categoryName = category.Name
 	}
 
+	locationNote, err := locationNoteUpdate(existing, req.LocationNote)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	var occurredAt *time.Time
 	if req.OccurredAt != nil {
 		parsed, err := parseFlexibleTimestamp(*req.OccurredAt)
@@ -60,7 +66,7 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, userID, tran
 		occurredAt = &parsed
 	}
 
-	transaction, walletBalance, err := s.updateTransactionTx(ctx, userID, transactionID, existing, req, occurredAt)
+	transaction, walletBalance, err := s.updateTransactionTx(ctx, userID, transactionID, existing, req, occurredAt, locationNote)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -74,7 +80,8 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, userID, tran
 	return transaction, walletBalance, nil
 }
 
-func (s *TransactionService) updateTransactionTx(ctx context.Context, userID, transactionID uuid.UUID, existing *model.Transaction, req dto.UpdateTransactionRequest, occurredAt *time.Time) (*model.Transaction, *int64, error) {
+// locationNote is locationNoteUpdate's result: nil = unchanged, "" = clear.
+func (s *TransactionService) updateTransactionTx(ctx context.Context, userID, transactionID uuid.UUID, existing *model.Transaction, req dto.UpdateTransactionRequest, occurredAt *time.Time, locationNote *string) (*model.Transaction, *int64, error) {
 	tx, err := s.repo.BeginTx(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("service.UpdateTransaction: %w", err)
@@ -109,12 +116,13 @@ func (s *TransactionService) updateTransactionTx(ctx context.Context, userID, tr
 	}
 
 	transaction, err := s.repo.UpdateTransaction(ctx, tx, repository.UpdateTransactionParams{
-		ID:         transactionID,
-		UserID:     userID,
-		Amount:     req.Amount,
-		CategoryID: req.CategoryID,
-		OccurredAt: occurredAt,
-		Note:       req.Note,
+		ID:           transactionID,
+		UserID:       userID,
+		Amount:       req.Amount,
+		CategoryID:   req.CategoryID,
+		OccurredAt:   occurredAt,
+		Note:         req.Note,
+		LocationNote: locationNote,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -128,7 +136,7 @@ func (s *TransactionService) updateTransactionTx(ctx context.Context, userID, tr
 	// Records only the fields this PATCH actually supplied, in the same
 	// transaction as the row update above (specs/transaction-audit-log/
 	// spec.md US-01, Context #1/#4).
-	auditBefore, auditAfter := auditUpdateDiff(existing, req, occurredAt)
+	auditBefore, auditAfter := auditUpdateDiff(existing, req, occurredAt, locationNote)
 	if err := s.writeAuditLog(ctx, tx, userID, transactionID, model.AuditActionUpdate, auditBefore, auditAfter); err != nil {
 		return nil, nil, err
 	}

@@ -11,11 +11,13 @@ import { useCategoryPicker } from "@/features/categories/components/use-category
 import { useUpdateTransactionMutation } from "@/features/transactions/api/use-update-transaction-mutation";
 import { useDeleteTransactionMutation } from "@/features/transactions/api/use-delete-transaction-mutation";
 import { todayDateOnly } from "@/lib/date-range";
-import { Transaction } from "@/features/transactions/types";
+import { Transaction, TransactionLocationInput } from "@/features/transactions/types";
 import { TransactionDraft } from "@/features/transactions/draft-from-text";
 import { OutboxItem, OutboxPayload } from "@/features/transactions/outbox/outbox-types";
 import { buildQueuedDisplay } from "@/features/transactions/outbox/queued-display";
 import { useSaveOrQueue } from "@/features/transactions/components/use-save-or-queue";
+import { useTransactionLocation } from "@/features/transactions/components/use-transaction-location";
+import { LocationStepIntent } from "@/features/transactions/components/use-location-step";
 
 // Until a wallet is picked there is no currency of its own; VND is the app's
 // home currency and the strictest one (no decimals), so nothing typed before
@@ -178,33 +180,70 @@ export function useTransactionForm({ visible, onClose, editingTransaction, editi
               category_id: isTransfer ? undefined : categoryId ?? undefined,
               occurred_at: occurredAt,
               note: note || undefined,
+              location_note: location.locationNoteUpdate(),
             },
           },
           { onSuccess: onClose },
         ),
       );
+    } else if (location.needsPin) {
+      // Pinned on save, not on open: it is the location step's own save
+      // button that then books the Transaction (onConfirm below).
+      openLocationStep("save");
     } else {
-      // occurred_at is always the picked date, never the sync time (S-OFF-29).
-      const payload: OutboxPayload = {
-        wallet_id: walletId,
-        ...(isTransfer ? { to_wallet_id: toWalletId ?? undefined } : { category_id: categoryId ?? undefined }),
-        amount: cents,
-        type,
-        occurred_at: occurredAt,
-        note: note || undefined,
-        idempotency_key: editingQueued?.idempotency_key ?? idempotencyKey,
-      };
-      const display = buildQueuedDisplay(payload, wallets.data, categories.data);
-      if (editingQueued) saveQueued(editingQueued.idempotency_key, payload, display, onClose);
-      else save(payload, display, onClose);
+      saveCreate(cents, location.pinned);
     }
   };
+
+  const saveCreate = (cents: number, pin: TransactionLocationInput | null) => {
+    if (!walletId) return;
+    // occurred_at is always the picked date, never the sync time (S-OFF-29).
+    const payload: OutboxPayload = {
+      wallet_id: walletId,
+      ...(isTransfer ? { to_wallet_id: toWalletId ?? undefined } : { category_id: categoryId ?? undefined }),
+      amount: cents,
+      type,
+      occurred_at: occurredAt,
+      note: note || undefined,
+      idempotency_key: editingQueued?.idempotency_key ?? idempotencyKey,
+      // Kept on a queued item too, so it syncs with the pin taken offline.
+      ...(pin ? { location: pin } : {}),
+    };
+    const display = buildQueuedDisplay(payload, wallets.data, categories.data);
+    if (editingQueued) saveQueued(editingQueued.idempotency_key, payload, display, onClose);
+    else save(payload, display, onClose);
+  };
+
+  const location = useTransactionLocation({
+    visible,
+    editingTransaction,
+    editingQueued,
+    // The form was validated when save was tapped and sat covered by the step
+    // since; only the amount is resolved again, exactly as submit does it.
+    onConfirm: (pin) => {
+      const cents = amount.resolve();
+      if (saving || amountInvalid(cents) || cents === null) return;
+      saveCreate(cents, pin);
+    },
+  });
 
   const categoryPicker = useCategoryPicker({
     categories: categories.data ?? [],
     selectedIds: categoryId ? [categoryId] : [],
     onApply: (ids) => setCategoryId(ids[0] ?? null),
   });
+
+  // The sheet has one child slot. Whichever panel opened last keeps it, so a
+  // panel sliding back out keeps its own content until it is gone.
+  const [activeChild, setActiveChild] = useState<"category" | "location">("category");
+  const openCategoryPicker = () => {
+    setActiveChild("category");
+    categoryPicker.open();
+  };
+  const openLocationStep = (intent: LocationStepIntent) => {
+    setActiveChild("location");
+    location.openStep(intent);
+  };
 
   return {
     isEditing,
@@ -240,5 +279,9 @@ export function useTransactionForm({ visible, onClose, editingTransaction, editi
     transferTarget,
     submit,
     categoryPicker,
+    openCategoryPicker,
+    openLocationStep,
+    drawerChild: activeChild === "location" ? location.stepChild : categoryPicker.child,
+    location,
   };
 }

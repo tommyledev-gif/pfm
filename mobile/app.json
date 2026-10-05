@@ -35,6 +35,12 @@
         }
       ],
       [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Budgest dùng vị trí của bạn để ghim nơi tạo giao dịch lên bản đồ."
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "Budgest accesses your photos so you can set a custom category icon.",

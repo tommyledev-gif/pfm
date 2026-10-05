@@ -51,10 +51,12 @@ type CreateTransactionParams struct {
 	IdempotencyKey *uuid.UUID
 	// ToWalletID is the destination Wallet, set only for a transfer.
 	ToWalletID *uuid.UUID
+	// Location is nil for a Transaction recorded without a map pin.
+	Location *model.TransactionLocation
 }
 
 func (r *TransactionRepository) CreateTransaction(ctx context.Context, tx pgx.Tx, arg CreateTransactionParams) (*model.Transaction, error) {
-	row, err := r.q.WithTx(tx).CreateTransaction(ctx, sqlc.CreateTransactionParams{
+	params := sqlc.CreateTransactionParams{
 		UserID:         arg.UserID,
 		WalletID:       arg.WalletID,
 		CategoryID:     arg.CategoryID,
@@ -64,7 +66,14 @@ func (r *TransactionRepository) CreateTransaction(ctx context.Context, tx pgx.Tx
 		OccurredAt:     arg.OccurredAt,
 		IdempotencyKey: arg.IdempotencyKey,
 		ToWalletID:     arg.ToWalletID,
-	})
+	}
+	if loc := arg.Location; loc != nil {
+		params.LocationLat = &loc.Latitude
+		params.LocationLng = &loc.Longitude
+		params.LocationName = loc.PlaceName
+		params.LocationNote = loc.Note
+	}
+	row, err := r.q.WithTx(tx).CreateTransaction(ctx, params)
 	if err != nil {
 		return nil, err
 	}
@@ -81,23 +90,7 @@ func (r *TransactionRepository) GetTransactionByIdempotencyKey(ctx context.Conte
 	if err != nil {
 		return nil, err
 	}
-	return &model.Transaction{
-		ID:           row.ID,
-		UserID:       row.UserID,
-		WalletID:     row.WalletID,
-		WalletName:   row.WalletName,
-		CategoryID:   row.CategoryID,
-		CategoryName: row.CategoryName,
-		Amount:       row.Amount,
-		Type:         model.TransactionType(row.Type),
-		Note:         row.Note,
-		OccurredAt:   row.OccurredAt,
-		CreatedAt:    row.CreatedAt,
-		UpdatedAt:    row.UpdatedAt,
-		DeletedAt:    row.DeletedAt,
-		ToWalletID:   row.ToWalletID,
-		ToWalletName: row.ToWalletName,
-	}, nil
+	return toJoinedTransactionModel(sqlc.GetTransactionByIDRow(row)), nil
 }
 
 // DecrementWalletBalanceIfSufficient backs the insufficient-balance floor for
@@ -139,23 +132,7 @@ func (r *TransactionRepository) GetTransactionByID(ctx context.Context, id uuid.
 	if err != nil {
 		return nil, err
 	}
-	return &model.Transaction{
-		ID:           row.ID,
-		UserID:       row.UserID,
-		WalletID:     row.WalletID,
-		WalletName:   row.WalletName,
-		CategoryID:   row.CategoryID,
-		CategoryName: row.CategoryName,
-		Amount:       row.Amount,
-		Type:         model.TransactionType(row.Type),
-		Note:         row.Note,
-		OccurredAt:   row.OccurredAt,
-		CreatedAt:    row.CreatedAt,
-		UpdatedAt:    row.UpdatedAt,
-		DeletedAt:    row.DeletedAt,
-		ToWalletID:   row.ToWalletID,
-		ToWalletName: row.ToWalletName,
-	}, nil
+	return toJoinedTransactionModel(row), nil
 }
 
 // ListTransactionsFilter carries US-02's optional query filters — every
@@ -199,23 +176,7 @@ func (r *TransactionRepository) ListTransactionsByUser(ctx context.Context, user
 	}
 	transactions := make([]*model.Transaction, 0, len(rows))
 	for _, row := range rows {
-		transactions = append(transactions, &model.Transaction{
-			ID:           row.ID,
-			UserID:       row.UserID,
-			WalletID:     row.WalletID,
-			WalletName:   row.WalletName,
-			CategoryID:   row.CategoryID,
-			CategoryName: row.CategoryName,
-			Amount:       row.Amount,
-			Type:         model.TransactionType(row.Type),
-			Note:         row.Note,
-			OccurredAt:   row.OccurredAt,
-			CreatedAt:    row.CreatedAt,
-			UpdatedAt:    row.UpdatedAt,
-			DeletedAt:    row.DeletedAt,
-			ToWalletID:   row.ToWalletID,
-			ToWalletName: row.ToWalletName,
-		})
+		transactions = append(transactions, toJoinedTransactionModel(sqlc.GetTransactionByIDRow(row)))
 	}
 	return transactions, nil
 }
@@ -248,6 +209,9 @@ type UpdateTransactionParams struct {
 	CategoryID *uuid.UUID
 	OccurredAt *time.Time
 	Note       *string
+	// LocationNote: nil leaves it unchanged, "" clears it, anything else sets
+	// it. Coordinates and place name are never updatable.
+	LocationNote *string
 }
 
 // UpdateTransaction is scoped by id + user_id, same visibility guarantee as
@@ -255,12 +219,13 @@ type UpdateTransactionParams struct {
 // per plan.md Finding #13) alongside any AdjustWalletBalance call.
 func (r *TransactionRepository) UpdateTransaction(ctx context.Context, tx pgx.Tx, arg UpdateTransactionParams) (*model.Transaction, error) {
 	row, err := r.q.WithTx(tx).UpdateTransaction(ctx, sqlc.UpdateTransactionParams{
-		ID:         arg.ID,
-		UserID:     arg.UserID,
-		Amount:     arg.Amount,
-		CategoryID: arg.CategoryID,
-		OccurredAt: arg.OccurredAt,
-		Note:       arg.Note,
+		ID:           arg.ID,
+		UserID:       arg.UserID,
+		Amount:       arg.Amount,
+		CategoryID:   arg.CategoryID,
+		OccurredAt:   arg.OccurredAt,
+		Note:         arg.Note,
+		LocationNote: arg.LocationNote,
 	})
 	if err != nil {
 		return nil, err
@@ -279,23 +244,8 @@ func (r *TransactionRepository) SoftDeleteTransaction(ctx context.Context, tx pg
 	return toTransactionModel(row), nil
 }
 
-func toTransactionModel(row sqlc.Transaction) *model.Transaction {
-	return &model.Transaction{
-		ID:         row.ID,
-		UserID:     row.UserID,
-		WalletID:   row.WalletID,
-		CategoryID: row.CategoryID,
-		Amount:     row.Amount,
-		Type:       model.TransactionType(row.Type),
-		Note:       row.Note,
-		OccurredAt: row.OccurredAt,
-		CreatedAt:  row.CreatedAt,
-		UpdatedAt:  row.UpdatedAt,
-		DeletedAt:  row.DeletedAt,
-		ToWalletID: row.ToWalletID,
-	}
-}
-
-// toWalletModel already exists in wallet_repository.go (same package) —
-// reused here for DecrementWalletBalanceIfSufficient/AdjustWalletBalance's
-// sqlc.Wallet -> model.Wallet conversion, not redefined.
+// toTransactionModel, toJoinedTransactionModel and toTransactionLocation live
+// in transaction_repository_mapping.go (300-line cap). toWalletModel already
+// exists in wallet_repository.go (same package) — reused here for
+// DecrementWalletBalanceIfSufficient/AdjustWalletBalance's sqlc.Wallet ->
+// model.Wallet conversion, not redefined.

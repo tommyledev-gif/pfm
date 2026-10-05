@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -114,6 +112,10 @@ func (f *fakeTransactionRepo) CreateTransaction(_ context.Context, _ pgx.Tx, arg
 		UpdatedAt:  now,
 		ToWalletID: arg.ToWalletID,
 	}
+	if arg.Location != nil {
+		loc := *arg.Location
+		t.Location = &loc
+	}
 	f.transactions[t.ID] = t
 	if arg.IdempotencyKey != nil {
 		f.idempotencyIndex[idempotencyIndexKey(arg.UserID, *arg.IdempotencyKey)] = t.ID
@@ -192,105 +194,6 @@ func (f *fakeTransactionRepo) GetTransactionByID(_ context.Context, id uuid.UUID
 	return &cp, nil
 }
 
-// ListTransactionsByUser applies every filter and the occurred_at-keyed
-// cursor tie-break in plain Go, mirroring the real SQL WHERE clause
-// (db/queries/transactions.sql) closely enough for these tests' purposes.
-func (f *fakeTransactionRepo) ListTransactionsByUser(_ context.Context, userID uuid.UUID, filter repository.ListTransactionsFilter) ([]*model.Transaction, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	var out []*model.Transaction
-	for _, t := range f.transactions {
-		if t.DeletedAt != nil || t.UserID != userID {
-			continue
-		}
-		if filter.WalletID != nil && t.WalletID != *filter.WalletID {
-			continue
-		}
-		if filter.CategoryID != nil && t.CategoryID != *filter.CategoryID {
-			continue
-		}
-		if len(filter.CategoryIDs) > 0 {
-			matched := false
-			for _, id := range filter.CategoryIDs {
-				if t.CategoryID == id {
-					matched = true
-					break
-				}
-			}
-			if !matched {
-				continue
-			}
-		}
-		if filter.Type != nil && string(t.Type) != *filter.Type {
-			continue
-		}
-		if filter.From != nil && t.OccurredAt.Before(*filter.From) {
-			continue
-		}
-		if filter.To != nil && t.OccurredAt.After(*filter.To) {
-			continue
-		}
-		if filter.Search != nil {
-			note := ""
-			if t.Note != nil {
-				note = *t.Note
-			}
-			if !strings.Contains(strings.ToLower(note), strings.ToLower(*filter.Search)) {
-				continue
-			}
-		}
-		if filter.CursorOccurredAt != nil {
-			cursorOccurredAt := *filter.CursorOccurredAt
-			cursorCreatedAt := time.Time{}
-			if filter.CursorCreatedAt != nil {
-				cursorCreatedAt = *filter.CursorCreatedAt
-			}
-			before := t.OccurredAt.Before(cursorOccurredAt)
-			tie1 := t.OccurredAt.Equal(cursorOccurredAt) && t.CreatedAt.Before(cursorCreatedAt)
-			tie2 := t.OccurredAt.Equal(cursorOccurredAt) && t.CreatedAt.Equal(cursorCreatedAt) &&
-				filter.CursorID != nil && t.ID.String() < filter.CursorID.String()
-			if !(before || tie1 || tie2) {
-				continue
-			}
-		}
-		cp := *t
-		out = append(out, &cp)
-	}
-	sort.Slice(out, func(i, j int) bool {
-		if !out[i].OccurredAt.Equal(out[j].OccurredAt) {
-			return out[i].OccurredAt.After(out[j].OccurredAt)
-		}
-		if !out[i].CreatedAt.Equal(out[j].CreatedAt) {
-			return out[i].CreatedAt.After(out[j].CreatedAt)
-		}
-		return out[i].ID.String() > out[j].ID.String()
-	})
-	limit := int(filter.Limit)
-	if limit > 0 && len(out) > limit {
-		out = out[:limit]
-	}
-	return out, nil
-}
-
-// CountTransactionsByUser mirrors the real query's relationship to
-// ListTransactionsByUser — the same filters with the cursor and limit
-// stripped — by delegating rather than restating the filter logic, so the two
-// can't drift apart in the fake the way they could in hand-copied code.
-func (f *fakeTransactionRepo) CountTransactionsByUser(ctx context.Context, userID uuid.UUID, filter repository.ListTransactionsFilter) (int64, error) {
-	unpaged := filter
-	unpaged.CursorOccurredAt = nil
-	unpaged.CursorCreatedAt = nil
-	unpaged.CursorID = nil
-	unpaged.Limit = 0
-
-	rows, err := f.ListTransactionsByUser(ctx, userID, unpaged)
-	if err != nil {
-		return 0, err
-	}
-	return int64(len(rows)), nil
-}
-
 func (f *fakeTransactionRepo) UpdateTransaction(_ context.Context, _ pgx.Tx, arg repository.UpdateTransactionParams) (*model.Transaction, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -310,6 +213,17 @@ func (f *fakeTransactionRepo) UpdateTransaction(_ context.Context, _ pgx.Tx, arg
 	}
 	if arg.Note != nil {
 		t.Note = arg.Note
+	}
+	// Mirrors the real CASE: nil = unchanged, "" = NULL. Replaces Location
+	// rather than mutating it — copies handed out earlier share the pointer.
+	if arg.LocationNote != nil && t.Location != nil {
+		loc := *t.Location
+		loc.Note = nil
+		if *arg.LocationNote != "" {
+			note := *arg.LocationNote
+			loc.Note = &note
+		}
+		t.Location = &loc
 	}
 	t.UpdatedAt = time.Now().UTC()
 	cp := *t

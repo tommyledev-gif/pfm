@@ -3,9 +3,13 @@
 -- idempotency_key ($8) is nullable — every pre-existing caller omits it and
 -- gets NULL, which the partial unique index (010_transactions_idempotency_key.sql)
 -- never treats as a collision (specs/ai-chat-assistant/plan.md Finding #3).
-INSERT INTO transactions (user_id, wallet_id, category_id, amount, type, note, occurred_at, idempotency_key, to_wallet_id)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, created_at, updated_at, deleted_at, idempotency_key, to_wallet_id;
+-- location_* ($10-$13) are all NULL for a Transaction recorded without a map
+-- pin (026_transactions_location.sql); the CHECKs there keep them coherent.
+INSERT INTO transactions (user_id, wallet_id, category_id, amount, type, note, occurred_at, idempotency_key, to_wallet_id,
+                          location_lat, location_lng, location_name, location_note)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, created_at, updated_at, deleted_at, idempotency_key, to_wallet_id,
+          location_lat, location_lng, location_name, location_note;
 
 -- name: GetTransactionByIdempotencyKey :one
 -- Backs the AI Chat confirm-step replay check (specs/ai-chat-assistant/spec.md
@@ -22,7 +26,8 @@ SELECT
     t.id, t.user_id, t.wallet_id, t.category_id, t.amount, t.type, t.note,
     t.occurred_at, t.created_at, t.updated_at, t.deleted_at,
     w.name AS wallet_name, c.name AS category_name,
-    t.to_wallet_id, tw.name AS to_wallet_name
+    t.to_wallet_id, tw.name AS to_wallet_name,
+    t.location_lat, t.location_lng, t.location_name, t.location_note
 FROM transactions t
 JOIN wallets w ON w.id = t.wallet_id
 JOIN categories c ON c.id = t.category_id
@@ -42,7 +47,8 @@ SELECT
     t.id, t.user_id, t.wallet_id, t.category_id, t.amount, t.type, t.note,
     t.occurred_at, t.created_at, t.updated_at, t.deleted_at,
     w.name AS wallet_name, c.name AS category_name,
-    t.to_wallet_id, tw.name AS to_wallet_name
+    t.to_wallet_id, tw.name AS to_wallet_name,
+    t.location_lat, t.location_lng, t.location_name, t.location_note
 FROM transactions t
 JOIN wallets w ON w.id = t.wallet_id
 JOIN categories c ON c.id = t.category_id
@@ -79,7 +85,8 @@ SELECT
     t.id, t.user_id, t.wallet_id, t.category_id, t.amount, t.type, t.note,
     t.occurred_at, t.created_at, t.updated_at, t.deleted_at,
     w.name AS wallet_name, c.name AS category_name,
-    t.to_wallet_id, tw.name AS to_wallet_name
+    t.to_wallet_id, tw.name AS to_wallet_name,
+    t.location_lat, t.location_lng, t.location_name, t.location_note
 FROM transactions t
 JOIN wallets w ON w.id = t.wallet_id
 JOIN categories c ON c.id = t.category_id
@@ -135,18 +142,28 @@ WHERE t.user_id = $1
 -- Partial update via COALESCE, same convention as UpdateWallet/UpdateCategory.
 -- wallet_id and type are never columns this query can touch — they aren't
 -- request fields at all (dto.UpdateTransactionRequest has no such fields,
--- spec.md Context #5).
+-- spec.md Context #5). Neither are location_lat/lng/name: a pin is fixed at
+-- creation (026_transactions_location.sql).
+-- location_note is the one nullable column a PATCH can clear, so it can't use
+-- COALESCE: NULL leaves it unchanged, '' clears it to NULL, anything else
+-- sets it. The service has already rejected a location_note on a Transaction
+-- without coordinates; transactions_location_details_check backs that up.
 UPDATE transactions
 SET
-    amount      = COALESCE(sqlc.narg('amount'), amount),
-    category_id = COALESCE(sqlc.narg('category_id'), category_id),
-    occurred_at = COALESCE(sqlc.narg('occurred_at'), occurred_at),
-    note        = COALESCE(sqlc.narg('note'), note),
-    updated_at  = NOW()
+    amount        = COALESCE(sqlc.narg('amount'), amount),
+    category_id   = COALESCE(sqlc.narg('category_id'), category_id),
+    occurred_at   = COALESCE(sqlc.narg('occurred_at'), occurred_at),
+    note          = COALESCE(sqlc.narg('note'), note),
+    location_note = CASE
+        WHEN sqlc.narg('location_note')::text IS NULL THEN location_note
+        ELSE NULLIF(sqlc.narg('location_note')::text, '')
+    END,
+    updated_at    = NOW()
 WHERE id = $1
   AND user_id = $2
   AND deleted_at IS NULL
-RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, created_at, updated_at, deleted_at, idempotency_key, to_wallet_id;
+RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, created_at, updated_at, deleted_at, idempotency_key, to_wallet_id,
+          location_lat, location_lng, location_name, location_note;
 
 -- name: SoftDeleteTransaction :one
 UPDATE transactions
@@ -154,7 +171,8 @@ SET deleted_at = NOW()
 WHERE id = $1
   AND user_id = $2
   AND deleted_at IS NULL
-RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, created_at, updated_at, deleted_at, idempotency_key, to_wallet_id;
+RETURNING id, user_id, wallet_id, category_id, amount, type, note, occurred_at, created_at, updated_at, deleted_at, idempotency_key, to_wallet_id,
+          location_lat, location_lng, location_name, location_note;
 
 -- name: ExistsTransactionForWallet :one
 -- Backs F-03's long-deferred 409 CURRENCY_LOCKED check (WAL-T14) — called

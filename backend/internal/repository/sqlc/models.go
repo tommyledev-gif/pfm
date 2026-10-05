@@ -112,6 +112,13 @@ type Transaction struct {
 	// ToWalletID is the destination of a transfer (022_transaction_transfer.sql);
 	// nil for income/expense.
 	ToWalletID *uuid.UUID
+	// Location* (026_transactions_location.sql) are all nil for a Transaction
+	// recorded without a map pin. Lat/Lng are a measurement, not money, so
+	// float8 is correct here.
+	LocationLat  *float64
+	LocationLng  *float64
+	LocationName *string
+	LocationNote *string
 }
 
 // Notification mirrors the notifications table exactly (009_notifications.sql).

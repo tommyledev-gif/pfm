@@ -82,7 +82,13 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, userID uuid.
 		occurredAt = parsed
 	}
 
-	transaction, walletBalance, err := s.createTransactionTx(ctx, userID, wallet.ID, category.ID, destinationID, req, occurredAt)
+	// Allowed on every type, transfers included.
+	location, err := newTransactionLocation(req.Location)
+	if err != nil {
+		return nil, nil, false, err
+	}
+
+	transaction, walletBalance, err := s.createTransactionTx(ctx, userID, wallet.ID, category.ID, destinationID, req, occurredAt, location)
 	if err != nil {
 		// Two confirms racing past the lookup above with the same fresh key
 		// (specs/ai-chat-assistant/plan.md Finding #13): the partial unique
@@ -114,8 +120,9 @@ func (s *TransactionService) lookupIdempotentTransaction(ctx context.Context, us
 // createTransactionTx returns the Wallet's new balance alongside the created
 // Transaction (spec.md US-01 step 8: "returns 201 with the created
 // Transaction and the Wallet's new balance"). For a transfer that is the
-// SOURCE Wallet's balance; toWalletID is nil for income/expense.
-func (s *TransactionService) createTransactionTx(ctx context.Context, userID uuid.UUID, walletID, categoryID uuid.UUID, toWalletID *uuid.UUID, req dto.CreateTransactionRequest, occurredAt time.Time) (*model.Transaction, int64, error) {
+// SOURCE Wallet's balance; toWalletID is nil for income/expense. location is
+// the already-normalized map pin, nil when none was sent.
+func (s *TransactionService) createTransactionTx(ctx context.Context, userID uuid.UUID, walletID, categoryID uuid.UUID, toWalletID *uuid.UUID, req dto.CreateTransactionRequest, occurredAt time.Time, location *model.TransactionLocation) (*model.Transaction, int64, error) {
 	tx, err := s.repo.BeginTx(ctx)
 	if err != nil {
 		return nil, 0, fmt.Errorf("service.CreateTransaction: %w", err)
@@ -162,6 +169,7 @@ func (s *TransactionService) createTransactionTx(ctx context.Context, userID uui
 		OccurredAt:     occurredAt,
 		IdempotencyKey: req.IdempotencyKey,
 		ToWalletID:     toWalletID,
+		Location:       location,
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("service.CreateTransaction: %w", err)

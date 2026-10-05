@@ -18,6 +18,8 @@ import { OutboxItem } from "@/features/transactions/outbox/outbox-types";
 import { TransactionDraft } from "@/features/transactions/draft-from-text";
 import { TransactionKeypadFooter } from "@/features/transactions/components/TransactionKeypadFooter";
 import { WalletChipRow } from "@/features/transactions/components/WalletChipRow";
+import { LocationToggleRow } from "@/features/transactions/components/LocationToggleRow";
+import { TransactionLocationCard } from "@/features/transactions/components/TransactionLocationCard";
 import { useTransactionForm } from "@/features/transactions/components/use-transaction-form";
 
 const FALLBACK_CURRENCY = "VND";
@@ -78,6 +80,10 @@ export function TransactionFormModal({ visible, onClose, editingTransaction, edi
     transferTarget,
     submit,
     categoryPicker,
+    openCategoryPicker,
+    openLocationStep,
+    drawerChild,
+    location,
   } = useTransactionForm({ visible, onClose, editingTransaction, editingQueued, draft });
   const requireOnline = useRequireOnline();
 
@@ -89,7 +95,7 @@ export function TransactionFormModal({ visible, onClose, editingTransaction, edi
       <Drawer
         visible={visible}
         onClose={onClose}
-        child={categoryPicker.child}
+        child={drawerChild}
         footer={
           <TransactionKeypadFooter
             amount={amount}
@@ -97,7 +103,7 @@ export function TransactionFormModal({ visible, onClose, editingTransaction, edi
             type={type}
             category={categoryPicker.selected[0] ?? null}
             transferTarget={transferTarget}
-            onPressCategory={categoryPicker.open}
+            onPressCategory={openCategoryPicker}
             note={note}
             onChangeNote={setNote}
             noteInputKey={`note-${formKey}`}
@@ -182,6 +188,21 @@ export function TransactionFormModal({ visible, onClose, editingTransaction, edi
             )}
             {submitAttempted ? <FieldError message={errors.toWallet} /> : null}
           </>
+        ) : null}
+
+        {!isEditing ? (
+          <LocationToggleRow
+            value={location.pinLocation}
+            onValueChange={location.setPinLocation}
+            pinned={location.pinned}
+            onPressPinned={() => openLocationStep("adjust")}
+          />
+        ) : editingTransaction?.location ? (
+          <TransactionLocationCard
+            location={editingTransaction.location}
+            note={location.locationNote}
+            onChangeNote={location.setLocationNote}
+          />
         ) : null}
 
         {isEditing ? (

@@ -78,6 +78,16 @@ func auditSnapshot(t *model.Transaction) map[string]any {
 	} else {
 		snapshot["note"] = nil
 	}
+	// Only when present, same as to_wallet_id. Keys mirror the API's
+	// `location` object; nil *string fields marshal as null.
+	if t.Location != nil {
+		snapshot["location"] = map[string]any{
+			"latitude":   t.Location.Latitude,
+			"longitude":  t.Location.Longitude,
+			"place_name": t.Location.PlaceName,
+			"note":       t.Location.Note,
+		}
+	}
 	return snapshot
 }
 
@@ -87,7 +97,9 @@ func auditSnapshot(t *model.Transaction) map[string]any {
 // which DTO fields were supplied, not on whether the value actually differs:
 // re-submitting an identical value is still logged (spec.md S-TAL-07, an
 // explicit assumption flagged in that spec's Open Questions #1).
-func auditUpdateDiff(existing *model.Transaction, req dto.UpdateTransactionRequest, occurredAt *time.Time) (map[string]any, map[string]any) {
+// locationNote is the normalized value actually written (nil = not in this
+// PATCH, "" = cleared), so a clear is logged as `null`, matching the column.
+func auditUpdateDiff(existing *model.Transaction, req dto.UpdateTransactionRequest, occurredAt *time.Time, locationNote *string) (map[string]any, map[string]any) {
 	before := map[string]any{}
 	after := map[string]any{}
 
@@ -111,6 +123,25 @@ func auditUpdateDiff(existing *model.Transaction, req dto.UpdateTransactionReque
 		}
 		after["note"] = *req.Note
 	}
+	// Keyed on the PATCH field name, like the others. The service has already
+	// rejected a location_note on a Transaction with no location, so
+	// existing.Location is non-nil here.
+	if locationNote != nil && existing.Location != nil {
+		before["location_note"] = nullableAuditString(existing.Location.Note)
+		if *locationNote == "" {
+			after["location_note"] = nil
+		} else {
+			after["location_note"] = *locationNote
+		}
+	}
 
 	return before, after
+}
+
+// nullableAuditString renders a *string as its value, or a JSON null.
+func nullableAuditString(value *string) any {
+	if value == nil {
+		return nil
+	}
+	return *value
 }

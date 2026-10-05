@@ -26,6 +26,7 @@ import { useCurrentUserId } from "@/stores/use-current-user-id";
 import { LogoutGuardDialog } from "@/features/settings/components/LogoutGuardDialog";
 import { accountDisplayName } from "@/features/accounts/account-registry-store";
 import { AccountSwitchRow } from "@/features/accounts/components/AccountSwitchRow";
+import { PinLocationPreferenceRow } from "@/features/transactions/components/PinLocationPreferenceRow";
 import { useLogout } from "@/features/accounts/hooks/use-logout";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { totalBalance } from "@/features/wallets/wallet-totals";
@@ -148,6 +149,8 @@ export default function SettingsScreen() {
           </Pressable>
         ))}
       </View>
+
+      <PinLocationPreferenceRow />
 
       {/* Directly above "Đăng xuất" (specs/mobile-account-switch AC-05). */}
       <AccountSwitchRow />

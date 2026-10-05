@@ -23,6 +23,11 @@ interface UiPrefsState {
   setDebugBubbleVisible: (visible: boolean) => void;
   walletsViewMode: WalletsViewMode;
   setWalletsViewMode: (mode: WalletsViewMode) => void;
+  // Settings' "Ghim vị trí khi tạo giao dịch": where each new Transaction
+  // form's own location switch starts. The form can still turn it off for the
+  // one it is filling in without touching this.
+  pinLocationByDefault: boolean;
+  setPinLocationByDefault: (enabled: boolean) => void;
 }
 
 export const useUiPrefsStore = create<UiPrefsState>()(
@@ -36,6 +41,8 @@ export const useUiPrefsStore = create<UiPrefsState>()(
       // rehydration (persist's shallow merge), so no version bump is owed.
       walletsViewMode: "carousel",
       setWalletsViewMode: (mode) => set({ walletsViewMode: mode }),
+      pinLocationByDefault: true,
+      setPinLocationByDefault: (enabled) => set({ pinLocationByDefault: enabled }),
     }),
     {
       name: "pfm_ui_prefs",

@@ -50,3 +50,18 @@ export function PaletteIcon({ size, color = colors.textPrimary, strokeWidth = 1.
     </Svg>
   );
 }
+
+/** A map marker — where a transaction was made. */
+export function MapPinIcon({ size, color = colors.textPrimary, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <Svg {...base(size)} fill="none">
+      <Path
+        d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinejoin="round"
+      />
+      <Circle cx="12" cy="10" r="2.5" stroke={color} strokeWidth={strokeWidth} />
+    </Svg>
+  );
+}

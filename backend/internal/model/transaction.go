@@ -43,6 +43,22 @@ type Transaction struct {
 	// money arrived in. nil for income and expense.
 	ToWalletID   *uuid.UUID
 	ToWalletName *string
+	// Location is where the Transaction was recorded (026_transactions_
+	// location.sql) — nil when it was created without a map pin. Allowed on
+	// any type.
+	Location *TransactionLocation
+}
+
+// TransactionLocation is a map pin plus its optional descriptions. Latitude/
+// Longitude are fixed at creation, as is PlaceName (the reverse-geocoded
+// name); only Note can change afterwards. Coordinates are float64 on purpose:
+// they are a measurement, not money, so CLAUDE.md's no-float rule does not
+// apply.
+type TransactionLocation struct {
+	Latitude  float64
+	Longitude float64
+	PlaceName *string
+	Note      *string
 }
 
 // SignedEffect returns this Transaction's effect on its Wallet's balance:

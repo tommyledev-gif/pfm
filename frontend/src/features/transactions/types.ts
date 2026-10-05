@@ -15,6 +15,18 @@ export interface Transaction {
   // Only ever present on the mutating endpoints (create/update) — never on
   // GET (spec.md Response Shape). Backend: dto.TransactionResponse.
   wallet_balance?: number;
+  // Where the mobile app pinned it when created; null when it was not.
+  location: TransactionLocation | null;
+}
+
+// Mirrors the `location` object of backend dto.TransactionResponse.
+// Coordinates are degrees, not money — plain numbers are fine here.
+export interface TransactionLocation {
+  latitude: number;
+  longitude: number;
+  // Reverse-geocoded area, e.g. "Quận 1, TP. Hồ Chí Minh"; null when pinned offline.
+  place_name: string | null;
+  note: string | null;
 }
 
 export interface ListTransactionsResult {
