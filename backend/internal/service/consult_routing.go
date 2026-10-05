@@ -39,7 +39,13 @@ func (s *ConsultService) route(ctx context.Context, userID uuid.UUID, p *AIConsu
 	}
 	switch p.Kind {
 	case model.ParseKindQuery:
-	case model.ParseKindEvaluate, model.ParseKindScenario:
+	case model.ParseKindScenario:
+		if p.GoalAmountVND != nil {
+			return s.routeScenario(ctx, userID, p, currency, out)
+		}
+		out.reply = &dto.ConsultResponse{Kind: string(model.ConsultKindComingLater), Message: msgComingLater, Chips: comingLaterChips(p.Kind, currency)}
+		return out, nil
+	case model.ParseKindEvaluate:
 		out.reply = &dto.ConsultResponse{Kind: string(model.ConsultKindComingLater), Message: msgComingLater, Chips: comingLaterChips(p.Kind, currency)}
 		return out, nil
 	case model.ParseKindNeedsContext:

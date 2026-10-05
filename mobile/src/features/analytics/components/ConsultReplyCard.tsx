@@ -5,6 +5,7 @@ import { CategoryChoiceList } from "@/features/analytics/components/CategoryChoi
 import { ChartRenderer } from "@/features/analytics/components/ChartRenderer";
 import { SuggestionChips } from "@/features/analytics/components/SuggestionChips";
 import { SuggestionRows } from "@/features/analytics/components/SuggestionRows";
+import { ScenarioPlan } from "@/features/analytics/components/ScenarioPlan";
 import { periodElapsed } from "@/features/analytics/period-elapsed";
 import { AnalyticsPeriodInfo, AnalyticsQuery, ConsultCategoryRef, ConsultMessageData } from "@/features/analytics/types";
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
@@ -73,6 +74,8 @@ export function ConsultReplyCard({ data, handlers, sourceText }: ConsultReplyCar
         </>
       ) : null}
 
+      {data.scenario ? <ScenarioPlan scenario={data.scenario} /> : null}
+
       {data.kind === "clarify_category" && data.category_choices && data.pending_query ? (
         <CategoryChoiceList
           choices={data.category_choices}
@@ -90,7 +93,7 @@ export function ConsultReplyCard({ data, handlers, sourceText }: ConsultReplyCar
       {/* An answer's follow-ups are optional next questions — a light row of
           chips. A reply that could not answer has nothing else to offer, so
           its questions are the reply: whole tappable rows. */}
-      {answer ? (
+      {answer || data.scenario ? (
         <View style={styles.chips}>
           <SuggestionChips
             chips={chips}

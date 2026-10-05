@@ -131,7 +131,8 @@ export type ConsultKind =
   | "needs_context"
   | "coming_later"
   | "switch_mode"
-  | "degraded";
+  | "degraded"
+  | "scenario";
 
 export interface ConsultCategoryRef {
   id: string;
@@ -147,6 +148,23 @@ export interface ConsultResponse {
   pending_query?: AnalyticsQuery;
   chips: AnalyticsFollowUp[];
   switch_to_recording?: boolean;
+  scenario?: ConsultScenario;
+}
+
+/** A savings-goal plan (kind "scenario"); amounts are integer cents. The
+ *  averages, cap and feasibility are absent without recent history. */
+export interface ConsultScenario {
+  currency: string;
+  goal: number;
+  deadline?: string;
+  months: number;
+  monthly_save: number;
+  baseline_cycles: number;
+  avg_income?: number;
+  avg_expense?: number;
+  spend_cap?: number;
+  cut_needed?: number;
+  feasible?: boolean;
 }
 
 export interface ConsultRequest {

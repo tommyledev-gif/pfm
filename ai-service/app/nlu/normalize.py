@@ -59,8 +59,8 @@ _MILLION = 1_000_000
 
 # 1tr5 → 1_500_000; the digit after "tr" is hundreds of thousands.
 _TR_SHORTHAND = re.compile(r"\b(\d+)\s*tr(\d)\b")
-# 1.5 trieu / 1,5 trieu / 2 trieu / 3 cu
-_MILLIONS = re.compile(r"\b(\d+)(?:[.,](\d+))?\s*(?:trieu|tr|cu)\b")
+# 1.5 trieu / 1,5 trieu / 2 trieu / 3 cu / 30m — "m" only glued to the digit.
+_MILLIONS = re.compile(r"\b(\d+)(?:[.,](\d+))?(?:\s*(?:trieu|tr|cu)|m)\b")
 # 500 nghin / 500 ngan / 50k — "k" counts as thousand only right after a digit.
 _THOUSANDS = re.compile(r"\b(\d+)(?:[.,](\d+))?\s*(?:nghin|ngan|k)\b")
 _WHITESPACE = re.compile(r"\s+")

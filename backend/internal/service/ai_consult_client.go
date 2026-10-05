@@ -40,7 +40,12 @@ type AIConsultParse struct {
 	AmountMinVND       *int64
 	Limit              int
 	CategoryConfidence *float64
-	NormalizedText     string
+	// Goal* / MonthlySaveVND are a savings-goal scenario, in đồng; set only
+	// when Kind is scenario and the question named a target amount.
+	GoalAmountVND  *int64
+	GoalDeadline   string // local YYYY-MM-DD, may be empty
+	MonthlySaveVND *int64
+	NormalizedText string
 	// InvalidOutput: the model answered but its output did not fit the
 	// catalog. The reply is "unsupported", never "degraded" (plan.md BR-26).
 	InvalidOutput    bool
@@ -83,6 +88,12 @@ type consultWireQuery struct {
 	Limit        *int     `json:"limit"`
 }
 
+type consultWireScenario struct {
+	GoalAmountVND  int64   `json:"goal_amount_vnd"`
+	GoalDeadline   *string `json:"goal_deadline"`
+	MonthlySaveVND *int64  `json:"monthly_save_vnd"`
+}
+
 type consultWireUsage struct {
 	PromptTokens     int `json:"prompt_tokens"`
 	CompletionTokens int `json:"completion_tokens"`
@@ -92,7 +103,8 @@ type consultWireUsage struct {
 type consultWireResponse struct {
 	Kind               string            `json:"kind"`
 	Coverage           string            `json:"coverage"`
-	Query              *consultWireQuery `json:"query"`
+	Query              *consultWireQuery    `json:"query"`
+	Scenario           *consultWireScenario `json:"scenario"`
 	CategoryConfidence *float64          `json:"category_confidence"`
 	NormalizedText     string            `json:"normalized_text"`
 	Usage              consultWireUsage  `json:"usage"`
@@ -149,6 +161,10 @@ func fromConsultWire(w consultWireResponse) (*AIConsultParse, error) {
 		Kind: w.Kind, Coverage: w.Coverage, CategoryConfidence: w.CategoryConfidence,
 		NormalizedText: w.NormalizedText, InvalidOutput: w.InvalidOutput, PromptTokens: w.Usage.PromptTokens,
 		CompletionTokens: w.Usage.CompletionTokens, CachedTokens: w.Usage.CachedTokens,
+	}
+	if sc := w.Scenario; sc != nil {
+		goal := sc.GoalAmountVND
+		out.GoalAmountVND, out.GoalDeadline, out.MonthlySaveVND = &goal, deref(sc.GoalDeadline), sc.MonthlySaveVND
 	}
 	if w.Query == nil {
 		return out, nil

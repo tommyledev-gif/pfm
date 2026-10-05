@@ -125,6 +125,28 @@ type ConsultResponse struct {
 	PendingQuery      *AnalyticsQueryRequest   `json:"pending_query,omitempty"`
 	Chips             []AnalyticsFollowUp      `json:"chips"`
 	SwitchToRecording bool                     `json:"switch_to_recording,omitempty"`
+	Scenario          *ConsultScenario         `json:"scenario,omitempty"`
+}
+
+// ConsultScenario is a savings-goal plan, all amounts int64 xu. The
+// averages come from the last completed cycles; they are nil when there is
+// no history to compare against, and so is Feasible.
+type ConsultScenario struct {
+	Currency       string `json:"currency"`
+	Goal           int64  `json:"goal"`
+	// Deadline is the local YYYY-MM-DD the money is needed by, if one was said.
+	Deadline       string `json:"deadline,omitempty"`
+	Months         int    `json:"months"`
+	MonthlySave    int64  `json:"monthly_save"`
+	BaselineCycles int    `json:"baseline_cycles"`
+	AvgIncome      *int64 `json:"avg_income,omitempty"`
+	AvgExpense     *int64 `json:"avg_expense,omitempty"`
+	// SpendCap is the most the User can spend a month and still save
+	// MonthlySave: average income minus MonthlySave.
+	SpendCap       *int64 `json:"spend_cap,omitempty"`
+	// CutNeeded is how much below the current average spending SpendCap is.
+	CutNeeded      *int64 `json:"cut_needed,omitempty"`
+	Feasible       *bool  `json:"feasible,omitempty"`
 }
 
 // ConsultCategoryRef names a Category in a banner or a choice list.

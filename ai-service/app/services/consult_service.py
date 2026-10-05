@@ -30,6 +30,7 @@ from app.schemas.consult_schema import (
     ConsultQuery,
     ConsultRequest,
     ConsultResponse,
+    ConsultScenario,
     ConsultToolOutput,
     ConsultUsage,
 )
@@ -125,10 +126,18 @@ def to_response(output: ConsultToolOutput, req: ConsultRequest, normalized: str,
                 amount_min_vnd=output.amount_min_vnd,
                 limit=output.limit,
             )
+    scenario = None
+    if output.kind == "scenario" and output.goal_amount_vnd is not None:
+        scenario = ConsultScenario(
+            goal_amount_vnd=output.goal_amount_vnd,
+            goal_deadline=output.goal_deadline,
+            monthly_save_vnd=output.monthly_save_vnd,
+        )
     return ConsultResponse(
         kind=output.kind,
         coverage=coverage,
         query=query,
+        scenario=scenario,
         category_confidence=output.category_confidence if output.category_ids else None,
         normalized_text=normalized,
         usage=usage,

@@ -148,6 +148,8 @@ const (
 	ConsultKindComingLater     ConsultKind = "coming_later"
 	ConsultKindSwitchMode      ConsultKind = "switch_mode"
 	ConsultKindDegraded        ConsultKind = "degraded"
+	// ConsultKindScenario is a savings-goal plan (target amount by a date).
+	ConsultKindScenario ConsultKind = "scenario"
 )
 
 // Interpreter verdicts from the AI Service (spec.md brief §II.4 boundaries).

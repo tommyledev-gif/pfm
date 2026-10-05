@@ -129,3 +129,5 @@
 {"text": "hôm nay so với hôm qua", "group": "single_day", "expected": {"kind": "query", "coverage": "full", "metric": "compare", "period": "custom", "from": "2026-10-14", "to": "2026-10-14"}}
 {"text": "sáng nay tiêu bao nhiêu", "group": "single_day", "expected": {"kind": "query", "coverage": "partial"}}
 {"text": "tối qua chi gì", "group": "single_day", "expected": {"kind": "query", "coverage": "partial"}}
+{"text": "tháng 12 năm này thi bằng lái 30m thì mỗi tháng chi như nào để đạt được", "group": "query_vs_evaluate", "expected": {"kind": "scenario"}}
+{"text": "để dành 3tr mỗi tháng thì bao giờ đủ 50tr", "group": "query_vs_evaluate", "expected": {"kind": "scenario"}}

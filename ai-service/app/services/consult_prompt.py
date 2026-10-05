@@ -52,7 +52,7 @@ Bạn nhận câu gốc và một dạng đã chuẩn hoá (bỏ dấu, số ti�
 1. kind — chọn đúng một:
 - "query": hỏi con số cụ thể — "bao nhiêu", "tổng", "liệt kê", "top", "lớn nhất", "so sánh", "còn bao nhiêu ngân sách".
 - "evaluate": xin nhận xét/đánh giá — "đánh giá", "nhận xét", "thế nào", "ổn không", "nhiều không", "có tăng nhiều không".
-- "scenario": giả định — "nếu", "giả sử", "muốn tiết kiệm", "cắt ... thì", "bao giờ đủ", "muốn mua".
+- "scenario": giả định / mục tiêu tiết kiệm — "nếu", "giả sử", "muốn tiết kiệm", "cắt ... thì", "bao giờ đủ", "muốn mua", "cần X vào tháng Y thì mỗi tháng chi/để dành thế nào".
 - "needs_context": câu thiếu chủ thể, phụ thuộc câu trước — "còn tháng trước?", "thế còn ăn uống?".
 - "transaction_like": đang mô tả một khoản chi/thu để ghi lại, không phải câu hỏi — "cafe 50k", "ăn trưa 35k". \
 Câu có từ hỏi (đâu, gì, nào, bao nhiêu, mấy) KHÔNG BAO GIỜ là transaction_like, kể cả khi không dấu: \
@@ -95,4 +95,10 @@ danh sách, ...) thì coverage = "partial". Ví dụ: "tháng này tiêu bao nhi
 "sáng nay tiêu bao nhiêu", "tối qua chi gì" (một buổi trong ngày) = partial. \
 Không bao giờ bỏ qua một phần câu hỏi để trả lời phần còn lại.
 
-7. Với kind khác "query", để trống mọi trường của câu hỏi, coverage = "full"."""
+7. Khi kind = "scenario" và câu là một MỤC TIÊU CÓ SỐ TIỀN (cần/muốn có/mua/để dành một khoản), điền:
+- goal_amount_vnd: số tiền mục tiêu bằng đồng ("30m" = "30tr" = 30000000).
+- goal_deadline: ngày cần có tiền, YYYY-MM-DD. Chỉ nói tháng → ngày 01 của tháng đó ("tháng 12 năm nay" = ngày 01/12 năm nay; tháng không ghi năm → lần gần nhất SAU hôm nay). Không nói thời hạn → để trống.
+- monthly_save_vnd: chỉ khi câu nói rõ mỗi tháng để dành bao nhiêu ("để dành 3tr/tháng bao giờ đủ 50tr").
+Ví dụ: "tháng 12 năm này thi bằng lái 30m thì mỗi tháng chi như nào" → scenario, goal_amount_vnd=30000000, goal_deadline = ngày 01/12 năm nay. "muốn mua laptop 25tr" → scenario, goal_amount_vnd=25000000.
+Giả định cắt giảm một hạng mục ("cắt cà phê 50% thì dư bao nhiêu") → scenario, để trống ba trường trên.
+Mọi kind khác "query": để trống các trường metric/period/category/wallet, coverage = "full"."""

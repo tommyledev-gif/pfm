@@ -68,6 +68,9 @@ class ConsultToolOutput(BaseModel):
     amount_min_vnd: int | None = Field(default=None, ge=1, description="threshold in dong, e.g. 50000 for 50k")
     limit: int | None = Field(default=None, ge=1, le=LIST_MAX_ROWS)
     category_confidence: float | None = Field(default=None, ge=0, le=1)
+    goal_amount_vnd: int | None = Field(default=None, ge=1, description="scenario only: target amount in dong, e.g. 30000000 for 30tr")
+    goal_deadline: str | None = Field(default=None, description="scenario only: YYYY-MM-DD the money is needed by")
+    monthly_save_vnd: int | None = Field(default=None, ge=1, description="scenario only: amount the User says they save per month, in dong")
 
 
 class ConsultQuery(BaseModel):
@@ -85,6 +88,17 @@ class ConsultQuery(BaseModel):
     limit: int | None = None
 
 
+class ConsultScenario(BaseModel):
+    """A savings goal: reach goal_amount_vnd by goal_deadline, or by saving
+    monthly_save_vnd a month. The backend does all the arithmetic."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    goal_amount_vnd: int
+    goal_deadline: str | None = None
+    monthly_save_vnd: int | None = None
+
+
 class ConsultUsage(BaseModel):
     prompt_tokens: int = 0
     completion_tokens: int = 0
@@ -95,6 +109,9 @@ class ConsultResponse(BaseModel):
     kind: ParseKind
     coverage: Coverage
     query: ConsultQuery | None = None
+    # Set only for kind="scenario" when the question is a savings goal;
+    # other what-ifs (cutting a Category) still have no scenario.
+    scenario: ConsultScenario | None = None
     category_confidence: float | None = None
     normalized_text: str
     usage: ConsultUsage
