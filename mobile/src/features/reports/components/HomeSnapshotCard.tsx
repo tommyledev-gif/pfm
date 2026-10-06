@@ -1,5 +1,5 @@
 import { memo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Animated, StyleSheet, Text, View } from "react-native";
 
 import { Card } from "@/components/ui/Card";
 import { LiquidCircle } from "@/components/shared/LiquidCircle";
@@ -13,6 +13,7 @@ import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme
 import { Category } from "@/features/categories/types";
 import { ReportCategoryEntry } from "@/features/reports/types";
 import { AtRiskBudgetRow } from "@/features/reports/hooks/use-home-snapshot";
+import { usePeriodSlide } from "@/features/reports/hooks/use-period-slide";
 
 // The left column is 3/12 of the card, so the ring cannot be a fixed size —
 // on a narrow phone that column is about 67px and a hardcoded circle would
@@ -32,6 +33,7 @@ const RIGHT_COLUMN_ROWS = 3;
 
 interface HomeSnapshotCardProps {
   loading: boolean;
+  periodIndex: number; // the active Ngày / Tháng / Năm tab's position — sets the slide's direction
   isDay: boolean;
   currency: string;
   periodSpent: number;
@@ -59,6 +61,7 @@ interface HomeSnapshotCardProps {
  */
 export const HomeSnapshotCard = memo(function HomeSnapshotCard({
   loading,
+  periodIndex,
   isDay,
   currency,
   periodSpent,
@@ -83,6 +86,7 @@ export const HomeSnapshotCard = memo(function HomeSnapshotCard({
   // Belt-and-braces for the reserved slots above: the tallest the content has
   // been is kept as its minimum, so no tab can ever make the card shrink.
   const [contentMinHeight, setContentMinHeight] = useState(0);
+  const slideStyle = usePeriodSlide(periodIndex);
   const ringSize = Math.min(RING_MAX_SIZE, Math.max(RING_MIN_SIZE, ringColumnWidth));
   const isOverBudget = Boolean(budgetSnapshot && periodSpent > budgetSnapshot.limit);
 
@@ -115,7 +119,7 @@ export const HomeSnapshotCard = memo(function HomeSnapshotCard({
           their own padding), so the card grew or shrank the moment data
           arrived. Rendering the real thing underneath makes the loading and
           loaded card exactly the same height by construction. */}
-      <View>
+      <Animated.View style={slideStyle}>
         <View
           style={[styles.body, loading && styles.hidden]}
           pointerEvents={loading ? "none" : "auto"}
@@ -253,13 +257,13 @@ export const HomeSnapshotCard = memo(function HomeSnapshotCard({
             <SnapshotCardSkeleton />
           </View>
         ) : null}
-      </View>
+      </Animated.View>
     </Card>
   );
 });
 
 const useStyles = createStyles((colors) => ({
-  card: { gap: spacing.md },
+  card: { gap: spacing.md, overflow: "hidden" }, // clips the period slide at the rounded edge
   body: { gap: spacing.md },
   hidden: { opacity: 0 },
   // A translucent tinted pill, not a solid fill — a loud block read as jarring

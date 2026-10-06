@@ -150,6 +150,7 @@ export default function HomeScreen() {
 
             <HomeSnapshotCard
               loading={snapshot.loading}
+              periodIndex={PERIODS.findIndex((p) => p.value === homePeriod)}
               isDay={homePeriod === "day"}
               currency={snapshot.currency}
               periodSpent={snapshot.periodSpent}

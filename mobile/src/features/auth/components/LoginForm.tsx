@@ -35,7 +35,9 @@ export function LoginForm({ mode = "login", initialEmail, onDone }: LoginFormPro
   const colors = useColors();
   const styles = useStyles();
   const [email, setEmail] = useState(initialEmail ?? "");
-  const [password, setPassword] = useState("000000");
+  // Test-account convenience on the login screen only — "+ Thêm tài khoản"
+  // is logging in a *different* User, so a carried-over password is wrong.
+  const [password, setPassword] = useState(mode === "login" ? "00000000" : "");
   const [showPassword, setShowPassword] = useState(false);
   const login = useLoginMutation();
   const passwordRef = useRef<TextInput>(null);

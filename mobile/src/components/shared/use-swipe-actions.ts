@@ -138,11 +138,12 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
       if (closeCurrentlyParked && closeCurrentlyParked !== reset) closeCurrentlyParked();
       closeCurrentlyParked = reset;
       Vibration.vibrate(PARK_VIBRATION_MS);
-      Animated.spring(translateX, {
-        toValue: side === "left" ? maxFor("left") : -maxFor("right"),
-        useNativeDriver: true,
-        bounciness: 0,
-      }).start();
+      const parkedAt = side === "left" ? maxFor("left") : -maxFor("right");
+      // Recorded as where the row now IS, not where the finger let go — the
+      // next drag (e.g. swiping it closed) is measured from here.
+      offsetRef.current = parkedAt;
+      (side === "left" ? leftProgress : rightProgress).setValue(1);
+      Animated.spring(translateX, { toValue: parkedAt, useNativeDriver: true, bounciness: 0 }).start();
       setParkedSide(side);
     };
 
@@ -159,8 +160,13 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
     const panResponder = PanResponder.create({
       onMoveShouldSetPanResponder: (_, gesture) => {
         if (disabledRef.current) return false;
-        const draggingRight = gesture.dx > 0 && Boolean(leftRef.current);
-        const draggingLeft = gesture.dx < 0 && Boolean(rightRef.current);
+        // A row standing open can always be dragged back toward closed, even
+        // when the side it would cross into has no action of its own (a
+        // User bubble offers only "Sửa"). Without this, a parked row could be
+        // closed only by first dragging further open and reversing mid-hold.
+        const offset = offsetRef.current;
+        const draggingRight = gesture.dx > 0 && (Boolean(leftRef.current) || offset < 0);
+        const draggingLeft = gesture.dx < 0 && (Boolean(rightRef.current) || offset > 0);
         return (
           (draggingRight || draggingLeft) &&
           Math.abs(gesture.dx) > ACTIVATION_DISTANCE &&
@@ -175,6 +181,10 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
       onShouldBlockNativeResponder: () => true,
       onPanResponderGrant: () => {
         baseRef.current = offsetRef.current;
+        // Picking a parked row back up turns its button back into the
+        // drag indicator, so it fades with the travel as the row closes.
+        // Releasing past the threshold parks it again.
+        setParkedSide(null);
         // A swipe the User started must not be half-hidden behind the
         // keyboard. Safe mid-gesture: termination is refused above, so the
         // layout shift as the keyboard closes cannot steal this gesture.
