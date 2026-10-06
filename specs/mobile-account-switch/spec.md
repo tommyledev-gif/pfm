@@ -136,7 +136,7 @@ Issuing is **not** idempotent — each call returns a new credential. The App ma
 ### Main Flow
 1. Settings shows a "Chuyển tài khoản" row directly above "Đăng xuất". On its right, an overlapping group of up to 3 account avatars (initial letter, active account first); with 4 or more accounts, a dark "+N" circle follows, where N = number of accounts − 3.
 2. User taps the row.
-3. App decides: more than one other account → opens the account dialog (step 4); exactly one other → goes straight to step 5a with that account; none → opens the dialog with only the active account and "+ Thêm tài khoản" (AC-07).
+3. App opens the account dialog (step 4) — always, whatever the number of other accounts; with none it holds only the active account and "+ Thêm tài khoản" (AC-07). (Changed 2026-10-06: a single other account used to be switched to directly, which never showed the User which account they were going to.)
 4. The dialog lists every Saved Account: avatar, display name, email, status ("Đang dùng" for the active one — not tappable; "Đã hết hạn — đăng nhập lại" for expired ones). Each inactive row offers "Gỡ khỏi thiết bị" (US-04). The bottom offers "+ Thêm tài khoản" (US-03).
 5. User taps a valid account.
 5a. If the identity check is on, the phone asks for it (US-07). Cancelled or failed → stop here; nothing changes.
@@ -147,7 +147,7 @@ Issuing is **not** idempotent — each call returns a new credential. The App ma
 
 ### Acceptance Criteria
 - **AC-05** — The "Chuyển tài khoản" row sits directly above "Đăng xuất" and shows at most 3 avatars plus, from the 4th account, a "+N" circle with the correct N.
-- **AC-06** — With more than one other account, the tap opens the dialog; with exactly one, it switches directly (after the identity check, US-07).
+- **AC-06** — With one or more other accounts, the tap opens the dialog and the User picks the account; the identity check (US-07) runs after the pick. Nothing switches on the row tap itself.
 - **AC-07** — With no other account, the tap opens the dialog containing only the active account (labelled "Đang dùng", not tappable)
   and the "+ Thêm tài khoản" action.
 - **AC-08** — A switch completes within 10 s in every outcome (success or failure), including on a slow or dead network.
@@ -163,7 +163,7 @@ Issuing is **not** idempotent — each call returns a new credential. The App ma
 | Scenario ID | Given | When | Then | Notes |
 |---|---|---|---|---|
 | S-ASW-06 | List = [A (active), B, C] | User taps "Chuyển tài khoản" | Dialog lists A ("Đang dùng"), B, C, plus "+ Thêm tài khoản" | AC-06 |
-| S-ASW-07 | List = [A (active), B] | User taps the row | Identity check (if on), then switches straight to B; Home shows B's data | AC-06 |
+| S-ASW-07 | List = [A (active), B] | User taps the row | Dialog lists A ("Đang dùng") and B, plus "+ Thêm tài khoản"; nothing switches until B is picked | AC-06 |
 | S-ASW-08 | List = [A (active)] | User taps the row | Dialog shows A ("Đang dùng", not tappable) and "+ Thêm tài khoản" only | AC-07 |
 | S-ASW-09 | List = A, B, C, D, E | Settings renders | Row shows 3 avatars and a "+2" circle | AC-05 |
 | S-ASW-10 | List = [A, B], 1–3 avatars | Settings renders | No "+N" circle | AC-05 |

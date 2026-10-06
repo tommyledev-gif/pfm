@@ -1,3 +1,4 @@
+import { memo, useMemo } from "react";
 import { Animated, Text, View } from "react-native";
 
 import { spacing, typography, walletAccentPalette, createStyles } from "@/lib/theme";
@@ -5,6 +6,7 @@ import { Wallet } from "@/features/wallets/types";
 import {
   CARD_HEIGHT,
   CARD_OVERLAP,
+  CARD_WIDTH,
   CAROUSEL_SHADOW_BLEED_BOTTOM,
   CAROUSEL_SHADOW_BLEED_TOP,
   WalletStackCard,
@@ -16,6 +18,61 @@ import { SNAP_INTERVAL, useWalletCarousel } from "@/features/wallets/components/
 const NEIGHBOUR_OVERLAP = 18;
 const NEIGHBOUR_SCALE = 0.88;
 const NEIGHBOUR_OPACITY = 0.5;
+
+// ── The swap is a shuffle, not a cross-fade ──────────────────────────────
+// A card's path is keyed by its distance from the centre in snap intervals
+// (1 = resting neighbour, 0 = centred). Coming in, it first slides a little
+// further OUT (PULL_OUT, by ¾), clears the centre card entirely by the
+// halfway mark, then sweeps back in over it. The path is mirrored, so the
+// outgoing card runs the same one in reverse: out past its resting spot,
+// then tucking back under.
+//
+// ⚠️ Why: paint order is JS state (centreIndex) and flips at the halfway
+// mark. With a plain lean the two cards still overlapped there, so the
+// incoming card visibly jumped on top of the centred one — both half-faded at
+// that instant, which read as the centre card suddenly dimming. Now nothing
+// overlaps from ¼ to ¾ of the swipe, so the flip lands unseen even when the
+// re-render is a few frames late.
+const PULL_OUT = 14;
+// Gap left between the two cards at the halfway mark.
+const SWAP_GAP = 8;
+const REST_X = SNAP_INTERVAL - NEIGHBOUR_OVERLAP;
+// Centre-to-centre offset at the halfway mark: half a card (at its scale
+// there) plus half the gap, so the incoming and outgoing cards just clear.
+const HALFWAY_X = (CARD_WIDTH * (1 + NEIGHBOUR_SCALE)) / 4 + SWAP_GAP / 2;
+// Each keyframe's translateX is its target position minus where the scroll
+// alone puts the card (that many snap intervals from the centre).
+const SHIFT_HALFWAY = HALFWAY_X - 0.5 * SNAP_INTERVAL;
+const SHIFT_PULLED_OUT = REST_X + PULL_OUT - 0.75 * SNAP_INTERVAL;
+const SHIFT_REST = REST_X - SNAP_INTERVAL;
+const SHUFFLE_INPUT = [-1, -0.75, -0.5, 0, 0.5, 0.75, 1];
+const SHUFFLE_OUTPUT = [-SHIFT_REST, -SHIFT_PULLED_OUT, -SHIFT_HALFWAY, 0, SHIFT_HALFWAY, SHIFT_PULLED_OUT, SHIFT_REST];
+
+/**
+ * Each rendered card's native-driven motion, built once per card count.
+ *
+ * ⚠️ Built in a memo rather than inline in render: a new interpolation chain
+ * per card per render meant every re-render of Home rebuilt the whole native
+ * animation graph for three copies of every wallet.
+ */
+function useCardMotion(count: number, scrollX: Animated.Value) {
+  return useMemo(
+    () =>
+      Array.from({ length: count }, (_, index) => {
+        // -1 is one card left of centre, 0 is centred.
+        const offset = Animated.subtract(index, Animated.divide(scrollX, SNAP_INTERVAL));
+        const range = [-1, 0, 1];
+        return {
+          translateX: offset.interpolate({ inputRange: SHUFFLE_INPUT, outputRange: SHUFFLE_OUTPUT, extrapolate: "clamp" }),
+          scale: offset.interpolate({ inputRange: range, outputRange: [NEIGHBOUR_SCALE, 1, NEIGHBOUR_SCALE], extrapolate: "clamp" }),
+          opacity: offset.interpolate({ inputRange: range, outputRange: [NEIGHBOUR_OPACITY, 1, NEIGHBOUR_OPACITY], extrapolate: "clamp" }),
+          // Fades the accent border in on whichever card is centred.
+          active: offset.interpolate({ inputRange: [-0.6, 0, 0.6], outputRange: [0, 1, 0], extrapolate: "clamp" }),
+        };
+      }),
+    [count, scrollX],
+  );
+}
 
 // Each wallet's accent by its position in the list. Colors are assigned by
 // position, not by wallet type, so every card is visibly its own. The one
@@ -58,7 +115,7 @@ interface WalletCarouselProps {
  * scroll both keep working. No reanimated and no gesture-handler — neither is
  * a dependency of this project.
  */
-export function WalletCarousel({
+function WalletCarouselView({
   wallets,
   onPressWallet,
   initialWalletId,
@@ -81,6 +138,7 @@ export function WalletCarousel({
     pressCard,
     onScrollBeginDrag,
   } = useWalletCarousel({ wallets, initialWalletId, onActiveWalletChange });
+  const cardMotion = useCardMotion(rendered.length, scrollX);
 
   if (wallets.length === 0) {
     return <Text style={styles.empty}>Chưa có ví nào — thêm một ví để bắt đầu.</Text>;
@@ -113,10 +171,7 @@ export function WalletCarousel({
         {containerWidth === 0
           ? null
           : rendered.map((wallet, index) => {
-              // Where this card sits relative to the viewport's centre, in
-              // snap intervals: -1 is one card left of centre, 0 is centred.
-              const offsetFromCentre = Animated.subtract(index, Animated.divide(scrollX, SNAP_INTERVAL));
-              const range = [-1, 0, 1];
+              const motion = cardMotion[index];
               // Nearest to the centre paints last. The final card keeps its
               // full width so the scrollable content is exactly long enough to
               // bring it to the middle.
@@ -138,35 +193,12 @@ export function WalletCarousel({
                     // shadow's size — ordering by raw index would give the
                     // centre card a shadow the size of the card.
                     elevation: Math.max(0, 8 - proximity),
-                    transform: [
-                      {
-                        translateX: offsetFromCentre.interpolate({
-                          inputRange: range,
-                          outputRange: [NEIGHBOUR_OVERLAP, 0, -NEIGHBOUR_OVERLAP],
-                          extrapolate: "clamp",
-                        }),
-                      },
-                      {
-                        scale: offsetFromCentre.interpolate({
-                          inputRange: range,
-                          outputRange: [NEIGHBOUR_SCALE, 1, NEIGHBOUR_SCALE],
-                          extrapolate: "clamp",
-                        }),
-                      },
-                    ],
-                    opacity: offsetFromCentre.interpolate({
-                      inputRange: range,
-                      outputRange: [NEIGHBOUR_OPACITY, 1, NEIGHBOUR_OPACITY],
-                      extrapolate: "clamp",
-                    }),
+                    transform: [{ translateX: motion.translateX }, { scale: motion.scale }],
+                    opacity: motion.opacity,
                   }}
                   // Fades the accent border in on whichever card is
                   // centred, without re-rendering on every scroll frame.
-                  activeOpacity={offsetFromCentre.interpolate({
-                    inputRange: [-0.6, 0, 0.6],
-                    outputRange: [0, 1, 0],
-                    extrapolate: "clamp",
-                  })}
+                  activeOpacity={motion.active}
                   // A side card is a shortcut for the swipe that would bring it
                   // over; only the card already in the middle is "opened".
                   onPress={() => pressCard(index, onPressWallet ? () => onPressWallet(wallet) : undefined)}
@@ -180,6 +212,10 @@ export function WalletCarousel({
     </View>
   );
 }
+
+// Memoized: Home re-renders for every query it reads, and the carousel is the
+// heaviest thing on it — it should re-render only when its own props change.
+export const WalletCarousel = memo(WalletCarouselView);
 
 const useStyles = createStyles((colors) => ({
   // A fixed height regardless of wallet count, so content below does not shift

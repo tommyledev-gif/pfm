@@ -36,3 +36,6 @@ docs-template
 # Python bytecode
 __pycache__/
 *.py[cod]
+
+# Lark app credentials (local only)
+lark-credentials.json

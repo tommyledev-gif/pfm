@@ -66,16 +66,23 @@ const useStyles = createStyles((colors) => ({
     width: TRACK_WIDTH,
     height: TRACK_HEIGHT,
     borderRadius: radii.pill,
-    backgroundColor: colors.trackMuted,
+    backgroundColor: colors.toggleTrackOff,
     padding: THUMB_INSET,
     overflow: "hidden",
   },
-  trackOn: { backgroundColor: colors.green, borderRadius: radii.pill },
+  trackOn: { backgroundColor: colors.toggleTrackOn, borderRadius: radii.pill },
   thumb: {
     width: THUMB_SIZE,
     height: THUMB_SIZE,
     borderRadius: radii.pill,
-    backgroundColor: colors.textPrimary,
+    backgroundColor: colors.toggleThumb,
+    // A white thumb on the light theme's pale "off" track needs an edge to be
+    // seen at all; on the dark theme the same shadow simply disappears.
+    shadowColor: "#000",
+    shadowOpacity: 0.18,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 2,
   },
   disabled: { opacity: DISABLED_OPACITY },
 }));

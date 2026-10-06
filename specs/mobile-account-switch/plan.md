@@ -212,7 +212,7 @@ Every new file stays under 300 lines; `settings.tsx` (248) shrinks because logou
 | Account added/updated on every password login, no opt-in | AC-01, AC-02 | `completeLogin()` → `registry.upsert()`; previous credential of the same user revoked (best effort) |
 | Cap of 5; evict LRU inactive, never active or incoming | AC-03, EC-03 | `registry.upsert()` → evicted entry: revoke (best effort) + delete key + per-user data |
 | Login success independent of credential issue | AC-04 | `completeLogin()` commits session first; issue failure only logs (debug console) and leaves the account for the renewal hook |
-| Tap rule: >1 other → dialog; 1 other → direct; 0 → dialog with the active row (in-use label, not tappable) + add action | AC-06, AC-07 | `AccountSwitchRow` `onPress`; `AccountSwitchDialog` always renders the active row |
+| Tap rule: always the dialog (≥1 other → pick from the list; 0 → the active row (in-use label, not tappable) + add action) | AC-06, AC-07 | `AccountSwitchRow` `onPress`; `AccountSwitchDialog` always renders the active row |
 | Identity check before every saved-account switch, before the overlay | BR-14, AC-27/28, EC-16/17 | `switchToAccount()` first awaits `confirmOwner()` when `identityCheckEnabled`; anything but `passed`/`unavailable` returns early with nothing written; the in-flight guard is taken before the prompt so a second tap is ignored |
 | No device lock → proceed, warn once | BR-15, AC-29 | `confirmOwner()` returns `unavailable`; if `!noLockWarningShown` → warning toast + set flag |
 | Turning the check off needs the check | AC-32 | `IdentityCheckToggleRow`: off → `confirmOwner()`; `passed`/`unavailable` → set false; on → set true directly |

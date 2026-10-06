@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
@@ -8,7 +9,8 @@ import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 // Home screen's header: wordmark + bell (unread dot, opens Notifications) +
 // avatar (opens Settings) — mobile/design_handoff_pfm_app/README.md "Home".
-export function TopBar({ userName }: { userName: string }) {
+// Memoized: it re-renders from its own unread query, not with every Home render.
+export const TopBar = memo(function TopBar({ userName }: { userName: string }) {
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
@@ -29,7 +31,7 @@ export function TopBar({ userName }: { userName: string }) {
       </View>
     </View>
   );
-}
+});
 
 const useStyles = createStyles((colors) => ({
   row: {

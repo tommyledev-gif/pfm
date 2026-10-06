@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { Card } from "@/components/ui/Card";
@@ -10,10 +10,9 @@ import { colorForCategory } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
 import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
-import { Budget } from "@/features/budgets/types";
-import { BudgetRowStatus } from "@/features/budgets/budget-pace";
 import { Category } from "@/features/categories/types";
 import { ReportCategoryEntry } from "@/features/reports/types";
+import { AtRiskBudgetRow } from "@/features/reports/hooks/use-home-snapshot";
 
 // The left column is 3/12 of the card, so the ring cannot be a fixed size —
 // on a narrow phone that column is about 67px and a hardcoded circle would
@@ -30,13 +29,6 @@ const RING_MAX_SIZE = 132;
 // (padding with invisible copies), and the left column always reserves its
 // status line, whether or not the active tab has anything to put there.
 const RIGHT_COLUMN_ROWS = 3;
-
-export interface AtRiskBudgetRow {
-  budget: Budget;
-  limit: Budget["limits"][number];
-  status: BudgetRowStatus;
-  elapsed: number;
-}
 
 interface HomeSnapshotCardProps {
   loading: boolean;
@@ -62,9 +54,10 @@ interface HomeSnapshotCardProps {
  *
  * Extracted from the screen so that file stays within the 300-line limit. All
  * of its figures are computed by the caller and passed in — this renders, it
- * does not derive.
+ * does not derive. Memoized, so Home re-rendering for another query (wallets,
+ * recent transactions) does not redraw the ring and its rows.
  */
-export function HomeSnapshotCard({
+export const HomeSnapshotCard = memo(function HomeSnapshotCard({
   loading,
   isDay,
   currency,
@@ -263,7 +256,7 @@ export function HomeSnapshotCard({
       </View>
     </Card>
   );
-}
+});
 
 const useStyles = createStyles((colors) => ({
   card: { gap: spacing.md },
@@ -283,7 +276,7 @@ const useStyles = createStyles((colors) => ({
   trendNegative: { backgroundColor: withAlpha(colors.peach, 0.12), borderColor: withAlpha(colors.peach, 0.35) },
   trendPositive: { backgroundColor: withAlpha(colors.green, 0.1), borderColor: withAlpha(colors.green, 0.3) },
   trendLabel: { ...typography.tiny },
-  row: { flexDirection: "row", gap: spacing.md, alignItems: "flex-start",  },
+  row: { flexDirection: "row", gap: spacing.md, alignItems: "flex-start" },
   // Widened from 3/9 (the ring column was narrower than its contents). Both
   // need a zero minimum, or a long category name widens the right column and
   // squeezes the left one below its measured width.

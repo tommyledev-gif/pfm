@@ -53,13 +53,29 @@ export const RIM_HEIGHT = BALL_SINK + SOCKET_RADIUS + RIM_PAD;
 export const RIM_LEFT_OFFSET = BALL_SIZE / 2 - RIM_CX;
 // Left fillet (clockwise), socket arc under the ball (counter-clockwise),
 // right fillet (clockwise).
-export const RIM_PATH =
-  `M ${RIM_CX - FILLET_DX} ${EDGE_Y} ` +
+const SOCKET_OUTLINE =
   `A ${SOCKET_FILLET_RADIUS} ${SOCKET_FILLET_RADIUS} 0 0 1 ${RIM_CX - TANGENT_DX} ${TANGENT_Y} ` +
   `A ${SOCKET_RADIUS} ${SOCKET_RADIUS} 0 ${SOCKET_LARGE_ARC} 0 ${RIM_CX + TANGENT_DX} ${TANGENT_Y} ` +
   `A ${SOCKET_FILLET_RADIUS} ${SOCKET_FILLET_RADIUS} 0 0 1 ${RIM_CX + FILLET_DX} ${EDGE_Y}`;
-// The same outline closed along the edge: the hollow's tinted fill.
-export const SOCKET_FILL_PATH = `${RIM_PATH} Z`;
+export const RIM_PATH = `M ${RIM_CX - FILLET_DX} ${EDGE_Y} ${SOCKET_OUTLINE}`;
+
+// ⚠️ The hollow is CUT OUT of the bar, not painted onto it. It used to be a
+// tinted fill drawn over the opaque bar, which on the dark theme came out as
+// a black disc around the ball instead of the screen behind it. Now the bar's
+// top band is this box with the hollow taken out (even-odd: the second
+// subpath is a hole in the first) plus plain fillers either side, all riding
+// ballX — so the hollow shows whatever the screen paints there. The hollow is
+// closed along the very top (y 0), not the hairline's centre, so no sliver of
+// bar is left across its mouth.
+export const BAND_CUTOUT_PATH =
+  `M 0 0 H ${RIM_WIDTH} V ${RIM_HEIGHT} H 0 Z ` +
+  `M ${RIM_CX - FILLET_DX} 0 V ${EDGE_Y} ${SOCKET_OUTLINE} V 0 Z`;
+// Depth of the hollow's lowest point; the bar is solid below it.
+const HOLLOW_DEPTH = BALL_SINK + SOCKET_RADIUS;
+// The fillers reach half-way into the box's solid edge strip (RIM_PAD wide),
+// so two opaque shapes overlap there and no hairline seam can open between
+// them at a fractional offset.
+const FILLER_OVERLAP = RIM_PAD / 2;
 // Tab-switch "bounce" on the ball's icon: up to this scale, then back to 1.
 export const ICON_BOUNCE_SCALE = 1.15;
 // Idle float: the ball drifts this many px above its resting spot and back,
@@ -78,13 +94,44 @@ export const useStyles = createStyles((colors) => ({
   // margined pill — only the top corners stay rounded. paddingBottom (set
   // inline to insets.bottom) extends the bar's own background into the
   // safe-area strip below the tabs instead of leaving it transparent.
-  pill: {
-    width: "100%",
-    // borderTopLeftRadius: radii.hero,
-    // borderTopRightRadius: radii.hero,
-    // No border of its own: the top hairline is drawn separately (topLine)
-    // so it can break around the ball's socket.
-    overflow: "hidden",
+  // Holds only the tab row now — the bar's surface is barBase + the band
+  // below, so the hollow can be a real hole. No border of its own: the top
+  // hairline is drawn separately (topLine) so it can break around the socket.
+  pill: { width: "100%" },
+  // Solid bar below the hollow's depth, safe-area strip included. Starts one
+  // pixel inside the band (RIM_HEIGHT) so the two overlap rather than meet.
+  barBase: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: HOLLOW_DEPTH,
+    bottom: 0,
+    backgroundColor: colors.navBg,
+  },
+  bandFillerLeft: {
+    position: "absolute",
+    top: 0,
+    left: RIM_LEFT_OFFSET - LINE_LENGTH + FILLER_OVERLAP,
+    width: LINE_LENGTH,
+    height: RIM_HEIGHT,
+    backgroundColor: colors.navBg,
+  },
+  bandFillerRight: {
+    position: "absolute",
+    top: 0,
+    left: RIM_LEFT_OFFSET + RIM_WIDTH - FILLER_OVERLAP,
+    width: LINE_LENGTH,
+    height: RIM_HEIGHT,
+    backgroundColor: colors.navBg,
+  },
+  // A plain band laid over the cut-out one until the tab row is measured —
+  // before that ballX is 0 and the hole would sit under the first tab.
+  bandCover: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: RIM_HEIGHT,
     backgroundColor: colors.navBg,
   },
   topLine: {
@@ -94,6 +141,7 @@ export const useStyles = createStyles((colors) => ({
     height: HAIRLINE,
     backgroundColor: colors.navBorder,
   },
+  // The hollow's box: the cut-out band and the rim stroke share it.
   rim: { position: "absolute", top: 0, left: RIM_LEFT_OFFSET, width: RIM_WIDTH, height: RIM_HEIGHT },
   tabRow: { flexDirection: "row", width: "100%", height: PILL_HEIGHT },
   tab: { flex: 1, alignItems: "center", justifyContent: "center" },

@@ -35,10 +35,8 @@ export const useUiPrefsStore = create<UiPrefsState>()(
     (set) => ({
       homePeriod: "day",
       setHomePeriod: (period) => set({ homePeriod: period }),
-      debugBubbleVisible: true,
+      debugBubbleVisible: false, // 1. Sửa mặc định thành false ở đây
       setDebugBubbleVisible: (visible) => set({ debugBubbleVisible: visible }),
-      // A key missing from older persisted state takes this default at
-      // rehydration (persist's shallow merge), so no version bump is owed.
       walletsViewMode: "carousel",
       setWalletsViewMode: (mode) => set({ walletsViewMode: mode }),
       pinLocationByDefault: true,
@@ -47,30 +45,30 @@ export const useUiPrefsStore = create<UiPrefsState>()(
     {
       name: "pfm_ui_prefs",
       storage: createJSONStorage(() => AsyncStorage),
-      // ⚠️ Changing the default above is NOT enough on its own: a persisted
-      // value always wins over it at rehydration, so every existing install
-      // would keep landing on whatever it last stored. The default only reaches
-      // anyone through a version bump.
-      version: 2,
+      // ⚠️ Ghi chú của hệ thống: Phải nâng version để clear bộ nhớ cũ
+      version: 3, // 2. Tăng từ 2 lên 3
       migrate: (persisted, version) => {
         const state = persisted as Partial<UiPrefsState> | undefined;
         if (!state) return state;
 
         let homePeriod = state.homePeriod as string | undefined;
+        let debugBubbleVisible = state.debugBubbleVisible; // Lấy giá trị cũ ra
 
-        // "week" was removed from the selector. Left alone it rehydrates into a
-        // period no tab can represent: nothing highlighted, and a range the user
-        // has no control to switch away from.
         if (homePeriod === "week") homePeriod = "day";
-
-        // A "month" stored before v2 was the old DEFAULT, not a choice — the
-        // Ngày tab did not exist yet, so nobody could have preferred month over
-        // it. Moving those installs once is what actually makes Ngày the
-        // default; from here on their own selection is remembered again.
         if (version < 2 && homePeriod === "month") homePeriod = "day";
+        
+        // 3. Nếu nâng từ phiên bản nhỏ hơn 3 lên, ép nó thành false luôn
+        if (version < 3) {
+          debugBubbleVisible = false;
+        }
 
-        return { ...state, homePeriod: (homePeriod ?? "day") as HomePeriod };
+        return { 
+          ...state, 
+          homePeriod: (homePeriod ?? "day") as HomePeriod,
+          debugBubbleVisible: debugBubbleVisible ?? false 
+        };
       },
     },
   ),
 );
+

@@ -1,20 +1,25 @@
 import { Text, View } from "react-native";
 
+import { MapPinIcon } from "@/components/ui/Icon";
 import { Toggle } from "@/components/ui/Toggle";
-import { createStyles, radii, spacing, typography } from "@/lib/theme";
+import { createStyles, radii, spacing, typography, useColors } from "@/lib/theme";
 import { useUiPrefsStore } from "@/stores/ui-prefs-store";
 
 const TITLE = "Ghim vị trí khi tạo giao dịch";
-const HINT = "Bật sẵn cho mỗi giao dịch mới: khi lưu sẽ lấy GPS và ghim lên bản đồ. Vẫn có thể tắt riêng cho từng giao dịch.";
+const HINT = "Bật sẵn cho mỗi giao dịch mới — vẫn tắt được riêng từng giao dịch.";
 
-// Settings' default for the new-Transaction form's location switch.
+// Settings' default for the new-Transaction form's location switch. Laid out
+// like the menu rows it is grouped with under "Cài đặt người dùng" — icon,
+// label, control — so the group reads as one list.
 export function PinLocationPreferenceRow() {
+  const colors = useColors();
   const styles = useStyles();
   const enabled = useUiPrefsStore((s) => s.pinLocationByDefault);
   const setEnabled = useUiPrefsStore((s) => s.setPinLocationByDefault);
 
   return (
     <View style={styles.row}>
+      <MapPinIcon size={20} color={colors.textSecondary} />
       <View style={styles.text}>
         <Text style={styles.title}>{TITLE}</Text>
         <Text style={styles.hint}>{HINT}</Text>
@@ -41,7 +46,7 @@ const useStyles = createStyles((colors) => ({
     borderColor: colors.surfaceBorder,
     borderRadius: radii.listCard,
   },
-  text: { flex: 1, gap: spacing.xs },
+  text: { flex: 1, gap: 2 },
   title: { ...typography.body, color: colors.textPrimary },
-  hint: { ...typography.caption, color: colors.textSecondary },
+  hint: { ...typography.tiny, color: colors.textSecondary },
 }));

@@ -8,6 +8,7 @@ import { BarChartIcon, HomeIcon, ListIcon, SparkleIcon, UserIcon } from "@/compo
 import { useColors } from "@/lib/theme";
 import {
   BALL_SIZE,
+  BAND_CUTOUT_PATH,
   BOB_DISTANCE,
   BOB_DURATION,
   HAIRLINE,
@@ -16,7 +17,6 @@ import {
   LINE_RIGHT_START,
   PILL_HEIGHT,
   RIM_PATH,
-  SOCKET_FILL_PATH,
   useStyles,
 } from "@/components/shared/bottom-nav-styles";
 
@@ -45,8 +45,8 @@ const SETTINGS_SUB_ROUTES = ["/appearance", "/wallets", "/categories", "/users",
 // elevates over whichever tab is active instead of a permanently-raised
 // button.
 //
-// ballX is the single source of truth for both the ball and the aura
-// (dark cutout) behind it — they read the same Animated.Value, offset by a
+// ballX is the single source of truth for both the ball and the hollow cut
+// out of the bar behind it — they read the same Animated.Value, offset by a
 // static left, so they can never drift out of sync with each other.
 export function BottomNav() {
   const colors = useColors();
@@ -187,9 +187,22 @@ export function BottomNav() {
   const ballScaleX = squish.interpolate({ inputRange: [0, 1], outputRange: [1, 1.22] });
   const ballScaleY = squish.interpolate({ inputRange: [0, 1], outputRange: [1, 0.85] });
   const ballBobY = bob.interpolate({ inputRange: [0, 1], outputRange: [0, -BOB_DISTANCE] });
+  const bandCoverOpacity = ballOpacity.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
+  const followBall = { transform: [{ translateX: ballX }] };
 
   return (
     <View style={[styles.wrapper, { height: PILL_HEIGHT + insets.bottom }]} pointerEvents="box-none">
+      {/* The bar's surface, with the hollow cut out of its top band so the
+          screen behind shows through it — see BAND_CUTOUT_PATH. */}
+      <View pointerEvents="none" style={styles.barBase} />
+      <Animated.View pointerEvents="none" style={[styles.bandFillerLeft, followBall]} />
+      <Animated.View pointerEvents="none" style={[styles.rim, followBall]}>
+        <Svg width="100%" height="100%">
+          <Path d={BAND_CUTOUT_PATH} fill={colors.navBg} fillRule="evenodd" />
+        </Svg>
+      </Animated.View>
+      <Animated.View pointerEvents="none" style={[styles.bandFillerRight, followBall]} />
+      <Animated.View pointerEvents="none" style={[styles.bandCover, { opacity: bandCoverOpacity }]} />
       <View style={[styles.pill, { paddingBottom: insets.bottom }]}>
         <View style={styles.tabRow}>
           {TABS.map(({ href, Icon }, index) => (
@@ -236,7 +249,6 @@ export function BottomNav() {
         style={[styles.rim, { opacity: ballOpacity, transform: [{ translateX: ballX }] }]}
       >
         <Svg width="100%" height="100%">
-          <Path d={SOCKET_FILL_PATH} fill={colors.navSocketOuter} />
           <Path d={RIM_PATH} stroke={colors.navBorder} strokeWidth={HAIRLINE} fill="none" />
         </Svg>
       </Animated.View>

@@ -5,12 +5,13 @@ import { currentPeriodRange, monthRange, previousPeriodRange } from "@/lib/date-
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { budgetTotals } from "@/features/budgets/budget-totals";
 import {
+  BudgetRowStatus,
   budgetPeriodElapsed,
   budgetRowStatus,
   daysLeftInMonth,
   remainingPerDay,
 } from "@/features/budgets/budget-pace";
-import { AtRiskBudgetRow } from "@/features/reports/components/HomeSnapshotCard";
+import { Budget } from "@/features/budgets/types";
 import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary-query";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { primaryCurrency } from "@/features/wallets/wallet-totals";
@@ -18,6 +19,14 @@ import { HomePeriod } from "@/stores/ui-prefs-store";
 
 const TOP_CATEGORIES_COUNT = 3;
 const FALLBACK_CURRENCY = "VND";
+
+/** One budget limit running hot enough to show on the snapshot card. */
+export interface AtRiskBudgetRow {
+  budget: Budget;
+  limit: Budget["limits"][number];
+  status: BudgetRowStatus;
+  elapsed: number;
+}
 
 /**
  * Every figure the home snapshot shows.
@@ -55,7 +64,12 @@ export function useHomeSnapshot(homePeriod: HomePeriod) {
 
   const periodSpent = periodSummary.data?.totals[0]?.total_expense ?? 0;
   const previousPeriodSpent = previousPeriodSummary.data?.totals[0]?.total_expense ?? 0;
-  const budgetSnapshot = budgets.data ? budgetTotals(budgets.data, currency) : null;
+  // Memoized like every other object handed to the (memoized) card — a fresh
+  // one per render would redraw it on every Home render regardless.
+  const budgetSnapshot = useMemo(
+    () => (budgets.data ? budgetTotals(budgets.data, currency) : null),
+    [budgets.data, currency],
+  );
 
   /**
    * What is still spendable today.

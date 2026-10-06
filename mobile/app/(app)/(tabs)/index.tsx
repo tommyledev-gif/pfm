@@ -1,10 +1,9 @@
-import { useMemo, useState } from "react";
-import { FlatList, Pressable, Text, View } from "react-native";
+import { memo, useCallback, useMemo, useState } from "react";
+import { FlatList, ListRenderItemInfo, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { PlusIcon } from "@/components/ui/Icon";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
 import { Screen } from "@/components/shared/Screen";
 import { TopBar } from "@/components/shared/TopBar";
@@ -12,12 +11,10 @@ import { TransactionRow } from "@/components/shared/TransactionRow";
 import { previousPeriodLabel } from "@/lib/date-range";
 import { isWaitingForNetwork } from "@/lib/query-status";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { useLatestCallback } from "@/lib/use-latest-callback";
 import { useRefresh } from "@/lib/use-refresh";
-import { PendingConfirmationsSection } from "@/features/ai-chat/components/PendingConfirmationsSection";
+import { HomePendingProposals } from "@/features/ai-chat/components/HomePendingProposals";
 import { HomePendingSyncSection } from "@/features/transactions/components/HomePendingSyncSection";
-import { useTransactionRemoval } from "@/features/ai-chat/components/use-transaction-removal";
-import { removalDialogCopy } from "@/features/ai-chat/removal-copy";
-import { isPendingProposal } from "@/features/ai-chat/pending";
 import { HomeSnapshotCard } from "@/features/reports/components/HomeSnapshotCard";
 import { useHomeSnapshot } from "@/features/reports/hooks/use-home-snapshot";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
@@ -30,15 +27,15 @@ import { splitFutureTransactions } from "@/features/transactions/future";
 import { TransactionFormModal } from "@/features/transactions/components/TransactionFormModal";
 import { TransactionRowSkeleton } from "@/features/transactions/components/TransactionRowSkeleton";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
+import { Category } from "@/features/categories/types";
 import { useUiPrefsStore, HomePeriod } from "@/stores/ui-prefs-store";
-import { useChatStore } from "@/stores/chat-store";
 
 const RECENT_TRANSACTION_SKELETON_COUNT = 4;
 const RECENT_TRANSACTION_COUNT = 4;
 // Over-fetched on purpose: rows dated ahead of today are dropped below, and
 // asking for exactly four would leave the list short by however many there are.
 const RECENT_FETCH_LIMIT = 10;
-const FALLBACK_CURRENCY = "VND";
+const NO_WALLETS: Wallet[] = [];
 
 const PERIODS: { label: string; value: HomePeriod }[] = [
   { label: "Ngày", value: "day" },
@@ -46,12 +43,40 @@ const PERIODS: { label: string; value: HomePeriod }[] = [
   { label: "Năm", value: "year" },
 ];
 
+interface RecentRowProps {
+  transaction: Transaction;
+  currency: string | undefined;
+  category: Category | undefined;
+  onPress: (transaction: Transaction) => void;
+}
+
+const RecentRow = memo(function RecentRow({ transaction, currency, category, onPress }: RecentRowProps) {
+  return (
+    <Pressable onPress={() => onPress(transaction)}>
+      <TransactionRow transaction={transaction} currency={currency} category={category} />
+    </Pressable>
+  );
+});
+
+// The edit sheet runs its whole form hook on every render, even closed — kept
+// out of Home's re-renders unless its own props change.
+const EditTransactionSheet = memo(TransactionFormModal);
+
+/**
+ * ⚠️ Performance, the same way the AI chat screen does it: Home stays mounted
+ * behind every other tab and re-renders whenever any query it reads changes,
+ * so each piece is memoized and handed stable callbacks (useLatestCallback),
+ * and the chat thread is read only by the pending block that shows it. A
+ * re-render here used to rebuild the whole screen — the wallet carousel's
+ * native animation graph included — and that work landed on the same JS
+ * thread that had to answer the tap back to Home, which is what made the
+ * switch take half a second or more to happen.
+ */
 export default function HomeScreen() {
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
 
-  const thread = useChatStore((s) => s.thread);
   const homePeriod = useUiPrefsStore((s) => s.homePeriod);
   const setHomePeriod = useUiPrefsStore((s) => s.setHomePeriod);
 
@@ -60,7 +85,6 @@ export default function HomeScreen() {
   const recent = useTransactionsQuery({ limit: RECENT_FETCH_LIMIT });
   const categories = useCategoriesQuery();
   const snapshot = useHomeSnapshot(homePeriod);
-  const removal = useTransactionRemoval();
 
   const categoryById = useMemo(() => new Map(categories.data?.map((c) => [c.id, c])), [categories.data]);
   const walletCurrencyMap = useMemo(() => {
@@ -69,49 +93,46 @@ export default function HomeScreen() {
     return map;
   }, [wallets.data]);
 
-  // Selecting the raw, referentially stable thread and filtering in a memo —
-  // a selector returning a fresh array every call makes the store see a
-  // changed snapshot on every render and re-render forever.
-  const pendingConfirmations = useMemo(() => thread.filter(isPendingProposal), [thread]);
-
   // "Recent" means recent, and the list is ordered newest first — so a
   // transaction booked for next month would sit above things that have
   // actually happened. Those rows are not lost; the Transactions screen
   // surfaces them behind its own upcoming card.
-  const recentTransactions = splitFutureTransactions(recent.data?.pages[0]?.data ?? []).upToToday.slice(
-    0,
-    RECENT_TRANSACTION_COUNT,
+  const firstPage = recent.data?.pages[0]?.data;
+  const recentTransactions = useMemo(
+    () => splitFutureTransactions(firstPage ?? []).upToToday.slice(0, RECENT_TRANSACTION_COUNT),
+    [firstPage],
   );
 
   const { refreshControl } = useRefresh([wallets, recent, categories, ...snapshot.queries]);
 
-  const removalCopy = removalDialogCopy(removal.target, removal.targetIsPersisted, {
-    currency:
-      walletCurrencyMap.get(removal.target?.action?.payload.wallet_id ?? "") ?? FALLBACK_CURRENCY,
-    resolveCategoryName: (id) => categoryById.get(id)?.name,
-  });
-
-  // Deep-links into the chat at the exact message, instead of the chat's own
-  // default of landing on the newest one. The nonce lets the same item be
-  // re-opened twice in a row.
-  const goToPendingMessage = (messageId: string, openEdit?: boolean) =>
-    router.push({
-      pathname: "/ai-chat",
-      params: { focusMessageId: messageId, focusedAt: String(Date.now()), ...(openEdit ? { openEdit: "1" } : {}) },
-    });
-
   // Opens the Wallets screen on the tapped wallet, which flashes a border on
-  // it. Same nonce trick as above: tapping the same card twice still replays.
-  const openWallet = (wallet: Wallet) =>
-    router.push({ pathname: "/wallets", params: { focusWalletId: wallet.id, focusedAt: String(Date.now()) } });
+  // it. The nonce lets tapping the same card twice still replay it.
+  const openWallet = useLatestCallback((wallet: Wallet) =>
+    router.push({ pathname: "/wallets", params: { focusWalletId: wallet.id, focusedAt: String(Date.now()) } }),
+  );
 
   // Hands the exact window the user is looking at to the Budgets tab, so the
   // limits there are prorated to the same period rather than the whole month.
-  const openBudgetsForPeriod = () =>
+  const openBudgetsForPeriod = useLatestCallback(() =>
     router.push({
       pathname: "/insights",
       params: { tab: "Budgets", from: snapshot.periodRange.from, to: snapshot.periodRange.to },
-    });
+    }),
+  );
+  const openInsights = useCallback(() => router.push("/insights"), [router]);
+  const closeEditor = useCallback(() => setEditingTransaction(null), []);
+
+  const renderRecent = useCallback(
+    ({ item }: ListRenderItemInfo<Transaction>) => (
+      <RecentRow
+        transaction={item}
+        currency={walletCurrencyMap.get(item.wallet_id)}
+        category={categoryById.get(item.category_id)}
+        onPress={setEditingTransaction}
+      />
+    ),
+    [walletCurrencyMap, categoryById],
+  );
 
   return (
     <Screen>
@@ -143,17 +164,10 @@ export default function HomeScreen() {
               topCategoriesExpenseTotal={snapshot.topCategoriesExpenseTotal}
               categoryById={categoryById}
               onOpenBudgets={openBudgetsForPeriod}
-              onOpenInsights={() => router.push("/insights")}
+              onOpenInsights={openInsights}
             />
 
-            <PendingConfirmationsSection
-              messages={pendingConfirmations}
-              categoryById={categoryById}
-              walletCurrencyById={walletCurrencyMap}
-              onViewAll={() => router.push("/pending")}
-              onOpenMessage={goToPendingMessage}
-              onRequestRemove={removal.request}
-            />
+            <HomePendingProposals categoryById={categoryById} walletCurrencyById={walletCurrencyMap} />
 
             <HomePendingSyncSection />
 
@@ -173,7 +187,7 @@ export default function HomeScreen() {
               ) : isWaitingForNetwork(wallets) ? (
                 <OfflinePlaceholder />
               ) : (
-                <WalletCarousel wallets={wallets.data ?? []} onPressWallet={openWallet} />
+                <WalletCarousel wallets={wallets.data ?? NO_WALLETS} onPressWallet={openWallet} />
               )}
             </View>
 
@@ -185,15 +199,7 @@ export default function HomeScreen() {
             </View>
           </View>
         }
-        renderItem={({ item }) => (
-          <Pressable onPress={() => setEditingTransaction(item)}>
-            <TransactionRow
-              transaction={item}
-              currency={walletCurrencyMap.get(item.wallet_id)}
-              category={categoryById.get(item.category_id)}
-            />
-          </Pressable>
-        )}
+        renderItem={renderRecent}
         ListEmptyComponent={
           recent.isLoading ? (
             <View>
@@ -209,23 +215,10 @@ export default function HomeScreen() {
         }
       />
 
-      <TransactionFormModal
+      <EditTransactionSheet
         visible={Boolean(editingTransaction)}
-        onClose={() => setEditingTransaction(null)}
+        onClose={closeEditor}
         editingTransaction={editingTransaction}
-      />
-
-      {/* ⚠️ Every pending row here is an unconfirmed proposal, so confirming
-          writes nothing to the server — the message is marked discarded and
-          stays in the thread. It is never deleted from it. */}
-      <ConfirmDialog
-        visible={removal.target !== null}
-        title={removalCopy.title}
-        message={removalCopy.message}
-        confirmLabel={removalCopy.confirmLabel}
-        loading={removal.deleting}
-        onCancel={removal.cancel}
-        onConfirm={removal.confirm}
       />
     </Screen>
   );

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
@@ -21,8 +21,11 @@ const ICON_BOX = 32;
  * Home's "waiting to sync" glance (specs/mobile-offline-support): Transactions
  * saved on this device while offline and not yet accepted by the server.
  * Absent when the queue is empty. Every row leads to Transactions.
+ *
+ * Memoized (no props): it re-renders from its own outbox subscription only,
+ * never because Home re-rendered for something else.
  */
-export function HomePendingSyncSection() {
+export const HomePendingSyncSection = memo(function HomePendingSyncSection() {
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
@@ -74,7 +77,7 @@ export function HomePendingSyncSection() {
       </View>
     </View>
   );
-}
+});
 
 function HomePendingSyncRow({ item, isLast, onPress }: { item: OutboxItem; isLast: boolean; onPress: () => void }) {
   const colors = useColors();

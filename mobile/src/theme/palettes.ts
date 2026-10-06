@@ -36,6 +36,13 @@ const dark = {
   periwinkle: "#9FB3FF",
 
   trackMuted: "rgba(255,255,255,0.22)",
+  // Toggle (components/ui/Toggle.tsx). Its own tokens, not trackMuted/green:
+  // on near-black the neon primary as a whole track and a near-white thumb
+  // were the two brightest things on any settings screen. Both are pulled
+  // down so a row of switches sits at the same weight as the text beside it.
+  toggleTrackOff: "rgba(255,255,255,0.12)",
+  toggleTrackOn: "#35800F",
+  toggleThumb: "#A9B0BB",
   // Fully opaque — the translucent blur let scrolling content show through
   // the bar, which read as the nav being washed out.
   navBg: "#0F1116",
@@ -53,9 +60,6 @@ const dark = {
   // dark ground lightens; the light theme's dark ink darkens by the same
   // alpha — never a literal rgba(255,255,255,a), which vanishes on white.
   overlayBase: "#FFFFFF",
-  // BottomNav's hollow behind the active ball — one flat tint, the old
-  // middle ring's depth, now that it is the only layer.
-  navSocketOuter: "rgba(0,0,0,0.42)",
 };
 
 export type Palette = { [K in keyof typeof dark]: string };
@@ -91,6 +95,11 @@ const light: Palette = {
   periwinkle: "#4361D8",
 
   trackMuted: "rgba(15,23,42,0.12)",
+  // A lighter green than the primary (which reads heavy as a solid fill this
+  // size) and a white thumb — the dark ink thumb looked like a hole on white.
+  toggleTrackOff: "rgba(15,23,42,0.16)",
+  toggleTrackOn: "#52B52A",
+  toggleThumb: "#FFFFFF",
   navBg: "#FFFFFF",
   navBorder: "rgba(15,23,42,0.08)",
   error: "#D93F36",
@@ -100,8 +109,6 @@ const light: Palette = {
   warning: "#9A6B00",
 
   overlayBase: "#0F172A",
-  // A black hole punched into a white bar reads as a stain, not depth.
-  navSocketOuter: "rgba(15,23,42,0.07)",
 };
 
 export type ThemeName = "dark" | "light";

@@ -43,7 +43,6 @@ import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary
 // The server-side gate remains the actual authorization boundary; this is
 // just not advertising a door the user can't open.
 const SETTINGS_ROWS = [
-  { label: "Giao diện", Icon: PaletteIcon, href: "/appearance" as const, adminOnly: false, testID: "row-settings-appearance" },
   { label: "Ví của bạn", Icon: WalletIcon, href: "/wallets" as const, adminOnly: false },
   { label: "Danh mục", Icon: TagIcon, href: "/categories" as const, adminOnly: false },
   { label: "Thành viên gia đình", Icon: UsersIcon, href: "/users" as const, adminOnly: true },
@@ -52,7 +51,13 @@ const SETTINGS_ROWS = [
   { label: "Trợ giúp & hỗ trợ", Icon: HelpIcon, href: null, adminOnly: false },
   { label: "Nhà phát triển", Icon: CodeIcon, href: "/developer" as const, adminOnly: false },
 ];
-type SettingsHref = NonNullable<(typeof SETTINGS_ROWS)[number]["href"]>;
+// "Cài đặt người dùng": how the app looks and behaves for this User, kept apart
+// from the data-management rows above. PinLocationPreferenceRow joins it below.
+const USER_SETTINGS_ROWS = [
+  { label: "Giao diện", Icon: PaletteIcon, href: "/appearance" as const, adminOnly: false, testID: "row-settings-appearance" },
+];
+type SettingsRow = (typeof SETTINGS_ROWS)[number] | (typeof USER_SETTINGS_ROWS)[number];
+type SettingsHref = NonNullable<SettingsRow["href"]>;
 // Taps on a menu row closer together than this count as one.
 const ROW_TAP_GUARD_MS = 600;
 
@@ -90,6 +95,20 @@ export default function SettingsScreen() {
 
   // Unsynced Transactions first get a choice (specs/mobile-offline-support US-07).
   const requestLogout = () => (outboxItemsFor(userId).length > 0 ? setLogoutGuardOpen(true) : logout());
+
+  const renderRow = ({ label, Icon, href, testID }: SettingsRow) => (
+    <Pressable
+      key={label}
+      testID={testID}
+      style={styles.row}
+      onPress={href ? () => openRow(href) : undefined}
+      disabled={!href}
+    >
+      <Icon size={20} color={colors.textSecondary} />
+      <Text style={styles.rowLabel}>{label}</Text>
+      <ChevronRightIcon size={18} color={colors.textMuted} />
+    </Pressable>
+  );
 
   return (
     <Screen>
@@ -135,22 +154,16 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.settingsGroup}>
-        {SETTINGS_ROWS.filter((row) => !row.adminOnly || role === "admin").map(({ label, Icon, href, testID }) => (
-          <Pressable
-            key={label}
-            testID={testID}
-            style={styles.row}
-            onPress={href ? () => openRow(href) : undefined}
-            disabled={!href}
-          >
-            <Icon size={20} color={colors.textSecondary} />
-            <Text style={styles.rowLabel}>{label}</Text>
-            <ChevronRightIcon size={18} color={colors.textMuted} />
-          </Pressable>
-        ))}
+        {SETTINGS_ROWS.filter((row) => !row.adminOnly || role === "admin").map(renderRow)}
       </View>
 
-      <PinLocationPreferenceRow />
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Cài đặt người dùng</Text>
+        <View style={styles.settingsGroup}>
+          {USER_SETTINGS_ROWS.map(renderRow)}
+          <PinLocationPreferenceRow />
+        </View>
+      </View>
 
       {/* Directly above "Đăng xuất" (specs/mobile-account-switch AC-05). */}
       <AccountSwitchRow />
@@ -207,6 +220,14 @@ const useStyles = createStyles((colors) => ({
   statLabel: { ...typography.tiny, color: colors.textSecondary },
   statValue: { ...typography.label, color: colors.textPrimary },
   settingsGroup: { gap: spacing.xs },
+  section: { gap: spacing.sm },
+  // Home's section-title register: uppercase, letter-spaced, muted.
+  sectionTitle: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
   row: {
     flexDirection: "row",
     alignItems: "center",

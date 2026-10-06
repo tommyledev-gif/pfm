@@ -62,16 +62,8 @@ export function ChatInputBar({
     <>
       {quickActions ? (
         <View style={styles.quickActionSlot}>{quickActions}</View>
-      ) : !keyboardVisible && onOpenBudgetWizard ? (
-        // box-none: the row floats over the thread, and its empty width must
-        // not swallow taps meant for the message beneath it.
-        <View style={styles.quickActionRow} pointerEvents="box-none">
-          <Pressable testID="btn-open-budget-wizard" style={styles.quickActionChip} onPress={onOpenBudgetWizard}>
-            <SparkleIcon size={14} />
-            <Text style={styles.quickActionLabel}>Lập ngân sách</Text>
-          </Pressable>
-        </View>
       ) : null}
+
 
       {aboveInput}
 
