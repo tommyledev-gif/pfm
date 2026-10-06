@@ -2,15 +2,14 @@ import { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 
 import { CalendarIcon } from "@/components/ui/Icon";
-import { AmountRevealPopup } from "@/components/ui/AmountRevealPopup";
 import { Card } from "@/components/ui/Card";
 import { CategoryPickerDrawer } from "@/components/shared/CategoryPickerDrawer";
 import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
 import { DonutChart } from "@/components/shared/DonutChart";
 import { DonutLegendRow } from "@/components/shared/DonutLegendRow";
+import { RevealableAmount } from "@/components/shared/RevealableAmount";
 import { CategoryTransactionsDialog } from "@/features/reports/components/CategoryTransactionsDialog";
 import { buildCategoryColorMap } from "@/lib/category-color";
-import { formatCurrencyCompact } from "@/lib/currency";
 import { monthRange } from "@/lib/date-range";
 import { formatDateRange } from "@/lib/format-date";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
@@ -20,6 +19,7 @@ import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { daysInRange, proratedLimit } from "@/features/budgets/budget-pace";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary-query";
+import { SpendingEmptyState } from "@/features/reports/components/SpendingEmptyState";
 import { SpendingTabSkeleton } from "@/features/reports/components/SpendingTabSkeleton";
 
 // Insights → Spending tab — README: date-range label, Income/Expense stat
@@ -33,9 +33,11 @@ interface SpendingTabProps {
   // Changes on every navigation so re-focusing the same category works even
   // after the user has deselected it. See notifications.tsx's push site.
   focusNonce?: string;
+  /** Switches Insights to its Budgets tab — offered by the empty state. */
+  onOpenBudgets?: () => void;
 }
 
-export function SpendingTab({ focusCategoryId, focusNonce }: SpendingTabProps = {}) {
+export function SpendingTab({ focusCategoryId, focusNonce, onOpenBudgets }: SpendingTabProps = {}) {
   const colors = useColors();
   const styles = useStyles();
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
@@ -49,10 +51,6 @@ export function SpendingTab({ focusCategoryId, focusNonce }: SpendingTabProps = 
   // separately from `selected` so closing the dialog leaves the chart's own
   // highlight exactly where the user left it.
   const [detailCategoryId, setDetailCategoryId] = useState<string | null>(null);
-  // Long-pressing the compact Thu nhập/Chi tiêu figure reveals the exact
-  // amount — same AmountRevealPopup used by TransactionRow, since the
-  // compact "~7m100k" form is a deliberate approximation (formatCurrencyCompact).
-  const [revealTotal, setRevealTotal] = useState<"income" | "expense" | null>(null);
 
   // Both deps are plain strings, so this can't re-fire on identity alone — the
   // trap that made useCategoryPicker loop.
@@ -124,58 +122,67 @@ export function SpendingTab({ focusCategoryId, focusNonce }: SpendingTabProps = 
         <Text style={styles.range}>{formatDateRange(range.from, range.to)}</Text>
       </Pressable>
 
+      {/* The compact "~7tr100k" figures give up the exact amount on a hold,
+          with the same fill-from-the-middle bar and pointing tooltip as the
+          Settings stat cards — RevealableAmount owns both. */}
       <View style={styles.statRow}>
-        <Pressable style={styles.statCard} onLongPress={() => setRevealTotal("income")}>
-          <Card style={styles.statCardInner}>
-            <Text style={styles.statLabel}>Thu nhập</Text>
-            <Text style={[styles.statValue, { color: colors.green }]} numberOfLines={1}>
-              {formatCurrencyCompact(primaryTotal?.total_income ?? 0, currency)}
-            </Text>
-          </Card>
-        </Pressable>
-        <Pressable style={styles.statCard} onLongPress={() => setRevealTotal("expense")}>
-          <Card style={styles.statCardInner}>
-            <Text style={styles.statLabel}>Chi tiêu</Text>
-            <Text style={[styles.statValue, { color: colors.peach }]} numberOfLines={1}>
-              {formatCurrencyCompact(primaryTotal?.total_expense ?? 0, currency)}
-            </Text>
-          </Card>
-        </Pressable>
+        <RevealableAmount
+          label="Thu nhập"
+          amountCents={primaryTotal?.total_income ?? 0}
+          currency={currency}
+          containerStyle={styles.statCard}
+          labelStyle={styles.statLabel}
+          style={[styles.statValue, { color: colors.green }]}
+          testID="text-spending-income"
+        />
+        <RevealableAmount
+          label="Chi tiêu"
+          amountCents={primaryTotal?.total_expense ?? 0}
+          currency={currency}
+          containerStyle={styles.statCard}
+          labelStyle={styles.statLabel}
+          style={[styles.statValue, { color: colors.peach }]}
+          testID="text-spending-expense"
+        />
       </View>
 
-      <Card style={styles.donutCard}>
-        <DonutChart
-          segments={segments}
-          currency={currency}
-          selected={selected}
-          onToggle={(key) => setSelected((prev) => (prev === key ? null : key))}
-          budgetTotal={budgetTotal}
-          onPressDetails={setDetailCategoryId}
-        />
-        {budgetTotal !== null && !isCurrentMonthRange ? (
-          <Text style={styles.budgetHint}>
-            Hạn mức tháng đã chia theo {rangeDayCount === 1 ? "ngày" : `${rangeDayCount} ngày`} bạn chọn.
-          </Text>
-        ) : null}
-      </Card>
-
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {segments.length === 0 ? (
-          <Text style={styles.empty}>Không có khoản chi nào trong khoảng thời gian này.</Text>
-        ) : (
-          segments.map((seg) => (
-            <DonutLegendRow
-              key={seg.key}
-              segment={seg}
+      {segments.length === 0 ? (
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.emptyScroll}>
+          <SpendingEmptyState onOpenBudgets={onOpenBudgets} />
+        </ScrollView>
+      ) : (
+        <>
+          <Card style={styles.donutCard}>
+            <DonutChart
+              segments={segments}
               currency={currency}
-              percentage={totalExpense > 0 ? (seg.amount / totalExpense) * 100 : 0}
-              selected={selected === seg.key}
-              onPress={() => setSelected((prev) => (prev === seg.key ? null : seg.key))}
-              onHoldCategory={() => setCategoryPickerOpen(true)}
+              selected={selected}
+              onToggle={(key) => setSelected((prev) => (prev === key ? null : key))}
+              budgetTotal={budgetTotal}
+              onPressDetails={setDetailCategoryId}
             />
-          ))
-        )}
-      </ScrollView>
+            {budgetTotal !== null && !isCurrentMonthRange ? (
+              <Text style={styles.budgetHint}>
+                Hạn mức tháng đã chia theo {rangeDayCount === 1 ? "ngày" : `${rangeDayCount} ngày`} bạn chọn.
+              </Text>
+            ) : null}
+          </Card>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {segments.map((seg) => (
+              <DonutLegendRow
+                key={seg.key}
+                segment={seg}
+                currency={currency}
+                percentage={totalExpense > 0 ? (seg.amount / totalExpense) * 100 : 0}
+                selected={selected === seg.key}
+                onPress={() => setSelected((prev) => (prev === seg.key ? null : seg.key))}
+                onHoldCategory={() => setCategoryPickerOpen(true)}
+              />
+            ))}
+          </ScrollView>
+        </>
+      )}
 
       <DateRangePickerModal
         visible={pickerOpen}
@@ -208,15 +215,6 @@ export function SpendingTab({ focusCategoryId, focusNonce }: SpendingTabProps = 
         categories={segments.map((s) => ({ id: s.key, name: s.label, icon: s.icon, iconUrl: s.iconUrl, color: s.color }))}
         onSelect={(id) => setSelected((prev) => (prev === id ? null : id))}
       />
-
-      <AmountRevealPopup
-        visible={revealTotal !== null}
-        onClose={() => setRevealTotal(null)}
-        amountCents={
-          revealTotal === "income" ? primaryTotal?.total_income ?? 0 : primaryTotal?.total_expense ?? 0
-        }
-        currency={currency}
-      />
     </View>
   );
 }
@@ -237,11 +235,21 @@ const useStyles = createStyles((colors) => ({
   },
   range: { ...typography.caption, color: colors.textSecondary },
   statRow: { flexDirection: "row", gap: spacing.md },
-  statCard: { flex: 1 },
-  statCardInner: { gap: spacing.xs },
+  // The whole card is RevealableAmount's hold target, so it carries Card's
+  // look itself rather than wrapping one.
+  statCard: {
+    flex: 1,
+    gap: spacing.xs,
+    padding: 16,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    backgroundColor: colors.surface,
+  },
   statLabel: { ...typography.caption, color: colors.textSecondary },
   statValue: { ...typography.cardTitle },
   donutCard: { alignItems: "center", paddingVertical: spacing.xl, gap: spacing.sm },
   budgetHint: { ...typography.tiny, color: colors.textMuted, textAlign: "center" },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
+  emptyScroll: { paddingBottom: 140 },
 }));

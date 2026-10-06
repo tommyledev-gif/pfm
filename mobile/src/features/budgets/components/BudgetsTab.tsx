@@ -22,6 +22,7 @@ import { BudgetFilterChips, BudgetFilterKey } from "@/features/budgets/component
 import { BudgetCardSkeleton } from "@/features/budgets/components/BudgetCardSkeleton";
 import { BudgetListRow } from "@/features/budgets/components/BudgetListRow";
 import { BudgetMonthSummary } from "@/features/budgets/components/BudgetMonthSummary";
+import { BudgetPreset, BudgetsEmptyState } from "@/features/budgets/components/BudgetsEmptyState";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { CategoryTransactionsDialog } from "@/features/reports/components/CategoryTransactionsDialog";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
@@ -44,9 +45,11 @@ interface BudgetsTabProps {
   /** Changes per navigation so the same day can be re-opened after the user has
    *  cleared the filter by hand. */
   rangeNonce?: string;
+  /** Opens the guided budget setup — the empty state's main action. */
+  onOpenBudgetWizard?: () => void;
 }
 
-export function BudgetsTab({ initialRange, rangeNonce }: BudgetsTabProps = {}) {
+export function BudgetsTab({ initialRange, rangeNonce, onOpenBudgetWizard }: BudgetsTabProps = {}) {
   const colors = useColors();
   const styles = useStyles();
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>(initialRange ?? {});
@@ -56,6 +59,9 @@ export function BudgetsTab({ initialRange, rangeNonce }: BudgetsTabProps = {}) {
   const categories = useCategoriesQuery();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
+  // Held in state, not rebuilt per render: the form resets its fields
+  // whenever this changes identity.
+  const [preset, setPreset] = useState<BudgetPreset | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [highlightedBudgetId, setHighlightedBudgetId] = useState<string | null>(null);
   // Which budget's transactions are being read. Held as the whole row (budget
@@ -115,10 +121,12 @@ export function BudgetsTab({ initialRange, rangeNonce }: BudgetsTabProps = {}) {
   // over (BudgetRepo.SpentByUserCurrentPeriod).
   const detailRange = resolvedRange ?? monthRange(0);
 
-  const openNew = () => {
+  const openNew = (withPreset: BudgetPreset | null = null) => {
     setEditingBudget(null);
+    setPreset(withPreset);
     setModalOpen(true);
   };
+  const hasNoBudgets = budgets.data?.length === 0;
 
   if (isWaitingForNetwork(budgets)) return <OfflinePlaceholder />;
   if (budgets.isLoading) {
@@ -139,67 +147,77 @@ export function BudgetsTab({ initialRange, rangeNonce }: BudgetsTabProps = {}) {
         contentContainerStyle={{ paddingBottom: fabClearance }}
         refreshControl={refreshControl}
       >
-        <View style={styles.rangeRow}>
-          <Pressable style={styles.rangeButton} onPress={() => setRangePickerOpen(true)} testID="btn-budgets-range">
-            <CalendarIcon size={14} color={colors.textSecondary} />
-            <Text style={styles.rangeLabel}>
-              {resolvedRange ? formatDateRange(resolvedRange.from, resolvedRange.to) : "Tháng này"}
-            </Text>
-          </Pressable>
-          {rangeActive ? (
-            <Pressable onPress={() => setDateRange({})} hitSlop={8}>
-              <Text style={styles.rangeClear}>Xoá lọc</Text>
-            </Pressable>
-          ) : null}
-        </View>
-
-        <BudgetMonthSummary
-          // Under a filter the card describes the selected window, not the
-          // month — its own totals already come from the filtered rows, so the
-          // pace and the wording have to follow or the card contradicts itself.
-          pace={
-            rangeActive && resolvedRange
-              ? { elapsed: rangeElapsed, daysLeft: 0, label: formatDateRange(resolvedRange.from, resolvedRange.to) }
-              : pace
-          }
-          periodNoun={rangeActive ? (rangeDayCount === 1 ? "ngày" : "khoảng này") : "tháng"}
-          showDaysLeft={!rangeActive}
-          totalLimit={totals.limit}
-          totalSpent={totals.spent}
-          currency={currency}
-          overCount={counts.over}
-        />
-
-        <BudgetFilterChips value={filter} onChange={setFilter} counts={counts} />
-
-        {visibleRows.length === 0 ? (
-          <Text style={styles.empty}>
-            {rows.length === 0 ? "Chưa có ngân sách nào — nhấn + để tạo." : "Không có ngân sách nào trong nhóm này."}
-          </Text>
+        {hasNoBudgets ? (
+          <BudgetsEmptyState
+            currency={currency}
+            onOpenWizard={onOpenBudgetWizard ?? (() => openNew())}
+            onCreate={openNew}
+          />
         ) : (
-          visibleRows.map(({ budget, limit, periodElapsed }) => (
-            <View
-              key={`${budget.id}-${limit.currency}`}
-              onLayout={(e) => {
-                rowOffsets.current[budget.id] = e.nativeEvent.layout.y;
-              }}
-            >
-              <BudgetListRow
-                budget={budget}
-                limit={limit}
-                periodElapsed={periodElapsed}
-                category={categoryById.get(budget.category_id)}
-                highlighted={highlightedBudgetId === budget.id}
-                onPress={() => {
-                  setHighlightedBudgetId(null);
-                  setEditingBudget(budget);
-                  setModalOpen(true);
-                }}
-                onHold={() => setPickerOpen(true)}
-                onPressBar={() => setDetailRow({ budget, limit })}
-              />
+          <>
+            <View style={styles.rangeRow}>
+              <Pressable style={styles.rangeButton} onPress={() => setRangePickerOpen(true)} testID="btn-budgets-range">
+                <CalendarIcon size={14} color={colors.textSecondary} />
+                <Text style={styles.rangeLabel}>
+                  {resolvedRange ? formatDateRange(resolvedRange.from, resolvedRange.to) : "Tháng này"}
+                </Text>
+              </Pressable>
+              {rangeActive ? (
+                <Pressable onPress={() => setDateRange({})} hitSlop={8}>
+                  <Text style={styles.rangeClear}>Xoá lọc</Text>
+                </Pressable>
+              ) : null}
             </View>
-          ))
+
+            <BudgetMonthSummary
+              // Under a filter the card describes the selected window, not the
+              // month — its own totals already come from the filtered rows, so the
+              // pace and the wording have to follow or the card contradicts itself.
+              pace={
+                rangeActive && resolvedRange
+                  ? { elapsed: rangeElapsed, daysLeft: 0, label: formatDateRange(resolvedRange.from, resolvedRange.to) }
+                  : pace
+              }
+              periodNoun={rangeActive ? (rangeDayCount === 1 ? "ngày" : "khoảng này") : "tháng"}
+              showDaysLeft={!rangeActive}
+              totalLimit={totals.limit}
+              totalSpent={totals.spent}
+              currency={currency}
+              overCount={counts.over}
+            />
+
+            <BudgetFilterChips value={filter} onChange={setFilter} counts={counts} />
+
+            {visibleRows.length === 0 ? (
+              <Text style={styles.empty}>
+                {rows.length === 0 ? "Chưa có ngân sách nào — nhấn + để tạo." : "Không có ngân sách nào trong nhóm này."}
+              </Text>
+            ) : (
+              visibleRows.map(({ budget, limit, periodElapsed }) => (
+                <View
+                  key={`${budget.id}-${limit.currency}`}
+                  onLayout={(e) => {
+                    rowOffsets.current[budget.id] = e.nativeEvent.layout.y;
+                  }}
+                >
+                  <BudgetListRow
+                    budget={budget}
+                    limit={limit}
+                    periodElapsed={periodElapsed}
+                    category={categoryById.get(budget.category_id)}
+                    highlighted={highlightedBudgetId === budget.id}
+                    onPress={() => {
+                      setHighlightedBudgetId(null);
+                      setEditingBudget(budget);
+                      setModalOpen(true);
+                    }}
+                    onHold={() => setPickerOpen(true)}
+                    onPressBar={() => setDetailRow({ budget, limit })}
+                  />
+                </View>
+              ))
+            )}
+          </>
         )}
       </ScrollView>
 
@@ -210,13 +228,14 @@ export function BudgetsTab({ initialRange, rangeNonce }: BudgetsTabProps = {}) {
           that bottom sat behind the nav. Fab lifts itself clear of the nav
           and the safe-area inset. `right: 0` because Insights already pads
           its sides — the same 20px from the edge as Transactions' Fab. */}
-      <Fab onPress={openNew} accessibilityLabel="Thêm ngân sách" testID="btn-new-budget" style={styles.fab} />
+      <Fab onPress={() => openNew()} accessibilityLabel="Thêm ngân sách" testID="btn-new-budget" style={styles.fab} />
 
       <BudgetFormModal
         visible={modalOpen}
         onClose={() => setModalOpen(false)}
         currency={currency}
         editingBudget={editingBudget}
+        preset={preset}
       />
 
       <DateRangePickerModal

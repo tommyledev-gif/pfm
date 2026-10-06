@@ -13,6 +13,7 @@ import { useCategoriesQuery } from "@/features/categories/api/use-categories-que
 import { useCategoryPicker } from "@/features/categories/components/use-category-picker";
 import { TransactionKeypadFooter } from "@/features/transactions/components/TransactionKeypadFooter";
 import { WalletChipRow } from "@/features/transactions/components/WalletChipRow";
+import { useOpenWalletCreator } from "@/features/wallets/use-open-wallet-creator";
 import { NO_VND_WALLET_HINT } from "@/features/ai-chat/proposal-wallet";
 import { TransactionActionPayload } from "@/features/ai-chat/types";
 
@@ -62,6 +63,7 @@ export function EditTransactionModal({
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [walletId, setWalletId] = useState<string | null>(null);
   const wallets = useWalletsQuery();
+  const openWalletCreator = useOpenWalletCreator();
   const selectableWallets = (wallets.data ?? []).filter((w) => !vndOnly || w.currency === PROPOSAL_CURRENCY);
   // A proposal kept on a non-VND Wallet (or none) starts with nothing chosen.
   const chosenWalletId = selectableWallets.some((w) => w.id === walletId) ? walletId : null;
@@ -187,9 +189,23 @@ export function EditTransactionModal({
             locked={lockWalletAndType}
           />
           {vndOnly && wallets.data && selectableWallets.length === 0 ? (
-            <Text testID="txt-edit-no-vnd-wallet" style={styles.lockedHint}>
-              {NO_VND_WALLET_HINT}
-            </Text>
+            <>
+              <Text testID="txt-edit-no-vnd-wallet" style={styles.lockedHint}>
+                {NO_VND_WALLET_HINT}
+              </Text>
+              {/* Closed first: the sheet would otherwise sit over the
+                  Wallets screen it just opened. */}
+              <Pressable
+                onPress={() => {
+                  onClose();
+                  openWalletCreator();
+                }}
+                hitSlop={8}
+                testID="btn-edit-create-vnd-wallet"
+              >
+                <Text style={styles.createWalletLink}>Tạo ví VND →</Text>
+              </Pressable>
+            </>
           ) : null}
           {lockWalletAndType ? (
             <Text style={styles.lockedHint}>Không thể đổi loại và ví của giao dịch đã lưu</Text>
@@ -226,4 +242,5 @@ const useStyles = createStyles((colors) => ({
   chipLabel: { ...typography.caption, color: colors.textSecondary },
   chipLabelActive: { color: colors.onGreen },
   lockedHint: { ...typography.tiny, color: colors.textMuted },
+  createWalletLink: { ...typography.caption, color: colors.green },
 }));

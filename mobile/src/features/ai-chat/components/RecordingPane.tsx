@@ -1,5 +1,5 @@
 import { RefObject, useCallback, useMemo, useState } from "react";
-import { FlatList, Keyboard, LayoutChangeEvent, ListRenderItemInfo, StyleSheet, Text, View } from "react-native";
+import { FlatList, Keyboard, LayoutChangeEvent, ListRenderItemInfo, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import { onlineManager } from "@tanstack/react-query";
 
@@ -13,6 +13,7 @@ import { OfflineManualEntryDialog } from "@/features/ai-chat/components/OfflineM
 import { draftFromText } from "@/features/transactions/draft-from-text";
 import { useManualDraftStore } from "@/features/transactions/manual-draft-store";
 import { PhraseSuggestions } from "@/features/ai-chat/components/PhraseSuggestions";
+import { RecordingEmptyState } from "@/features/ai-chat/components/RecordingEmptyState";
 import { useChatThreadStyles } from "@/features/ai-chat/components/chat-thread-styles";
 import { ChatMode } from "@/features/ai-chat/chat-mode";
 import { useChatActions } from "@/features/ai-chat/hooks/use-chat-actions";
@@ -20,8 +21,11 @@ import { usePhraseSuggestions } from "@/features/ai-chat/hooks/use-phrase-sugges
 import { ChatMessage } from "@/features/ai-chat/types";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { Category } from "@/features/categories/types";
+import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { Wallet } from "@/features/wallets/types";
+import { useOpenWalletCreator } from "@/features/wallets/use-open-wallet-creator";
 import { useRequireOnline } from "@/lib/connectivity";
+import { PROPOSAL_CURRENCY } from "@/lib/constants";
 import { useLatestCallback } from "@/lib/use-latest-callback";
 import { useCurrentUserId } from "@/stores/use-current-user-id";
 
@@ -98,6 +102,13 @@ export function RecordingPane({
   // the category's budget. The card never writes budgets.
   const budgets = useBudgetsQuery();
   const suggestions = usePhraseSuggestions(input, userId);
+  // Proposals are read as VND (proposal-wallet.ts), so without a VND Wallet a
+  // card can never be saved — it offers to create one instead. Only once the
+  // list has loaded, so it never flashes for an account that has one.
+  const wallets = useWalletsQuery();
+  const noVndWallet = wallets.isSuccess && !wallets.data.some((w) => w.currency === PROPOSAL_CURRENCY);
+  const openWalletCreator = useOpenWalletCreator();
+  const handleCreateWallet = noVndWallet ? openWalletCreator : undefined;
 
   // Keyed "categoryId|currency": a budget carries a separate limit per
   // currency, and a proposal in one must never be measured against another.
@@ -163,6 +174,7 @@ export function RecordingPane({
         onPressHistory={handlePressHistory}
         onOpenBudgetWizard={handleOpenWizard}
         onOpenManualEntry={handleOpenManualEntry}
+        onCreateWallet={handleCreateWallet}
       />
     ),
     [
@@ -177,6 +189,7 @@ export function RecordingPane({
       handlePressHistory,
       handleOpenWizard,
       handleOpenManualEntry,
+      handleCreateWallet,
     ],
   );
 
@@ -201,12 +214,7 @@ export function RecordingPane({
           renderItem={renderItem}
           // No counter-transform on these: the list already composes its own
           // inversion onto the header/empty slots.
-          ListEmptyComponent={
-            <Text style={chatThreadStyles.hint}>
-              Cho mình biết bạn đã chi hay thu gì — vd: &ldquo;Cà phê 50k tiền mặt&rdquo; — mình sẽ soạn sẵn giao dịch
-              cho bạn.
-            </Text>
-          }
+          ListEmptyComponent={<RecordingEmptyState onPickExample={onChangeInput} />}
           // Header, not footer: on an inverted list the header renders at the
           // visual bottom, which is where the typing dots belong.
           ListHeaderComponent={

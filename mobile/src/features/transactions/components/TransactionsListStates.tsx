@@ -5,6 +5,7 @@ import { useIsOnline } from "@/lib/connectivity";
 import { isWaitingForNetwork } from "@/lib/query-status";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { TransactionRowSkeleton } from "@/features/transactions/components/TransactionRowSkeleton";
+import { NoResultsState, NoTransactionsState } from "@/features/transactions/components/TransactionsEmptyStates";
 
 interface ListQueryState {
   isLoading: boolean;
@@ -19,11 +20,29 @@ interface TransactionsListStateProps {
 }
 
 const LIST_SKELETON_COUNT = 6;
-const EMPTY_MESSAGE = "Không tìm thấy giao dịch nào.";
+const ONLY_FUTURE_MESSAGE = "Chưa có giao dịch nào tính đến hôm nay.";
+
+interface TransactionsListEmptyProps extends TransactionsListStateProps {
+  /** Something is narrowing the list — "nothing matches", not "nothing yet". */
+  filtered: boolean;
+  /** Rows exist, but every one is dated ahead of today (the upcoming card). */
+  onlyFuture: boolean;
+  onAdd: () => void;
+  onClearFilters: () => void;
+  onSearch: (text: string) => void;
+}
 
 // The Transactions list's empty slot: skeleton while loading, the offline
-// state when nothing is saved for these filters (EC-OFF-06), else "none".
-export function TransactionsListEmpty({ query }: TransactionsListStateProps) {
+// state when nothing is saved for these filters (EC-OFF-06), then either
+// "nothing matches these filters" or "nothing recorded yet".
+export function TransactionsListEmpty({
+  query,
+  filtered,
+  onlyFuture,
+  onAdd,
+  onClearFilters,
+  onSearch,
+}: TransactionsListEmptyProps) {
   const styles = useStyles();
   if (isWaitingForNetwork(query)) return <OfflinePlaceholder />;
   if (query.isLoading) {
@@ -35,7 +54,11 @@ export function TransactionsListEmpty({ query }: TransactionsListStateProps) {
       </View>
     );
   }
-  return <Text style={styles.empty}>{EMPTY_MESSAGE}</Text>;
+  if (filtered) return <NoResultsState onClearFilters={onClearFilters} onSearch={onSearch} />;
+  // The upcoming card above the list already shows those rows; "no
+  // transactions yet" right under it would contradict it.
+  if (onlyFuture) return <Text style={styles.empty}>{ONLY_FUTURE_MESSAGE}</Text>;
+  return <NoTransactionsState onAdd={onAdd} />;
 }
 
 // Older pages are never saved (S-OFF-16): offline, the end of the saved

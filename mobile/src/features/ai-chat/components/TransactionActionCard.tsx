@@ -3,7 +3,7 @@ import { Pressable, Text, View } from "react-native";
 
 import { AmountRevealPopup } from "@/components/ui/AmountRevealPopup";
 import { Avatar } from "@/components/ui/Avatar";
-import { CalendarIcon, CheckIcon, EditIcon } from "@/components/ui/Icon";
+import { CalendarIcon, CheckIcon, EditIcon, WalletIcon } from "@/components/ui/Icon";
 import { PillButton } from "@/components/ui/PillButton";
 import { PillTag } from "@/components/ui/PillTag";
 import { ProgressBar } from "@/components/ui/ProgressBar";
@@ -11,7 +11,7 @@ import { colorForCategory } from "@/lib/category-color";
 import { formatCurrencyTruncated } from "@/lib/currency";
 import { formatDateShort } from "@/lib/format-date";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
-import { WALLET_REQUIRED_MESSAGE } from "@/features/ai-chat/proposal-wallet";
+import { NO_VND_WALLET_HINT, WALLET_REQUIRED_MESSAGE } from "@/features/ai-chat/proposal-wallet";
 import { ChatAction } from "@/features/ai-chat/types";
 
 // Share of the budget at which the bar stops being neutral and starts
@@ -41,6 +41,9 @@ interface TransactionActionCardProps {
   budgetSpent?: number;
   /** No VND Wallet yet: the caller routes Confirm to the edit form instead. */
   walletRequired?: boolean;
+  /** Set when the User owns no VND Wallet at all — there is nothing for the
+   *  edit form to offer, so the card's button goes to create one instead. */
+  onCreateWallet?: () => void;
   /** The message id, for per-card testIDs. */
   testIDSuffix?: string;
 }
@@ -68,6 +71,7 @@ export function TransactionActionCard({
   budgetLimit,
   budgetSpent,
   walletRequired,
+  onCreateWallet,
   testIDSuffix,
 }: TransactionActionCardProps) {
   const colors = useColors();
@@ -192,16 +196,26 @@ export function TransactionActionCard({
           </View>
           {walletRequired ? (
             <Text testID={`txt-wallet-required-${testIDSuffix}`} style={styles.walletRequired}>
-              {WALLET_REQUIRED_MESSAGE}
+              {onCreateWallet ? NO_VND_WALLET_HINT : WALLET_REQUIRED_MESSAGE}
             </Text>
           ) : null}
           <View style={styles.actionRow}>
-            <PillButton
-              label="Xác nhận & Lưu"
-              onPress={onConfirm}
-              loading={saving}
-              style={styles.confirmButton}
-            />
+            {walletRequired && onCreateWallet ? (
+              <PillButton
+                label="Tạo ví VND"
+                icon={<WalletIcon size={16} color={colors.onGreen} />}
+                onPress={onCreateWallet}
+                style={styles.confirmButton}
+                testID={`btn-create-wallet-${testIDSuffix}`}
+              />
+            ) : (
+              <PillButton
+                label="Xác nhận & Lưu"
+                onPress={onConfirm}
+                loading={saving}
+                style={styles.confirmButton}
+              />
+            )}
           </View>
         </>
       )}

@@ -6,6 +6,7 @@ import { Screen } from "@/components/shared/Screen";
 import { spacing, typography, createStyles } from "@/lib/theme";
 import { SpendingTab } from "@/features/reports/components/SpendingTab";
 import { BudgetsTab } from "@/features/budgets/components/BudgetsTab";
+import { BudgetWizardModal } from "@/features/budget-wizard/components/BudgetWizardModal";
 
 // Keys stay English because they cross a navigation boundary — Home deep-links
 // here with `tab: "Budgets"`. Only what the user reads is translated.
@@ -18,6 +19,7 @@ type SubTab = (typeof SUB_TABS)[number]["key"];
 export default function InsightsScreen() {
   const styles = useStyles();
   const [tab, setTab] = useState<SubTab>("Spending");
+  const [wizardOpen, setWizardOpen] = useState(false);
   // Deep link from a budget notification (app/(app)/notifications.tsx): force
   // the Spending tab and hand the category down so its donut segment opens
   // selected. `focusedAt` is the nonce that lets the same category be focused
@@ -57,11 +59,21 @@ export default function InsightsScreen() {
 
       <View style={styles.body}>
         {tab === "Spending" ? (
-          <SpendingTab focusCategoryId={categoryId} focusNonce={focusedAt} />
+          <SpendingTab focusCategoryId={categoryId} focusNonce={focusedAt} onOpenBudgets={() => setTab("Budgets")} />
         ) : (
-          <BudgetsTab initialRange={from || to ? { from, to } : undefined} rangeNonce={`${from ?? ""}-${to ?? ""}`} />
+          <BudgetsTab
+            initialRange={from || to ? { from, to } : undefined}
+            rangeNonce={`${from ?? ""}-${to ?? ""}`}
+            onOpenBudgetWizard={() => setWizardOpen(true)}
+          />
         )}
       </View>
+
+      {/* At the screen's root, not inside BudgetsTab: the wizard is a
+          full-screen overlay positioned against its parent, and the tab body
+          is inset by this screen's padding and title. Same placement as the
+          chat screen's ChatOverlays. */}
+      <BudgetWizardModal visible={wizardOpen} onClose={() => setWizardOpen(false)} />
     </Screen>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, SectionList } from "react-native";
 
 import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
@@ -9,7 +9,6 @@ import { monthRange } from "@/lib/date-range";
 import { formatDateRange } from "@/lib/format-date";
 import { useRefresh } from "@/lib/use-refresh";
 import { spacing, createStyles } from "@/lib/theme";
-import { TransactionKind } from "@/lib/constants";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useTransactionsQuery } from "@/features/transactions/api/use-transactions-query";
 import { useTransactionIO } from "@/features/transactions/use-transaction-io";
@@ -26,25 +25,21 @@ import { PendingSyncSection } from "@/features/transactions/components/PendingSy
 import { PendingSyncEditor } from "@/features/transactions/components/PendingSyncEditor";
 import { TransactionDayHeader } from "@/features/transactions/components/TransactionDayHeader";
 import { useCollapsedDays } from "@/features/transactions/hooks/use-collapsed-days";
+import { useTransactionFilters } from "@/features/transactions/hooks/use-transaction-filters";
 import { TransactionsHeader, TypeFilterValue } from "@/features/transactions/components/TransactionsHeader";
 import { CategoryFilterModal } from "@/features/transactions/components/CategoryFilterModal";
 import { SortDrawerModal } from "@/features/transactions/components/SortDrawerModal";
 import { isDefaultSort, sortTransactions, SORT_OPTIONS, SortKey } from "@/features/transactions/sort";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 
-const SEARCH_DEBOUNCE_MS = 400;
-
 export default function TransactionsScreen() {
   const styles = useStyles();
-  const [filter, setFilter] = useState<TransactionKind | undefined>(undefined);
-  const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
+  const filters = useTransactionFilters();
+  const { filter, setFilter, dateRange, setDateRange, categoryIds, setCategoryIds, searchInput, sharedFilters } = filters;
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [categoryIds, setCategoryIds] = useState<string[]>([]);
   const [categoryFilterOpen, setCategoryFilterOpen] = useState(false);
   const [sortKeys, setSortKeys] = useState<SortKey[]>([]);
   const [sortDrawerOpen, setSortDrawerOpen] = useState(false);
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [futureOpen, setFutureOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -55,22 +50,6 @@ export default function TransactionsScreen() {
   const { collapsedDays, toggleDay } = useCollapsedDays();
   const wallets = useWalletsQuery();
   const categories = useCategoriesQuery();
-
-  // Debounced so every keystroke doesn't fire a new request — same 400ms
-  // convention as other search-as-you-type inputs in this codebase.
-  useEffect(() => {
-    const handle = setTimeout(() => setSearch(searchInput.trim()), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(handle);
-  }, [searchInput]);
-
-  // Every filter except the type tab — shared by the list query below and the
-  // "Tất cả" tab's own count, which by definition must ignore that tab.
-  const sharedFilters = {
-    from: dateRange.from,
-    to: dateRange.to,
-    category_ids: categoryIds.length > 0 ? categoryIds.join(",") : undefined,
-    search: search || undefined,
-  };
 
   const transactions = useTransactionsQuery({ ...sharedFilters, type: filter });
 
@@ -151,6 +130,11 @@ export default function TransactionsScreen() {
   // Everything the screen shows, not just the list: the header's period total
   // and the "Tất cả" tab count are separate requests, and leaving either
   // behind on a pull would show a total that disagrees with the rows under it.
+  const openCreateForm = () => {
+    setEditingTransaction(null);
+    setFormOpen(true);
+  };
+
   const { refreshControl } = useRefresh([
     transactions,
     allTypesCount,
@@ -181,7 +165,7 @@ export default function TransactionsScreen() {
             typeFilter={filter ?? "all"}
             onChangeTypeFilter={(value: TypeFilterValue) => setFilter(value === "all" ? undefined : value)}
             searchInput={searchInput}
-            onChangeSearch={setSearchInput}
+            onChangeSearch={filters.setSearchInput}
             dateRangeLabel={dateRangeLabel}
             onOpenDatePicker={() => setPickerOpen(true)}
             categoryCount={categoryIds.length}
@@ -215,18 +199,20 @@ export default function TransactionsScreen() {
             />
           </Pressable>
         )}
-        ListEmptyComponent={<TransactionsListEmpty query={transactions} />}
+        ListEmptyComponent={
+          <TransactionsListEmpty
+            query={transactions}
+            filtered={filters.hasActiveFilter}
+            onlyFuture={future.length > 0}
+            onAdd={openCreateForm}
+            onClearFilters={filters.clearFilters}
+            onSearch={filters.searchFor}
+          />
+        }
         ListFooterComponent={<TransactionsListFooter query={transactions} />}
       />
 
-      <Fab
-        accessibilityLabel="Thêm giao dịch"
-        testID="btn-add-transaction"
-        onPress={() => {
-          setEditingTransaction(null);
-          setFormOpen(true);
-        }}
-      />
+      <Fab accessibilityLabel="Thêm giao dịch" testID="btn-add-transaction" onPress={openCreateForm} />
 
       <DateRangePickerModal
         visible={pickerOpen}

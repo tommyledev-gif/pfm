@@ -33,6 +33,8 @@ interface ChatMessageRowProps {
   onPressHistory: (message: ChatMessage) => void;
   onOpenBudgetWizard: (message: ChatMessage) => void;
   onOpenManualEntry: () => void;
+  /** Present only while the User owns no VND Wallet — see TransactionActionCard. */
+  onCreateWallet?: () => void;
 }
 
 /**
@@ -58,6 +60,7 @@ function ChatMessageRowView({
   onPressHistory,
   onOpenBudgetWizard,
   onOpenManualEntry,
+  onCreateWallet,
 }: ChatMessageRowProps) {
   const wallet = message.action ? walletById.get(message.action.payload.wallet_id ?? "") : undefined;
   const currency = wallet?.currency ?? FALLBACK_CURRENCY;
@@ -125,6 +128,7 @@ function ChatMessageRowView({
             saving={confirming}
             onConfirm={() => (walletRequired ? onTriggerEdit(message) : onConfirm(message))}
             walletRequired={walletRequired}
+            onCreateWallet={onCreateWallet}
             testIDSuffix={message.id}
             edited={message.edited}
             onPressHistory={message.editHistory ? () => onPressHistory(message) : undefined}

@@ -65,3 +65,28 @@ export function MapPinIcon({ size, color = colors.textPrimary, strokeWidth = 1.8
     </Svg>
   );
 }
+
+/** A padlock — a step that opens once the one before it is done. */
+export function LockIcon({ size, color = colors.textPrimary, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <Svg {...base(size)} fill="none">
+      <Rect x="5" y="10.5" width="14" height="10" rx="2.5" stroke={color} strokeWidth={strokeWidth} />
+      <Path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+/** A columned building — a bank account, any money source. */
+export function BankIcon({ size, color = colors.textPrimary, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <Svg {...base(size)} fill="none">
+      <Path d="M3.5 9 12 4l8.5 5h-17Z" stroke={color} strokeWidth={strokeWidth} strokeLinejoin="round" />
+      <Path
+        d="M6 9.5v7M10 9.5v7M14 9.5v7M18 9.5v7M3.5 20h17"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}

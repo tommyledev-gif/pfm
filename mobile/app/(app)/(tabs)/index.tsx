@@ -2,8 +2,9 @@ import { memo, useCallback, useMemo, useState } from "react";
 import { FlatList, ListRenderItemInfo, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
-import { PlusIcon } from "@/components/ui/Icon";
+import { BankIcon, PlusIcon, ReceiptIcon } from "@/components/ui/Icon";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
+import { EmptyInlineCard } from "@/components/shared/EmptyState";
 import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
 import { Screen } from "@/components/shared/Screen";
 import { TopBar } from "@/components/shared/TopBar";
@@ -28,6 +29,9 @@ import { TransactionFormModal } from "@/features/transactions/components/Transac
 import { TransactionRowSkeleton } from "@/features/transactions/components/TransactionRowSkeleton";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { Category } from "@/features/categories/types";
+import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
+import { HomeOnboardingCard } from "@/features/onboarding/components/HomeOnboardingCard";
+import { useOpenWalletCreator } from "@/features/wallets/use-open-wallet-creator";
 import { useUiPrefsStore, HomePeriod } from "@/stores/ui-prefs-store";
 
 const RECENT_TRANSACTION_SKELETON_COUNT = 4;
@@ -81,10 +85,13 @@ export default function HomeScreen() {
   const setHomePeriod = useUiPrefsStore((s) => s.setHomePeriod);
 
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [creatingTransaction, setCreatingTransaction] = useState(false);
   const wallets = useWalletsQuery();
   const recent = useTransactionsQuery({ limit: RECENT_FETCH_LIMIT });
   const categories = useCategoriesQuery();
+  const budgets = useBudgetsQuery();
   const snapshot = useHomeSnapshot(homePeriod);
+  const openWalletCreator = useOpenWalletCreator();
 
   const categoryById = useMemo(() => new Map(categories.data?.map((c) => [c.id, c])), [categories.data]);
   const walletCurrencyMap = useMemo(() => {
@@ -102,6 +109,10 @@ export default function HomeScreen() {
     () => splitFutureTransactions(firstPage ?? []).upToToday.slice(0, RECENT_TRANSACTION_COUNT),
     [firstPage],
   );
+  // A fresh account — not one transaction ever, future-dated included — gets
+  // the onboarding journey in place of a snapshot of zeros. Decided only once
+  // all three answers are in, so a slow query never flashes the wrong one.
+  const isFresh = recent.isSuccess && wallets.isSuccess && budgets.isSuccess && (firstPage?.length ?? 0) === 0;
 
   const { refreshControl } = useRefresh([wallets, recent, categories, ...snapshot.queries]);
 
@@ -120,7 +131,11 @@ export default function HomeScreen() {
     }),
   );
   const openInsights = useCallback(() => router.push("/insights"), [router]);
-  const closeEditor = useCallback(() => setEditingTransaction(null), []);
+  const closeEditor = useCallback(() => {
+    setEditingTransaction(null);
+    setCreatingTransaction(false);
+  }, []);
+  const startTransaction = useCallback(() => setCreatingTransaction(true), []);
 
   const renderRecent = useCallback(
     ({ item }: ListRenderItemInfo<Transaction>) => (
@@ -146,27 +161,38 @@ export default function HomeScreen() {
           <View style={styles.header}>
             <TopBar userName="Me" />
 
-            <SegmentedTabs style={styles.periodRow} options={PERIODS} value={homePeriod} onChange={setHomePeriod} />
+            {isFresh ? (
+              <HomeOnboardingCard
+                hasWallet={(wallets.data?.length ?? 0) > 0}
+                hasTransaction={false}
+                hasBudget={(budgets.data?.length ?? 0) > 0}
+                onAddTransaction={startTransaction}
+              />
+            ) : (
+              <>
+                <SegmentedTabs style={styles.periodRow} options={PERIODS} value={homePeriod} onChange={setHomePeriod} />
 
-            <HomeSnapshotCard
-              loading={snapshot.loading}
-              periodIndex={PERIODS.findIndex((p) => p.value === homePeriod)}
-              isDay={homePeriod === "day"}
-              currency={snapshot.currency}
-              periodSpent={snapshot.periodSpent}
-              spentDelta={snapshot.spentDelta}
-              previousPeriodLabel={previousPeriodLabel(homePeriod)}
-              budgetSnapshot={snapshot.budgetSnapshot}
-              remainingToday={snapshot.remainingToday}
-              todayAllowance={snapshot.todayAllowance}
-              daysLeft={snapshot.daysLeft}
-              atRiskBudgets={snapshot.atRiskBudgets}
-              topCategories={snapshot.topCategories}
-              topCategoriesExpenseTotal={snapshot.topCategoriesExpenseTotal}
-              categoryById={categoryById}
-              onOpenBudgets={openBudgetsForPeriod}
-              onOpenInsights={openInsights}
-            />
+                <HomeSnapshotCard
+                  loading={snapshot.loading}
+                  periodIndex={PERIODS.findIndex((p) => p.value === homePeriod)}
+                  isDay={homePeriod === "day"}
+                  currency={snapshot.currency}
+                  periodSpent={snapshot.periodSpent}
+                  spentDelta={snapshot.spentDelta}
+                  previousPeriodLabel={previousPeriodLabel(homePeriod)}
+                  budgetSnapshot={snapshot.budgetSnapshot}
+                  remainingToday={snapshot.remainingToday}
+                  todayAllowance={snapshot.todayAllowance}
+                  daysLeft={snapshot.daysLeft}
+                  atRiskBudgets={snapshot.atRiskBudgets}
+                  topCategories={snapshot.topCategories}
+                  topCategoriesExpenseTotal={snapshot.topCategoriesExpenseTotal}
+                  categoryById={categoryById}
+                  onOpenBudgets={openBudgetsForPeriod}
+                  onOpenInsights={openInsights}
+                />
+              </>
+            )}
 
             <HomePendingProposals categoryById={categoryById} walletCurrencyById={walletCurrencyMap} />
 
@@ -187,6 +213,13 @@ export default function HomeScreen() {
                 <WalletCardSkeleton />
               ) : isWaitingForNetwork(wallets) ? (
                 <OfflinePlaceholder />
+              ) : wallets.data?.length === 0 ? (
+                <EmptyInlineCard
+                  icon={<BankIcon size={18} color={colors.textSecondary} />}
+                  text="Chưa có nguồn tiền nào được kết nối"
+                  onPress={openWalletCreator}
+                  testID="empty-home-wallets"
+                />
               ) : (
                 <WalletCarousel wallets={wallets.data ?? NO_WALLETS} onPressWallet={openWallet} />
               )}
@@ -211,13 +244,17 @@ export default function HomeScreen() {
           ) : isWaitingForNetwork(recent) ? (
             <OfflinePlaceholder />
           ) : (
-            <Text style={styles.empty}>Chưa có giao dịch nào.</Text>
+            <EmptyInlineCard
+              icon={<ReceiptIcon size={18} color={colors.textSecondary} />}
+              text="Chưa có dữ liệu giao dịch"
+              testID="empty-home-recent"
+            />
           )
         }
       />
 
       <EditTransactionSheet
-        visible={Boolean(editingTransaction)}
+        visible={Boolean(editingTransaction) || creatingTransaction}
         onClose={closeEditor}
         editingTransaction={editingTransaction}
       />
@@ -251,5 +288,4 @@ const useStyles = createStyles((colors) => ({
   sectionCountHint: { ...typography.tiny, color: colors.textMuted },
   sectionAction: { ...typography.caption, color: colors.green },
   addWalletAction: { flexDirection: "row", alignItems: "center", gap: 4 },
-  empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
 }));

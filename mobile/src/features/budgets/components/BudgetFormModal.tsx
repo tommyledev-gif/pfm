@@ -31,6 +31,10 @@ interface BudgetFormModalProps {
   // Present => edit mode: category is fixed, submit calls PATCH instead of
   // POST. Absent => create mode (original behavior).
   editingBudget?: Budget | null;
+  /** Create mode only: open with this category (and limit, in cents) already
+   *  filled in — the Budgets empty state's suggestions. Still just a form:
+   *  nothing is saved until the User taps Tạo. */
+  preset?: { categoryId: string; amountCents: number | null } | null;
 }
 
 // Insights → Budgets tab "+ New budget" action (README), extended to also
@@ -52,7 +56,7 @@ interface BudgetFormModalProps {
 // (CategorySelectField + useCategoryPicker), not the horizontal chip row it had
 // before — that row rendered every expense category at once with no way to find
 // one, which is unusable past a dozen.
-export function BudgetFormModal({ visible, onClose, currency, editingBudget }: BudgetFormModalProps) {
+export function BudgetFormModal({ visible, onClose, currency, editingBudget, preset }: BudgetFormModalProps) {
   const colors = useColors();
   const styles = useStyles();
   const requireOnline = useRequireOnline();
@@ -73,11 +77,11 @@ export function BudgetFormModal({ visible, onClose, currency, editingBudget }: B
       const existingLimit = editingBudget.limits.find((l) => l.currency === currency);
       setAmount(existingLimit ? String(toMajorUnits(existingLimit.amount_limit)) : "");
     } else {
-      setCategoryId(null);
-      setAmount("");
+      setCategoryId(preset?.categoryId ?? null);
+      setAmount(preset?.amountCents ? String(toMajorUnits(preset.amountCents)) : "");
     }
     setSubmitAttempted(false);
-  }, [visible, editingBudget, currency]);
+  }, [visible, editingBudget, currency, preset]);
 
   const mutation = isEditing ? updateBudget : createBudget;
 

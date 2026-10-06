@@ -52,7 +52,13 @@ export default function WalletsScreen() {
   // Set by Home when one of its wallet cards is tapped: open on that wallet
   // and flash a border on it. `focusedAt` is a nonce, so tapping the same
   // card twice in a row still replays the highlight.
-  const { focusWalletId, focusedAt } = useLocalSearchParams<{ focusWalletId?: string; focusedAt?: string }>();
+  // `create` (a nonce, see useOpenWalletCreator) is set by every "you need a
+  // wallet first" prompt: arrive with the new-wallet form already open.
+  const { focusWalletId, focusedAt, create } = useLocalSearchParams<{
+    focusWalletId?: string;
+    focusedAt?: string;
+    create?: string;
+  }>();
   const wallets = useWalletsQuery();
   const viewMode = useUiPrefsStore((s) => s.walletsViewMode);
   const setViewMode = useUiPrefsStore((s) => s.setWalletsViewMode);
@@ -96,6 +102,10 @@ export default function WalletsScreen() {
     setEditingWallet(wallet);
     setModalOpen(true);
   };
+
+  useEffect(() => {
+    if (create) openEditor(null);
+  }, [create]);
 
   const listRef = useRef<SectionList<Wallet, WalletSection>>(null);
   const scrollRetries = useRef(0);
