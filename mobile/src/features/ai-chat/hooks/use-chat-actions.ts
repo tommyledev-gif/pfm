@@ -7,6 +7,7 @@ import { ChatMessage, EditHistoryEntry, TransactionActionPayload } from "@/featu
 import { nextMessageId, newIdempotencyKey } from "@/features/ai-chat/message-id";
 import { toReplyMessages } from "@/features/ai-chat/reply-fanout";
 import { useConfirmProposal } from "@/features/ai-chat/hooks/use-confirm-proposal";
+import { useNeedsFirstWallet } from "@/features/wallets/use-open-wallet-creator";
 import { useChatStore } from "@/stores/chat-store";
 
 // The typing indicator is meant to be felt, not just technically present —
@@ -35,6 +36,7 @@ export function useChatActions({ onSent }: UseChatActionsOptions) {
   const { confirmingId, confirm: confirmAction } = useConfirmProposal();
 
   const sendMessage = useSendChatMessageMutation();
+  const noWallets = useNeedsFirstWallet();
   const updateTransaction = useUpdateTransactionMutation();
 
   // Shared by a fresh send and a resend-after-editing flow — same pacing
@@ -50,7 +52,7 @@ export function useChatActions({ onSent }: UseChatActionsOptions) {
       if (elapsed < MIN_TYPING_MS) {
         await new Promise((resolve) => setTimeout(resolve, MIN_TYPING_MS - elapsed));
       }
-      return toReplyMessages(response, { sourceText: message, edited });
+      return toReplyMessages(response, { sourceText: message, edited, noWallets });
     } catch (err) {
       const code = getErrorCode(err);
       const isBusy = code === "RATE_LIMITED" || code === "AI_SERVICE_UNAVAILABLE";

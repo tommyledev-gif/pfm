@@ -52,12 +52,17 @@ export const RIM_WIDTH = RIM_CX * 2;
 export const RIM_HEIGHT = BALL_SINK + SOCKET_RADIUS + RIM_PAD;
 export const RIM_LEFT_OFFSET = BALL_SIZE / 2 - RIM_CX;
 // Left fillet (clockwise), socket arc under the ball (counter-clockwise),
-// right fillet (clockwise).
-const SOCKET_OUTLINE =
-  `A ${SOCKET_FILLET_RADIUS} ${SOCKET_FILLET_RADIUS} 0 0 1 ${RIM_CX - TANGENT_DX} ${TANGENT_Y} ` +
-  `A ${SOCKET_RADIUS} ${SOCKET_RADIUS} 0 ${SOCKET_LARGE_ARC} 0 ${RIM_CX + TANGENT_DX} ${TANGENT_Y} ` +
-  `A ${SOCKET_FILLET_RADIUS} ${SOCKET_FILLET_RADIUS} 0 0 1 ${RIM_CX + FILLET_DX} ${EDGE_Y}`;
-export const RIM_PATH = `M ${RIM_CX - FILLET_DX} ${EDGE_Y} ${SOCKET_OUTLINE}`;
+// right fillet (clockwise) — for a hollow centred at x = cx, so a box wider
+// than the rim's (NavBallLight's) can draw the same shape.
+const socketOutline = (cx: number) =>
+  `A ${SOCKET_FILLET_RADIUS} ${SOCKET_FILLET_RADIUS} 0 0 1 ${cx - TANGENT_DX} ${TANGENT_Y} ` +
+  `A ${SOCKET_RADIUS} ${SOCKET_RADIUS} 0 ${SOCKET_LARGE_ARC} 0 ${cx + TANGENT_DX} ${TANGENT_Y} ` +
+  `A ${SOCKET_FILLET_RADIUS} ${SOCKET_FILLET_RADIUS} 0 0 1 ${cx + FILLET_DX} ${EDGE_Y}`;
+/** The hollow's outline as a stroke, centred at x = cx. */
+export const rimPathAt = (cx: number) => `M ${cx - FILLET_DX} ${EDGE_Y} ${socketOutline(cx)}`;
+/** The hollow as a closed shape, its mouth closed along the bar's very top. */
+export const hollowPathAt = (cx: number) => `M ${cx - FILLET_DX} 0 V ${EDGE_Y} ${socketOutline(cx)} V 0 Z`;
+export const RIM_PATH = rimPathAt(RIM_CX);
 
 // ⚠️ The hollow is CUT OUT of the bar, not painted onto it. It used to be a
 // tinted fill drawn over the opaque bar, which on the dark theme came out as
@@ -67,11 +72,9 @@ export const RIM_PATH = `M ${RIM_CX - FILLET_DX} ${EDGE_Y} ${SOCKET_OUTLINE}`;
 // ballX — so the hollow shows whatever the screen paints there. The hollow is
 // closed along the very top (y 0), not the hairline's centre, so no sliver of
 // bar is left across its mouth.
-export const BAND_CUTOUT_PATH =
-  `M 0 0 H ${RIM_WIDTH} V ${RIM_HEIGHT} H 0 Z ` +
-  `M ${RIM_CX - FILLET_DX} 0 V ${EDGE_Y} ${SOCKET_OUTLINE} V 0 Z`;
+export const BAND_CUTOUT_PATH = `M 0 0 H ${RIM_WIDTH} V ${RIM_HEIGHT} H 0 Z ` + hollowPathAt(RIM_CX);
 // Depth of the hollow's lowest point; the bar is solid below it.
-const HOLLOW_DEPTH = BALL_SINK + SOCKET_RADIUS;
+export const HOLLOW_DEPTH = BALL_SINK + SOCKET_RADIUS;
 // The fillers reach half-way into the box's solid edge strip (RIM_PAD wide),
 // so two opaque shapes overlap there and no hairline seam can open between
 // them at a fractional offset.

@@ -61,14 +61,12 @@ export function BudgetsEmptyState({ currency, onOpenWizard, onCreate }: BudgetsE
           testID: "btn-empty-budgets-wizard",
         }}
       >
-        <Text style={styles.hint}>Trả lời vài câu hỏi — AI đề xuất hạn mức cho từng danh mục.</Text>
       </EmptyStateCard>
 
       {rows.length > 0 ? (
         <>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Gợi ý danh mục phổ biến</Text>
-            <Text style={styles.sectionHint}>Chạm để tạo nhanh</Text>
           </View>
           {rows.map(({ systemKey, amountCents, category }) => {
             const isSavings = amountCents === null;

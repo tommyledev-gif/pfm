@@ -40,13 +40,19 @@ const dark = {
   // on near-black the neon primary as a whole track and a near-white thumb
   // were the two brightest things on any settings screen. Both are pulled
   // down so a row of switches sits at the same weight as the text beside it.
-  toggleTrackOff: "rgba(255,255,255,0.12)",
-  toggleTrackOn: "#35800F",
-  toggleThumb: "#A9B0BB",
+  // Lifted one step since (2026-10-07): at #35800F / #A9B0BB the switch read
+  // as dimmed-out, not merely quiet. Still well short of the neon and white.
+  toggleTrackOff: "rgba(255,255,255,0.16)",
+  toggleTrackOn: "#45A016",
+  toggleThumb: "#C3C9D2",
   // Fully opaque — the translucent blur let scrolling content show through
   // the bar, which read as the nav being washed out.
   navBg: "#0F1116",
   navBorder: "rgba(255,255,255,0.08)",
+  // The light the active nav ball casts into its hollow (NavBallLight) — a
+  // touch yellower than `green`, the way a lit source reads warmer than its
+  // own surface.
+  navGlow: "#AAFF45",
   error: "#FF9E96",
   // Solid fill for destructive buttons that must read as "this deletes" at a
   // glance. `peach` is too light to carry white text; this red is not.
@@ -102,6 +108,8 @@ const light: Palette = {
   toggleThumb: "#FFFFFF",
   navBg: "#FFFFFF",
   navBorder: "rgba(15,23,42,0.08)",
+  // Unused: the ball's light is a dark-theme-only effect.
+  navGlow: "#3A8F0B",
   error: "#D93F36",
   danger: "#E5484D",
   onDanger: "#FFFFFF",

@@ -31,6 +31,9 @@ export function PendingRow({ message, label, currency, closeSignal, onOpen, onRe
   return (
     <SwipeableRow
       closeSignal={closeSignal}
+      // Edge grips on both sides: the row says it can be swiped before
+      // anyone has to guess.
+      showHandles
       leftAction={{
         Icon: EditIcon,
         color: colors.green,

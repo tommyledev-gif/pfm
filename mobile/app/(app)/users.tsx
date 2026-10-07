@@ -9,6 +9,7 @@ import { useUsersQuery } from "@/features/users/api/use-users-query";
 import { UserListItem } from "@/features/users/components/UserListItem";
 import { UserListItemSkeleton } from "@/features/users/components/UserListItemSkeleton";
 import { InviteUserModal } from "@/features/users/components/InviteUserModal";
+import { UsersEmptyState } from "@/features/users/components/UsersEmptyState";
 
 const LIST_SKELETON_COUNT = 4;
 
@@ -28,7 +29,7 @@ export default function UsersScreen() {
         <Pressable onPress={() => router.back()} hitSlop={8}>
           <ChevronLeftIcon size={24} />
         </Pressable>
-        <Text style={styles.title}>Household Members</Text>
+        <Text style={styles.title}>Thành viên</Text>
         <Pressable style={styles.addButton} onPress={() => setInviteOpen(true)} hitSlop={8}>
           <PlusIcon size={16} color={colors.onGreen} />
         </Pressable>
@@ -50,9 +51,11 @@ export default function UsersScreen() {
           ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
           renderItem={({ item }) => <UserListItem user={item} />}
           ListEmptyComponent={
-            <Text style={styles.empty}>
-              {users.isError ? "Failed to load members." : "No members yet — tap + to invite one."}
-            </Text>
+            <UsersEmptyState
+              failed={users.isError}
+              onInvite={() => setInviteOpen(true)}
+              onRetry={() => void users.refetch()}
+            />
           }
         />
       )}
@@ -82,5 +85,4 @@ const useStyles = createStyles((colors) => ({
   },
   list: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl },
   skeletonSpacing: { marginTop: spacing.sm },
-  empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
 }));

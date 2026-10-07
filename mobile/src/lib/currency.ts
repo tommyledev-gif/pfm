@@ -16,12 +16,25 @@ function localeFor(currency: string): string {
   return currency.toUpperCase() === "VND" ? VND_LOCALE : FOREIGN_LOCALE;
 }
 
+// ⚠️ One formatter per currency, built once. Constructing an
+// Intl.NumberFormat is expensive on Hermes for Android — every one calls into
+// the platform's ICU, slowly until it has warmed up — and the transaction
+// sheet formats several amounts on every keypad press. Building them fresh
+// each time is what made typing lag for the first moments after the sheet
+// opened. A formatter is immutable, so sharing one is safe.
+const formatCache = new Map<string, Intl.NumberFormat>();
+
 function currencyFormat(currency: string): Intl.NumberFormat {
-  return new Intl.NumberFormat(localeFor(currency), {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  });
+  let format = formatCache.get(currency);
+  if (!format) {
+    format = new Intl.NumberFormat(localeFor(currency), {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 0,
+    });
+    formatCache.set(currency, format);
+  }
+  return format;
 }
 
 export function formatCurrency(amountCents: number, currency: string = "VND"): string {

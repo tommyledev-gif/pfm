@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Dimensions, LayoutChangeEvent, Modal, Pressable, Text, View } from "react-native";
 
-import { formatCurrency, toMajorUnits } from "@/lib/currency";
-import { numberToWordsVi } from "@/lib/number-to-words-vi";
+import { formatCurrency } from "@/lib/currency";
+import { amountInWordsVi } from "@/lib/number-to-words-vi";
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
 
 /** A target's box in screen coordinates — `measure()`'s pageX/pageY plus its size. */
@@ -93,7 +93,7 @@ export function AmountTooltip({ visible, anchor, amountCents, currency, label, o
           <Text style={styles.amount} selectable>
             {formatCurrency(amountCents, currency)}
           </Text>
-          <Text style={styles.words}>{numberToWordsVi(toMajorUnits(amountCents))}</Text>
+          <Text style={styles.words}>{amountInWordsVi(amountCents, currency)}</Text>
           {placement ? (
             <View
               style={[

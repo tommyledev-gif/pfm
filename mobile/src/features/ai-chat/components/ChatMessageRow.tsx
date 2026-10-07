@@ -16,6 +16,7 @@ import { ChatMessage } from "@/features/ai-chat/types";
 import { Category } from "@/features/categories/types";
 import { Wallet } from "@/features/wallets/types";
 import { ManualEntryButton } from "@/features/ai-chat/components/ManualEntryButton";
+import { CreateWalletButton } from "@/features/ai-chat/components/CreateWalletButton";
 
 interface ChatMessageRowProps {
   message: ChatMessage;
@@ -35,6 +36,8 @@ interface ChatMessageRowProps {
   onOpenManualEntry: () => void;
   /** Present only while the User owns no VND Wallet — see TransactionActionCard. */
   onCreateWallet?: () => void;
+  /** Opens the new-wallet form — for a reply flagged `offerCreateWallet`. */
+  onOpenWalletCreator: () => void;
 }
 
 /**
@@ -61,6 +64,7 @@ function ChatMessageRowView({
   onOpenBudgetWizard,
   onOpenManualEntry,
   onCreateWallet,
+  onOpenWalletCreator,
 }: ChatMessageRowProps) {
   const wallet = message.action ? walletById.get(message.action.payload.wallet_id ?? "") : undefined;
   const currency = wallet?.currency ?? FALLBACK_CURRENCY;
@@ -141,6 +145,8 @@ function ChatMessageRowView({
           />
         ) : message.offerManualEntry ? (
           <ManualEntryButton onPress={onOpenManualEntry} />
+        ) : message.offerCreateWallet ? (
+          <CreateWalletButton onPress={onOpenWalletCreator} />
         ) : null}
       </ChatBubble>
       <ActionPopover

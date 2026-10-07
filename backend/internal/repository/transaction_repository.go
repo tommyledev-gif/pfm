@@ -210,8 +210,15 @@ type UpdateTransactionParams struct {
 	OccurredAt *time.Time
 	Note       *string
 	// LocationNote: nil leaves it unchanged, "" clears it, anything else sets
-	// it. Coordinates and place name are never updatable.
+	// it.
 	LocationNote *string
+	// LocationLat/LocationLng move an existing pin: nil (both) leaves it
+	// unchanged, non-nil (always both — the service guarantees the pair)
+	// moves it. LocationName is the new position's place name, written only
+	// alongside a move; nil or "" stores NULL.
+	LocationLat  *float64
+	LocationLng  *float64
+	LocationName *string
 }
 
 // UpdateTransaction is scoped by id + user_id, same visibility guarantee as
@@ -226,6 +233,9 @@ func (r *TransactionRepository) UpdateTransaction(ctx context.Context, tx pgx.Tx
 		OccurredAt:   arg.OccurredAt,
 		Note:         arg.Note,
 		LocationNote: arg.LocationNote,
+		LocationLat:  arg.LocationLat,
+		LocationLng:  arg.LocationLng,
+		LocationName: arg.LocationName,
 	})
 	if err != nil {
 		return nil, err

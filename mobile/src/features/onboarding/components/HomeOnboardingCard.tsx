@@ -1,14 +1,23 @@
 import { Pressable, Text, View } from "react-native";
+import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 
-import { EmptyIllustration } from "@/components/shared/EmptyIllustration";
 import { EmptyStateCard } from "@/components/shared/EmptyState";
 import { PillButton } from "@/components/ui/PillButton";
 import { CheckIcon, LockIcon, PlusIcon, TargetIcon, WalletIcon } from "@/components/ui/Icon";
 import { withAlpha } from "@/lib/color";
-import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { radii, spacing, typography, createStyles, useColors, useThemeDefinition } from "@/lib/theme";
 import { OnboardingStep, OnboardingStepKey, buildOnboardingSteps } from "@/features/onboarding/onboarding-steps";
 import { useOpenWalletCreator } from "@/features/wallets/use-open-wallet-creator";
+
+// Rasterised from assets/app-img/*-empty_home.svg (traced artwork, ~100k
+// paths — far too heavy for react-native-svg), background keyed out to
+// transparent so it sits on either theme's card. Both share one size.
+const ILLUSTRATION = {
+  light: require("../../../../assets/app-img/light-empty-home.webp"),
+  dark: require("../../../../assets/app-img/dark-empty-home.webp"),
+};
+const ILLUSTRATION_ASPECT_RATIO = 982 / 547;
 
 interface HomeOnboardingCardProps {
   hasWallet: boolean;
@@ -27,6 +36,7 @@ interface HomeOnboardingCardProps {
 export function HomeOnboardingCard({ hasWallet, hasTransaction, hasBudget, onAddTransaction }: HomeOnboardingCardProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { isDark } = useThemeDefinition();
   const router = useRouter();
   const openWalletCreator = useOpenWalletCreator();
   const onAction = (step: OnboardingStepKey) => {
@@ -51,18 +61,20 @@ export function HomeOnboardingCard({ hasWallet, hasTransaction, hasBudget, onAdd
     <View style={styles.container} testID="card-home-onboarding">
       <EmptyStateCard
         illustration={
-          <EmptyIllustration badge={<PlusIcon size={12} color={colors.onGreen} strokeWidth={2.6} />}>
-            <WalletIcon size={30} color={colors.green} />
-          </EmptyIllustration>
+          <Image
+            source={isDark ? ILLUSTRATION.dark : ILLUSTRATION.light}
+            style={styles.illustration}
+            contentFit="contain"
+            accessible={false}
+          />
         }
         eyebrow="Khởi đầu tài chính thông minh"
         title="Sẵn sàng kiểm soát chi tiêu"
-        description="Hoàn thành 3 bước thiết lập đơn giản để kích hoạt dòng tiền và biểu đồ phân tích tự động."
+        description="Thiết lập 3 bước để bắt đầu sử dụng PFM."
       />
 
       <View style={styles.journeyHeader}>
-        <Text style={styles.journeyTitle}>Hành trình bắt đầu ({completed}/3)</Text>
-        {completed === 0 ? <Text style={styles.journeyTag}>Mới kích hoạt</Text> : null}
+        <Text style={styles.journeyTitle}>Đang ở bước {completed}/3</Text>
       </View>
 
       <View style={styles.steps}>
@@ -118,13 +130,18 @@ function StepRow({ step, index, onPress }: { step: OnboardingStep; index: number
           <Text style={[styles.rowTitle, isDone && styles.rowTitleDone]} numberOfLines={1}>
             {step.title}
           </Text>
-          {isActive ? (
-            <Text style={styles.badgeActive}>Cần thực hiện</Text>
-          ) : isDone ? (
-            <Text style={styles.badgeDone}>Hoàn thành</Text>
-          ) : (
-            <Text style={styles.badgeLocked}>Bước {index + 1}</Text>
-          )}
+          {/* A View pill around one line of text, never shrunk: the padding,
+              tint and radius used to sit on the Text itself, which Android
+              measured too narrow beside the shrinking title — "Cần làm"
+              wrapped to "Cần" and a blank gap. */}
+          <View style={[styles.badge, isActive && styles.badgeActive]}>
+            <Text
+              style={[styles.badgeLabel, isActive || isDone ? styles.badgeLabelGreen : styles.badgeLabelMuted]}
+              numberOfLines={1}
+            >
+              {isActive ? "Cần làm" : isDone ? "Hoàn thành" : `Bước ${index + 1}`}
+            </Text>
+          </View>
         </View>
         <Text style={styles.rowDescription}>{step.description}</Text>
       </View>
@@ -134,6 +151,7 @@ function StepRow({ step, index, onPress }: { step: OnboardingStep; index: number
 
 const useStyles = createStyles((colors) => ({
   container: { gap: spacing.md },
+  illustration: { width: "100%", aspectRatio: ILLUSTRATION_ASPECT_RATIO },
   journeyHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -172,15 +190,10 @@ const useStyles = createStyles((colors) => ({
   rowTitle: { ...typography.body, color: colors.textPrimary, flexShrink: 1 },
   rowTitleDone: { color: colors.textSecondary },
   rowDescription: { ...typography.caption, fontWeight: "500", color: colors.textSecondary, lineHeight: 17 },
-  badgeActive: {
-    ...typography.tiny,
-    color: colors.green,
-    paddingVertical: 2,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radii.pill,
-    backgroundColor: withAlpha(colors.green, 0.12),
-    overflow: "hidden",
-  },
-  badgeDone: { ...typography.tiny, color: colors.green },
-  badgeLocked: { ...typography.tiny, color: colors.textMuted },
+  // Same padding in every state, so the three labels line up on the right.
+  badge: { flexShrink: 0, paddingVertical: 2, paddingHorizontal: spacing.sm, borderRadius: radii.pill },
+  badgeActive: { backgroundColor: withAlpha(colors.green, 0.12) },
+  badgeLabel: { ...typography.tiny },
+  badgeLabelGreen: { color: colors.green },
+  badgeLabelMuted: { color: colors.textMuted },
 }));

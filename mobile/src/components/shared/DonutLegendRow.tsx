@@ -3,6 +3,7 @@ import { Animated, Pressable, Text, View } from "react-native";
 import { Avatar } from "@/components/ui/Avatar";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { formatCurrency } from "@/lib/currency";
+import { formatPercent } from "@/lib/percent";
 import { useHoldProgress } from "@/lib/use-hold-progress";
 import { typography, createStyles, useColors } from "@/lib/theme";
 import { DonutSegment } from "@/components/shared/DonutChart";
@@ -51,7 +52,7 @@ export function DonutLegendRow({
           {segment.label}
         </Animated.Text>
         <Text style={legendStyles.value}>
-          {formatCurrency(segment.amount, currency)} · {percentage.toFixed(0)}%
+          {formatCurrency(segment.amount, currency)} · {formatPercent(percentage)}
         </Text>
       </View>
       <ProgressBar progress={percentage / 100} color={segment.color} height={4} />

@@ -84,6 +84,9 @@ interface DrawerProps {
 // full window height guarantees the sheet starts below the visible area
 // regardless of device size or how tall `children` ends up being.
 const OFFSCREEN_Y = Dimensions.get("window").height;
+// How long after opening the overlay keeps re-checking where its host sits —
+// past a screen push (native-stack fade) and the safe-area padding landing.
+const ANCHOR_SETTLE_MS = 800;
 
 export function Drawer({ visible, onClose, children, footer, child }: DrawerProps) {
   const styles = useStyles();
@@ -125,10 +128,8 @@ export function Drawer({ visible, onClose, children, footer, child }: DrawerProp
   useEffect(() => {
     if (visible) {
       setRendered(true);
-      // Belt-and-braces alongside the anchor's own onLayout: an anchor that
-      // was already laid out (reopening the same sheet without remounting)
-      // won't necessarily fire onLayout again.
-      requestAnimationFrame(measureAnchor);
+      // An anchor already laid out (reopening without remounting) won't fire
+      // onLayout again — the settle loop below measures it instead.
       Animated.parallel([
         Animated.timing(backdropOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
         Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 20, mass: 0.9, stiffness: 200 }),
@@ -145,6 +146,25 @@ export function Drawer({ visible, onClose, children, footer, child }: DrawerProp
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  // ⚠️ Re-measured every frame for a moment after opening, not once. A sheet
+  // opened the instant its screen mounts (Wallets' `create` param, sent by
+  // every "create a wallet first" prompt) measured while that screen was
+  // still settling — mid-push, before its safe-area padding landed — and kept
+  // the stale offset: the status-bar strip stayed uncovered at the top, and
+  // the sheet's bottom ran off-screen by the same amount. The anchor's own
+  // onLayout cannot catch this: the anchor never moves inside its host; the
+  // host moves in the window. setOrigin ignores an unchanged position, so a
+  // settled screen costs one measurement per frame and no renders.
+  useEffect(() => {
+    if (!visible) return;
+    const until = Date.now() + ANCHOR_SETTLE_MS;
+    let frame = requestAnimationFrame(function tick() {
+      measureAnchor();
+      if (Date.now() < until) frame = requestAnimationFrame(tick);
+    });
+    return () => cancelAnimationFrame(frame);
   }, [visible]);
 
   // `child` is read through a ref inside the back handler so the subscription

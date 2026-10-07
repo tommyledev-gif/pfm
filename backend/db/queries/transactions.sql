@@ -142,12 +142,19 @@ WHERE t.user_id = $1
 -- Partial update via COALESCE, same convention as UpdateWallet/UpdateCategory.
 -- wallet_id and type are never columns this query can touch — they aren't
 -- request fields at all (dto.UpdateTransactionRequest has no such fields,
--- spec.md Context #5). Neither are location_lat/lng/name: a pin is fixed at
--- creation (026_transactions_location.sql).
+-- spec.md Context #5).
 -- location_note is the one nullable column a PATCH can clear, so it can't use
 -- COALESCE: NULL leaves it unchanged, '' clears it to NULL, anything else
 -- sets it. The service has already rejected a location_note on a Transaction
 -- without coordinates; transactions_location_details_check backs that up.
+-- location_lat/lng/name move an EXISTING pin (2026-10-07): NULL lat/lng leave
+-- the pin as is; non-NULL lat/lng (the service always sends both) move it and
+-- replace location_name with the new place name — NULL or '' stores NULL,
+-- since the old area name would describe the old position. The service has
+-- already rejected a move on a Transaction without a pin (adding one after
+-- creation is not allowed); transactions_location_pair_check and
+-- transactions_location_range_check back up the pair and WGS84 ranges.
+-- location_note is independent of a move.
 UPDATE transactions
 SET
     amount        = COALESCE(sqlc.narg('amount'), amount),
@@ -157,6 +164,12 @@ SET
     location_note = CASE
         WHEN sqlc.narg('location_note')::text IS NULL THEN location_note
         ELSE NULLIF(sqlc.narg('location_note')::text, '')
+    END,
+    location_lat  = COALESCE(sqlc.narg('location_lat')::float8, location_lat),
+    location_lng  = COALESCE(sqlc.narg('location_lng')::float8, location_lng),
+    location_name = CASE
+        WHEN sqlc.narg('location_lat')::float8 IS NULL THEN location_name
+        ELSE NULLIF(sqlc.narg('location_name')::text, '')
     END,
     updated_at    = NOW()
 WHERE id = $1

@@ -35,9 +35,14 @@ export const REFRESH_RETRY_DELAY_SECONDS = 30;
 export const NETWORK_ERROR_MESSAGE = "Không thể kết nối máy chủ. Vui lòng kiểm tra mạng và thử lại.";
 export const NEEDS_CONNECTION_MESSAGE = "Cần kết nối mạng để thực hiện thao tác này.";
 export const OFFLINE_REFRESH_MESSAGE = "Đang ngoại tuyến — chưa thể làm mới.";
-// A connectivity drop shorter than this never shows the offline banner, so
-// a flapping connection does not make it flicker (EC-OFF-04).
-export const OFFLINE_BANNER_SHOW_DELAY_MS = 1500;
+// The offline strip (components/shared/OfflineBanner.tsx) moves the screen's
+// content, so a flapping connection must not make it flicker (EC-OFF-04):
+// it appears only once offline has lasted OFFLINE_STRIP_SHOW_DELAY_MS, and
+// leaves only once the connection has held for ONLINE_STABLE_DELAY_MS —
+// after showing "reconnected" for RECONNECTED_STRIP_MS.
+export const OFFLINE_STRIP_SHOW_DELAY_MS = 2000;
+export const ONLINE_STABLE_DELAY_MS = 1000;
+export const RECONNECTED_STRIP_MS = 2000;
 export const OFFLINE_NO_DATA_MESSAGE = "Chưa có dữ liệu đã lưu cho mục này. Kết nối mạng để tải.";
 
 // Per-User saved query cache (US-03). Keep age confirmed by the product owner

@@ -12,7 +12,8 @@ import (
 )
 
 // Transaction location (026_transactions_location.sql): an optional map pin
-// set on create, of which only the note is editable afterwards.
+// set on create. Afterwards its note is editable (this file) and the pin can
+// be moved (transaction_service_location_move_test.go), never added.
 
 func locationReq(lat, lng float64, placeName, note *string) *dto.TransactionLocationRequest {
 	return &dto.TransactionLocationRequest{Latitude: &lat, Longitude: &lng, PlaceName: placeName, Note: note}

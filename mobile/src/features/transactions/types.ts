@@ -92,9 +92,19 @@ export interface UpdateTransactionRequest {
   category_id?: string;
   occurred_at?: string;
   note?: string;
-  // Only for a Transaction that has a location; "" clears it. Coordinates and
-  // place name are fixed once created.
+  // Only for a Transaction that has a location; "" clears it.
   location_note?: string;
+  // Moves an existing pin (never adds one to a Transaction without). The old
+  // area name goes with the old spot: an omitted place_name is stored empty.
+  location?: TransactionLocationMove;
+}
+
+// PATCH's `location` — where a saved pin was moved to. Its note travels
+// separately, as location_note.
+export interface TransactionLocationMove {
+  latitude: number;
+  longitude: number;
+  place_name?: string;
 }
 
 // --- Export / Import (specs/transaction-export-import) ---------------------

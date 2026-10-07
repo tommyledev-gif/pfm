@@ -1,7 +1,7 @@
 import { Modal, Pressable, Text } from "react-native";
 
-import { formatCurrency, toMajorUnits } from "@/lib/currency";
-import { numberToWordsVi } from "@/lib/number-to-words-vi";
+import { formatCurrency } from "@/lib/currency";
+import { amountInWordsVi } from "@/lib/number-to-words-vi";
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
 
 interface AmountRevealPopupProps {
@@ -20,7 +20,7 @@ interface AmountRevealPopupProps {
 // bubble wouldn't.
 export function AmountRevealPopup({ visible, onClose, amountCents, currency }: AmountRevealPopupProps) {
   const styles = useStyles();
-  const words = numberToWordsVi(toMajorUnits(amountCents));
+  const words = amountInWordsVi(amountCents, currency);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>

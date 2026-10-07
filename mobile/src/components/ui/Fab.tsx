@@ -10,7 +10,7 @@ import { radii, spacing, createStyles, useColors } from "@/lib/theme";
 // FAB floats this far up plus the safe-area inset, so it always clears the
 // nav instead of sitting on top of it.
 const NAV_HEIGHT = 64;
-const FAB_SIZE = 56;
+export const FAB_SIZE = 56;
 
 interface FabProps {
   onPress: () => void;
@@ -26,8 +26,13 @@ interface FabProps {
  * scroll clear of both the nav and the button, instead of ending beneath them.
  */
 export function useFabClearance(): number {
+  return useFabBottom() + FAB_SIZE + spacing.lg;
+}
+
+/** The Fab's `bottom` offset — clear of the nav and the safe-area inset. */
+export function useFabBottom(): number {
   const insets = useSafeAreaInsets();
-  return NAV_HEIGHT + insets.bottom + spacing.xl + FAB_SIZE + spacing.lg;
+  return NAV_HEIGHT + insets.bottom + spacing.xl;
 }
 
 /**
@@ -39,7 +44,7 @@ export function useFabClearance(): number {
 export function Fab({ onPress, Icon = PlusIcon, accessibilityLabel, testID, style }: FabProps) {
   const colors = useColors();
   const styles = useStyles();
-  const insets = useSafeAreaInsets();
+  const bottom = useFabBottom();
   return (
     <Pressable
       testID={testID}
@@ -49,7 +54,7 @@ export function Fab({ onPress, Icon = PlusIcon, accessibilityLabel, testID, styl
       hitSlop={8}
       style={({ pressed }) => [
         styles.fab,
-        { bottom: NAV_HEIGHT + insets.bottom + spacing.xl },
+        { bottom },
         style,
         pressed && styles.pressed,
       ]}

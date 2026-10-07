@@ -117,17 +117,17 @@ N/A for the User — the renewal is not idempotent by design (each successful re
 
 ### Main Flow
 1. Device loses its connection.
-2. System shows a slim offline banner on every signed-in screen, with the time the saved data was last updated and, when any exist, the number of Queued Transactions.
+2. System shows a slim offline strip under the status bar on every signed-in screen ("Ngoại tuyến", plus the number of Queued Transactions when any exist). Tapping it shows the time the saved data was last updated and which actions need a connection.
 3. System stops automatic data loading (no endless spinners, no error screens caused only by being offline).
 4. Actions that need the server (Domain decision #2) are shown as unavailable, with a short "needs a connection" reason when tapped.
-5. Device reconnects. System hides the banner and refreshes the visible data.
+5. Device reconnects. System briefly shows "reconnected" in the strip, then hides it, and refreshes the visible data.
 
 ### Scenarios
 
 | Scenario ID | Given | When | Then | Notes |
 |---|---|---|---|---|
 | S-OFF-07 | Signed in, online | Device goes offline | Offline banner appears on the current screen within a few seconds | |
-| S-OFF-08 | Offline, banner shown | Device reconnects | Banner disappears; visible screens refresh without a pull | |
+| S-OFF-08 | Offline, banner shown | Device reconnects | Banner briefly reads "reconnected", then disappears; visible screens refresh without a pull | |
 | S-OFF-09 | Offline | User pulls to refresh | Refresh ends at once with an "offline" message; nothing else changes | Not an endless spinner |
 | S-OFF-10 | Online but server unreachable | Any request fails with no answer | User sees a "cannot reach the server" message, distinct from a server-side error message | Distinct network error message |
 | S-OFF-11 | Offline | User taps Edit/Delete on a Transaction, any Wallet/Category/Budget save or delete, AI Chat send, approve an AI proposal, import/export, invite a User | Action does not run; User sees "needs a connection" | Online-only list (decision #2) |
@@ -141,7 +141,7 @@ N/A for the User — the renewal is not idempotent by design (each successful re
 - **EC-OFF-06** A screen whose data was never saved on this device (e.g. a report period never opened) shows an "offline — no saved data for this view" state, not a skeleton forever and not an error.
 
 ### Definition of Done
-- AC-OFF-05: The offline banner shows/hides with connectivity on every signed-in screen, including the saved-data time and the waiting count (S-OFF-07, S-OFF-08, S-OFF-13).
+- AC-OFF-05: The offline banner shows/hides with connectivity on every signed-in screen, including the waiting count; tapping it shows the saved-data time (S-OFF-07, S-OFF-08, S-OFF-13).
 - AC-OFF-06: Pull-to-refresh offline ends immediately with an offline message (S-OFF-09).
 - AC-OFF-07: A request that gets no answer shows a network-specific message everywhere the app shows request errors, including sign-in (S-OFF-10, S-OFF-14).
 - AC-OFF-08: Every action in S-OFF-11 is unavailable offline with a "needs a connection" reason, and any online-only action that slips through fails fast with the network message, never hangs (S-OFF-11, EC-OFF-05).
@@ -166,14 +166,14 @@ N/A — no writes.
 ### Main Flow
 1. While online, System keeps a copy of the latest successful answers for: Wallets (with balances), Categories, Budgets, report summaries, and the first page of recent Transactions lists. Only these.
 2. User opens the app (cold start) offline.
-3. System shows the saved data immediately, marked by the offline banner with its last-updated time.
+3. System shows the saved data immediately, marked by the offline banner; its last-updated time is one tap away on the banner.
 4. Device reconnects; System replaces the saved data with fresh data.
 
 ### Scenarios
 
 | Scenario ID | Given | When | Then | Notes |
 |---|---|---|---|---|
-| S-OFF-15 | User used the app online, then closed it | User opens it offline | Home shows Wallets, balances, Budgets and recent Transactions from saved data; banner shows the last-updated time | Core O2 |
+| S-OFF-15 | User used the app online, then closed it | User opens it offline | Home shows Wallets, balances, Budgets and recent Transactions from saved data; the banner opens the last-updated time | Core O2 |
 | S-OFF-16 | Saved data exists | User opens Transactions offline | The recent list (first page) is shown; scrolling to older pages shows the offline "no saved data" end state | Only the first page is kept |
 | S-OFF-17 | User A signed in, data saved | A signs out; B signs in on the same device | B never sees A's saved data, not even for a moment | ⚠️ User isolation |
 | S-OFF-18 | User A signs out | — | A's saved data is removed from the device | |
@@ -185,7 +185,7 @@ N/A — no writes.
 - **EC-OFF-07** Saved data is stored unencrypted in the app's private storage, the same exposure the AI Chat thread has today. Accepted for v1 and stated here explicitly; it is removed on sign-out (Out of Scope #7).
 - **EC-OFF-08** If writing saved data fails (storage full), the app keeps working online; offline it simply has less saved data. No error is shown.
 - **EC-OFF-09** When `mobile-account-switch` ships, switching from A to B must keep A's saved data (owned by A) for when A returns, and must not let a write in progress for A land under B.
-- **EC-OFF-10** Saved data is a display convenience: a balance shown from saved data can be out of date. The banner's last-updated time is the User's cue; no figure is ever presented as live while offline.
+- **EC-OFF-10** Saved data is a display convenience: a balance shown from saved data can be out of date. The banner (and the last-updated time it opens) is the User's cue; no figure is ever presented as live while offline.
 
 ### Definition of Done
 - AC-OFF-10: A cold start offline shows the allow-listed data from the last online session, with the last-updated time (S-OFF-15, S-OFF-16).

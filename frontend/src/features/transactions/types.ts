@@ -61,6 +61,18 @@ export interface UpdateTransactionRequest {
   category_id?: string;
   occurred_at?: string;
   note?: string;
+  // Moves a pin the Transaction already has (400 INVALID_INPUT when it has
+  // none — a pin can't be added after creation). place_name is the new
+  // position's area name; omitted/null/"" stores null. Never carries a note —
+  // the pin's note is not changed by this field. Backend:
+  // dto.TransactionLocationMoveRequest.
+  location?: TransactionLocationMove;
+}
+
+export interface TransactionLocationMove {
+  latitude: number;
+  longitude: number;
+  place_name?: string | null;
 }
 
 // Client-side filter state driving GET /transactions' query params —

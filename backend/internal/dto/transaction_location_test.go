@@ -105,10 +105,76 @@ func TestUpdateTransactionRequest_LocationNote(t *testing.T) {
 	if err := validator.New().Struct(UpdateTransactionRequest{LocationNote: &tooLong}); err == nil {
 		t.Fatal("501-char location_note must fail validation")
 	}
+}
 
-	var bad UpdateTransactionRequest
-	if err := DecodeStrict([]byte(`{"location":{"latitude":1,"longitude":2}}`), &bad); err == nil {
-		t.Fatal("coordinates are not editable — a PATCH carrying location must be rejected")
+// PATCH may move an existing pin (2026-10-07): `location` carries the new
+// coordinates and place name, never a note.
+func TestUpdateTransactionRequest_LocationMove(t *testing.T) {
+	var req UpdateTransactionRequest
+	body := `{"location":{"latitude":10.7769,"longitude":106.7009,"place_name":"Quận 1"}}`
+	if err := DecodeStrict([]byte(body), &req); err != nil {
+		t.Fatalf("a PATCH carrying location must be accepted by DecodeStrict, got %v", err)
+	}
+	if req.Location == nil || req.Location.Latitude == nil || *req.Location.Latitude != 10.7769 ||
+		req.Location.Longitude == nil || *req.Location.Longitude != 106.7009 ||
+		req.Location.PlaceName == nil || *req.Location.PlaceName != "Quận 1" {
+		t.Fatalf("location decoded wrong: %+v", req.Location)
+	}
+	if err := validator.New().Struct(req); err != nil {
+		t.Fatalf("a valid move must pass validation, got %v", err)
+	}
+	if !req.HasUpdates() {
+		t.Fatal("a location-only PATCH must count as an update")
+	}
+
+	var noName UpdateTransactionRequest
+	if err := DecodeStrict([]byte(`{"location":{"latitude":0,"longitude":0,"place_name":null}}`), &noName); err != nil {
+		t.Fatalf("place_name is optional and nullable, got %v", err)
+	}
+	if err := validator.New().Struct(noName); err != nil {
+		t.Fatalf("0,0 without a place name must pass, got %v", err)
+	}
+}
+
+// The note keeps its own field (location_note). DecodeStrict's
+// DisallowUnknownFields reaches nested objects, so `location.note` is a 400.
+func TestUpdateTransactionRequest_LocationMoveRejectsNote(t *testing.T) {
+	var req UpdateTransactionRequest
+	err := DecodeStrict([]byte(`{"location":{"latitude":1,"longitude":2,"note":"cổng xanh"}}`), &req)
+	if err == nil || !strings.Contains(err.Error(), `unknown field "note"`) {
+		t.Fatalf("a note inside location must be rejected as an unknown field, got %v", err)
+	}
+}
+
+func TestUpdateTransactionRequest_LocationMoveValidation(t *testing.T) {
+	longName := strings.Repeat("ồ", 201)
+	cases := []struct {
+		name      string
+		move      TransactionLocationMoveRequest
+		wantField string // "" = must pass
+	}{
+		{"exact bounds", TransactionLocationMoveRequest{Latitude: float64Ptr(-90), Longitude: float64Ptr(180)}, ""},
+		{"latitude above 90", TransactionLocationMoveRequest{Latitude: float64Ptr(90.5), Longitude: float64Ptr(0)}, "Latitude"},
+		{"longitude below -180", TransactionLocationMoveRequest{Latitude: float64Ptr(0), Longitude: float64Ptr(-180.1)}, "Longitude"},
+		{"latitude missing", TransactionLocationMoveRequest{Longitude: float64Ptr(106.7)}, "Latitude"},
+		{"longitude missing", TransactionLocationMoveRequest{Latitude: float64Ptr(10.7)}, "Longitude"},
+		{"place_name over 200 chars", TransactionLocationMoveRequest{Latitude: float64Ptr(1), Longitude: float64Ptr(2), PlaceName: &longName}, "PlaceName"},
+	}
+	v := validator.New()
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			move := tc.move
+			err := v.Struct(UpdateTransactionRequest{Location: &move})
+			if tc.wantField == "" {
+				if err != nil {
+					t.Fatalf("expected pass, got %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.wantField) {
+				t.Fatalf("expected a failure on %s, got %v", tc.wantField, err)
+			}
+		})
 	}
 }
 

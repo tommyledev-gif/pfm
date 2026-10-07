@@ -10,8 +10,11 @@ interface LocationMapProps {
   coords: Coordinates;
   // Given: the pin follows a tap on the map or a drag of the pin itself — a
   // fix taken indoors can be a street off. Omitted: a still preview, and a
-  // tap opens the spot in Google Maps.
+  // tap opens the spot in Google Maps — unless `pannable`.
   onMove?: (coords: Coordinates) => void;
+  // Without onMove: a live map to look around in (pan, zoom) whose pin stays
+  // exactly where it is — viewing a saved spot, not editing it.
+  pannable?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -20,7 +23,7 @@ const ZOOM_DELTA = 0.004;
 
 // Callers remount it (`key`) for a new fix: the region is only the initial one,
 // so a pin the User moves never yanks the camera after it.
-export function LocationMap({ coords, onMove, style }: LocationMapProps) {
+export function LocationMap({ coords, onMove, pannable = false, style }: LocationMapProps) {
   const colors = useColors();
   const styles = useStyles();
 
@@ -34,13 +37,17 @@ export function LocationMap({ coords, onMove, style }: LocationMapProps) {
     );
   }
 
-  const interactive = Boolean(onMove);
+  const editable = Boolean(onMove);
+  const interactive = editable || pannable;
   return (
     <View style={[styles.frame, style]}>
       <MapView
         style={styles.map}
         initialRegion={{ ...coords, latitudeDelta: ZOOM_DELTA, longitudeDelta: ZOOM_DELTA }}
-        onPress={(e) => (onMove ? onMove(e.nativeEvent.coordinate) : openInGoogleMaps(coords))}
+        onPress={(e) => {
+          if (onMove) onMove(e.nativeEvent.coordinate);
+          else if (!pannable) openInGoogleMaps(coords);
+        }}
         scrollEnabled={interactive}
         zoomEnabled={interactive}
         rotateEnabled={false}
@@ -52,7 +59,7 @@ export function LocationMap({ coords, onMove, style }: LocationMapProps) {
       >
         <Marker
           coordinate={coords}
-          draggable={interactive}
+          draggable={editable}
           onDragEnd={(e) => onMove?.(e.nativeEvent.coordinate)}
         />
       </MapView>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Animated, Pressable, ScrollView, Text, View } from "react-native";
 
-import { Fab, useFabClearance } from "@/components/ui/Fab";
+import { useFabClearance } from "@/components/ui/Fab";
 import { CalendarIcon } from "@/components/ui/Icon";
 import { CategoryPickerDrawer } from "@/components/shared/CategoryPickerDrawer";
 import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
@@ -18,13 +18,15 @@ import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { Budget } from "@/features/budgets/types";
 import { currentMonthPace } from "@/features/budgets/budget-pace";
 import { useBudgetRows } from "@/features/budgets/hooks/use-budget-rows";
-import { BudgetFilterChips, BudgetFilterKey } from "@/features/budgets/components/BudgetFilterChips";
+import { BUDGET_FILTERS, BudgetFilterChips, BudgetFilterKey } from "@/features/budgets/components/BudgetFilterChips";
+import { BudgetsFab } from "@/features/budgets/components/BudgetsFab";
 import { BudgetCardSkeleton } from "@/features/budgets/components/BudgetCardSkeleton";
 import { BudgetListRow } from "@/features/budgets/components/BudgetListRow";
 import { BudgetMonthSummary } from "@/features/budgets/components/BudgetMonthSummary";
 import { BudgetPreset, BudgetsEmptyState } from "@/features/budgets/components/BudgetsEmptyState";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { CategoryTransactionsDialog } from "@/features/reports/components/CategoryTransactionsDialog";
+import { usePeriodSlide } from "@/features/reports/hooks/use-period-slide";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { primaryCurrency } from "@/features/wallets/wallet-totals";
 
@@ -69,6 +71,9 @@ export function BudgetsTab({ initialRange, rangeNonce, onOpenBudgetWizard }: Bud
   // figure the bar showed, rather than re-deriving it and risking disagreement.
   const [detailRow, setDetailRow] = useState<{ budget: Budget; limit: Budget["limits"][number] } | null>(null);
   const [filter, setFilter] = useState<BudgetFilterKey>("all");
+  // The rows slide in from the side of the chip the User moved to — the same
+  // motion Home's Ngày / Tháng / Năm tabs use.
+  const filterSlide = usePeriodSlide(BUDGET_FILTERS.findIndex((f) => f.key === filter));
 
   // Wallets and categories are refreshed alongside the budgets themselves:
   // the primary currency the whole tab is scaled to comes from wallets, and
@@ -78,6 +83,8 @@ export function BudgetsTab({ initialRange, rangeNonce, onOpenBudgetWizard }: Bud
 
   const scrollRef = useRef<ScrollView>(null);
   const rowOffsets = useRef<Record<string, number>>({});
+  // Row offsets are measured inside the sliding wrapper; this is its own top.
+  const rowsTop = useRef(0);
 
   const categoryById = useMemo(() => new Map(categories.data?.map((c) => [c.id, c])), [categories.data]);
   const currency: WalletCurrency = (wallets.data ? primaryCurrency(wallets.data) : undefined) ?? "VND";
@@ -113,7 +120,7 @@ export function BudgetsTab({ initialRange, rangeNonce, onOpenBudgetWizard }: Bud
     setFilter("all");
     setHighlightedBudgetId(row.budget.id);
     const y = rowOffsets.current[row.budget.id];
-    if (y !== undefined) scrollRef.current?.scrollTo({ y: Math.max(y - spacing.md, 0), animated: true });
+    if (y !== undefined) scrollRef.current?.scrollTo({ y: Math.max(rowsTop.current + y - spacing.md, 0), animated: true });
   };
 
   // Budgets are monthly, so an unfiltered view drills into the current
@@ -188,47 +195,44 @@ export function BudgetsTab({ initialRange, rangeNonce, onOpenBudgetWizard }: Bud
 
             <BudgetFilterChips value={filter} onChange={setFilter} counts={counts} />
 
-            {visibleRows.length === 0 ? (
-              <Text style={styles.empty}>
-                {rows.length === 0 ? "Chưa có ngân sách nào — nhấn + để tạo." : "Không có ngân sách nào trong nhóm này."}
-              </Text>
-            ) : (
-              visibleRows.map(({ budget, limit, periodElapsed }) => (
-                <View
-                  key={`${budget.id}-${limit.currency}`}
-                  onLayout={(e) => {
-                    rowOffsets.current[budget.id] = e.nativeEvent.layout.y;
-                  }}
-                >
-                  <BudgetListRow
-                    budget={budget}
-                    limit={limit}
-                    periodElapsed={periodElapsed}
-                    category={categoryById.get(budget.category_id)}
-                    highlighted={highlightedBudgetId === budget.id}
-                    onPress={() => {
-                      setHighlightedBudgetId(null);
-                      setEditingBudget(budget);
-                      setModalOpen(true);
+            <Animated.View style={filterSlide} onLayout={(e) => (rowsTop.current = e.nativeEvent.layout.y)}>
+              {visibleRows.length === 0 ? (
+                <Text style={styles.empty}>
+                  {rows.length === 0 ? "Chưa có ngân sách nào — nhấn + để tạo." : "Không có ngân sách nào trong nhóm này."}
+                </Text>
+              ) : (
+                visibleRows.map(({ budget, limit, periodElapsed }) => (
+                  <View
+                    key={`${budget.id}-${limit.currency}`}
+                    onLayout={(e) => {
+                      rowOffsets.current[budget.id] = e.nativeEvent.layout.y;
                     }}
-                    onHold={() => setPickerOpen(true)}
-                    onPressBar={() => setDetailRow({ budget, limit })}
-                  />
-                </View>
-              ))
-            )}
+                  >
+                    <BudgetListRow
+                      budget={budget}
+                      limit={limit}
+                      periodElapsed={periodElapsed}
+                      category={categoryById.get(budget.category_id)}
+                      highlighted={highlightedBudgetId === budget.id}
+                      onPress={() => {
+                        setHighlightedBudgetId(null);
+                        setEditingBudget(budget);
+                        setModalOpen(true);
+                      }}
+                      onHold={() => setPickerOpen(true)}
+                      onPressBar={() => setDetailRow({ budget, limit })}
+                    />
+                  </View>
+                ))
+              )}
+            </Animated.View>
           </>
         )}
       </ScrollView>
 
-      {/* Floating over the list rather than a header button: the list is the
-          whole screen now, and "add" shouldn't cost a row of it. The shared
-          Fab, not a hand-placed one: Insights' body runs to the bottom of the
-          screen, under the floating BottomNav, and a button pinned 16px off
-          that bottom sat behind the nav. Fab lifts itself clear of the nav
-          and the safe-area inset. `right: 0` because Insights already pads
-          its sides — the same 20px from the edge as Transactions' Fab. */}
-      <Fab onPress={() => openNew()} accessibilityLabel="Thêm ngân sách" testID="btn-new-budget" style={styles.fab} />
+      {/* `right: 0` because Insights already pads its sides — the same 20px
+          from the edge as Transactions' Fab. */}
+      <BudgetsFab onOpenWizard={onOpenBudgetWizard} onCreate={() => openNew()} style={styles.fab} />
 
       <BudgetFormModal
         visible={modalOpen}

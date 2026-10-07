@@ -175,6 +175,7 @@ export function RecordingPane({
         onOpenBudgetWizard={handleOpenWizard}
         onOpenManualEntry={handleOpenManualEntry}
         onCreateWallet={handleCreateWallet}
+        onOpenWalletCreator={openWalletCreator}
       />
     ),
     [
@@ -190,6 +191,7 @@ export function RecordingPane({
       handleOpenWizard,
       handleOpenManualEntry,
       handleCreateWallet,
+      openWalletCreator,
     ],
   );
 

@@ -1,3 +1,5 @@
+import { toMajorUnits } from "@/lib/currency";
+
 const DIGIT_WORDS = ["không", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín"];
 
 // "mốt/tư/lăm" replace "một/bốn/năm" once a nonzero tens digit precedes them
@@ -83,4 +85,18 @@ export function numberToWordsVi(value: number): string {
 
   const result = parts.join(" ");
   return value < 0 ? `âm ${result}` : result;
+}
+
+// What the spelled-out amount ends with — the unit, read the way it is said.
+// A currency without a word here ends with its code ("… EUR").
+const CURRENCY_WORDS: Record<string, string> = { VND: "đồng", USD: "đô la Mỹ" };
+
+/**
+ * An amount in cents, spelled out in Vietnamese with its currency at the end:
+ * "một triệu năm trăm nghìn đồng". The figure above it already shows "₫";
+ * the words used to stop at the number, so the line read as if it had no unit.
+ */
+export function amountInWordsVi(amountCents: number, currency: string): string {
+  const code = currency.toUpperCase();
+  return `${numberToWordsVi(toMajorUnits(amountCents))} ${CURRENCY_WORDS[code] ?? code}`;
 }

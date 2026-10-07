@@ -7,6 +7,7 @@ import { Screen } from "@/components/shared/Screen";
 import { dayLabelVi, formatDateViShort } from "@/lib/format-date";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { AuditLogRow } from "@/features/audit-logs/components/AuditLogRow";
+import { AuditLogsEmptyState } from "@/features/audit-logs/components/AuditLogsEmptyState";
 import { useAuditLogsQuery } from "@/features/audit-logs/api/use-audit-logs-query";
 import { AuditLogEntry } from "@/features/audit-logs/types";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
@@ -110,11 +111,7 @@ export default function AuditLogsScreen() {
               resolveWalletName={(id) => walletNameById.get(id) ?? "Ví"}
             />
           )}
-          ListEmptyComponent={
-            <Text testID="empty-audit-logs" style={styles.empty}>
-              Chưa có thay đổi nào được ghi nhận.
-            </Text>
-          }
+          ListEmptyComponent={<AuditLogsEmptyState />}
           ListFooterComponent={
             auditLogs.isFetchingNextPage ? <ActivityIndicator color={colors.green} style={styles.loader} /> : null
           }
@@ -142,5 +139,4 @@ const useStyles = createStyles((colors) => ({
   dayHeaderTitle: { ...typography.label, color: colors.textPrimary },
   dayHeaderDate: { ...typography.tiny, color: colors.textMuted },
   loader: { marginVertical: spacing.lg },
-  empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xxl },
 }));

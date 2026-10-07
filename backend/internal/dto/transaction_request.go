@@ -39,10 +39,12 @@ type CreateTransactionRequest struct {
 	// (200) instead of creating a duplicate.
 	IdempotencyKey *uuid.UUID `json:"idempotency_key"`
 	// Location is the optional map pin the Transaction was recorded at — any
-	// type may carry one. Omitted or null means no location. Fixed once
-	// created: only its note is editable afterwards (UpdateTransactionRequest.
-	// LocationNote). No tag needed: validator dives into a non-nil pointer to
-	// a struct and skips a nil one.
+	// type may carry one. Omitted or null means no location — and then the
+	// Transaction can never gain one later. Afterwards PATCH can move the pin
+	// (UpdateTransactionRequest.Location) and edit its note
+	// (UpdateTransactionRequest.LocationNote), but never add or remove it.
+	// No tag needed: validator dives into a non-nil pointer to a struct and
+	// skips a nil one.
 	Location *TransactionLocationRequest `json:"location"`
 }
 
@@ -60,6 +62,19 @@ type TransactionLocationRequest struct {
 	Note      *string  `json:"note" validate:"omitempty,max=500"`
 }
 
+// TransactionLocationMoveRequest is UpdateTransactionRequest.location: a new
+// position for a pin the Transaction already has. Same field rules as
+// TransactionLocationRequest, minus `note` — the note keeps its own PATCH
+// field (location_note), and DecodeStrict rejects a `note` key in here
+// (encoding/json's DisallowUnknownFields applies to nested objects too).
+// PlaceName is the area name for the NEW position; absent, null, empty or
+// whitespace-only all store NULL, because the old pin's name would be wrong.
+type TransactionLocationMoveRequest struct {
+	Latitude  *float64 `json:"latitude" validate:"required,gte=-90,lte=90"`
+	Longitude *float64 `json:"longitude" validate:"required,gte=-180,lte=180"`
+	PlaceName *string  `json:"place_name" validate:"omitempty,max=200"`
+}
+
 // UpdateTransactionRequest is the body of PATCH /transactions/{id}.
 // Deliberately has no wallet_id or type field at the type level (spec.md:
 // "never accepted by this endpoint" — Context #5) — decoded via
@@ -72,11 +87,16 @@ type UpdateTransactionRequest struct {
 	CategoryID *uuid.UUID `json:"category_id"`
 	OccurredAt *string    `json:"occurred_at"`
 	Note       *string    `json:"note" validate:"omitempty,max=500"`
-	// LocationNote edits the note on the Transaction's location — the only
-	// part of a location that can change after creation (coordinates and
-	// place_name never can). Absent (or null) leaves it unchanged, a
-	// non-empty string sets it, "" clears it. Rejected by the service when
-	// the Transaction has no location.
+	// Location moves the Transaction's existing pin (coordinates + place
+	// name). Absent (or null) leaves the pin unchanged — null does NOT remove
+	// it. Rejected by the service when the Transaction has no location: a pin
+	// can be moved, never added or removed after creation. The pin's note is
+	// untouched by this field; it changes only through LocationNote.
+	Location *TransactionLocationMoveRequest `json:"location"`
+	// LocationNote edits the note on the Transaction's location, independently
+	// of Location. Absent (or null) leaves it unchanged, a non-empty string
+	// sets it, "" clears it. Rejected by the service when the Transaction has
+	// no location.
 	LocationNote *string `json:"location_note" validate:"omitempty,max=500"`
 }
 
@@ -84,7 +104,8 @@ type UpdateTransactionRequest struct {
 // is a client mistake (400), not a no-op 200 (spec.md S-TRX-46). A
 // location_note of "" counts: clearing the note is an update.
 func (r UpdateTransactionRequest) HasUpdates() bool {
-	return r.Amount != nil || r.CategoryID != nil || r.OccurredAt != nil || r.Note != nil || r.LocationNote != nil
+	return r.Amount != nil || r.CategoryID != nil || r.OccurredAt != nil || r.Note != nil ||
+		r.Location != nil || r.LocationNote != nil
 }
 
 // ListTransactionsQuery is the query-string binding for GET /transactions.

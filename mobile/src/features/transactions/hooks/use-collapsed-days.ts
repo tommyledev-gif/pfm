@@ -1,30 +1,19 @@
 import { useState } from "react";
-import { LayoutAnimation } from "react-native";
 
-import { useReduceMotion } from "@/lib/use-reduce-motion";
-
-// One short motion for a day folding or unfolding: its rows, and every later
-// day sliding to its new place. Shared with the header's chevron so the two
-// move as one.
-export const DAY_TOGGLE_ANIMATION_MS = 220;
-
-const DAY_TOGGLE_ANIMATION = LayoutAnimation.create(
-  DAY_TOGGLE_ANIMATION_MS,
-  LayoutAnimation.Types.easeInEaseOut,
-  LayoutAnimation.Properties.opacity,
-);
+// One motion for a day folding or unfolding: its rows easing shut (see
+// CollapsibleRow), and every later day sliding to its new place. Shared with
+// the header's chevron so the two move as one.
+export const DAY_TOGGLE_ANIMATION_MS = 260;
 
 /**
  * Which days of the Transactions list are folded, and the toggle that folds
- * them — animated, unless the OS asks for reduced motion, in which case the
- * change is instant (a faster movement is still movement).
+ * them. The motion itself lives in CollapsibleRow and the day header, each
+ * honouring the OS's reduced-motion setting.
  */
 export function useCollapsedDays() {
-  const reduceMotion = useReduceMotion();
   const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set());
 
   const toggleDay = (dayKey: string) => {
-    if (!reduceMotion) LayoutAnimation.configureNext(DAY_TOGGLE_ANIMATION);
     setCollapsedDays((prev) => {
       const next = new Set(prev);
       if (next.has(dayKey)) next.delete(dayKey);

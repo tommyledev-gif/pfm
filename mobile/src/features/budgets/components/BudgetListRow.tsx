@@ -1,6 +1,7 @@
 import { Animated, Pressable, Text, View } from "react-native";
 
 import { formatCurrency } from "@/lib/currency";
+import { formatPercent } from "@/lib/percent";
 import { useHoldProgress } from "@/lib/use-hold-progress";
 import { withAlpha } from "@/lib/color";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
@@ -101,7 +102,7 @@ export function BudgetListRow({
             times (385% — đã vượt, vượt 5.280.000 đ, 7.130.000 / 1.850.000). */}
         <View style={styles.footRow}>
           <Text style={[styles.caption, { color: status.over ? colors.danger : status.color }]} numberOfLines={1}>
-            {status.percent}% · {status.over ? "Vượt" : "Còn"} {formatCurrency(Math.abs(status.remaining), limit.currency)}
+            {formatPercent(status.ratio * 100)} · {status.over ? "Vượt" : "Còn"} {formatCurrency(Math.abs(status.remaining), limit.currency)}
           </Text>
           <Text style={styles.amounts} numberOfLines={1}>
             Hạn mức: {formatCurrency(limit.amount_limit, limit.currency)}

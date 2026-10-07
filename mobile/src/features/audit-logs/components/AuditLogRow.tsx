@@ -4,6 +4,7 @@ import { formatCurrency } from "@/lib/currency";
 import { formatDateShort, formatTime } from "@/lib/format-date";
 import { colors, radii, spacing, typography, createStyles } from "@/lib/theme";
 import { AuditAction, AuditLogEntry, AuditSnapshot } from "@/features/audit-logs/types";
+import { formatCoordinates } from "@/features/transactions/location/map-support";
 
 const ACTION_LABEL: Record<AuditAction, string> = {
   create: "Tạo",
@@ -26,7 +27,20 @@ const FIELD_LABEL: Record<string, string> = {
   note: "Ghi chú",
   wallet_id: "Ví",
   type: "Loại",
+  location: "Vị trí",
+  location_note: "Ghi chú vị trí",
 };
+
+// A moved pin is logged as {latitude, longitude, place_name}: read as its
+// area's name, or its coordinates when it has none.
+function formatPin(value: object): string {
+  const pin = value as { latitude?: unknown; longitude?: unknown; place_name?: unknown };
+  if (typeof pin.place_name === "string" && pin.place_name) return pin.place_name;
+  if (typeof pin.latitude === "number" && typeof pin.longitude === "number") {
+    return formatCoordinates({ latitude: pin.latitude, longitude: pin.longitude });
+  }
+  return "—";
+}
 
 interface AuditLogRowProps {
   entry: AuditLogEntry;
@@ -57,6 +71,8 @@ export function AuditLogRow({ entry, resolveCategoryName, resolveWalletName, cur
         return formatDateShort(String(value));
       case "type":
         return value === "income" ? "Thu" : "Chi";
+      case "location":
+        return typeof value === "object" ? formatPin(value) : String(value);
       default:
         return String(value);
     }

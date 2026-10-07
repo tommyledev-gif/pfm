@@ -225,6 +225,24 @@ func (f *fakeTransactionRepo) UpdateTransaction(_ context.Context, _ pgx.Tx, arg
 		}
 		t.Location = &loc
 	}
+	// Mirrors the real move: non-nil lat/lng replace the position, and the
+	// place name with it ("" = NULL). Like the real query it does not check
+	// for an existing pin — rejecting a move on a pin-less Transaction is the
+	// service's job, so a test asserting that rejection exercises the service.
+	if arg.LocationLat != nil && arg.LocationLng != nil {
+		loc := model.TransactionLocation{}
+		if t.Location != nil {
+			loc = *t.Location
+		}
+		loc.Latitude = *arg.LocationLat
+		loc.Longitude = *arg.LocationLng
+		loc.PlaceName = nil
+		if arg.LocationName != nil && *arg.LocationName != "" {
+			name := *arg.LocationName
+			loc.PlaceName = &name
+		}
+		t.Location = &loc
+	}
 	t.UpdatedAt = time.Now().UTC()
 	cp := *t
 	return &cp, nil

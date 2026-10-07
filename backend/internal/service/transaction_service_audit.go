@@ -97,9 +97,10 @@ func auditSnapshot(t *model.Transaction) map[string]any {
 // which DTO fields were supplied, not on whether the value actually differs:
 // re-submitting an identical value is still logged (spec.md S-TAL-07, an
 // explicit assumption flagged in that spec's Open Questions #1).
-// locationNote is the normalized value actually written (nil = not in this
-// PATCH, "" = cleared), so a clear is logged as `null`, matching the column.
-func auditUpdateDiff(existing *model.Transaction, req dto.UpdateTransactionRequest, occurredAt *time.Time, locationNote *string) (map[string]any, map[string]any) {
+// location carries the normalized values actually written (nil parts = not
+// in this PATCH): a location_note clear ("") is logged as `null`, matching
+// the column, and a pin move as before/after `location` objects.
+func auditUpdateDiff(existing *model.Transaction, req dto.UpdateTransactionRequest, occurredAt *time.Time, location locationUpdate) (map[string]any, map[string]any) {
 	before := map[string]any{}
 	after := map[string]any{}
 
@@ -123,19 +124,35 @@ func auditUpdateDiff(existing *model.Transaction, req dto.UpdateTransactionReque
 		}
 		after["note"] = *req.Note
 	}
-	// Keyed on the PATCH field name, like the others. The service has already
-	// rejected a location_note on a Transaction with no location, so
+	// Keyed on the PATCH field names, like the others. The service has already
+	// rejected location/location_note on a Transaction with no location, so
 	// existing.Location is non-nil here.
-	if locationNote != nil && existing.Location != nil {
+	if location.Note != nil && existing.Location != nil {
 		before["location_note"] = nullableAuditString(existing.Location.Note)
-		if *locationNote == "" {
+		if *location.Note == "" {
 			after["location_note"] = nil
 		} else {
-			after["location_note"] = *locationNote
+			after["location_note"] = *location.Note
 		}
+	}
+	// Same keys as auditSnapshot's `location`, minus `note` — a move never
+	// touches the note, which is logged under location_note when it changes.
+	if move := location.Move; move != nil && existing.Location != nil {
+		before["location"] = auditPin(existing.Location.Latitude, existing.Location.Longitude, existing.Location.PlaceName)
+		after["location"] = auditPin(move.Latitude, move.Longitude, move.PlaceName)
 	}
 
 	return before, after
+}
+
+// auditPin renders a pin's position the way the API's `location` object
+// does; a nil place name marshals as null.
+func auditPin(latitude, longitude float64, placeName *string) map[string]any {
+	return map[string]any{
+		"latitude":   latitude,
+		"longitude":  longitude,
+		"place_name": nullableAuditString(placeName),
+	}
 }
 
 // nullableAuditString renders a *string as its value, or a JSON null.

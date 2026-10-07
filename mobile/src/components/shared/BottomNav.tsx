@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 
 import { BarChartIcon, HomeIcon, ListIcon, SparkleIcon, UserIcon } from "@/components/ui/Icon";
+import { NavBallLight } from "@/components/shared/NavBallLight";
 import { useColors } from "@/lib/theme";
 import {
   BALL_SIZE,
@@ -252,6 +253,8 @@ export function BottomNav() {
           <Path d={RIM_PATH} stroke={colors.navBorder} strokeWidth={HAIRLINE} fill="none" />
         </Svg>
       </Animated.View>
+      {/* Over the hollow and its rim, under the ball that casts it. */}
+      <NavBallLight ballX={ballX} bob={bob} opacity={ballOpacity} />
       <Animated.View
         pointerEvents="none"
         style={[

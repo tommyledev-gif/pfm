@@ -181,6 +181,7 @@ export function useTransactionForm({ visible, onClose, editingTransaction, editi
               occurred_at: occurredAt,
               note: note || undefined,
               location_note: location.locationNoteUpdate(),
+              location: location.locationMoveUpdate(),
             },
           },
           { onSuccess: onClose },

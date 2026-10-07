@@ -85,6 +85,10 @@ export interface ChatMessage {
   // error string, since the user was already mid-flow trying to log
   // something.
   offerManualEntry?: boolean;
+  // Set client-side (reply-fanout.ts) on the backend's "create a wallet
+  // first" reply — renders a button that opens the new-wallet form, and the
+  // reply's text is the app's own copy rather than the backend's.
+  offerCreateWallet?: boolean;
   // specs/ai-budget-wizard/spec.md US-02 — set on an assistant reply carrying
   // action_type: "budget_wizard"; renders BudgetWizardCard instead of a plain
   // bubble. budgetWizardSubmitted/budgetWizardCreatedCount are client-side

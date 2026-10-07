@@ -22,28 +22,45 @@ function localeFor(currency: string): string {
   return currency.toUpperCase() === "VND" ? VND_LOCALE : FOREIGN_LOCALE;
 }
 
+// ⚠️ Both answers below are fixed per currency, and each costs an
+// Intl.NumberFormat — slow on Hermes for Android, very slow until its ICU has
+// warmed up. The keypad asks for them on every press, so they are worked out
+// once per currency and kept (see lib/currency.ts's formatCache, same reason).
+const decimalsCache = new Map<string, number>();
+const separatorsCache = new Map<string, { group: string; decimal: string }>();
+
 /** How many decimals an amount in `currency` may have: VND 0, USD 2 — never more than the API's cents. */
 export function currencyDecimals(currency: string): number {
   const code = currency.toUpperCase();
+  const cached = decimalsCache.get(code);
+  if (cached !== undefined) return cached;
   let decimals = FALLBACK_DECIMALS[code] ?? DEFAULT_DECIMALS;
   try {
     decimals = new Intl.NumberFormat(FOREIGN_LOCALE, { style: "currency", currency: code }).resolvedOptions().maximumFractionDigits ?? decimals;
   } catch {
     // Unknown code or no Intl: keep the fallback.
   }
-  return Math.min(decimals, API_MINOR_DIGITS);
+  const result = Math.min(decimals, API_MINOR_DIGITS);
+  decimalsCache.set(code, result);
+  return result;
 }
 
 function separators(currency: string): { group: string; decimal: string } {
+  const code = currency.toUpperCase();
+  const cached = separatorsCache.get(code);
+  if (cached) return cached;
+  let result: { group: string; decimal: string };
   try {
     const parts = new Intl.NumberFormat(localeFor(currency)).formatToParts(1000.5);
-    return {
+    result = {
       group: parts.find((p) => p.type === "group")?.value ?? ",",
       decimal: parts.find((p) => p.type === "decimal")?.value ?? ".",
     };
   } catch {
-    return currency.toUpperCase() === "VND" ? { group: ".", decimal: "," } : { group: ",", decimal: "." };
+    result = code === "VND" ? { group: ".", decimal: "," } : { group: ",", decimal: "." };
   }
+  separatorsCache.set(code, result);
+  return result;
 }
 
 /** One operand, grouped — a trailing "." is kept, so "1,000." still shows its point. */

@@ -5,7 +5,16 @@ import { useRouter } from "expo-router";
 import { EmptyIllustration } from "@/components/shared/EmptyIllustration";
 import { EmptyStateCard } from "@/components/shared/EmptyState";
 import { Chip } from "@/components/ui/Chip";
-import { CloseIcon, PlusIcon, ReceiptIcon, SearchIcon, SparkleIcon, TagIcon, WalletIcon } from "@/components/ui/Icon";
+import {
+  ChevronRightIcon,
+  CloseIcon,
+  PlusIcon,
+  ReceiptIcon,
+  SearchIcon,
+  SparkleIcon,
+  TagIcon,
+  WalletIcon,
+} from "@/components/ui/Icon";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useTransactionsQuery } from "@/features/transactions/api/use-transactions-query";
 import { Transaction } from "@/features/transactions/types";
@@ -147,6 +156,7 @@ interface ShortcutTileProps {
 }
 
 function ShortcutTile({ icon, eyebrow, label, onPress }: ShortcutTileProps) {
+  const colors = useColors();
   const styles = useStyles();
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}>
@@ -159,15 +169,17 @@ function ShortcutTile({ icon, eyebrow, label, onPress }: ShortcutTileProps) {
           {label}
         </Text>
       </View>
+      <ChevronRightIcon size={16} color={colors.textMuted} />
     </Pressable>
   );
 }
 
 const useStyles = createStyles((colors) => ({
   stack: { gap: spacing.md, marginTop: spacing.sm },
-  tiles: { flexDirection: "row", gap: spacing.md },
+  // Stacked, one shortcut per row — side by side, each label had half the
+  // width and was cut off on a narrow phone.
+  tiles: { gap: spacing.sm },
   tile: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,

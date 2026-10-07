@@ -1,118 +1,151 @@
-import { useEffect, useState } from "react";
-import { Text, View } from "react-native";
-import { useQueryClient } from "@tanstack/react-query";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useEffect, useRef, useState } from "react";
+import { AccessibilityInfo, Pressable, Text } from "react-native";
+import { useIsFocused } from "@react-navigation/native";
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
-import { BALL_TOP, PILL_HEIGHT } from "@/components/shared/bottom-nav-styles";
-import { useIsOnline } from "@/lib/connectivity";
-import { OFFLINE_BANNER_SHOW_DELAY_MS } from "@/lib/constants";
-import { formatTime } from "@/lib/format-date";
-import { createStyles, radii, spacing, typography } from "@/lib/theme";
+import { OfflineInfoSheet } from "@/components/shared/OfflineInfoSheet";
+import { CheckIcon, ChevronRightIcon, WifiOffIcon } from "@/components/ui/Icon";
+import { withAlpha } from "@/lib/color";
+import { ConnectionStripState, useConnectionStrip } from "@/lib/connection-strip";
+import { createStyles, spacing, typography, useColors } from "@/lib/theme";
+import { useReduceMotion } from "@/lib/use-reduce-motion";
 import { useOutboxCount } from "@/stores/outbox-store";
 import { useCurrentUserId } from "@/stores/use-current-user-id";
 
-interface OfflineBannerProps {
-  // Whether the BottomNav is currently rendered beneath the banner.
-  navVisible: boolean;
-  // Dock under the status bar instead of at the bottom — for screens whose
-  // own input floats right above the nav (AI Chat), where a bottom banner
-  // would sit on top of it.
-  dockTop: boolean;
-}
+const STRIP_HEIGHT = 28;
+const RESIZE_MS = 220;
 
-const OFFLINE_LABEL = "Đang ngoại tuyến";
-const LAST_UPDATED_LABEL = "dữ liệu lúc";
-const SEPARATOR = " · ";
-const queuedLabel = (count: number) => `${count} giao dịch chờ đồng bộ`;
-// The "last updated" time stands for the whole saved snapshot; Wallets are
-// what every main screen leads with, so their fetch time is the reference.
-const LAST_UPDATED_QUERY_KEY = ["wallets"] as const;
-// The nav's ball rises above the bar's top edge by -BALL_TOP; clear it too.
-const NAV_CLEARANCE = PILL_HEIGHT - BALL_TOP + spacing.xs;
+const OFFLINE_LABEL = "Ngoại tuyến";
+const RECONNECTED_LABEL = "Đã kết nối lại · đang đồng bộ";
+const OPEN_HINT = "Xem dữ liệu cập nhật lúc nào và thao tác nào cần mạng";
 
-// Slim offline pill shown on every signed-in screen (specs/mobile-offline-
-// support US-02, AC-OFF-05) — rendered once in app/(app)/_layout.tsx rather
-// than in each screen, so no screen's own layout changes. Purely
-// informational: pointerEvents "none" so it never swallows a tap meant for
-// the content beneath it.
-export function OfflineBanner({ navVisible, dockTop }: OfflineBannerProps) {
+type VisibleState = Exclude<ConnectionStripState, "hidden">;
+
+/**
+ * The offline strip (specs/mobile-offline-support US-02, AC-OFF-05): a thin
+ * full-width band right under the status bar, in the layout — it pushes the
+ * screen down rather than floating over it. Rendered by Screen.tsx, so every
+ * signed-in screen has it without a line of its own.
+ *
+ * ⚠️ It replaced a floating pill docked above the BottomNav (plan Finding
+ * #12). Offline is a lasting state, not a toast: floating, the pill fought
+ * the Fab and the nav for the same corner, covered the end of every list,
+ * and lost — its right edge sat under the Fab.
+ *
+ * Says only "Ngoại tuyến", plus the waiting count when there is one (S-OFF-13).
+ * A tap opens OfflineInfoSheet with the saved data's time and the actions
+ * that need a network. On reconnect it turns green for a moment, then folds
+ * away by animating its height. Timing (and flapping, EC-OFF-04) is
+ * lib/connection-strip.ts.
+ */
+export function OfflineBanner() {
+  const colors = useColors();
   const styles = useStyles();
-  const insets = useSafeAreaInsets();
-  const isOnline = useIsOnline();
-  const queryClient = useQueryClient();
+  const status = useConnectionStrip();
   const queuedCount = useOutboxCount(useCurrentUserId());
-  const [showOffline, setShowOffline] = useState(false);
+  const focused = useIsFocused();
+  const reduceMotion = useReduceMotion();
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const visible = status !== "hidden";
 
-  const lastUpdatedMs = Math.max(
-    0,
-    ...queryClient.getQueryCache().findAll({ queryKey: LAST_UPDATED_QUERY_KEY }).map((q) => q.state.dataUpdatedAt),
-  );
-  // S-OFF-13: the waiting count joins the line only while there is one.
-  const message = [
-    OFFLINE_LABEL,
-    lastUpdatedMs > 0 ? `${LAST_UPDATED_LABEL} ${formatLastUpdated(lastUpdatedMs)}` : null,
-    queuedCount > 0 ? queuedLabel(queuedCount) : null,
-  ]
-    .filter(Boolean)
-    .join(SEPARATOR);
-  const position = dockTop
-    ? { top: insets.top + spacing.xs }
-    : { bottom: (navVisible ? NAV_CLEARANCE : spacing.sm) + insets.bottom };
+  // What the strip shows while folding away: the last visible state, not an
+  // empty band. Adjusted during render, React's pattern for derived state.
+  const [shown, setShown] = useState<VisibleState>(visible ? status : "offline");
+  if (visible && status !== shown) setShown(status);
+  const offline = shown === "offline";
+  const label = offline
+    ? queuedCount > 0
+      ? `${OFFLINE_LABEL} · ${queuedCount} chờ đồng bộ`
+      : OFFLINE_LABEL
+    : RECONNECTED_LABEL;
 
-  // Shown only once offline has lasted a moment, hidden at once on
-  // reconnect — a flapping connection never makes it flicker (EC-OFF-04).
+  // Starts at its target, so a screen opened while offline has the strip
+  // already in place — only a change of state moves anything.
+  const height = useSharedValue(visible ? STRIP_HEIGHT : 0);
   useEffect(() => {
-    if (isOnline) {
-      setShowOffline(false);
-      return;
-    }
-    const timer = setTimeout(() => setShowOffline(true), OFFLINE_BANNER_SHOW_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, [isOnline]);
+    const target = visible ? STRIP_HEIGHT : 0;
+    height.value = reduceMotion
+      ? target
+      : withTiming(target, { duration: RESIZE_MS, easing: Easing.out(Easing.cubic) });
+  }, [visible, reduceMotion, height]);
+  const heightStyle = useAnimatedStyle(() => ({ height: height.value }));
 
-  if (!showOffline) return null;
+  // The sheet is about being offline — once back online it has nothing to say.
+  useEffect(() => {
+    if (status !== "offline") setSheetOpen(false);
+  }, [status]);
+
+  // Announced, rather than an accessibilityLiveRegion: every mounted screen
+  // has its own strip (tabs stay mounted), so only the focused one may speak,
+  // and only on an actual change — not each time a screen is opened.
+  const previousStatus = useRef(status);
+  useEffect(() => {
+    const changed = previousStatus.current !== status;
+    previousStatus.current = status;
+    if (changed && focused && status !== "hidden") {
+      AccessibilityInfo.announceForAccessibility(status === "offline" ? OFFLINE_LABEL : RECONNECTED_LABEL);
+    }
+  }, [status, focused]);
 
   return (
-    <View style={[styles.wrapper, position]} pointerEvents="none">
-      <View style={styles.pill} testID="banner-offline">
-        <View style={styles.dot} />
-        <Text style={styles.text} numberOfLines={2}>
-          {message}
-        </Text>
-      </View>
-    </View>
+    <>
+      <Animated.View
+        style={[styles.strip, heightStyle]}
+        accessibilityElementsHidden={!visible}
+        importantForAccessibility={visible ? "auto" : "no-hide-descendants"}
+      >
+        <Pressable
+          testID="banner-offline"
+          onPress={() => setSheetOpen(true)}
+          disabled={!offline || !visible}
+          accessibilityRole={offline ? "button" : undefined}
+          accessibilityLabel={label}
+          accessibilityHint={offline ? OPEN_HINT : undefined}
+          style={({ pressed }) => [
+            styles.content,
+            offline ? styles.contentOffline : styles.contentReconnected,
+            pressed && styles.pressed,
+          ]}
+        >
+          {offline ? (
+            <WifiOffIcon size={13} color={colors.textSecondary} />
+          ) : (
+            <CheckIcon size={13} color={colors.green} strokeWidth={2.6} />
+          )}
+          <Text style={[styles.label, !offline && styles.labelReconnected]} numberOfLines={1}>
+            {label}
+          </Text>
+          {offline ? <ChevronRightIcon size={12} color={colors.textMuted} /> : null}
+        </Pressable>
+      </Animated.View>
+      {/* Outside the strip: the strip clips to its own height. */}
+      <OfflineInfoSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} queuedCount={queuedCount} />
+    </>
   );
 }
 
-// "HH:mm" when the data is from today, "dd/MM HH:mm" otherwise — an older
-// snapshot must not read as if it were from this morning.
-function formatLastUpdated(ms: number): string {
-  const date = new Date(ms);
-  const iso = date.toISOString();
-  if (date.toDateString() === new Date().toDateString()) return formatTime(iso);
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  return `${day}/${month} ${formatTime(iso)}`;
-}
-
-const DOT_SIZE = 8;
-
 const useStyles = createStyles((colors) => ({
-  // left/right 0 + alignItems center: an absolute view without an explicit
-  // left is centred by Yoga via the parent's alignment instead.
-  wrapper: { position: "absolute", left: 0, right: 0, alignItems: "center" },
-  pill: {
+  // Clips the content while the height animates, so the band folds shut
+  // instead of squashing its text.
+  strip: { overflow: "hidden" },
+  content: {
+    height: STRIP_HEIGHT,
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
-    maxWidth: "90%",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surfaceRaised,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
+    justifyContent: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.xl,
+    borderBottomWidth: 1,
   },
-  dot: { width: DOT_SIZE, height: DOT_SIZE, borderRadius: DOT_SIZE / 2, backgroundColor: colors.warning },
-  text: { ...typography.caption, color: colors.textPrimary, flexShrink: 1 },
+  // Surface, not a warning colour: switching the network off is something
+  // the User did, not an error — and amber next to the brand green read as
+  // an alarm.
+  contentOffline: { backgroundColor: colors.surface, borderBottomColor: colors.surfaceBorder },
+  contentReconnected: {
+    backgroundColor: withAlpha(colors.green, 0.12),
+    borderBottomColor: withAlpha(colors.green, 0.25),
+  },
+  pressed: { opacity: 0.7 },
+  label: { ...typography.caption, color: colors.textSecondary, flexShrink: 1 },
+  labelReconnected: { color: colors.green },
 }));

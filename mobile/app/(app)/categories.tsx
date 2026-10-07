@@ -45,7 +45,7 @@ export default function CategoriesScreen() {
         <Pressable onPress={() => router.back()} hitSlop={8}>
           <ChevronLeftIcon size={24} />
         </Pressable>
-        <Text style={styles.title}>Categories</Text>
+        <Text style={styles.title}>Danh mục</Text>
         <Pressable
           style={styles.addButton}
           onPress={() => {

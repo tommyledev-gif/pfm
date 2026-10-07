@@ -328,6 +328,12 @@ SET
         WHEN $7::text IS NULL THEN location_note
         ELSE NULLIF($7::text, '')
     END,
+    location_lat  = COALESCE($8::float8, location_lat),
+    location_lng  = COALESCE($9::float8, location_lng),
+    location_name = CASE
+        WHEN $8::float8 IS NULL THEN location_name
+        ELSE NULLIF($10::text, '')
+    END,
     updated_at    = NOW()
 WHERE id = $1
   AND user_id = $2
@@ -346,16 +352,23 @@ type UpdateTransactionParams struct {
 	// LocationNote: nil leaves the column unchanged, "" clears it to NULL,
 	// anything else sets it (026_transactions_location.sql).
 	LocationNote *string
+	// LocationLat/LocationLng: nil leaves the pin unchanged; non-nil (always
+	// both) moves it. LocationName is only read when LocationLat is non-nil:
+	// it replaces location_name, nil or "" storing NULL.
+	LocationLat  *float64
+	LocationLng  *float64
+	LocationName *string
 }
 
 // UpdateTransaction returns every column explicitly — the Scan below includes
 // IdempotencyKey (010_transactions_idempotency_key.sql), ToWalletID
 // (022_transaction_transfer.sql) and the Location* columns
 // (026_transactions_location.sql) as the trailing columns; of those, this
-// statement only ever touches location_note.
+// statement touches only the Location* ones (a pin move and/or its note).
 func (q *Queries) UpdateTransaction(ctx context.Context, arg UpdateTransactionParams) (Transaction, error) {
 	row := q.db.QueryRow(ctx, updateTransaction,
 		arg.ID, arg.UserID, arg.Amount, arg.CategoryID, arg.OccurredAt, arg.Note, arg.LocationNote,
+		arg.LocationLat, arg.LocationLng, arg.LocationName,
 	)
 	var i Transaction
 	err := row.Scan(

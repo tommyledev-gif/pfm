@@ -197,11 +197,11 @@ export function TransactionFormModal({ visible, onClose, editingTransaction, edi
             pinned={location.pinned}
             onPressPinned={() => openLocationStep("adjust")}
           />
-        ) : editingTransaction?.location ? (
+        ) : location.currentSavedPin ? (
           <TransactionLocationCard
-            location={editingTransaction.location}
-            note={location.locationNote}
-            onChangeNote={location.setLocationNote}
+            location={location.currentSavedPin}
+            moved={location.savedPinMoved}
+            onPress={() => openLocationStep("saved")}
           />
         ) : null}
 

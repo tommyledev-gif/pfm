@@ -3,6 +3,7 @@ import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 
 import { formatCurrency, formatCurrencyCompact } from "@/lib/currency";
+import { formatPercent } from "@/lib/percent";
 import { useEntryAnimation } from "@/lib/use-entry-animation";
 import { typography, createStyles } from "@/lib/theme";
 
@@ -266,7 +267,7 @@ export function DonutChart({
             {activeArc.label}
           </Text>
           <Text style={styles.tooltipValue}>
-            {formatCurrency(activeArc.amount, currency)} · {total > 0 ? Math.round((activeArc.amount / total) * 100) : 0}%
+            {formatCurrency(activeArc.amount, currency)} · {formatPercent(total > 0 ? (activeArc.amount / total) * 100 : 0)}
           </Text>
           {onPressDetails ? (
             <Pressable onPress={() => onPressDetails(activeArc.key)} hitSlop={8} testID="btn-donut-tooltip-details">

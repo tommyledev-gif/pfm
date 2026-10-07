@@ -49,9 +49,10 @@ type Transaction struct {
 	Location *TransactionLocation
 }
 
-// TransactionLocation is a map pin plus its optional descriptions. Latitude/
-// Longitude are fixed at creation, as is PlaceName (the reverse-geocoded
-// name); only Note can change afterwards. Coordinates are float64 on purpose:
+// TransactionLocation is a map pin plus its optional descriptions. A pin is
+// set at creation or never; afterwards it can be moved (Latitude/Longitude
+// together with PlaceName, the reverse-geocoded name of the new position) and
+// its Note edited, but not removed. Coordinates are float64 on purpose:
 // they are a measurement, not money, so CLAUDE.md's no-float rule does not
 // apply.
 type TransactionLocation struct {

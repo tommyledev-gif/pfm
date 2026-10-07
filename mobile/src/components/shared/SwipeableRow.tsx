@@ -1,7 +1,8 @@
-import { ReactNode, useEffect } from "react";
+import { ReactNode, useEffect, useMemo } from "react";
 import { Animated, Dimensions, StyleSheet, View } from "react-native";
 
 import { SwipeAction, SwipeActionButton } from "@/components/shared/SwipeActionButton";
+import { SwipeHandle } from "@/components/shared/SwipeHandle";
 import { DELETE_SWIPE_RATIO, EDIT_SWIPE_RATIO, useSwipeActions } from "@/components/shared/use-swipe-actions";
 
 export type { SwipeAction } from "@/components/shared/SwipeActionButton";
@@ -21,6 +22,12 @@ interface SwipeableRowProps {
    * never be left pointing at content that has moved underneath it.
    */
   closeSignal?: number | string;
+  /**
+   * Opt-in: a grip bar at the edge of each side that has an action, so the
+   * row looks draggable before anyone has tried (see SwipeHandle). Off by
+   * default — only lists that need the cue turn it on.
+   */
+  showHandles?: boolean;
 }
 
 /**
@@ -30,7 +37,14 @@ interface SwipeableRowProps {
  * only when that button is tapped, which is what stops an accidental flick
  * from deleting something. See use-swipe-actions for the gesture itself.
  */
-export function SwipeableRow({ children, leftAction, rightAction, disabled, closeSignal }: SwipeableRowProps) {
+export function SwipeableRow({
+  children,
+  leftAction,
+  rightAction,
+  disabled,
+  closeSignal,
+  showHandles = false,
+}: SwipeableRowProps) {
   // A destructive side gets the wider cap so its parked button has room for a
   // label; a plain one keeps the narrower, long-standing feel.
   const leftRatio = leftAction?.destructive ? DELETE_SWIPE_RATIO : EDIT_SWIPE_RATIO;
@@ -42,7 +56,11 @@ export function SwipeableRow({ children, leftAction, rightAction, disabled, clos
     disabled,
   });
 
-  const { close } = swipe;
+  const { close, leftProgress, rightProgress } = swipe;
+  // Only one side ever moves at a time, so the sum is "how far into a swipe,
+  // either way" — both handles fade on any drag.
+  const handleProgress = useMemo(() => Animated.add(leftProgress, rightProgress), [leftProgress, rightProgress]);
+  const handlesHidden = swipe.parkedSide !== null;
   useEffect(() => {
     close();
   }, [closeSignal, close]);
@@ -79,6 +97,13 @@ export function SwipeableRow({ children, leftAction, rightAction, disabled, clos
       ) : null}
       <Animated.View style={{ transform: [{ translateX: swipe.translateX }] }} {...swipe.panHandlers}>
         {children}
+        {/* After the content, so they paint over the card they sit on. */}
+        {showHandles && leftAction ? (
+          <SwipeHandle side="left" destructive={leftAction.destructive} progress={handleProgress} hidden={handlesHidden} />
+        ) : null}
+        {showHandles && rightAction ? (
+          <SwipeHandle side="right" destructive={rightAction.destructive} progress={handleProgress} hidden={handlesHidden} />
+        ) : null}
       </Animated.View>
     </View>
   );

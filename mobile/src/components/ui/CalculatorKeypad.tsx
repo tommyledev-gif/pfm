@@ -1,10 +1,12 @@
-import { ReactNode } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ReactNode, useEffect, useRef } from "react";
+import { ActivityIndicator, Animated, Pressable, Text, View } from "react-native";
 
 import { BackspaceIcon, CalendarIcon, CheckIcon } from "@/components/ui/Icon";
 import { KeypadKey } from "@/lib/calculator/input";
 import { withAlpha } from "@/lib/color";
 import { typography, createStyles, useColors } from "@/lib/theme";
+import { useJsIdle } from "@/lib/use-js-idle";
+import { useReduceMotion } from "@/lib/use-reduce-motion";
 
 const DIGIT_ROWS: { digits: KeypadKey[]; operator: KeypadKey }[] = [
   { digits: ["7", "8", "9"], operator: "+" },
@@ -36,6 +38,7 @@ const KEY_HEIGHT = 48;
 const KEY_RADIUS = 12;
 const GAP = 6;
 const DIGIT_BLOCK_COLUMNS = 4;
+const READY_FADE_MS = 140;
 
 interface CalculatorKeypadProps {
   onInsert: (key: KeypadKey) => void;
@@ -93,6 +96,20 @@ export function CalculatorKeypad({
   const styles = useStyles();
   const keyId = (name: string) => (testID ? `${testID}-key-${name}` : undefined);
 
+  // ⚠️ Shown and enabled only once the JS thread is free. The keypad mounts
+  // with its whole sheet, and a press made while that sheet is still
+  // rendering and settling queues behind it — the first keys felt dropped or
+  // late. Its space is held from the start (only opacity changes), so nothing
+  // shifts when it appears.
+  const ready = useJsIdle();
+  const reduceMotion = useReduceMotion();
+  const opacity = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!ready) return;
+    if (reduceMotion) opacity.setValue(1);
+    else Animated.timing(opacity, { toValue: 1, duration: READY_FADE_MS, useNativeDriver: true }).start();
+  }, [ready, reduceMotion, opacity]);
+
   const digitKey = (key: KeypadKey) => (
     <KeyColumn key={key}>
       <Pressable
@@ -132,7 +149,13 @@ export function CalculatorKeypad({
   const confirmBlocked = confirmDisabled || confirmLoading;
 
   return (
-    <View testID={testID} style={styles.row}>
+    <Animated.View
+      testID={testID}
+      style={[styles.row, { opacity }]}
+      pointerEvents={ready ? "auto" : "none"}
+      accessibilityElementsHidden={!ready}
+      importantForAccessibility={ready ? "auto" : "no-hide-descendants"}
+    >
       <View style={styles.digitBlock}>
         {DIGIT_ROWS.map((row) => (
           <View key={row.operator} style={styles.row}>
@@ -197,7 +220,7 @@ export function CalculatorKeypad({
           )}
         </Pressable>
       </View>
-    </View>
+    </Animated.View>
   );
 }
 

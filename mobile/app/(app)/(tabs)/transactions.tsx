@@ -24,6 +24,7 @@ import { TransactionsListEmpty, TransactionsListFooter } from "@/features/transa
 import { PendingSyncSection } from "@/features/transactions/components/PendingSyncSection";
 import { PendingSyncEditor } from "@/features/transactions/components/PendingSyncEditor";
 import { TransactionDayHeader } from "@/features/transactions/components/TransactionDayHeader";
+import { CollapsibleRow } from "@/features/transactions/components/CollapsibleRow";
 import { useCollapsedDays } from "@/features/transactions/hooks/use-collapsed-days";
 import { useTransactionFilters } from "@/features/transactions/hooks/use-transaction-filters";
 import { TransactionsHeader, TypeFilterValue } from "@/features/transactions/components/TransactionsHeader";
@@ -31,6 +32,9 @@ import { CategoryFilterModal } from "@/features/transactions/components/Category
 import { SortDrawerModal } from "@/features/transactions/components/SortDrawerModal";
 import { isDefaultSort, sortTransactions, SORT_OPTIONS, SortKey } from "@/features/transactions/sort";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
+
+// Between every cell of the list — a folded row cancels it (CollapsibleRow).
+const LIST_GAP = spacing.md;
 
 export default function TransactionsScreen() {
   const styles = useStyles();
@@ -185,19 +189,21 @@ export default function TransactionsScreen() {
         renderSectionHeader={({ section }) =>
           section.dayLabel ? <TransactionDayHeader section={section} onToggle={() => toggleDay(section.key)} /> : null
         }
-        renderItem={({ item }) => (
-          <Pressable
-            onPress={() => {
-              setEditingTransaction(item);
-              setFormOpen(true);
-            }}
-          >
-            <TransactionRow
-              transaction={item}
-              currency={walletCurrencyMap.get(item.wallet_id)}
-              category={categoryById.get(item.category_id)}
-            />
-          </Pressable>
+        renderItem={({ item, section }) => (
+          <CollapsibleRow collapsed={section.collapsed} listGap={LIST_GAP}>
+            <Pressable
+              onPress={() => {
+                setEditingTransaction(item);
+                setFormOpen(true);
+              }}
+            >
+              <TransactionRow
+                transaction={item}
+                currency={walletCurrencyMap.get(item.wallet_id)}
+                category={categoryById.get(item.category_id)}
+              />
+            </Pressable>
+          </CollapsibleRow>
         )}
         ListEmptyComponent={
           <TransactionsListEmpty
@@ -265,5 +271,5 @@ export default function TransactionsScreen() {
 
 const useStyles = createStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bgApp },
-  content: { paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: 140, gap: spacing.md },
+  content: { paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: 140, gap: LIST_GAP },
 }));

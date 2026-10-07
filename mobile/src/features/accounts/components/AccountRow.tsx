@@ -1,8 +1,10 @@
 import { Pressable, Text, View } from "react-native";
 
 import { Avatar } from "@/components/ui/Avatar";
+import { TrashIcon } from "@/components/ui/Icon";
 import { colorForCategory } from "@/lib/category-color";
-import { createStyles, spacing, typography } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { createStyles, radii, spacing, typography, useColors } from "@/lib/theme";
 import { accountDisplayName, isAccountExpired } from "@/features/accounts/account-registry-store";
 import { SavedAccount } from "@/features/accounts/types";
 
@@ -20,10 +22,12 @@ export const ACCOUNT_STATUS_COPY = {
   active: "Đang dùng",
   expired: "Đã hết hạn — đăng nhập lại",
 } as const;
+// Spoken by screen readers only — the button itself is a trash icon.
 const REMOVE_LABEL = "Gỡ khỏi thiết bị";
 
 /** One saved account in the switch dialog / login chooser (spec US-02 step 4). */
 export function AccountRow({ account, isActive, onPress, onRemove, testID }: AccountRowProps) {
+  const colors = useColors();
   const styles = useStyles();
   const expired = !isActive && isAccountExpired(account);
   const status = isActive ? ACCOUNT_STATUS_COPY.active : expired ? ACCOUNT_STATUS_COPY.expired : null;
@@ -55,9 +59,11 @@ export function AccountRow({ account, isActive, onPress, onRemove, testID }: Acc
           onPress={() => onRemove(account)}
           hitSlop={8}
           accessibilityRole="button"
+          accessibilityLabel={REMOVE_LABEL}
           testID={`btn-account-remove-${account.userId}`}
+          style={({ pressed }) => [styles.remove, pressed && styles.removePressed]}
         >
-          <Text style={styles.remove}>{REMOVE_LABEL}</Text>
+          <TrashIcon size={18} color={colors.peach} />
         </Pressable>
       ) : null}
     </View>
@@ -72,5 +78,13 @@ const useStyles = createStyles((colors) => ({
   email: { ...typography.caption, color: colors.textSecondary },
   status: { ...typography.tiny, color: colors.mustard },
   statusActive: { color: colors.green },
-  remove: { ...typography.caption, color: colors.textSecondary },
+  remove: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: withAlpha(colors.peach, 0.12),
+  },
+  removePressed: { opacity: 0.7 },
 }));

@@ -8,6 +8,7 @@ import { Screen } from "@/components/shared/Screen";
 import { WALLET_TYPES, WalletType } from "@/lib/constants";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
+import { useRequireOnline } from "@/lib/connectivity";
 import { isWaitingForNetwork } from "@/lib/query-status";
 import { useHighlightFade } from "@/lib/use-highlight-fade";
 import { useUiPrefsStore, WalletsViewMode } from "@/stores/ui-prefs-store";
@@ -19,6 +20,7 @@ import { WalletCarousel } from "@/features/wallets/components/WalletCarousel";
 import { WalletFormModal } from "@/features/wallets/components/WalletFormModal";
 import { WalletListItem } from "@/features/wallets/components/WalletListItem";
 import { WalletRecentTransactions } from "@/features/wallets/components/WalletRecentTransactions";
+import { WalletsEmptyState } from "@/features/wallets/components/WalletsEmptyState";
 
 const TYPE_LABEL: Record<WalletType, string> = {
   cash: "Tiền mặt",
@@ -97,11 +99,17 @@ export default function WalletsScreen() {
   }, [wallets.data]);
 
   const activeWallet = wallets.data?.find((w) => w.id === activeWalletId) ?? wallets.data?.[0] ?? null;
+  // Only once loaded — never while loading or waiting offline, which keep
+  // their own skeleton / placeholder.
+  const isEmpty = wallets.isSuccess && wallets.data.length === 0;
 
   const openEditor = (wallet: Wallet | null) => {
     setEditingWallet(wallet);
     setModalOpen(true);
   };
+  // A new wallet can only be saved online — say so at the tap, not at save.
+  const requireOnline = useRequireOnline();
+  const openCreator = () => requireOnline(() => openEditor(null));
 
   useEffect(() => {
     if (create) openEditor(null);
@@ -139,14 +147,19 @@ export default function WalletsScreen() {
           <ChevronLeftIcon size={24} />
         </Pressable>
         <Text style={styles.title}>Ví tiền</Text>
-        <Pressable style={styles.addButton} onPress={() => openEditor(null)} hitSlop={8}>
+        <Pressable style={styles.addButton} onPress={openCreator} hitSlop={8}>
           <PlusIcon size={16} color={colors.onGreen} />
         </Pressable>
       </View>
 
-      <SegmentedTabs style={styles.modeTabs} options={VIEW_MODES} value={viewMode} onChange={setViewMode} />
+      {/* Two ways of looking at nothing is not a choice worth offering. */}
+      {isEmpty ? null : (
+        <SegmentedTabs style={styles.modeTabs} options={VIEW_MODES} value={viewMode} onChange={setViewMode} />
+      )}
 
-      {viewMode === "carousel" ? (
+      {isEmpty ? (
+        <WalletsEmptyState onCreate={openCreator} />
+      ) : viewMode === "carousel" ? (
         <View style={styles.cardsView}>
           {/* Pinned under the tabs, outside any scroll: the carousel used to
               sit in a vertically centred ScrollView, so every height change in
@@ -219,7 +232,6 @@ export default function WalletsScreen() {
               highlightOpacity={item.id === highlightWalletId ? highlightOpacity : undefined}
             />
           )}
-          ListEmptyComponent={<Text style={styles.empty}>Chưa có ví nào — nhấn + để tạo ví mới.</Text>}
         />
       )}
 
@@ -270,5 +282,4 @@ const useStyles = createStyles((colors) => ({
     letterSpacing: 0.6,
   },
   sectionHeaderCount: { ...typography.tiny, color: colors.textMuted },
-  empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
 }));
