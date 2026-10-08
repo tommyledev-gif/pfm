@@ -133,8 +133,9 @@ export const HomeSnapshotCard = memo(function HomeSnapshotCard({
               style={[styles.trendLabel, { color: spentDelta > 0 ? colors.peach : colors.green }]}
               numberOfLines={1}
             >
-              {spentDelta > 0 ? "Nhiều hơn " : spentDelta < 0 ? "Ít hơn " : "Bằng "}
-              {formatCurrency(Math.abs(spentDelta), currency)} so với {previousPeriodLabel}
+              {spentDelta === 0
+                ? `Bằng ${previousPeriodLabel}`
+                : `${spentDelta > 0 ? "Nhiều hơn" : "Ít hơn"} ${formatCurrency(Math.abs(spentDelta), currency)} so với ${previousPeriodLabel}`}
             </Text>
           </View>
 

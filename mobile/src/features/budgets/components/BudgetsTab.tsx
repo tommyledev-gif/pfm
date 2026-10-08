@@ -171,7 +171,7 @@ export function BudgetsTab({ initialRange, rangeNonce, onOpenBudgetWizard }: Bud
               </Pressable>
               {rangeActive ? (
                 <Pressable onPress={() => setDateRange({})} hitSlop={8}>
-                  <Text style={styles.rangeClear}>Xoá lọc</Text>
+                  <Text style={styles.rangeClear}>Xóa bộ lọc</Text>
                 </Pressable>
               ) : null}
             </View>
@@ -198,7 +198,7 @@ export function BudgetsTab({ initialRange, rangeNonce, onOpenBudgetWizard }: Bud
             <Animated.View style={filterSlide} onLayout={(e) => (rowsTop.current = e.nativeEvent.layout.y)}>
               {visibleRows.length === 0 ? (
                 <Text style={styles.empty}>
-                  {rows.length === 0 ? "Chưa có ngân sách nào — nhấn + để tạo." : "Không có ngân sách nào trong nhóm này."}
+                  {rows.length === 0 ? `Chưa có ngân sách bằng ${currency}.` : "Không có ngân sách nào trong nhóm này."}
                 </Text>
               ) : (
                 visibleRows.map(({ budget, limit, periodElapsed }) => (

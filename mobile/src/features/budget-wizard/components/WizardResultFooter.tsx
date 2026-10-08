@@ -51,7 +51,7 @@ export function WizardResultFooter({
           style={[styles.ghostBtn, planSaved && styles.ghostBtnDone]}
         >
           <Text style={[styles.ghostLabel, planSaved && styles.ghostLabelDone]} numberOfLines={2}>
-            {planSaved ? "✓ Đã lưu kế hoạch" : "Lưu kế hoạch này để dùng lại"}
+            {planSaved ? "Đã lưu kế hoạch" : "Lưu để dùng sau"}
           </Text>
         </Pressable>
 
@@ -61,7 +61,7 @@ export function WizardResultFooter({
           disabled={submitting || !canSubmit}
           style={[styles.primaryBtn, (submitting || !canSubmit) && styles.primaryBtnDisabled]}
         >
-          <Text style={styles.primaryLabel}>{submitting ? "Đang lưu…" : "Bắt đầu dùng"}</Text>
+          <Text style={styles.primaryLabel}>{submitting ? "Đang lưu…" : "Áp dụng ngân sách"}</Text>
         </Pressable>
       </View>
 
@@ -73,9 +73,9 @@ export function WizardResultFooter({
           before. */}
       <ConfirmDialog
         visible={overwriteConfirmOpen && hasExistingBudgets}
-        title="Bạn đã có ngân sách"
-        message="Kế hoạch này sẽ thay thế toàn bộ ngân sách hiện tại của bạn. Các hạn mức cũ sẽ không khôi phục được."
-        confirmLabel="Ghi đè"
+        title="Thay ngân sách hiện tại?"
+        message="Mọi ngân sách hiện tại sẽ bị thay bằng kế hoạch này. Không thể hoàn tác."
+        confirmLabel="Thay ngân sách"
         onCancel={onCancelOverwrite}
         onConfirm={() => requireOnline(onConfirmOverwrite)}
         loading={submitting}

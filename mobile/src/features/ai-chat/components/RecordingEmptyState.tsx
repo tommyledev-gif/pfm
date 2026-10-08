@@ -1,15 +1,18 @@
 import { Text, View, ViewProps } from "react-native";
 
-import { EmptyIllustration } from "@/components/shared/EmptyIllustration";
 import { EmptyStateCard } from "@/components/shared/EmptyState";
+import { ThemedIllustration } from "@/components/shared/ThemedIllustration";
 import { Chip } from "@/components/ui/Chip";
-import { SparkleIcon, WalletIcon } from "@/components/ui/Icon";
+import { WalletIcon } from "@/components/ui/Icon";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useNeedsFirstWallet, useOpenWalletCreator } from "@/features/wallets/use-open-wallet-creator";
 
 // One of each shape the parser handles: an expense with a wallet named, a
 // bare expense, and an income — tapping one fills the input, never sends.
 const EXAMPLES = ["Cà phê 50k tiền mặt", "Ăn trưa 45k", "Nhận lương 15tr"];
+// The robot art is nearly square: at full card width it took most of the
+// thread's height and pushed the examples down behind the composer.
+const AI_CHAT_ART_MAX_WIDTH = 220;
 
 interface RecordingEmptyStateProps extends Pick<ViewProps, "style" | "onLayout"> {
   /** Puts the example into the input, for the User to send or edit. */
@@ -33,21 +36,17 @@ export function RecordingEmptyState({ onPickExample, style, onLayout }: Recordin
   return (
     <View style={[styles.container, style]} onLayout={onLayout} testID="empty-chat-recording">
       <EmptyStateCard
-        illustration={
-          <EmptyIllustration size={112}>
-            <SparkleIcon size={28} />
-          </EmptyIllustration>
-        }
+        illustration={<ThemedIllustration name="aiChat" maxWidth={AI_CHAT_ART_MAX_WIDTH} />}
         title="Ghi giao dịch bằng một câu"
         description={
           needsWallet
-            ? "Bạn chưa có ví nào — giao dịch cần một ví để được lưu vào. Tạo ví trước, rồi quay lại nhắn cho mình nhé."
-            : "Cho mình biết bạn đã chi hay thu gì — mình sẽ soạn sẵn giao dịch để bạn xác nhận."
+            ? "Chưa có ví. Tạo ví để ghi giao dịch."
+            : "Nhắn khoản vừa chi hoặc thu. Giao dịch chỉ lưu khi bạn bấm Lưu."
         }
         action={
           needsWallet
             ? {
-                label: "Tạo ví trước",
+                label: "Tạo ví",
                 icon: <WalletIcon size={18} color={colors.onGreen} />,
                 onPress: openWalletCreator,
                 testID: "btn-chat-empty-create-wallet",

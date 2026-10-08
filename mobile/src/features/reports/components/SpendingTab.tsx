@@ -63,7 +63,14 @@ export function SpendingTab({ focusCategoryId, focusNonce, onOpenBudgets }: Spen
   }
   if (isWaitingForNetwork(summary)) return <OfflinePlaceholder />;
   if (!summary.data) {
-    return <Text style={styles.empty}>Không thể tải báo cáo.</Text>;
+    return (
+      <View style={styles.loadError}>
+        <Text style={styles.empty}>Chưa tải được báo cáo.</Text>
+        <Pressable onPress={() => summary.refetch()} hitSlop={8} testID="btn-spending-retry">
+          <Text style={styles.retry}>Thử lại</Text>
+        </Pressable>
+      </View>
+    );
   }
 
   const { range, totals, by_category } = summary.data;
@@ -250,6 +257,8 @@ const useStyles = createStyles((colors) => ({
   statValue: { ...typography.cardTitle },
   donutCard: { alignItems: "center", paddingVertical: spacing.xl, gap: spacing.sm },
   budgetHint: { ...typography.tiny, color: colors.textMuted, textAlign: "center" },
-  empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
+  loadError: { alignItems: "center", gap: spacing.sm, marginTop: spacing.xl },
+  empty: { ...typography.label, color: colors.textSecondary, textAlign: "center" },
+  retry: { ...typography.label, color: colors.green },
   emptyScroll: { paddingBottom: 140 },
 }));

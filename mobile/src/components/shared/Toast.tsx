@@ -3,6 +3,7 @@ import { Animated, Dimensions, PanResponder, Pressable, Text, View } from "react
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CloseIcon } from "@/components/ui/Icon";
+import { withAlpha } from "@/lib/color";
 import { colors, radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useToastStore, type ToastVariant } from "@/stores/toast-store";
 
@@ -132,7 +133,7 @@ export function Toast() {
       <Animated.View
         style={[
           styles.card,
-          { borderLeftColor: VARIANT_ACCENT[variant], transform: [{ translateX }, { translateY }] },
+          { borderColor: withAlpha(VARIANT_ACCENT[variant], 0.45), transform: [{ translateX }, { translateY }] },
         ]}
         {...panResponder.panHandlers}
       >
@@ -160,9 +161,10 @@ const useStyles = createStyles((colors) => ({
     alignItems: "center",
     gap: spacing.md,
     backgroundColor: colors.surface,
+    // The variant is carried by one even border all the way round, softened —
+    // not a thick accent stripe down the left edge, which is the stock
+    // "alert" look and read as decoration rather than as part of the card.
     borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    borderLeftWidth: 4,
     borderRadius: radii.listCard,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,

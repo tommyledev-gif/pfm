@@ -1,8 +1,8 @@
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
-const TITLE = "Đang ngoại tuyến";
+const TITLE = "Không có kết nối mạng";
 const MESSAGE =
-  "Trợ lý cần kết nối mạng để đọc tin nhắn. Bạn có thể nhập giao dịch này thủ công — nội dung vừa gõ sẽ được điền sẵn, giao dịch được lưu trên máy và tự đồng bộ khi có mạng.";
+  "Trợ lý cần mạng để đọc tin nhắn. Nhập thủ công thì giao dịch lưu trên máy và tự đồng bộ khi có mạng.";
 const CONFIRM_LABEL = "Nhập thủ công";
 
 interface OfflineManualEntryDialogProps {

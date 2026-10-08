@@ -1,3 +1,13 @@
+# PFM — Agent Notes
+
+Project rules live in `CLAUDE.md`. Keep anything added here ABOVE the GitNexus block below: that block is regenerated wholesale by `npx gitnexus analyze`.
+
+## UX copy (user-facing text)
+
+Before writing or changing any text a user can see, read `.claude/skills/pfm-ux-copy/SKILL.md`, then the reference it names for the case (`references/vi-style.md`, `patterns.md`, `glossary.md`, `llm-runtime-prompt.md`). This applies to labels, buttons, titles, empty states, errors, toasts, dialogs, placeholders, `accessibilityLabel`, push/notification text, backend `message` strings that reach the UI, and AI-service replies and prompts. It does not apply to code comments, specs, docs, or commit messages.
+
+The `UX Copy` section of `CLAUDE.md` lists the non-negotiables. Neither client has an i18n layer yet (strings are hardcoded Vietnamese), so write the VI string in place; the skill's locale-file rules and `scripts/lint_copy.py` apply only once locale files exist.
+
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 

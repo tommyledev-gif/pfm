@@ -115,6 +115,21 @@ Wallet balance update và transaction insert luôn trong **cùng 1 DB transactio
 - TypeScript: `const` by default, không dùng `any`.
 - Go: wrap error với context — `fmt.Errorf("service.Create: %w", err)`.
 - SQL: viết trong `.sql` file → sqlc gen. Không raw string query trong Go.
+- Mọi chữ user nhìn thấy theo skill `pfm-ux-copy` — xem mục **UX Copy** bên dưới.
+
+## UX Copy (user-facing text)
+
+Every string a user can see follows the `pfm-ux-copy` skill — `.claude/skills/pfm-ux-copy/SKILL.md` (source archive: `docs/pfm-ux-copywriting.skill`). That covers labels, buttons, titles, empty states, errors, toasts, confirm dialogs, placeholders, `accessibilityLabel`, push/notification text, backend `message` strings that reach the UI, and AI-service replies and their prompts. Load the skill before writing or changing any of these, then the reference it names for the case at hand: `vi-style.md` (banned words, before/after), `patterns.md` (per component), `glossary.md` (terms), `llm-runtime-prompt.md` (AI replies).
+
+Non-negotiables (the skill has the full list and the reasoning):
+- Facts first; one string = one idea = one next action. Title + button must make sense on their own.
+- None of: "—", "!", emoji, "nhé/nha/ạ", "Vui lòng", "Rất tiếc", "Oops", "thành công", "Bạn có thể…/Hãy…", "chúng tôi", or marketing words (thông minh, hành trình, đồng hành, tối ưu…).
+- Buttons name what happens on tap ("Xóa giao dịch" / "Giữ lại"), never "Có/Không".
+- Errors say what failed + what to do + the money/data state; "Số dư chưa thay đổi" only when the write is atomic.
+- One concept = one word per `glossary.md` (a wallet is always "ví", never "nguồn tiền"/"tài khoản"). New terms go into the glossary first.
+- Money and dates go through the shared formatters (`formatCurrency`, the format-date helpers) — never hand-written "đ", "VNĐ", "k", "1/10".
+
+Current reality: neither client has an i18n layer — strings are Vietnamese, hardcoded in components. Until one is adopted, write the VI string in place (no EN needed); the skill's locale-key/plural rules and `scripts/lint_copy.py` apply only once locale files exist. Adopting i18next is its own decision, not something to start inside a feature.
 
 ## MVP Features
 
@@ -152,7 +167,7 @@ Full spec: `api-spec/openapi.yaml`
 /renew-docs ← sync docs/architecture.md + docs/tech_stacks.md theo code thực tế
 
 
-Skill definitions: `.claude/skills/agents/{ba,plan,dev,qc}.md`
+Skill definitions: `.claude/skills/agents/{ba,plan,dev,qc}.md` · UX copy: `.claude/skills/pfm-ux-copy/`
 
 ## Git
 

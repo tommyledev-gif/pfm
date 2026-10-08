@@ -11,7 +11,7 @@
 // this file has to change with it, or screen 1 promises a figure screen 3 then
 // contradicts.
 
-import { floorToPerDayStep } from "@/lib/currency";
+import { floorToPerDayStep, formatCurrency } from "@/lib/currency";
 
 // ---------------------------------------------------------------------------
 // Constants — all xu. Mirrors common/budget_wizard_v2.go.
@@ -123,25 +123,25 @@ export type IncomeValidation =
  */
 export function validateIncomeStep(incomeXu: number, fixedXu: number, savingsXu: number): IncomeValidation {
   if (incomeXu <= 0) {
-    return { ok: false, field: "income", message: "Thu nhập phải lớn hơn 0." };
+    return { ok: false, field: "income", message: "Nhập thu nhập lớn hơn 0." };
   }
   if (incomeXu > INCOME_CAP_XU) {
     // Names the ceiling: "the maximum the app supports" gave no number to act on.
-    return { ok: false, field: "income", message: "Thu nhập tối đa là 10 tỷ đ." };
+    return { ok: false, field: "income", message: `Thu nhập tối đa ${formatCurrency(INCOME_CAP_XU)}.` };
   }
   const disposable = disposableXu(incomeXu, fixedXu, savingsXu);
   if (disposable <= 0) {
     return {
       ok: false,
       field: "fixed",
-      message: "Chi phí cố định và tiết kiệm đã vượt thu nhập. Bạn xem lại giúp nhé.",
+      message: "Chi phí cố định và tiết kiệm vượt thu nhập. Giảm một trong hai khoản.",
     };
   }
   if (disposable < MIN_VIABLE_DISPOSABLE_XU) {
     return {
       ok: false,
       field: "fixed",
-      message: "Số còn lại quá nhỏ để chia thành các danh mục. Bạn giảm bớt tiết kiệm hoặc chi phí cố định nhé.",
+      message: "Phần còn lại quá ít để chia theo danh mục. Giảm tiết kiệm hoặc chi phí cố định.",
     };
   }
   return { ok: true };

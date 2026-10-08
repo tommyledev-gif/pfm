@@ -68,13 +68,12 @@ export function HomeOnboardingCard({ hasWallet, hasTransaction, hasBudget, onAdd
             accessible={false}
           />
         }
-        eyebrow="Khởi đầu tài chính thông minh"
-        title="Sẵn sàng kiểm soát chi tiêu"
-        description="Thiết lập 3 bước để bắt đầu sử dụng PFM."
+        title="Biết tiền đi đâu"
+        description="Ghi thu chi, đặt ngân sách theo danh mục."
       />
 
       <View style={styles.journeyHeader}>
-        <Text style={styles.journeyTitle}>Đang ở bước {completed}/3</Text>
+        <Text style={styles.journeyTitle}>Xong {completed}/3 bước</Text>
       </View>
 
       <View style={styles.steps}>
@@ -139,7 +138,7 @@ function StepRow({ step, index, onPress }: { step: OnboardingStep; index: number
               style={[styles.badgeLabel, isActive || isDone ? styles.badgeLabelGreen : styles.badgeLabelMuted]}
               numberOfLines={1}
             >
-              {isActive ? "Cần làm" : isDone ? "Hoàn thành" : `Bước ${index + 1}`}
+              {isActive ? "Cần làm" : isDone ? "Xong" : `Bước ${index + 1}`}
             </Text>
           </View>
         </View>

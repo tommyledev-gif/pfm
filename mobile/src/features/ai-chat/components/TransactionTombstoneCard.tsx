@@ -24,7 +24,7 @@ interface TransactionTombstoneCardProps {
 // does not exist.
 const KIND_LABEL: Record<TombstoneKind, string> = {
   deleted: "Đã xóa giao dịch",
-  discarded: "Đã bỏ — chưa từng lưu",
+  discarded: "Đã bỏ, chưa lưu",
 };
 
 /**

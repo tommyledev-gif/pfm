@@ -68,7 +68,7 @@ export function BudgetMonthSummary({
           {formatCurrency(Math.abs(remaining), currency)}
         </Text>
         <Text style={styles.amountSuffix}>
-          {over ? "vượt trên hạn mức " : "còn lại trên hạn mức "}
+          {over ? "vượt hạn mức " : "còn lại trong hạn mức "}
           <Text style={styles.amountLimit}>{formatCurrency(totalLimit, currency)}</Text>
         </Text>
       </View>
@@ -77,7 +77,7 @@ export function BudgetMonthSummary({
 
       {someOver ? (
         <Text style={styles.overNote}>
-          {overCount} danh mục đã vượt hạn mức — tổng vẫn còn nhờ các danh mục khác.
+          {overCount} danh mục đã vượt hạn mức. Tổng vẫn còn nhờ các mục khác.
         </Text>
       ) : null}
 

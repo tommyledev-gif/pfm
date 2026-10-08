@@ -1,7 +1,7 @@
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 
 import { Avatar } from "@/components/ui/Avatar";
-import { CheckIcon } from "@/components/ui/Icon";
+import { CalendarIcon, CheckIcon } from "@/components/ui/Icon";
 import { colorForCategory } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
 import { formatDateShort } from "@/lib/format-date";
@@ -26,8 +26,11 @@ interface PendingReviewCardProps {
 // One proposal on the pending-review screen.
 //
 // Kept to what a decision needs: what it is, where the money moves, how much
-// — on one row — and two small actions under it. Tapping anywhere else on the
-// card edits it. The earlier version stacked a tag, a status line, a boxed
+// — on one row — and, under it, when it happened on the left with the two
+// small actions on the right. The date used to trail the wallet in the meta
+// line, where it was truncated first on a long note and sat in a different
+// place on every card; on the action row it lines up down the whole list and
+// fills space that was empty. Tapping anywhere else on the card edits it. The earlier version stacked a tag, a status line, a boxed
 // note row, a trash tile and a full-width "Duyệt chi tiêu (-50.000 đ)"
 // button per card, so three proposals already filled the screen with chrome.
 export function PendingReviewCard({
@@ -73,7 +76,7 @@ export function PendingReviewCard({
           <Text style={styles.meta} numberOfLines={1}>
             {/* The category only repeats here when the note took the title slot. */}
             {payload.note ? `${categoryName} · ` : ""}
-            {walletName} · {formatDateShort(payload.occurred_at)}
+            {walletName}
           </Text>
         </View>
         <Text style={[styles.amount, { color: isIncome ? colors.green : colors.textPrimary }]} numberOfLines={1}>
@@ -83,6 +86,12 @@ export function PendingReviewCard({
       </View>
 
       <View style={styles.actions}>
+        <View style={styles.date}>
+          <CalendarIcon size={13} color={colors.textMuted} />
+          <Text style={styles.dateLabel} numberOfLines={1}>
+            {formatDateShort(payload.occurred_at)}
+          </Text>
+        </View>
         <Pressable
           style={({ pressed }) => [styles.action, styles.dismiss, pressed && styles.actionPressed]}
           onPress={onRemove}
@@ -130,7 +139,11 @@ const useStyles = createStyles((colors) => ({
   // Expenses stay in plain text colour: a list where every amount is red reads
   // as an alarm, and the sign already says which way the money goes.
   amount: { ...typography.body, fontWeight: "700" },
-  actions: { flexDirection: "row", justifyContent: "flex-end", gap: spacing.sm },
+  actions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  // flex: 1 pushes the two actions to the right edge; minWidth 0 lets the
+  // date shrink before they do on a narrow phone.
+  date: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 6 },
+  dateLabel: { ...typography.caption, fontWeight: "500", color: colors.textSecondary, flexShrink: 1 },
   action: {
     minWidth: 84,
     height: 34,

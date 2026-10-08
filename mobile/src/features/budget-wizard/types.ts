@@ -124,7 +124,7 @@ export const PRESET_OPTIONS: { key: PresetKey; icon: string; label: string; desc
     key: "couple_no_kids",
     icon: "💑",
     label: "Vợ chồng son",
-    description: "Hai người, chưa có con — ăn ngoài và đi chơi nhiều hơn.",
+    description: "Hai người, chưa có con. Ăn ngoài và đi chơi nhiều hơn.",
   },
   {
     key: "own_family",
@@ -173,20 +173,20 @@ export function confidenceBadge(source: IntentSource): ConfidenceBadge {
     case "manual":
       return {
         level: 3,
-        label: "bạn đã nói",
-        explanation: "Con số này là của bạn — bạn đã tự nhập hoặc tự sửa nó, nên tôi không đoán gì cả.",
+        label: "bạn tự đặt",
+        explanation: "Số do bạn nhập hoặc sửa, không phải ước lượng.",
       };
     case "history":
       return {
         level: 2,
         label: "từ lịch sử chi tiêu",
-        explanation: "Tính từ các giao dịch bạn đã ghi trước đây, nên khá gần thực tế của bạn.",
+        explanation: "Tính từ giao dịch đã ghi, nên sát với chi tiêu thật.",
       };
     default:
       return {
         level: 1,
         label: "ước lượng",
-        explanation: "Chỉ dựa trên kiểu sống bạn chọn, chưa dựa trên chi tiêu thật. Bạn sửa lại bất cứ lúc nào.",
+        explanation: "Dựa trên kiểu sống đã chọn, chưa dựa trên chi tiêu thật. Sửa lại bất cứ lúc nào.",
       };
   }
 }

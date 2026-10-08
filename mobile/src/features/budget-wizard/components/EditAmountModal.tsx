@@ -67,9 +67,9 @@ export function EditAmountModal({
       <DrawerHeader
         title={categoryName}
         actions={[
-          { label: "Huỷ", onPress: onClose, variant: "secondary" },
+          { label: "Hủy", onPress: onClose, variant: "secondary" },
           {
-            label: "Xác nhận",
+            label: "Lưu",
             onPress: () => onConfirm(clamped),
             variant: "primary",
             testID: "btn-wizard-amount-confirm",
@@ -99,7 +99,7 @@ export function EditAmountModal({
         </View>
 
         <View style={styles.meta}>
-          <Text style={styles.metaLabel}>🛟 Dự phòng còn lại</Text>
+          <Text style={styles.metaLabel}>Dự phòng còn lại</Text>
           {/* Amber, never red — this is a tight constraint, not a fault. */}
           <Text style={[styles.metaValue, bufferAfter <= 0 && styles.metaValueTight]}>
             {formatCurrency(Math.max(bufferAfter, 0), currency)}

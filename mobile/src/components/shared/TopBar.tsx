@@ -40,7 +40,9 @@ const useStyles = createStyles((colors) => ({
     justifyContent: "space-between",
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
+    // No bottom padding: Home's header stack spaces its blocks with its own
+    // `gap`, and padding here stacked on top of that (plus the period tabs'
+    // old marginTop) left 44px between the bar and the tabs under it.
   },
   logo: { ...typography.cardTitle, color: colors.textPrimary, letterSpacing: 0.5 },
   actions: { flexDirection: "row", alignItems: "center", gap: spacing.lg },

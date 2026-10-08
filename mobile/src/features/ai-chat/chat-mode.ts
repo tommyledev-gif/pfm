@@ -52,7 +52,7 @@ export const CHAT_MODE_META: Record<ChatMode, ChatModeMeta> = {
     label: "Ghi giao dịch",
     shortLabel: "Giao dịch",
     // No voice input exists, so the copy promises typing only.
-    description: "Ghi chi tiêu, thu nhập nhanh chỉ bằng một câu.",
+    description: "Ghi khoản thu chi bằng một câu.",
     placeholder: "Mô tả một giao dịch…",
     icon: ReceiptIcon,
     get tint() { return colors.green; },
@@ -61,7 +61,7 @@ export const CHAT_MODE_META: Record<ChatMode, ChatModeMeta> = {
   budget: {
     label: "Lập ngân sách",
     shortLabel: "Ngân sách",
-    description: "Tạo kế hoạch tài chính thông minh dựa trên thói quen của bạn.",
+    description: "Chia thu nhập thành hạn mức theo danh mục.",
     placeholder: "Mô tả một giao dịch…",
     icon: TargetIcon,
     get tint() { return colors.lavender; },
@@ -70,8 +70,8 @@ export const CHAT_MODE_META: Record<ChatMode, ChatModeMeta> = {
   consult: {
     label: "Hỏi phân tích",
     shortLabel: "Phân tích",
-    description: "Nhận phân tích sâu về thói quen chi tiêu của bạn.",
-    placeholder: "Hỏi về chi tiêu của bạn…",
+    description: "Hỏi tháng này chi bao nhiêu, mục nào nhiều nhất.",
+    placeholder: "Hỏi về chi tiêu…",
     icon: InsightIcon,
     get tint() { return colors.mint; },
     get accentTo() { return colors.info; },

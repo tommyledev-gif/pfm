@@ -141,7 +141,7 @@ function WalletCarouselView({
   const cardMotion = useCardMotion(rendered.length, scrollX);
 
   if (wallets.length === 0) {
-    return <Text style={styles.empty}>Chưa có ví nào — thêm một ví để bắt đầu.</Text>;
+    return <Text style={styles.empty}>Chưa có ví. Tạo ví để ghi giao dịch.</Text>;
   }
 
   return (

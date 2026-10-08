@@ -1,7 +1,7 @@
 import { Pressable, ScrollView, Text, View } from "react-native";
 
 import { CheckIcon } from "@/components/ui/Icon";
-import { WizardAmbientGlow } from "@/features/budget-wizard/components/WizardAmbientGlow";
+import { EmojiGlyph } from "@/components/ui/EmojiGlyph";
 import { PRESET_OPTIONS, PresetKey } from "@/features/budget-wizard/types";
 import { withAlpha } from "@/lib/color";
 import { colors, radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
@@ -28,6 +28,11 @@ const PRESET_TINT: Record<PresetKey, string> = {
 };
 
 const ICON_TILE_SIZE = 44;
+// Drawn through EmojiGlyph, the OpenMoji artwork every category icon uses
+// (Avatar → EmojiGlyph), not as a raw emoji in a Text — the device's emoji
+// font made these six look like they belonged to a different app than the
+// category icons on the very next screen. Same ~0.6 of the tile as Avatar.
+const ICON_GLYPH_SIZE = 26;
 // A comfortable row, not a grid cell: the icon, a title and a line of
 // description need vertical room, and six full-width rows are easier to
 // compare than a 2×3 grid where the eye has to travel in two directions.
@@ -55,18 +60,19 @@ const ROW_MIN_HEIGHT = 72;
  * The rows are centred in whatever height is left over rather than pinned
  * under the question: on a tall phone a top-aligned list of six left a block
  * of dead space above the footer and made the screen look unfinished.
+ *
+ * The ambient glow behind this step is drawn by BudgetWizardModal, not here —
+ * see the note there.
  */
 export function WizardStepProfile({ selected, onSelect }: WizardStepProfileProps) {
   const colors = useColors();
   const styles = useStyles();
   return (
     <View style={styles.root}>
-      <WizardAmbientGlow />
-
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.head}>
           <Text style={styles.title}>Bạn đang sống kiểu nào?</Text>
-          <Text style={styles.subtitle}>Tôi sẽ dựng ngân sách khởi điểm từ đây.</Text>
+          <Text style={styles.subtitle}>Ngân sách khởi điểm dựa trên câu trả lời này.</Text>
         </View>
 
         {PRESET_OPTIONS.map((opt) => {
@@ -91,7 +97,7 @@ export function WizardStepProfile({ selected, onSelect }: WizardStepProfileProps
                   active && { backgroundColor: `${tint}26`, borderColor: `${tint}80` },
                 ]}
               >
-                <Text style={styles.icon}>{opt.icon}</Text>
+                <EmojiGlyph emoji={opt.icon} size={ICON_GLYPH_SIZE} />
               </View>
 
               <View style={styles.copy}>
@@ -158,7 +164,6 @@ const useStyles = createStyles((colors) => ({
     alignItems: "center",
     justifyContent: "center",
   },
-  icon: { fontSize: 24 },
   copy: { flex: 1, minWidth: 0, gap: 3 },
   label: { ...typography.body, fontWeight: "700", color: colors.textPrimary },
   description: { ...typography.tiny, color: colors.textSecondary, lineHeight: 15 },

@@ -76,7 +76,7 @@ export function ConsultPane({
           }}
           // No quoted example question here: it would look tappable and is
           // not — the real, tappable ones are the chips right above the input.
-          ListEmptyComponent={<Text style={styles.hint}>Hỏi mình về chi tiêu của bạn, hoặc chọn một gợi ý bên dưới.</Text>}
+          ListEmptyComponent={<Text style={styles.hint}>Hỏi về chi tiêu, ngân sách hoặc ví.</Text>}
           ListHeaderComponent={
             consult.sending ? (
               <View style={[styles.typingRow, consultStyles.typing]}>

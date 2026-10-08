@@ -14,19 +14,19 @@ const STEPS: Omit<OnboardingStep, "status">[] = [
   {
     key: "wallet",
     title: "Thêm ví",
-    description: "Tạo tài khoản ngân hàng, ví điện tử hoặc quỹ tiền mặt đầu tiên.",
+    description: "Tiền mặt, ngân hàng hoặc ví điện tử.",
     cta: "Thêm ví đầu tiên",
   },
   {
     key: "transaction",
     title: "Ghi giao dịch đầu tiên",
-    description: "Ghi chép chi tiêu hằng ngày để bắt đầu đo lường chính xác dòng tiền.",
+    description: "Ghi khoản chi gần nhất, ví dụ bữa trưa hôm nay.",
     cta: "Ghi giao dịch đầu tiên",
   },
   {
     key: "budget",
     title: "Tạo ngân sách",
-    description: "Thiết lập hạn mức chi tiêu định kỳ giúp ngăn chặn chi tiêu quá tay.",
+    description: "Đặt hạn mức theo danh mục để biết tháng này còn chi được bao nhiêu.",
     cta: "Tạo ngân sách",
   },
 ];

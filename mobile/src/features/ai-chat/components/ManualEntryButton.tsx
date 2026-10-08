@@ -9,7 +9,7 @@ export function ManualEntryButton({ onPress }: { onPress: () => void }) {
   const styles = useStyles();
   return (
     <Pressable testID="btn-chat-manual-entry" style={styles.button} onPress={onPress}>
-      <Text style={styles.label}>Tạo giao dịch thủ công</Text>
+      <Text style={styles.label}>Nhập thủ công</Text>
     </Pressable>
   );
 }

@@ -201,8 +201,8 @@ export default function HomeScreen() {
             <View style={styles.section}>
               <View style={styles.sectionHeaderRow}>
                 <View style={styles.sectionTitleRow}>
-                  <Text style={styles.sectionTitle}>Ví của bạn</Text>
-                  <Text style={styles.sectionCountHint}>{wallets.data?.length ?? 0} nguồn tiền</Text>
+                  <Text style={styles.sectionTitle}>Ví</Text>
+                  <Text style={styles.sectionCountHint}>{wallets.data?.length ?? 0} ví</Text>
                 </View>
                 <Pressable onPress={() => router.push("/wallets")} hitSlop={8} style={styles.addWalletAction}>
                   <PlusIcon size={12} color={colors.green} />
@@ -216,7 +216,7 @@ export default function HomeScreen() {
               ) : wallets.data?.length === 0 ? (
                 <EmptyInlineCard
                   icon={<BankIcon size={18} color={colors.textSecondary} />}
-                  text="Chưa có nguồn tiền nào được kết nối"
+                  text="Chưa có ví. Tạo ví để ghi giao dịch."
                   onPress={openWalletCreator}
                   testID="empty-home-wallets"
                 />
@@ -246,7 +246,7 @@ export default function HomeScreen() {
           ) : (
             <EmptyInlineCard
               icon={<ReceiptIcon size={18} color={colors.textSecondary} />}
-              text="Chưa có dữ liệu giao dịch"
+              text="Chưa có giao dịch."
               testID="empty-home-recent"
             />
           )
@@ -267,7 +267,7 @@ const useStyles = createStyles((colors) => ({
   content: { paddingBottom: 140, paddingHorizontal: spacing.xl, gap: spacing.md },
   header: { gap: spacing.xl },
   section: { gap: spacing.md },
-  periodRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
+  periodRow: { flexDirection: "row", gap: spacing.sm },
   // No bottom margin: the section's own gap owns the space under a header,
   // so adding one here stacked two spacings and left the carousel floating
   // further from its title than from the block below it.

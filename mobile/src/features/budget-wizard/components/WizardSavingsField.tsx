@@ -73,7 +73,7 @@ export function WizardSavingsField({
           style={[styles.chip, choice.kind === "amount" && styles.chipActive]}
         >
           <Text style={[styles.chipLabel, choice.kind === "amount" && styles.chipLabelActive]}>
-            {choice.kind === "amount" ? "Số khác ✎" : "Số khác"}
+            Số khác
           </Text>
         </Pressable>
       </View>
@@ -83,7 +83,7 @@ export function WizardSavingsField({
           costs they have not measured, breaks the plan in week two — and an
           abandoned plan saves nothing at all. */}
       {choice.kind === "pct" && choice.pct === DEFAULT_SAVINGS_PCT ? (
-        <Text style={styles.hint}>Mức dễ giữ được. Tháng sau dư thì mình nâng lên.</Text>
+        <Text style={styles.hint}>Mức dễ giữ. Tháng sau dư thì tăng lên.</Text>
       ) : null}
       {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
 

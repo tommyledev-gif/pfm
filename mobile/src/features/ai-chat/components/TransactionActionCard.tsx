@@ -210,7 +210,7 @@ export function TransactionActionCard({
               />
             ) : (
               <PillButton
-                label="Xác nhận & Lưu"
+                label="Lưu"
                 onPress={onConfirm}
                 loading={saving}
                 style={styles.confirmButton}

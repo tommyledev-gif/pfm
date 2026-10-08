@@ -15,7 +15,6 @@ import { buildProposalSegments, segmentLegendEntry } from "@/features/budget-wiz
 import { BudgetProposalsResponse, ConfidenceBadge, ProposalEntry } from "@/features/budget-wizard/types";
 import { buildCategoryColorMap } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
-import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 interface WizardStepResultProps {
@@ -159,7 +158,7 @@ export function WizardStepResult({
       <ScrollView contentContainerStyle={styles.scroll}>
         <View testID="text-wizard-estimate-notice" style={styles.notice}>
           <Text style={styles.noticeText}>
-            Đây là ước lượng — tôi chưa biết thói quen chi tiêu của bạn. Bạn chỉnh lại bất cứ lúc nào.
+            Ước lượng theo kiểu sống đã chọn, chưa theo chi tiêu thật. Sửa lại bất cứ lúc nào.
           </Text>
         </View>
 
@@ -178,7 +177,7 @@ export function WizardStepResult({
         <View style={styles.rows}>
           {orderedProposals.length === 0 ? (
             <Text testID="text-wizard-empty-plan" style={styles.emptyPlan}>
-              Kế hoạch đang trống. Thêm ít nhất một danh mục để bắt đầu.
+              Kế hoạch chưa có danh mục. Thêm ít nhất một mục để lưu.
             </Text>
           ) : null}
           {orderedProposals.map((entry) => (
@@ -262,12 +261,16 @@ const useStyles = createStyles((colors) => ({
   centered: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.md, padding: spacing.xl },
   errorText: { ...typography.body, color: colors.textSecondary, textAlign: "center" },
   scroll: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl, gap: spacing.lg },
+  // One hairline all the way round, on the card surface — no coloured stripe
+  // down the left edge. The stripe is the stock "callout" treatment and read
+  // as decoration; a plain bordered box is enough to set a sentence apart.
   notice: {
-    borderLeftWidth: 2,
-    borderLeftColor: colors.green,
-    backgroundColor: withAlpha(colors.green, 0.06),
-    borderRadius: 8,
-    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    backgroundColor: colors.surface,
+    borderRadius: radii.listCard,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
   },
   noticeText: { ...typography.caption, color: colors.textSecondary, lineHeight: 18 },
   headline: { gap: 2 },

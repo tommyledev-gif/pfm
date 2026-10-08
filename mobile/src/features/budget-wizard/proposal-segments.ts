@@ -50,7 +50,7 @@ export function segmentLegendEntry(
   if (activeKey === BUFFER_SEGMENT_KEY) {
     return {
       key: BUFFER_SEGMENT_KEY,
-      name: "Dự phòng — chưa thuộc mục nào",
+      name: "Dự phòng (chưa thuộc mục nào)",
       color: colors.surfaceBorder,
       amount: result.unallocated_amount,
       share: share(result.unallocated_amount),

@@ -121,7 +121,7 @@ export function WizardStepIncome({
         {restoredFromSavedAt ? (
           <View style={styles.restoredBanner}>
             <Text style={styles.restoredText}>
-              Đã điền sẵn từ kế hoạch bạn lưu ngày {formatSavedAt(restoredFromSavedAt)}.
+              Đã điền từ kế hoạch lưu ngày {formatSavedAt(restoredFromSavedAt)}.
             </Text>
             {onDiscardSavedPlan ? (
               <Pressable onPress={onDiscardSavedPlan} hitSlop={8} testID="btn-wizard-discard-plan">
@@ -154,7 +154,7 @@ export function WizardStepIncome({
           // what counts as fixed, and this is for the user who reads that list
           // and realises they do not know the total.
           action={{
-            label: breakdown.length > 0 ? `${breakdown.length} khoản ✎` : "Tôi không nhớ tổng →",
+            label: breakdown.length > 0 ? `Sửa ${breakdown.length} khoản` : "Tôi không nhớ tổng →",
             onPress: onOpenFixedCosts,
             testID: "btn-wizard-fixed-costs",
           }}
@@ -271,9 +271,11 @@ const useStyles = createStyles((colors) => ({
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: radii.listCard,
-    borderLeftWidth: 2,
-    borderLeftColor: colors.green,
-    backgroundColor: withAlpha(colors.green, 0.06),
+    // Same plain hairline box as step 3's estimate notice, not a coloured
+    // stripe down the left edge.
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    backgroundColor: colors.surface,
   },
   restoredText: { flex: 1, ...typography.tiny, color: colors.textSecondary },
   restoredAction: { ...typography.tiny, color: colors.green },

@@ -4,12 +4,12 @@ import { useRouter } from "expo-router";
 
 import { EmptyIllustration } from "@/components/shared/EmptyIllustration";
 import { EmptyStateCard } from "@/components/shared/EmptyState";
+import { ThemedIllustration } from "@/components/shared/ThemedIllustration";
 import { Chip } from "@/components/ui/Chip";
 import {
   ChevronRightIcon,
   CloseIcon,
   PlusIcon,
-  ReceiptIcon,
   SearchIcon,
   SparkleIcon,
   TagIcon,
@@ -39,21 +39,14 @@ export function NoTransactionsState({ onAdd }: { onAdd: () => void }) {
   return (
     <View style={styles.stack} testID="empty-transactions-none">
       <EmptyStateCard
-        illustration={
-          <EmptyIllustration badge={<PlusIcon size={12} color={colors.onGreen} strokeWidth={2.6} />}>
-            <ReceiptIcon size={30} color={colors.green} />
-          </EmptyIllustration>
-        }
+        illustration={<ThemedIllustration name="transactions" />}
         title="Chưa có giao dịch nào"
-        description={
-          needsWallet
-            ? "Tạo một ví trước — mọi khoản thu chi sẽ được ghi vào đó và xuất hiện tại đây."
-            : "Mọi khoản thu chi được ghi chép sẽ xuất hiện tại đây."
-        }
+        // No wallet is the one thing the title does not already say.
+        description={needsWallet ? "Chưa có ví. Tạo ví để ghi giao dịch." : undefined}
         action={
           needsWallet
             ? {
-                label: "Thêm ví đầu tiên",
+                label: "Tạo ví",
                 icon: <WalletIcon size={18} color={colors.onGreen} />,
                 onPress: openWalletCreator,
                 testID: "btn-empty-create-wallet",
@@ -112,10 +105,10 @@ export function NoResultsState({ onClearFilters, onSearch }: NoResultsStateProps
             <SearchIcon size={30} color={colors.green} />
           </EmptyIllustration>
         }
-        title="Không có kết quả khớp bộ lọc"
-        description="Thử tìm kiếm với từ khóa khác hoặc điều chỉnh lại tiêu chí lọc để xem các giao dịch liên quan."
+        title="Không tìm thấy giao dịch"
+        description="Thử từ khóa khác."
         action={{
-          label: "Xoá bộ lọc",
+          label: "Xóa bộ lọc",
           icon: <CloseIcon size={16} color={colors.onGreen} strokeWidth={2.4} />,
           onPress: onClearFilters,
           testID: "btn-empty-clear-filters",

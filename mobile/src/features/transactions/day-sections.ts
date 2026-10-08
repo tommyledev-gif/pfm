@@ -5,8 +5,11 @@ export interface DaySection {
   key: string;
   dayLabel: string;
   dateLabel: string;
-  // Kept whole even while the day is collapsed: the rows stay mounted and
-  // fold to zero height (CollapsibleRow), which is what lets the fold animate.
+  // Empty while the day is collapsed. ⚠️ The rows are dropped, not kept
+  // mounted at zero height: inside the SectionList every cell still takes the
+  // list's gap whatever its height, so a folded day of ten rows left ten gaps
+  // of blank space behind it. A folded day is now laid out exactly like a day
+  // with no rows. (Unfolding eases them back in — ExpandRevealRow.)
   data: Transaction[];
   // Full row count regardless of collapse, so a collapsed day can still say
   // how much it is hiding.
@@ -99,5 +102,7 @@ export function buildDaySections(
     group.data.push(item);
   }
 
-  return groups;
+  // After the loop, not instead of the push: count and the subtotals above
+  // still cover every row, so a folded day says what it is hiding.
+  return groups.map((g) => (g.collapsed ? { ...g, data: [] } : g));
 }

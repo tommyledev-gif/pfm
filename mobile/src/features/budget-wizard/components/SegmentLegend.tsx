@@ -37,7 +37,7 @@ export function SegmentLegend({ entry, currency }: SegmentLegendProps) {
     return (
       <View style={styles.row}>
         <Text style={styles.hint} numberOfLines={1}>
-          Chạm vào từng khúc để xem đó là mục nào.
+          Chạm từng khúc để xem tên mục.
         </Text>
       </View>
     );

@@ -1,8 +1,8 @@
 import { Pressable, Text, View } from "react-native";
 
-import { EmptyIllustration } from "@/components/shared/EmptyIllustration";
 import { EmptyStateCard } from "@/components/shared/EmptyState";
-import { ChevronRightIcon, PlusIcon, TargetIcon } from "@/components/ui/Icon";
+import { ThemedIllustration } from "@/components/shared/ThemedIllustration";
+import { ChevronRightIcon, PlusIcon } from "@/components/ui/Icon";
 import { TintedIconTile } from "@/components/ui/TintedIconTile";
 import { colorForCategory } from "@/lib/category-color";
 import { WalletCurrency } from "@/lib/constants";
@@ -47,13 +47,9 @@ export function BudgetsEmptyState({ currency, onOpenWizard, onCreate }: BudgetsE
   return (
     <View style={styles.stack} testID="empty-budgets">
       <EmptyStateCard
-        illustration={
-          <EmptyIllustration>
-            <TargetIcon size={30} color={colors.green} />
-          </EmptyIllustration>
-        }
-        title="Bạn chưa thiết lập ngân sách nào"
-        description="Tạo ngân sách giúp bạn kiểm soát chi tiêu ăn uống, mua sắm và tiết kiệm hiệu quả hơn mỗi tháng."
+        illustration={<ThemedIllustration name="budgets" />}
+        title="Chưa có ngân sách"
+        description="Đặt hạn mức theo danh mục để biết tháng này còn chi được bao nhiêu."
         action={{
           label: "Tạo ngân sách",
           icon: <PlusIcon size={18} color={colors.onGreen} />,
@@ -96,7 +92,7 @@ export function BudgetsEmptyState({ currency, onOpenWizard, onCreate }: BudgetsE
                       ? "Đề xuất 15–20% thu nhập"
                       : offerAmount
                         ? `Mức tiêu chuẩn ~ ${formatCurrency(amountCents, currency)}`
-                        : "Tự đặt hạn mức phù hợp"}
+                        : "Tự đặt hạn mức"}
                   </Text>
                 </View>
                 <View style={styles.chevron}>

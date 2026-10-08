@@ -126,7 +126,7 @@
 
 ## NAMING & CONVENTIONS
 
-- [ ] No Vietnamese text in code, comments, or committed docs — English only, across Go, Python, and Dart.
+- [ ] No Vietnamese text in code, comments, or committed docs — English only, across Go, Python, Dart, and TypeScript. Exceptions: user-facing strings (the product's UI language is Vietnamese — they follow **UX COPY** below) and the `pfm-ux-copy` skill files.
 - [ ] No AI-generated filler comments left in code. Comments only for genuinely non-obvious logic. Max 30 words per comment.
 
 ### Go
@@ -193,6 +193,32 @@
 - [ ] No `any` in TypeScript — API response shapes are explicit types/interfaces, mirrored from `api-spec/openapi.yaml` where one exists.
 - [ ] Money values formatted via the shared `formatCurrency` utility only — never `amount / 100` inline in JSX.
 - [ ] No magic numbers/strings in components (timeouts, page sizes, route paths) — extracted to `lib/constants.ts`.
+
+---
+
+## UX COPY (user-facing text)
+
+> Scope: every string a user can see — `mobile/app/`, `mobile/src/`, `frontend/src/` (labels, buttons, titles, empty states, errors, toasts, dialogs, placeholders, `accessibilityLabel`), backend `message` strings and push/notification text that reach the UI, and AI-service reply prompts. Not code comments, specs, or docs.
+> Source of truth: `.claude/skills/pfm-ux-copy/` (`SKILL.md` + `references/`). This section is the gate; the skill holds the reasoning and before/after examples.
+
+- [ ] Title + button alone say what happened and what to do next. Facts first — no "Rất tiếc,", "Hiện tại,", "Lưu ý:" openers.
+- [ ] One string = one idea = one next action. No "hoặc" joining two actions; the second action becomes its own button/link.
+- [ ] Nothing the screen already shows is explained again.
+- [ ] None of: "—" (em dash), "!", emoji, "nhé/nha/nè/ạ", "Vui lòng", "Rất tiếc", "Oops/Ôi", "Chúc mừng", "thành công", "Bạn có thể…/Hãy…", "chúng tôi", or the app calling itself "mình" (chips written in the user's voice excepted).
+- [ ] No marketing/AI vocabulary. Blocked: hành trình, đồng hành, nâng tầm, đột phá, làm chủ tài chính. Replace with a number or a concrete action, or cut: thông minh, tối ưu, toàn diện, mượt mà, dễ dàng, nhanh chóng, khám phá, trải nghiệm.
+- [ ] Verbs, not nominalisations; plain words over formal Sino-Vietnamese ("đổi bộ lọc", not "điều chỉnh tiêu chí lọc"; "tạo", not "khởi tạo"/"thực hiện").
+- [ ] Buttons are verb + object for what happens on tap. Destructive confirms pair "[Xóa …]" with "[Giữ lại]" — never "Có/Không"; bare "OK"/"Xác nhận" only when the dialog already names the action.
+- [ ] Errors: what failed + (why, if known) + what to do. Errors in a money write state the balance/data state — "Số dư chưa thay đổi" only when the write is atomic. A bare "Đã xảy ra lỗi" is allowed only as the unknown-error fallback. Money-related errors use a banner or dialog, not a toast that disappears.
+- [ ] New error UI branches on the envelope's `error_code` (mobile: `getErrorCode()`) and writes the copy client-side for known codes; the server `message` (`getErrorMessage()`) is the fallback only. Backend `message` strings that reach users follow these same rules.
+- [ ] Login failures never reveal which field was wrong ("Email hoặc mật khẩu không đúng"). No token, full email, or account number in toasts, errors, or logs.
+- [ ] AI/automatic suggestions look unsaved ("Chờ xác nhận"; [Lưu]/[Sửa]/[Bỏ]). "Đã lưu" only after the server confirms the write.
+- [ ] Budget/spending copy states numbers against the user's own limits — no praise, judgement, or financial advice.
+- [ ] Terms match `references/glossary.md` (one concept = one word — a wallet is always "ví", never "nguồn tiền"/"tài khoản"). A new term is added to the glossary in the same PR.
+- [ ] Amounts and dates reach the string through the shared formatters (`formatCurrency`, format-date helpers) — no hand-written "đ"/"VNĐ"/"k"/"tr", no hardcoded "dd/mm".
+- [ ] Length within `references/patterns.md` §1 (button ≤ 3–4 syllables, screen title ≤ 5–7, toast ≤ 6, body ≤ 2 sentences). Phrases (title, button, label, chip, toast) have no trailing period; full-sentence bodies do.
+- [ ] Still correct with a 60-character wallet/category name; full Vietnamese diacritics (Unicode NFC).
+- [ ] AI-service reply prompts follow `references/llm-runtime-prompt.md`: only figures from the computed facts, no opener/closer, ≤ 2 sentences.
+- [ ] Once a locale layer exists (none today — strings are hardcoded Vietnamese): keys follow `feature.screen.element[.state]`, VI and EN share keys and placeholders, VI plurals use only `_other`, no sentence built by concatenating keys, and `python -X utf8 .claude/skills/pfm-ux-copy/scripts/lint_copy.py <locales dir>` reports 0 ERROR (`-X utf8` is required on Windows — without it the script crashes printing Vietnamese to a cp1252 console).
 
 ---
 

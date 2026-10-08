@@ -33,7 +33,7 @@ export function BudgetWizardCard({ submitted, createdCount, onPress }: BudgetWiz
   return (
     <Pressable style={styles.card} onPress={onPress} testID="card-budget-wizard">
       <SparkleIcon size={20} />
-      <Text style={styles.label}>Mở trình lập ngân sách</Text>
+      <Text style={styles.label}>Lập ngân sách</Text>
     </Pressable>
   );
 }

@@ -8,6 +8,7 @@ import { spacing, createStyles } from "@/lib/theme";
 import { useSheetStore } from "@/stores/sheet-store";
 import { BUDGET_WIZARD_TOTAL_STEPS, useBudgetWizardState } from "@/features/budget-wizard/hooks/use-budget-wizard-state";
 import { FixedCostsModal } from "@/features/budget-wizard/components/FixedCostsModal";
+import { WizardAmbientGlow } from "@/features/budget-wizard/components/WizardAmbientGlow";
 import { WizardBackConfirmDialog } from "@/features/budget-wizard/components/WizardBackConfirmDialog";
 import { WizardProgressHeader } from "@/features/budget-wizard/components/WizardProgressHeader";
 import { WizardStepIncome } from "@/features/budget-wizard/components/WizardStepIncome";
@@ -65,6 +66,13 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
 
   return (
     <View style={styles.overlay}>
+      {/* ⚠️ Behind the WHOLE screen, header and status bar included — not
+          inside the profile step. Drawn inside the step it started under the
+          progress header, so the screen read as two backgrounds stacked: the
+          plain strip behind the pills, and the glow cut off in a hard line
+          right beneath it. */}
+      {step === 2 && !isSuccess ? <WizardAmbientGlow /> : null}
+
       {/* ⚠️ Success replaces the stepper entirely — it is not rendered inside it.
           It is a destination, not another screen in the sequence, and leaving it
           inside the step container makes it inherit the stepper's chrome and

@@ -95,7 +95,7 @@ export function AddBudgetRowModal({
           {/* Not an error — the plan is simply fully allocated. Saying so beats
               offering a form whose submit button could never be enabled. */}
           <Text style={styles.note}>
-            Dự phòng đã hết nên chưa thêm được mục mới. Bạn giảm bớt một mục khác rồi quay lại nhé.
+            Dự phòng đã hết. Giảm một mục khác để thêm mục mới.
           </Text>
         </View>
       </Drawer>
@@ -107,12 +107,12 @@ export function AddBudgetRowModal({
       {confirmingMatches ? (
         <>
           <DrawerHeader
-            title="Có thể bạn đã có mục này"
+            title="Dùng mục có sẵn?"
             actions={[{ label: "Quay lại", onPress: () => setConfirmingMatches(null), variant: "secondary" }]}
           />
           <View style={styles.body}>
             <Text style={styles.note}>
-              Mình thấy vài mục nghe giống &quot;{name.trim()}&quot;. Dùng lại một trong số này nhé?
+              Có vài mục giống &quot;{name.trim()}&quot;.
             </Text>
 
             {confirmingMatches.map((category) => {
@@ -154,7 +154,7 @@ export function AddBudgetRowModal({
           <DrawerHeader
             title="Thêm danh mục"
             actions={[
-              { label: "Huỷ", onPress: onClose, variant: "secondary" },
+              { label: "Hủy", onPress: onClose, variant: "secondary" },
               { label: "Thêm", onPress: submit, variant: "primary", disabled: !canSubmit, testID: "btn-wizard-add-row-submit" },
             ]}
           />
@@ -186,13 +186,13 @@ export function AddBudgetRowModal({
             />
 
             <View style={styles.meta}>
-              <Text style={styles.metaLabel}>🛟 Lấy từ dự phòng, tối đa</Text>
+              <Text style={styles.metaLabel}>Lấy từ dự phòng, tối đa</Text>
               <Text style={styles.metaValue}>{formatCurrency(max, currency)}</Text>
             </View>
             {name.trim().length > 0 && clamped < MIN_AMOUNT_PER_CATEGORY_XU ? (
               <Text style={styles.note}>
-                Tối thiểu {formatCurrency(MIN_AMOUNT_PER_CATEGORY_XU, currency)} — dưới mức này thì một lần chi
-                bình thường cũng vượt, cảnh báo sẽ thành vô nghĩa.
+                Tối thiểu {formatCurrency(MIN_AMOUNT_PER_CATEGORY_XU, currency)}. Thấp hơn thì một lần chi
+                bình thường đã vượt hạn mức.
               </Text>
             ) : null}
           </View>

@@ -12,7 +12,7 @@ export function CreateWalletButton({ onPress }: { onPress: () => void }) {
   return (
     <Pressable testID="btn-chat-create-wallet" style={styles.button} onPress={onPress} accessibilityRole="button">
       <WalletIcon size={16} color={colors.onGreen} />
-      <Text style={styles.label}>Tạo ví mới</Text>
+      <Text style={styles.label}>Tạo ví</Text>
     </Pressable>
   );
 }

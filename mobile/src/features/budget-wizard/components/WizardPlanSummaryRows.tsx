@@ -36,7 +36,7 @@ export function WizardPlanSummaryRows({
     <>
       {buffer > 0 ? (
         <View style={styles.bufferRow}>
-          <Text style={styles.bufferLabel}>🛟 Dự phòng</Text>
+          <Text style={styles.bufferLabel}>Dự phòng</Text>
           <Text testID="text-wizard-buffer" style={styles.bufferValue}>
             {formatCurrency(buffer, currency)}
           </Text>
@@ -45,18 +45,18 @@ export function WizardPlanSummaryRows({
 
       <View style={styles.deducted}>
         <View style={styles.deductedRow}>
-          <Text style={styles.deductedLabel}>📈 Tiết kiệm</Text>
+          <Text style={styles.deductedLabel}>Tiết kiệm</Text>
           <Text style={styles.deductedValue}>{formatCurrency(savings, currency)}</Text>
         </View>
         <View style={styles.deductedRow}>
-          <Text style={styles.deductedLabel}>🏠 Cố định</Text>
+          <Text style={styles.deductedLabel}>Cố định</Text>
           <Text style={styles.deductedValue}>{formatCurrency(fixed, currency)}</Text>
         </View>
       </View>
 
       {overCommitted ? (
         <Text style={styles.warn}>
-          Bạn khai nhiều hơn số còn được chi {formatCurrency(shortfall, currency)}. Bạn giảm bớt ở đâu đó nhé.
+          Tổng các mục vượt số được chi {formatCurrency(shortfall, currency)}. Giảm bớt một vài mục.
         </Text>
       ) : null}
     </>
