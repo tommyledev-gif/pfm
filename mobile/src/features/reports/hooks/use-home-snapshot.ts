@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 
+import { isAwaitingFirstData } from "@/lib/query-status";
 import { useThemeName } from "@/lib/theme";
 import { currentPeriodRange, monthRange, previousPeriodRange } from "@/lib/date-range";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
@@ -136,7 +137,7 @@ export function useHomeSnapshot(homePeriod: HomePeriod) {
     // Every input defaults to zero or empty before its own query resolves —
     // without this the first render showed a zeroed snapshot rather than a
     // loading state.
-    loading: wallets.isLoading || periodSummary.isLoading || thisMonthSummary.isLoading || budgets.isLoading,
+    loading: [wallets, periodSummary, thisMonthSummary, budgets].some(isAwaitingFirstData),
     // Handed to the screen's pull-to-refresh: refreshing fewer than all of
     // them would leave the trend badge comparing a fresh number to a stale one.
     queries: [budgets, periodSummary, thisMonthSummary, previousPeriodSummary],

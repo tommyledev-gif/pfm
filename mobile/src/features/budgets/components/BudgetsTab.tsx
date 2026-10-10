@@ -11,7 +11,7 @@ import { monthRange } from "@/lib/date-range";
 import { formatDateRange } from "@/lib/format-date";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
-import { isWaitingForNetwork } from "@/lib/query-status";
+import { isAwaitingFirstData, isWaitingForNetwork } from "@/lib/query-status";
 import { useRefresh } from "@/lib/use-refresh";
 import { WalletCurrency } from "@/lib/constants";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
@@ -136,7 +136,7 @@ export function BudgetsTab({ initialRange, rangeNonce, onOpenBudgetWizard }: Bud
   const hasNoBudgets = budgets.data?.length === 0;
 
   if (isWaitingForNetwork(budgets)) return <OfflinePlaceholder />;
-  if (budgets.isLoading) {
+  if (isAwaitingFirstData(budgets)) {
     return (
       <View style={styles.skeletonList}>
         {Array.from({ length: CARD_SKELETON_COUNT }).map((_, i) => (

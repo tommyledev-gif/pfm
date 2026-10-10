@@ -10,7 +10,7 @@ import { Screen } from "@/components/shared/Screen";
 import { TopBar } from "@/components/shared/TopBar";
 import { TransactionRow } from "@/components/shared/TransactionRow";
 import { previousPeriodLabel } from "@/lib/date-range";
-import { isWaitingForNetwork } from "@/lib/query-status";
+import { isAwaitingFirstData, isWaitingForNetwork } from "@/lib/query-status";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useLatestCallback } from "@/lib/use-latest-callback";
 import { useRefresh } from "@/lib/use-refresh";
@@ -113,6 +113,10 @@ export default function HomeScreen() {
   // the onboarding journey in place of a snapshot of zeros. Decided only once
   // all three answers are in, so a slow query never flashes the wrong one.
   const isFresh = recent.isSuccess && wallets.isSuccess && budgets.isSuccess && (firstPage?.length ?? 0) === 0;
+  // Fresh vs. returning is decided once, after all three have answered. Until
+  // then the snapshot card stays a skeleton, so a new User never sees the
+  // snapshot flash in before the onboarding card replaces it.
+  const deciding = [recent, wallets, budgets].some(isAwaitingFirstData);
 
   const { refreshControl } = useRefresh([wallets, recent, categories, ...snapshot.queries]);
 
@@ -173,7 +177,7 @@ export default function HomeScreen() {
                 <SegmentedTabs style={styles.periodRow} options={PERIODS} value={homePeriod} onChange={setHomePeriod} />
 
                 <HomeSnapshotCard
-                  loading={snapshot.loading}
+                  loading={snapshot.loading || deciding}
                   periodIndex={PERIODS.findIndex((p) => p.value === homePeriod)}
                   isDay={homePeriod === "day"}
                   currency={snapshot.currency}
@@ -209,7 +213,7 @@ export default function HomeScreen() {
                   <Text style={styles.sectionAction}>Thêm ví</Text>
                 </Pressable>
               </View>
-              {wallets.isLoading ? (
+              {isAwaitingFirstData(wallets) ? (
                 <WalletCardSkeleton />
               ) : isWaitingForNetwork(wallets) ? (
                 <OfflinePlaceholder />
@@ -235,7 +239,7 @@ export default function HomeScreen() {
         }
         renderItem={renderRecent}
         ListEmptyComponent={
-          recent.isLoading ? (
+          isAwaitingFirstData(recent) ? (
             <View>
               {Array.from({ length: RECENT_TRANSACTION_SKELETON_COUNT }).map((_, i) => (
                 <TransactionRowSkeleton key={i} />

@@ -8,6 +8,8 @@ interface ConfirmDialogProps {
   title: string;
   message: string;
   confirmLabel?: string;
+  /** Names what keeping things as they are means, e.g. "Giữ lại". */
+  cancelLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
   loading?: boolean;
@@ -30,6 +32,7 @@ export function ConfirmDialog({
   title,
   message,
   confirmLabel = "Xóa",
+  cancelLabel = "Hủy",
   onConfirm,
   onCancel,
   loading,
@@ -45,7 +48,7 @@ export function ConfirmDialog({
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.message}>{message}</Text>
           <View style={styles.actions}>
-            <PillButton label="Hủy" variant="outline" onPress={onCancel} style={styles.flexButton} />
+            <PillButton label={cancelLabel} variant="outline" onPress={onCancel} style={styles.flexButton} />
             <PillButton
               label={confirmLabel}
               onPress={onConfirm}

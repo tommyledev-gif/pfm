@@ -2,13 +2,12 @@ import { ActivityIndicator, Text, View } from "react-native";
 
 import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
 import { useIsOnline } from "@/lib/connectivity";
-import { isWaitingForNetwork } from "@/lib/query-status";
+import { isAwaitingFirstData, isWaitingForNetwork } from "@/lib/query-status";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { TransactionRowSkeleton } from "@/features/transactions/components/TransactionRowSkeleton";
 import { NoResultsState, NoTransactionsState } from "@/features/transactions/components/TransactionsEmptyStates";
 
 interface ListQueryState {
-  isLoading: boolean;
   isPending: boolean;
   fetchStatus: "fetching" | "paused" | "idle";
   hasNextPage: boolean;
@@ -45,7 +44,7 @@ export function TransactionsListEmpty({
 }: TransactionsListEmptyProps) {
   const styles = useStyles();
   if (isWaitingForNetwork(query)) return <OfflinePlaceholder />;
-  if (query.isLoading) {
+  if (isAwaitingFirstData(query)) {
     return (
       <View>
         {Array.from({ length: LIST_SKELETON_COUNT }).map((_, i) => (

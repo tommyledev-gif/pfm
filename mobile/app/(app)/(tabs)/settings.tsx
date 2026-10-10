@@ -65,6 +65,8 @@ type SettingsHref = NonNullable<SettingsRow["href"]> | typeof EDIT_PROFILE_HREF;
 const ROW_TAP_GUARD_MS = 600;
 
 const LOGOUT_BUSY_OPACITY = 0.7;
+const AVATAR_SIZE = 72;
+const EDIT_BADGE_SIZE = 28;
 
 function displayNameOf(email: string | null, fullName: string | null): string {
   return email ? accountDisplayName({ email, fullName }) : (fullName ?? "Thành viên");
@@ -120,27 +122,29 @@ export default function SettingsScreen() {
     <Screen>
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.identity}>
-        {/* The avatar is a way into the profile too — where most people tap first. */}
-        <Pressable
-          onPress={() => openRow(EDIT_PROFILE_HREF)}
-          accessibilityRole="button"
-          accessibilityLabel="Sửa hồ sơ"
-          testID="btn-settings-avatar"
-        >
-          <Avatar name={name} iconUrl={profile?.avatar_url} size={72} fallback="initial" />
-        </Pressable>
+        {/* The avatar opens the profile too; the pencil badge says so. */}
+        <View style={styles.avatarWrap}>
+          <Pressable
+            onPress={() => openRow(EDIT_PROFILE_HREF)}
+            accessibilityRole="button"
+            accessibilityLabel="Sửa hồ sơ"
+            testID="btn-settings-avatar"
+          >
+            <Avatar name={name} iconUrl={profile?.avatar_url} size={AVATAR_SIZE} fallback="initial" />
+          </Pressable>
+          <Pressable
+            onPress={() => openRow(EDIT_PROFILE_HREF)}
+            accessibilityRole="button"
+            accessibilityLabel="Sửa hồ sơ"
+            hitSlop={spacing.sm}
+            style={({ pressed }) => [styles.editProfile, pressed && styles.editProfilePressed]}
+            testID="btn-settings-edit-profile"
+          >
+            <EditIcon size={14} color={colors.textPrimary} />
+          </Pressable>
+        </View>
         <Text style={styles.name}>{name}</Text>
         {email ? <Text style={styles.email}>{email}</Text> : null}
-        <Pressable
-          onPress={() => openRow(EDIT_PROFILE_HREF)}
-          accessibilityRole="button"
-          accessibilityLabel="Sửa hồ sơ"
-          hitSlop={spacing.sm}
-          style={({ pressed }) => [styles.editProfile, pressed && styles.editProfilePressed]}
-          testID="btn-settings-edit-profile"
-        >
-          <EditIcon size={18} color={colors.textSecondary} />
-        </Pressable>
       </View>
 
       <View style={styles.statRow}>
@@ -227,19 +231,20 @@ const useStyles = createStyles((colors) => ({
   identity: { alignItems: "center", gap: spacing.xs },
   name: { ...typography.title, color: colors.textPrimary, marginTop: spacing.sm },
   email: { ...typography.caption, color: colors.textSecondary },
-  // Top-right of the identity block, out of the centered name/email column.
+  avatarWrap: { width: AVATAR_SIZE, height: AVATAR_SIZE },
+  // On the avatar's top-right edge; the bgApp ring cuts it out of the circle.
   editProfile: {
     position: "absolute",
-    top: 0,
-    right: 0,
-    width: 40,
-    height: 40,
+    top: -2,
+    right: -4,
+    width: EDIT_BADGE_SIZE,
+    height: EDIT_BADGE_SIZE,
     borderRadius: radii.pill,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
+    backgroundColor: colors.surfaceRaised,
+    borderWidth: 2,
+    borderColor: colors.bgApp,
   },
   editProfilePressed: { opacity: 0.7 },
   statRow: { flexDirection: "row", gap: spacing.sm },

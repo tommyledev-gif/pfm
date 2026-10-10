@@ -3,14 +3,14 @@ import { Animated, Easing, LayoutChangeEvent, Pressable, View } from "react-nati
 import { useRouter, usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
-// Deep imports, one file per icon: Metro does not tree-shake, so the package
-// root would pull every Phosphor icon (all six weights) into the bundle.
-import { ChartBarIcon } from "phosphor-react-native/src/icons/ChartBar";
-import { ChatCircleDotsIcon } from "phosphor-react-native/src/icons/ChatCircleDots";
-import { HouseIcon } from "phosphor-react-native/src/icons/House";
-import { ListBulletsIcon } from "phosphor-react-native/src/icons/ListBullets";
-import { UserIcon } from "phosphor-react-native/src/icons/User";
 
+import {
+  AssistantIcon,
+  HomeTabIcon,
+  InsightsTabIcon,
+  SettingsTabIcon,
+  TransactionsTabIcon,
+} from "@/components/shared/nav-icons";
 import { NavBallLight } from "@/components/shared/NavBallLight";
 import { useColors } from "@/lib/theme";
 import {
@@ -28,14 +28,14 @@ import {
 } from "@/components/shared/bottom-nav-styles";
 
 // Phosphor, two weights of the same glyph: "regular" in the row, "fill" on
-// the ball, so the active tab reads as active from its shape alone. AI Chat
-// is a chat bubble rather than a sparkle: it says "chat" at 22px.
+// the ball, so the active tab reads as active from its shape alone. The bar
+// is icon-only, so `label` is what a screen reader announces.
 export const TABS = [
-  { href: "/", Icon: HouseIcon },
-  { href: "/transactions", Icon: ListBulletsIcon },
-  { href: "/ai-chat", Icon: ChatCircleDotsIcon },
-  { href: "/insights", Icon: ChartBarIcon },
-  { href: "/settings", Icon: UserIcon },
+  { href: "/", Icon: HomeTabIcon, label: "Trang chủ" },
+  { href: "/transactions", Icon: TransactionsTabIcon, label: "Giao dịch" },
+  { href: "/ai-chat", Icon: AssistantIcon, label: "Trợ lý" },
+  { href: "/insights", Icon: InsightsTabIcon, label: "Phân tích" },
+  { href: "/settings", Icon: SettingsTabIcon, label: "Cài đặt" },
 ] as const;
 
 // Screens reachable only through Settings' own menu (settings.tsx's
@@ -224,9 +224,12 @@ export function BottomNav() {
       <Animated.View pointerEvents="none" style={[styles.bandCover, { opacity: bandCoverOpacity }]} />
       <View style={[styles.pill, { paddingBottom: insets.bottom }]}>
         <View style={styles.tabRow}>
-          {TABS.map(({ href, Icon }, index) => (
+          {TABS.map(({ href, Icon, label }, index) => (
             <Pressable
               key={href}
+              accessibilityRole="tab"
+              accessibilityLabel={label}
+              accessibilityState={{ selected: index === activeIndex }}
               onLayout={handleTabLayout(index)}
               // navigate, not replace: the tabs are a real tab navigator
               // ((tabs)/_layout.tsx), so this jumps to the already-mounted

@@ -1,68 +1,95 @@
 import { useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
-import { SparkleIcon } from "@/components/ui/Icon";
+import { Screen } from "@/components/shared/Screen";
+import { ChevronLeftIcon } from "@/components/ui/Icon";
+import { BrandMark } from "@/features/auth/components/BrandMark";
 import { LoginForm } from "@/features/auth/components/LoginForm";
-import { ContinueAsList } from "@/features/accounts/components/ContinueAsList";
-import { spacing, typography, createStyles } from "@/lib/theme";
+import { useAccountRegistryStore } from "@/features/accounts/account-registry-store";
+import { SavedAccountLogin } from "@/features/accounts/components/SavedAccountLogin";
+import { useKeyboardHeight } from "@/lib/use-keyboard-height";
+import { spacing, createStyles, useColors } from "@/lib/theme";
 
+const COPY = {
+  title: "Đăng nhập",
+  back: "Quay lại",
+} as const;
+
+// Two states, never both at once:
+//  A. an account is remembered here → SavedAccountLogin (who, then one way in);
+//  B. nothing remembered, or "Dùng tài khoản khác" → email + password.
 export default function LoginScreen() {
+  const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
+  const keyboardHeight = useKeyboardHeight();
+  const isHydrated = useAccountRegistryStore((s) => s.isHydrated);
+  const accounts = useAccountRegistryStore((s) => s.accounts);
+  const [useAnother, setUseAnother] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const [prefillEmail, setPrefillEmail] = useState<string | undefined>(
-    "owner@example.com",
-  );
+  const ordered = [...accounts].sort((a, b) => Date.parse(b.lastUsedAt) - Date.parse(a.lastUsedAt));
+  // Falls back to the most recent one when nothing is picked yet, or when the
+  // picked one has just been removed from the device.
+  const selected = ordered.find((a) => a.userId === selectedId) ?? ordered[0];
+  const showSaved = !useAnother && selected !== undefined;
+  const goHome = () => router.replace("/(app)/(tabs)");
+
+  if (!isHydrated) return <Screen>{null}</Screen>;
+
+  // SavedAccountLogin scrolls on its own, so its sheets can sit beside the scroll view.
+  if (showSaved) {
+    return (
+      <Screen>
+        <SavedAccountLogin
+          account={selected}
+          accounts={ordered}
+          onSelect={setSelectedId}
+          onUseAnother={() => setUseAnother(true)}
+          onDone={goHome}
+        />
+      </Screen>
+    );
+  }
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.container}
-      keyboardShouldPersistTaps="handled"
-    >
-      <View style={styles.header}>
-        <SparkleIcon size={28} />
-        <Text style={styles.title}>Budgest</Text>
-        <Text style={styles.subtitle}>Log in to manage your money</Text>
-      </View>
-
-      <ContinueAsList onPrefill={setPrefillEmail} />
-
-      <LoginForm
-        key={prefillEmail ?? ""}
-        initialEmail={prefillEmail}
-        onDone={() => {
-          router.replace("/(app)/(tabs)");
-        }}
-      />
-    </ScrollView>
+    <Screen>
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={[styles.content, { paddingBottom: spacing.xxl + keyboardHeight }]}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Back to the saved account when there is one; else the brand row. */}
+        <View style={styles.header}>
+          {ordered.length > 0 ? (
+            <Pressable
+              onPress={() => setUseAnother(false)}
+              style={styles.back}
+              accessibilityRole="button"
+              accessibilityLabel={COPY.back}
+              testID="btn-login-back-to-saved"
+            >
+              <ChevronLeftIcon size={24} color={colors.textPrimary} />
+            </Pressable>
+          ) : (
+            <BrandMark />
+          )}
+        </View>
+        <Text style={styles.title} accessibilityRole="header">{COPY.title}</Text>
+        <View style={styles.form}>
+          <LoginForm onDone={goHome} />
+        </View>
+      </ScrollView>
+    </Screen>
   );
 }
 
 const useStyles = createStyles((colors) => ({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.bgApp,
-  },
-  container: {
-    flexGrow: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: spacing.xxl,
-    paddingVertical: spacing.xxl,
-    gap: spacing.xxl,
-  },
-  header: {
-    alignItems: "center",
-    gap: spacing.xs,
-  },
-  title: {
-    ...typography.hero,
-    color: colors.textPrimary,
-  },
-  subtitle: {
-    ...typography.label,
-    color: colors.textSecondary,
-  },
+  screen: { flex: 1, backgroundColor: colors.bgApp },
+  content: { flexGrow: 1, paddingHorizontal: spacing.xxl, paddingTop: spacing.md },
+  header: { minHeight: 44, flexDirection: "row", alignItems: "center" },
+  back: { width: 44, height: 44, marginLeft: -10, alignItems: "center", justifyContent: "center" },
+  title: { marginTop: 32, fontSize: 30, lineHeight: 38, fontWeight: "700", letterSpacing: -0.3, color: colors.textPrimary },
+  form: { marginTop: 32 },
 }));

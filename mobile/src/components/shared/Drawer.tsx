@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { Animated, BackHandler, Dimensions, Pressable, ScrollView, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { DrawerChildPanel } from "@/components/shared/DrawerChildPanel";
 import { SheetHandle } from "@/components/shared/SheetHandle";
@@ -91,6 +92,11 @@ const ANCHOR_SETTLE_MS = 800;
 export function Drawer({ visible, onClose, children, footer, child }: DrawerProps) {
   const styles = useStyles();
   const keyboardHeight = useKeyboardHeight();
+  // The sheet runs to the screen's bottom edge (edge-to-edge), so its last
+  // row would sit under the gesture bar / nav buttons without this. With the
+  // keyboard up the keyboard covers that strip and lifts the sheet anyway.
+  const { bottom: bottomInset } = useSafeAreaInsets();
+  const navPad = keyboardHeight > 0 ? 0 : bottomInset;
   // Kept mounted for the duration of the close animation — flipping
   // straight to `if (!visible) return null` would unmount mid-slide-down
   // and make the sheet vanish instantly instead of animating out.
@@ -224,13 +230,13 @@ export function Drawer({ visible, onClose, children, footer, child }: DrawerProp
                 // scroll area once the sheet hits its 90% cap, rather than
                 // being pushed off the bottom of the screen by it.
                 style={[styles.sheetScroll, drag.expanded && styles.sheetScrollExpanded]}
-                contentContainerStyle={styles.sheet}
+                contentContainerStyle={[styles.sheet, !footer && { paddingBottom: spacing.xl + navPad }]}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
               >
                 {children}
               </ScrollView>
-              {footer ? <View style={styles.footer}>{footer}</View> : null}
+              {footer ? <View style={[styles.footer, { paddingBottom: spacing.xl + navPad }]}>{footer}</View> : null}
             </Pressable>
           </Animated.View>
         </Pressable>

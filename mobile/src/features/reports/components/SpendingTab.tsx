@@ -14,7 +14,7 @@ import { monthRange } from "@/lib/date-range";
 import { formatDateRange } from "@/lib/format-date";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
-import { isWaitingForNetwork } from "@/lib/query-status";
+import { isAwaitingFirstData, isWaitingForNetwork } from "@/lib/query-status";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { daysInRange, proratedLimit } from "@/features/budgets/budget-pace";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
@@ -58,10 +58,10 @@ export function SpendingTab({ focusCategoryId, focusNonce, onOpenBudgets }: Spen
     if (focusCategoryId) setSelected(focusCategoryId);
   }, [focusCategoryId, focusNonce]);
 
-  if (summary.isLoading) {
-    return <SpendingTabSkeleton />;
-  }
   if (isWaitingForNetwork(summary)) return <OfflinePlaceholder />;
+  // Not isLoading: while the saved cache is read back the query is pending
+  // without fetching, and this used to fall through to "Chưa tải được báo cáo".
+  if (isAwaitingFirstData(summary)) return <SpendingTabSkeleton />;
   if (!summary.data) {
     return (
       <View style={styles.loadError}>

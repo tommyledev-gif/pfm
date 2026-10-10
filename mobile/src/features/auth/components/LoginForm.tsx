@@ -3,7 +3,8 @@ import { Keyboard, Pressable, Text, TextInput, View } from "react-native";
 
 import { PillButton } from "@/components/ui/PillButton";
 import { EyeIcon, EyeOffIcon } from "@/components/ui/Icon";
-import { getErrorMessage } from "@/lib/axios";
+import { getErrorCode, getErrorMessage } from "@/lib/axios";
+import { isNetworkError } from "@/lib/api-envelope";
 import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useLoginMutation } from "@/features/auth/api/use-login-mutation";
@@ -16,29 +17,58 @@ interface LoginFormProps {
   mode?: LoginFormMode;
   /** Only ever the email of an expired saved account being renewed (EC-10). */
   initialEmail?: string;
+  /**
+   * The email is already known and shown above the form (a saved account),
+   * so only the password is asked for. Needs `initialEmail`.
+   */
+  hideEmail?: boolean;
   onDone?: (outcome: LoginOutcome) => void;
 }
 
+type Field = "email" | "password";
+
 const SUBMIT_LABEL: Record<LoginFormMode, string> = {
-  login: "Log In",
+  login: "Đăng nhập",
   "add-account": "Thêm tài khoản",
 };
 
-// Backend error messages are lowercase sentence fragments (e.g. "invalid
-// email or password" — backend/internal/common/errors.go) meant to be
-// embedded in JSON, not shown verbatim as UI copy.
-function capitalize(text: string): string {
-  return text.length ? text.charAt(0).toUpperCase() + text.slice(1) : text;
+const COPY = {
+  emailLabel: "Email",
+  emailPlaceholder: "ten@email.com",
+  passwordLabel: "Mật khẩu",
+  showPassword: "Hiện mật khẩu",
+  hidePassword: "Ẩn mật khẩu",
+  failed: "Chưa đăng nhập được. Thử lại.",
+} as const;
+
+// The server's messages are English fragments meant for logs ("invalid email
+// or password"), so login failures are worded here, by error code.
+const ERROR_COPY: Record<string, string> = {
+  // Never says which of the two was wrong.
+  INVALID_CREDENTIALS: "Email hoặc mật khẩu không đúng.",
+  // LoginRateLimiter / LoginAccountRateLimiter: a 15-minute window.
+  RATE_LIMITED: "Đăng nhập sai quá nhiều lần. Thử lại sau 15 phút.",
+  ACCOUNT_NOT_ACTIVATED: "Tài khoản chưa kích hoạt. Mở email mời để kích hoạt.",
+  ACCOUNT_DISABLED: "Tài khoản đã bị khóa. Liên hệ admin.",
+};
+
+const FIELD_HEIGHT = 56;
+const FIELD_RADIUS = 16;
+
+function loginErrorMessage(error: unknown): string {
+  if (isNetworkError(error)) return getErrorMessage(error, COPY.failed);
+  return ERROR_COPY[getErrorCode(error) ?? ""] ?? COPY.failed;
 }
 
-export function LoginForm({ mode = "login", initialEmail, onDone }: LoginFormProps) {
+// Labelled fields over a full-width primary button. The field being typed in
+// carries the accent border, so it is clear where the keyboard is writing.
+export function LoginForm({ mode = "login", initialEmail, hideEmail = false, onDone }: LoginFormProps) {
   const colors = useColors();
   const styles = useStyles();
   const [email, setEmail] = useState(initialEmail ?? "");
-  // Test-account convenience on the login screen only — "+ Thêm tài khoản"
-  // is logging in a *different* User, so a carried-over password is wrong.
-  const [password, setPassword] = useState(mode === "login" ? "00000000" : "");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [focused, setFocused] = useState<Field | null>(null);
   const login = useLoginMutation();
   const passwordRef = useRef<TextInput>(null);
 
@@ -50,97 +80,121 @@ export function LoginForm({ mode = "login", initialEmail, onDone }: LoginFormPro
     );
   };
 
+  const focusProps = (field: Field) => ({
+    onFocus: () => setFocused(field),
+    onBlur: () => setFocused((current) => (current === field ? null : current)),
+  });
+
   return (
     <View style={styles.form}>
-      <TextInput
-        value={email}
-        onChangeText={setEmail}
-        placeholder="Email"
-        placeholderTextColor={colors.textMuted}
-        autoCapitalize="none"
-        keyboardType="email-address"
-        // "Next" (rather than the default "return", which does nothing but
-        // insert a newline) both reads as "input done here" and jumps
-        // straight to Password — matches the two-field email→password flow
-        // this form is always used for.
-        returnKeyType="next"
-        onSubmitEditing={() => passwordRef.current?.focus()}
-        blurOnSubmit={false}
-        style={styles.input}
-      />
-      <View style={styles.passwordRow}>
-        <TextInput
-          ref={passwordRef}
-          value={password}
-          onChangeText={setPassword}
-          placeholder="Password"
-          placeholderTextColor={colors.textMuted}
-          secureTextEntry={!showPassword}
-          // "Done" both dismisses the keyboard on submit and, since it's the
-          // last field, doubles as the login action.
-          returnKeyType="done"
-          onSubmitEditing={() => {
-            Keyboard.dismiss();
-            submit();
-          }}
-          style={styles.passwordInput}
-        />
-        <Pressable onPress={() => setShowPassword((v) => !v)} hitSlop={8} style={styles.eyeButton}>
-          {showPassword ? (
-            <EyeOffIcon size={20} color={colors.textSecondary} />
-          ) : (
-            <EyeIcon size={20} color={colors.textSecondary} />
-          )}
-        </Pressable>
+      <View style={styles.fields}>
+        {hideEmail ? null : (
+          <View style={styles.field}>
+            <Text style={styles.label}>{COPY.emailLabel}</Text>
+            <TextInput
+              value={email}
+              onChangeText={setEmail}
+              placeholder={COPY.emailPlaceholder}
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              autoComplete="email"
+              textContentType="username"
+              // "Next" jumps straight to the password, the only field after it.
+              returnKeyType="next"
+              onSubmitEditing={() => passwordRef.current?.focus()}
+              submitBehavior="submit"
+              accessibilityLabel={COPY.emailLabel}
+              style={[styles.box, styles.input, focused === "email" && styles.boxFocused]}
+              testID="input-login-email"
+              {...focusProps("email")}
+            />
+          </View>
+        )}
+        <View style={styles.field}>
+          <Text style={styles.label}>{COPY.passwordLabel}</Text>
+          <View style={[styles.box, styles.passwordRow, focused === "password" && styles.boxFocused]}>
+            <TextInput
+              ref={passwordRef}
+              value={password}
+              onChangeText={setPassword}
+              placeholderTextColor={colors.textMuted}
+              secureTextEntry={!showPassword}
+              autoComplete="current-password"
+              textContentType="password"
+              autoFocus={hideEmail}
+              // "Done" is the last field's submit: it closes the keyboard and logs in.
+              returnKeyType="done"
+              onSubmitEditing={() => {
+                Keyboard.dismiss();
+                submit();
+              }}
+              accessibilityLabel={COPY.passwordLabel}
+              style={[styles.input, styles.passwordInput]}
+              testID="input-login-password"
+              {...focusProps("password")}
+            />
+            <Pressable
+              onPress={() => setShowPassword((v) => !v)}
+              hitSlop={4}
+              style={styles.eyeButton}
+              accessibilityRole="button"
+              accessibilityLabel={showPassword ? COPY.hidePassword : COPY.showPassword}
+            >
+              {showPassword ? (
+                <EyeOffIcon size={22} color={colors.textSecondary} />
+              ) : (
+                <EyeIcon size={22} color={colors.textSecondary} />
+              )}
+            </Pressable>
+          </View>
+        </View>
       </View>
       {login.isError ? (
         <View style={styles.errorBox}>
-          <Text style={styles.error}>{capitalize(getErrorMessage(login.error, "Login failed"))}</Text>
+          <Text style={styles.error}>{loginErrorMessage(login.error)}</Text>
         </View>
       ) : null}
       <PillButton
         label={SUBMIT_LABEL[mode]}
         loading={login.isPending}
-        variant="outline"
         disabled={!email || !password}
         onPress={submit}
-        style={styles.button}
-        textStyle={{color: colors.green}}
+        style={[styles.button, hideEmail ? styles.buttonTight : styles.buttonLoose]}
+        textStyle={styles.buttonLabel}
+        testID="btn-login-submit"
       />
     </View>
   );
 }
 
 const useStyles = createStyles((colors) => ({
-  form: { width: "100%", gap: spacing.md },
+  form: { width: "100%", gap: spacing.lg },
+  fields: { gap: 20 },
+  field: { gap: spacing.sm },
+  label: { ...typography.label, fontWeight: "500", color: colors.textSecondary },
+  box: {
+    height: FIELD_HEIGHT,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.surfaceBorder,
+    borderRadius: FIELD_RADIUS,
+  },
+  boxFocused: { borderColor: colors.green },
   input: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    borderRadius: radii.listCard,
     paddingHorizontal: spacing.lg,
-    paddingVertical: 14,
     color: colors.textPrimary,
-    ...typography.body,
+    fontSize: 17,
   },
-  passwordRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    borderRadius: radii.listCard,
-    paddingRight: spacing.md,
-  },
-  passwordInput: {
-    flex: 1,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: 14,
-    color: colors.textPrimary,
-    ...typography.body,
-  },
-  eyeButton: { padding: spacing.xs },
-  button: { marginTop: spacing.sm, backgroundColor: colors.greenDark },
+  passwordRow: { flexDirection: "row", alignItems: "center", paddingRight: 4 },
+  passwordInput: { flex: 1, height: "100%" },
+  eyeButton: { width: 48, height: 48, alignItems: "center", justifyContent: "center" },
+  button: { height: FIELD_HEIGHT, borderRadius: FIELD_RADIUS },
+  // A lone password field sits close to its button; a two-field form gets air.
+  buttonTight: { marginTop: 0 },
+  buttonLoose: { marginTop: spacing.sm },
+  buttonLabel: { fontSize: 16 },
   errorBox: {
     backgroundColor: withAlpha(colors.peach, 0.12),
     borderWidth: 1,

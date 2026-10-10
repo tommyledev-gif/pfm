@@ -14,3 +14,17 @@ interface QueryStatusLike {
 export function isWaitingForNetwork(query: QueryStatusLike): boolean {
   return query.isPending && query.fetchStatus === "paused";
 }
+
+/**
+ * True while a query has nothing to show yet and can still get it: the first
+ * fetch, or the saved cache still being read back (useQuery is told
+ * "restoring" then, and sits pending without fetching — isLoading is false
+ * during that window). Screens show their skeleton for exactly this, so they
+ * go skeleton → content once, never empty state → content.
+ *
+ * Check isWaitingForNetwork first: a paused query is pending too, but it is
+ * waiting for a network that may not come.
+ */
+export function isAwaitingFirstData(query: QueryStatusLike): boolean {
+  return query.isPending && query.fetchStatus !== "paused";
+}

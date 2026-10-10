@@ -4,7 +4,8 @@ import { Modal, Pressable, Text, View } from "react-native";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { MAX_SAVED_ACCOUNTS } from "@/lib/constants";
 import { createStyles, radii, spacing, typography } from "@/lib/theme";
-import { isAccountExpired, useAccountRegistryStore } from "@/features/accounts/account-registry-store";
+import { REMOVE_ACCOUNT_COPY } from "@/features/accounts/account-copy";
+import { accountDisplayName, isAccountExpired, useAccountRegistryStore } from "@/features/accounts/account-registry-store";
 import { AccountRow } from "@/features/accounts/components/AccountRow";
 import { useSavedAccounts } from "@/features/accounts/hooks/use-saved-accounts";
 import { switchToAccount } from "@/features/accounts/switch-account";
@@ -20,10 +21,6 @@ interface AccountSwitchDialogProps {
 const TITLE = "Chuyển tài khoản";
 const ADD_LABEL = "+ Thêm tài khoản";
 const LIMIT_HINT = `Đã đạt tối đa ${MAX_SAVED_ACCOUNTS} tài khoản trên thiết bị này`;
-const REMOVE_TITLE = "Gỡ tài khoản?";
-const REMOVE_CONFIRM = "Gỡ";
-
-const removeMessage = (email: string) => `Gỡ ${email} khỏi thiết bị này? Lần sau cần đăng nhập lại bằng mật khẩu.`;
 
 /**
  * Every saved account (spec US-02 step 4): the active one first, labelled
@@ -92,9 +89,10 @@ export function AccountSwitchDialog({ visible, onClose, onAddAccount }: AccountS
 
       <ConfirmDialog
         visible={pendingRemoval !== null}
-        title={REMOVE_TITLE}
-        message={pendingRemoval ? removeMessage(pendingRemoval.email) : ""}
-        confirmLabel={REMOVE_CONFIRM}
+        title={pendingRemoval ? REMOVE_ACCOUNT_COPY.title(accountDisplayName(pendingRemoval)) : ""}
+        message={REMOVE_ACCOUNT_COPY.message}
+        confirmLabel={REMOVE_ACCOUNT_COPY.confirm}
+        cancelLabel={REMOVE_ACCOUNT_COPY.cancel}
         onConfirm={confirmRemoval}
         onCancel={() => setPendingRemoval(null)}
         testID="dialog-account-remove"
