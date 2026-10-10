@@ -3,8 +3,14 @@ import { Animated, Easing, LayoutChangeEvent, Pressable, View } from "react-nati
 import { useRouter, usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
+// Deep imports, one file per icon: Metro does not tree-shake, so the package
+// root would pull every Phosphor icon (all six weights) into the bundle.
+import { ChartBarIcon } from "phosphor-react-native/src/icons/ChartBar";
+import { ChatCircleDotsIcon } from "phosphor-react-native/src/icons/ChatCircleDots";
+import { HouseIcon } from "phosphor-react-native/src/icons/House";
+import { ListBulletsIcon } from "phosphor-react-native/src/icons/ListBullets";
+import { UserIcon } from "phosphor-react-native/src/icons/User";
 
-import { BarChartIcon, HomeIcon, ListIcon, SparkleIcon, UserIcon } from "@/components/ui/Icon";
 import { NavBallLight } from "@/components/shared/NavBallLight";
 import { useColors } from "@/lib/theme";
 import {
@@ -21,11 +27,14 @@ import {
   useStyles,
 } from "@/components/shared/bottom-nav-styles";
 
+// Phosphor, two weights of the same glyph: "regular" in the row, "fill" on
+// the ball, so the active tab reads as active from its shape alone. AI Chat
+// is a chat bubble rather than a sparkle: it says "chat" at 22px.
 export const TABS = [
-  { href: "/", Icon: HomeIcon },
-  { href: "/transactions", Icon: ListIcon },
-  { href: "/ai-chat", Icon: SparkleIcon },
-  { href: "/insights", Icon: BarChartIcon },
+  { href: "/", Icon: HouseIcon },
+  { href: "/transactions", Icon: ListBulletsIcon },
+  { href: "/ai-chat", Icon: ChatCircleDotsIcon },
+  { href: "/insights", Icon: ChartBarIcon },
   { href: "/settings", Icon: UserIcon },
 ] as const;
 
@@ -34,7 +43,16 @@ export const TABS = [
 // showing Settings as active while on any of these instead of freezing on
 // whichever tab was active before the push, which read as the nav losing
 // track of where you are.
-const SETTINGS_SUB_ROUTES = ["/appearance", "/wallets", "/categories", "/users", "/audit-logs", "/developer", "/security"];
+const SETTINGS_SUB_ROUTES = [
+  "/appearance",
+  "/wallets",
+  "/categories",
+  "/users",
+  "/audit-logs",
+  "/developer",
+  "/security",
+  "/edit-profile",
+];
 
 // Bottom nav — mobile/design_handoff_pfm_app/README.md "Design tokens" (nav)
 // + "Interactions summary". The bar itself sits flush against the screen's
@@ -221,7 +239,7 @@ export function BottomNav() {
               hitSlop={8}
             >
               <Animated.View style={{ opacity: rowOpacities[index] }}>
-                <Icon size={22} color={colors.textSecondary} />
+                <Icon size={22} color={colors.textSecondary} weight="regular" />
               </Animated.View>
             </Pressable>
           ))}
@@ -271,7 +289,7 @@ export function BottomNav() {
         ]}
       >
         <Animated.View style={{ opacity: iconOpacity, transform: [{ scale: iconScale }] }}>
-          <DisplayIcon size={22} color={colors.onGreen} />
+          <DisplayIcon size={22} color={colors.onGreen} weight="fill" />
         </Animated.View>
       </Animated.View>
     </View>

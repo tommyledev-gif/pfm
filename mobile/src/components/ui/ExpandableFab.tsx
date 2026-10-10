@@ -8,9 +8,14 @@ import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme
 import { useReduceMotion } from "@/lib/use-reduce-motion";
 
 const OPEN_MS = 220;
-// How far each action travels in from the main button. The one further
-// out starts further away, so the row reads as unfolding out of the button.
+// How far each action travels up from the main button. The one further
+// out starts further away, so the stack reads as unfolding out of the button.
 const SLIDE_PER_SLOT = 24;
+// Each action sits this much further left than the one above it, so the
+// stack bends around the main button like an arc instead of a straight
+// column: the top action lines up with the button's right edge, the one
+// just above the button ends at its center.
+const ARC_STEP = FAB_SIZE / 2;
 // Each action trails the one nearer the button by this share of the motion.
 const STAGGER = 0.2;
 
@@ -23,7 +28,7 @@ export interface FabAction {
 }
 
 interface ExpandableFabProps {
-  /** Laid out left to right, all to the left of the main button. */
+  /** Stacked top to bottom, all above the main button. */
   actions: FabAction[];
   accessibilityLabel: string;
   testID?: string;
@@ -32,9 +37,9 @@ interface ExpandableFabProps {
 }
 
 /**
- * A Fab that opens into a row of labelled actions to its left. The plus
+ * A Fab that opens into a stack of labelled actions above it. The plus
  * turns into an × while open; tapping it again, or anywhere else in the
- * host, folds the row back. Picking an action closes the row first.
+ * host, folds the stack back. Picking an action closes it first.
  *
  * Sits exactly where a plain Fab would (same size and bottom offset), so a
  * screen can swap one for the other without its list padding changing.
@@ -67,7 +72,7 @@ export function ExpandableFab({ actions, accessibilityLabel, testID, style }: Ex
 
   return (
     <>
-      {/* Catches a tap anywhere else in the host, so the row never stays
+      {/* Catches a tap anywhere else in the host, so the stack never stays
           open behind the User's back. Transparent: a dim limited to the
           host's padded box would show hard edges. */}
       {open ? <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} accessible={false} /> : null}
@@ -84,10 +89,14 @@ export function ExpandableFab({ actions, accessibilityLabel, testID, style }: Ex
             const slot = actions.length - 1 - index;
             const start = Math.min(slot * STAGGER, 0.6);
             const local = progress.interpolate({ inputRange: [start, 1], outputRange: [0, 1], extrapolate: "clamp" });
-            const translateX = local.interpolate({ inputRange: [0, 1], outputRange: [SLIDE_PER_SLOT * (slot + 1), 0] });
+            const translateY = local.interpolate({ inputRange: [0, 1], outputRange: [SLIDE_PER_SLOT * (slot + 1), 0] });
             const scale = local.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] });
+            const arcInset = ARC_STEP * index;
             return (
-              <Animated.View key={action.key} style={{ opacity: local, transform: [{ translateX }, { scale }] }}>
+              <Animated.View
+                key={action.key}
+                style={{ marginRight: arcInset, opacity: local, transform: [{ translateY }, { scale }] }}
+              >
                 <Pressable
                   testID={action.testID}
                   accessibilityRole="button"
@@ -129,11 +138,10 @@ const useStyles = createStyles((colors) => ({
   container: {
     position: "absolute",
     right: spacing.xl,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
+    alignItems: "flex-end",
+    gap: spacing.md,
   },
-  actions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  actions: { alignItems: "flex-end", gap: spacing.sm },
   action: {
     flexDirection: "row",
     alignItems: "center",

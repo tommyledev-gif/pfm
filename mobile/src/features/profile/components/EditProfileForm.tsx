@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 
-import { Drawer } from "@/components/shared/Drawer";
 import { Avatar } from "@/components/ui/Avatar";
 import { PillButton } from "@/components/ui/PillButton";
 import { getErrorMessage } from "@/lib/axios";
@@ -21,12 +20,10 @@ const NAME_MAX_LENGTH = 60;
 const AVATAR_SIZE = 88;
 
 const COPY = {
-  title: "Hồ sơ",
   nameLabel: "Tên",
   namePlaceholder: "Nguyễn Văn A",
   changePhoto: "Đổi ảnh",
   removePhoto: "Xóa ảnh",
-  cancel: "Hủy",
   save: "Lưu",
   saved: "Đã lưu",
   photoChanged: "Đã đổi ảnh",
@@ -37,16 +34,16 @@ const COPY = {
   photosDenied: "Chưa có quyền truy cập ảnh. Cấp quyền trong cài đặt của máy.",
 } as const;
 
-interface EditProfileDrawerProps {
-  visible: boolean;
-  onClose: () => void;
+interface EditProfileFormProps {
+  /** Called once the name has been saved — the screen leaves. */
+  onSaved: () => void;
 }
 
 // The signed-in User's own name and picture (PATCH /users/me, POST and DELETE
 // /users/me/avatar). Name and picture save separately: a picture applies the
 // moment it is picked, like the wallet and category icons, while the name waits
-// for Lưu.
-export function EditProfileDrawer({ visible, onClose }: EditProfileDrawerProps) {
+// for Lưu. Hosted by app/(app)/edit-profile.tsx.
+export function EditProfileForm({ onSaved }: EditProfileFormProps) {
   const colors = useColors();
   const styles = useStyles();
   const requireOnline = useRequireOnline();
@@ -55,17 +52,19 @@ export function EditProfileDrawer({ visible, onClose }: EditProfileDrawerProps) 
   const updateProfile = useUpdateProfileMutation();
   const uploadAvatar = useUploadAvatarMutation();
   const removeAvatar = useRemoveAvatarMutation();
-  const [name, setName] = useState("");
+  const [name, setName] = useState(profile?.full_name ?? "");
+  const edited = useRef(false);
 
+  // The profile may still be loading when the screen opens: fill the field
+  // once it arrives, but never over what the User has already typed.
   useEffect(() => {
-    if (!visible) return;
-    setName(profile?.full_name ?? "");
-    updateProfile.reset();
-    uploadAvatar.reset();
-    removeAvatar.reset();
-    // Re-seed only when the sheet opens, never while the User is typing.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
+    if (!edited.current) setName(profile?.full_name ?? "");
+  }, [profile?.full_name]);
+
+  const changeName = (text: string) => {
+    edited.current = true;
+    setName(text);
+  };
 
   const displayName = accountDisplayName({ email: email ?? "", fullName: profile?.full_name ?? null });
   const trimmed = name.trim();
@@ -76,7 +75,7 @@ export function EditProfileDrawer({ visible, onClose }: EditProfileDrawerProps) 
     updateProfile.mutate(trimmed, {
       onSuccess: () => {
         useToastStore.getState().show(COPY.saved, "info");
-        onClose();
+        onSaved();
       },
     });
   };
@@ -121,9 +120,7 @@ export function EditProfileDrawer({ visible, onClose }: EditProfileDrawerProps) 
         : null;
 
   return (
-    <Drawer visible={visible} onClose={onClose}>
-      <Text style={styles.title}>{COPY.title}</Text>
-
+    <View style={styles.form}>
       <View style={styles.photoBlock}>
         <Avatar name={displayName} iconUrl={profile?.avatar_url} size={AVATAR_SIZE} fallback="initial" />
         <View style={styles.photoActions}>
@@ -151,7 +148,7 @@ export function EditProfileDrawer({ visible, onClose }: EditProfileDrawerProps) 
       <Text style={styles.label}>{COPY.nameLabel}</Text>
       <TextInput
         value={name}
-        onChangeText={setName}
+        onChangeText={changeName}
         placeholder={COPY.namePlaceholder}
         placeholderTextColor={colors.textMuted}
         maxLength={NAME_MAX_LENGTH}
@@ -165,23 +162,20 @@ export function EditProfileDrawer({ visible, onClose }: EditProfileDrawerProps) 
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <View style={styles.actions}>
-        <PillButton label={COPY.cancel} variant="outline" onPress={onClose} style={styles.flexButton} />
-        <PillButton
-          label={COPY.save}
-          onPress={() => requireOnline(save)}
-          loading={updateProfile.isPending}
-          disabled={!canSave || busy}
-          style={styles.flexButton}
-          testID="btn-profile-save"
-        />
-      </View>
-    </Drawer>
+      <PillButton
+        label={COPY.save}
+        onPress={() => requireOnline(save)}
+        loading={updateProfile.isPending}
+        disabled={!canSave || busy}
+        style={styles.saveButton}
+        testID="btn-profile-save"
+      />
+    </View>
   );
 }
 
 const useStyles = createStyles((colors) => ({
-  title: { ...typography.title, color: colors.textPrimary },
+  form: { gap: spacing.md },
   photoBlock: { flexDirection: "row", alignItems: "center", gap: spacing.lg },
   photoActions: { gap: spacing.sm, alignItems: "flex-start" },
   removeLabel: { ...typography.caption, color: colors.peach, paddingHorizontal: spacing.sm },
@@ -197,6 +191,5 @@ const useStyles = createStyles((colors) => ({
     ...typography.body,
   },
   error: { color: colors.peach, ...typography.caption },
-  actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
-  flexButton: { flex: 1 },
+  saveButton: { marginTop: spacing.sm },
 }));

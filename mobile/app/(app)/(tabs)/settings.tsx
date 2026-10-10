@@ -6,6 +6,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import {
   ChevronRightIcon,
   CodeIcon,
+  EditIcon,
   HelpIcon,
   HistoryIcon,
   LogOutIcon,
@@ -32,7 +33,6 @@ import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { totalBalance } from "@/features/wallets/wallet-totals";
 import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary-query";
 import { useProfileQuery } from "@/features/profile/api/use-profile-query";
-import { EditProfileDrawer } from "@/features/profile/components/EditProfileDrawer";
 
 // Help & Support has no mobile screen yet — out of the design
 // handoff's scope (it maps them as entry points only). Wallets/Categories/
@@ -58,8 +58,9 @@ const SETTINGS_ROWS = [
 const USER_SETTINGS_ROWS = [
   { label: "Giao diện", Icon: PaletteIcon, href: "/appearance" as const, adminOnly: false, testID: "row-settings-appearance" },
 ];
+const EDIT_PROFILE_HREF = "/edit-profile" as const;
 type SettingsRow = (typeof SETTINGS_ROWS)[number] | (typeof USER_SETTINGS_ROWS)[number];
-type SettingsHref = NonNullable<SettingsRow["href"]>;
+type SettingsHref = NonNullable<SettingsRow["href"]> | typeof EDIT_PROFILE_HREF;
 // Taps on a menu row closer together than this count as one.
 const ROW_TAP_GUARD_MS = 600;
 
@@ -78,7 +79,6 @@ export default function SettingsScreen() {
   const role = useSessionStore((s) => s.role);
   const userId = useCurrentUserId();
   const [logoutGuardOpen, setLogoutGuardOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
   const { loggingOut, logout } = useLogout();
   const wallets = useWalletsQuery();
   const summary = useReportSummaryQuery();
@@ -120,16 +120,26 @@ export default function SettingsScreen() {
     <Screen>
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.identity}>
-        <Avatar name={name} iconUrl={profile?.avatar_url} size={72} fallback="initial" />
+        {/* The avatar is a way into the profile too — where most people tap first. */}
+        <Pressable
+          onPress={() => openRow(EDIT_PROFILE_HREF)}
+          accessibilityRole="button"
+          accessibilityLabel="Sửa hồ sơ"
+          testID="btn-settings-avatar"
+        >
+          <Avatar name={name} iconUrl={profile?.avatar_url} size={72} fallback="initial" />
+        </Pressable>
         <Text style={styles.name}>{name}</Text>
         {email ? <Text style={styles.email}>{email}</Text> : null}
         <Pressable
-          onPress={() => setProfileOpen(true)}
+          onPress={() => openRow(EDIT_PROFILE_HREF)}
           accessibilityRole="button"
-          hitSlop={spacing.md}
+          accessibilityLabel="Sửa hồ sơ"
+          hitSlop={spacing.sm}
+          style={({ pressed }) => [styles.editProfile, pressed && styles.editProfilePressed]}
           testID="btn-settings-edit-profile"
         >
-          <Text style={styles.editProfile}>Sửa hồ sơ</Text>
+          <EditIcon size={18} color={colors.textSecondary} />
         </Pressable>
       </View>
 
@@ -206,7 +216,6 @@ export default function SettingsScreen() {
         logout();
       }}
     />
-    <EditProfileDrawer visible={profileOpen} onClose={() => setProfileOpen(false)} />
     <BusyOverlay visible={loggingOut} testID="overlay-settings-logout" />
     </Screen>
   );
@@ -218,7 +227,21 @@ const useStyles = createStyles((colors) => ({
   identity: { alignItems: "center", gap: spacing.xs },
   name: { ...typography.title, color: colors.textPrimary, marginTop: spacing.sm },
   email: { ...typography.caption, color: colors.textSecondary },
-  editProfile: { ...typography.caption, color: colors.green, marginTop: spacing.xs },
+  // Top-right of the identity block, out of the centered name/email column.
+  editProfile: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    width: 40,
+    height: 40,
+    borderRadius: radii.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+  },
+  editProfilePressed: { opacity: 0.7 },
   statRow: { flexDirection: "row", gap: spacing.sm },
   // Card's own surface/border/radius (components/ui/Card.tsx), applied to the
   // hold target itself so the whole card is what gets held.

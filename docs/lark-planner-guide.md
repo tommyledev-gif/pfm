@@ -73,7 +73,8 @@ Claude gọi tool `bitable_v1_appTableRecord_search` và trả về danh sách t
 
 | Triệu chứng | Cách xử lý |
 |---|---|
-| `lark ... ✘ Failed to connect` | Chạy `npx -y @larksuiteoapi/lark-mcp@0.5.1 mcp --help`. Nếu lỗi thì do Node/npx hoặc mạng. Sửa xong chạy lại bước 2. |
+| `lark ... ✘ Failed to connect` ngay sau bước 2 trên máy mới | Thường do lần đầu `npx` phải tải package nên quá thời gian chờ. Chạy `npx -y @larksuiteoapi/lark-mcp@0.5.1 mcp --help` một lần để cache, rồi chạy lại `claude mcp list`. |
+| `lark ... ✘ Failed to connect` (vẫn lỗi) | Chạy `npx -y @larksuiteoapi/lark-mcp@0.5.1 mcp --help`. Nếu lỗi thì do Node/npx hoặc mạng. Sửa xong chạy lại bước 2. |
 | Claude không thấy tool Lark | Chưa mở session mới (bước 3). |
 | Lỗi `invalid app_secret` / `99991663` | App Secret sai hoặc đã bị reset trên console. Sửa `lark-credentials.json` rồi chạy lại bước 2. |
 | Lỗi quyền (`99991672`, `Forbidden`) trên Base | App mất quyền vào Base. Mở Base → `...` → **More** → **Add Document App** → thêm app **example** quyền edit. |
