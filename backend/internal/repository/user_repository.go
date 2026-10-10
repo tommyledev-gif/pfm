@@ -148,6 +148,26 @@ func (r *UserRepository) SetTokensValidAfter(ctx context.Context, id uuid.UUID, 
 	return affected > 0, nil
 }
 
+// UpdateFullName returns pgx.ErrNoRows (wrapped) for an unknown or
+// soft-deleted user.
+func (r *UserRepository) UpdateFullName(ctx context.Context, id uuid.UUID, fullName string) (*model.User, error) {
+	row, err := r.q.UpdateUserFullName(ctx, id, fullName)
+	if err != nil {
+		return nil, fmt.Errorf("repository.UpdateFullName: %w", err)
+	}
+	return toModel(row), nil
+}
+
+// SetAvatarURL stores the avatar URL, or clears it when avatarURL is nil.
+// Returns pgx.ErrNoRows (wrapped) for an unknown or soft-deleted user.
+func (r *UserRepository) SetAvatarURL(ctx context.Context, id uuid.UUID, avatarURL *string) (*model.User, error) {
+	row, err := r.q.SetUserAvatarURL(ctx, id, avatarURL)
+	if err != nil {
+		return nil, fmt.Errorf("repository.SetAvatarURL: %w", err)
+	}
+	return toModel(row), nil
+}
+
 func toModel(row sqlc.User) *model.User {
 	return &model.User{
 		ID:                row.ID,
@@ -166,5 +186,6 @@ func toModel(row sqlc.User) *model.User {
 		InviteSentAt:      row.InviteSentAt,
 		InviteResendCount: row.InviteResendCount,
 		TokensValidAfter:  row.TokensValidAfter,
+		AvatarURL:         row.AvatarURL,
 	}
 }

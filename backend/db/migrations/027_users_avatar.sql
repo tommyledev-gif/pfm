@@ -1,0 +1,11 @@
+-- User avatar (mobile Account screen).
+--
+-- avatar_url is the public URL of an uploaded avatar image (R2, under the
+-- "avatars/" key prefix, always a PNG or JPEG re-encoded by the server).
+-- NULL means no avatar: clients show their fallback (the logo / initials).
+--
+-- ⚠️ Apply BEFORE the backend that reads this column starts: every users
+-- query selects it, so without this column login fails (42703). Deploy:
+-- cmd/migrate (backend/deploy.sh) applies it before `up -d`. Idempotent, same
+-- convention as 022-026.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT NULL;

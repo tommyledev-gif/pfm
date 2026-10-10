@@ -37,6 +37,10 @@ type UserResponse struct {
 	Role        string     `json:"role"`
 	ActivatedAt *time.Time `json:"activated_at"`
 	CreatedAt   time.Time  `json:"created_at"`
+	// AvatarURL is null when the user has no avatar. Filled only by the
+	// queries that select it (GetUserByID and the profile queries), so it is
+	// null in the admin user list.
+	AvatarURL *string `json:"avatar_url"`
 	// InviteResendAvailableAt is set only for pending users: the earliest
 	// moment POST /admin/users/:id/resend-invite will accept, so a client can
 	// show a countdown instead of a button that 429s. Not sensitive — it
@@ -53,6 +57,7 @@ func NewUserResponse(u *model.User) UserResponse {
 		Role:        string(u.Role),
 		ActivatedAt: u.ActivatedAt,
 		CreatedAt:   u.CreatedAt,
+		AvatarURL:   u.AvatarURL,
 
 		InviteResendAvailableAt: inviteResendAvailableAt(u),
 	}

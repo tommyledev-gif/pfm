@@ -1,0 +1,35 @@
+name: AI Service Test
+
+# Reusable workflow (workflow_call), same pattern as backend-test.yml: one
+# definition for the PR check and for the gate before deploy-ai-service.yml
+# builds an image. Offline tests only — the `live` marker (real Groq calls) is
+# opt-in with PFM_LIVE_LLM=1 and stays off here.
+on:
+  workflow_call:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: ai-service
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            ai-service/requirements.txt
+            ai-service/requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Test
+        run: python -m pytest -q

@@ -51,6 +51,19 @@ if [ -n "$missing" ]; then
   exit 1
 fi
 
+# A JWT_SECRET under 32 bytes is guessable offline from any token, after which
+# anyone can mint a token for any user. The server itself refuses to start with
+# one (internal/config), but by then compose has already replaced the working
+# container and the health check would take minutes to give up and roll back.
+# Refuse here instead, before anything is pulled or recreated. Only the length
+# is read, never the value.
+jwt_secret_length="$(awk -F= '/^[[:space:]]*JWT_SECRET=/ { v = substr($0, index($0, "=") + 1); gsub(/\r/, "", v); gsub(/^["\047]|["\047]$/, "", v); n = length(v) } END { print n + 0 }' "$ENV_FILE_PATH")"
+if [ "$jwt_secret_length" -lt 32 ]; then
+  echo "Refusing to deploy — JWT_SECRET in $ENV_FILE_PATH is $jwt_secret_length bytes; it must be at least 32." >&2
+  echo "Generate one with: openssl rand -hex 32, and update the VPS_ENV_PROD secret (docs/ops-runbook.md §6)." >&2
+  exit 1
+fi
+
 env_has() { grep -qE "^[[:space:]]*$1=.+" "$ENV_FILE_PATH"; }
 
 # Cloudflare Tunnel (docs/ops-runbook.md). The tunnel service only starts

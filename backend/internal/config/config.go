@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 )
 
 // Config is read once at startup from environment variables (Docker Compose
@@ -45,7 +46,19 @@ type Config struct {
 	R2SecretAccessKey string
 	R2Bucket          string
 	R2PublicBaseURL   string
+
+	// DBMaxConns caps the pgx pool. pgx's own default is max(4, CPU count),
+	// which on a small VPS is a handful of connections for the whole API.
+	DBMaxConns int32
 }
+
+// MinJWTSecretBytes is the shortest JWT_SECRET accepted. The same key signs
+// every access, refresh, switch and import token, and HS256 is only as strong
+// as that key: a short one is guessable offline from any token, after which
+// anyone can mint a token for any user or role.
+const MinJWTSecretBytes = 32
+
+const defaultDBMaxConns = 10
 
 func Load() (*Config, error) {
 	cfg := &Config{
@@ -76,7 +89,31 @@ func Load() (*Config, error) {
 	if cfg.JWTSecret == "" {
 		return nil, fmt.Errorf("config.Load: JWT_SECRET is required")
 	}
+	if len(cfg.JWTSecret) < MinJWTSecretBytes {
+		return nil, fmt.Errorf("config.Load: JWT_SECRET must be at least %d bytes (got %d) — generate one with `openssl rand -hex 32`", MinJWTSecretBytes, len(cfg.JWTSecret))
+	}
+
+	maxConns, err := getEnvInt("DB_MAX_CONNS", defaultDBMaxConns)
+	if err != nil {
+		return nil, err
+	}
+	cfg.DBMaxConns = int32(maxConns)
 	return cfg, nil
+}
+
+// getEnvInt reads a positive integer, falling back to def when unset. A set
+// but invalid value is an error rather than a silent default: a typo in
+// DB_MAX_CONNS should stop the deploy, not quietly run with another limit.
+func getEnvInt(key string, def int) (int, error) {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return def, nil
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 1 || n > 1000 {
+		return 0, fmt.Errorf("config.Load: %s must be an integer between 1 and 1000, got %q", key, raw)
+	}
+	return n, nil
 }
 
 func getEnvOrDefault(key, fallback string) string {

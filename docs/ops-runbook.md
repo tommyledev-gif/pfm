@@ -48,3 +48,47 @@ The `<rclone env>` file uses the same `RCLONE_CONFIG_R2_*` lines that `ops/lib.s
 7. **(dashboard)** SSL/TLS → Edge Certificates → Always Use HTTPS **on**, so browser → Cloudflare is never HTTP either.
 
 **Rollback:** remove `BACKEND_BIND_ADDRESS` (or set it to `0.0.0.0`) and deploy, then point DNS back to an A record for the VPS IP.
+
+## 4. Cloudflare edge rules on the Free plan
+
+Everything here is **(dashboard)** work: nothing ships with a deploy. The Free plan is small on purpose, so this section says what it can and cannot do (limits from [Cloudflare's rate limiting docs](https://developers.cloudflare.com/waf/rate-limiting-rules/) and [managed rules docs](https://developers.cloudflare.com/waf/managed-rules/); check them before relying on a number).
+
+**What the edge can do on Free**
+- **One rate limiting rule**, counted per IP only, over a fixed 10-second window, action Block for 10 seconds. It stops bursts, not a slow guessing run. Suggested rule: URI path starts with `/api/v1/auth/` → block above 20 requests per 10 seconds per IP. Keep it loose: mobile carriers put many users behind one IP.
+- **Custom WAF rules** (5 on Free). Suggested: block any request whose path does not start with `/api/v1/` or `/activate`; block methods other than GET, POST, PATCH, DELETE, OPTIONS.
+- **Free Managed Ruleset**: leave on. It is a short list of high-severity rules, not the OWASP Top 10.
+
+**What it cannot do**
+- **Per-account or per-device limits at the edge.** Counting by header or JSON field is Enterprise-only (Advanced Rate Limiting). These live in the app instead: `LoginRateLimiter` (10 attempts per IP per 15 min), `LoginAccountRateLimiter` (10 failed logins per email per 15 min, from any IP) and `UploadRateLimiter` (`backend/internal/middleware/rate_limit.go`).
+- **OWASP Core Ruleset.** Pro plan and up. Until then, SQL injection is covered by the code (parameterised queries only), not the edge.
+
+**Do not turn on Bot Fight Mode** for the zone that serves the API. On Free it cannot be exempted per path, and it can issue challenges that the mobile app (axios) cannot solve, which would lock every user out. There is nothing to scrape here anyway: the API is invite-only and every route but login, refresh, switch, activation and health needs a token.
+
+## 5. Sessions
+
+A signed-in device is one row in `sessions` (migration 028). Access and refresh tokens carry its id as `sid`, and `JWTAuth` checks the row on every request.
+
+- **Limits:** 5 live sessions per user (the least recently used is revoked when a 6th starts), 7 days idle, 30 days absolute (`backend/internal/common/constants_session.go`).
+- **Instant revocation:** logout, "sign out everywhere" (self or admin), a disabled user and a reused refresh token all stop the session's access token on its next request.
+- **Reuse detection:** only the newest refresh token (and the one before it, for 5 minutes, so a refresh whose response was lost in a tunnel can be retried) is accepted. Anything older revokes the whole session. A `refresh token reuse: session revoked` warning in the log means a copy of a token was replayed.
+- **Look at them:** `SELECT id, created_at, last_used_at, expires_at, revoked_at, revoked_reason FROM sessions WHERE user_id = '<id>' ORDER BY created_at DESC;`
+- **Retention:** rows revoked or past their hard stop for 7 days are deleted every 6 hours, together with expired `revoked_tokens` rows.
+- **Pre-session refresh tokens** (issued before this release) are accepted once and swapped for a session-bound pair, so nobody is signed out by the release. The window closes by itself 7 days after migration 028 was applied (`pre-session refresh tokens accepted until` in the startup log), when every such token has expired anyway; after that a session-less refresh token is refused. That branch in `AuthService.Refresh` can be deleted then. If the ledger cannot be read the window stays shut.
+
+**Known limits** (from an independent review of this change)
+- **Switch tokens are not tied to a database row.** A token signed with a leaked `JWT_SECRET` for a known user id can still be redeemed at `/auth/switch` for a session. Access tokens and (after the window above) refresh tokens cannot be forged that way, because they need a live session. Rotating the secret ends it; binding switch tokens to a table would close it for good.
+- **Failed-login lockout is a trade-off.** Anyone who knows an email can fail logins on purpose and keep that account from signing in for 15 minutes at a time.
+- **The web app does not refresh or log out on cookie expiry**, so each web sign-in leaves a session that is never used again. With five sessions allowed, a few web sign-ins can push out a phone that has been idle for days. Fine while the web app is not deployed; wire a refresh route before it is.
+- **The web proxy forwards no client IP**, so every web login shares one per-IP bucket (it did before sessions too).
+
+## 6. Secret rotation (do this once)
+
+`backend/.env.prod` was committed to git between 2026-08-17 and 2026-08-21 and removed on 2026-08-21, so every value in those versions is still readable in the history of anything that cloned the repo. Both the server and `deploy.sh` now refuse a `JWT_SECRET` shorter than 32 bytes. `deploy.sh` checks before it pulls or recreates anything, so until step 1 is done the next backend deploy stops with an error and the running release is left alone.
+
+1. **`JWT_SECRET`**: set a new `openssl rand -hex 32` value in `VPS_ENV_PROD`. Everyone signs in again once.
+2. **`GROQ_API_KEY`**: revoke in the Groq console, issue a new one.
+3. **R2 keys** (`R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, and the `BACKUP_R2_*` pair): delete and recreate the API token in Cloudflare.
+4. **SMTP password**: revoke the app password, create a new one.
+5. **Admin password**: set a new strong `SEED_ADMIN_PASSWORD` in `VPS_ENV_PROD` and deploy; `cmd/seed` re-syncs the admin's password hash on every deploy. There is no change-password screen yet.
+6. **`POSTGRES_PASSWORD`**: changing it in the env file alone does not change it inside the existing volume; run `ALTER USER` first, then update the file.
+7. Optionally purge the file from history (`git filter-repo --path backend/.env.prod --invert-paths`, then force-push). Rotation is what protects you; purging only stops new clones from seeing the old values.

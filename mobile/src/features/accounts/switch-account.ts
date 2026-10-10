@@ -64,7 +64,7 @@ async function runSwitch(userId: string): Promise<SwitchOutcome> {
     toast(SWITCH_COPY.offline);
     return "failed";
   }
-  if (!(await passSwitchIdentityCheck())) return "cancelled";
+  if (!(await passSwitchIdentityCheck(account.role))) return "cancelled";
 
   useSwitchProgressStore.getState().setSwitching(true);
   await flushChatWithin(SWITCH_CHAT_FLUSH_TIMEOUT_MS);

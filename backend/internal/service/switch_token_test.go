@@ -23,6 +23,8 @@ type switchFixture struct {
 	auth     *AuthService
 	switches *AccountSwitchService
 	sessions *SessionRevocationService
+	sessionSvc *SessionService
+	sessionRepo *fakeSessionRepo
 }
 
 func newSwitchFixture(t *testing.T) *switchFixture {
@@ -30,14 +32,18 @@ func newSwitchFixture(t *testing.T) *switchFixture {
 	tokens := NewTokenService(testSwitchSigningKey)
 	users := newFakeUserRepo()
 	revoked := newFakeRevokedTokenRepo()
-	switches := NewAccountSwitchService(users, revoked, tokens, zap.NewNop())
+	sessionRepo := newFakeSessionRepo(newTestClock(), users)
+	sessionSvc := NewSessionService(sessionRepo, tokens, zap.NewNop())
+	switches := NewAccountSwitchService(users, revoked, tokens, sessionSvc, zap.NewNop())
 	return &switchFixture{
 		tokens:   tokens,
 		users:    users,
 		revoked:  revoked,
-		auth:     NewAuthService(users, revoked, tokens, zap.NewNop()),
+		auth:     NewAuthService(users, revoked, tokens, sessionSvc, zap.NewNop()),
 		switches: switches,
-		sessions: NewSessionRevocationService(users, switches, zap.NewNop()),
+		sessions: NewSessionRevocationService(users, switches, sessionSvc, zap.NewNop()),
+		sessionSvc: sessionSvc,
+		sessionRepo: sessionRepo,
 	}
 }
 

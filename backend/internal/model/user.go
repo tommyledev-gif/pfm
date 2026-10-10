@@ -46,4 +46,7 @@ type User struct {
 	// TokensValidAfter is the sign-out-everywhere point (mig 025, UTC, whole
 	// seconds; nil = never used). Populated only by GetUserByID.
 	TokensValidAfter *time.Time
+	// AvatarURL is the public URL of the uploaded avatar (mig 027); nil = none.
+	// Populated only by GetUserByID and the profile queries.
+	AvatarURL *string
 }

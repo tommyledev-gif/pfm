@@ -1,5 +1,6 @@
 import * as LocalAuthentication from "expo-local-authentication";
 
+import { UserRole } from "@/lib/constants";
 import { useSecurityPrefsStore } from "@/stores/security-prefs-store";
 import { useToastStore } from "@/stores/toast-store";
 
@@ -11,6 +12,8 @@ const CANCEL_LABEL = "Hủy";
 export const IDENTITY_CHECK_FAILED_MESSAGE = "Không xác minh được. Chưa chuyển tài khoản.";
 const NO_LOCK_WARNING =
   "Máy chưa cài khóa màn hình nên ai cầm máy cũng có thể chuyển tài khoản. Hãy cài khóa màn hình trong cài đặt của máy.";
+export const NO_LOCK_ADMIN_BLOCKED_MESSAGE =
+  "Máy chưa có khóa màn hình nên chưa chuyển sang tài khoản admin. Cài khóa màn hình rồi thử lại.";
 
 const CANCELLED_ERRORS: readonly LocalAuthentication.LocalAuthenticationError[] = [
   "user_cancel",
@@ -62,14 +65,24 @@ export function warnNoLockOnce(): void {
 
 /**
  * The gate every saved-account switch passes through (BR-14): true = go on.
- * Off → no prompt (AC-30). No lock → go on with the one-time warning.
- * Cancelled → silently stop; failed → toast and stop.
+ * Off → no prompt (AC-30). Cancelled → silently stop; failed → toast and stop.
+ *
+ * No screen lock on the phone: nothing can confirm who is holding it. Going on
+ * is acceptable for an ordinary account (one-time warning, BR-15), but never
+ * for an admin account, whose switch would hand the holder invites and every
+ * other member's session controls. That one stops here, with a toast saying
+ * how to proceed. A debug build keeps the old behaviour so an emulator, which
+ * usually has no lock, can still switch.
  */
-export async function passSwitchIdentityCheck(): Promise<boolean> {
+export async function passSwitchIdentityCheck(targetRole: UserRole): Promise<boolean> {
   if (!useSecurityPrefsStore.getState().identityCheckEnabled) return true;
   const result = await confirmOwner();
   if (result === "passed") return true;
   if (result === "unavailable") {
+    if (targetRole === "admin" && !__DEV__) {
+      useToastStore.getState().show(NO_LOCK_ADMIN_BLOCKED_MESSAGE, "warning");
+      return false;
+    }
     warnNoLockOnce();
     return true;
   }

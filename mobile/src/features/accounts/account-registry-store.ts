@@ -36,6 +36,8 @@ interface AccountRegistryState {
   /** Adds or refreshes a User with a fresh switch token (BR-01/02, AC-02/03). */
   upsert: (user: User, issued: IssuedSwitchToken, options: UpsertOptions) => Promise<void>;
   remove: (userId: string, options: RemoveOptions) => Promise<void>;
+  /** Keeps a saved account's name and picture in step with the profile. */
+  updateIdentity: (userId: string, identity: { fullName: string | null; avatarUrl: string | null }) => void;
   markExpired: (userId: string) => void;
   setInterrupted: (userId: string, interrupted: boolean) => void;
   /** Marks every account whose token is past its expiry (device clock). */
@@ -121,6 +123,7 @@ export const useAccountRegistryStore = create<AccountRegistryState>((set, get) =
         userId: user.id,
         email: user.email,
         fullName: user.full_name,
+        avatarUrl: user.avatar_url ?? null,
         role: user.role,
         switchIssuedAt: nowIso,
         switchExpiresAt: issued.expiresAt,
@@ -154,6 +157,8 @@ export const useAccountRegistryStore = create<AccountRegistryState>((set, get) =
       if (dropLocalData) removeLocalUserData(userId);
       if (revoke && token) revokeSwitchTokenQuietly(token);
     },
+
+    updateIdentity: (userId, { fullName, avatarUrl }) => patch(userId, { fullName, avatarUrl }),
 
     markExpired: (userId) => patch(userId, { expired: true, switchInterrupted: false }),
 

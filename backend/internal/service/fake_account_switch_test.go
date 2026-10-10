@@ -25,6 +25,14 @@ func (f *fakeRevokedTokenRepo) Claim(_ context.Context, tokenJTI string, _ *uuid
 	return true, nil
 }
 
+// Release mirrors ReleaseTokenJTI: the claim is deleted.
+func (f *fakeRevokedTokenRepo) Release(_ context.Context, tokenJTI string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.revoked, tokenJTI)
+	return nil
+}
+
 // SetTokensValidAfter mirrors SetUserTokensValidAfter (0 rows → false).
 func (f *fakeUserRepo) SetTokensValidAfter(_ context.Context, id uuid.UUID, at time.Time) (bool, error) {
 	f.mu.Lock()

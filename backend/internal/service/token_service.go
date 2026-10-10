@@ -19,6 +19,10 @@ import (
 type AccessClaims struct {
 	UserID string `json:"user_id"`
 	Role   string `json:"role"`
+	// SessionID is the sessions row this token belongs to (`sid`). JWTAuth
+	// requires it and checks the row on every request, which is what makes a
+	// token revocable instantly and unforgeable from the signing key alone.
+	SessionID string `json:"sid,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -31,6 +35,9 @@ type AccessClaims struct {
 // jti/sub/exp too (specs/mobile-account-switch plan.md Finding #1).
 type refreshClaims struct {
 	Purpose string `json:"purpose,omitempty"`
+	// SessionID is empty only on refresh tokens issued before sessions
+	// existed (mig 028); AuthService.Refresh upgrades those to a session.
+	SessionID string `json:"sid,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -63,15 +70,38 @@ func NewTokenService(signingKey string) *TokenService {
 	return &TokenService{signingKey: []byte(signingKey)}
 }
 
-// GenerateTokenPair issues a 15-minute access token and a 7-day refresh
-// token for the given user. Both durations are named constants
-// (common.AccessTokenTTL / common.RefreshTokenTTL) — never inlined.
+// GenerateTokenPair issues a session-less 15-minute access token and 7-day
+// refresh token for the given user (no `sid`).
+//
+// ⚠️ Production code issues credentials through SessionService, which binds
+// them to a sessions row. This exists for tests of the legacy paths (JWTAuth
+// refusing a token with no `sid`, AuthService.Refresh upgrading a
+// pre-session refresh token); JWTAuth rejects what it returns as an access
+// token. Both durations are named constants (common.AccessTokenTTL /
+// common.RefreshTokenTTL) — never inlined.
 func (s *TokenService) GenerateTokenPair(user *model.User) (accessToken string, refreshToken string, err error) {
+	return s.sign(user, uuid.Nil, uuid.NewString(), time.Now().UTC().Add(common.RefreshTokenTTL))
+}
+
+// IssueSessionTokens signs an access/refresh pair bound to sessionID. The
+// refresh token carries refreshJTI and expires at refreshExpiresAt, which
+// SessionService has already recorded on the session row.
+func (s *TokenService) IssueSessionTokens(user *model.User, sessionID uuid.UUID, refreshJTI string, refreshExpiresAt time.Time) (accessToken string, refreshToken string, err error) {
+	return s.sign(user, sessionID, refreshJTI, refreshExpiresAt)
+}
+
+// sign mints the pair; uuid.Nil leaves `sid` off both tokens.
+func (s *TokenService) sign(user *model.User, sessionID uuid.UUID, refreshJTI string, refreshExpiresAt time.Time) (accessToken string, refreshToken string, err error) {
 	now := time.Now().UTC()
+	sid := ""
+	if sessionID != uuid.Nil {
+		sid = sessionID.String()
+	}
 
 	access := jwt.NewWithClaims(jwt.SigningMethodHS256, AccessClaims{
-		UserID: user.ID.String(),
-		Role:   string(user.Role),
+		UserID:    user.ID.String(),
+		Role:      string(user.Role),
+		SessionID: sid,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   user.ID.String(),
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -80,22 +110,22 @@ func (s *TokenService) GenerateTokenPair(user *model.User) (accessToken string, 
 	})
 	accessToken, err = access.SignedString(s.signingKey)
 	if err != nil {
-		return "", "", fmt.Errorf("service.GenerateTokenPair: sign access token: %w", err)
+		return "", "", fmt.Errorf("service.TokenService.sign: sign access token: %w", err)
 	}
 
 	refresh := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims{
+		SessionID: sid,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ID:        uuid.NewString(),
+			ID:        refreshJTI,
 			Subject:   user.ID.String(),
 			IssuedAt:  jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(now.Add(common.RefreshTokenTTL)),
+			ExpiresAt: jwt.NewNumericDate(refreshExpiresAt),
 		},
 	})
 	refreshToken, err = refresh.SignedString(s.signingKey)
 	if err != nil {
-		return "", "", fmt.Errorf("service.GenerateTokenPair: sign refresh token: %w", err)
+		return "", "", fmt.Errorf("service.TokenService.sign: sign refresh token: %w", err)
 	}
-
 	return accessToken, refreshToken, nil
 }
 
@@ -125,8 +155,8 @@ func (s *TokenService) ParseAccessToken(tokenString string) (*AccessClaims, erro
 // so an unverified parse there let anyone forge a token for any user. The
 // jti requirement also rejects access and import tokens (they carry none),
 // which share the signing key; the purpose check rejects switch tokens.
-// issuedAt is returned for the sign-out-everywhere check.
-func (s *TokenService) ParseRefreshToken(tokenString string) (jti string, subject string, expiresAt time.Time, issuedAt *jwt.NumericDate, err error) {
+// IssuedAt is returned for the sign-out-everywhere check.
+func (s *TokenService) ParseRefreshToken(tokenString string) (*RefreshTokenInfo, error) {
 	claims := &refreshClaims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -135,12 +165,27 @@ func (s *TokenService) ParseRefreshToken(tokenString string) (jti string, subjec
 		return s.signingKey, nil
 	}, jwt.WithExpirationRequired())
 	if err != nil {
-		return "", "", time.Time{}, nil, fmt.Errorf("service.ParseRefreshToken: %w", err)
+		return nil, fmt.Errorf("service.ParseRefreshToken: %w", err)
 	}
 	if !token.Valid || claims.ID == "" || claims.Subject == "" || claims.Purpose != "" {
-		return "", "", time.Time{}, nil, fmt.Errorf("service.ParseRefreshToken: not a valid refresh token")
+		return nil, fmt.Errorf("service.ParseRefreshToken: not a valid refresh token")
 	}
-	return claims.ID, claims.Subject, claims.ExpiresAt.Time, claims.IssuedAt, nil
+	return &RefreshTokenInfo{
+		JTI:       claims.ID,
+		Subject:   claims.Subject,
+		SessionID: claims.SessionID,
+		ExpiresAt: claims.ExpiresAt.Time,
+		IssuedAt:  claims.IssuedAt,
+	}, nil
+}
+
+// RefreshTokenInfo is what a verified refresh token tells AuthService.
+type RefreshTokenInfo struct {
+	JTI       string
+	Subject   string
+	SessionID string // "" for a refresh token issued before sessions existed
+	ExpiresAt time.Time
+	IssuedAt  *jwt.NumericDate
 }
 
 // ParseRefreshTokenUnverified extracts the jti and expiry from a refresh

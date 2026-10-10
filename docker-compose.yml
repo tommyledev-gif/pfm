@@ -49,10 +49,32 @@ services:
     networks:
       - pfm_network
 
+  # Applies every pending migration, then exits. Replaces relying on the
+  # docker-entrypoint-initdb.d mounts above, which fire only on a brand new
+  # volume and had drifted behind backend/db/migrations/ (022-028 were never
+  # added) — the same ledger-based runner production uses (deploy.sh). On a
+  # fresh volume the mounts still create 001-021 and this adopts them, then
+  # applies the rest.
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: pfm-backend-dev
+    entrypoint: ["./migrate"]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - pfm_network
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    image: pfm-backend-dev
     environment:
       PORT: 8080
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
@@ -76,6 +98,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     networks:
       - pfm_network
 

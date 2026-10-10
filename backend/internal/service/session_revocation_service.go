@@ -9,21 +9,25 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/example/pfm/backend/internal/common"
+	"github.com/example/pfm/backend/internal/model"
 )
 
 // SessionRevocationService implements "sign out everywhere"
-// (specs/mobile-account-switch US-08 self, US-09 admin) by moving the
-// user's tokens_valid_after point. Refresh and switch tokens issued before
-// it are refused by AuthService.Refresh / AccountSwitchService.Switch;
-// access tokens simply run out (spec EC-20).
+// (specs/mobile-account-switch US-08 self, US-09 admin) in two steps: it
+// moves the user's tokens_valid_after point, which refuses every refresh and
+// switch token issued before it (AuthService.Refresh /
+// AccountSwitchService.Switch), and it revokes the user's sessions, which
+// stops their access tokens at the next request instead of when they run out
+// (the spec's EC-20 said they would simply run out).
 type SessionRevocationService struct {
 	userRepo UserRepo
 	switches *AccountSwitchService
+	sessions *SessionService
 	logger   *zap.Logger
 }
 
-func NewSessionRevocationService(userRepo UserRepo, switches *AccountSwitchService, logger *zap.Logger) *SessionRevocationService {
-	return &SessionRevocationService{userRepo: userRepo, switches: switches, logger: logger}
+func NewSessionRevocationService(userRepo UserRepo, switches *AccountSwitchService, sessions *SessionService, logger *zap.Logger) *SessionRevocationService {
+	return &SessionRevocationService{userRepo: userRepo, switches: switches, sessions: sessions, logger: logger}
 }
 
 // RevokeAllForSelf signs the caller out everywhere and returns a fresh
@@ -46,7 +50,11 @@ func (s *SessionRevocationService) RevokeAllForSelf(ctx context.Context, callerI
 		return nil, common.ErrUnauthenticated
 	}
 
-	session, err := s.switches.newSession(user)
+	if err := s.sessions.EndAll(ctx, user.ID, model.SessionRevokedSignOutAll); err != nil {
+		return nil, fmt.Errorf("service.RevokeAllForSelf: %w", err)
+	}
+
+	session, err := s.switches.newSession(ctx, user)
 	if err != nil {
 		return nil, fmt.Errorf("service.RevokeAllForSelf: %w", err)
 	}
@@ -68,6 +76,9 @@ func (s *SessionRevocationService) RevokeAllForUser(ctx context.Context, adminID
 	}
 	if !updated {
 		return common.ErrNotFound
+	}
+	if err := s.sessions.EndAll(ctx, targetID, model.SessionRevokedAdmin); err != nil {
+		return fmt.Errorf("service.RevokeAllForUser: %w", err)
 	}
 	return nil
 }

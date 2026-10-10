@@ -26,6 +26,8 @@ type UserRepo interface {
 	ListUsers(ctx context.Context, p repository.ListUsersParams) ([]*model.User, error)
 	CountUsers(ctx context.Context, status, role *string) (int64, error)
 	SetTokensValidAfter(ctx context.Context, id uuid.UUID, at time.Time) (bool, error)
+	UpdateFullName(ctx context.Context, id uuid.UUID, fullName string) (*model.User, error)
+	SetAvatarURL(ctx context.Context, id uuid.UUID, avatarURL *string) (*model.User, error)
 }
 
 // RevokedTokenRepo is the repository contract AuthService.Logout depends on.
@@ -33,6 +35,25 @@ type RevokedTokenRepo interface {
 	Revoke(ctx context.Context, tokenJTI string, userID *uuid.UUID, expiresAt time.Time) error
 	IsRevoked(ctx context.Context, tokenJTI string) (bool, error)
 	Claim(ctx context.Context, tokenJTI string, userID *uuid.UUID, expiresAt time.Time) (bool, error)
+	// Release undoes a Claim whose redemption then failed.
+	Release(ctx context.Context, tokenJTI string) error
+}
+
+// SessionRepo is the repository contract SessionService depends on (mig 028).
+// *repository.SessionRepository satisfies it structurally; tests substitute
+// an in-memory fake.
+type SessionRepo interface {
+	// Create revokes the user's least recently used live sessions so that,
+	// with the new one, at most maxActive remain, then inserts it.
+	Create(ctx context.Context, s model.Session, maxActive int) error
+	Get(ctx context.Context, id uuid.UUID) (*model.Session, error)
+	// Rotate is a compare-and-swap on the current refresh jti.
+	Rotate(ctx context.Context, id uuid.UUID, currentJTI, newJTI string, expiresAt time.Time) (bool, error)
+	Revoke(ctx context.Context, id, userID uuid.UUID, reason string) (bool, error)
+	RevokeAllForUser(ctx context.Context, userID uuid.UUID, reason string) (int64, error)
+	// AuthState returns nil, nil when there is no such session for the user.
+	AuthState(ctx context.Context, id, userID uuid.UUID) (*model.SessionAuthState, error)
+	DeleteExpired(ctx context.Context, cutoff time.Time) (int64, error)
 }
 
 // WalletRepo is the repository contract WalletService depends on (F-03).
@@ -254,6 +275,7 @@ type NotificationRepo interface {
 var (
 	_ UserRepo           = (*repository.UserRepository)(nil)
 	_ RevokedTokenRepo   = (*repository.RevokedTokenRepository)(nil)
+	_ SessionRepo        = (*repository.SessionRepository)(nil)
 	_ WalletRepo         = (*repository.WalletRepository)(nil)
 	_ CategoryRepo       = (*repository.CategoryRepository)(nil)
 	_ BudgetRepo         = (*repository.BudgetRepository)(nil)

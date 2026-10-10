@@ -8,6 +8,9 @@ export interface User {
   role: UserRole;
   activated_at: string | null;
   created_at: string;
+  // Public URL of the uploaded avatar, null = none. Mirrors UserResponse.avatar_url;
+  // null in the admin user list.
+  avatar_url: string | null;
 }
 
 export interface PaginationInfo {

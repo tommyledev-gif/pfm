@@ -14,7 +14,7 @@ const CONFIRM_TITLE = "Đăng xuất mọi thiết bị?";
 const CONFIRM_LABEL = "Đăng xuất";
 
 const confirmMessage = (email: string) =>
-  `Tài khoản ${email} sẽ bị đăng xuất khỏi mọi thiết bị khác, kể cả các máy đã lưu tài khoản để chuyển nhanh. Có thể mất vài phút để có hiệu lực hoàn toàn.`;
+  `Tài khoản ${email} sẽ bị đăng xuất khỏi mọi thiết bị khác, kể cả các máy đã lưu tài khoản để chuyển nhanh.`;
 
 /** "Đăng xuất mọi thiết bị" on the Security screen (spec US-08). */
 export function RevokeAllSessionsRow() {

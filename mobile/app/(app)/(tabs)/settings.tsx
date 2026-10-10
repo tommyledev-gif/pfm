@@ -31,6 +31,8 @@ import { useLogout } from "@/features/accounts/hooks/use-logout";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { totalBalance } from "@/features/wallets/wallet-totals";
 import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary-query";
+import { useProfileQuery } from "@/features/profile/api/use-profile-query";
+import { EditProfileDrawer } from "@/features/profile/components/EditProfileDrawer";
 
 // Help & Support has no mobile screen yet — out of the design
 // handoff's scope (it maps them as entry points only). Wallets/Categories/
@@ -63,8 +65,8 @@ const ROW_TAP_GUARD_MS = 600;
 
 const LOGOUT_BUSY_OPACITY = 0.7;
 
-function displayNameFromEmail(email: string | null): string {
-  return email ? accountDisplayName({ email, fullName: null }) : "Thành viên";
+function displayNameOf(email: string | null, fullName: string | null): string {
+  return email ? accountDisplayName({ email, fullName }) : (fullName ?? "Thành viên");
 }
 
 export default function SettingsScreen() {
@@ -76,10 +78,14 @@ export default function SettingsScreen() {
   const role = useSessionStore((s) => s.role);
   const userId = useCurrentUserId();
   const [logoutGuardOpen, setLogoutGuardOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const { loggingOut, logout } = useLogout();
   const wallets = useWalletsQuery();
   const summary = useReportSummaryQuery();
-  const name = displayNameFromEmail(email);
+  const profile = useProfileQuery().data;
+  // The name the User set, not one made up from the email (the email's local
+  // part is only the fallback until a name is set or while offline with no copy).
+  const name = displayNameOf(email, profile?.full_name ?? null);
 
   const netWorth = wallets.data ? totalBalance(wallets.data) : null;
   const primaryTotal = summary.data?.totals[0];
@@ -114,9 +120,17 @@ export default function SettingsScreen() {
     <Screen>
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.identity}>
-        <Avatar name={name} size={72} fallback="initial" />
+        <Avatar name={name} iconUrl={profile?.avatar_url} size={72} fallback="initial" />
         <Text style={styles.name}>{name}</Text>
         {email ? <Text style={styles.email}>{email}</Text> : null}
+        <Pressable
+          onPress={() => setProfileOpen(true)}
+          accessibilityRole="button"
+          hitSlop={spacing.md}
+          testID="btn-settings-edit-profile"
+        >
+          <Text style={styles.editProfile}>Sửa hồ sơ</Text>
+        </Pressable>
       </View>
 
       <View style={styles.statRow}>
@@ -192,6 +206,7 @@ export default function SettingsScreen() {
         logout();
       }}
     />
+    <EditProfileDrawer visible={profileOpen} onClose={() => setProfileOpen(false)} />
     <BusyOverlay visible={loggingOut} testID="overlay-settings-logout" />
     </Screen>
   );
@@ -203,6 +218,7 @@ const useStyles = createStyles((colors) => ({
   identity: { alignItems: "center", gap: spacing.xs },
   name: { ...typography.title, color: colors.textPrimary, marginTop: spacing.sm },
   email: { ...typography.caption, color: colors.textSecondary },
+  editProfile: { ...typography.caption, color: colors.green, marginTop: spacing.xs },
   statRow: { flexDirection: "row", gap: spacing.sm },
   // Card's own surface/border/radius (components/ui/Card.tsx), applied to the
   // hold target itself so the whole card is what gets held.

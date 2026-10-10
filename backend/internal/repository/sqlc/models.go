@@ -25,9 +25,11 @@ type User struct {
 	DeletedAt         *time.Time
 	InviteSentAt      *time.Time
 	InviteResendCount int32
-	// TokensValidAfter (mig 025) is populated ONLY by GetUserByID; every
-	// other users query leaves it nil (hand-edited, not regenerated).
+	// TokensValidAfter (mig 025) and AvatarURL (mig 027) are populated ONLY by
+	// GetUserByID and the profile queries (users_profile.sql.go); every other
+	// users query leaves them nil (hand-edited, not regenerated).
 	TokensValidAfter *time.Time
+	AvatarURL        *string
 }
 
 // RevokedToken mirrors the revoked_tokens table exactly.

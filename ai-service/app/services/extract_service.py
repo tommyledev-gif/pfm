@@ -20,6 +20,8 @@ import json
 import logging
 from copy import deepcopy
 
+from fastapi.concurrency import run_in_threadpool
+
 from app.core.config import settings
 from app.core.groq_client import get_anthropic_client, get_groq_client
 from app.schemas.extract_schema import ChatTurn, ExtractRequest, ExtractResponse
@@ -40,15 +42,18 @@ class ExtractionUnavailableError(Exception):
 async def extract_transactions(req: ExtractRequest) -> ExtractResponse:
     system_prompt = build_system_prompt(req.wallets, req.categories, req.now)
 
+    # The SDK clients are synchronous: called directly from this coroutine they
+    # would freeze the event loop (every other request and /health with it)
+    # for the whole provider round trip.
     try:
-        return _call_groq(system_prompt, req.history, req.message)
+        return await run_in_threadpool(_call_groq, system_prompt, req.history, req.message)
     except Exception as exc:  # noqa: BLE001 - any Groq failure falls back, never propagates raw
         logger.warning(
             "groq extraction failed, falling back to anthropic",
             extra={"prompt_chars": len(req.message), "error_type": type(exc).__name__, "error": str(exc)},
         )
         try:
-            return _call_anthropic(system_prompt, req.history, req.message)
+            return await run_in_threadpool(_call_anthropic, system_prompt, req.history, req.message)
         except Exception as fallback_exc:  # noqa: BLE001
             logger.error(
                 "anthropic fallback also failed",

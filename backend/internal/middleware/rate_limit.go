@@ -1,11 +1,16 @@
 package middleware
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"net"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"go.uber.org/zap"
 
 	"github.com/example/pfm/backend/internal/common"
+	"github.com/example/pfm/backend/internal/dto"
 	"github.com/example/pfm/backend/internal/response"
 )
 
@@ -86,7 +91,7 @@ func LoginRateLimiter(logger *zap.Logger) fiber.Handler {
 		// ClientIP, not c.IP(): behind Cloudflare Tunnel c.IP() is the
 		// cloudflared container for every user, so all of them shared one
 		// 10-attempt bucket and one attacker could lock everyone out.
-		KeyGenerator: ClientIP,
+		KeyGenerator: RateLimitIP,
 		LimitReached: func(c *fiber.Ctx) error {
 			return response.Error(c, logger, common.ErrRateLimited)
 		},
@@ -101,9 +106,79 @@ func SwitchRateLimiter(logger *zap.Logger) fiber.Handler {
 	return limiter.New(limiter.Config{
 		Max:          common.SwitchRateLimit,
 		Expiration:   common.SwitchRateLimitWindow,
-		KeyGenerator: ClientIP,
+		KeyGenerator: RateLimitIP,
 		LimitReached: func(c *fiber.Ctx) error {
 			return response.Error(c, logger, common.ErrRateLimited)
 		},
 	})
+}
+
+// LoginAccountRateLimiter caps FAILED logins per account, across every IP:
+// LoginRateLimiter alone lets an attacker with many addresses try a password
+// list against one account at 10 tries per address. Only failed attempts
+// count (a 4xx/5xx response), so the account's owner signing in correctly is
+// never what trips it.
+//
+// Trade-off, accepted: whoever knows an email can lock that account out of
+// logging in for the window by failing on purpose. The window is short, the
+// app is invite-only (emails are not public), and the alternative is letting
+// a distributed guess run unchecked.
+//
+// The key is a hash of the normalised email, read with the same parser the
+// login handler uses (c.BodyParser: JSON, form and multipart alike). A
+// different parser here would let a form-encoded body slip past the account
+// limit while the handler still accepted it. Hashing keeps the key a fixed
+// size however large the body is. A body that carries no email falls back to
+// the client IP so malformed requests cannot all share one key.
+func LoginAccountRateLimiter(logger *zap.Logger) fiber.Handler {
+	return limiter.New(limiter.Config{
+		Max:                    common.LoginAccountRateLimit,
+		Expiration:             common.LoginAccountRateLimitWindow,
+		SkipSuccessfulRequests: true,
+		KeyGenerator: func(c *fiber.Ctx) string {
+			var req dto.LoginRequest
+			if err := c.BodyParser(&req); err == nil && req.Email != "" {
+				sum := sha256.Sum256([]byte(common.NormalizeEmail(req.Email)))
+				return "login-account:" + hex.EncodeToString(sum[:16])
+			}
+			return "login-account-ip:" + RateLimitIP(c)
+		},
+		LimitReached: func(c *fiber.Ctx) error {
+			return response.Error(c, logger, common.ErrRateLimited)
+		},
+	})
+}
+
+// UploadRateLimiter caps image uploads per user. Every upload is decoded and
+// re-encoded on the server (imageupload.Process), which costs real CPU, so an
+// authenticated client must not be able to loop it. Must run after JWTAuth so
+// common.LocalsUserID is already populated.
+func UploadRateLimiter(logger *zap.Logger) fiber.Handler {
+	return limiter.New(limiter.Config{
+		Max:        common.UploadRateLimit,
+		Expiration: common.UploadRateLimitWindow,
+		KeyGenerator: func(c *fiber.Ctx) string {
+			userID, _ := c.Locals(common.LocalsUserID).(string)
+			return "upload:" + userID
+		},
+		LimitReached: func(c *fiber.Ctx) error {
+			return response.Error(c, logger, common.ErrRateLimited)
+		},
+	})
+}
+
+// RateLimitIP is the key IP-based limiters use: an IPv4 address as is, an IPv6
+// address reduced to its /64. A single household or VPS is handed a whole /64
+// (2^64 addresses), so keying on the full address would let one machine
+// rotate through addresses and never meet the limit.
+func RateLimitIP(c *fiber.Ctx) string {
+	return rateLimitKeyFor(ClientIP(c))
+}
+
+func rateLimitKeyFor(raw string) string {
+	ip := net.ParseIP(raw)
+	if ip == nil || ip.To4() != nil {
+		return raw
+	}
+	return ip.Mask(net.CIDRMask(64, 128)).String() + "/64"
 }

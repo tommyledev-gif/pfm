@@ -64,7 +64,7 @@ func TestSessionRevocationService_RevokeAllForSelf(t *testing.T) {
 		f := newSwitchFixture(t)
 		user := seedUser(f.users, "a@example.com", model.UserStatusActive)
 		failing := failingSetUserRepo{f.users}
-		svc := NewSessionRevocationService(failing, NewAccountSwitchService(failing, f.revoked, f.tokens, zap.NewNop()), zap.NewNop())
+		svc := NewSessionRevocationService(failing, NewAccountSwitchService(failing, f.revoked, f.tokens, f.sessionSvc, zap.NewNop()), f.sessionSvc, zap.NewNop())
 		_, err := svc.RevokeAllForSelf(ctx, user.ID, jwt.NewNumericDate(time.Now().UTC()))
 		var appErr *common.AppError
 		if !errors.Is(err, errFakeWrite) || errors.As(err, &appErr) {

@@ -18,6 +18,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
+      "allowBackup": false,
       "package": "com.example.pfm",
       "softwareKeyboardLayoutMode": "resize"
     },
@@ -43,7 +44,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Budgest accesses your photos so you can set a custom category icon.",
+          "photosPermission": "Budgest cần truy cập ảnh để bạn chọn ảnh đại diện và biểu tượng cho ví, danh mục, ngân sách.",
           "cameraPermission": false
         }
       ],

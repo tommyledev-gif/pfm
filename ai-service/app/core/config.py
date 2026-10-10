@@ -46,6 +46,13 @@ class Settings(BaseSettings):
     # for the identical input across repeated calls.
     temperature: float = 0.0
 
+    # Extract and category suggestion share the Go backend's 15 s request
+    # budget (service.aiServiceRequestTimeout / aiBudgetClientRequestTimeout).
+    # Primary + fallback must add up to less than that, or the backend gives
+    # up while this service is still working for nobody.
+    primary_timeout_seconds: float = 7.0
+    fallback_timeout_seconds: float = 6.0
+
     # Consult (free-text spending questions, specs/ai-chat-query-spending):
     # the output is a small classification, so a tight cap; and a timeout
     # under the Go backend's 8s budget so this service answers 503 before

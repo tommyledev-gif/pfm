@@ -127,14 +127,20 @@ jobs:
                 ./deploy.sh
             }
 
+            # $2 is the probe path. A new release is gated on /health/ready (the
+            # process is up AND it can reach Postgres), which is what catches a
+            # wrong database password or a half-applied schema before traffic
+            # does. A rollback target may be an image from before that route
+            # existed, so rollbacks are judged on plain /health.
             check_health() {
               attempts="$1"
+              probe="$2"
               i=1
               while [ "$i" -le "$attempts" ]; do
-                if docker exec pfm-backend-container wget -qO /dev/null http://127.0.0.1:8080/api/v1/health; then
+                if docker exec pfm-backend-container wget -qO /dev/null "http://127.0.0.1:8080/api/v1/${probe}"; then
                   return 0
                 fi
-                echo "Attempt ${i}/${attempts}: health endpoint not ready, retrying in 10s"
+                echo "Attempt ${i}/${attempts}: /${probe} not ready, retrying in 10s"
                 sleep 10
                 i=$((i + 1))
               done
@@ -143,19 +149,19 @@ jobs:
 
             deploy_tag "$NEW_TAG"
 
-            if check_health 20; then
-              echo "Health check passed: /api/v1/health is up (tag ${NEW_TAG})"
+            if check_health 20 health/ready; then
+              echo "Health check passed: /api/v1/health/ready is up (tag ${NEW_TAG})"
               echo "$NEW_TAG" > "$LAST_GOOD_TAG_FILE"
               exit 0
             fi
 
-            echo "Health check timeout: /api/v1/health never came up for tag ${NEW_TAG}"
+            echo "Health check timeout: /api/v1/health/ready never came up for tag ${NEW_TAG}"
             docker logs --tail 200 pfm-backend-container || true
 
             if [ -n "$PREV_TAG" ] && [ "$PREV_TAG" != "$NEW_TAG" ]; then
               echo "Rolling back to last known-good image tag: ${PREV_TAG}"
               deploy_tag "$PREV_TAG"
-              if check_health 10; then
+              if check_health 10 health; then
                 echo "Rollback to ${PREV_TAG} succeeded"
               else
                 echo "Rollback to ${PREV_TAG} FAILED — manual intervention required"

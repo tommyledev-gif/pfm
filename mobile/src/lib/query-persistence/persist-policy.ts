@@ -7,7 +7,7 @@ import { QUERY_CACHE_MAX_AGE_MS, QUERY_CACHE_SCHEMA_VERSION } from "@/lib/consta
 // support US-03 step 1, AC-OFF-13). Anything else — chat thread, audit logs,
 // users, notifications, the budget-wizard prefill — is never written: it is
 // sensitive, volatile, or useless offline (S-OFF-21).
-export const PERSISTED_QUERY_ROOTS = ["wallets", "categories", "budgets", "report-summary", "transactions"] as const;
+export const PERSISTED_QUERY_ROOTS = ["wallets", "categories", "budgets", "report-summary", "transactions", "profile"] as const;
 
 export const TRANSACTIONS_QUERY_ROOT = "transactions";
 

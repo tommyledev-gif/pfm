@@ -1,20 +1,36 @@
 package main
 
 import (
+	"context"
+
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/zap"
 
+	"github.com/example/pfm/backend/internal/common"
 	"github.com/example/pfm/backend/internal/handler"
 	"github.com/example/pfm/backend/internal/middleware"
 	"github.com/example/pfm/backend/internal/model"
 	"github.com/example/pfm/backend/internal/service"
 )
 
+// dbPinger is the part of *pgxpool.Pool the readiness probe uses.
+type dbPinger interface {
+	Ping(ctx context.Context) error
+}
+
 // registerRoutes wires every F-01/F-02 endpoint under CLAUDE.md's API base
 // (/api/v1). Auth/rate-limit middleware ordering matters: JWTAuth must run
 // before RequireRole (role comes from the token) and before
 // InviteRateLimiter (keyed by the caller's user ID from that same token).
-func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, transactionExportHandler *handler.TransactionExportHandler, transactionImportHandler *handler.TransactionImportHandler, auditLogHandler *handler.AuditLogHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, chatHandler *handler.ChatHandler, budgetWizardHandler *handler.BudgetWizardHandler, analyticsHandler *handler.AnalyticsHandler, accountSwitchHandler *handler.AccountSwitchHandler, sessionRevocationHandler *handler.SessionRevocationHandler, tokens *service.TokenService, logger *zap.Logger) {
+func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, transactionExportHandler *handler.TransactionExportHandler, transactionImportHandler *handler.TransactionImportHandler, auditLogHandler *handler.AuditLogHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, chatHandler *handler.ChatHandler, budgetWizardHandler *handler.BudgetWizardHandler, analyticsHandler *handler.AnalyticsHandler, accountSwitchHandler *handler.AccountSwitchHandler, sessionRevocationHandler *handler.SessionRevocationHandler, profileHandler *handler.ProfileHandler, tokens *service.TokenService, sessions *service.SessionService, db dbPinger, logger *zap.Logger) {
+	// One instance for every protected route: validates the access token and
+	// its session (see middleware.JWTAuth).
+	jwtAuth := middleware.JWTAuth(tokens, sessions, logger)
+	// ONE limiter shared by every upload route: each call to UploadRateLimiter
+	// builds its own counter, so one per route would multiply the per-user cap
+	// by the number of routes.
+	uploadLimit := middleware.UploadRateLimiter(logger)
+
 	// Serves the invite-activation form at the backend's own domain — see
 	// handler.ActivatePageHandler doc comment for why this lives here instead
 	// of on the (currently undeployed) frontend/ Next.js app.
@@ -27,10 +43,24 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	v1.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
 	})
+	// Readiness: the same, plus a database ping. The deploy gate uses this one,
+	// so a release that comes up but cannot reach Postgres (a wrong password
+	// in the env file, a failed migration left behind) is rolled back instead
+	// of answering /health while every real request fails. Container liveness
+	// stays on /health: a database blip must not restart the API.
+	v1.Get("/health/ready", func(c *fiber.Ctx) error {
+		ctx, cancel := context.WithTimeout(c.Context(), common.HealthDBPingTimeout)
+		defer cancel()
+		if err := db.Ping(ctx); err != nil {
+			logger.Error("readiness: database ping failed", zap.Error(err))
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"status": "database unavailable"})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	})
 
 	auth := v1.Group("/auth")
 	auth.Post("/activate", authHandler.Activate)
-	auth.Post("/login", middleware.LoginRateLimiter(logger), authHandler.Login)
+	auth.Post("/login", middleware.LoginRateLimiter(logger), middleware.LoginAccountRateLimiter(logger), authHandler.Login)
 	auth.Post("/logout", authHandler.Logout)
 	// /auth/refresh is unauthenticated like /auth/logout — no rate limiter
 	// (specs/mobile-session-refresh/plan.md Pre-flight Finding #2): the
@@ -40,13 +70,13 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	// Account switching (specs/mobile-account-switch). Issuing needs a
 	// session; switching and revoking do not (the switch token is the
 	// credential). Only /switch is rate-limited (S-ASW-20).
-	auth.Post("/switch-token", middleware.JWTAuth(tokens, logger), accountSwitchHandler.IssueSwitchToken)
+	auth.Post("/switch-token", jwtAuth, accountSwitchHandler.IssueSwitchToken)
 	auth.Post("/switch-token/revoke", accountSwitchHandler.RevokeSwitchToken)
 	auth.Post("/switch", middleware.SwitchRateLimiter(logger), accountSwitchHandler.Switch)
 	// Sign out everywhere, self (US-08) — the device gets a fresh pair.
-	auth.Post("/sessions/revoke-all", middleware.JWTAuth(tokens, logger), sessionRevocationHandler.RevokeAllSelf)
+	auth.Post("/sessions/revoke-all", jwtAuth, sessionRevocationHandler.RevokeAllSelf)
 
-	admin := v1.Group("/admin", middleware.JWTAuth(tokens, logger), middleware.RequireRole(string(model.UserRoleAdmin), logger))
+	admin := v1.Group("/admin", jwtAuth, middleware.RequireRole(string(model.UserRoleAdmin), logger))
 	admin.Post("/users/invite", middleware.InviteRateLimiter(logger), userHandler.InviteUser)
 	admin.Get("/users", userHandler.ListUsers)
 	// No InviteRateLimiter here: the per-user cooldown in
@@ -57,13 +87,21 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	// self-target refusal lives in the service.
 	admin.Post("/users/:id/sessions/revoke-all", sessionRevocationHandler.RevokeAllForUser)
 
+	// The signed-in user's own profile. No RequireRole gate and no :id in the
+	// path: the user is always the caller, taken from the verified token.
+	users := v1.Group("/users", jwtAuth)
+	users.Get("/me", profileHandler.GetMe)
+	users.Patch("/me", profileHandler.UpdateMe)
+	users.Post("/me/avatar", uploadLimit, profileHandler.UploadAvatar)
+	users.Delete("/me/avatar", profileHandler.DeleteAvatar)
+
 	// F-03 Wallet Management — no RequireRole gate: every active user manages
 	// only their own wallets (plan.md Security & Actor Resolution).
-	wallets := v1.Group("/wallets", middleware.JWTAuth(tokens, logger))
+	wallets := v1.Group("/wallets", jwtAuth)
 	// A standalone upload step, not nested under "/:id" — a client picks an
 	// image before a wallet exists yet (the create form), same convention as
 	// categories.Post("/icon") (specs/wallet-budget-icons/spec.md US-01).
-	wallets.Post("/icon", walletHandler.UploadIcon)
+	wallets.Post("/icon", uploadLimit, walletHandler.UploadIcon)
 	wallets.Post("/", walletHandler.CreateWallet)
 	wallets.Get("/", walletHandler.ListWallets)
 	wallets.Get("/:id", walletHandler.GetWallet)
@@ -73,10 +111,10 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	// F-04 Category Management — no RequireRole gate: every active user
 	// manages only their own categories and reads system ones identically
 	// (plan.md Security & Actor Resolution).
-	categories := v1.Group("/categories", middleware.JWTAuth(tokens, logger))
+	categories := v1.Group("/categories", jwtAuth)
 	// A standalone upload step, not nested under "/:id" — a client picks an
 	// image before a category exists yet (the create form).
-	categories.Post("/icon", categoryHandler.UploadIcon)
+	categories.Post("/icon", uploadLimit, categoryHandler.UploadIcon)
 	categories.Post("/", categoryHandler.CreateCategory)
 	categories.Get("/", categoryHandler.ListCategories)
 	categories.Get("/:id", categoryHandler.GetCategory)
@@ -85,11 +123,11 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 
 	// F-05 Budget Management — no RequireRole gate: every active user
 	// manages only their own budgets (plan.md Security & Actor Resolution).
-	budgets := v1.Group("/budgets", middleware.JWTAuth(tokens, logger))
+	budgets := v1.Group("/budgets", jwtAuth)
 	// A standalone upload step, not nested under "/:id" — a client picks an
 	// image before a budget exists yet (the create form), same convention as
 	// categories.Post("/icon") (specs/wallet-budget-icons/spec.md US-03).
-	budgets.Post("/icon", budgetHandler.UploadIcon)
+	budgets.Post("/icon", uploadLimit, budgetHandler.UploadIcon)
 	// F-13 AI Budget Setup Wizard's bulk-create (specs/ai-budget-wizard/spec.md
 	// US-05) — joins the existing budgets group, JWTAuth only, same as every
 	// other /budgets/* endpoint (plan.md Finding #4).
@@ -103,7 +141,7 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	// F-06 Transaction Management — no RequireRole gate: every active user
 	// manages only their own transactions (plan.md Security & Actor
 	// Resolution).
-	transactions := v1.Group("/transactions", middleware.JWTAuth(tokens, logger))
+	transactions := v1.Group("/transactions", jwtAuth)
 	transactions.Post("/", transactionHandler.CreateTransaction)
 	transactions.Get("/", transactionHandler.ListTransactions)
 	// ⚠️ Registered BEFORE GET /:id on purpose (specs/transaction-audit-log/
@@ -126,14 +164,14 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	// F-07 Financial Reporting — no RequireRole gate: every active user views
 	// only their own report (plan.md Security & Actor Resolution). One
 	// endpoint covers spec.md US-01 through US-05 (Context decision #1).
-	reports := v1.Group("/reports", middleware.JWTAuth(tokens, logger))
+	reports := v1.Group("/reports", jwtAuth)
 	reports.Get("/summary", reportHandler.GetSummary)
 
 	// F-10 Notification Handling — no RequireRole gate: every active user
 	// sees only their own notifications (plan.md Security & Actor
 	// Resolution). Notification creation has no HTTP endpoint at all — it is
 	// produced by a background job (main.go's ticker), never a client request.
-	notifications := v1.Group("/notifications", middleware.JWTAuth(tokens, logger))
+	notifications := v1.Group("/notifications", jwtAuth)
 	notifications.Get("/", notificationHandler.ListNotifications)
 	notifications.Get("/:id", notificationHandler.GetNotification)
 	notifications.Post("/:id/read", notificationHandler.MarkNotificationRead)
@@ -144,7 +182,7 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	// common.LocalsUserID is already populated (same ordering rule as
 	// InviteRateLimiter). The confirm step reuses POST /transactions above —
 	// no separate route.
-	ai := v1.Group("/ai", middleware.JWTAuth(tokens, logger), middleware.AIChatRateLimiter(logger))
+	ai := v1.Group("/ai", jwtAuth, middleware.AIChatRateLimiter(logger))
 	ai.Post("/chat", chatHandler.Chat)
 	// Client-rendered chat thread cache (mobile chat-store.ts) — restores the
 	// full chat UI (action cards, confirmed state, edit history) after local
@@ -170,7 +208,7 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	// /query (chips, follow-ups) has no limiter at all (S-AIQ-35); only free
 	// text is limited, by its own per-route limiter. No CSRF token: both are
 	// Bearer-JWT APIs with no cookie session, so there is no ambient credential.
-	analytics := v1.Group("/analytics", middleware.JWTAuth(tokens, logger))
+	analytics := v1.Group("/analytics", jwtAuth)
 	analytics.Post("/query", analyticsHandler.Query)
 	analytics.Post("/consult", middleware.AIConsultRateLimiter(logger), analyticsHandler.Consult)
 }

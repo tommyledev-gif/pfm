@@ -1,9 +1,10 @@
 name: PR Checks
 
-# Quality gate for PRs into develop: runs backend go vet/test and frontend
-# lint/typecheck, but only for the areas a given PR actually touches — a
-# mobile-only or docs-only PR doesn't pay for a Go or Next.js run it can't
-# affect. deploy-backend.yml stays push-triggered and unaffected by this file.
+# Quality gate for PRs into develop: runs the backend checks (vet, migrations,
+# tests with the race detector against a real Postgres, govulncheck), the
+# ai-service tests, and the frontend and mobile lint/typecheck, but only for
+# the areas a given PR actually touches — a docs-only PR doesn't pay for a Go
+# or Next.js run it can't affect. deploy-backend.yml stays push-triggered and unaffected by this file.
 on:
   pull_request:
     branches:
@@ -21,6 +22,8 @@ jobs:
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
+      mobile: ${{ steps.filter.outputs.mobile }}
+      ai-service: ${{ steps.filter.outputs.ai-service }}
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -34,11 +37,52 @@ jobs:
               - 'backend/**'
             frontend:
               - 'frontend/**'
+            mobile:
+              - 'mobile/**'
+            ai-service:
+              - 'ai-service/**'
 
   backend-test:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     uses: ./.github/workflows/backend-test.yml
+
+  ai-service-test:
+    needs: changes
+    if: needs.changes.outputs.ai-service == 'true'
+    uses: ./.github/workflows/ai-service-test.yml
+
+  # mobile/ has no unit tests (verification is tsc + eslint + a run on a
+  # device), so the typecheck is the gate. Lint runs too; its existing
+  # warnings do not fail it, new errors do.
+  mobile-check:
+    needs: changes
+    if: needs.changes.outputs.mobile == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx expo lint
 
   frontend-lint:
     needs: changes

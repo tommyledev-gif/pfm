@@ -1,8 +1,15 @@
 name: Backend Test
 
-# Reusable workflow (workflow_call) so the same go vet/test steps run both
-# as a gate before deploy-backend.yml builds an image, and as a PR check in
-# ci-pr.yml — one definition, no drift between the two.
+# Reusable workflow (workflow_call) so the same checks run both as a gate
+# before deploy-backend.yml builds an image, and as a PR check in ci-pr.yml —
+# one definition, no drift between the two.
+#
+# Runs against a real Postgres, not just the in-memory fakes the service tests
+# use. That is what catches the failures fakes cannot: a migration that does
+# not apply on an empty database, SQL that does not match the schema, and the
+# concurrency rules that live in queries (the per-user session limit, the
+# refresh-token compare-and-swap). See backend/deploy.sh for the production
+# incidents this guards against.
 on:
   workflow_call:
 
@@ -14,18 +21,52 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: pfm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pfm"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:ci@localhost:5432/pfm?sslmode=disable
+      # Switches on the integration tests in internal/repository (skipped when unset).
+      PFM_TEST_DATABASE_URL: postgres://postgres:ci@localhost:5432/pfm?sslmode=disable
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
+      # go.mod's `go` and `toolchain` lines decide the version, so CI builds
+      # with the same patched toolchain the Dockerfile image does.
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
 
       - name: Vet
         run: go vet ./...
 
-      - name: Test
-        run: go test ./...
+      # Every migration, in order, on an empty database — the same runner
+      # deploy.sh uses. A broken or out-of-order migration fails here instead
+      # of in production.
+      - name: Apply migrations to an empty database
+        run: go run ./cmd/migrate
+
+      - name: Test (race detector, real Postgres)
+        run: go test -race -count=1 ./...
+
+      # Fails on a known vulnerability that this code actually calls (not on
+      # every advisory in a dependency it merely imports), so a finding here
+      # is one to act on. Dependency and Go-toolchain bumps are what clear it.
+      - name: Vulnerability scan (govulncheck)
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...

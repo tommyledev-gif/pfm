@@ -33,11 +33,12 @@ type AccountSwitchService struct {
 	userRepo    UserRepo
 	revokedRepo RevokedTokenRepo
 	tokens      *TokenService
+	sessions    *SessionService
 	logger      *zap.Logger
 }
 
-func NewAccountSwitchService(userRepo UserRepo, revokedRepo RevokedTokenRepo, tokens *TokenService, logger *zap.Logger) *AccountSwitchService {
-	return &AccountSwitchService{userRepo: userRepo, revokedRepo: revokedRepo, tokens: tokens, logger: logger}
+func NewAccountSwitchService(userRepo UserRepo, revokedRepo RevokedTokenRepo, tokens *TokenService, sessions *SessionService, logger *zap.Logger) *AccountSwitchService {
+	return &AccountSwitchService{userRepo: userRepo, revokedRepo: revokedRepo, tokens: tokens, sessions: sessions, logger: logger}
 }
 
 // Issue mints a switch token for the authenticated caller. Refused when the
@@ -82,8 +83,14 @@ func (s *AccountSwitchService) Switch(ctx context.Context, switchToken string) (
 		return nil, common.ErrUnauthenticated
 	}
 
-	session, err := s.newSession(user)
+	session, err := s.newSession(ctx, user)
 	if err != nil {
+		// The token was claimed (single use) but nothing came of it. Give it
+		// back, or the client's retry would be refused and the account marked
+		// expired, forcing a password login over what was only a hiccup.
+		if releaseErr := s.revokedRepo.Release(ctx, claims.JTI); releaseErr != nil {
+			s.logger.Error("account switch: could not release a claimed switch token", zap.String("jti", claims.JTI), zap.Error(releaseErr))
+		}
 		return nil, fmt.Errorf("service.AccountSwitch.Switch: %w", err)
 	}
 	return session, nil
@@ -102,10 +109,11 @@ func (s *AccountSwitchService) Revoke(ctx context.Context, switchToken string) e
 	return nil
 }
 
-// newSession issues a session pair and a switch token for an already
-// verified user. Shared with SessionRevocationService.RevokeAllForSelf.
-func (s *AccountSwitchService) newSession(user *model.User) (*SwitchSession, error) {
-	access, refresh, err := s.tokens.GenerateTokenPair(user)
+// newSession opens a session for an already verified user and issues its
+// token pair and a switch token. Shared with
+// SessionRevocationService.RevokeAllForSelf.
+func (s *AccountSwitchService) newSession(ctx context.Context, user *model.User) (*SwitchSession, error) {
+	access, refresh, err := s.sessions.Start(ctx, user)
 	if err != nil {
 		return nil, fmt.Errorf("newSession: %w", err)
 	}

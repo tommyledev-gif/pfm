@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"io"
-
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -191,30 +189,12 @@ func (h *BudgetHandler) UploadIcon(c *fiber.Ctx) error {
 		return response.Error(c, h.logger, common.ErrUnauthenticated)
 	}
 
-	fileHeader, err := c.FormFile("file")
+	img, err := readImageUpload(c)
 	if err != nil {
-		return response.Error(c, h.logger, common.NewInvalidInputError("missing \"file\" in multipart body"))
-	}
-	if fileHeader.Size > common.CategoryIconMaxUploadBytes {
-		return response.Error(c, h.logger, common.NewInvalidInputError("icon file exceeds the 2MB size limit"))
-	}
-	contentType := fileHeader.Header.Get("Content-Type")
-	if !common.CategoryIconAllowedContentTypes[contentType] {
-		return response.Error(c, h.logger, common.NewInvalidInputError("icon must be a PNG, JPEG, or SVG image"))
+		return response.Error(c, h.logger, err)
 	}
 
-	file, err := fileHeader.Open()
-	if err != nil {
-		return response.Error(c, h.logger, common.NewInvalidInputError("could not read uploaded file"))
-	}
-	defer file.Close() //nolint:errcheck // read-only handle, nothing to flush
-
-	data, err := io.ReadAll(file)
-	if err != nil {
-		return response.Error(c, h.logger, common.NewInvalidInputError("could not read uploaded file"))
-	}
-
-	iconURL, err := h.iconUploader.UploadIcon(c.Context(), common.BudgetIconKeyPrefix, fileHeader.Filename, contentType, data)
+	iconURL, err := h.iconUploader.UploadIcon(c.Context(), common.BudgetIconKeyPrefix, img.ContentType, img.Data)
 	if err != nil {
 		h.logger.Error("icon upload failed", zap.Error(err))
 		if _, unconfigured := h.iconUploader.(service.UnconfiguredIconUploader); unconfigured {

@@ -13,6 +13,8 @@ is needed here (unlike ExtractResponse.transactions).
 import json
 import logging
 
+from fastapi.concurrency import run_in_threadpool
+
 from app.core.config import settings
 from app.core.groq_client import get_anthropic_client, get_groq_client
 from app.schemas.budget_schema import CategorySuggestionResponse
@@ -41,15 +43,16 @@ class CategorySuggestionUnavailableError(Exception):
 
 
 async def suggest_category(description: str) -> CategorySuggestionResponse:
+    # Synchronous SDK calls run off the event loop (see extract_service.py).
     try:
-        return _call_groq(description)
+        return await run_in_threadpool(_call_groq, description)
     except Exception as exc:  # noqa: BLE001 - any Groq failure falls back, never propagates raw
         logger.warning(
             "groq category suggestion failed, falling back to anthropic",
             extra={"prompt_chars": len(description), "error_type": type(exc).__name__, "error": str(exc)},
         )
         try:
-            return _call_anthropic(description)
+            return await run_in_threadpool(_call_anthropic, description)
         except Exception as fallback_exc:  # noqa: BLE001
             logger.error(
                 "anthropic fallback also failed",

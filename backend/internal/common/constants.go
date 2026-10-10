@@ -92,28 +92,26 @@ const (
 // CategoryIconMaxLength above — no spec commits to a number.
 const CategoryIconMaxUploadBytes = 2 * 1024 * 1024 // 2 MiB
 
-// CategoryIconAllowedContentTypes is the upload allow-list — png/jpg/svg
-// per the product ask, checked against the multipart part's declared
-// Content-Type (not sniffed from bytes; good enough for an
-// invite-only app with no anonymous upload surface).
-var CategoryIconAllowedContentTypes = map[string]bool{
-	"image/png":     true,
-	"image/jpeg":    true,
-	"image/svg+xml": true,
-}
+// What an upload may contain is decided by imageupload.Process from the
+// file's own bytes (PNG, JPEG or WebP; SVG is refused), never from the
+// client's declared Content-Type or filename.
 
-// Icon upload object-storage key prefixes (service.IconUploader) — one per
-// entity so Category/Wallet/Budget uploads land in distinctly namespaced R2
-// keys despite sharing one uploader implementation
-// (specs/wallet-budget-icons/plan.md Finding #5). Wallet/Budget reuse
-// CategoryIconMaxUploadBytes/CategoryIconAllowedContentTypes as-is — a
-// per-entity rename was considered and deliberately deferred (same plan.md
-// finding) since the limits are identical across all three today.
+// Image upload object-storage key prefixes (service.IconUploader) — one per
+// entity so uploads land in distinctly namespaced R2 keys despite sharing one
+// uploader implementation (specs/wallet-budget-icons/plan.md Finding #5).
+// Wallet/Budget reuse CategoryIconMaxUploadBytes as-is — a per-entity rename
+// was considered and deliberately deferred (same plan.md finding) since the
+// limits are identical across all of them today.
 const (
 	CategoryIconKeyPrefix = "category-icons"
 	WalletIconKeyPrefix   = "wallet-icons"
 	BudgetIconKeyPrefix   = "budget-icons"
+	AvatarKeyPrefix       = "avatars"
 )
+
+// ImageKeyPrefixes lists every prefix the app writes images under; the
+// uploader only ever deletes objects below one of them.
+var ImageKeyPrefixes = []string{CategoryIconKeyPrefix, WalletIconKeyPrefix, BudgetIconKeyPrefix, AvatarKeyPrefix}
 
 // Budgets (F-05).
 const (

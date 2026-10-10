@@ -35,6 +35,7 @@ export function AvatarGroup({ accounts }: AvatarGroupProps) {
         <View key={account.userId} style={[styles.ring, index > 0 && styles.overlapped]}>
           <Avatar
             name={accountDisplayName(account)}
+            iconUrl={account.avatarUrl}
             color={colorForCategory(account.userId)}
             size={AVATAR_SIZE}
             fallback="initial"

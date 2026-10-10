@@ -41,6 +41,25 @@ func (r *RevokedTokenRepository) IsRevoked(ctx context.Context, tokenJTI string)
 	return revoked, nil
 }
 
+// Release undoes Claim for a token whose redemption then failed, so the
+// client can present it again. Idempotent.
+func (r *RevokedTokenRepository) Release(ctx context.Context, tokenJTI string) error {
+	if _, err := r.q.ReleaseTokenJTI(ctx, tokenJTI); err != nil {
+		return fmt.Errorf("repository.ReleaseTokenJTI: %w", err)
+	}
+	return nil
+}
+
+// DeleteExpired removes deny-list rows whose token expired before cutoff:
+// the token would be refused for its own expiry anyway (retention).
+func (r *RevokedTokenRepository) DeleteExpired(ctx context.Context, cutoff time.Time) (int64, error) {
+	n, err := r.q.DeleteExpiredRevokedTokens(ctx, cutoff)
+	if err != nil {
+		return 0, fmt.Errorf("repository.DeleteExpiredRevokedTokens: %w", err)
+	}
+	return n, nil
+}
+
 // Claim records the jti and reports whether THIS call recorded it. Only one
 // of several concurrent callers can ever get true (UNIQUE token_jti), which
 // is what makes a switch token single-use (account-switch Finding #5).

@@ -9,7 +9,6 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
 	"github.com/example/pfm/backend/internal/common"
@@ -34,7 +33,7 @@ func main() {
 		logger.Fatal("failed to load config", zap.Error(err))
 	}
 
-	pool, err := pgxpool.New(context.Background(), cfg.DatabaseURL)
+	pool, err := newPool(context.Background(), cfg)
 	if err != nil {
 		logger.Fatal("failed to connect to database", zap.Error(err))
 	}
@@ -43,6 +42,7 @@ func main() {
 	queries := sqlc.New(pool)
 	userRepo := repository.NewUserRepository(queries)
 	revokedRepo := repository.NewRevokedTokenRepository(queries)
+	sessionRepo := repository.NewSessionRepository(queries, pool)
 	walletRepo := repository.NewWalletRepository(queries, pool)
 	categoryRepo := repository.NewCategoryRepository(queries, pool)
 	budgetRepo := repository.NewBudgetRepository(queries, pool)
@@ -63,9 +63,12 @@ func main() {
 	// reports' default window) so no two screens disagree on "this cycle".
 	cycleResolver := service.NewCycleResolver(budgetPlanRepo)
 	userService := service.NewUserService(userRepo, emailSender, logger)
-	authService := service.NewAuthService(userRepo, revokedRepo, tokenService, logger)
-	accountSwitchService := service.NewAccountSwitchService(userRepo, revokedRepo, tokenService, logger)
-	sessionRevocationService := service.NewSessionRevocationService(userRepo, accountSwitchService, logger)
+	sessionService := service.NewSessionService(sessionRepo, tokenService, logger)
+	authService := service.NewAuthService(userRepo, revokedRepo, tokenService, sessionService, logger)
+	accountSwitchService := service.NewAccountSwitchService(userRepo, revokedRepo, tokenService, sessionService, logger)
+	sessionRevocationService := service.NewSessionRevocationService(userRepo, accountSwitchService, sessionService, logger)
+	tokenRetention := service.NewTokenRetention(sessionRepo, revokedRepo, logger)
+	openLegacyRefreshWindow(context.Background(), queries, authService, logger)
 	walletService := service.NewWalletService(walletRepo, logger)
 	categoryService := service.NewCategoryService(categoryRepo, logger)
 	budgetService := service.NewBudgetService(budgetRepo, cycleResolver, logger)
@@ -96,6 +99,7 @@ func main() {
 	authHandler := handler.NewAuthHandler(authService, logger)
 	accountSwitchHandler := handler.NewAccountSwitchHandler(accountSwitchService, logger)
 	sessionRevocationHandler := handler.NewSessionRevocationHandler(sessionRevocationService, logger)
+	profileHandler := handler.NewProfileHandler(service.NewProfileService(userRepo, iconUploader, logger), logger)
 	walletHandler := handler.NewWalletHandler(walletService, iconUploader, logger)
 	categoryHandler := handler.NewCategoryHandler(categoryService, iconUploader, logger)
 	budgetHandler := handler.NewBudgetHandler(budgetService, iconUploader, logger)
@@ -110,6 +114,10 @@ func main() {
 	analyticsHandler := handler.NewAnalyticsHandler(analyticsService, consultService, logger)
 
 	app := fiber.New(fiber.Config{
+		BodyLimit:    common.HTTPBodyLimitBytes,
+		ReadTimeout:  common.HTTPReadTimeout,
+		WriteTimeout: common.HTTPWriteTimeout,
+		IdleTimeout:  common.HTTPIdleTimeout,
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
 			return response.Error(c, logger, err)
 		},
@@ -120,7 +128,7 @@ func main() {
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 		AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 	}))
-	registerRoutes(app, userHandler, authHandler, walletHandler, categoryHandler, budgetHandler, transactionHandler, transactionExportHandler, transactionImportHandler, auditLogHandler, reportHandler, notificationHandler, chatHandler, budgetWizardHandler, analyticsHandler, accountSwitchHandler, sessionRevocationHandler, tokenService, logger)
+	registerRoutes(app, userHandler, authHandler, walletHandler, categoryHandler, budgetHandler, transactionHandler, transactionExportHandler, transactionImportHandler, auditLogHandler, reportHandler, notificationHandler, chatHandler, budgetWizardHandler, analyticsHandler, accountSwitchHandler, sessionRevocationHandler, profileHandler, tokenService, sessionService, pool, logger)
 
 	go func() {
 		if err := app.Listen(":" + cfg.Port); err != nil {
@@ -136,6 +144,7 @@ func main() {
 	schedulerCtx, stopScheduler := context.WithCancel(context.Background())
 	go runNotificationScheduler(schedulerCtx, notificationService, logger)
 	go runIntentLogRetention(schedulerCtx, intentLogRetention, logger)
+	go runTokenRetention(schedulerCtx, tokenRetention, logger)
 
 	waitForShutdown(app, stopScheduler, logger)
 }
@@ -219,6 +228,24 @@ func newIconUploader(cfg *config.Config, logger *zap.Logger) service.IconUploade
 	}
 	logger.Info("R2 icon uploader configured", zap.String("bucket", cfg.R2Bucket))
 	return uploader
+}
+
+// runTokenRetention deletes finished session rows and expired deny-list rows
+// (service.TokenRetention) at startup and then on a fixed interval.
+func runTokenRetention(ctx context.Context, retention *service.TokenRetention, logger *zap.Logger) {
+	ticker := time.NewTicker(common.TokenPurgeInterval)
+	defer ticker.Stop()
+
+	retention.Purge(ctx)
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Info("token retention stopped")
+			return
+		case <-ticker.C:
+			retention.Purge(ctx)
+		}
+	}
 }
 
 // runIntentLogRetention applies the question log's privacy retention

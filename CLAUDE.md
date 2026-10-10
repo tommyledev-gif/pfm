@@ -89,6 +89,8 @@ pfm/
 - Invite token: `crypto/rand` 32 bytes hex — không dùng UUID cho security token.
 - Token expiry: 72h. Activation: atomic UPDATE (clear token + set status=active trong 1 query).
 - JWT: access token 15 phút, refresh token 7 ngày.
+- Session: mỗi thiết bị là 1 dòng `sessions` (mig 028); token mang `sid`, `JWTAuth` kiểm tra session mỗi request nên thu hồi có hiệu lực ngay. Tối đa 5 session/user (session dùng lâu nhất bị thu hồi), tuyệt đối 30 ngày, refresh token dùng lại → thu hồi cả session. Chi tiết: `docs/ops-runbook.md` §5.
+- `JWT_SECRET` ≥ 32 byte (server và `deploy.sh` từ chối nếu ngắn hơn). Không commit `.env*` thật — `backend/.env.prod` từng bị commit (xem runbook §6).
 - Roles: `admin` | `member`.
 
 ## Core DB Schema (MVP)

@@ -117,3 +117,22 @@ SET tokens_valid_after = $2,
     updated_at         = NOW()
 WHERE id = $1
   AND deleted_at IS NULL;
+
+-- name: UpdateUserFullName :one
+-- Profile (mobile Account). Hand-authored in sqlc/users_profile.sql.go; returns
+-- only the columns a profile response needs, never password_hash.
+UPDATE users
+SET full_name  = $2,
+    updated_at = NOW()
+WHERE id = $1
+  AND deleted_at IS NULL
+RETURNING id, email, full_name, status, role, activated_at, created_at, updated_at, tokens_valid_after, avatar_url;
+
+-- name: SetUserAvatarURL :one
+-- NULL clears the avatar. Same column list as UpdateUserFullName.
+UPDATE users
+SET avatar_url = $2,
+    updated_at = NOW()
+WHERE id = $1
+  AND deleted_at IS NULL
+RETURNING id, email, full_name, status, role, activated_at, created_at, updated_at, tokens_valid_after, avatar_url;

@@ -21,7 +21,14 @@ func newTestAuthService(t *testing.T) (*AuthService, *fakeUserRepo, *fakeRevoked
 	userRepo := newFakeUserRepo()
 	revokedRepo := newFakeRevokedTokenRepo()
 	tokens := NewTokenService("test-signing-key-not-for-production")
-	return NewAuthService(userRepo, revokedRepo, tokens, zap.NewNop()), userRepo, revokedRepo
+	clock := newTestClock()
+	sessions := NewSessionService(newFakeSessionRepo(clock, userRepo), tokens, zap.NewNop())
+	sessions.now = clock.Now
+	svc := NewAuthService(userRepo, revokedRepo, tokens, sessions, zap.NewNop())
+	// Open for the whole test: the legacy-token tests need it; the deadline
+	// itself is covered in auth_legacy_and_switch_release_test.go.
+	svc.SetLegacyRefreshDeadline(time.Now().Add(24 * time.Hour))
+	return svc, userRepo, revokedRepo
 }
 
 func seedActiveUser(t *testing.T, repo *fakeUserRepo, email, password string, status model.UserStatus) {
@@ -146,6 +153,31 @@ func TestAuthService_Logout(t *testing.T) {
 	if err := svc.Logout(context.Background(), refresh); err != nil {
 		t.Fatalf("second (idempotent) logout failed: %v", err)
 	}
+	// A session-bound token ends its session; the deny-list is not involved.
+	if got := countRevokedSessions(svc); got != 1 {
+		t.Fatalf("expected exactly 1 revoked session, got %d", got)
+	}
+	if got := revokedRepo.revokedCount(); got != 0 {
+		t.Fatalf("a session token must not touch the deny-list, got %d rows", got)
+	}
+}
+
+// A refresh token issued before sessions existed has no sid: logout takes the
+// old path and puts its jti on the deny-list.
+func TestAuthService_Logout_LegacyToken(t *testing.T) {
+	svc, repo, revokedRepo := newTestAuthService(t)
+	seedActiveUser(t, repo, "homer@example.com", "correcthorse1", model.UserStatusActive)
+	user, _ := repo.GetUserByEmail(context.Background(), "homer@example.com")
+	_, legacyRefresh, err := svc.tokens.GenerateTokenPair(user)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 2; i++ {
+		if err := svc.Logout(context.Background(), legacyRefresh); err != nil {
+			t.Fatalf("logout %d failed: %v", i, err)
+		}
+	}
 	if got := revokedRepo.revokedCount(); got != 1 {
 		t.Fatalf("expected exactly 1 revoked row, got %d", got)
 	}
@@ -179,9 +211,10 @@ func TestAuthService_Logout_ConcurrentRace(t *testing.T) {
 			t.Fatalf("logout %d returned unexpected error: %v", i, err)
 		}
 	}
-	if got := revokedRepo.revokedCount(); got != 1 {
-		t.Fatalf("expected exactly 1 revoked row after concurrent logout, got %d", got)
+	if got := countRevokedSessions(svc); got != 1 {
+		t.Fatalf("expected exactly 1 revoked session after concurrent logout, got %d", got)
 	}
+	_ = revokedRepo
 }
 
 // S-REF-01 through S-REF-08 (specs/mobile-session-refresh/spec.md).
@@ -204,26 +237,69 @@ func TestAuthService_Refresh(t *testing.T) {
 		if newRefresh == refresh {
 			t.Fatal("expected a rotated (different) refresh token")
 		}
-		if got := revokedRepo.revokedCount(); got != 1 {
-			t.Fatalf("expected exactly 1 revoked row (the old token), got %d", got)
+		// A session token rotates inside its session row, not via the deny-list.
+		if got := revokedRepo.revokedCount(); got != 0 {
+			t.Fatalf("expected no deny-list rows for a session token, got %d", got)
+		}
+		if got := countRevokedSessions(svc); got != 0 {
+			t.Fatalf("a normal refresh must not revoke the session, got %d revoked", got)
 		}
 	})
 
-	t.Run("reuse of an already-rotated token fails", func(t *testing.T) {
+	// A refresh token from before sessions existed is traded once for a
+	// session-bound pair, and cannot be traded again.
+	t.Run("pre-session refresh token is upgraded to a session", func(t *testing.T) {
+		svc, repo, revokedRepo := newTestAuthService(t)
+		seedActiveUser(t, repo, "homer@example.com", "correcthorse1", model.UserStatusActive)
+		user, _ := repo.GetUserByEmail(context.Background(), "homer@example.com")
+		_, legacy, err := svc.tokens.GenerateTokenPair(user)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		access, newRefresh, err := svc.Refresh(context.Background(), legacy)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		claims, _ := svc.tokens.ParseAccessToken(access)
+		info, _ := svc.tokens.ParseRefreshToken(newRefresh)
+		if claims.SessionID == "" || info.SessionID != claims.SessionID {
+			t.Fatalf("the new pair must be bound to a session, got access sid %q refresh sid %q", claims.SessionID, info.SessionID)
+		}
+		if got := revokedRepo.revokedCount(); got != 1 {
+			t.Fatalf("expected the old token on the deny-list (1 row), got %d", got)
+		}
+
+		_, _, err = svc.Refresh(context.Background(), legacy)
+		var appErr *common.AppError
+		if !errors.As(err, &appErr) || appErr.Code != common.ErrCodeUnauthenticated {
+			t.Fatalf("expected UNAUTHENTICATED when the old token is reused, got %v", err)
+		}
+	})
+
+	// Replay of an old session token outside the grace window means a copy
+	// leaked: the whole session is revoked (inside it, a retry is allowed —
+	// see session_service_test.go).
+	t.Run("reuse of an already-rotated token fails and revokes the session", func(t *testing.T) {
 		svc, repo, _ := newTestAuthService(t)
 		seedActiveUser(t, repo, "homer@example.com", "correcthorse1", model.UserStatusActive)
 		_, refresh, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1")
 		if err != nil {
 			t.Fatalf("login failed: %v", err)
 		}
-		if _, _, err := svc.Refresh(context.Background(), refresh); err != nil {
+		_, current, err := svc.Refresh(context.Background(), refresh)
+		if err != nil {
 			t.Fatalf("first refresh failed: %v", err)
 		}
+		fakeSessions(svc).clock.Advance(common.RefreshReuseGrace + time.Second)
 
 		_, _, err = svc.Refresh(context.Background(), refresh)
 		var appErr *common.AppError
 		if !errors.As(err, &appErr) || appErr.Code != common.ErrCodeUnauthenticated {
 			t.Fatalf("expected UNAUTHENTICATED on reuse, got %v", err)
+		}
+		if _, _, err := svc.Refresh(context.Background(), current); err == nil {
+			t.Fatal("the session must be dead, including its newest refresh token")
 		}
 	})
 
@@ -360,7 +436,7 @@ func TestAuthService_Refresh(t *testing.T) {
 	})
 
 	t.Run("two devices refresh independently", func(t *testing.T) {
-		svc, repo, revokedRepo := newTestAuthService(t)
+		svc, repo, _ := newTestAuthService(t)
 		seedActiveUser(t, repo, "homer@example.com", "correcthorse1", model.UserStatusActive)
 		_, refreshA, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1")
 		if err != nil {
@@ -377,8 +453,8 @@ func TestAuthService_Refresh(t *testing.T) {
 		if _, _, err := svc.Refresh(context.Background(), refreshB); err != nil {
 			t.Fatalf("device B refresh should still succeed independently: %v", err)
 		}
-		if got := revokedRepo.revokedCount(); got != 2 {
-			t.Fatalf("expected 2 revoked rows (one per device's old token), got %d", got)
+		if got := countRevokedSessions(svc); got != 0 {
+			t.Fatalf("refreshing one device must not end another's session, got %d revoked", got)
 		}
 	})
 }

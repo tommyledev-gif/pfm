@@ -44,6 +44,7 @@ export function AccountRow({ account, isActive, onPress, onRemove, testID }: Acc
       >
         <Avatar
           name={accountDisplayName(account)}
+          iconUrl={account.avatarUrl}
           color={colorForCategory(account.userId)}
           size={AVATAR_SIZE}
           fallback="initial"

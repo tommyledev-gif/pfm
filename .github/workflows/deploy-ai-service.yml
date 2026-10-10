@@ -17,8 +17,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Same tests as the PR gate, defined once in ai-service-test.yml, so a
+  # broken build cannot reach build-and-push here either.
+  test:
+    uses: ./.github/workflows/ai-service-test.yml
+
   build-and-push:
     runs-on: ubuntu-latest
+    needs: test
     permissions:
       contents: read
     steps:
