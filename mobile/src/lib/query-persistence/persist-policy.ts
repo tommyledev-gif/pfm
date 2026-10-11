@@ -7,9 +7,20 @@ import { QUERY_CACHE_MAX_AGE_MS, QUERY_CACHE_SCHEMA_VERSION } from "@/lib/consta
 // support US-03 step 1, AC-OFF-13). Anything else — chat thread, audit logs,
 // users, notifications, the budget-wizard prefill — is never written: it is
 // sensitive, volatile, or useless offline (S-OFF-21).
-export const PERSISTED_QUERY_ROOTS = ["wallets", "categories", "budgets", "report-summary", "transactions", "profile"] as const;
+export const PERSISTED_QUERY_ROOTS = [
+  "wallets",
+  "categories",
+  "budgets",
+  "report-summary",
+  "transactions",
+  "transaction-detail",
+  "profile",
+] as const;
 
 export const TRANSACTIONS_QUERY_ROOT = "transactions";
+// One Transaction with its Items (specs/transaction-line-items EC-09) — its own
+// root so details never take the list caches' slots.
+export const TRANSACTION_DETAIL_QUERY_ROOT = "transaction-detail";
 
 function rootOf(queryKey: QueryKey): unknown {
   return queryKey[0];
@@ -17,6 +28,10 @@ function rootOf(queryKey: QueryKey): unknown {
 
 export function isTransactionsQueryKey(queryKey: QueryKey): boolean {
   return rootOf(queryKey) === TRANSACTIONS_QUERY_ROOT;
+}
+
+export function isTransactionDetailQueryKey(queryKey: QueryKey): boolean {
+  return rootOf(queryKey) === TRANSACTION_DETAIL_QUERY_ROOT;
 }
 
 // A search result is a one-off answer to a typed phrase, not "my recent

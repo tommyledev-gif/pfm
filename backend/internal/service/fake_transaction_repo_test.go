@@ -41,6 +41,10 @@ type fakeTransactionRepo struct {
 	// the audit write is reached at all, which is where the real service
 	// places it too.
 	auditLogs []repository.InsertAuditLogParams
+	// lines holds each Transaction's active lines; retiredLines counts
+	// soft-deleted lists (fake_transaction_repo_lines_test.go).
+	lines        map[uuid.UUID]repository.TransactionLines
+	retiredLines map[uuid.UUID][]repository.TransactionLines
 }
 
 func newFakeTransactionRepo() *fakeTransactionRepo {
@@ -48,6 +52,8 @@ func newFakeTransactionRepo() *fakeTransactionRepo {
 		transactions:     make(map[uuid.UUID]*model.Transaction),
 		wallets:          make(map[uuid.UUID]*model.Wallet),
 		idempotencyIndex: make(map[string]uuid.UUID),
+		lines:            make(map[uuid.UUID]repository.TransactionLines),
+		retiredLines:     make(map[uuid.UUID][]repository.TransactionLines),
 	}
 }
 

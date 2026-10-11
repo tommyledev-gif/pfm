@@ -161,6 +161,14 @@ type TransactionRepo interface {
 	// ever called from inside TransactionService's own already-open pgx.Tx
 	// (the same one carrying the balance mutation and the row write).
 	InsertAuditLog(ctx context.Context, tx pgx.Tx, arg repository.InsertAuditLogParams) error
+	// Items and Adjustments (specs/transaction-line-items). Writes run inside
+	// the caller's tx; ListActiveLines takes a nil tx for a plain read.
+	InsertTransactionLines(ctx context.Context, tx pgx.Tx, transactionID, userID uuid.UUID, lines repository.TransactionLines) error
+	ListActiveLines(ctx context.Context, tx pgx.Tx, transactionID, userID uuid.UUID) (repository.TransactionLines, error)
+	ListActiveLinesByTransactionIDs(ctx context.Context, userID uuid.UUID, transactionIDs []uuid.UUID) (map[uuid.UUID]repository.TransactionLines, error)
+	SoftDeleteActiveLines(ctx context.Context, tx pgx.Tx, transactionID, userID uuid.UUID) error
+	CountActiveItems(ctx context.Context, userID uuid.UUID, transactionIDs []uuid.UUID) (map[uuid.UUID]int, error)
+	LockTransactionForUpdate(ctx context.Context, tx pgx.Tx, transactionID, userID uuid.UUID) (int64, time.Time, error)
 }
 
 // AuditLogRepo is the read-side repository contract AuditLogService depends

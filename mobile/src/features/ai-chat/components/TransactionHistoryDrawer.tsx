@@ -10,6 +10,7 @@ import { useAuditLogsQuery } from "@/features/audit-logs/api/use-audit-logs-quer
 import { AuditAction, AuditLogEntry } from "@/features/audit-logs/types";
 import { TombstoneKind } from "@/features/ai-chat/tombstone";
 import { ChatMessage } from "@/features/ai-chat/types";
+import { AuditItemsDiff } from "@/features/audit-logs/components/AuditItemsDiff";
 
 const ACTION_LABEL: Record<AuditAction, string> = {
   create: "Tạo giao dịch",
@@ -99,14 +100,24 @@ export function TransactionHistoryDrawer({
           </Text>
         </View>
         {entry.action === "update" ? (
-          changed.map((field) => (
-            <Text key={field} style={styles.entryDetail} numberOfLines={2}>
-              <Text style={styles.fieldLabel}>{FIELD_LABEL[field] ?? field}: </Text>
-              {formatValue(field, (entry.before as Record<string, unknown>)?.[field])}
-              {"  →  "}
-              <Text style={styles.newValue}>{formatValue(field, (entry.after as Record<string, unknown>)?.[field])}</Text>
-            </Text>
-          ))
+          changed.map((field) =>
+            field === "items" ? (
+              <AuditItemsDiff
+                key={field}
+                logId={entry.id}
+                before={(entry.before as Record<string, unknown>)?.[field]}
+                after={(entry.after as Record<string, unknown>)?.[field]}
+                currency={currency}
+              />
+            ) : (
+              <Text key={field} style={styles.entryDetail} numberOfLines={2}>
+                <Text style={styles.fieldLabel}>{FIELD_LABEL[field] ?? field}: </Text>
+                {formatValue(field, (entry.before as Record<string, unknown>)?.[field])}
+                {"  →  "}
+                <Text style={styles.newValue}>{formatValue(field, (entry.after as Record<string, unknown>)?.[field])}</Text>
+              </Text>
+            ),
+          )
         ) : (
           <Text style={styles.entryDetail} numberOfLines={2}>
             {snapshot?.amount !== undefined ? formatValue("amount", snapshot.amount) : "—"}

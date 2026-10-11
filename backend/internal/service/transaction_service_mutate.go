@@ -67,7 +67,12 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, userID, tran
 		occurredAt = &parsed
 	}
 
-	transaction, walletBalance, err := s.updateTransactionTx(ctx, userID, transactionID, existing, req, occurredAt, location)
+	update, err := resolveLineUpdate(existing, req)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	transaction, walletBalance, err := s.updateTransactionTx(ctx, userID, transactionID, existing, req, occurredAt, location, update)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -82,12 +87,26 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, userID, tran
 }
 
 // location is resolveLocationUpdate's result (nil parts = unchanged).
-func (s *TransactionService) updateTransactionTx(ctx context.Context, userID, transactionID uuid.UUID, existing *model.Transaction, req dto.UpdateTransactionRequest, occurredAt *time.Time, location locationUpdate) (*model.Transaction, *int64, error) {
+func (s *TransactionService) updateTransactionTx(ctx context.Context, userID, transactionID uuid.UUID, existing *model.Transaction, req dto.UpdateTransactionRequest, occurredAt *time.Time, location locationUpdate, update lineUpdate) (*model.Transaction, *int64, error) {
 	tx, err := s.repo.BeginTx(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("service.UpdateTransaction: %w", err)
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck // no-op once committed
+
+	// Lock, stale-copy check and balance rule before any write
+	// (specs/transaction-line-items plan F1, F17). Under the lock the balance
+	// delta below uses the locked amount, not the pre-tx read.
+	currentLines, lockedAmount, err := s.checkLinesInTx(ctx, tx, userID, existing, req, update)
+	if err != nil {
+		return nil, nil, err
+	}
+	locked := update.needsLock(req)
+	if lockedAmount != existing.Amount {
+		fresh := *existing
+		fresh.Amount = lockedAmount
+		existing = &fresh
+	}
 
 	var walletBalance *int64
 	if req.Amount != nil {
@@ -139,11 +158,20 @@ func (s *TransactionService) updateTransactionTx(ctx context.Context, userID, tr
 		}
 		return nil, nil, fmt.Errorf("service.UpdateTransaction: %w", err)
 	}
+	lineResult, err := s.applyLinesInTx(ctx, tx, userID, transactionID, update, currentLines, locked)
+	if err != nil {
+		return nil, nil, err
+	}
+	attachLines(transaction, lineResult.final)
 
 	// Records only the fields this PATCH actually supplied, in the same
 	// transaction as the row update above (specs/transaction-audit-log/
 	// spec.md US-01, Context #1/#4).
 	auditBefore, auditAfter := auditUpdateDiff(existing, req, occurredAt, location)
+	if update.replace {
+		auditBefore["items"] = auditLinesSummary(lineResult.before)
+		auditAfter["items"] = auditLinesSummary(lineResult.final)
+	}
 	if err := s.writeAuditLog(ctx, tx, userID, transactionID, model.AuditActionUpdate, auditBefore, auditAfter); err != nil {
 		return nil, nil, err
 	}
@@ -170,6 +198,14 @@ func (s *TransactionService) DeleteTransaction(ctx context.Context, userID, tran
 		return nil, fmt.Errorf("service.DeleteTransaction: %w", err)
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck // no-op once committed
+
+	// The deletion snapshot keeps the lines (specs/transaction-line-items
+	// BR-12); the rows themselves stay attached to the soft-deleted Transaction.
+	lines, err := s.repo.ListActiveLines(ctx, tx, transactionID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("service.DeleteTransaction: %w", err)
+	}
+	attachLines(existing, lines)
 
 	reversal := -existing.SignedEffect()
 	wallet, err := s.repo.AdjustWalletBalance(ctx, tx, existing.WalletID, reversal)

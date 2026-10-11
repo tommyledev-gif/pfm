@@ -56,6 +56,8 @@ export const QUERY_CACHE_PERSIST_THROTTLE_MS = 1000;
 // Transactions lists kept (first page each, most recently fetched first) —
 // bounds the stored blob below Android's ~2 MB AsyncStorage row limit.
 export const MAX_PERSISTED_TRANSACTION_QUERIES = 5;
+// Single-Transaction caches (with Items) kept for offline reading.
+export const MAX_PERSISTED_TRANSACTION_DETAILS = 20;
 
 // Outbox of Transactions recorded offline (US-04..US-07). Cap confirmed by
 // the product owner (spec decision #8).
@@ -112,6 +114,13 @@ export const TRANSACTION_KIND_LABELS: Record<TransactionKind, string> = {
 
 // Mirrors common.TransactionNoteMaxLength.
 export const TRANSACTION_NOTE_MAX_LENGTH = 500;
+
+// Items of a Transaction — mirror backend common.TransactionItemsMax et al.
+// (specs/transaction-line-items plan §2.6); keep both sides in step.
+export const TRANSACTION_ITEMS_MAX = 100;
+export const TRANSACTION_ADJUSTMENTS_MAX = 10;
+export const TRANSACTION_LINE_NAME_MAX_LENGTH = 100;
+export const TRANSACTION_ITEM_QUANTITY_MAX = 9999;
 
 // Transaction export/import (specs/transaction-export-import). The MIME type
 // mirrors common.TransactionExportContentType; UTI is its iOS equivalent,

@@ -153,11 +153,43 @@ func (s *TransactionService) ListTransactions(ctx context.Context, userID uuid.U
 		total = &count
 	}
 
+	if err := s.attachItemCounts(ctx, userID, transactions); err != nil {
+		return ListTransactionsResult{}, err
+	}
+
 	return ListTransactionsResult{Transactions: transactions, NextCursor: nextCursor, Total: total}, nil
+}
+
+// attachItemCounts sets ItemCount on a page of rows with one batched query
+// (specs/transaction-line-items plan F4) — never one query per row.
+func (s *TransactionService) attachItemCounts(ctx context.Context, userID uuid.UUID, transactions []*model.Transaction) error {
+	ids := make([]uuid.UUID, 0, len(transactions))
+	for _, t := range transactions {
+		ids = append(ids, t.ID)
+	}
+	counts, err := s.repo.CountActiveItems(ctx, userID, ids)
+	if err != nil {
+		return fmt.Errorf("service.ListTransactions: %w", err)
+	}
+	for _, t := range transactions {
+		t.ItemCount = counts[t.ID]
+	}
+	return nil
 }
 
 // GetTransaction implements US-03 — distinguishes "belongs to someone else"
 // (403) from "doesn't exist" (404), per spec.md S-TRX-32/S-TRX-33.
+// Ownership is settled before any line is read (specs/transaction-line-items
+// BR-13). Non-transactional read.
 func (s *TransactionService) GetTransaction(ctx context.Context, userID, transactionID uuid.UUID) (*model.Transaction, error) {
-	return s.getOwnedTransaction(ctx, userID, transactionID)
+	transaction, err := s.getOwnedTransaction(ctx, userID, transactionID)
+	if err != nil {
+		return nil, err
+	}
+	lines, err := s.repo.ListActiveLines(ctx, nil, transactionID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("service.GetTransaction: %w", err)
+	}
+	attachLines(transaction, lines)
+	return transaction, nil
 }

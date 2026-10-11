@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { apiClient } from "@/lib/axios";
+import { TRANSACTION_DETAIL_QUERY_ROOT } from "@/lib/query-persistence/persist-policy";
 
 // Same invalidation set as create/update — deleting a transaction reconciles
 // the wallet balance and any budget tracking that category/period.
@@ -12,6 +13,7 @@ export function useDeleteTransactionMutation() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: [TRANSACTION_DETAIL_QUERY_ROOT] });
       queryClient.invalidateQueries({ queryKey: ["wallets"] });
       queryClient.invalidateQueries({ queryKey: ["budgets"] });
       queryClient.invalidateQueries({ queryKey: ["report-summary"] });

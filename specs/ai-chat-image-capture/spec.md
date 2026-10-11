@@ -2,6 +2,7 @@
 
 > Source: `specs/mobile-ux-batch-2026-10/research.md` (feasibility research, approved by the product owner, corrected 2026-10-04 — Option C: a vision-capable AI reads the image and returns Transaction proposals). SRS Feature-12 / FR-09 / BF-10 (AI Chat Assistance).
 > Status: Specced 2026-10-04; product-owner decisions of 2026-10-04 folded in (currency, every proposal shown, limits, handwriting). SRS story: Feature-12 US-05 (added 2026-10-04).
+> Amended 2026-10-11: a receipt proposal carries the receipt's Items and Adjustments ([Items of a Transaction](../transaction-line-items/spec.md)) instead of splitting line items into separate proposals — BR-03, AC-05, S-AIIMG-02 changed; BR-15, AC-41–AC-43, S-AIIMG-52–S-AIIMG-55, EC-27–EC-28 added.
 > Related: [Feature-12 US-01 Create a Transaction via Chat](../ai-chat-assistant/spec.md) (proposal → confirm model, idempotency key, ownership re-validation, all reused) · [F-06 Transaction Management](../transaction-management/spec.md) (the confirm step) · [Transaction import](../transaction-export-import/spec.md) (the exact path for real spreadsheet files)
 > Clients: **`mobile/` only.** `frontend/` (web) is frozen — see Out of Scope.
 
@@ -15,7 +16,7 @@ Three kinds of image are in scope, with different expected output:
 
 | Image kind | Expected proposals |
 |---|---|
-| Printed receipt / bill | Usually **one** proposal: the total payable. Individual line items only when the User's caption asks for them. |
+| Printed receipt / bill | **One** proposal: the total payable, carrying the receipt's Items and Adjustments when it lists them. |
 | Handwritten note | **One per written entry** (e.g. "cafe 45k, xăng 80k"). |
 | Spreadsheet screenshot | **One per data row**; header, subtotal and total rows are never proposals. |
 
@@ -47,7 +48,7 @@ Two defects in today's typed-message flow block this feature and are fixed first
 |---|---|
 | BR-01 | ⚠️ A proposal is never saved without the User's explicit Confirm on that proposal (or on a "confirm all" the User triggers on the existing pending-review screen). |
 | BR-02 | ⚠️ Money: every amount is an integer number of xu (VND minor unit, 1 đồng = 100 xu), never a fractional value at any step. The AI reads whole đồng; a value read with a fractional part is not rounded — that entry is skipped and counted as unreadable. Currency: VND only; no conversion at any step (BR-13). |
-| BR-03 | ⚠️ A receipt yields its **total payable**, never the cash handed over, the change returned, a subtotal, or a tax line — unless the caption asks for line items, in which case each line item is one proposal and the total is not also proposed. |
+| BR-03 | ⚠️ A receipt yields **one** proposal for its **total payable**, never the cash handed over, the change returned, a subtotal, or a tax line as a separate proposal. Its line items and its tax, fee and discount lines are attached to that proposal as Items and Adjustments (BR-15), not proposed separately. |
 | BR-04 | ⚠️ The System never invents an entry that is not visibly present in the image. Header, subtotal and total rows of a sheet are never proposals. |
 | BR-05 | The System never invents a date. A printed or written date is used as the Transaction date (day/month order, Vietnamese convention). When none is visible, the current date is used and the proposal carries the low-confidence label. A date in the future also carries the label. |
 | BR-06 | At most the maximum proposals per image. When the image holds more, the first entries in reading order are proposed and the reply says the rest were not read. |
@@ -59,13 +60,14 @@ Two defects in today's typed-message flow block this feature and are fixed first
 | BR-12 | Images over the accepted size or of an unaccepted type are refused before any reading happens. |
 | BR-13 | ⚠️ A proposal (typed or image) is only ever attached to a VND Wallet. If the Wallet named or chosen is not VND, the System uses the default Wallet when it is VND, else the User's earliest-created VND Wallet. If the User has no VND Wallet, the proposal is returned without a Wallet and cannot be saved until the User picks a VND Wallet for it (US-04). The amount is never converted. |
 | BR-14 | Every proposal in one reply is shown as its own card, in the order returned, for typed and image replies alike. No proposal is dropped. |
+| BR-15 | ⚠️ A receipt proposal carries the Items and Adjustments read from the receipt, following the Item rules of [Items of a Transaction](../transaction-line-items/spec.md). When they do not add up to the total payable (that spec's balance rule), the proposal keeps the total and the Items, carries the low-confidence label, and cannot be saved directly: Confirm opens the edit form, where the User fixes the gap or removes the Items, and "confirm all" on the pending-review screen skips it and counts it as not saved. When the receipt lists more lines than the item maximum, the proposal carries no Items and the lead-in says the Items were not attached. Handwritten notes and spreadsheet screenshots never produce Items. |
 
 ### Key Entities
 
 | Entity | Role in this feature |
 |---|---|
 | Image capture | Transient. One picture plus an optional caption, sent once for reading. Never stored by the System. |
-| Transaction proposal | The existing proposal (amount, type, Category, Wallet, date, note, confidence, idempotency key). One per entry read. The Wallet may be absent when the User has no VND Wallet (BR-13). |
+| Transaction proposal | The existing proposal (amount, type, Category, Wallet, date, note, confidence, idempotency key). One per entry read. The Wallet may be absent when the User has no VND Wallet (BR-13). A receipt proposal may carry Items and Adjustments (BR-15). |
 | Transaction | Created only on Confirm, through the existing create flow. |
 | Chat thread | The existing per-User thread. Gains an "image" user message (thumbnail kept on this device only) and one message per proposal. |
 | Wallet | Read-only context; ownership re-validated; only VND Wallets may receive a proposal. |
@@ -100,7 +102,7 @@ Two defects in today's typed-message flow block this feature and are fixed first
 2. System offers two choices: take a photo, or choose from the library.
 3. User picks one; System asks for the corresponding device permission the first time.
 4. User takes or picks a photo.
-5. System shows a preview of the image with an optional caption field (e.g. "tách từng món", "ví MB") and Send / Cancel.
+5. System shows a preview of the image with an optional caption field (e.g. "ví MB") and Send / Cancel.
 6. User taps Send.
 7. System reduces the image to a size that is still legible, posts the User's message in the thread (a small thumbnail plus the caption, if any), and shows the typing indicator.
 8. Backend checks the image's size and type, loads the User's own Wallets and Categories, and sends the image, caption, Wallets, Categories and the current date to the AI Service.
@@ -117,7 +119,7 @@ Two defects in today's typed-message flow block this feature and are fixed first
 | AC-02 | The User can choose camera or library. Cancelling either returns to the chat with nothing sent. |
 | AC-03 | A preview with an optional caption is always shown before anything is sent; Cancel discards the image. |
 | AC-04 | After Send, the User's message shows a thumbnail of the image and the caption.<br>Tapping the thumbnail opens the image full-screen on this device. |
-| AC-05 | A printed receipt produces one proposal for the total payable (BR-03). A caption asking for line items produces one proposal per line item instead. |
+| AC-05 | A printed receipt produces one proposal for the total payable (BR-03).<br>Its line items and tax, fee and discount lines appear on that proposal as Items and Adjustments (BR-15), never as separate proposals. |
 | AC-06 | A handwritten note produces one proposal per entry, with Vietnamese shorthand understood ("45k" = 45,000 đ, "1tr2" = 1,200,000 đ, "5m" = 5,000,000 đ).<br>When handwriting did not pass the accuracy check, every proposal from a handwritten note carries the low-confidence label. |
 | AC-07 | A spreadsheet screenshot produces one proposal per data row; header, subtotal and total rows produce none (BR-04). |
 | AC-08 | Every proposal amount is an integer number of xu of VND (BR-02), and every proposal's Wallet is a VND Wallet or absent (BR-13). |
@@ -127,13 +129,16 @@ Two defects in today's typed-message flow block this feature and are fixed first
 | AC-12 | An image with no recognizable expense or income yields no cards and a reply suggesting a clearer photo or typing instead. |
 | AC-13 | Image reading has its own limit (BR-10); hitting it never blocks typed messages, and typed messages never use it up. |
 | AC-14 | Nothing is saved as a Transaction by this step. |
+| AC-41 | A receipt proposal card shows its Item count and can be expanded to list its Items and Adjustments. |
+| AC-42 | ⚠️ A receipt proposal whose Items and Adjustments do not add up to its total carries the low-confidence label, and Confirm opens the edit form instead of saving (BR-15). |
+| AC-43 | Confirming a receipt proposal saves the Transaction together with its Items and Adjustments, or nothing; a repeated confirm never duplicates them. |
 
 ### Scenarios
 
 | Scenario ID | Given | When | Then | Notes |
 |---|---|---|---|---|
 | S-AIIMG-01 | User has a default Wallet (VND) and an expense Category "Ăn uống" | User sends a photo of a printed café receipt, total 145,000 đ, dated 02/10/2026 | `200`; 1 proposal: expense, 14,500,000 xu, "Ăn uống", default Wallet, date 2 Oct 2026 | Happy path — receipt total |
-| S-AIIMG-02 | Same | Same receipt, caption "tách từng món" | `200`; one proposal per line item; no separate total proposal; the amounts add up to the total when the receipt's lines do | BR-03 line-item mode |
+| S-AIIMG-02 | Same | A supermarket receipt with 12 line items, VAT 8,000 đ, total 108,000 đ | `200`; **one** proposal of 10,800,000 xu carrying 12 Items and a tax Adjustment of 8,000 đ; no proposal per line item | BR-03, BR-15 |
 | S-AIIMG-03 | ⚠️ Receipt shows total 145,000, cash given 200,000, change 55,000 | User sends it | 1 proposal of 145,000 đ — never 200,000 or 55,000 | BR-03 |
 | S-AIIMG-04 | User has expense Categories for food and transport | User sends a handwritten note "cafe 45k, xăng 80k, 2/10" | `200`; 2 proposals: 4,500,000 xu and 8,000,000 xu, both dated 2 Oct of the current year; when handwriting did not pass the accuracy check, both carry the low-confidence label | AC-06, BR-09 |
 | S-AIIMG-05 | Note says "tiền nhà 1tr2" | User sends it | 1 proposal of 120,000,000 xu | Shorthand "tr" |
@@ -156,6 +161,10 @@ Two defects in today's typed-message flow block this feature and are fixed first
 | S-AIIMG-22 | Every AI provider is down or times out | User sends an image | `502 AI_SERVICE_UNAVAILABLE`; retryable | System error |
 | S-AIIMG-23 | Device is offline | User opens recording mode | Attach-image button is disabled with an explanation | BR-11 |
 | S-AIIMG-24 | User denies camera permission | User chooses "take a photo" | Message explaining how to allow it in settings; library choice still works | — |
+| S-AIIMG-52 | ⚠️ Receipt lines read as 100,000 đ, no tax line, total 108,000 đ | User sends it | 1 proposal of 108,000 đ with the Items; low-confidence label; Confirm opens the edit form showing the 8,000 đ gap | BR-15, AC-42 |
+| S-AIIMG-53 | Receipt with more lines than the item maximum | User sends it | 1 proposal for the total, no Items; lead-in says the Items were not attached | BR-15 |
+| S-AIIMG-54 | Receipt with a discount line of 20,000 đ | User sends it | 1 proposal for the total; Items plus a discount Adjustment of 20,000 đ; they add up to the total | BR-15 |
+| S-AIIMG-55 | ⚠️ Proposal from S-AIIMG-02 | User confirms it twice (double tap) | One Transaction with one set of 12 Items and 1 Adjustment; balance moves once | AC-43 |
 
 ### Edge Cases
 - **EC-01** ⚠️ Mis-read amount (e.g. 45.000 read as 450.000): never saved automatically; the thumbnail stays next to the cards so the User can compare; uncertain readings carry the low-confidence label. The User corrects via the existing proposal edit before confirming.
@@ -173,6 +182,8 @@ Two defects in today's typed-message flow block this feature and are fixed first
 - **EC-13** Handwriting with a crossed-out entry: crossed-out entries are not proposed.
 - **EC-14** The default Wallet is not VND: BR-13 applies — proposals go to the User's earliest-created VND Wallet, or are returned without a Wallet when there is none (US-04).
 - **EC-15** A handwritten note mistaken by the AI for a printed receipt: its proposals carry the label only if they are uncertain for another reason. Accepted risk — every proposal still needs its own Confirm next to the thumbnail.
+- **EC-27** The User removes every Item from a receipt proposal in the edit form: it is saved as a plain Transaction of the total.
+- **EC-28** A receipt line read with a quantity that is not a whole number (e.g. 0.45 kg): it becomes one Item of quantity 1 whose name carries the weight, with the printed line amount.
 
 ### Client UI States (`mobile/`, recording mode)
 

@@ -2,8 +2,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { DehydratedState } from "@tanstack/react-query";
 import type { PersistedClient, Persister } from "@tanstack/react-query-persist-client";
 
-import { MAX_PERSISTED_TRANSACTION_QUERIES, QUERY_CACHE_STORAGE_KEY_PREFIX } from "@/lib/constants";
-import { isTransactionsQueryKey } from "@/lib/query-persistence/persist-policy";
+import { MAX_PERSISTED_TRANSACTION_DETAILS, MAX_PERSISTED_TRANSACTION_QUERIES, QUERY_CACHE_STORAGE_KEY_PREFIX } from "@/lib/constants";
+import { isTransactionDetailQueryKey, isTransactionsQueryKey } from "@/lib/query-persistence/persist-policy";
 
 type DehydratedQuery = DehydratedState["queries"][number];
 
@@ -45,8 +45,12 @@ function trimClientState(state: DehydratedState): DehydratedState {
     .sort((a, b) => b.state.dataUpdatedAt - a.state.dataUpdatedAt)
     .slice(0, MAX_PERSISTED_TRANSACTION_QUERIES)
     .map(firstPageOnly);
-  const others = state.queries.filter((q) => !isTransactionsQueryKey(q.queryKey));
-  return { ...state, queries: [...others, ...transactions] };
+  const details = state.queries
+    .filter((q) => isTransactionDetailQueryKey(q.queryKey))
+    .sort((a, b) => b.state.dataUpdatedAt - a.state.dataUpdatedAt)
+    .slice(0, MAX_PERSISTED_TRANSACTION_DETAILS);
+  const others = state.queries.filter((q) => !isTransactionsQueryKey(q.queryKey) && !isTransactionDetailQueryKey(q.queryKey));
+  return { ...state, queries: [...others, ...transactions, ...details] };
 }
 
 /**

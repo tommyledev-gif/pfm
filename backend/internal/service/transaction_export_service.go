@@ -88,7 +88,16 @@ func (s *TransactionExportService) BuildExportWorkbook(ctx context.Context, user
 		return transactions[a].CreatedAt.Before(transactions[b].CreatedAt)
 	})
 
-	data, err := writeWorkbook(transactions, currencyByWallet)
+	ids := make([]uuid.UUID, 0, len(transactions))
+	for _, t := range transactions {
+		ids = append(ids, t.ID)
+	}
+	linesByTransaction, err := s.repo.ListActiveLinesByTransactionIDs(ctx, userID, ids)
+	if err != nil {
+		return nil, "", fmt.Errorf("service.BuildExportWorkbook: %w", err)
+	}
+
+	data, err := writeWorkbook(transactions, currencyByWallet, linesByTransaction)
 	if err != nil {
 		return nil, "", err
 	}
@@ -148,9 +157,9 @@ func parseExportRange(q dto.ExportTransactionsQuery) (time.Time, time.Time, erro
 	return from.UTC(), to.UTC().Add(24*time.Hour - time.Nanosecond), nil
 }
 
-// writeWorkbook renders the rows into a single-sheet .xlsx, columns exactly
-// in common.TransactionExportColumns order.
-func writeWorkbook(transactions []*model.Transaction, currencyByWallet map[uuid.UUID]string) ([]byte, error) {
+// writeWorkbook renders the rows into the Transactions sheet, columns exactly
+// in common.TransactionExportColumns order, then the Items sheet.
+func writeWorkbook(transactions []*model.Transaction, currencyByWallet map[uuid.UUID]string, linesByTransaction map[uuid.UUID]repository.TransactionLines) ([]byte, error) {
 	file := excelize.NewFile()
 	defer file.Close() //nolint:errcheck // in-memory only, nothing to flush
 
@@ -195,6 +204,10 @@ func writeWorkbook(transactions []*model.Transaction, currencyByWallet map[uuid.
 		if err := file.SetSheetRow(sheet, cell, &row); err != nil {
 			return nil, fmt.Errorf("service.writeWorkbook: %w", err)
 		}
+	}
+
+	if err := writeItemsSheet(file, transactions, linesByTransaction); err != nil {
+		return nil, err
 	}
 
 	var buf bytes.Buffer

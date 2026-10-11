@@ -37,6 +37,12 @@ type TransactionResponse struct {
 	// Location is null — never omitted — when the Transaction was recorded
 	// without a map pin, so a client can always read the key.
 	Location *TransactionLocationResponse `json:"location"`
+	// ItemCount is always present (0 when none). Items/Adjustments are present
+	// on single-Transaction responses only, omitted from list rows
+	// (specs/transaction-line-items plan F4).
+	ItemCount   int                              `json:"item_count"`
+	Items       *[]TransactionItemResponse       `json:"items,omitempty"`
+	Adjustments *[]TransactionAdjustmentResponse `json:"adjustments,omitempty"`
 }
 
 // TransactionLocationResponse is TransactionResponse.location. PlaceName and
@@ -61,6 +67,7 @@ func newTransactionLocationResponse(l *model.TransactionLocation) *TransactionLo
 }
 
 func NewTransactionResponse(t *model.Transaction) TransactionResponse {
+	items, adjustments := newLineResponses(t)
 	return TransactionResponse{
 		ID:           t.ID,
 		WalletID:     t.WalletID,
@@ -76,6 +83,9 @@ func NewTransactionResponse(t *model.Transaction) TransactionResponse {
 		ToWalletID:   t.ToWalletID,
 		ToWalletName: t.ToWalletName,
 		Location:     newTransactionLocationResponse(t.Location),
+		ItemCount:    t.ItemCount,
+		Items:        items,
+		Adjustments:  adjustments,
 	}
 }
 

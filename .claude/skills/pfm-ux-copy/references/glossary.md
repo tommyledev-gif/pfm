@@ -22,6 +22,9 @@ Một khái niệm = một từ, ở cả VI và EN. Cột "Nguồn": `app` = đ
 | Backup | sao lưu | backup | đề xuất | |
 | Sync | đồng bộ | sync | đề xuất | |
 | Export / Import | xuất file / nhập file | export / import | đề xuất | |
+| Item (dòng hàng của giao dịch) | món | item | app | Không có danh mục riêng; đếm "{{count}} món". Không dùng "mặt hàng", "sản phẩm" |
+| Adjustment | thuế, phí, giảm giá | tax, fee, discount | app | Gọi theo loại: "Thuế", "Phí", "Giảm giá", "Khác". Nhóm chung trên UI: "Thuế, phí, giảm giá"; tránh "khoản điều chỉnh" (Hán-Việt, khó hiểu) |
+| Items total | tổng các món | items total | app | Khác "số tiền" của giao dịch (số đã trả) |
 
 ## Từ tránh dùng trong UI
 

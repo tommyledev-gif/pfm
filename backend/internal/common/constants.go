@@ -135,6 +135,16 @@ const (
 	TransactionNoteMaxLength = 500
 )
 
+// Items of a Transaction (specs/transaction-line-items plan §2.6). Plan-owned
+// limits; mobile mirrors them in src/lib/constants.ts and the DTO tags repeat
+// them as literals — keep all three in step.
+const (
+	TransactionItemsMax          = 100
+	TransactionAdjustmentsMax    = 10
+	TransactionLineNameMaxLength = 100
+	TransactionItemQuantityMax   = 9999
+)
+
 // Notifications (F-10). NotificationJobInterval is an explicit assumption
 // (specs/notification-handling/spec.md Open Questions #2) — no SRS/SDS
 // source states a cadence; 5 minutes balances alert staleness against load.

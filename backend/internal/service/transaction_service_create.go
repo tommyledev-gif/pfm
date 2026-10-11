@@ -33,6 +33,13 @@ import (
 // pre-existing call site) always gets wasReplay=false, i.e. unchanged 201
 // behavior (specs/ai-chat-assistant/plan.md Regression Scope).
 func (s *TransactionService) CreateTransaction(ctx context.Context, userID uuid.UUID, req dto.CreateTransactionRequest) (*model.Transaction, *int64, bool, error) {
+	// Kind-dependent line shape is still a 400, so it runs before any lookup
+	// (specs/transaction-line-items plan §2.3 check ordering).
+	lines, err := normalizeLines(req.Items, req.Adjustments)
+	if err != nil {
+		return nil, nil, false, err
+	}
+
 	if req.IdempotencyKey != nil {
 		existing, err := s.lookupIdempotentTransaction(ctx, userID, *req.IdempotencyKey)
 		if err == nil {
@@ -72,6 +79,12 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, userID uuid.
 	if destination != nil {
 		destinationID = &destination.ID
 	}
+	if isTransfer(req.Type) && hasLines(lines) {
+		return nil, nil, false, common.ErrItemsNotAllowed
+	}
+	if err := reconcile(req.Amount, lines); err != nil {
+		return nil, nil, false, err
+	}
 
 	occurredAt := time.Now().UTC()
 	if req.OccurredAt != nil {
@@ -88,7 +101,7 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, userID uuid.
 		return nil, nil, false, err
 	}
 
-	transaction, walletBalance, err := s.createTransactionTx(ctx, userID, wallet.ID, category.ID, destinationID, req, occurredAt, location)
+	transaction, walletBalance, err := s.createTransactionTx(ctx, userID, wallet.ID, category.ID, destinationID, req, occurredAt, location, lines)
 	if err != nil {
 		// Two confirms racing past the lookup above with the same fresh key
 		// (specs/ai-chat-assistant/plan.md Finding #13): the partial unique
@@ -112,9 +125,19 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, userID uuid.
 
 // lookupIdempotentTransaction returns the existing Transaction for a
 // previously-used idempotency key, or a pgx.ErrNoRows-wrapping error if the
-// key is fresh (checked via errors.Is by callers).
+// key is fresh (checked via errors.Is by callers). A replay carries the
+// original lines too (specs/transaction-line-items S-TXI-12).
 func (s *TransactionService) lookupIdempotentTransaction(ctx context.Context, userID, key uuid.UUID) (*model.Transaction, error) {
-	return s.repo.GetTransactionByIdempotencyKey(ctx, userID, key)
+	existing, err := s.repo.GetTransactionByIdempotencyKey(ctx, userID, key)
+	if err != nil {
+		return nil, err
+	}
+	lines, err := s.repo.ListActiveLines(ctx, nil, existing.ID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("service.lookupIdempotentTransaction: %w", err)
+	}
+	attachLines(existing, lines)
+	return existing, nil
 }
 
 // createTransactionTx returns the Wallet's new balance alongside the created
@@ -122,7 +145,7 @@ func (s *TransactionService) lookupIdempotentTransaction(ctx context.Context, us
 // Transaction and the Wallet's new balance"). For a transfer that is the
 // SOURCE Wallet's balance; toWalletID is nil for income/expense. location is
 // the already-normalized map pin, nil when none was sent.
-func (s *TransactionService) createTransactionTx(ctx context.Context, userID uuid.UUID, walletID, categoryID uuid.UUID, toWalletID *uuid.UUID, req dto.CreateTransactionRequest, occurredAt time.Time, location *model.TransactionLocation) (*model.Transaction, int64, error) {
+func (s *TransactionService) createTransactionTx(ctx context.Context, userID uuid.UUID, walletID, categoryID uuid.UUID, toWalletID *uuid.UUID, req dto.CreateTransactionRequest, occurredAt time.Time, location *model.TransactionLocation, lines repository.TransactionLines) (*model.Transaction, int64, error) {
 	tx, err := s.repo.BeginTx(ctx)
 	if err != nil {
 		return nil, 0, fmt.Errorf("service.CreateTransaction: %w", err)
@@ -174,6 +197,13 @@ func (s *TransactionService) createTransactionTx(ctx context.Context, userID uui
 	if err != nil {
 		return nil, 0, fmt.Errorf("service.CreateTransaction: %w", err)
 	}
+	// Same tx as the row and the balance (specs/transaction-line-items BR-10).
+	if hasLines(lines) {
+		if err := s.repo.InsertTransactionLines(ctx, tx, transaction.ID, userID, lines); err != nil {
+			return nil, 0, fmt.Errorf("service.CreateTransaction: %w", err)
+		}
+	}
+	attachLines(transaction, lines)
 
 	// Same transaction as the balance mutation and the insert above
 	// (specs/transaction-audit-log/spec.md Context #1). A replayed create

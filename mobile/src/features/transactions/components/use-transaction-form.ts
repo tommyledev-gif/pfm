@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Keyboard } from "react-native";
 
 import { useIsOnline, useRequireOnline } from "@/lib/connectivity";
@@ -8,7 +8,6 @@ import { useAmountExpression } from "@/lib/use-amount-expression";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useCategoryPicker } from "@/features/categories/components/use-category-picker";
-import { useUpdateTransactionMutation } from "@/features/transactions/api/use-update-transaction-mutation";
 import { useDeleteTransactionMutation } from "@/features/transactions/api/use-delete-transaction-mutation";
 import { todayDateOnly } from "@/lib/date-range";
 import { Transaction, TransactionLocationInput } from "@/features/transactions/types";
@@ -18,6 +17,10 @@ import { buildQueuedDisplay } from "@/features/transactions/outbox/queued-displa
 import { useSaveOrQueue } from "@/features/transactions/components/use-save-or-queue";
 import { useTransactionLocation } from "@/features/transactions/components/use-transaction-location";
 import { LocationStepIntent } from "@/features/transactions/components/use-location-step";
+import { useTransactionUpdate } from "@/features/transactions/components/use-transaction-update";
+import { useFormDrawerChild } from "@/features/transactions/components/use-form-drawer-child";
+import { buildItemsPanelChild } from "@/features/transactions/components/ItemsEditorPanel";
+import { useItemsEditor } from "@/features/transactions/items/use-items-editor";
 
 // Until a wallet is picked there is no currency of its own; VND is the app's
 // home currency and the strictest one (no decimals), so nothing typed before
@@ -36,8 +39,8 @@ interface UseTransactionFormOptions {
 
 /**
  * State, validation and submit for TransactionFormModal — split out so the
- * modal file stays under the 300-line limit once transfers added their own
- * destination wallet and rules. The modal only lays out what this returns.
+ * modal file stays under the 300-line limit. The edit-only half (detail with
+ * Items, stale-copy check) lives in use-transaction-update.ts.
  */
 export function useTransactionForm({ visible, onClose, editingTransaction, editingQueued, draft }: UseTransactionFormOptions) {
   const isEditing = Boolean(editingTransaction);
@@ -57,27 +60,42 @@ export function useTransactionForm({ visible, onClose, editingTransaction, editi
   const amountCurrency = wallets.data?.find((w) => w.id === walletId)?.currency ?? FALLBACK_CURRENCY;
   const amount = useAmountExpression(amountCurrency);
   const { reset: resetAmount } = amount;
+  const lines = useItemsEditor(amount);
+  const { reset: resetLines, seedLines } = lines;
+  const [itemsOpen, setItemsOpen] = useState(false);
+  // Bumped by every reset, so the saved lines are re-applied after it (below).
+  const [seedVersion, setSeedVersion] = useState(0);
   const [note, setNote] = useState("");
   const [occurredAt, setOccurredAt] = useState(todayDateOnly());
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  // Bumped every time the sheet opens and remounts (as a `key`) the note
-  // TextInput — belt-and-braces alongside the state reset right
-  // under it, so a stale native text-editing state left over from the
-  // previous open can never survive into a fresh "Giao dịch mới".
+  // Bumped on every open; remounts the note TextInput (as a `key`) so no stale
+  // native text state survives into a fresh "Giao dịch mới".
   const [formKey, setFormKey] = useState(0);
   // One per open sheet: a double tap on save, or a retry after a dropped
   // response, reaches the backend as the same create and is deduplicated
   // there (GetTransactionByIdempotencyKey) instead of booking it twice.
   const [idempotencyKey, setIdempotencyKey] = useState(newIdempotencyKey);
 
+  const seedFromTransaction = useCallback((t: Transaction) => {
+    setWalletId(t.wallet_id);
+    setType(t.type);
+    setCategoryId(t.category_id);
+    setToWalletId(t.to_wallet_id);
+    resetAmount(t.amount);
+    resetLines(t.amount, t.items, t.adjustments);
+    setNote(t.note ?? "");
+    setOccurredAt(t.occurred_at.slice(0, 10));
+  }, [resetAmount, resetLines]);
+
   const { createTransaction, save, saveQueued, queueing } = useSaveOrQueue();
   const isOnline = useIsOnline();
-  const updateTransaction = useUpdateTransactionMutation();
+  const update = useTransactionUpdate({ visible, editingTransaction, onReloaded: seedFromTransaction });
+  const detail = update.detail.data;
   const deleteTransaction = useDeleteTransactionMutation();
   const requireOnline = useRequireOnline();
-  const mutation = isEditing ? updateTransaction : createTransaction;
+  const mutation = isEditing ? update.mutation : createTransaction;
   const saving = mutation.isPending || queueing;
   // Offline before any Wallet was ever loaded: nothing to pick (S-OFF-27).
   const noSavedWallets = !isOnline && !wallets.data?.length;
@@ -85,13 +103,7 @@ export function useTransactionForm({ visible, onClose, editingTransaction, editi
   useEffect(() => {
     if (!visible) return;
     if (editingTransaction) {
-      setWalletId(editingTransaction.wallet_id);
-      setType(editingTransaction.type);
-      setCategoryId(editingTransaction.category_id);
-      setToWalletId(editingTransaction.to_wallet_id);
-      resetAmount(editingTransaction.amount);
-      setNote(editingTransaction.note ?? "");
-      setOccurredAt(editingTransaction.occurred_at.slice(0, 10));
+      seedFromTransaction(editingTransaction);
     } else if (editingQueued) {
       const queued = editingQueued.payload;
       setWalletId(queued.wallet_id);
@@ -99,6 +111,7 @@ export function useTransactionForm({ visible, onClose, editingTransaction, editi
       setCategoryId(queued.category_id ?? null);
       setToWalletId(queued.to_wallet_id ?? null);
       resetAmount(queued.amount);
+      resetLines(queued.amount, queued.items, queued.adjustments);
       setNote(queued.note ?? "");
       setOccurredAt(queued.occurred_at ?? todayDateOnly());
     } else {
@@ -108,17 +121,25 @@ export function useTransactionForm({ visible, onClose, editingTransaction, editi
       setCategoryId(null);
       setToWalletId(null);
       resetAmount(draft?.amountCents ?? null);
+      resetLines(draft?.amountCents ?? null);
       setNote(draft?.note ?? "");
       setOccurredAt(todayDateOnly());
     }
     setSubmitAttempted(false);
-  }, [visible, editingTransaction, editingQueued, draft, wallets.data, resetAmount]);
+    setItemsOpen(false);
+    setSeedVersion((v) => v + 1);
+  }, [visible, editingTransaction, editingQueued, draft, wallets.data, resetAmount, resetLines, seedFromTransaction]);
+
+  // ⚠️ A list row carries no lines; the detail brings them (plan F4). Re-applied
+  // after every reset too, or a background wallets refetch would blank them.
+  useEffect(() => {
+    if (visible && detail && detail.id === editingTransaction?.id) seedLines(detail.items, detail.adjustments);
+  }, [visible, detail, editingTransaction?.id, seedLines, seedVersion]);
 
   // Separate from the reset above on purpose: that effect also re-runs
-  // whenever `wallets.data` refetches in the background (e.g. right after
-  // creating a transaction invalidates it) — bumping the remount key there
-  // too would yank focus out from under anyone still typing the note in an
-  // open sheet. This one only fires on the true open transition.
+  // whenever `wallets.data` refetches in the background — bumping the remount
+  // key there too would yank focus out from under anyone still typing the
+  // note. This one only fires on the true open transition.
   useEffect(() => {
     if (!visible) return;
     setFormKey((k) => k + 1);
@@ -134,12 +155,12 @@ export function useTransactionForm({ visible, onClose, editingTransaction, editi
     // The calculator's own reason first (÷0, rounds to 0, not above 0) — it
     // says what to fix; the generic line is only for an empty amount.
     amount: amount.problem ?? (amountInvalid(amountCents) ? "Vui lòng nhập số tiền" : undefined),
+    // BR-07 / AC-07: an unexplained gap or an unfinished line blocks the save.
+    items: isTransfer ? undefined : lines.problem,
   };
-  const hasErrors = Boolean(errors.wallet || errors.category || errors.toWallet || errors.amount);
+  const hasErrors = Boolean(errors.wallet || errors.category || errors.toWallet || errors.amount || errors.items);
 
-  // So the user knows what a create is about to do to the wallet before they
-  // commit to it, not after — the projected figure only shows once a valid
-  // amount is entered, since "→ NaN" before that would just be noise.
+  // What a create will do to the wallet, shown once a valid amount is entered.
   const selectedWallet = wallets.data?.find((w) => w.id === walletId);
   // Only same-currency wallets can receive a transfer — the backend rejects
   // anything else (TRANSFER_CURRENCY_MISMATCH), so they are not offered.
@@ -153,43 +174,35 @@ export function useTransactionForm({ visible, onClose, editingTransaction, editi
       : null;
 
   const submit = () => {
-    // The note's keyboard should never still be up once submit has been
-    // tapped — even a validation failure should leave the field errors
-    // visible, not hidden behind the keyboard.
+    // The note's keyboard should never still be up once submit has been tapped.
     Keyboard.dismiss();
     setSubmitAttempted(true);
     // A second tap while the first request is still in flight is dropped
     // here; the idempotency key covers the tap that slips past this check.
     if (saving || noSavedWallets) return;
     // Resolved here rather than read from `amountCents`: the header's "Lưu"
-    // can be tapped mid-expression ("120+"), which this trims/evaluates in
-    // place so what is saved is exactly what the display then shows.
+    // can be tapped mid-expression ("120+"), which this evaluates in place.
     const cents = amount.resolve();
-    const otherErrors = Boolean(errors.wallet || errors.category || errors.toWallet);
+    const otherErrors = Boolean(errors.wallet || errors.category || errors.toWallet || errors.items);
     if (otherErrors || amountInvalid(cents) || cents === null || !walletId) return;
     if (isEditing && editingTransaction) {
-      // Editing is online-only (AC-OFF-08); only a new Transaction may be
-      // saved without a connection, once the outbox exists.
-      requireOnline(() =>
-        updateTransaction.mutate(
-          {
-            id: editingTransaction.id,
-            // A transfer's category is fixed server-side (and rejected if sent).
-            body: {
-              amount: cents,
-              category_id: isTransfer ? undefined : categoryId ?? undefined,
-              occurred_at: occurredAt,
-              note: note || undefined,
-              location_note: location.locationNoteUpdate(),
-              location: location.locationMoveUpdate(),
-            },
-          },
-          { onSuccess: onClose },
-        ),
+      update.submit(
+        {
+          amount: cents,
+          // A transfer's category is fixed server-side (and rejected if sent).
+          category_id: isTransfer ? undefined : categoryId ?? undefined,
+          occurred_at: occurredAt,
+          note: note || undefined,
+          location_note: location.locationNoteUpdate(),
+          location: location.locationMoveUpdate(),
+          // Only an edited list is sent; an untouched one stays as saved (plan F5).
+          ...(lines.dirty ? lines.toInputs() : {}),
+        },
+        onClose,
       );
     } else if (location.needsPin) {
-      // Pinned on save, not on open: it is the location step's own save
-      // button that then books the Transaction (onConfirm below).
+      // Pinned on save, not on open: the location step's own save button
+      // then books the Transaction (onConfirm below).
       openLocationStep("save");
     } else {
       saveCreate(cents, location.pinned);
@@ -209,6 +222,8 @@ export function useTransactionForm({ visible, onClose, editingTransaction, editi
       idempotency_key: editingQueued?.idempotency_key ?? idempotencyKey,
       // Kept on a queued item too, so it syncs with the pin taken offline.
       ...(pin ? { location: pin } : {}),
+      // Rides in the outbox payload too (AC-12).
+      ...(!isTransfer && lines.items.length > 0 ? lines.toInputs() : {}),
     };
     const display = buildQueuedDisplay(payload, wallets.data, categories.data);
     if (editingQueued) saveQueued(editingQueued.idempotency_key, payload, display, onClose);
@@ -234,55 +249,51 @@ export function useTransactionForm({ visible, onClose, editingTransaction, editi
     onApply: (ids) => setCategoryId(ids[0] ?? null),
   });
 
-  // The sheet has one child slot. Whichever panel opened last keeps it, so a
-  // panel sliding back out keeps its own content until it is gone.
-  const [activeChild, setActiveChild] = useState<"category" | "location">("category");
+  const itemsChild = buildItemsPanelChild({
+    visible: itemsOpen,
+    onClose: () => setItemsOpen(false),
+    lines,
+    amountCents,
+    currency: amountCurrency,
+    showErrors: submitAttempted,
+  });
+  const panels = useFormDrawerChild({ category: categoryPicker.child, location: location.stepChild, items: itemsChild });
   const openCategoryPicker = () => {
-    setActiveChild("category");
+    panels.claim("category");
     categoryPicker.open();
   };
   const openLocationStep = (intent: LocationStepIntent) => {
-    setActiveChild("location");
+    panels.claim("location");
     location.openStep(intent);
+  };
+  // ⚠️ Until the saved lines arrive, an edit would replace them with a partial
+  // list on save — so the editor stays shut while they load.
+  const pendingItemCount = editingTransaction?.item_count ?? 0;
+  const itemsLoading = isEditing && pendingItemCount > 0 && !detail;
+  // A saved Transaction's lines are edited online only (AC-26); a new or queued one anywhere.
+  const openItemsEditor = () => {
+    if (itemsLoading) return;
+    const open = () => {
+      panels.claim("items");
+      setItemsOpen(true);
+    };
+    if (isEditing) requireOnline(open);
+    else open();
   };
 
   return {
-    isEditing,
-    wallets,
-    walletId,
-    setWalletId,
-    type,
-    setType,
-    isTransfer,
-    toWalletId,
-    setToWalletId,
-    setCategoryId,
-    amount,
-    note,
-    setNote,
-    occurredAt,
-    setOccurredAt,
-    datePickerOpen,
-    setDatePickerOpen,
-    submitAttempted,
-    confirmDeleteOpen,
-    setConfirmDeleteOpen,
-    formKey,
-    deleteTransaction,
-    mutation,
-    saving,
-    noSavedWallets,
-    errors,
-    hasErrors,
-    selectedWallet,
-    destinationWallets,
-    projectedBalance,
-    transferTarget,
-    submit,
-    categoryPicker,
-    openCategoryPicker,
-    openLocationStep,
-    drawerChild: activeChild === "location" ? location.stepChild : categoryPicker.child,
-    location,
+    isEditing, wallets, walletId, setWalletId, type, setType, isTransfer, toWalletId, setToWalletId,
+    setCategoryId, amount, note, setNote, occurredAt, setOccurredAt, datePickerOpen, setDatePickerOpen,
+    submitAttempted, confirmDeleteOpen, setConfirmDeleteOpen, formKey, deleteTransaction, mutation,
+    saving, noSavedWallets, errors, hasErrors, selectedWallet, destinationWallets, projectedBalance,
+    transferTarget, submit, categoryPicker, openCategoryPicker, openLocationStep, location,
+    drawerChild: panels.drawerChild,
+    lines,
+    openItemsEditor,
+    stale: update.stale,
+    isOnline,
+    // Items count from the list row until the detail with the lines arrives.
+    pendingItemCount,
+    itemsLoading,
   };
 }

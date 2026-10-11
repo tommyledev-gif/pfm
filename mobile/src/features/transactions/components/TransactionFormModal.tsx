@@ -1,4 +1,4 @@
-import { Pressable, Text, View } from "react-native";
+import { Text } from "react-native";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Drawer } from "@/components/shared/Drawer";
@@ -7,12 +7,9 @@ import { FieldError } from "@/components/ui/FieldError";
 import { PillButton } from "@/components/ui/PillButton";
 import { TrashIcon } from "@/components/ui/Icon";
 import { SingleDatePickerModal } from "@/components/shared/SingleDatePickerModal";
-import { getErrorMessage } from "@/lib/axios";
 import { useRequireOnline } from "@/lib/connectivity";
 import { formatCurrency } from "@/lib/currency";
-import { withAlpha } from "@/lib/color";
-import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
-import { TRANSACTION_KIND_LABELS, TRANSACTION_KINDS } from "@/lib/constants";
+import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { Transaction } from "@/features/transactions/types";
 import { OutboxItem } from "@/features/transactions/outbox/outbox-types";
 import { TransactionDraft } from "@/features/transactions/draft-from-text";
@@ -21,6 +18,11 @@ import { WalletChipRow } from "@/features/transactions/components/WalletChipRow"
 import { LocationToggleRow } from "@/features/transactions/components/LocationToggleRow";
 import { TransactionLocationCard } from "@/features/transactions/components/TransactionLocationCard";
 import { useTransactionForm } from "@/features/transactions/components/use-transaction-form";
+import { TransactionTypeChips } from "@/features/transactions/components/TransactionTypeChips";
+import { ItemsEntryRow } from "@/features/transactions/components/ItemsEntryRow";
+import { TransactionItemsSection } from "@/features/transactions/components/TransactionItemsSection";
+import { StaleEditDialog } from "@/features/transactions/components/StaleEditDialog";
+import { transactionSaveErrorMessage } from "@/features/transactions/items/save-error-message";
 
 const FALLBACK_CURRENCY = "VND";
 
@@ -84,6 +86,12 @@ export function TransactionFormModal({ visible, onClose, editingTransaction, edi
     openLocationStep,
     drawerChild,
     location,
+    lines,
+    openItemsEditor,
+    stale,
+    isOnline,
+    pendingItemCount,
+    itemsLoading,
   } = useTransactionForm({ visible, onClose, editingTransaction, editingQueued, draft });
   const requireOnline = useRequireOnline();
 
@@ -110,7 +118,7 @@ export function TransactionFormModal({ visible, onClose, editingTransaction, edi
             occurredAt={occurredAt}
             onPressDate={() => setDatePickerOpen(true)}
             errors={submitAttempted ? [errors.category, errors.amount] : []}
-            submitError={activeError ? getErrorMessage(activeError, "Không thể lưu giao dịch") : null}
+            submitError={activeError ? transactionSaveErrorMessage(activeError) : null}
             onSubmit={submit}
             submitting={saving}
           />
@@ -130,23 +138,16 @@ export function TransactionFormModal({ visible, onClose, editingTransaction, edi
         />
 
         <Text style={styles.label}>Loại{lockedSuffix}</Text>
-        <View style={styles.chipRow}>
-          {TRANSACTION_KINDS.map((t) => (
-            <Pressable
-              key={t}
-              onPress={() => {
-                if (isEditing) return;
-                setType(t);
-                setCategoryId(null);
-              }}
-              style={[styles.chip, type === t && styles.chipActive, isEditing && styles.chipDisabled]}
-            >
-              <Text style={[styles.chipLabel, type === t && styles.chipLabelActive]}>
-                {TRANSACTION_KIND_LABELS[t]}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+        <TransactionTypeChips
+          type={type}
+          locked={isEditing}
+          itemCount={lines.items.length}
+          onClearItems={lines.clear}
+          onSelect={(t) => {
+            setType(t);
+            setCategoryId(null);
+          }}
+        />
 
         <Text style={styles.label}>
           {isTransfer ? "Từ ví" : "Ví"}
@@ -190,6 +191,20 @@ export function TransactionFormModal({ visible, onClose, editingTransaction, edi
           </>
         ) : null}
 
+        {/* Editing a saved one offline: read the cached Items (EC-09, AC-26). */}
+        {!isTransfer && isEditing && !isOnline ? (
+          <TransactionItemsSection lines={lines} currency={selectedWallet?.currency ?? FALLBACK_CURRENCY} itemCount={pendingItemCount} />
+        ) : !isTransfer ? (
+          <ItemsEntryRow
+            lines={lines}
+            currency={selectedWallet?.currency ?? FALLBACK_CURRENCY}
+            pendingCount={pendingItemCount}
+            loading={itemsLoading}
+            onPress={openItemsEditor}
+            error={submitAttempted ? errors.items : undefined}
+          />
+        ) : null}
+
         {!isEditing ? (
           <LocationToggleRow
             value={location.pinLocation}
@@ -229,6 +244,14 @@ export function TransactionFormModal({ visible, onClose, editingTransaction, edi
         loading={deleteTransaction.isPending}
       />
 
+      <StaleEditDialog
+        visible={stale.visible}
+        onLoadLatest={stale.onLoadLatest}
+        onSaveAnyway={stale.onSaveAnyway}
+        onDismiss={stale.onDismiss}
+        loading={saving}
+      />
+
       <SingleDatePickerModal
         visible={datePickerOpen}
         onClose={() => setDatePickerOpen(false)}
@@ -242,24 +265,6 @@ export function TransactionFormModal({ visible, onClose, editingTransaction, edi
 const useStyles = createStyles((colors) => ({
   label: { ...typography.caption, color: colors.textSecondary },
   balanceHint: { ...typography.tiny, color: colors.textMuted },
-  chipRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
-  // Fixed height + centred label, not vertical padding: the type chips and
-  // the wallet chips (a horizontal ScrollView, which stretches its children)
-  // used to come out at different heights.
-  chip: {
-    height: 36,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    borderRadius: radii.pill,
-    backgroundColor: withAlpha(colors.overlayBase, 0.06),
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-  },
-  chipActive: { backgroundColor: colors.green, borderColor: colors.green },
-  chipDisabled: { opacity: 0.5 },
-  chipLabel: { ...typography.caption, color: colors.textSecondary },
-  chipLabelActive: { color: colors.onGreen },
   deleteButton: { backgroundColor: colors.danger, marginTop: spacing.sm },
   deleteLabel: { color: colors.onDanger, fontWeight: "800" },
 }));

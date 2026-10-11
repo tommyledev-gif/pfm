@@ -23,6 +23,49 @@ export interface Transaction {
   // because a copy saved on the device before locations existed has no such
   // field — the server always sends it.
   location?: TransactionLocation | null;
+  // Item count on every row (0 when none). items/adjustments only come with a
+  // single-Transaction response (GET /:id, create, update) — never on list
+  // rows (specs/transaction-line-items plan F4). Optional because copies
+  // cached before this feature have none of the three.
+  item_count?: number;
+  items?: TransactionItem[];
+  adjustments?: TransactionAdjustment[];
+}
+
+// --- Items of a Transaction (specs/transaction-line-items) ----------------
+
+export type AdjustmentKind = "tax" | "fee" | "discount" | "other";
+export type AdjustmentDirection = "add" | "subtract";
+
+// Money is integer cents of the Transaction's Wallet currency.
+export interface TransactionItem {
+  name: string;
+  quantity: number;
+  unit_price: number | null;
+  amount: number;
+}
+
+export interface TransactionAdjustment {
+  kind: AdjustmentKind;
+  direction: AdjustmentDirection;
+  label: string | null;
+  amount: number;
+}
+
+// What a create/update sends. quantity defaults to 1 server-side; direction is
+// required for "other" only; label only for "other".
+export interface TransactionItemInput {
+  name: string;
+  quantity: number;
+  unit_price?: number;
+  amount: number;
+}
+
+export interface TransactionAdjustmentInput {
+  kind: AdjustmentKind;
+  direction?: AdjustmentDirection;
+  label?: string;
+  amount: number;
 }
 
 // Mirrors the `location` object of backend dto.TransactionResponse.
@@ -82,6 +125,8 @@ export interface CreateTransactionRequest {
   note?: string;
   idempotency_key?: string;
   location?: TransactionLocationInput;
+  items?: TransactionItemInput[];
+  adjustments?: TransactionAdjustmentInput[];
 }
 
 // wallet_id and type are never accepted by PATCH (backend dto.
@@ -97,6 +142,12 @@ export interface UpdateTransactionRequest {
   // Moves an existing pin (never adds one to a Transaction without). The old
   // area name goes with the old spot: an omitted place_name is stored empty.
   location?: TransactionLocationMove;
+  // Present = replace both lists ([] removes them); absent = leave them.
+  items?: TransactionItemInput[];
+  adjustments?: TransactionAdjustmentInput[];
+  // updated_at of the copy being edited; a newer server copy → 409
+  // TRANSACTION_CHANGED instead of a silent overwrite (BR-16).
+  expected_updated_at?: string;
 }
 
 // PATCH's `location` — where a saved pin was moved to. Its note travels

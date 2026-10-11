@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { checkBudgetLimit } from "@/features/budgets/check-budget-limit";
 import { apiClient, unwrap } from "@/lib/axios";
+import { TRANSACTION_DETAIL_QUERY_ROOT } from "@/lib/query-persistence/persist-policy";
 import { Transaction, UpdateTransactionRequest } from "@/features/transactions/types";
 
 interface UpdateTransactionVariables {
@@ -24,6 +25,7 @@ export function useUpdateTransactionMutation() {
     },
     onSuccess: async (transaction) => {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: [TRANSACTION_DETAIL_QUERY_ROOT] });
       queryClient.invalidateQueries({ queryKey: ["wallets"] });
       queryClient.invalidateQueries({ queryKey: ["report-summary"] });
       await checkBudgetLimit(queryClient, transaction);

@@ -5,6 +5,7 @@
 > Ticket: none — PFM has no Jira; this folder is the tracking unit.
 > Stacks touched: **Python AI Service · Go backend · React Native mobile.** `frontend/` web is frozen — no web section.
 > Task prefix: `AIIMG-T{NN}`. Scenario IDs: `S-AIIMG-NN` (spec). Product-owner decisions of 2026-10-04 folded in (spec Resolved design decisions 6–10).
+> Amended 2026-10-11 for spec BR-03/BR-15, AC-41–AC-43, S-AIIMG-52–S-AIIMG-55: a receipt proposal carries Items and Adjustments ([../transaction-line-items/plan.md](../transaction-line-items/plan.md)). Findings F24–F28, Phase 0 receipt-line criteria (§2.3), tool schema (§4.3), tasks AIIMG-T49–T55.
 
 ---
 
@@ -37,6 +38,11 @@ Cross-checked against the code on 2026-10-04. Several findings **contradict rese
 | F21 | **`editUserMessage` supersedes only the next message.** With fan-out, the 2nd..Nth unconfirmed cards would stay confirmable against stale input. | `hooks/use-chat-actions.ts:97-99` | AIIMG-T45: supersede every following assistant message with an unconfirmed `action`, up to the next `role === "user"` message (spec AC-39). No new field. |
 | F22 | **Client-side Wallet currency gate.** `EditTransactionModal` lists every Wallet; switching an unconfirmed AI proposal to a USD Wallet keeps the VND-cents amount. Threads saved before F19 can hold unconfirmed proposals on USD Wallets. | `components/EditTransactionModal.tsx:168`, `pending.ts` | AIIMG-T46: pure `proposal-wallet.ts` `isSavableProposal(payload, walletById)` (Wallet present **and** `VND`). Card Confirm → opens edit when false; `useConfirmProposal.save` returns false without a request when false (covers confirm-all, spec AC-34); edit modal gets a `vndOnly` prop for unconfirmed AI proposals (filters `WalletChipRow`, shows a "create a VND Wallet first" hint when the list is empty). |
 | F23 | **Handwriting signal.** Decision 8 needs to know the image was handwritten; the AI wire has no such field. | spec BR-09, AC-06 | Tool schema gains top-level `source_kind` (`receipt` / `handwritten` / `spreadsheet` / `other`). Go caps every item's confidence at `AIImageReviewConfidence` when `source_kind = handwritten` **and** `AIImageFlagHandwritten` is true (set from the Phase 0 verdict). No new client field. |
+| F24 | **Receipt lines on the AI wire.** Spec BR-15: one receipt proposal carries its Items and Adjustments. The tool schema has no place for them. | spec BR-03, BR-15 | §4.3: each `transactions[]` entry gains `items[]` (`name`, `quantity` integer ≥ 1, `unit_price_vnd` integer or null, `amount_vnd` integer > 0) and `adjustments[]` (`kind` tax/fee/discount/other, `direction` add/subtract, `label` or null, `amount_vnd` integer > 0). The prompt fills them only when `source_kind = receipt`. Go converts ×`VNDToCentsFactor`, then runs the TXI `normalizeLines` (shape) and `reconcile` (balance rule) from `service/transaction_lines.go`. Typed chat never produces lines. |
+| F25 ⚠️ | **Unreconciled or oversized receipt lines.** A misread line makes the lines miss the total; a very long receipt exceeds `TransactionItemsMax`. | spec BR-15, S-AIIMG-52, S-AIIMG-53 | Lines that fail `normalizeLines` drop **all** lines of that proposal (never a partial list). Lines that fail `reconcile` are kept and the proposal's confidence is capped at `AIImageReviewConfidence`. More lines than `TransactionItemsMax` → no lines, and `items_dropped_count` feeds the lead-in (`chat_image_reply.go`). The total payable is never altered to fit the lines. |
+| F26 | **Output size.** 100 lines ≈ 2.5–3k completion tokens; `vision_max_tokens = 1500` would cut the tool call mid-JSON. | §3.6 | `vision_max_tokens` → 4000. Phase 0 measures p95 latency on long receipts; `vision_timeout_seconds` and `AIImageRequestTimeout` rise only if the measured p95 requires it. |
+| F27 | **Proposal DTO and confirm.** `TransactionActionPayload` mirrors `CreateTransactionRequest`; the confirm is a plain `POST /transactions`. | `dto/chat_response.go` | Payload gains `items` / `adjustments` (`omitempty`, xu). The client forwards them unchanged on confirm → the TXI create saves Transaction + lines in one tx under the proposal's idempotency key (AC-43, S-AIIMG-55). No new endpoint. |
+| F28 | **Mobile gate for unreconciled lines.** `isSavableProposal` checks only the Wallet. | `proposal-wallet.ts` | Extend it: not savable when lines are present and TXI `line-math.ts` finds a gap. Confirm → `EditTransactionModal`, which gains the TXI Items entry (reusing `ItemsEditorSheet`); confirm-all already skips non-savable cards (AC-42). The card shows the Item count and an expandable list (`ProposalItemsList.tsx`, AC-41). |
 
 ---
 
@@ -45,7 +51,7 @@ Cross-checked against the code on 2026-10-04. Several findings **contradict rese
 Duration ~1 day. Owner: dev + product owner (samples, verdict). Output: a results table appended to `specs/mobile-ux-batch-2026-10/research.md` §6 (by the user/dev, not part of this plan's file set).
 
 ### 2.1 Samples
-- **12–15 real Vietnamese images**, min. 4 per type: printed receipts (café, supermarket, fuel, a long one with cash/change lines, one priced in a foreign currency — spec EC-05), handwritten notes (mixed `k` / `tr` / `m` shorthand, one with a crossed-out line, one undated), spreadsheet screenshots (header + total row, one with an income/expense column, one with > `AIImageMaxProposals` rows).
+- **12–15 real Vietnamese images**, min. 4 per type: printed receipts (café, supermarket, fuel, a long one with cash/change lines, one priced in a foreign currency — spec EC-05 — plus **3 supermarket receipts with 30+ lines, VAT and a discount line**, F24), handwritten notes (mixed `k` / `tr` / `m` shorthand, one with a crossed-out line, one undated), spreadsheet screenshots (header + total row, one with an income/expense column, one with > `AIImageMaxProposals` rows).
 - ⚠️ Real receipts carry PII: samples stay on the dev machine, **never committed**. A hand-labelled ground-truth sheet (expected rows, amounts in dong, dates, type, source kind) accompanies them.
 
 ### 2.2 Method
@@ -61,6 +67,10 @@ Duration ~1 day. Owner: dev + product owner (samples, verdict). Output: a result
 | Printed receipt | Cash-tendered / change / subtotal proposed as an item | 0 occurrences |
 | Printed receipt | Date correct when printed | ≥ 80 % |
 | Printed receipt | Foreign-currency amount proposed | 0 occurrences |
+| Printed receipt | Line amount exact (long receipts) | ≥ 90 % of lines |
+| Printed receipt | Line count exact | ≥ 80 % of receipts |
+| Printed receipt | Lines reconcile with the total (spec BR-15) | ≥ 80 % of receipts |
+| Printed receipt | VAT / discount captured as an Adjustment, not an Item | ≥ 90 % of receipts |
 | Handwritten note | Row amount exact | ≥ 80 % of rows |
 | Handwritten note | Phantom rows | ≤ 1 across the whole set |
 | Handwritten note | Wrong amount with confidence ≥ 0.6 ("confident miss") | ≤ 10 % of rows |
@@ -79,6 +89,7 @@ Duration ~1 day. Owner: dev + product owner (samples, verdict). Output: a result
 |---|---|
 | All types pass on ≥ 1 model | Proceed. That model → `groq_vision_model`; the other → `groq_vision_fallback_model`. `AIImageFlagHandwritten = false`. |
 | Receipts + sheets pass, handwritten fails | **Proceed (product decision 2026-10-04).** `AIImageFlagHandwritten = true`: every proposal from a handwritten note carries the low-confidence label. No extra gate. |
+| Receipt totals pass, receipt-line criteria fail | **Proceed without lines**: `AIImageReadReceiptLines = false` (the prompt never asks for lines; F24 code stays dormant). Re-run the line criteria when a better model is available. |
 | Receipts or sheets fail on both models | **Stop.** Re-open research (Option B cloud OCR, or prompt redesign) before any image build task. Pre-requisite fixes still ship. |
 | Magnitude errors > 0 | Fix prompt (shorthand rules) and re-run; do not switch the unit to xu without re-running the whole gate. |
 
@@ -263,7 +274,9 @@ Worst case 3 × 12 s = 36 s → Go client timeout `AIImageRequestTimeout = 40 s`
 | `AIImageReviewConfidence` | 0.5 (must stay < `AIChatConfidenceThreshold`) | same |
 | `AIImageFlagHandwritten` | set by Phase 0 verdict (§2.4) | same |
 | `WalletDefaultCurrency` | "VND" (existing) — the only currency a proposal may target | `common/constants.go` |
-| `vision_timeout_seconds` / `vision_max_tokens` / `vision_max_items` | 12 / 1500 / 20 | `ai-service/app/core/config.py` |
+| `vision_timeout_seconds` / `vision_max_tokens` / `vision_max_items` | 12 / **4000** (F26) / 20 | `ai-service/app/core/config.py` |
+| `vision_max_lines` | `TransactionItemsMax` + `TransactionAdjustmentsMax` (TXI) | `ai-service/app/core/config.py` (prompt cap; Go re-checks) |
+| `AIImageReadReceiptLines` | true unless the Phase 0 line criteria fail (§2.4) | `common/constants_ai_image.go` |
 | `CAPTURE_MAX_EDGE_PX` / `CAPTURE_JPEG_QUALITY` / `CAPTURE_MAX_BYTES` | 1600 / 0.7 / 2.5 MiB | `mobile/src/features/ai-chat/image-capture.ts` |
 | `AI_CONFIDENCE_THRESHOLD` | 0.6 (mirrors Go) | `mobile/src/lib/constants.ts` |
 | `PROPOSAL_CURRENCY` | "VND" (mirrors Go) | `mobile/src/lib/constants.ts` |
@@ -477,9 +490,11 @@ sequenceDiagram
 - `intent`: `"create_transaction" | "no_transactions"`
 - `source_kind`: `"receipt" | "handwritten" | "spreadsheet" | "other"`
 - `transactions[]` (max `vision_max_items`): `amount_vnd` **integer** > 0 (whole dong), `tx_type` `"income" | "expense"`, `category_id` string, `wallet_id` string|null, `note` string|null (≤ 200 chars), `occurred_at` `YYYY-MM-DD`|null, `confidence` number 0–1
+- `transactions[].items[]` (receipt only, max `vision_max_lines`): `name` string (as printed, weight/unit kept in the name), `quantity` **integer** ≥ 1, `unit_price_vnd` **integer** > 0 or null, `amount_vnd` **integer** > 0 (printed line amount)
+- `transactions[].adjustments[]` (receipt only): `kind` `"tax" | "fee" | "discount" | "other"`, `direction` `"add" | "subtract"`, `label` string or null, `amount_vnd` **integer** > 0
 - `truncated`: boolean
 
-Prompt rules (prompt text itself is written in Vietnamese, like the existing extractor, in `image_prompt_builder.py`): receipt → one item = total payable, never the cash-tendered, change, subtotal or VAT line, unless caption asks for line items; handwritten → one item per entry, skip crossed-out; sheet → one item per data row, skip header/subtotal/total, use an income/expense column if present; amounts are VND only — skip any amount shown in another currency; shorthand k / nghìn / tr / triệu / m and "1tr2"; "." is the thousands separator; DD/MM dates, year defaults to the current year; never invent a date (null) or a row; stop at `max_items` and set `truncated`; confidence < 0.6 when unsure; caption can name a Wallet; prefer VND Wallets (the backend enforces it regardless); report `source_kind` for the whole image.
+Prompt rules (prompt text itself is written in Vietnamese, like the existing extractor, in `image_prompt_builder.py`): receipt → one transaction = total payable, never the cash-tendered, change or subtotal; its product lines go into `items` (name as printed, a weight such as 0.45 kg stays in the name with quantity 1, printed line amount, unit price when printed) and its VAT / service fee / discount / rounding lines into `adjustments` — never as separate transactions (spec BR-03, BR-15); handwritten → one item per entry, skip crossed-out; sheet → one item per data row, skip header/subtotal/total, use an income/expense column if present; amounts are VND only — skip any amount shown in another currency; shorthand k / nghìn / tr / triệu / m and "1tr2"; "." is the thousands separator; DD/MM dates, year defaults to the current year; never invent a date (null) or a row; stop at `max_items` and set `truncated`; confidence < 0.6 when unsure; caption can name a Wallet; prefer VND Wallets (the backend enforces it regardless); report `source_kind` for the whole image.
 
 ---
 
@@ -651,6 +666,17 @@ Sequencing: **Pre-requisite fixes (T43–T48) ship first, independently of Phase
 | AIIMG-T38 | Delete capture dir on logout | `mobile/src/stores/session-scoped-reset.ts` |
 | AIIMG-T39 | *(Superseded by AIIMG-T45 — typed fan-out is now a required pre-requisite.)* | — |
 | AIIMG-T40 | On-device manual checklist: S-AIIMG-01–09, 12, 20, 22–35 in Expo Go (Android) | — |
+
+### Receipt lines (spec BR-15 — after TXI backend T01–T11 merge)
+| ID | Task | File |
+|---|---|---|
+| AIIMG-T49 | Phase 0 additions: 3 long supermarket receipts; score the receipt-line criteria (§2.3); set `AIImageReadReceiptLines` | spike script, `research.md` §6 |
+| AIIMG-T50 | Schema `items[]` / `adjustments[]` (strict ints), prompt rule (§4.3), `vision_max_tokens`, `vision_max_lines`; tests: float line amount rejected, no lines for handwritten/sheet | `ai-service/app/schemas/extract_image_schema.py`, `services/image_prompt_builder.py`, `core/config.py`, `tests/*` |
+| AIIMG-T51 | Go: convert lines ×100, TXI `normalizeLines` + `reconcile`, drop-all on shape failure, confidence cap on gap, drop on oversize + lead-in count (F25) | `service/chat_image_service.go`, `chat_image_reply.go`, `ai_image_client.go` |
+| AIIMG-T52 | DTO payload `items` / `adjustments` (F27) | `dto/chat_response.go` |
+| AIIMG-T53 | Backend tests S-AIIMG-02, 52–55 | `service/chat_image_service_test.go` |
+| AIIMG-T54 | Mobile: types; `isSavableProposal` gap rule (F28); `ProposalItemsList` on the card; Items entry in `EditTransactionModal`; confirm forwards lines | `features/ai-chat/{types.ts,proposal-wallet.ts}`, `components/{TransactionActionCard,ProposalItemsList,EditTransactionModal}.tsx`, `hooks/use-confirm-proposal.ts` |
+| AIIMG-T55 | On-device: S-AIIMG-02, 52–55 | — |
 
 ### Docs (after merge, by the user's normal flow)
 | ID | Task | File |

@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/go-playground/validator/v10"
 
@@ -36,6 +37,9 @@ func init() {
 type fieldError struct {
 	Field string `json:"field"`
 	Rule  string `json:"rule"`
+	// Path locates a field inside a list, e.g. "Items[2].Name"
+	// (specs/transaction-line-items) — omitted for top-level fields.
+	Path string `json:"path,omitempty"`
 }
 
 // newValidationError wraps a bind/validate failure as a single
@@ -48,9 +52,20 @@ func newValidationError(err error) *common.AppError {
 
 	details := make([]fieldError, 0, len(verrs))
 	for _, fe := range verrs {
-		details = append(details, fieldError{Field: fe.Field(), Rule: fe.Tag()})
+		details = append(details, fieldError{Field: fe.Field(), Rule: fe.Tag(), Path: nestedPath(fe.Namespace())})
 	}
 
 	message := fmt.Sprintf("field '%s' failed validation: %s", verrs[0].Field(), verrs[0].Tag())
 	return common.NewInvalidInputErrorWithDetails(message, details)
+}
+
+// nestedPath drops the root struct name from a validator namespace and keeps
+// it only when the field sits inside a list ("Req.Items[2].Name" ->
+// "Items[2].Name"); top-level fields return "".
+func nestedPath(namespace string) string {
+	_, rest, found := strings.Cut(namespace, ".")
+	if !found || !strings.Contains(rest, "[") {
+		return ""
+	}
+	return rest
 }

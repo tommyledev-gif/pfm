@@ -87,6 +87,13 @@ const (
 	ErrCodeTransferSameWallet        = "TRANSFER_SAME_WALLET"
 	ErrCodeTransferCurrencyMismatch  = "TRANSFER_CURRENCY_MISMATCH"
 	ErrCodeTransferCategoryImmutable = "TRANSFER_CATEGORY_IMMUTABLE"
+	// Items of a Transaction (specs/transaction-line-items). ItemsTotalMismatch:
+	// Items + adding - subtracting Adjustments != amount (BR-07). ItemsNotAllowed:
+	// lines on a transfer (BR-02). Both 422. TransactionChanged: an edit made
+	// from a stale copy (BR-16) — 409, a conflict with current resource state.
+	ErrCodeItemsTotalMismatch = "ITEMS_TOTAL_MISMATCH"
+	ErrCodeItemsNotAllowed    = "ITEMS_NOT_ALLOWED"
+	ErrCodeTransactionChanged = "TRANSACTION_CHANGED"
 	// ErrCodeCurrencyLocked backs F-03's long-deferred 409 CURRENCY_LOCKED
 	// check (specs/wallet-management/spec.md S-WAL-21) — wired up by
 	// specs/transaction-management/plan.md Finding #2 / WAL-T14 now that the
@@ -194,6 +201,8 @@ var (
 	ErrTransferSameWallet         = &AppError{Code: ErrCodeTransferSameWallet, Status: http.StatusUnprocessableEntity, Message: "ví nguồn và ví nhận phải khác nhau"}
 	ErrTransferCurrencyMismatch   = &AppError{Code: ErrCodeTransferCurrencyMismatch, Status: http.StatusUnprocessableEntity, Message: "chỉ chuyển được giữa hai ví cùng đơn vị tiền tệ"}
 	ErrTransferCategoryImmutable  = &AppError{Code: ErrCodeTransferCategoryImmutable, Status: http.StatusUnprocessableEntity, Message: "không thể đổi danh mục của giao dịch chuyển khoản"}
+	ErrItemsNotAllowed            = &AppError{Code: ErrCodeItemsNotAllowed, Status: http.StatusUnprocessableEntity, Message: "Giao dịch chuyển tiền không có món."}
+	ErrTransactionChanged         = &AppError{Code: ErrCodeTransactionChanged, Status: http.StatusConflict, Message: "Giao dịch đã được sửa ở nơi khác."}
 	ErrCurrencyLocked             = &AppError{Code: ErrCodeCurrencyLocked, Status: http.StatusConflict, Message: "không thể đổi đơn vị tiền tệ khi ví đã có giao dịch"}
 	ErrNotificationAccessDenied   = &AppError{Code: ErrCodeNotificationAccessDenied, Status: http.StatusForbidden, Message: "bạn không có quyền truy cập thông báo này"}
 	ErrNotificationNotFound       = &AppError{Code: ErrCodeNotificationNotFound, Status: http.StatusNotFound, Message: "không tìm thấy thông báo"}
@@ -214,6 +223,22 @@ var (
 // NewInvalidInputError builds a 400 INVALID_INPUT error with a field-specific message.
 func NewInvalidInputError(message string) *AppError {
 	return &AppError{Code: ErrCodeInvalidInput, Status: http.StatusBadRequest, Message: message}
+}
+
+// NewItemsTotalMismatchError is 422 ITEMS_TOTAL_MISMATCH with the figures a
+// client needs to show the gap (specs/transaction-line-items BR-07). All
+// values are integer minor units.
+func NewItemsTotalMismatchError(itemsTotal, computedTotal, amount int64) *AppError {
+	return &AppError{
+		Code:    ErrCodeItemsTotalMismatch,
+		Status:  http.StatusUnprocessableEntity,
+		Message: "Tổng các món chưa khớp số tiền giao dịch.",
+		Details: map[string]int64{
+			"items_total":    itemsTotal,
+			"computed_total": computedTotal,
+			"amount":         amount,
+		},
+	}
 }
 
 // NewInvalidInputErrorWithDetails builds a 400 INVALID_INPUT error carrying

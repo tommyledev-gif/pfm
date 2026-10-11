@@ -81,6 +81,9 @@ Software Requirement Specification (SRS)
     - [US-03: View a Transaction [MVP]](#us-03-view-a-transaction-mvp)
     - [US-04: Update a Transaction](#us-04-update-a-transaction)
     - [US-05: Delete a Transaction](#us-05-delete-a-transaction)
+    - [US-06: Add Items to a Transaction [Release 1]](#us-06-add-items-to-a-transaction-release-1)
+    - [US-07: View the Items of a Transaction [Release 1]](#us-07-view-the-items-of-a-transaction-release-1)
+    - [US-08: Edit the Items of a Saved Transaction [Release 1]](#us-08-edit-the-items-of-a-saved-transaction-release-1)
   - [Feature-07: Financial Reporting](#feature-07-financial-reporting)
     - [US-01: View the Summary Report [MVP]](#us-01-view-the-summary-report-mvp)
     - [US-02: View Income Report](#us-02-view-income-report)
@@ -218,7 +221,8 @@ Each Wallet shall optionally support a visual icon (an emoji/short label, or an 
 The System shall allow Users to **record financial Transactions**, including **both income and expense Transactions**.
 
 Each Transaction shall include at least the **amount**, transaction **type** (income or expense), **date**, **Wallet**, and **Category**.  
-Users should be able to view, edit, and delete Transactions.
+Users should be able to view, edit, and delete Transactions.  
+A Transaction may optionally list its **Items** (what was bought or received) and **Adjustments** (tax, fee, discount); together they must add up to the Transaction amount, which remains the amount counted in reports and budgets.
 
 ## FR-03: Category Management {#fr-03-category-management}
 
@@ -748,6 +752,55 @@ The User Stories of this feature are described below.
 
 ### US-05: Delete a Transaction {#us-05-delete-a-transaction}
 
+### US-06: Add Items to a Transaction [Release 1] {#us-06-add-items-to-a-transaction-release-1}
+*As a User,*  
+*I want to list the Items (and any tax, fee or discount lines) of a purchase while recording it*  
+*so that I keep what I bought without splitting one payment into many Transactions.*
+
+Items have no Category of their own; they belong to the Transaction's Category. Quantity is a whole number. The Transaction amount (the total paid) stays the source of truth: Items may add up to a different number only when Adjustment lines (tax, fee, discount, other) explain the difference.
+
+  **Background**:  
+    **Given** the User is logged in  
+     And the User has a Wallet "Cash Wallet" in VND with balance 1,000,000  
+     And the User has a Category "Food" (type Expense)
+
+  **Scenario: Record a supermarket purchase with Items and tax**  
+    **When** the User records an expense in "Food" with Items "Milk" 2 x 15,000 and "Bread" 1 x 70,000  
+     And adds a tax line of 8,000  
+     And enters amount 108,000  
+    **Then** the System saves 1 Transaction of 108,000 with 2 Items and 1 tax line  
+     And the "Cash Wallet" balance becomes 892,000
+
+  **Scenario: Reject Items that do not add up to the amount**  
+    **When** the User records an expense with Items totaling 100,000 and amount 108,000 and no Adjustment  
+    **Then** the System does not save the Transaction  
+     And the System shows the 8,000 difference and offers to add it as an Adjustment
+
+### US-07: View the Items of a Transaction [Release 1] {#us-07-view-the-items-of-a-transaction-release-1}
+*As a User,*  
+*I want to see the Items and Adjustments of a recorded Transaction*  
+*so that I can check what a payment was for.*
+
+  **Scenario: See the Items of a Transaction**  
+    **Given** the User recorded a Transaction with 2 Items and 1 tax line  
+    **When** the User opens the Transaction  
+    **Then** the System shows the 2 Items, the tax line, the Items total and the amount
+
+### US-08: Edit the Items of a Saved Transaction [Release 1] {#us-08-edit-the-items-of-a-saved-transaction-release-1}
+*As a User,*  
+*I want to add, change or remove the Items of a Transaction I already saved*  
+*so that I can correct a misread line or finish a list later.*
+
+  **Scenario: Fix an Item and the amount together**  
+    **Given** a saved Transaction of 108,000 with Items totaling 100,000 and a tax line of 8,000  
+    **When** the User changes an Item from 30,000 to 35,000 and the amount to 113,000  
+    **Then** the System saves the change  
+     And the Wallet balance moves by 5,000 once
+
+  **Scenario: Reject an edit that breaks the total**  
+    **When** the User changes an Item from 30,000 to 35,000 but keeps the amount at 108,000  
+    **Then** the System does not save the change and the Wallet balance is unchanged
+
 ## Feature-07: Financial Reporting {#feature-07-financial-reporting}
 
 Provides Users with summarized financial information and reports to help them understand their overall financial situation.  
@@ -917,6 +970,7 @@ This release reads VND amounts only and records them into VND Wallets, without c
     **When** the User attaches a photo of a receipt showing total 145,000, cash given 200,000 and change 55,000  
      And the User taps "Send"  
     **Then** the System proposes 1 expense Transaction: amount 145,000, category "Food", wallet "Cash Wallet", dated as printed on the receipt  
+     And the receipt's line items are attached to that proposal as Items, not proposed separately  
      And the System does not propose the cash given or the change  
      And nothing is created until the User confirms the proposal
 

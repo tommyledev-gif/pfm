@@ -46,6 +46,11 @@ type CreateTransactionRequest struct {
 	// No tag needed: validator dives into a non-nil pointer to a struct and
 	// skips a nil one.
 	Location *TransactionLocationRequest `json:"location"`
+	// Items/Adjustments are optional; income and expense only
+	// (specs/transaction-line-items). max repeats common.TransactionItemsMax /
+	// TransactionAdjustmentsMax.
+	Items       []TransactionItemRequest       `json:"items" validate:"omitempty,max=100,dive"`
+	Adjustments []TransactionAdjustmentRequest `json:"adjustments" validate:"omitempty,max=10,dive"`
 }
 
 // TransactionLocationRequest is CreateTransactionRequest.location.
@@ -98,6 +103,15 @@ type UpdateTransactionRequest struct {
 	// sets it, "" clears it. Rejected by the service when the Transaction has
 	// no location.
 	LocationNote *string `json:"location_note" validate:"omitempty,max=500"`
+	// Items replaces the whole Item and Adjustment list when present: absent or
+	// null leaves both unchanged, [] removes both (specs/transaction-line-items
+	// plan F5). Adjustments without Items is rejected by the service.
+	Items       *[]TransactionItemRequest       `json:"items" validate:"omitempty,max=100,dive"`
+	Adjustments *[]TransactionAdjustmentRequest `json:"adjustments" validate:"omitempty,max=10,dive"`
+	// ExpectedUpdatedAt is the updated_at of the copy the client edited. When
+	// present and the Transaction has changed since, the edit is refused with
+	// 409 TRANSACTION_CHANGED (BR-16). Absent = no check. Not an update on its own.
+	ExpectedUpdatedAt *string `json:"expected_updated_at"`
 }
 
 // HasUpdates reports whether at least one field was supplied — an empty body
@@ -105,7 +119,7 @@ type UpdateTransactionRequest struct {
 // location_note of "" counts: clearing the note is an update.
 func (r UpdateTransactionRequest) HasUpdates() bool {
 	return r.Amount != nil || r.CategoryID != nil || r.OccurredAt != nil || r.Note != nil ||
-		r.Location != nil || r.LocationNote != nil
+		r.Location != nil || r.LocationNote != nil || r.Items != nil
 }
 
 // ListTransactionsQuery is the query-string binding for GET /transactions.

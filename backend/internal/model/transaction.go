@@ -47,6 +47,12 @@ type Transaction struct {
 	// location.sql) — nil when it was created without a map pin. Allowed on
 	// any type.
 	Location *TransactionLocation
+	// Items/Adjustments are loaded only on single-Transaction reads and
+	// writes; list rows carry ItemCount alone (specs/transaction-line-items
+	// plan F4). Not columns of transactions.
+	Items       []TransactionItem
+	Adjustments []TransactionAdjustment
+	ItemCount   int
 }
 
 // TransactionLocation is a map pin plus its optional descriptions. A pin is

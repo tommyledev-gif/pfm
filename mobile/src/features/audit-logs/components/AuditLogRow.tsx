@@ -5,6 +5,7 @@ import { formatDateShort, formatTime } from "@/lib/format-date";
 import { colors, radii, spacing, typography, createStyles } from "@/lib/theme";
 import { AuditAction, AuditLogEntry, AuditSnapshot } from "@/features/audit-logs/types";
 import { formatCoordinates } from "@/features/transactions/location/map-support";
+import { AuditItemsDiff } from "@/features/audit-logs/components/AuditItemsDiff";
 
 const ACTION_LABEL: Record<AuditAction, string> = {
   create: "Tạo",
@@ -109,16 +110,26 @@ export function AuditLogRow({ entry, resolveCategoryName, resolveWalletName, cur
           {changedFields.length === 0 ? (
             <Text style={styles.changeLine}>Không có thay đổi được ghi nhận</Text>
           ) : (
-            changedFields.map((field) => (
-              <Text key={field} style={styles.changeLine} numberOfLines={2}>
-                <Text style={styles.fieldLabel}>{FIELD_LABEL[field] ?? field}: </Text>
-                {formatValue(field, (entry.before as Record<string, unknown>)?.[field])}
-                {"  →  "}
-                <Text style={styles.newValue}>
-                  {formatValue(field, (entry.after as Record<string, unknown>)?.[field])}
+            changedFields.map((field) =>
+              field === "items" ? (
+                <AuditItemsDiff
+                  key={field}
+                  logId={entry.id}
+                  before={(entry.before as Record<string, unknown>)?.[field]}
+                  after={(entry.after as Record<string, unknown>)?.[field]}
+                  currency={currency}
+                />
+              ) : (
+                <Text key={field} style={styles.changeLine} numberOfLines={2}>
+                  <Text style={styles.fieldLabel}>{FIELD_LABEL[field] ?? field}: </Text>
+                  {formatValue(field, (entry.before as Record<string, unknown>)?.[field])}
+                  {"  →  "}
+                  <Text style={styles.newValue}>
+                    {formatValue(field, (entry.after as Record<string, unknown>)?.[field])}
+                  </Text>
                 </Text>
-              </Text>
-            ))
+              ),
+            )
           )}
         </View>
       ) : (

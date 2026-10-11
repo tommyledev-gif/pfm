@@ -42,6 +42,7 @@ export function TransactionRow({
   const amountColor = isTransfer ? colors.periwinkle : isIncome ? colors.green : colors.peach;
   const amountSign = isTransfer ? "" : isIncome ? "+" : "-";
   const [revealVisible, setRevealVisible] = useState(false);
+  const itemCount = transaction.item_count ?? 0;
 
   return (
     <View style={styles.row}>
@@ -67,6 +68,15 @@ export function TransactionRow({
           <Text style={styles.sub} numberOfLines={1}>
             {isTransfer ? `${transaction.wallet_name} → ${transaction.to_wallet_name ?? "?"}` : transaction.wallet_name}
           </Text>
+          {/* specs/transaction-line-items AC-14: only when it has Items. */}
+          {itemCount > 0 ? (
+            <>
+              <Text style={styles.subDivider}>•</Text>
+              <Text testID={`badge-item-count-${transaction.id}`} style={styles.sub} numberOfLines={1}>
+                {itemCount} món
+              </Text>
+            </>
+          ) : null}
         </View>
       </View>
       {/* Long-press reveals the untruncated amount + Vietnamese words (AmountRevealPopup) — a nested

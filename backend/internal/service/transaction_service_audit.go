@@ -88,6 +88,7 @@ func auditSnapshot(t *model.Transaction) map[string]any {
 			"note":       t.Location.Note,
 		}
 	}
+	addLinesToSnapshot(snapshot, t)
 	return snapshot
 }
 
