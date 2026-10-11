@@ -49,6 +49,18 @@ class ExtractRequest(BaseModel):
     now: str  # RFC3339, UTC — the Go Backend's server time, never client-supplied
 
 
+class ProposedItem(BaseModel):
+    """One line of a single purchase (specs/transaction-line-items). Whole VND,
+    integers only — the Go Backend converts to xu and recomputes the total."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    quantity: int = Field(default=1, ge=1)
+    unit_price_vnd: int | None = None
+    amount_vnd: int
+
+
 class ProposedTransaction(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -64,6 +76,9 @@ class ProposedTransaction(BaseModel):
     note: str | None = None
     occurred_at: str  # YYYY-MM-DD
     confidence: float = Field(ge=0.0, le=1.0)
+    # Filled only when one purchase lists several things bought together;
+    # empty for an ordinary single expense or income.
+    items: list[ProposedItem] = Field(default_factory=list)
 
 
 class ExtractResponse(BaseModel):

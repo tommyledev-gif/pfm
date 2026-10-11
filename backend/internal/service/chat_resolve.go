@@ -81,6 +81,13 @@ func resolveActions(wallets []*model.Wallet, categories []*model.Category, propo
 			continue
 		}
 
+		// One purchase listed line by line: the total comes from the lines.
+		amount := p.AmountVND * common.VNDToCentsFactor
+		items, itemsTotal, hasItems := resolveChatItems(p.Items)
+		if hasItems {
+			amount = itemsTotal
+		}
+
 		occurredAt, err := parseFlexibleTimestamp(p.OccurredAt)
 		if err != nil {
 			occurredAt = time.Now().UTC()
@@ -94,10 +101,11 @@ func resolveActions(wallets []*model.Wallet, categories []*model.Category, propo
 				// The AI Service returns whole VND (50000 for "50k"); amounts are
 				// BIGINT xu everywhere else. Never converted to another currency —
 				// resolveWallet only ever picks a VND Wallet.
-				Amount:     p.AmountVND * common.VNDToCentsFactor,
+				Amount:     amount,
 				Type:       p.TxType,
 				Note:       p.Note,
 				OccurredAt: occurredAt,
+				Items:      items,
 			},
 			IdempotencyKey: uuid.New(),
 			Confidence:     p.Confidence,

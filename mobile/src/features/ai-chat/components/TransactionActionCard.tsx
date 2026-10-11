@@ -13,6 +13,7 @@ import { formatDateShort } from "@/lib/format-date";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { NO_VND_WALLET_HINT, WALLET_REQUIRED_MESSAGE } from "@/features/ai-chat/proposal-wallet";
 import { ChatAction } from "@/features/ai-chat/types";
+import { ProposalItemsList } from "@/features/ai-chat/components/ProposalItemsList";
 
 // Share of the budget at which the bar stops being neutral and starts
 // leaning amber. Below it the number is just a number; at 80% the next
@@ -194,6 +195,9 @@ export function TransactionActionCard({
             <PillTag label={categoryName} />
             <PillTag label={walletName} />
           </View>
+          {payload.items?.length ? (
+            <ProposalItemsList items={payload.items} currency={currency} testIDSuffix={testIDSuffix} />
+          ) : null}
           {walletRequired ? (
             <Text testID={`txt-wallet-required-${testIDSuffix}`} style={styles.walletRequired}>
               {onCreateWallet ? NO_VND_WALLET_HINT : WALLET_REQUIRED_MESSAGE}

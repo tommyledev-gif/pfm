@@ -106,6 +106,8 @@ export function EditTransactionModal({
     onApply: (ids) => setCategoryId(ids[0] ?? null),
   });
 
+  const itemCount = payload?.items?.length ?? 0;
+  const itemsTotal = payload?.items?.reduce((sum, item) => sum + item.amount, 0) ?? 0;
   const amountValid = amount.cents !== null && amount.cents > 0;
   const canSave = amountValid && Boolean(categoryId) && Boolean(chosenWalletId) && Boolean(occurredAt);
   const errors = submitAttempted
@@ -122,6 +124,9 @@ export function EditTransactionModal({
     // saved is exactly what the amount display then shows.
     const cents = amount.resolve();
     if (cents === null || cents <= 0 || !categoryId || !chosenWalletId || !occurredAt) return;
+    // The Items stay only while the amount is still their sum — a changed
+    // amount would fail the balance rule on save (specs/transaction-line-items BR-07).
+    const keepItems = Boolean(payload?.items?.length) && cents === itemsTotal;
     onSave({
       wallet_id: chosenWalletId,
       category_id: categoryId,
@@ -129,6 +134,7 @@ export function EditTransactionModal({
       type,
       note: note.trim() || null,
       occurred_at: occurredAt,
+      ...(keepItems ? { items: payload?.items } : {}),
     });
   };
 
@@ -161,6 +167,12 @@ export function EditTransactionModal({
             { label: "Lưu", onPress: submit, disabled: !canSave },
           ]}
         />
+
+        {itemCount > 0 ? (
+          <Text style={styles.lockedHint}>
+            {amount.cents === itemsTotal ? `${itemCount} món. Đổi số tiền sẽ bỏ danh sách món.` : "Số tiền đã đổi. Danh sách món sẽ bị bỏ khi lưu."}
+          </Text>
+        ) : null}
 
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Loại</Text>

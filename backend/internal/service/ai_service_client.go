@@ -63,6 +63,17 @@ type AIProposedTransaction struct {
 	Note       *string
 	OccurredAt string // YYYY-MM-DD, parsed by ChatService
 	Confidence float64
+	// Items lists one purchase line by line (specs/transaction-line-items);
+	// empty for an ordinary transaction. Untrusted, like every field here.
+	Items []AIProposedItem
+}
+
+// AIProposedItem is one line of a purchase, in whole VND.
+type AIProposedItem struct {
+	Name         string
+	Quantity     int32
+	UnitPriceVND *int64
+	AmountVND    int64
 }
 
 // AIExtractResponse.Intent is "create_transaction" or "ambiguous" for
@@ -123,13 +134,21 @@ type aiWireRequest struct {
 }
 
 type aiWireTransaction struct {
-	AmountVND  int64   `json:"amount_vnd"`
-	TxType     string  `json:"tx_type"`
-	CategoryID string  `json:"category_id"`
-	WalletID   *string `json:"wallet_id"`
-	Note       *string `json:"note"`
-	OccurredAt string  `json:"occurred_at"`
-	Confidence float64 `json:"confidence"`
+	AmountVND  int64            `json:"amount_vnd"`
+	TxType     string           `json:"tx_type"`
+	CategoryID string           `json:"category_id"`
+	WalletID   *string          `json:"wallet_id"`
+	Note       *string          `json:"note"`
+	OccurredAt string           `json:"occurred_at"`
+	Confidence float64          `json:"confidence"`
+	Items      []aiWireLineItem `json:"items"`
+}
+
+type aiWireLineItem struct {
+	Name         string `json:"name"`
+	Quantity     int32  `json:"quantity"`
+	UnitPriceVND *int64 `json:"unit_price_vnd"`
+	AmountVND    int64  `json:"amount_vnd"`
 }
 
 type aiWireResponse struct {
@@ -199,6 +218,10 @@ func toWireRequest(req AIExtractRequest) aiWireRequest {
 func fromWireResponse(resp aiWireResponse) *AIExtractResponse {
 	items := make([]AIProposedTransaction, 0, len(resp.Transactions))
 	for _, t := range resp.Transactions {
+		lines := make([]AIProposedItem, 0, len(t.Items))
+		for _, l := range t.Items {
+			lines = append(lines, AIProposedItem{Name: l.Name, Quantity: l.Quantity, UnitPriceVND: l.UnitPriceVND, AmountVND: l.AmountVND})
+		}
 		items = append(items, AIProposedTransaction{
 			AmountVND:  t.AmountVND,
 			TxType:     t.TxType,
@@ -207,6 +230,7 @@ func fromWireResponse(resp aiWireResponse) *AIExtractResponse {
 			Note:       t.Note,
 			OccurredAt: t.OccurredAt,
 			Confidence: t.Confidence,
+			Items:      lines,
 		})
 	}
 	return &AIExtractResponse{Intent: resp.Intent, Transactions: items}

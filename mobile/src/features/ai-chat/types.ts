@@ -1,5 +1,6 @@
 import { ConsultMessageData } from "@/features/analytics/types";
 import { TransactionType } from "@/lib/constants";
+import { TransactionItemInput } from "@/features/transactions/types";
 
 // Mirrors backend/internal/dto/chat_{request,response}.go — POST /ai/chat.
 export interface ChatRequest {
@@ -16,6 +17,9 @@ export interface TransactionActionPayload {
   type: TransactionType;
   note: string | null;
   occurred_at: string;
+  // One purchase listed line by line (specs/transaction-line-items); amount
+  // is their sum. Forwarded unchanged when the proposal is saved.
+  items?: TransactionItemInput[];
 }
 
 export interface ChatAction {

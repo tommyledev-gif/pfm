@@ -125,7 +125,7 @@ def _call_groq(system_prompt: str, history: list[ChatTurn], message: str) -> Ext
     }
     completion = client.chat.completions.create(
         model=settings.groq_model,
-        max_tokens=settings.max_tokens,
+        max_tokens=settings.extract_max_tokens,
         temperature=settings.temperature,
         tools=[tool],
         tool_choice={"type": "function", "function": {"name": _TOOL_NAME}},
@@ -148,7 +148,7 @@ def _call_anthropic(system_prompt: str, history: list[ChatTurn], message: str) -
     tool = {"name": _TOOL_NAME, "description": _TOOL_DESCRIPTION, "input_schema": _extract_tool_schema()}
     response = client.messages.create(
         model=settings.anthropic_model,
-        max_tokens=settings.max_tokens,
+        max_tokens=settings.extract_max_tokens,
         temperature=settings.temperature,
         system=system_prompt,
         tools=[tool],

@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     # max_tokens must always be set explicitly on every LLM call (dev.md LLM
     # Rules) — never rely on the SDK's default.
     max_tokens: int = 1024
+    # /extract only: a purchase listed item by item (specs/transaction-line-
+    # items) returns one tool-call entry per item, which 1024 can cut off.
+    extract_max_tokens: int = 2048
     # This is structured extraction/classification, not creative writing —
     # temperature=0 makes category/amount/type matching deterministic and
     # repeatable. Never rely on the SDK default (~0.7-1.0), which was

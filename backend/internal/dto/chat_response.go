@@ -19,6 +19,17 @@ type TransactionActionPayload struct {
 	Type       string     `json:"type"`
 	Note       *string    `json:"note"`
 	OccurredAt time.Time  `json:"occurred_at"`
+	// Items of one purchase (specs/transaction-line-items, typed chat): when
+	// present, Amount equals their sum. Forwarded unchanged on confirm.
+	Items []ChatActionItem `json:"items,omitempty"`
+}
+
+// ChatActionItem has CreateTransactionRequest's item shape, money in xu.
+type ChatActionItem struct {
+	Name      string `json:"name"`
+	Quantity  int32  `json:"quantity"`
+	UnitPrice *int64 `json:"unit_price,omitempty"`
+	Amount    int64  `json:"amount"`
 }
 
 // ChatActionResponse is one proposed Transaction the User must explicitly

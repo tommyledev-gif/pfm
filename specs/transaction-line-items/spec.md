@@ -42,6 +42,7 @@ This feature lets a Transaction carry an optional list of **Items** (what was bo
 | BR-14 | Reports, Budgets, the Home summary and AI analytics always use the Transaction amount and Category. Items never change any total. |
 | BR-15 | The Transaction export includes every Item and Adjustment of the exported Transactions, on its own sheet, linked to its Transaction. The main sheet is unchanged, so an exported file can still be imported (Items are not imported). |
 | BR-16 | ⚠️ An edit made from a copy of the Transaction that has since changed (for example on another device) is not saved silently. The User is warned that the Transaction changed and chooses to load the latest version (discarding their edit) or to save their edit over it. |
+| BR-17 | A typed AI Chat message describing **one** purchase line by line (e.g. a shop or wallet name followed by a list) is proposed as **one** Transaction carrying those Items, its amount being their sum; unrelated expenses in one message stay separate proposals. The System computes the sum itself, never trusting the AI's arithmetic. Any unreadable line drops the whole list and the proposal stays a plain Transaction. Added 2026-10-11. |
 
 ### Key Entities
 
@@ -310,7 +311,7 @@ Same editor states as US-01 (matched, gap, limit reached, saving, error), plus:
 - Fractional quantities and structured units.
 - Importing Items from a spreadsheet.
 - Searching or filtering by Item name; per-Item price history or analytics.
-- Items from a typed AI Chat message. Items from a receipt image are covered by Feature-12 US-05 (amended, BR-15).
+- Items from a receipt image — covered by Feature-12 US-05 (amended, BR-15).
 - Items on transfers.
 
 ## Open Questions

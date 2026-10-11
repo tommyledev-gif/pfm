@@ -57,9 +57,13 @@ trợ giúp lập kế hoạch chi tiêu tổng thể thay vì ghi một khoản
 được viết đầy đủ, không viết tắt (ví dụ "50000" hoặc "50.000"), giữ nguyên giá trị đó, không nhân thêm.
 3. "hôm nay" = ngày hiện tại ở trên; "hôm qua" = ngày hiện tại trừ 1 ngày. Nếu tin nhắn KHÔNG nhắc đến ngày nào cả, \
 mặc định occurred_at là ngày hiện tại ở trên. occurred_at LUÔN LUÔN là một ngày thật cụ thể theo định dạng YYYY-MM-DD \
-(ví dụ "2026-08-16") — không bao giờ là một placeholder hay biến số.
+(ví dụ "2026-08-16") — không bao giờ là một placeholder hay biến số. Ngày viết bằng số theo kiểu Việt Nam là NGÀY/THÁNG: "10/11" = ngày 10 tháng 11, "2/10" = ngày 2 tháng 10; không ghi năm thì dùng năm hiện tại. Nếu ngày suy ra nằm sau ngày hiện tại, vẫn giữ đúng ngày đó nhưng đặt confidence dưới 0.6.
 4. "2 trà đá 5k" nghĩa là 2 × 5000 = 10000 — tính phép nhân trước khi trả về.
-5. Nếu câu nhắn tin có nhiều khoản chi/thu riêng biệt, tách thành nhiều phần tử trong transactions.
+5. Phân biệt MỘT lần mua nhiều món với NHIỀU khoản chi/thu riêng biệt:
+   a. Các món mua trong CÙNG MỘT lần thanh toán — có một tên ví, cửa hàng, ứng dụng hoặc hình thức thanh toán đứng trước rồi liệt kê các món (thường sau dấu ":" hoặc chữ "gồm"), ví dụ "Spaylater: vớ 95k, bịt mắt 45k" hoặc "đi siêu thị gồm sữa 30k, bánh 20k" — trả về MỘT phần tử duy nhất trong transactions. items là từng món: name giữ đúng chữ người dùng viết (kể cả màu, thương hiệu, đơn vị); quantity là số lượng nếu có ghi, mặc định 1; unit_price_vnd chỉ khi có ghi đơn giá, ngược lại null; amount_vnd là thành tiền của món đó. amount_vnd của giao dịch là tổng thành tiền các món. note là tên cửa hàng hoặc nội dung chung của lần mua.
+   b. Các khoản riêng biệt, không cùng một lần mua (ví dụ "ăn sáng 30k, đổ xăng 50k"): tách thành nhiều phần tử trong transactions, mỗi phần tử để items rỗng.
+   c. Giao dịch chỉ có một món thì để items rỗng.
+   d. Tên đứng đầu danh sách trùng với tên một ví đã liệt kê ở trên thì dùng wallet_id của ví đó.
 6. Xác định tx_type ("income" hay "expense") TRƯỚC, sau đó CHỈ được chọn category_id từ đúng danh sách tương ứng ở \
 trên — không bao giờ chọn một category_id thuộc nhóm còn lại, kể cả khi tên nghe có vẻ liên quan.
 7. category_id PHẢI là một trong các id đã liệt kê ở trên — không tự đặt tên danh mục mới.
