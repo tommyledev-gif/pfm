@@ -25,6 +25,11 @@ Một khái niệm = một từ, ở cả VI và EN. Cột "Nguồn": `app` = đ
 | Item (dòng hàng của giao dịch) | món | item | app | Không có danh mục riêng; đếm "{{count}} món". Không dùng "mặt hàng", "sản phẩm" |
 | Adjustment | thuế, phí, giảm giá | tax, fee, discount | app | Gọi theo loại: "Thuế", "Phí", "Giảm giá", "Khác". Nhóm chung trên UI: "Thuế, phí, giảm giá"; tránh "khoản điều chỉnh" (Hán-Việt, khó hiểu) |
 | Items total | tổng các món | items total | app | Khác "số tiền" của giao dịch (số đã trả) |
+| Account (người dùng) | tài khoản | account | app | Chỉ cho tài khoản người dùng, không bao giờ cho ví |
+| Username | tên đăng nhập | username | app | Đặt một lần lúc kích hoạt, đăng nhập thay email. Khác "tên hiển thị" |
+| Display name | tên hiển thị | display name | app | Tên người khác thấy, sửa được trong Hồ sơ |
+| Access request | yêu cầu tạo tài khoản | access request | app | Gửi từ màn đăng nhập. Trạng thái: "Chờ duyệt" → "Chờ kích hoạt" → "Đang dùng" |
+| Approve (yêu cầu) | duyệt | approve | app | Nút: "Duyệt yêu cầu" |
 
 ## Từ tránh dùng trong UI
 

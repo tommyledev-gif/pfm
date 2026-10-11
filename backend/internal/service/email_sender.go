@@ -15,6 +15,12 @@ import (
 // swapping providers later never touches UserService.
 type EmailSender interface {
 	SendActivationEmail(ctx context.Context, toEmail, inviteToken string) error
+	// SendAccessRequestEmail asks adminEmail to approve requesterEmail's
+	// access request (mig 031) through a one-time approval link.
+	SendAccessRequestEmail(ctx context.Context, adminEmail, requesterEmail, approvalToken string) error
+	// SendAccessApprovedEmail tells the requester their request was approved;
+	// it carries the same activation link an invite does.
+	SendAccessApprovedEmail(ctx context.Context, toEmail, inviteToken string) error
 }
 
 // LogEmailSender is a placeholder implementation: it logs that an email
@@ -32,6 +38,20 @@ func NewLogEmailSender(logger *zap.Logger) *LogEmailSender {
 func (s *LogEmailSender) SendActivationEmail(_ context.Context, toEmail, _ string) error {
 	// Never log the raw invite token (spec.md DoD) or the full email.
 	s.logger.Info("activation email dispatched (placeholder sender)",
+		zap.String("email", common.MaskEmail(toEmail)),
+	)
+	return nil
+}
+
+func (s *LogEmailSender) SendAccessRequestEmail(_ context.Context, adminEmail, _, _ string) error {
+	s.logger.Info("access request email dispatched (placeholder sender)",
+		zap.String("email", common.MaskEmail(adminEmail)),
+	)
+	return nil
+}
+
+func (s *LogEmailSender) SendAccessApprovedEmail(_ context.Context, toEmail, _ string) error {
+	s.logger.Info("access approved email dispatched (placeholder sender)",
 		zap.String("email", common.MaskEmail(toEmail)),
 	)
 	return nil

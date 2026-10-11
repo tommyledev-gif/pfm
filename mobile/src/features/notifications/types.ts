@@ -9,6 +9,9 @@ export interface Notification {
   // category and deep-links into Insights. Backend:
   // dto.NotificationResponse.
   related_budget_id: string | null;
+  // The requester on an "access_request" notification (an admin's), so the
+  // row can approve it; null for every other type.
+  related_user_id: string | null;
   created_at: string;
 }
 

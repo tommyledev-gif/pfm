@@ -64,7 +64,7 @@ func TestAuthService_Refresh_PreSessionTokenWindow(t *testing.T) {
 		svc, repo, _ := newTestAuthService(t)
 		svc.SetLegacyRefreshDeadline(time.Now().Add(-time.Hour))
 		seedActiveUser(t, repo, "homer@example.com", "correcthorse1", model.UserStatusActive)
-		_, refresh, err := svc.Login(ctx, "homer@example.com", "correcthorse1")
+		_, _, refresh, err := svc.Login(ctx, "homer@example.com", "correcthorse1")
 		if err != nil {
 			t.Fatal(err)
 		}

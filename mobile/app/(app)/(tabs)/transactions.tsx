@@ -205,7 +205,8 @@ export default function TransactionsScreen() {
         ListEmptyComponent={
           <TransactionsListEmpty
             query={transactions}
-            filtered={filters.hasActiveFilter}
+            filtered={filters.hasNarrowingFilter}
+            typeFilter={filter}
             onlyFuture={future.length > 0}
             onAdd={openCreateForm}
             onClearFilters={filters.clearFilters}

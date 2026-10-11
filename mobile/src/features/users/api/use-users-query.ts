@@ -6,9 +6,10 @@ import { ListUsersResult } from "@/features/users/types";
 // GET /admin/users — backend enforces the admin-only check server-side
 // (403 for members); mobile does not gate this screen client-side, same as
 // frontend/src/app/app/users/page.tsx.
-export function useUsersQuery() {
+export function useUsersQuery({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ["users"],
+    enabled,
     queryFn: async () => {
       const res = await apiClient.get<{ success: boolean; message: string; data?: ListUsersResult }>(
         "/admin/users",

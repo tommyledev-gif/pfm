@@ -47,3 +47,10 @@ SET is_read = TRUE
 WHERE id = $1
   AND user_id = $2
 RETURNING *;
+
+-- name: CreateAccessRequestNotification :exec
+-- Tells an admin that someone asked for an account (mig 031); related_user_id
+-- is the requester, so the app can approve straight from the notification.
+-- Hand-authored in sqlc/notifications_access.sql.go.
+INSERT INTO notifications (user_id, type, title, body, related_user_id)
+VALUES ($1, 'access_request', $2, $3, $4);

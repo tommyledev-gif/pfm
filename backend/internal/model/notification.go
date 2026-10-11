@@ -14,6 +14,9 @@ type NotificationType string
 
 const (
 	NotificationTypeBudgetExceeded NotificationType = "budget_exceeded"
+	// NotificationTypeAccessRequest goes to an admin when someone asks for an
+	// account (mig 031); RelatedUserID is the requester.
+	NotificationTypeAccessRequest NotificationType = "access_request"
 )
 
 // Notification is the domain representation of the notifications table. Zero
@@ -34,4 +37,5 @@ type Notification struct {
 	Currency        *string
 	PeriodStart     *time.Time
 	CreatedAt       time.Time
+	RelatedUserID   *uuid.UUID
 }

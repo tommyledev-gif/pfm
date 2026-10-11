@@ -30,6 +30,9 @@ type User struct {
 	// users query leaves them nil (hand-edited, not regenerated).
 	TokensValidAfter *time.Time
 	AvatarURL        *string
+	// Username (mig 030) is populated by GetUserByEmail, GetUserByID,
+	// GetUserByUsername, ListUsers, ActivateUser and the profile queries.
+	Username *string
 }
 
 // RevokedToken mirrors the revoked_tokens table exactly.
@@ -140,6 +143,8 @@ type Notification struct {
 	Currency        *string
 	PeriodStart     *time.Time
 	CreatedAt       time.Time
+	// RelatedUserID (mig 031): the requester on an 'access_request' notification.
+	RelatedUserID *uuid.UUID
 }
 
 // ChatMessage mirrors the chat_messages table exactly (011_chat_messages.sql,

@@ -33,10 +33,11 @@ export function useTransactionFilters() {
     search: search || undefined,
   };
 
-  // `search`, not `searchInput`: what the list on screen was actually
-  // fetched with.
-  const hasActiveFilter =
-    filter !== undefined || Boolean(dateRange.from || dateRange.to) || categoryIds.length > 0 || search !== "";
+  // Date, categories or search — not the type tab. A tab on its own picks a
+  // kind of transaction to look at; an empty tab means "none of that kind
+  // yet", not "nothing matches". `search`, not `searchInput`: what the list
+  // on screen was actually fetched with.
+  const hasNarrowingFilter = Boolean(dateRange.from || dateRange.to) || categoryIds.length > 0 || search !== "";
 
   const resetNarrowing = () => {
     setFilter(undefined);
@@ -67,7 +68,7 @@ export function useTransactionFilters() {
     searchInput,
     setSearchInput,
     sharedFilters,
-    hasActiveFilter,
+    hasNarrowingFilter,
     clearFilters,
     searchFor,
   };

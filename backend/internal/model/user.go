@@ -9,9 +9,12 @@ import (
 type UserStatus string
 
 const (
-	UserStatusPending  UserStatus = "pending"
-	UserStatusActive   UserStatus = "active"
-	UserStatusDisabled UserStatus = "disabled"
+	// UserStatusRequested: asked for an account from the login screen, not
+	// yet approved by an admin (mig 031). Approval moves it to pending.
+	UserStatusRequested UserStatus = "requested"
+	UserStatusPending   UserStatus = "pending"
+	UserStatusActive    UserStatus = "active"
+	UserStatusDisabled  UserStatus = "disabled"
 )
 
 type UserRole string
@@ -49,4 +52,7 @@ type User struct {
 	// AvatarURL is the public URL of the uploaded avatar (mig 027); nil = none.
 	// Populated only by GetUserByID and the profile queries.
 	AvatarURL *string
+	// Username is the tên đăng nhập chosen at activation (mig 030), lowercase;
+	// nil for accounts activated before it existed. Never changes afterwards.
+	Username *string
 }

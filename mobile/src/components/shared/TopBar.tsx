@@ -5,15 +5,18 @@ import { useRouter } from "expo-router";
 import { Avatar } from "@/components/ui/Avatar";
 import { BellIcon } from "@/components/ui/Icon";
 import { useNotificationsQuery } from "@/features/notifications/api/use-notifications-query";
+import { useProfileIdentity } from "@/features/profile/use-profile-identity";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 // Home screen's header: wordmark + bell (unread dot, opens Notifications) +
 // avatar (opens Settings) — mobile/design_handoff_pfm_app/README.md "Home".
-// Memoized: it re-renders from its own unread query, not with every Home render.
-export const TopBar = memo(function TopBar({ userName }: { userName: string }) {
+// Memoized: it re-renders from its own unread and profile queries, not with
+// every Home render. The avatar is the same picture Settings shows.
+export const TopBar = memo(function TopBar() {
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
+  const { name, avatarUrl } = useProfileIdentity();
   const unread = useNotificationsQuery(true);
   const hasUnread = (unread.data?.data.length ?? 0) > 0;
 
@@ -25,8 +28,14 @@ export const TopBar = memo(function TopBar({ userName }: { userName: string }) {
           <BellIcon size={22} color={colors.textPrimary} />
           {hasUnread ? <View style={styles.dot} /> : null}
         </Pressable>
-        <Pressable onPress={() => router.push("/settings")} hitSlop={8}>
-          <Avatar name={userName} size={36} fallback="initial" />
+        <Pressable
+          onPress={() => router.push("/settings")}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Cài đặt"
+          testID="btn-home-avatar"
+        >
+          <Avatar name={name} iconUrl={avatarUrl} size={36} fallback="initial" />
         </Pressable>
       </View>
     </View>

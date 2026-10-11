@@ -55,6 +55,7 @@ UPDATE users
 SET
     full_name         = $2,
     password_hash     = $3,
+    username          = $4,
     status            = 'active',
     invite_token      = NULL,
     invite_expires_at = NULL,
@@ -63,13 +64,14 @@ SET
 WHERE invite_token = $1
   AND status = 'pending'
   AND invite_expires_at > NOW()
-RETURNING id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at, invite_sent_at, invite_resend_count
+RETURNING id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at, invite_sent_at, invite_resend_count, username
 `
 
 type ActivateUserParams struct {
 	InviteToken  string
 	FullName     *string
 	PasswordHash string
+	Username     string
 }
 
 // ActivateUser returns pgx.ErrNoRows (via QueryRow.Scan) when the WHERE
@@ -77,12 +79,13 @@ type ActivateUserParams struct {
 // consumed, or expired" and is how the race in test_cases.md TC-USR-26 (only
 // one of two concurrent activations succeeds) resolves without extra locking.
 func (q *Queries) ActivateUser(ctx context.Context, arg ActivateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, activateUser, arg.InviteToken, arg.FullName, arg.PasswordHash)
+	row := q.db.QueryRow(ctx, activateUser, arg.InviteToken, arg.FullName, arg.PasswordHash, arg.Username)
 	var i User
 	err := row.Scan(
 		&i.ID, &i.Email, &i.FullName, &i.PasswordHash, &i.Status, &i.Role,
 		&i.InvitedBy, &i.InviteToken, &i.InviteExpiresAt, &i.ActivatedAt,
 		&i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.InviteSentAt, &i.InviteResendCount,
+		&i.Username,
 	)
 	return i, err
 }
@@ -123,7 +126,7 @@ func (q *Queries) ResendInvite(ctx context.Context, arg ResendInviteParams) (Use
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at, invite_sent_at, invite_resend_count FROM users
+SELECT id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at, invite_sent_at, invite_resend_count, username FROM users
 WHERE email = $1
   AND deleted_at IS NULL
 LIMIT 1
@@ -136,12 +139,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.ID, &i.Email, &i.FullName, &i.PasswordHash, &i.Status, &i.Role,
 		&i.InvitedBy, &i.InviteToken, &i.InviteExpiresAt, &i.ActivatedAt,
 		&i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.InviteSentAt, &i.InviteResendCount,
+		&i.Username,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at, invite_sent_at, invite_resend_count, tokens_valid_after, avatar_url FROM users
+SELECT id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at, invite_sent_at, invite_resend_count, tokens_valid_after, avatar_url, username FROM users
 WHERE id = $1
   AND deleted_at IS NULL
 LIMIT 1
@@ -154,7 +158,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.ID, &i.Email, &i.FullName, &i.PasswordHash, &i.Status, &i.Role,
 		&i.InvitedBy, &i.InviteToken, &i.InviteExpiresAt, &i.ActivatedAt,
 		&i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.InviteSentAt, &i.InviteResendCount,
-		&i.TokensValidAfter, &i.AvatarURL,
+		&i.TokensValidAfter, &i.AvatarURL, &i.Username,
 	)
 	return i, err
 }
@@ -173,7 +177,7 @@ func (q *Queries) CountUserByEmailAnyStatus(ctx context.Context, email string) (
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at, invite_sent_at, invite_resend_count FROM users
+SELECT id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at, invite_sent_at, invite_resend_count, username FROM users
 WHERE deleted_at IS NULL
   AND ($2::text IS NULL OR status = $2)
   AND ($3::text IS NULL OR role = $3)
@@ -208,6 +212,7 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 			&i.ID, &i.Email, &i.FullName, &i.PasswordHash, &i.Status, &i.Role,
 			&i.InvitedBy, &i.InviteToken, &i.InviteExpiresAt, &i.ActivatedAt,
 			&i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.InviteSentAt, &i.InviteResendCount,
+			&i.Username,
 		); err != nil {
 			return nil, err
 		}

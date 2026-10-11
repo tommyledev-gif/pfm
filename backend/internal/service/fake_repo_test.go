@@ -76,7 +76,7 @@ func (f *fakeUserRepo) GetUserByInviteToken(_ context.Context, token string) (*m
 // ActivateUser mirrors the real conditional UPDATE: acquiring the lock is
 // the atomicity boundary, so exactly one of two concurrent callers for the
 // same token observes status still "pending" and flips it.
-func (f *fakeUserRepo) ActivateUser(_ context.Context, inviteToken string, fullName *string, passwordHash string) (*model.User, error) {
+func (f *fakeUserRepo) ActivateUser(_ context.Context, inviteToken, username string, fullName *string, passwordHash string) (*model.User, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -88,8 +88,16 @@ func (f *fakeUserRepo) ActivateUser(_ context.Context, inviteToken string, fullN
 		return nil, pgx.ErrNoRows
 	}
 
+	for _, other := range f.byEmail {
+		if other != u && other.Username != nil && *other.Username == username {
+			return nil, &pgconn.PgError{Code: pgUniqueViolation, ConstraintName: "idx_users_username_active_unique"}
+		}
+	}
+
 	u.Status = model.UserStatusActive
 	u.FullName = fullName
+	uname := username
+	u.Username = &uname
 	ph := passwordHash
 	u.PasswordHash = &ph
 	now := time.Now().UTC()

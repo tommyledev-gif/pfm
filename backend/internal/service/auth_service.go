@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -64,9 +65,17 @@ func (s *AuthService) SetLegacyRefreshDeadline(t time.Time) { s.legacyRefreshUnt
 // 410) — the update's own WHERE clause remains the sole authority on whether
 // activation actually succeeds, so this does not reintroduce the TOCTOU race
 // plan.md's Edge Case #1 warns against (see the comment inline below).
-func (s *AuthService) Activate(ctx context.Context, token, fullName, password, passwordConfirm string) (*model.User, string, string, error) {
+//
+// The username (tên đăng nhập, mig 030) is chosen here, once: it is required,
+// normalized to lowercase, and a clash with another live account is 409
+// USERNAME_TAKEN with the invite left unused, so the same link can try again.
+func (s *AuthService) Activate(ctx context.Context, token, username, fullName, password, passwordConfirm string) (*model.User, string, string, error) {
+	username = common.NormalizeUsername(username)
+	if problem := common.UsernameProblem(username); problem != "" {
+		return nil, "", "", common.NewInvalidUsernameError(problem)
+	}
 	if len(password) < common.MinPasswordLength {
-		return nil, "", "", common.NewWeakPasswordError(fmt.Sprintf("password must be at least %d characters", common.MinPasswordLength))
+		return nil, "", "", common.NewWeakPasswordError(fmt.Sprintf("Mật khẩu cần ít nhất %d ký tự.", common.MinPasswordLength))
 	}
 	if password != passwordConfirm {
 		return nil, "", "", common.ErrPasswordMismatch
@@ -98,10 +107,14 @@ func (s *AuthService) Activate(ctx context.Context, token, fullName, password, p
 	// concurrent request already consumed the token between the read above
 	// and this call, this returns pgx.ErrNoRows and the loser gets 404 —
 	// exactly the race test_cases.md TC-USR-26 exercises.
-	activated, err := s.userRepo.ActivateUser(ctx, token, fullNamePtr, string(hash))
+	activated, err := s.userRepo.ActivateUser(ctx, token, username, fullNamePtr, string(hash))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, "", "", common.ErrNotFound
+		}
+		// The only unique index this UPDATE can hit is the username one.
+		if isUniqueViolation(err) {
+			return nil, "", "", common.ErrUsernameTaken
 		}
 		return nil, "", "", fmt.Errorf("service.Activate: %w", err)
 	}
@@ -120,39 +133,53 @@ func (s *AuthService) Activate(ctx context.Context, token, fullName, password, p
 // knows their own email, so this isn't an enumeration risk). Only the
 // "email not found" vs. "wrong password" pair must be timing-equivalent,
 // which the dummyPasswordHash compare below provides.
-func (s *AuthService) Login(ctx context.Context, email, password string) (string, string, error) {
-	user, err := s.userRepo.GetUserByEmail(ctx, common.NormalizeEmail(email))
+//
+// identifier is an email or a tên đăng nhập (mig 030): anything with an "@"
+// is an email, since a username cannot contain one. The signed-in user is
+// returned so the client learns the account's email even when the username
+// was typed.
+func (s *AuthService) Login(ctx context.Context, identifier, password string) (*model.User, string, string, error) {
+	user, err := s.loginUser(ctx, identifier)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(password))
-			return "", "", common.ErrInvalidCredentials
+			return nil, "", "", common.ErrInvalidCredentials
 		}
-		return "", "", fmt.Errorf("service.Login: %w", err)
+		return nil, "", "", fmt.Errorf("service.Login: %w", err)
 	}
 
 	switch user.Status {
+	case model.UserStatusRequested:
+		return nil, "", "", common.ErrAccountAwaitingApproval
 	case model.UserStatusPending:
-		return "", "", common.ErrAccountNotActive
+		return nil, "", "", common.ErrAccountNotActive
 	case model.UserStatusDisabled:
-		return "", "", common.ErrAccountDisabled
+		return nil, "", "", common.ErrAccountDisabled
 	}
 
 	if user.PasswordHash == nil {
 		// Defensive: an active user should always have a password hash set
 		// at activation time. Treat as invalid credentials rather than panic.
 		_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(password))
-		return "", "", common.ErrInvalidCredentials
+		return nil, "", "", common.ErrInvalidCredentials
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(password)); err != nil {
-		return "", "", common.ErrInvalidCredentials
+		return nil, "", "", common.ErrInvalidCredentials
 	}
 
 	accessToken, refreshToken, err := s.sessions.Start(ctx, user)
 	if err != nil {
-		return "", "", fmt.Errorf("service.Login: %w", err)
+		return nil, "", "", fmt.Errorf("service.Login: %w", err)
 	}
-	return accessToken, refreshToken, nil
+	return user, accessToken, refreshToken, nil
+}
+
+func (s *AuthService) loginUser(ctx context.Context, identifier string) (*model.User, error) {
+	if strings.Contains(identifier, "@") {
+		return s.userRepo.GetUserByEmail(ctx, common.NormalizeEmail(identifier))
+	}
+	return s.userRepo.GetUserByUsername(ctx, common.NormalizeUsername(identifier))
 }
 
 // Refresh implements the session-refresh extension to F-02

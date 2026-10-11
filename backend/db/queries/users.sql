@@ -18,6 +18,7 @@ UPDATE users
 SET
     full_name         = $2,
     password_hash     = $3,
+    username          = $4,
     status            = 'active',
     invite_token      = NULL,
     invite_expires_at = NULL,
@@ -136,3 +137,43 @@ SET avatar_url = $2,
 WHERE id = $1
   AND deleted_at IS NULL
 RETURNING id, email, full_name, status, role, activated_at, created_at, updated_at, tokens_valid_after, avatar_url;
+
+-- name: GetUserByUsername :one
+-- Login by tên đăng nhập (mig 030). Hand-authored in sqlc/users_access.sql.go,
+-- as are the access-request queries below (mig 031).
+SELECT * FROM users
+WHERE username = $1
+  AND deleted_at IS NULL
+LIMIT 1;
+
+-- name: CreateAccessRequest :one
+-- Someone without an account asks admin $2 for one. A unique violation means
+-- the email already has a live account (any status).
+INSERT INTO users (email, role, status, invited_by, approval_token)
+VALUES ($1, 'member', 'requested', $2, $3)
+RETURNING *;
+
+-- name: GetUserByApprovalToken :one
+SELECT * FROM users
+WHERE approval_token = $1
+  AND status = 'requested'
+  AND deleted_at IS NULL
+LIMIT 1;
+
+-- name: ApproveAccessRequest :one
+-- requested -> pending with a fresh invite: from here it is an invited user.
+-- The status condition makes a second approval (email link and app at once)
+-- match no row, so only one invite email goes out.
+UPDATE users
+SET
+    status              = 'pending',
+    approval_token      = NULL,
+    invite_token        = $2,
+    invite_expires_at   = NOW() + INTERVAL '72 hours',
+    invite_sent_at      = NOW(),
+    invite_resend_count = 0,
+    updated_at          = NOW()
+WHERE id = $1
+  AND status = 'requested'
+  AND deleted_at IS NULL
+RETURNING *;

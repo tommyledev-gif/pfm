@@ -12,6 +12,9 @@ import { useNotificationsQuery } from "@/features/notifications/api/use-notifica
 import { useMarkNotificationReadMutation } from "@/features/notifications/api/use-mark-notification-read-mutation";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { Notification } from "@/features/notifications/types";
+import { useUsersQuery } from "@/features/users/api/use-users-query";
+import { ApproveRequestButton } from "@/features/users/components/ApproveRequestButton";
+import { useSessionStore } from "@/stores/session-store";
 
 export default function NotificationsScreen() {
   const colors = useColors();
@@ -26,6 +29,14 @@ export default function NotificationsScreen() {
   // category — this is the hop between the two. Budgets are already cached by
   // Home/Insights in practice, so this rarely costs a request.
   const budgets = useBudgetsQuery();
+  // Admins only (the endpoint 403s for members): which access requests are
+  // still waiting, so only those notifications offer "Duyệt yêu cầu".
+  const isAdmin = useSessionStore((s) => s.role) === "admin";
+  const users = useUsersQuery({ enabled: isAdmin });
+  const waitingRequestEmailById = useMemo(
+    () => new Map((users.data?.data ?? []).filter((u) => u.status === "requested").map((u) => [u.id, u.email])),
+    [users.data],
+  );
 
   const categoryIdByBudgetId = useMemo(
     () => new Map((budgets.data ?? []).map((b) => [b.id, b.category_id])),
@@ -40,6 +51,12 @@ export default function NotificationsScreen() {
   // nothing.
   const openNotification = (item: Notification) => {
     if (!item.is_read) requireOnline(() => markRead.mutate(item.id));
+
+    // An access request opens Thành viên, where the requester's row is.
+    if (item.type === "access_request" && isAdmin) {
+      router.push("/users");
+      return;
+    }
 
     const categoryId = item.related_budget_id ? categoryIdByBudgetId.get(item.related_budget_id) : undefined;
     if (!categoryId) return;
@@ -58,6 +75,12 @@ export default function NotificationsScreen() {
       (n) => n.title.toLowerCase().includes(query) || n.body.toLowerCase().includes(query),
     );
   }, [notifications.data, searchInput]);
+
+  const approveActionFor = (item: Notification) => {
+    const requesterEmail = item.related_user_id ? waitingRequestEmailById.get(item.related_user_id) : undefined;
+    if (item.type !== "access_request" || !item.related_user_id || !requesterEmail) return undefined;
+    return <ApproveRequestButton userId={item.related_user_id} email={requesterEmail} />;
+  };
 
   const sections = useMemo(() => {
     const grouped: { title: string; data: NonNullable<typeof notifications.data>["data"] }[] = [];
@@ -116,7 +139,7 @@ export default function NotificationsScreen() {
           renderSectionHeader={({ section }) => <Text style={styles.sectionHeader}>{section.title}</Text>}
           renderItem={({ item }) => (
             <Pressable onPress={() => openNotification(item)}>
-              <NotificationRow notification={item} />
+              <NotificationRow notification={item} action={approveActionFor(item)} />
             </Pressable>
           )}
           ListEmptyComponent={

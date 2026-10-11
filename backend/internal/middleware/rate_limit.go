@@ -124,10 +124,12 @@ func SwitchRateLimiter(logger *zap.Logger) fiber.Handler {
 // app is invite-only (emails are not public), and the alternative is letting
 // a distributed guess run unchecked.
 //
-// The key is a hash of the normalised email, read with the same parser the
-// login handler uses (c.BodyParser: JSON, form and multipart alike). A
+// The key is a hash of the normalised email or tên đăng nhập (the same field
+// carries either; lowercasing normalises both), read with the same parser
+// the login handler uses (c.BodyParser: JSON, form and multipart alike). A
 // different parser here would let a form-encoded body slip past the account
-// limit while the handler still accepted it. Hashing keeps the key a fixed
+// limit while the handler still accepted it. An account can be tried under
+// both its email and its username, so its effective cap is twice the limit. Hashing keeps the key a fixed
 // size however large the body is. A body that carries no email falls back to
 // the client IP so malformed requests cannot all share one key.
 func LoginAccountRateLimiter(logger *zap.Logger) fiber.Handler {

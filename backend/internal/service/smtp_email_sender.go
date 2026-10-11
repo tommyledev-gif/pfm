@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/smtp"
+	"net/url"
 )
 
 // SMTPConfig is the subset of config.Config the SMTP sender needs — passed
@@ -17,11 +18,12 @@ type SMTPConfig struct {
 	Password  string
 	FromEmail string
 	FromName  string
-	// AppBaseURL is the web frontend origin the activation link points at.
+	// AppBaseURL is the origin the email links point at: the backend serves
+	// /activate and /approve-access itself (handler.ActivatePageHandler).
 	AppBaseURL string
 }
 
-// SMTPEmailSender sends the activation email over real SMTP (Gmail: smtp.gmail.com:587
+// SMTPEmailSender sends the account emails over real SMTP (Gmail: smtp.gmail.com:587
 // with an App Password — Gmail rejects the account's normal password for SMTP auth
 // once 2FA is enabled). Replaces LogEmailSender once SMTP_HOST is configured
 // (see cmd/server/main.go).
@@ -33,51 +35,56 @@ func NewSMTPEmailSender(cfg SMTPConfig) *SMTPEmailSender {
 	return &SMTPEmailSender{cfg: cfg}
 }
 
-// SendActivationEmail implements EmailSender. Gmail's SMTP server advertises
-// STARTTLS on port 587; net/smtp.SendMail upgrades the connection automatically
-// when the server offers it, so no manual TLS dialing is needed here.
+// SendActivationEmail implements EmailSender: the invite an admin sent.
 func (s *SMTPEmailSender) SendActivationEmail(ctx context.Context, toEmail, inviteToken string) error {
-	activationLink := fmt.Sprintf("%s/activate?token=%s", s.cfg.AppBaseURL, inviteToken)
-	msg := buildActivationEmailMessage(s.cfg.FromEmail, s.cfg.FromName, toEmail, activationLink)
+	email := activationEmail(s.link("/activate", inviteToken))
+	if err := s.send(ctx, toEmail, email); err != nil {
+		return fmt.Errorf("service.SMTPEmailSender.SendActivationEmail: %w", err)
+	}
+	return nil
+}
 
+// SendAccessRequestEmail implements EmailSender: asks an admin to approve.
+func (s *SMTPEmailSender) SendAccessRequestEmail(ctx context.Context, adminEmail, requesterEmail, approvalToken string) error {
+	email := accessRequestEmail(requesterEmail, s.link("/approve-access", approvalToken))
+	if err := s.send(ctx, adminEmail, email); err != nil {
+		return fmt.Errorf("service.SMTPEmailSender.SendAccessRequestEmail: %w", err)
+	}
+	return nil
+}
+
+// SendAccessApprovedEmail implements EmailSender: the request was approved,
+// and the next step is the same activation link an invite carries.
+func (s *SMTPEmailSender) SendAccessApprovedEmail(ctx context.Context, toEmail, inviteToken string) error {
+	email := accessApprovedEmail(s.link("/activate", inviteToken))
+	if err := s.send(ctx, toEmail, email); err != nil {
+		return fmt.Errorf("service.SMTPEmailSender.SendAccessApprovedEmail: %w", err)
+	}
+	return nil
+}
+
+func (s *SMTPEmailSender) link(path, token string) string {
+	return fmt.Sprintf("%s%s?token=%s", s.cfg.AppBaseURL, path, url.QueryEscape(token))
+}
+
+// send delivers one message. Gmail's SMTP server advertises STARTTLS on port
+// 587; net/smtp.SendMail upgrades the connection automatically when the
+// server offers it, so no manual TLS dialing is needed here.
+func (s *SMTPEmailSender) send(ctx context.Context, toEmail string, email emailContent) error {
+	msg := buildEmailMessage(s.cfg.FromEmail, s.cfg.FromName, toEmail, email)
 	addr := fmt.Sprintf("%s:%s", s.cfg.Host, s.cfg.Port)
 	auth := smtp.PlainAuth("", s.cfg.Username, s.cfg.Password, s.cfg.Host)
 
 	// net/smtp has no context-aware variant; run it on a goroutine so the
-	// caller's timeout (common.EmailDispatchTimeout, set by
-	// UserService.dispatchActivationEmail) is still honored even though the
-	// underlying dial/write can't itself be cancelled mid-flight.
+	// caller's timeout (common.EmailDispatchTimeout) is still honored even
+	// though the underlying dial/write can't itself be cancelled mid-flight.
 	done := make(chan error, 1)
 	go func() { done <- smtp.SendMail(addr, auth, s.cfg.FromEmail, []string{toEmail}, msg) }()
 
 	select {
 	case <-ctx.Done():
-		return fmt.Errorf("service.SMTPEmailSender.SendActivationEmail: %w", ctx.Err())
+		return ctx.Err()
 	case err := <-done:
-		if err != nil {
-			return fmt.Errorf("service.SMTPEmailSender.SendActivationEmail: %w", err)
-		}
-		return nil
+		return err
 	}
-}
-
-// buildActivationEmailMessage is a pure function so the message format is
-// unit-testable without a real SMTP connection.
-func buildActivationEmailMessage(fromEmail, fromName, toEmail, activationLink string) []byte {
-	const subject = "Activate your PFM account"
-
-	headers := fmt.Sprintf(
-		"From: %s <%s>\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=\"UTF-8\"\r\n\r\n",
-		fromName, fromEmail, toEmail, subject,
-	)
-
-	body := fmt.Sprintf(`<html><body style="font-family:sans-serif">
-<h2>Welcome to PFM</h2>
-<p>You've been invited to PFM — Personal Finance Management. Click below to activate your account:</p>
-<p><a href="%s" style="display:inline-block;padding:10px 20px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px">Activate account</a></p>
-<p>Or copy this link into your browser:<br><a href="%s">%s</a></p>
-<p style="color:#666;font-size:12px">This link expires in 72 hours. If you didn't expect this invite, you can ignore this email.</p>
-</body></html>`, activationLink, activationLink, activationLink)
-
-	return []byte(headers + body)
 }

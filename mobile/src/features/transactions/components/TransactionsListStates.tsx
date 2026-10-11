@@ -6,6 +6,8 @@ import { isAwaitingFirstData, isWaitingForNetwork } from "@/lib/query-status";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { TransactionRowSkeleton } from "@/features/transactions/components/TransactionRowSkeleton";
 import { NoResultsState, NoTransactionsState } from "@/features/transactions/components/TransactionsEmptyStates";
+import { NoTransactionsOfTypeState } from "@/features/transactions/components/NoTransactionsOfTypeState";
+import { TransactionKind } from "@/lib/constants";
 
 interface ListQueryState {
   isPending: boolean;
@@ -22,8 +24,10 @@ const LIST_SKELETON_COUNT = 6;
 const ONLY_FUTURE_MESSAGE = "Chưa có giao dịch nào tính đến hôm nay.";
 
 interface TransactionsListEmptyProps extends TransactionsListStateProps {
-  /** Something is narrowing the list — "nothing matches", not "nothing yet". */
+  /** Date, categories or search narrow the list: "nothing matches", not "nothing yet". */
   filtered: boolean;
+  /** The type tab on screen; undefined on "Tất cả". */
+  typeFilter: TransactionKind | undefined;
   /** Rows exist, but every one is dated ahead of today (the upcoming card). */
   onlyFuture: boolean;
   onAdd: () => void;
@@ -37,6 +41,7 @@ interface TransactionsListEmptyProps extends TransactionsListStateProps {
 export function TransactionsListEmpty({
   query,
   filtered,
+  typeFilter,
   onlyFuture,
   onAdd,
   onClearFilters,
@@ -57,6 +62,7 @@ export function TransactionsListEmpty({
   // The upcoming card above the list already shows those rows; "no
   // transactions yet" right under it would contradict it.
   if (onlyFuture) return <Text style={styles.empty}>{ONLY_FUTURE_MESSAGE}</Text>;
+  if (typeFilter) return <NoTransactionsOfTypeState type={typeFilter} onAdd={onAdd} />;
   return <NoTransactionsState onAdd={onAdd} />;
 }
 

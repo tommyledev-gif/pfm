@@ -22,7 +22,7 @@ type dbPinger interface {
 // (/api/v1). Auth/rate-limit middleware ordering matters: JWTAuth must run
 // before RequireRole (role comes from the token) and before
 // InviteRateLimiter (keyed by the caller's user ID from that same token).
-func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, transactionExportHandler *handler.TransactionExportHandler, transactionImportHandler *handler.TransactionImportHandler, auditLogHandler *handler.AuditLogHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, chatHandler *handler.ChatHandler, budgetWizardHandler *handler.BudgetWizardHandler, analyticsHandler *handler.AnalyticsHandler, accountSwitchHandler *handler.AccountSwitchHandler, sessionRevocationHandler *handler.SessionRevocationHandler, profileHandler *handler.ProfileHandler, tokens *service.TokenService, sessions *service.SessionService, db dbPinger, logger *zap.Logger) {
+func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, transactionExportHandler *handler.TransactionExportHandler, transactionImportHandler *handler.TransactionImportHandler, auditLogHandler *handler.AuditLogHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, chatHandler *handler.ChatHandler, budgetWizardHandler *handler.BudgetWizardHandler, analyticsHandler *handler.AnalyticsHandler, accountSwitchHandler *handler.AccountSwitchHandler, sessionRevocationHandler *handler.SessionRevocationHandler, profileHandler *handler.ProfileHandler, accessRequestHandler *handler.AccessRequestHandler, tokens *service.TokenService, sessions *service.SessionService, db dbPinger, logger *zap.Logger) {
 	// One instance for every protected route: validates the access token and
 	// its session (see middleware.JWTAuth).
 	jwtAuth := middleware.JWTAuth(tokens, sessions, logger)
@@ -35,6 +35,8 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	// handler.ActivatePageHandler doc comment for why this lives here instead
 	// of on the (currently undeployed) frontend/ Next.js app.
 	app.Get("/activate", handler.ActivatePageHandler)
+	// The admin's "Xem và duyệt" email link (access requests, mig 031).
+	app.Get("/approve-access", handler.ApproveAccessPageHandler)
 
 	v1 := app.Group("/api/v1")
 
@@ -75,6 +77,10 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	auth.Post("/switch", middleware.SwitchRateLimiter(logger), accountSwitchHandler.Switch)
 	// Sign out everywhere, self (US-08) — the device gets a fresh pair.
 	auth.Post("/sessions/revoke-all", jwtAuth, sessionRevocationHandler.RevokeAllSelf)
+	// Access requests (mig 031): asked for from the login screen, approved
+	// from the admin's email link. Both unauthenticated, both IP-limited.
+	auth.Post("/access-requests", middleware.AccessRequestRateLimiter(logger), accessRequestHandler.RequestAccess)
+	auth.Post("/access-requests/approve", middleware.AccessApproveRateLimiter(logger), accessRequestHandler.ApproveByToken)
 
 	admin := v1.Group("/admin", jwtAuth, middleware.RequireRole(string(model.UserRoleAdmin), logger))
 	admin.Post("/users/invite", middleware.InviteRateLimiter(logger), userHandler.InviteUser)
@@ -86,6 +92,8 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	// Sign out everywhere for another user (account-switch US-09); the
 	// self-target refusal lives in the service.
 	admin.Post("/users/:id/sessions/revoke-all", sessionRevocationHandler.RevokeAllForUser)
+	// Approve an access request from the app (Thành viên / Thông báo).
+	admin.Post("/users/:id/approve", accessRequestHandler.Approve)
 
 	// The signed-in user's own profile. No RequireRole gate and no :id in the
 	// path: the user is always the caller, taken from the verified token.

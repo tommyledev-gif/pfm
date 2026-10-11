@@ -20,7 +20,10 @@ const NAME_MAX_LENGTH = 60;
 const AVATAR_SIZE = 88;
 
 const COPY = {
-  nameLabel: "Tên",
+  // The display name; the tên đăng nhập below is a different thing.
+  nameLabel: "Tên hiển thị",
+  usernameLabel: "Tên đăng nhập",
+  usernameHint: "Đặt một lần lúc kích hoạt, không đổi được.",
   namePlaceholder: "Nguyễn Văn A",
   changePhoto: "Đổi ảnh",
   removePhoto: "Xóa ảnh",
@@ -145,6 +148,16 @@ export function EditProfileForm({ onSaved }: EditProfileFormProps) {
         </View>
       </View>
 
+      {/* Read-only: chosen once on the activation page (backend mig 030).
+          Accounts activated before it existed have none, so nothing shows. */}
+      {profile?.username ? (
+        <View style={styles.usernameBlock} testID="text-profile-username">
+          <Text style={styles.label}>{COPY.usernameLabel}</Text>
+          <Text style={styles.usernameValue} selectable>{profile.username}</Text>
+          <Text style={styles.hint}>{COPY.usernameHint}</Text>
+        </View>
+      ) : null}
+
       <Text style={styles.label}>{COPY.nameLabel}</Text>
       <TextInput
         value={name}
@@ -180,6 +193,9 @@ const useStyles = createStyles((colors) => ({
   photoActions: { gap: spacing.sm, alignItems: "flex-start" },
   removeLabel: { ...typography.caption, color: colors.peach, paddingHorizontal: spacing.sm },
   label: { ...typography.caption, color: colors.textSecondary },
+  usernameBlock: { gap: 4 },
+  usernameValue: { ...typography.body, color: colors.textPrimary },
+  hint: { ...typography.tiny, color: colors.textMuted },
   input: {
     backgroundColor: withAlpha(colors.overlayBase, 0.06),
     borderWidth: 1,

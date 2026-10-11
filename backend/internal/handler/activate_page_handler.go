@@ -10,146 +10,198 @@ import "github.com/gofiber/fiber/v2"
 // invite email's activation link has nowhere else to land. The page itself
 // just POSTs to the existing /api/v1/auth/activate JSON endpoint client-side
 // — no template engine or new dependency needed for one static page.
+//
+// It is also where the tên đăng nhập is chosen, the one time it can be
+// (mig 030). Each field checks itself on blur and on submit with the same
+// rules the server applies (common.UsernameProblem, MinPasswordLength), and
+// a server rejection is shown under the field it is about.
 func ActivatePageHandler(c *fiber.Ctx) error {
 	c.Set("Content-Type", "text/html; charset=utf-8")
 	return c.SendString(activatePageHTML)
 }
 
-const activatePageHTML = `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Activate your PFM account</title>
-<style>
-  :root { color-scheme: dark; }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    background: #050B14;
-    color: #F5F6F8;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  }
-  .card {
-    width: 100%;
-    max-width: 380px;
-    background: #12161F;
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 20px;
-    padding: 28px 24px;
-  }
-  h1 { font-size: 20px; margin: 0 0 6px; }
-  p.sub { margin: 0 0 20px; font-size: 13px; color: rgba(255,255,255,0.55); }
-  label { display: block; font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.55); margin: 14px 0 6px; }
-  input {
-    width: 100%;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 12px;
-    padding: 12px 14px;
-    color: #F5F6F8;
-    font-size: 15px;
-  }
-  input:focus { outline: 2px solid #85FF33; outline-offset: -1px; }
-  button {
-    width: 100%;
-    margin-top: 20px;
-    padding: 13px 14px;
-    border: none;
-    border-radius: 999px;
-    background: #85FF33;
-    color: #06130A;
-    font-size: 15px;
-    font-weight: 700;
-    cursor: pointer;
-  }
-  button:disabled { opacity: 0.5; cursor: not-allowed; }
-  .msg { margin-top: 16px; padding: 12px 14px; border-radius: 12px; font-size: 13px; display: none; }
-  .msg.error { display: block; background: rgba(255,158,150,0.12); border: 1px solid rgba(255,158,150,0.35); color: #FF9E96; }
-  .msg.success { display: block; background: rgba(126,235,192,0.12); border: 1px solid rgba(126,235,192,0.35); color: #7EEBC0; }
-  form.done input, form.done button, form.done label { display: none; }
-</style>
+const activatePageHTML = pageHead + `<title>Kích hoạt tài khoản Budgest</title>
 </head>
 <body>
-  <div class="card">
-    <h1>Activate your PFM account</h1>
-    <p class="sub">Set your name and password to finish setting up your account.</p>
-    <form id="activate-form">
-      <label for="full_name">Full name</label>
-      <input id="full_name" name="full_name" type="text" autocomplete="name">
+  <div class="card" id="card">
+    <h1>Kích hoạt tài khoản</h1>
+    <p class="sub hide-when-done">Đặt tên đăng nhập và mật khẩu cho tài khoản Budgest.</p>
+    <form id="form" class="hide-when-done" novalidate>
+      <div class="field" id="field-username">
+        <label for="username">Tên đăng nhập</label>
+        <input id="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="30">
+        <div class="hint">3 đến 30 ký tự: chữ không dấu, số, dấu chấm, gạch dưới. Không đổi được sau này.</div>
+        <div class="error" id="error-username"></div>
+      </div>
 
-      <label for="password">Password</label>
-      <input id="password" name="password" type="password" autocomplete="new-password" required>
+      <div class="field" id="field-full_name">
+        <label for="full_name">Tên hiển thị <span class="optional">(không bắt buộc)</span></label>
+        <input id="full_name" type="text" autocomplete="name" maxlength="100">
+        <div class="hint">Đổi được trong app.</div>
+        <div class="error" id="error-full_name"></div>
+      </div>
 
-      <label for="password_confirm">Confirm password</label>
-      <input id="password_confirm" name="password_confirm" type="password" autocomplete="new-password" required>
+      <div class="field" id="field-password">
+        <label for="password">Mật khẩu</label>
+        <input id="password" type="password" autocomplete="new-password">
+        <div class="hint">Ít nhất 8 ký tự.</div>
+        <div class="error" id="error-password"></div>
+      </div>
 
-      <button id="submit-btn" type="submit">Activate account</button>
-      <div id="msg" class="msg"></div>
+      <div class="field" id="field-password_confirm">
+        <label for="password_confirm">Nhập lại mật khẩu</label>
+        <input id="password_confirm" type="password" autocomplete="new-password">
+        <div class="error" id="error-password_confirm"></div>
+      </div>
+
+      <button id="submit" type="submit">Kích hoạt tài khoản</button>
     </form>
+    <div id="msg" class="msg"></div>
   </div>
 
 <script>
 (function () {
-  var form = document.getElementById("activate-form");
-  var msg = document.getElementById("msg");
-  var submitBtn = document.getElementById("submit-btn");
+  var MIN_PASSWORD = 8;
   var token = new URLSearchParams(window.location.search).get("token") || "";
+  var form = document.getElementById("form");
+  var submit = document.getElementById("submit");
+  var msg = document.getElementById("msg");
+  var touched = {};
+
+  function value(id) { return document.getElementById(id).value; }
+
+  // Same rules, same order, as common.UsernameProblem.
+  function usernameProblem(u) {
+    if (!u) return "Nhập tên đăng nhập.";
+    if (u.length < 3 || u.length > 30) return "Tên đăng nhập dài 3 đến 30 ký tự.";
+    if (!/^[a-z0-9._]+$/.test(u)) return "Chỉ dùng chữ không dấu, số, dấu chấm hoặc gạch dưới.";
+    if (!/^[a-z]/.test(u)) return "Tên đăng nhập bắt đầu bằng chữ cái.";
+    if (/[._]$/.test(u)) return "Tên đăng nhập kết thúc bằng chữ hoặc số.";
+    if (/[._]{2}/.test(u)) return "Không đặt hai dấu chấm hoặc gạch dưới liền nhau.";
+    return "";
+  }
+
+  var checks = {
+    username: function () { return usernameProblem(value("username")); },
+    full_name: function () { return ""; },
+    password: function () {
+      return value("password").length < MIN_PASSWORD ? "Mật khẩu cần ít nhất 8 ký tự." : "";
+    },
+    password_confirm: function () {
+      if (!value("password_confirm")) return "Nhập lại mật khẩu.";
+      return value("password_confirm") !== value("password") ? "Hai mật khẩu chưa khớp." : "";
+    }
+  };
+
+  function setFieldError(name, text) {
+    var field = document.getElementById("field-" + name);
+    document.getElementById("error-" + name).textContent = text;
+    field.classList.toggle("invalid", Boolean(text));
+    document.getElementById(name).setAttribute("aria-invalid", text ? "true" : "false");
+  }
+
+  function check(name) { var p = checks[name](); setFieldError(name, p); return p; }
 
   function showMessage(text, kind) {
     msg.textContent = text;
     msg.className = "msg " + kind;
   }
 
+  // Usernames are stored lowercase, so the field shows what will be kept.
+  document.getElementById("username").addEventListener("input", function (e) {
+    var lowered = e.target.value.toLowerCase().replace(/\s/g, "");
+    if (lowered !== e.target.value) e.target.value = lowered;
+    if (touched.username) check("username");
+  });
+
+  Object.keys(checks).forEach(function (name) {
+    var input = document.getElementById(name);
+    input.addEventListener("blur", function () {
+      // Leaving a field empty is not an error yet; submitting is.
+      if (!input.value) return;
+      touched[name] = true;
+      check(name);
+    });
+    if (name !== "username") {
+      input.addEventListener("input", function () {
+        if (touched[name]) check(name);
+        if (name === "password" && touched.password_confirm) check("password_confirm");
+      });
+    }
+  });
+
   if (!token) {
-    showMessage("This activation link is missing its token. Use the link from your invite email.", "error");
-    submitBtn.disabled = true;
+    showMessage("Liên kết thiếu mã kích hoạt. Mở lại liên kết trong email.", "error");
+    submit.disabled = true;
   }
+
+  // Server error code -> the field it is about. Anything else is shown for the form.
+  var FIELD_BY_CODE = {
+    INVALID_USERNAME: "username",
+    USERNAME_TAKEN: "username",
+    WEAK_PASSWORD: "password",
+    PASSWORD_MISMATCH: "password_confirm"
+  };
+  var FORM_COPY = {
+    NOT_FOUND: "Liên kết này không còn dùng được. Nhờ admin gửi lại lời mời.",
+    TOKEN_EXPIRED: "Liên kết đã hết hạn. Nhờ admin gửi lại lời mời.",
+    RATE_LIMITED: "Thử quá nhiều lần. Đợi vài phút rồi thử lại."
+  };
+  var FIELD_COPY = { PASSWORD_MISMATCH: "Hai mật khẩu chưa khớp." };
 
   form.addEventListener("submit", function (event) {
     event.preventDefault();
     if (!token) return;
 
-    var password = document.getElementById("password").value;
-    var passwordConfirm = document.getElementById("password_confirm").value;
-    if (password !== passwordConfirm) {
-      showMessage("Passwords do not match.", "error");
+    var firstInvalid = null;
+    Object.keys(checks).forEach(function (name) {
+      touched[name] = true;
+      if (check(name) && !firstInvalid) firstInvalid = name;
+    });
+    if (firstInvalid) {
+      document.getElementById(firstInvalid).focus();
       return;
     }
 
-    submitBtn.disabled = true;
-    submitBtn.textContent = "Activating…";
+    submit.disabled = true;
+    submit.textContent = "Đang kích hoạt…";
+    msg.className = "msg";
 
     fetch("/api/v1/auth/activate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         token: token,
-        full_name: document.getElementById("full_name").value || undefined,
-        password: password,
-        password_confirm: passwordConfirm,
-      }),
+        username: value("username"),
+        full_name: value("full_name").trim() || undefined,
+        password: value("password"),
+        password_confirm: value("password_confirm")
+      })
     })
       .then(function (res) {
-        return res.json().then(function (body) { return { ok: res.ok, body: body }; });
+        return res.json().catch(function () { return {}; }).then(function (body) { return { ok: res.ok, body: body }; });
       })
       .then(function (result) {
-        if (!result.ok) {
-          throw new Error((result.body && result.body.message) || "Could not activate this account.");
+        if (result.ok) {
+          document.getElementById("card").classList.add("done");
+          showMessage("Đã kích hoạt tài khoản. Mở app Budgest và đăng nhập bằng tên đăng nhập " + value("username") + " hoặc email.", "success");
+          return;
         }
-        showMessage("Account activated! Open the PFM app and log in with your new password.", "success");
-        form.classList.add("done");
-        msg.style.display = "block";
+        var code = (result.body && result.body.error_code) || "";
+        var field = FIELD_BY_CODE[code];
+        if (field) {
+          setFieldError(field, FIELD_COPY[code] || result.body.message);
+          document.getElementById(field).focus();
+        } else {
+          showMessage(FORM_COPY[code] || "Chưa kích hoạt được. Thử lại.", "error");
+        }
+        submit.disabled = false;
+        submit.textContent = "Kích hoạt tài khoản";
       })
-      .catch(function (err) {
-        showMessage(err.message || "Could not activate this account. The link may have expired.", "error");
-        submitBtn.disabled = false;
-        submitBtn.textContent = "Activate account";
+      .catch(function () {
+        showMessage("Chưa kết nối được máy chủ. Kiểm tra mạng rồi thử lại.", "error");
+        submit.disabled = false;
+        submit.textContent = "Kích hoạt tài khoản";
       });
   });
 })();

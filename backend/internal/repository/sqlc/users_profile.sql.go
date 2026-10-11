@@ -8,7 +8,7 @@ import (
 
 // The profile queries return only what a profile response needs — never
 // password_hash or the invite fields.
-const profileColumns = `id, email, full_name, status, role, activated_at, created_at, updated_at, tokens_valid_after, avatar_url`
+const profileColumns = `id, email, full_name, status, role, activated_at, created_at, updated_at, tokens_valid_after, avatar_url, username`
 
 const updateUserFullName = `-- name: UpdateUserFullName :one
 UPDATE users
@@ -43,7 +43,7 @@ func scanProfile(row rowScanner) (User, error) {
 	var i User
 	err := row.Scan(
 		&i.ID, &i.Email, &i.FullName, &i.Status, &i.Role, &i.ActivatedAt,
-		&i.CreatedAt, &i.UpdatedAt, &i.TokensValidAfter, &i.AvatarURL,
+		&i.CreatedAt, &i.UpdatedAt, &i.TokensValidAfter, &i.AvatarURL, &i.Username,
 	)
 	return i, err
 }

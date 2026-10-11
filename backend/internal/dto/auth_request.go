@@ -6,16 +6,22 @@ package dto
 // codes (WEAK_PASSWORD vs INVALID_INPUT vs PASSWORD_MISMATCH) that a single
 // generic validation-tag failure can't express, so those checks live in
 // AuthService instead — only presence is checked at this layer.
+//
+// Username (tên đăng nhập) is required too, but its format rules live in
+// AuthService for the same reason: INVALID_USERNAME says which rule failed.
 type ActivateRequest struct {
 	Token           string `json:"token" validate:"required"`
+	Username        string `json:"username" validate:"max=64"`
 	FullName        string `json:"full_name" validate:"omitempty"`
 	Password        string `json:"password" validate:"required"`
 	PasswordConfirm string `json:"password_confirm" validate:"required"`
 }
 
-// LoginRequest is the body of POST /auth/login.
+// LoginRequest is the body of POST /auth/login. Email carries an email or a
+// tên đăng nhập (mig 030); the JSON key keeps its old name so older clients
+// keep working. AuthService.Login tells the two apart by the "@".
 type LoginRequest struct {
-	Email    string `json:"email" validate:"required,email"`
+	Email    string `json:"email" validate:"required,max=254"`
 	Password string `json:"password" validate:"required"`
 }
 

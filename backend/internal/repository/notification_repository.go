@@ -134,5 +134,15 @@ func toNotificationModel(row sqlc.Notification) *model.Notification {
 		Currency:        row.Currency,
 		PeriodStart:     row.PeriodStart,
 		CreatedAt:       row.CreatedAt,
+		RelatedUserID:   row.RelatedUserID,
 	}
+}
+
+// CreateAccessRequestNotification tells admin adminID that requesterID asked
+// for an account (mig 031). No dedup: one request row makes one notification.
+func (r *NotificationRepository) CreateAccessRequestNotification(ctx context.Context, adminID uuid.UUID, title, body string, requesterID uuid.UUID) error {
+	if err := r.q.CreateAccessRequestNotification(ctx, adminID, title, body, requesterID); err != nil {
+		return fmt.Errorf("repository.CreateAccessRequestNotification: %w", err)
+	}
+	return nil
 }

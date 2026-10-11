@@ -13,6 +13,10 @@ import { useCategoriesQuery } from "@/features/categories/api/use-categories-que
 import { useCategoryPicker } from "@/features/categories/components/use-category-picker";
 import { TransactionKeypadFooter } from "@/features/transactions/components/TransactionKeypadFooter";
 import { WalletChipRow } from "@/features/transactions/components/WalletChipRow";
+import { ItemsEntryRow } from "@/features/transactions/components/ItemsEntryRow";
+import { buildItemsPanelChild } from "@/features/transactions/components/ItemsEditorPanel";
+import { useFormDrawerChild } from "@/features/transactions/components/use-form-drawer-child";
+import { useItemsEditor } from "@/features/transactions/items/use-items-editor";
 import { useOpenWalletCreator } from "@/features/wallets/use-open-wallet-creator";
 import { NO_VND_WALLET_HINT } from "@/features/ai-chat/proposal-wallet";
 import { TransactionActionPayload } from "@/features/ai-chat/types";
@@ -46,10 +50,11 @@ interface EditTransactionModalProps {
 // place — either way this same modal is reused, only the caller's `onSave`
 // handler and this component's `lockWalletAndType` prop differ.
 //
-// Same keypad layout as TransactionFormModal (reference-ui/): type and wallet
-// scroll in the body; the amount keypad, category chip, note and the date
-// key (which replaced the inline calendar that used to make this the
-// longest sheet in the app) are pinned in the Drawer footer.
+// Same keypad layout as TransactionFormModal (reference-ui/): type, wallet and
+// the "Các món" row scroll in the body; the amount keypad, category chip, note
+// and the date key are pinned in the Drawer footer. The items are edited in
+// the same slide-in panel as the manual form (specs/transaction-line-items),
+// with the same rule: items and adjustments must add up to the amount.
 export function EditTransactionModal({
   visible,
   payload,
@@ -71,6 +76,9 @@ export function EditTransactionModal({
   const currency = wallets.data?.find((w) => w.id === chosenWalletId)?.currency ?? FALLBACK_CURRENCY;
   const amount = useAmountExpression(currency);
   const { reset: resetAmount } = amount;
+  const lines = useItemsEditor(amount);
+  const { reset: resetLines } = lines;
+  const [itemsOpen, setItemsOpen] = useState(false);
   const [occurredAt, setOccurredAt] = useState("");
   const [note, setNote] = useState("");
   const [datePickerOpen, setDatePickerOpen] = useState(false);
@@ -82,6 +90,8 @@ export function EditTransactionModal({
     if (!visible || !payload) return;
     setType(payload.type);
     resetAmount(payload.amount);
+    resetLines(payload.amount, payload.items, payload.adjustments);
+    setItemsOpen(false);
     setCategoryId(payload.category_id);
     setWalletId(payload.wallet_id);
     // react-native-calendars requires a strict "YYYY-MM-DD" key, but
@@ -90,7 +100,7 @@ export function EditTransactionModal({
     setOccurredAt(payload.occurred_at.slice(0, 10));
     setNote(payload.note ?? "");
     setSubmitAttempted(false);
-  }, [visible, payload, resetAmount]);
+  }, [visible, payload, resetAmount, resetLines]);
 
   // Switching type can leave a category selected that belongs to the other
   // type's list (expense categories aren't valid once type flips to income).
@@ -106,15 +116,28 @@ export function EditTransactionModal({
     onApply: (ids) => setCategoryId(ids[0] ?? null),
   });
 
-  const itemCount = payload?.items?.length ?? 0;
-  const itemsTotal = payload?.items?.reduce((sum, item) => sum + item.amount, 0) ?? 0;
+  const itemsChild = buildItemsPanelChild({
+    visible: itemsOpen,
+    onClose: () => setItemsOpen(false),
+    lines,
+    amountCents: amount.cents,
+    currency,
+    showErrors: submitAttempted,
+  });
+  const panels = useFormDrawerChild({ category: categoryPicker.child, items: itemsChild }, "category");
+  const openCategoryPicker = () => {
+    panels.claim("category");
+    categoryPicker.open();
+  };
+  const openItemsEditor = () => {
+    panels.claim("items");
+    setItemsOpen(true);
+  };
+
   const amountValid = amount.cents !== null && amount.cents > 0;
   const canSave = amountValid && Boolean(categoryId) && Boolean(chosenWalletId) && Boolean(occurredAt);
   const errors = submitAttempted
-    ? [
-        categoryId ? undefined : "Vui lòng chọn danh mục",
-        amount.problem ?? (amountValid ? undefined : "Vui lòng nhập số tiền"),
-      ]
+    ? [categoryId ? undefined : "Chọn danh mục.", amount.problem ?? (amountValid ? undefined : "Nhập số tiền.")]
     : [];
 
   const submit = () => {
@@ -124,9 +147,10 @@ export function EditTransactionModal({
     // saved is exactly what the amount display then shows.
     const cents = amount.resolve();
     if (cents === null || cents <= 0 || !categoryId || !chosenWalletId || !occurredAt) return;
-    // The Items stay only while the amount is still their sum — a changed
-    // amount would fail the balance rule on save (specs/transaction-line-items BR-07).
-    const keepItems = Boolean(payload?.items?.length) && cents === itemsTotal;
+    // BR-07: an unfinished line, or lines that do not add up to the amount,
+    // block the save; the "Các món" row says which.
+    if (lines.problem) return;
+    const lineInputs = lines.items.length > 0 ? lines.toInputs() : null;
     onSave({
       wallet_id: chosenWalletId,
       category_id: categoryId,
@@ -134,7 +158,8 @@ export function EditTransactionModal({
       type,
       note: note.trim() || null,
       occurred_at: occurredAt,
-      ...(keepItems ? { items: payload?.items } : {}),
+      ...(lineInputs ? { items: lineInputs.items } : {}),
+      ...(lineInputs && lineInputs.adjustments.length > 0 ? { adjustments: lineInputs.adjustments } : {}),
     });
   };
 
@@ -143,14 +168,14 @@ export function EditTransactionModal({
       <Drawer
         visible={visible}
         onClose={onClose}
-        child={categoryPicker.child}
+        child={panels.drawerChild}
         footer={
           <TransactionKeypadFooter
             amount={amount}
             currency={currency}
             type={type}
             category={categoryPicker.selected[0] ?? null}
-            onPressCategory={categoryPicker.open}
+            onPressCategory={openCategoryPicker}
             note={note}
             onChangeNote={setNote}
             occurredAt={occurredAt}
@@ -167,12 +192,6 @@ export function EditTransactionModal({
             { label: "Lưu", onPress: submit, disabled: !canSave },
           ]}
         />
-
-        {itemCount > 0 ? (
-          <Text style={styles.lockedHint}>
-            {amount.cents === itemsTotal ? `${itemCount} món. Đổi số tiền sẽ bỏ danh sách món.` : "Số tiền đã đổi. Danh sách món sẽ bị bỏ khi lưu."}
-          </Text>
-        ) : null}
 
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Loại</Text>
@@ -223,6 +242,15 @@ export function EditTransactionModal({
             <Text style={styles.lockedHint}>Không thể đổi loại và ví của giao dịch đã lưu</Text>
           ) : null}
         </View>
+
+        <ItemsEntryRow
+          lines={lines}
+          currency={currency}
+          pendingCount={0}
+          loading={false}
+          onPress={openItemsEditor}
+          error={submitAttempted ? lines.problem : undefined}
+        />
       </Drawer>
 
       <SingleDatePickerModal

@@ -58,11 +58,15 @@ func (r *UserRepository) GetUserByInviteToken(ctx context.Context, token string)
 // in plan.md — it returns pgx.ErrNoRows when the token didn't match a
 // pending, unexpired row (already consumed by a concurrent request, or
 // simply invalid/expired). The service layer distinguishes those cases.
-func (r *UserRepository) ActivateUser(ctx context.Context, inviteToken string, fullName *string, passwordHash string) (*model.User, error) {
+//
+// A unique violation on the username index means another live account took
+// that tên đăng nhập; the UPDATE is rolled back, so the invite stays usable.
+func (r *UserRepository) ActivateUser(ctx context.Context, inviteToken, username string, fullName *string, passwordHash string) (*model.User, error) {
 	row, err := r.q.ActivateUser(ctx, sqlc.ActivateUserParams{
 		InviteToken:  inviteToken,
 		FullName:     fullName,
 		PasswordHash: passwordHash,
+		Username:     username,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("repository.ActivateUser: %w", err)
@@ -187,5 +191,6 @@ func toModel(row sqlc.User) *model.User {
 		InviteResendCount: row.InviteResendCount,
 		TokensValidAfter:  row.TokensValidAfter,
 		AvatarURL:         row.AvatarURL,
+		Username:          row.Username,
 	}
 }

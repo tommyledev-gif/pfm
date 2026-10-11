@@ -100,6 +100,7 @@ func main() {
 	accountSwitchHandler := handler.NewAccountSwitchHandler(accountSwitchService, logger)
 	sessionRevocationHandler := handler.NewSessionRevocationHandler(sessionRevocationService, logger)
 	profileHandler := handler.NewProfileHandler(service.NewProfileService(userRepo, iconUploader, logger), logger)
+	accessRequestHandler := handler.NewAccessRequestHandler(service.NewAccessRequestService(userRepo, notificationRepo, emailSender, logger), logger)
 	walletHandler := handler.NewWalletHandler(walletService, iconUploader, logger)
 	categoryHandler := handler.NewCategoryHandler(categoryService, iconUploader, logger)
 	budgetHandler := handler.NewBudgetHandler(budgetService, iconUploader, logger)
@@ -128,7 +129,7 @@ func main() {
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 		AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 	}))
-	registerRoutes(app, userHandler, authHandler, walletHandler, categoryHandler, budgetHandler, transactionHandler, transactionExportHandler, transactionImportHandler, auditLogHandler, reportHandler, notificationHandler, chatHandler, budgetWizardHandler, analyticsHandler, accountSwitchHandler, sessionRevocationHandler, profileHandler, tokenService, sessionService, pool, logger)
+	registerRoutes(app, userHandler, authHandler, walletHandler, categoryHandler, budgetHandler, transactionHandler, transactionExportHandler, transactionImportHandler, auditLogHandler, reportHandler, notificationHandler, chatHandler, budgetWizardHandler, analyticsHandler, accountSwitchHandler, sessionRevocationHandler, profileHandler, accessRequestHandler, tokenService, sessionService, pool, logger)
 
 	go func() {
 		if err := app.Listen(":" + cfg.Port); err != nil {

@@ -10,9 +10,9 @@ import {
   HelpIcon,
   HistoryIcon,
   LogOutIcon,
-  PaletteIcon,
   ShieldIcon,
   TagIcon,
+  UserIcon,
   UsersIcon,
   WalletIcon,
 } from "@/components/ui/Icon";
@@ -25,14 +25,12 @@ import { useSessionStore } from "@/stores/session-store";
 import { outboxItemsFor } from "@/stores/outbox-store";
 import { useCurrentUserId } from "@/stores/use-current-user-id";
 import { LogoutGuardDialog } from "@/features/settings/components/LogoutGuardDialog";
-import { accountDisplayName } from "@/features/accounts/account-registry-store";
 import { AccountSwitchRow } from "@/features/accounts/components/AccountSwitchRow";
-import { PinLocationPreferenceRow } from "@/features/transactions/components/PinLocationPreferenceRow";
 import { useLogout } from "@/features/accounts/hooks/use-logout";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { totalBalance } from "@/features/wallets/wallet-totals";
 import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary-query";
-import { useProfileQuery } from "@/features/profile/api/use-profile-query";
+import { useProfileIdentity } from "@/features/profile/use-profile-identity";
 
 // Help & Support has no mobile screen yet — out of the design
 // handoff's scope (it maps them as entry points only). Wallets/Categories/
@@ -50,16 +48,13 @@ const SETTINGS_ROWS = [
   { label: "Thành viên gia đình", Icon: UsersIcon, href: "/users" as const, adminOnly: true },
   { label: "Nhật ký giao dịch", Icon: HistoryIcon, href: "/audit-logs" as const, adminOnly: false },
   { label: "Bảo mật", Icon: ShieldIcon, href: "/security" as const, adminOnly: false, testID: "row-settings-security" },
+  // How the app looks and behaves for this User; its own screen lists them.
+  { label: "Cài đặt người dùng", Icon: UserIcon, href: "/user-settings" as const, adminOnly: false, testID: "row-settings-user" },
   { label: "Trợ giúp & hỗ trợ", Icon: HelpIcon, href: null, adminOnly: false },
   { label: "Nhà phát triển", Icon: CodeIcon, href: "/developer" as const, adminOnly: false },
 ];
-// "Cài đặt người dùng": how the app looks and behaves for this User, kept apart
-// from the data-management rows above. PinLocationPreferenceRow joins it below.
-const USER_SETTINGS_ROWS = [
-  { label: "Giao diện", Icon: PaletteIcon, href: "/appearance" as const, adminOnly: false, testID: "row-settings-appearance" },
-];
 const EDIT_PROFILE_HREF = "/edit-profile" as const;
-type SettingsRow = (typeof SETTINGS_ROWS)[number] | (typeof USER_SETTINGS_ROWS)[number];
+type SettingsRow = (typeof SETTINGS_ROWS)[number];
 type SettingsHref = NonNullable<SettingsRow["href"]> | typeof EDIT_PROFILE_HREF;
 // Taps on a menu row closer together than this count as one.
 const ROW_TAP_GUARD_MS = 600;
@@ -67,10 +62,6 @@ const ROW_TAP_GUARD_MS = 600;
 const LOGOUT_BUSY_OPACITY = 0.7;
 const AVATAR_SIZE = 72;
 const EDIT_BADGE_SIZE = 28;
-
-function displayNameOf(email: string | null, fullName: string | null): string {
-  return email ? accountDisplayName({ email, fullName }) : (fullName ?? "Thành viên");
-}
 
 export default function SettingsScreen() {
   const colors = useColors();
@@ -84,10 +75,7 @@ export default function SettingsScreen() {
   const { loggingOut, logout } = useLogout();
   const wallets = useWalletsQuery();
   const summary = useReportSummaryQuery();
-  const profile = useProfileQuery().data;
-  // The name the User set, not one made up from the email (the email's local
-  // part is only the fallback until a name is set or while offline with no copy).
-  const name = displayNameOf(email, profile?.full_name ?? null);
+  const { name, avatarUrl } = useProfileIdentity();
 
   const netWorth = wallets.data ? totalBalance(wallets.data) : null;
   const primaryTotal = summary.data?.totals[0];
@@ -130,7 +118,7 @@ export default function SettingsScreen() {
             accessibilityLabel="Sửa hồ sơ"
             testID="btn-settings-avatar"
           >
-            <Avatar name={name} iconUrl={profile?.avatar_url} size={AVATAR_SIZE} fallback="initial" />
+            <Avatar name={name} iconUrl={avatarUrl} size={AVATAR_SIZE} fallback="initial" />
           </Pressable>
           <Pressable
             onPress={() => openRow(EDIT_PROFILE_HREF)}
@@ -183,14 +171,6 @@ export default function SettingsScreen() {
 
       <View style={styles.settingsGroup}>
         {SETTINGS_ROWS.filter((row) => !row.adminOnly || role === "admin").map(renderRow)}
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Cài đặt người dùng</Text>
-        <View style={styles.settingsGroup}>
-          {USER_SETTINGS_ROWS.map(renderRow)}
-          <PinLocationPreferenceRow />
-        </View>
       </View>
 
       {/* Directly above "Đăng xuất" (specs/mobile-account-switch AC-05). */}
@@ -264,14 +244,6 @@ const useStyles = createStyles((colors) => ({
   statLabel: { ...typography.tiny, color: colors.textSecondary },
   statValue: { ...typography.label, color: colors.textPrimary },
   settingsGroup: { gap: spacing.xs },
-  section: { gap: spacing.sm },
-  // Home's section-title register: uppercase, letter-spaced, muted.
-  sectionTitle: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
   row: {
     flexDirection: "row",
     alignItems: "center",

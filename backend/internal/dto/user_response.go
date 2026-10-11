@@ -30,9 +30,12 @@ func NewInviteUserResponse(u *model.User) InviteUserResponse {
 // a user. password_hash, invite_token, and invite_expires_at must never be
 // added here (test_cases.md TC-USR-44 / spec.md Edge Case #3).
 type UserResponse struct {
-	ID          uuid.UUID  `json:"id"`
-	Email       string     `json:"email"`
-	FullName    *string    `json:"full_name"`
+	ID       uuid.UUID `json:"id"`
+	Email    string    `json:"email"`
+	FullName *string   `json:"full_name"`
+	// Username is the tên đăng nhập (mig 030); null for accounts activated
+	// before it existed and for anyone not yet activated.
+	Username    *string    `json:"username"`
 	Status      string     `json:"status"`
 	Role        string     `json:"role"`
 	ActivatedAt *time.Time `json:"activated_at"`
@@ -53,6 +56,7 @@ func NewUserResponse(u *model.User) UserResponse {
 		ID:          u.ID,
 		Email:       u.Email,
 		FullName:    u.FullName,
+		Username:    u.Username,
 		Status:      string(u.Status),
 		Role:        string(u.Role),
 		ActivatedAt: u.ActivatedAt,

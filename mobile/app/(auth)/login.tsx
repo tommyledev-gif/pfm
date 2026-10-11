@@ -9,11 +9,13 @@ import { LoginForm } from "@/features/auth/components/LoginForm";
 import { useAccountRegistryStore } from "@/features/accounts/account-registry-store";
 import { SavedAccountLogin } from "@/features/accounts/components/SavedAccountLogin";
 import { useKeyboardHeight } from "@/lib/use-keyboard-height";
-import { spacing, createStyles, useColors } from "@/lib/theme";
+import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 const COPY = {
   title: "Đăng nhập",
   back: "Quay lại",
+  noAccount: "Chưa có tài khoản?",
+  requestAccess: "Gửi yêu cầu tạo tài khoản",
 } as const;
 
 // Two states, never both at once:
@@ -80,6 +82,18 @@ export default function LoginScreen() {
         <View style={styles.form}>
           <LoginForm onDone={goHome} />
         </View>
+        {/* Invite-only: without an invite, ask an admin for one. */}
+        <View style={styles.requestRow}>
+          <Text style={styles.requestHint}>{COPY.noAccount}</Text>
+          <Pressable
+            onPress={() => router.push("/request-access")}
+            hitSlop={8}
+            accessibilityRole="button"
+            testID="btn-login-request-access"
+          >
+            <Text style={styles.requestLink}>{COPY.requestAccess}</Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </Screen>
   );
@@ -92,4 +106,7 @@ const useStyles = createStyles((colors) => ({
   back: { width: 44, height: 44, marginLeft: -10, alignItems: "center", justifyContent: "center" },
   title: { marginTop: 32, fontSize: 30, lineHeight: 38, fontWeight: "700", letterSpacing: -0.3, color: colors.textPrimary },
   form: { marginTop: 32 },
+  requestRow: { marginTop: spacing.xl, flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 6 },
+  requestHint: { ...typography.label, color: colors.textSecondary },
+  requestLink: { ...typography.label, fontWeight: "600", color: colors.green },
 }));

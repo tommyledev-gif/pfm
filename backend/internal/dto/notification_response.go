@@ -25,7 +25,10 @@ type NotificationResponse struct {
 	Body            string     `json:"body"`
 	IsRead          bool       `json:"is_read"`
 	RelatedBudgetID *uuid.UUID `json:"related_budget_id"`
-	CreatedAt       time.Time  `json:"created_at"`
+	// RelatedUserID is the requester on an 'access_request' notification
+	// (mig 031), so the admin can approve from it; null otherwise.
+	RelatedUserID *uuid.UUID `json:"related_user_id"`
+	CreatedAt     time.Time  `json:"created_at"`
 }
 
 func NewNotificationResponse(n *model.Notification) NotificationResponse {
@@ -36,6 +39,7 @@ func NewNotificationResponse(n *model.Notification) NotificationResponse {
 		Body:            n.Body,
 		IsRead:          n.IsRead,
 		RelatedBudgetID: n.RelatedBudgetID,
+		RelatedUserID:   n.RelatedUserID,
 		CreatedAt:       n.CreatedAt,
 	}
 }

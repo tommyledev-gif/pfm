@@ -1,3 +1,4 @@
+import { ReactNode } from "react";
 import { Text, View } from "react-native";
 
 import { Avatar } from "@/components/ui/Avatar";
@@ -9,7 +10,9 @@ import { Notification } from "@/features/notifications/types";
 
 // README: "Each row: colored icon circle, title + timestamp, body text.
 // Unread rows get a 3px green left border."
-export function NotificationRow({ notification }: { notification: Notification }) {
+// `action` sits under the body text: an admin's access-request notification
+// carries its "Duyệt yêu cầu" button there.
+export function NotificationRow({ notification, action }: { notification: Notification; action?: ReactNode }) {
   const styles = useStyles();
   return (
     <View style={[styles.row, !notification.is_read && styles.unread]}>
@@ -22,6 +25,7 @@ export function NotificationRow({ notification }: { notification: Notification }
           <Text style={styles.time}>{formatTime(notification.created_at)}</Text>
         </View>
         <Text style={styles.text}>{notification.body}</Text>
+        {action}
       </View>
     </View>
   );

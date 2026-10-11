@@ -12,7 +12,7 @@ INSERT INTO notifications (user_id, type, title, body, related_budget_id, curren
 VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (related_budget_id, currency, period_start) WHERE type = 'budget_exceeded'
     DO NOTHING
-RETURNING id, user_id, type, title, body, is_read, related_budget_id, currency, period_start, created_at
+RETURNING id, user_id, type, title, body, is_read, related_budget_id, currency, period_start, created_at, related_user_id
 `
 
 type CreateBudgetExceededNotificationParams struct {
@@ -35,12 +35,12 @@ func (q *Queries) CreateBudgetExceededNotification(ctx context.Context, arg Crea
 		arg.UserID, arg.Type, arg.Title, arg.Body, arg.RelatedBudgetID, arg.Currency, arg.PeriodStart,
 	)
 	var i Notification
-	err := row.Scan(&i.ID, &i.UserID, &i.Type, &i.Title, &i.Body, &i.IsRead, &i.RelatedBudgetID, &i.Currency, &i.PeriodStart, &i.CreatedAt)
+	err := row.Scan(&i.ID, &i.UserID, &i.Type, &i.Title, &i.Body, &i.IsRead, &i.RelatedBudgetID, &i.Currency, &i.PeriodStart, &i.CreatedAt, &i.RelatedUserID)
 	return i, err
 }
 
 const listNotificationsByUser = `-- name: ListNotificationsByUser :many
-SELECT id, user_id, type, title, body, is_read, related_budget_id, currency, period_start, created_at FROM notifications
+SELECT id, user_id, type, title, body, is_read, related_budget_id, currency, period_start, created_at, related_user_id FROM notifications
 WHERE user_id = $1
   AND ($3::bool IS NULL OR is_read = $3)
   AND (
@@ -70,7 +70,7 @@ func (q *Queries) ListNotificationsByUser(ctx context.Context, arg ListNotificat
 	var items []Notification
 	for rows.Next() {
 		var i Notification
-		if err := rows.Scan(&i.ID, &i.UserID, &i.Type, &i.Title, &i.Body, &i.IsRead, &i.RelatedBudgetID, &i.Currency, &i.PeriodStart, &i.CreatedAt); err != nil {
+		if err := rows.Scan(&i.ID, &i.UserID, &i.Type, &i.Title, &i.Body, &i.IsRead, &i.RelatedBudgetID, &i.Currency, &i.PeriodStart, &i.CreatedAt, &i.RelatedUserID); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -100,7 +100,7 @@ func (q *Queries) CountNotifications(ctx context.Context, arg CountNotifications
 }
 
 const getNotificationByID = `-- name: GetNotificationByID :one
-SELECT id, user_id, type, title, body, is_read, related_budget_id, currency, period_start, created_at FROM notifications
+SELECT id, user_id, type, title, body, is_read, related_budget_id, currency, period_start, created_at, related_user_id FROM notifications
 WHERE id = $1
 LIMIT 1
 `
@@ -111,7 +111,7 @@ LIMIT 1
 func (q *Queries) GetNotificationByID(ctx context.Context, id uuid.UUID) (Notification, error) {
 	row := q.db.QueryRow(ctx, getNotificationByID, id)
 	var i Notification
-	err := row.Scan(&i.ID, &i.UserID, &i.Type, &i.Title, &i.Body, &i.IsRead, &i.RelatedBudgetID, &i.Currency, &i.PeriodStart, &i.CreatedAt)
+	err := row.Scan(&i.ID, &i.UserID, &i.Type, &i.Title, &i.Body, &i.IsRead, &i.RelatedBudgetID, &i.Currency, &i.PeriodStart, &i.CreatedAt, &i.RelatedUserID)
 	return i, err
 }
 
@@ -120,7 +120,7 @@ UPDATE notifications
 SET is_read = TRUE
 WHERE id = $1
   AND user_id = $2
-RETURNING id, user_id, type, title, body, is_read, related_budget_id, currency, period_start, created_at
+RETURNING id, user_id, type, title, body, is_read, related_budget_id, currency, period_start, created_at, related_user_id
 `
 
 type MarkNotificationReadParams struct {
@@ -134,6 +134,6 @@ type MarkNotificationReadParams struct {
 func (q *Queries) MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) (Notification, error) {
 	row := q.db.QueryRow(ctx, markNotificationRead, arg.ID, arg.UserID)
 	var i Notification
-	err := row.Scan(&i.ID, &i.UserID, &i.Type, &i.Title, &i.Body, &i.IsRead, &i.RelatedBudgetID, &i.Currency, &i.PeriodStart, &i.CreatedAt)
+	err := row.Scan(&i.ID, &i.UserID, &i.Type, &i.Title, &i.Body, &i.IsRead, &i.RelatedBudgetID, &i.Currency, &i.PeriodStart, &i.CreatedAt, &i.RelatedUserID)
 	return i, err
 }

@@ -257,7 +257,7 @@ export function useTransactionForm({ visible, onClose, editingTransaction, editi
     currency: amountCurrency,
     showErrors: submitAttempted,
   });
-  const panels = useFormDrawerChild({ category: categoryPicker.child, location: location.stepChild, items: itemsChild });
+  const panels = useFormDrawerChild({ category: categoryPicker.child, location: location.stepChild, items: itemsChild }, "category");
   const openCategoryPicker = () => {
     panels.claim("category");
     categoryPicker.open();

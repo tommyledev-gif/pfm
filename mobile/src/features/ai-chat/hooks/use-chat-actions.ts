@@ -6,6 +6,7 @@ import { useUpdateTransactionMutation } from "@/features/transactions/api/use-up
 import { ChatMessage, EditHistoryEntry, TransactionActionPayload } from "@/features/ai-chat/types";
 import { nextMessageId, newIdempotencyKey } from "@/features/ai-chat/message-id";
 import { toReplyMessages } from "@/features/ai-chat/reply-fanout";
+import { proposalLinesChanged } from "@/features/ai-chat/proposal-lines";
 import { useConfirmProposal } from "@/features/ai-chat/hooks/use-confirm-proposal";
 import { useNeedsFirstWallet } from "@/features/wallets/use-open-wallet-creator";
 import { useChatStore } from "@/stores/chat-store";
@@ -116,6 +117,7 @@ export function useChatActions({ onSent }: UseChatActionsOptions) {
     const editHistory = [...priorHistory, { payload, timestamp, source: "edited" as const }];
 
     if (target.confirmed && target.transactionId) {
+      const linesChanged = target.action ? proposalLinesChanged(target.action.payload, payload) : false;
       updateTransaction.mutate(
         {
           id: target.transactionId,
@@ -124,6 +126,8 @@ export function useChatActions({ onSent }: UseChatActionsOptions) {
             category_id: payload.category_id,
             occurred_at: payload.occurred_at,
             note: payload.note ?? undefined,
+            // Both lists together, [] for "removed": PATCH replaces them as a pair.
+            ...(linesChanged ? { items: payload.items ?? [], adjustments: payload.adjustments ?? [] } : {}),
           },
         },
         {

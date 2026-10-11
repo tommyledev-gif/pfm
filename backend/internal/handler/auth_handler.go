@@ -36,7 +36,7 @@ func (h *AuthHandler) Activate(c *fiber.Ctx) error {
 		return response.Error(c, h.logger, newValidationError(err))
 	}
 
-	user, accessToken, refreshToken, err := h.authService.Activate(c.Context(), req.Token, req.FullName, req.Password, req.PasswordConfirm)
+	user, accessToken, refreshToken, err := h.authService.Activate(c.Context(), req.Token, req.Username, req.FullName, req.Password, req.PasswordConfirm)
 	if err != nil {
 		return response.Error(c, h.logger, err)
 	}
@@ -58,14 +58,15 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		return response.Error(c, h.logger, newValidationError(err))
 	}
 
-	accessToken, refreshToken, err := h.authService.Login(c.Context(), req.Email, req.Password)
+	user, accessToken, refreshToken, err := h.authService.Login(c.Context(), req.Email, req.Password)
 	if err != nil {
 		return response.Error(c, h.logger, err)
 	}
 
-	return response.Success(c, fiber.StatusOK, "login successful", dto.TokenPairResponse{
+	return response.Success(c, fiber.StatusOK, "login successful", dto.LoginResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
+		Email:        user.Email,
 	})
 }
 

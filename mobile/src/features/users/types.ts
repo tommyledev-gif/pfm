@@ -6,6 +6,9 @@ export interface User {
   id: string;
   email: string;
   full_name: string | null;
+  // Tên đăng nhập, chosen once at activation; null for accounts activated
+  // before it existed and for anyone not activated yet.
+  username: string | null;
   status: UserStatus;
   role: UserRole;
   activated_at: string | null;

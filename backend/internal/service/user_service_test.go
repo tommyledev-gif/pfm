@@ -19,6 +19,10 @@ import (
 type noopEmailSender struct{}
 
 func (noopEmailSender) SendActivationEmail(context.Context, string, string) error { return nil }
+func (noopEmailSender) SendAccessRequestEmail(context.Context, string, string, string) error {
+	return nil
+}
+func (noopEmailSender) SendAccessApprovedEmail(context.Context, string, string) error { return nil }
 
 func newTestUserService(t *testing.T) (*UserService, *fakeUserRepo) {
 	t.Helper()

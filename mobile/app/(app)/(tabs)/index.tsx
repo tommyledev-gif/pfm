@@ -163,7 +163,7 @@ export default function HomeScreen() {
         refreshControl={refreshControl}
         ListHeaderComponent={
           <View style={styles.header}>
-            <TopBar userName="Me" />
+            <TopBar />
 
             {isFresh ? (
               <HomeOnboardingCard

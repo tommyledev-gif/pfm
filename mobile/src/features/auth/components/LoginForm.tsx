@@ -6,6 +6,7 @@ import { EyeIcon, EyeOffIcon } from "@/components/ui/Icon";
 import { getErrorCode, getErrorMessage } from "@/lib/axios";
 import { isNetworkError } from "@/lib/api-envelope";
 import { withAlpha } from "@/lib/color";
+import { DEV_LOGIN } from "@/lib/dev-login";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useLoginMutation } from "@/features/auth/api/use-login-mutation";
 import { completeLogin, LoginOutcome } from "@/features/accounts/complete-login";
@@ -33,9 +34,11 @@ const SUBMIT_LABEL: Record<LoginFormMode, string> = {
 };
 
 const COPY = {
-  emailLabel: "Email",
+  // Either one signs in (backend AuthService.Login).
+  emailLabel: "Email hoặc tên đăng nhập",
   emailPlaceholder: "ten@email.com",
   passwordLabel: "Mật khẩu",
+  passwordPlaceholder: "Nhập mật khẩu",
   showPassword: "Hiện mật khẩu",
   hidePassword: "Ẩn mật khẩu",
   failed: "Chưa đăng nhập được. Thử lại.",
@@ -45,15 +48,23 @@ const COPY = {
 // or password"), so login failures are worded here, by error code.
 const ERROR_COPY: Record<string, string> = {
   // Never says which of the two was wrong.
-  INVALID_CREDENTIALS: "Email hoặc mật khẩu không đúng.",
+  INVALID_CREDENTIALS: "Tài khoản hoặc mật khẩu không đúng.",
   // LoginRateLimiter / LoginAccountRateLimiter: a 15-minute window.
   RATE_LIMITED: "Đăng nhập sai quá nhiều lần. Thử lại sau 15 phút.",
   ACCOUNT_NOT_ACTIVATED: "Tài khoản chưa kích hoạt. Mở email mời để kích hoạt.",
+  ACCOUNT_AWAITING_APPROVAL: "Yêu cầu tạo tài khoản đang chờ admin duyệt.",
   ACCOUNT_DISABLED: "Tài khoản đã bị khóa. Liên hệ admin.",
 };
 
 const FIELD_HEIGHT = 56;
 const FIELD_RADIUS = 16;
+
+// Dev builds start filled in with the test account (lib/dev-login.ts); its
+// password only goes with its own email, never a saved account being renewed.
+function initialFields(initialEmail: string | undefined): { email: string; password: string } {
+  const email = initialEmail ?? DEV_LOGIN?.email ?? "";
+  return { email, password: DEV_LOGIN && email === DEV_LOGIN.email ? DEV_LOGIN.password : "" };
+}
 
 function loginErrorMessage(error: unknown): string {
   if (isNetworkError(error)) return getErrorMessage(error, COPY.failed);
@@ -65,18 +76,22 @@ function loginErrorMessage(error: unknown): string {
 export function LoginForm({ mode = "login", initialEmail, hideEmail = false, onDone }: LoginFormProps) {
   const colors = useColors();
   const styles = useStyles();
-  const [email, setEmail] = useState(initialEmail ?? "");
-  const [password, setPassword] = useState("");
+  const [initial] = useState(() => initialFields(initialEmail));
+  const [email, setEmail] = useState(initial.email);
+  const [password, setPassword] = useState(initial.password);
   const [showPassword, setShowPassword] = useState(false);
   const [focused, setFocused] = useState<Field | null>(null);
   const login = useLoginMutation();
   const passwordRef = useRef<TextInput>(null);
 
   const submit = () => {
-    if (!email || !password) return;
+    const identifier = email.trim();
+    if (!identifier || !password) return;
     login.mutate(
-      { email, password },
-      { onSuccess: async (pair) => onDone?.(await completeLogin(pair, email)) },
+      { email: identifier, password },
+      // The account's own email, not what was typed: a tên đăng nhập works
+      // for signing in, but the device remembers the account by its email.
+      { onSuccess: async (result) => onDone?.(await completeLogin(result, result.email ?? identifier)) },
     );
   };
 
@@ -119,6 +134,7 @@ export function LoginForm({ mode = "login", initialEmail, hideEmail = false, onD
               ref={passwordRef}
               value={password}
               onChangeText={setPassword}
+              placeholder={COPY.passwordPlaceholder}
               placeholderTextColor={colors.textMuted}
               secureTextEntry={!showPassword}
               autoComplete="current-password"
