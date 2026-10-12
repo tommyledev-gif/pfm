@@ -1,4 +1,4 @@
-import { memo, useMemo } from "react";
+import { memo } from "react";
 import { Animated, Text, View } from "react-native";
 
 import { spacing, typography, walletAccentPalette, createStyles } from "@/lib/theme";
@@ -6,73 +6,13 @@ import { Wallet } from "@/features/wallets/types";
 import {
   CARD_HEIGHT,
   CARD_OVERLAP,
-  CARD_WIDTH,
   CAROUSEL_SHADOW_BLEED_BOTTOM,
   CAROUSEL_SHADOW_BLEED_TOP,
   WalletStackCard,
 } from "@/features/wallets/components/WalletStackCard";
 import { SNAP_INTERVAL, useWalletCarousel } from "@/features/wallets/components/use-wallet-carousel";
-
-// How far a neighbour leans further inward on top of the overlap, so the
-// flanking cards tuck under the active one instead of merely touching it.
-const NEIGHBOUR_OVERLAP = 18;
-const NEIGHBOUR_SCALE = 0.88;
-const NEIGHBOUR_OPACITY = 0.5;
-
-// ── The swap is a shuffle, not a cross-fade ──────────────────────────────
-// A card's path is keyed by its distance from the centre in snap intervals
-// (1 = resting neighbour, 0 = centred). Coming in, it first slides a little
-// further OUT (PULL_OUT, by ¾), clears the centre card entirely by the
-// halfway mark, then sweeps back in over it. The path is mirrored, so the
-// outgoing card runs the same one in reverse: out past its resting spot,
-// then tucking back under.
-//
-// ⚠️ Why: paint order is JS state (centreIndex) and flips at the halfway
-// mark. With a plain lean the two cards still overlapped there, so the
-// incoming card visibly jumped on top of the centred one — both half-faded at
-// that instant, which read as the centre card suddenly dimming. Now nothing
-// overlaps from ¼ to ¾ of the swipe, so the flip lands unseen even when the
-// re-render is a few frames late.
-const PULL_OUT = 14;
-// Gap left between the two cards at the halfway mark.
-const SWAP_GAP = 8;
-const REST_X = SNAP_INTERVAL - NEIGHBOUR_OVERLAP;
-// Centre-to-centre offset at the halfway mark: half a card (at its scale
-// there) plus half the gap, so the incoming and outgoing cards just clear.
-const HALFWAY_X = (CARD_WIDTH * (1 + NEIGHBOUR_SCALE)) / 4 + SWAP_GAP / 2;
-// Each keyframe's translateX is its target position minus where the scroll
-// alone puts the card (that many snap intervals from the centre).
-const SHIFT_HALFWAY = HALFWAY_X - 0.5 * SNAP_INTERVAL;
-const SHIFT_PULLED_OUT = REST_X + PULL_OUT - 0.75 * SNAP_INTERVAL;
-const SHIFT_REST = REST_X - SNAP_INTERVAL;
-const SHUFFLE_INPUT = [-1, -0.75, -0.5, 0, 0.5, 0.75, 1];
-const SHUFFLE_OUTPUT = [-SHIFT_REST, -SHIFT_PULLED_OUT, -SHIFT_HALFWAY, 0, SHIFT_HALFWAY, SHIFT_PULLED_OUT, SHIFT_REST];
-
-/**
- * Each rendered card's native-driven motion, built once per card count.
- *
- * ⚠️ Built in a memo rather than inline in render: a new interpolation chain
- * per card per render meant every re-render of Home rebuilt the whole native
- * animation graph for three copies of every wallet.
- */
-function useCardMotion(count: number, scrollX: Animated.Value) {
-  return useMemo(
-    () =>
-      Array.from({ length: count }, (_, index) => {
-        // -1 is one card left of centre, 0 is centred.
-        const offset = Animated.subtract(index, Animated.divide(scrollX, SNAP_INTERVAL));
-        const range = [-1, 0, 1];
-        return {
-          translateX: offset.interpolate({ inputRange: SHUFFLE_INPUT, outputRange: SHUFFLE_OUTPUT, extrapolate: "clamp" }),
-          scale: offset.interpolate({ inputRange: range, outputRange: [NEIGHBOUR_SCALE, 1, NEIGHBOUR_SCALE], extrapolate: "clamp" }),
-          opacity: offset.interpolate({ inputRange: range, outputRange: [NEIGHBOUR_OPACITY, 1, NEIGHBOUR_OPACITY], extrapolate: "clamp" }),
-          // Fades the accent border in on whichever card is centred.
-          active: offset.interpolate({ inputRange: [-0.6, 0, 0.6], outputRange: [0, 1, 0], extrapolate: "clamp" }),
-        };
-      }),
-    [count, scrollX],
-  );
-}
+import { CARD_PERSPECTIVE, useCardMotion } from "@/features/wallets/components/wallet-carousel-motion";
+import { WalletCarouselPager } from "@/features/wallets/components/WalletCarouselPager";
 
 // Each wallet's accent by its position in the list. Colors are assigned by
 // position, not by wallet type, so every card is visibly its own. The one
@@ -101,9 +41,10 @@ interface WalletCarouselProps {
 }
 
 /**
- * The wallets section: the selected wallet centred, its neighbours peeking on
- * both sides, wrapping around at either end. Shared by Home and the Wallets
- * screen's card view, so a wallet keeps the same accent color on both.
+ * The wallets section: the selected wallet centred, its neighbours tucked
+ * behind it on both sides and turned away, wrapping around at either end,
+ * with a ‹ • ━ • › pager under it. Shared by Home and the Wallets screen's
+ * card view, so a wallet keeps the same accent color on both.
  *
  * ⚠️ A plain ScrollView rather than a FlatList, deliberately. Looping means
  * silently jumping the scroll offset by a whole copy's width once the user
@@ -113,7 +54,8 @@ interface WalletCarouselProps {
  *
  * The OS owns the scroll, so fling physics and the host screen's own vertical
  * scroll both keep working. No reanimated and no gesture-handler — neither is
- * a dependency of this project.
+ * a dependency of this project. Cards and pager dots both run off the one
+ * native-driven scroll value.
  */
 function WalletCarouselView({
   wallets,
@@ -136,6 +78,8 @@ function WalletCarouselView({
     onScrollFrame,
     onMomentumEnd,
     pressCard,
+    step,
+    looping,
     onScrollBeginDrag,
   } = useWalletCarousel({ wallets, initialWalletId, onActiveWalletChange });
   const cardMotion = useCardMotion(rendered.length, scrollX);
@@ -146,69 +90,86 @@ function WalletCarouselView({
 
   return (
     <View testID="carousel-wallets" style={styles.container} onLayout={onLayout}>
-      <Animated.ScrollView
-        ref={scrollRef}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        snapToInterval={SNAP_INTERVAL}
-        disableIntervalMomentum
-        decelerationRate="fast"
-        // Only the horizontal axis is claimed, so the home screen's vertical
-        // scroll still works over the cards.
-        directionalLockEnabled
-        // No gap: the overlap is carried by each card's negative right margin
-        // below, which Yoga will not accept as a negative `gap`.
-        contentContainerStyle={{ paddingHorizontal: sidePadding, paddingTop: CAROUSEL_SHADOW_BLEED_TOP, paddingBottom: CAROUSEL_SHADOW_BLEED_BOTTOM }}
-        scrollEventThrottle={16}
-        onContentSizeChange={onContentSizeChange}
-        onMomentumScrollEnd={onMomentumEnd}
-        onScrollBeginDrag={onScrollBeginDrag}
-        onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], {
-          useNativeDriver: true,
-          listener: onScrollFrame,
-        })}
-      >
-        {containerWidth === 0
-          ? null
-          : rendered.map((wallet, index) => {
-              const motion = cardMotion[index];
-              // Nearest to the centre paints last. The final card keeps its
-              // full width so the scrollable content is exactly long enough to
-              // bring it to the middle.
-              const proximity = Math.abs(index - centreIndex);
-              const isLast = index === rendered.length - 1;
+      <View style={styles.cards}>
+        <Animated.ScrollView
+          ref={scrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          snapToInterval={SNAP_INTERVAL}
+          disableIntervalMomentum
+          decelerationRate="fast"
+          // Only the horizontal axis is claimed, so the home screen's vertical
+          // scroll still works over the cards.
+          directionalLockEnabled
+          // No gap: the overlap is carried by each card's negative right margin
+          // below, which Yoga will not accept as a negative `gap`.
+          contentContainerStyle={{ paddingHorizontal: sidePadding, paddingTop: CAROUSEL_SHADOW_BLEED_TOP, paddingBottom: CAROUSEL_SHADOW_BLEED_BOTTOM }}
+          scrollEventThrottle={16}
+          onContentSizeChange={onContentSizeChange}
+          onMomentumScrollEnd={onMomentumEnd}
+          onScrollBeginDrag={onScrollBeginDrag}
+          onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], {
+            useNativeDriver: true,
+            listener: onScrollFrame,
+          })}
+        >
+          {containerWidth === 0
+            ? null
+            : rendered.map((wallet, index) => {
+                const motion = cardMotion[index];
+                // Nearest to the centre paints last. The final card keeps its
+                // full width so the scrollable content is exactly long enough to
+                // bring it to the middle.
+                const proximity = Math.abs(index - centreIndex);
+                const isLast = index === rendered.length - 1;
 
-              return (
-                <WalletStackCard
-                  // Index, not wallet id — the loop copies repeat every id.
-                  key={`${wallet.id}-${index}`}
-                  wallet={wallet}
-                  accentColor={accentForIndex(index % wallets.length, wallets.length)}
-                  animatedStyle={{
-                    marginRight: isLast ? 0 : -CARD_OVERLAP,
-                    zIndex: rendered.length - proximity,
-                    // Android orders siblings by elevation before zIndex, so
-                    // the two have to agree or the stack inverts there. Kept in
-                    // a small range because on Android elevation is also the
-                    // shadow's size — ordering by raw index would give the
-                    // centre card a shadow the size of the card.
-                    elevation: Math.max(0, 8 - proximity),
-                    transform: [{ translateX: motion.translateX }, { scale: motion.scale }],
-                    opacity: motion.opacity,
-                  }}
-                  // Fades the accent border in on whichever card is
-                  // centred, without re-rendering on every scroll frame.
-                  activeOpacity={motion.active}
-                  // A side card is a shortcut for the swipe that would bring it
-                  // over; only the card already in the middle is "opened".
-                  onPress={() => pressCard(index, onPressWallet ? () => onPressWallet(wallet) : undefined)}
-                  // Every loop copy of the wallet gets it — whichever copy is
-                  // centred is the one the user sees.
-                  highlightOpacity={wallet.id === highlightWalletId ? highlightOpacity : undefined}
-                />
-              );
-            })}
-      </Animated.ScrollView>
+                return (
+                  <WalletStackCard
+                    // Index, not wallet id — the loop copies repeat every id.
+                    key={`${wallet.id}-${index}`}
+                    wallet={wallet}
+                    accentColor={accentForIndex(index % wallets.length, wallets.length)}
+                    animatedStyle={{
+                      marginRight: isLast ? 0 : -CARD_OVERLAP,
+                      zIndex: rendered.length - proximity,
+                      // Android orders siblings by elevation before zIndex, so
+                      // the two have to agree or the stack inverts there. Kept in
+                      // a small range because on Android elevation is also the
+                      // shadow's size — ordering by raw index would give the
+                      // centre card a shadow the size of the card.
+                      elevation: Math.max(0, 8 - proximity),
+                      transform: [
+                        { perspective: CARD_PERSPECTIVE },
+                        { translateX: motion.translateX },
+                        { rotateY: motion.rotateY },
+                        { scale: motion.scale },
+                      ],
+                      opacity: motion.opacity,
+                    }}
+                    // Fades the accent border in on whichever card is
+                    // centred, without re-rendering on every scroll frame.
+                    activeOpacity={motion.active}
+                    // A side card is a shortcut for the swipe that would bring it
+                    // over; only the card already in the middle is "opened".
+                    onPress={() => pressCard(index, onPressWallet ? () => onPressWallet(wallet) : undefined)}
+                    // Every loop copy of the wallet gets it — whichever copy is
+                    // centred is the one the user sees.
+                    highlightOpacity={wallet.id === highlightWalletId ? highlightOpacity : undefined}
+                  />
+                );
+              })}
+        </Animated.ScrollView>
+      </View>
+
+      <WalletCarouselPager
+        dotCount={wallets.length}
+        positionCount={rendered.length}
+        scrollX={scrollX}
+        canGoBack={looping || centreIndex > 0}
+        canGoForward={looping || centreIndex < rendered.length - 1}
+        onBack={() => step(-1)}
+        onForward={() => step(1)}
+      />
     </View>
   );
 }
@@ -218,18 +179,17 @@ function WalletCarouselView({
 export const WalletCarousel = memo(WalletCarouselView);
 
 const useStyles = createStyles((colors) => ({
-  // A fixed height regardless of wallet count, so content below does not shift
-  // as the wallets load. Full-bleed: the section's own horizontal padding is
-  // cancelled so a neighbour can sit under the screen edge. Taller than a card
-  // by the shadow bleed, so shadows are not clipped.
+  // Full-bleed: the section's own horizontal padding is cancelled so a
+  // neighbour can sit under the screen edge. Pulled back into the surrounding
+  // gap above, but never past it — the bleed area is still part of a scroll
+  // view and would steal taps meant for the section header.
   container: {
-    height: CARD_HEIGHT + CAROUSEL_SHADOW_BLEED_TOP + CAROUSEL_SHADOW_BLEED_BOTTOM,
     marginHorizontal: -spacing.xl,
-    // Pulled back into the surrounding gap, but never past it — the bleed
-    // area is still part of a scroll view and would steal taps meant for the
-    // section header or the next section.
     marginTop: -Math.min(CAROUSEL_SHADOW_BLEED_TOP, spacing.md),
-    marginBottom: -Math.min(CAROUSEL_SHADOW_BLEED_BOTTOM, spacing.md),
   },
+  // A fixed height regardless of wallet count, so content below does not shift
+  // as the wallets load. Taller than a card by the shadow bleed, so shadows are
+  // not clipped; the pager is pulled up over the bottom bleed (PAGER_OFFSET_TOP).
+  cards: { height: CARD_HEIGHT + CAROUSEL_SHADOW_BLEED_TOP + CAROUSEL_SHADOW_BLEED_BOTTOM },
   empty: { ...typography.caption, color: colors.textSecondary, paddingVertical: spacing.md },
 }));

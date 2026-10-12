@@ -44,6 +44,9 @@ export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChan
   // Set while a tap-started slide is in flight — see scrollToCard.
   const tapTarget = useRef<number | null>(null);
   const tapSettleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Arrow presses that arrived during a slide, as a signed count (+1 next,
+  // -1 previous) — see step.
+  const pendingSteps = useRef(0);
 
   const releaseTapTarget = () => {
     tapTarget.current = null;
@@ -104,6 +107,7 @@ export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChan
   // the card back.
   const onMomentumEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const x = event.nativeEvent.contentOffset.x;
+    let landed = false;
     if (tapTarget.current !== null) {
       // ⚠️ A tap is itself a touch on the scroll view, and Android's
       // ScrollView reports a momentum end for every touch once it settles —
@@ -114,16 +118,19 @@ export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChan
       // hold and may wrap.
       if (Math.abs(x - tapTarget.current * SNAP_INTERVAL) > 1) return;
       releaseTapTarget();
+      landed = true;
     }
-    if (!looping) return;
-    if (x < loopWidth / 2) {
-      scrollRef.current?.scrollTo({ x: x + loopWidth, animated: false });
-      setCentreIndex(Math.round((x + loopWidth) / SNAP_INTERVAL));
-    } else if (x > loopWidth * 1.5) {
-      scrollRef.current?.scrollTo({ x: x - loopWidth, animated: false });
-      setCentreIndex(Math.round((x - loopWidth) / SNAP_INTERVAL));
+    let settled = x;
+    if (looping && (x < loopWidth / 2 || x > loopWidth * 1.5)) {
+      settled = x < loopWidth / 2 ? x + loopWidth : x - loopWidth;
+      scrollRef.current?.scrollTo({ x: settled, animated: false });
+      setCentreIndex(Math.round(settled / SNAP_INTERVAL));
     }
+    if (landed) runPendingStep(Math.round(settled / SNAP_INTERVAL));
   };
+
+  // The middle-copy index showing the same wallet as rendered `index`.
+  const anchored = (index: number) => (looping ? wallets.length + (index % wallets.length) : index);
 
   /**
    * Brings the card at rendered `index` to the centre — what tapping a card
@@ -142,10 +149,46 @@ export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChan
   const scrollToCard = (index: number) => {
     if (index === centreIndex) return;
     releaseTapTarget();
+    // No slide means no momentum end to wrap on, so land in the middle copy
+    // directly — otherwise repeated arrow presses walk off the end of the copies.
+    if (reduceMotion) {
+      jumpTo(anchored(index));
+      return;
+    }
     tapTarget.current = index;
-    tapSettleTimer.current = setTimeout(releaseTapTarget, TAP_SCROLL_SETTLE_MS);
+    tapSettleTimer.current = setTimeout(() => {
+      pendingSteps.current = 0;
+      releaseTapTarget();
+    }, TAP_SCROLL_SETTLE_MS);
     setCentreIndex(index);
-    scrollRef.current?.scrollTo({ x: index * SNAP_INTERVAL, animated: !reduceMotion });
+    scrollRef.current?.scrollTo({ x: index * SNAP_INTERVAL, animated: true });
+  };
+
+  /**
+   * One card left (-1) or right (+1) — the pager's arrows.
+   *
+   * ⚠️ A press while a slide is running is queued and run when that slide
+   * lands, one card at a time. Re-aiming the running slide two cards out
+   * would put the far card on top straight away, and it would pass, half
+   * transparent, over the card crossing the centre.
+   */
+  const step = (delta: 1 | -1) => {
+    if (tapTarget.current !== null) {
+      const limit = Math.max(1, wallets.length - 1);
+      pendingSteps.current = Math.max(-limit, Math.min(limit, pendingSteps.current + delta));
+      return;
+    }
+    const target = centreIndex + delta;
+    if (target >= 0 && target < rendered.length) scrollToCard(target);
+  };
+
+  const runPendingStep = (from: number) => {
+    const queued = pendingSteps.current;
+    if (queued === 0) return;
+    const delta = Math.sign(queued);
+    pendingSteps.current = queued - delta;
+    if (from + delta >= 0 && from + delta < rendered.length) scrollToCard(from + delta);
+    else pendingSteps.current = 0;
   };
 
   /**
@@ -160,6 +203,7 @@ export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChan
    */
   const pressCard = (index: number, open?: () => void) => {
     if (tapTarget.current !== null) {
+      pendingSteps.current = 0;
       if (index !== tapTarget.current) scrollToCard(index);
       return;
     }
@@ -206,7 +250,13 @@ export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChan
     onScrollFrame,
     onMomentumEnd,
     pressCard,
-    // A drag takes over from any tap-started slide still in flight.
-    onScrollBeginDrag: releaseTapTarget,
+    step,
+    looping,
+    // A drag takes over from any tap-started slide still in flight, and
+    // drops arrow presses still queued behind it.
+    onScrollBeginDrag: () => {
+      pendingSteps.current = 0;
+      releaseTapTarget();
+    },
   };
 }

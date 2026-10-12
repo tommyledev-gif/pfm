@@ -206,3 +206,29 @@ WHERE id = $1
   AND status = 'requested'
   AND deleted_at IS NULL
 RETURNING *;
+
+-- name: SearchUsers :many
+-- Account deletion tool (mobile Security screen): live accounts whose email
+-- or tên đăng nhập contains the pattern, any status. The caller lowercases
+-- the pattern and escapes LIKE's own wildcards (\ % _) first.
+SELECT * FROM users
+WHERE deleted_at IS NULL
+  AND (email ILIKE '%' || $1::text || '%' ESCAPE '\' OR username ILIKE '%' || $1::text || '%' ESCAPE '\')
+ORDER BY email
+LIMIT $2;
+
+-- name: SoftDeleteUser :one
+-- Account deletion tool: the row is soft-deleted, never removed, so the
+-- account's wallets and transactions stay intact. Every lookup used to sign
+-- in or to authorize a request ignores deleted rows, and the email/username
+-- unique indexes only cover live rows, so the address can be invited again.
+-- Clearing the invite and approval tokens kills any link still in an inbox.
+UPDATE users
+SET
+    deleted_at     = NOW(),
+    invite_token   = NULL,
+    approval_token = NULL,
+    updated_at     = NOW()
+WHERE id = $1
+  AND deleted_at IS NULL
+RETURNING *;

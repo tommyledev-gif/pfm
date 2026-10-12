@@ -4,6 +4,9 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import { Screen } from "@/components/shared/Screen";
 import { ChevronLeftIcon } from "@/components/ui/Icon";
 import { spacing, typography, createStyles } from "@/lib/theme";
+import { useSessionStore } from "@/stores/session-store";
+import { isAccountDeletionOperator } from "@/features/security/account-deletion";
+import { DeleteAccountsSection } from "@/features/security/components/DeleteAccountsSection";
 import { IdentityCheckToggleRow } from "@/features/security/components/IdentityCheckToggleRow";
 import { RevokeAllSessionsRow } from "@/features/security/components/RevokeAllSessionsRow";
 
@@ -14,6 +17,7 @@ const TITLE = "Bảo mật";
 export default function SecurityScreen() {
   const styles = useStyles();
   const router = useRouter();
+  const canDeleteAccounts = useSessionStore((s) => isAccountDeletionOperator(s.email));
 
   return (
     <Screen style={styles.screen}>
@@ -23,9 +27,12 @@ export default function SecurityScreen() {
         </Pressable>
         <Text style={styles.title}>{TITLE}</Text>
       </View>
-      <ScrollView contentContainerStyle={styles.content} testID="screen-security">
+      {/* "handled": with the search keyboard open, the first tap on [Xóa] has
+          to reach the row, not just close the keyboard. */}
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" testID="screen-security">
         <IdentityCheckToggleRow />
         <RevokeAllSessionsRow />
+        {canDeleteAccounts ? <DeleteAccountsSection /> : null}
       </ScrollView>
     </Screen>
   );

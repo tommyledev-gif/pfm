@@ -22,7 +22,7 @@ type dbPinger interface {
 // (/api/v1). Auth/rate-limit middleware ordering matters: JWTAuth must run
 // before RequireRole (role comes from the token) and before
 // InviteRateLimiter (keyed by the caller's user ID from that same token).
-func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, transactionExportHandler *handler.TransactionExportHandler, transactionImportHandler *handler.TransactionImportHandler, auditLogHandler *handler.AuditLogHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, chatHandler *handler.ChatHandler, budgetWizardHandler *handler.BudgetWizardHandler, analyticsHandler *handler.AnalyticsHandler, accountSwitchHandler *handler.AccountSwitchHandler, sessionRevocationHandler *handler.SessionRevocationHandler, profileHandler *handler.ProfileHandler, accessRequestHandler *handler.AccessRequestHandler, tokens *service.TokenService, sessions *service.SessionService, db dbPinger, logger *zap.Logger) {
+func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, transactionExportHandler *handler.TransactionExportHandler, transactionImportHandler *handler.TransactionImportHandler, auditLogHandler *handler.AuditLogHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, chatHandler *handler.ChatHandler, budgetWizardHandler *handler.BudgetWizardHandler, analyticsHandler *handler.AnalyticsHandler, accountSwitchHandler *handler.AccountSwitchHandler, sessionRevocationHandler *handler.SessionRevocationHandler, profileHandler *handler.ProfileHandler, accessRequestHandler *handler.AccessRequestHandler, accountDeletionHandler *handler.AccountDeletionHandler, tokens *service.TokenService, sessions *service.SessionService, db dbPinger, logger *zap.Logger) {
 	// One instance for every protected route: validates the access token and
 	// its session (see middleware.JWTAuth).
 	jwtAuth := middleware.JWTAuth(tokens, sessions, logger)
@@ -95,6 +95,11 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	// Approve or reject an access request from the app (Thành viên / Thông báo).
 	admin.Post("/users/:id/approve", accessRequestHandler.Approve)
 	admin.Post("/users/:id/reject", accessRequestHandler.Reject)
+	// Test-phase account deletion tool (mobile Security screen). The service
+	// lets through only common.AccountDeletionOperatorEmail, on top of the
+	// group's role gate.
+	admin.Get("/users/search", accountDeletionHandler.SearchUsers)
+	admin.Delete("/users/:id", accountDeletionHandler.DeleteUser)
 
 	// The signed-in user's own profile. No RequireRole gate and no :id in the
 	// path: the user is always the caller, taken from the verified token.
