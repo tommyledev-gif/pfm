@@ -74,3 +74,22 @@ RETURNING ` + userColumns
 func (q *Queries) ApproveAccessRequest(ctx context.Context, id uuid.UUID, inviteToken string) (User, error) {
 	return scanUser(q.db.QueryRow(ctx, approveAccessRequest, id, inviteToken))
 }
+
+const rejectAccessRequest = `-- name: RejectAccessRequest :one
+UPDATE users
+SET
+    deleted_at     = NOW(),
+    approval_token = NULL,
+    updated_at     = NOW()
+WHERE id = $1
+  AND status = 'requested'
+  AND deleted_at IS NULL
+RETURNING ` + userColumns
+
+// RejectAccessRequest soft-deletes a still-waiting request and clears its
+// approval token. pgx.ErrNoRows means it was no longer waiting — the same
+// status condition as ApproveAccessRequest, so an approval and a rejection
+// racing each other cannot both win.
+func (q *Queries) RejectAccessRequest(ctx context.Context, id uuid.UUID) (User, error) {
+	return scanUser(q.db.QueryRow(ctx, rejectAccessRequest, id))
+}

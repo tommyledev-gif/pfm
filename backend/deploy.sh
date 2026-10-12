@@ -15,6 +15,10 @@ if [ ! -f "$ENV_FILE_PATH" ]; then
   echo "Missing $ENV_FILE_PATH — create it on the VPS before deploying." >&2
   exit 1
 fi
+# Every secret the stack has is in this file. Owner-only on every deploy, so a
+# copy written by hand (or by an older workflow without the umask) is fixed
+# too. The ops cron jobs run as this same user and still read it.
+chmod 600 "$ENV_FILE_PATH"
 
 # Refuse to deploy on an env file missing anything docker-compose.yml
 # interpolates *without* a `:-` default. Compose only warns about those and

@@ -29,9 +29,11 @@ type UserRepo interface {
 	SetAvatarURL(ctx context.Context, id uuid.UUID, avatarURL *string) (*model.User, error)
 	// Tên đăng nhập (mig 030) and access requests (mig 031).
 	GetUserByUsername(ctx context.Context, username string) (*model.User, error)
+	SetUsernameOnce(ctx context.Context, id uuid.UUID, username string) (*model.User, error)
 	CreateAccessRequest(ctx context.Context, email string, adminID uuid.UUID, approvalToken string) (*model.User, error)
 	GetUserByApprovalToken(ctx context.Context, approvalToken string) (*model.User, error)
 	ApproveAccessRequest(ctx context.Context, id uuid.UUID, inviteToken string) (*model.User, error)
+	RejectAccessRequest(ctx context.Context, id uuid.UUID) (*model.User, error)
 }
 
 // Compile-time check, same as the ones in interfaces.go.

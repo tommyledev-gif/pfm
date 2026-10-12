@@ -3,17 +3,23 @@ import { Pressable, Text, View } from "react-native";
 
 import { formatCurrency } from "@/lib/currency";
 import { createStyles, spacing, typography } from "@/lib/theme";
-import { TransactionItemInput } from "@/features/transactions/types";
+import { TransactionAdjustmentInput, TransactionItemInput } from "@/features/transactions/types";
+import { FIXED_DIRECTIONS } from "@/features/transactions/items/line-math";
+import { ADJUSTMENT_KIND_LABELS } from "@/features/transactions/components/AdjustmentRow";
 
 interface ProposalItemsListProps {
   items: TransactionItemInput[];
+  adjustments?: TransactionAdjustmentInput[];
   currency: string;
   testIDSuffix?: string;
 }
 
 // The Items of one purchase on an AI proposal card (specs/transaction-line-
 // items): a count that expands, so a long list never pushes Save off screen.
-export function ProposalItemsList({ items, currency, testIDSuffix }: ProposalItemsListProps) {
+// Adjustments (tax, fee, discount — only ever added by editing the proposal)
+// stay visible under it: they are few, and they are why the amount differs
+// from the items' sum.
+export function ProposalItemsList({ items, adjustments = [], currency, testIDSuffix }: ProposalItemsListProps) {
   const styles = useStyles();
   const [expanded, setExpanded] = useState(false);
 
@@ -36,6 +42,21 @@ export function ProposalItemsList({ items, currency, testIDSuffix }: ProposalIte
             </View>
           ))
         : null}
+      {adjustments.map((adjustment, index) => {
+        // Tax, fee and discount carry no direction on the wire (BR-06).
+        const direction = adjustment.direction ?? FIXED_DIRECTIONS[adjustment.kind] ?? "add";
+        const label = adjustment.kind === "other" && adjustment.label ? adjustment.label : ADJUSTMENT_KIND_LABELS[adjustment.kind];
+        return (
+          <View key={`adj-${index}`} style={styles.row} testID={testIDSuffix ? `row-proposal-adjustment-${testIDSuffix}-${index}` : undefined}>
+            <Text style={styles.name} numberOfLines={1}>
+              {label}
+            </Text>
+            <Text style={styles.amount}>
+              {`${direction === "subtract" ? "−" : "+"}${formatCurrency(adjustment.amount, currency)}`}
+            </Text>
+          </View>
+        );
+      })}
     </View>
   );
 }

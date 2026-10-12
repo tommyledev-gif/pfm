@@ -144,7 +144,7 @@ func (s *BudgetWizardService) Proposals(ctx context.Context, userID uuid.UUID, r
 		case errors.Is(err, budgetproposal.ErrDisposableTooSmall):
 			return nil, common.ErrDisposableTooSmall
 		case errors.Is(err, budgetproposal.ErrNoIntents):
-			return nil, common.NewInvalidInputError("bạn chọn ít nhất một danh mục nhé")
+			return nil, common.NewInvalidInputError("Chọn ít nhất một danh mục.")
 		default:
 			return nil, fmt.Errorf("service.Proposals: %w", err)
 		}

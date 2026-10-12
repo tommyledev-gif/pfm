@@ -162,7 +162,7 @@ func TestChatService_Chat_LowConfidence_SurfacedAsGuess(t *testing.T) {
 	if resp.Actions[0].Confidence != 0.4 {
 		t.Fatalf("expected the real confidence (0.4) preserved on the action, got %v", resp.Actions[0].Confidence)
 	}
-	if resp.Message == "Đã đề xuất 1 giao dịch, vui lòng xác nhận." {
+	if resp.Message == "1 giao dịch chờ xác nhận." {
 		t.Fatalf("expected a guess-framed lead-in message for a low-confidence action, got the confident-proposal wording")
 	}
 }
@@ -248,7 +248,7 @@ func TestChatService_Chat_NoDefaultWallet_Ambiguous(t *testing.T) {
 	if resp.Intent != string(model.ChatIntentAmbiguous) {
 		t.Fatalf("expected ambiguous intent, got %s", resp.Intent)
 	}
-	if resp.Message != "Vui lòng cho biết bạn muốn dùng ví nào." {
+	if resp.Message != "Ghi vào ví nào?" {
 		t.Fatalf("expected the wallet-specific ambiguous message, got %q", resp.Message)
 	}
 }

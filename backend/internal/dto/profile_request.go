@@ -8,3 +8,10 @@ package dto
 type UpdateProfileRequest struct {
 	FullName string `json:"full_name"`
 }
+
+// ClaimUsernameRequest is the body of PUT /users/me/username, decoded with
+// DecodeStrict like UpdateProfileRequest. The username's rules live in the
+// service (ProfileService.ClaimUsername, common.UsernameProblem).
+type ClaimUsernameRequest struct {
+	Username string `json:"username"`
+}

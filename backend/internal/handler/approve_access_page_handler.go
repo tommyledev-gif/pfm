@@ -40,7 +40,7 @@ const approveAccessPageHTML = pageHead + `<title>Duyệt yêu cầu tạo tài k
   }
 
   var COPY = {
-    ACCESS_REQUEST_HANDLED: "Yêu cầu này đã được duyệt.",
+    ACCESS_REQUEST_HANDLED: "Yêu cầu này không còn chờ duyệt.",
     RATE_LIMITED: "Thử quá nhiều lần. Đợi vài phút rồi thử lại."
   };
 

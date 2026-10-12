@@ -92,14 +92,17 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	// Sign out everywhere for another user (account-switch US-09); the
 	// self-target refusal lives in the service.
 	admin.Post("/users/:id/sessions/revoke-all", sessionRevocationHandler.RevokeAllForUser)
-	// Approve an access request from the app (Thành viên / Thông báo).
+	// Approve or reject an access request from the app (Thành viên / Thông báo).
 	admin.Post("/users/:id/approve", accessRequestHandler.Approve)
+	admin.Post("/users/:id/reject", accessRequestHandler.Reject)
 
 	// The signed-in user's own profile. No RequireRole gate and no :id in the
 	// path: the user is always the caller, taken from the verified token.
 	users := v1.Group("/users", jwtAuth)
 	users.Get("/me", profileHandler.GetMe)
 	users.Patch("/me", profileHandler.UpdateMe)
+	// Accounts activated before tên đăng nhập existed (mig 030) set one, once.
+	users.Put("/me/username", profileHandler.ClaimUsername)
 	users.Post("/me/avatar", uploadLimit, profileHandler.UploadAvatar)
 	users.Delete("/me/avatar", profileHandler.DeleteAvatar)
 

@@ -13,7 +13,7 @@ import { useMarkNotificationReadMutation } from "@/features/notifications/api/us
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { Notification } from "@/features/notifications/types";
 import { useUsersQuery } from "@/features/users/api/use-users-query";
-import { ApproveRequestButton } from "@/features/users/components/ApproveRequestButton";
+import { AccessRequestActions } from "@/features/users/components/AccessRequestActions";
 import { useSessionStore } from "@/stores/session-store";
 
 export default function NotificationsScreen() {
@@ -30,7 +30,8 @@ export default function NotificationsScreen() {
   // Home/Insights in practice, so this rarely costs a request.
   const budgets = useBudgetsQuery();
   // Admins only (the endpoint 403s for members): which access requests are
-  // still waiting, so only those notifications offer "Duyệt yêu cầu".
+  // still waiting, so only those notifications offer "Duyệt yêu cầu" and
+  // "Từ chối". A rejected request leaves this list, taking both buttons.
   const isAdmin = useSessionStore((s) => s.role) === "admin";
   const users = useUsersQuery({ enabled: isAdmin });
   const waitingRequestEmailById = useMemo(
@@ -79,7 +80,7 @@ export default function NotificationsScreen() {
   const approveActionFor = (item: Notification) => {
     const requesterEmail = item.related_user_id ? waitingRequestEmailById.get(item.related_user_id) : undefined;
     if (item.type !== "access_request" || !item.related_user_id || !requesterEmail) return undefined;
-    return <ApproveRequestButton userId={item.related_user_id} email={requesterEmail} />;
+    return <AccessRequestActions userId={item.related_user_id} email={requesterEmail} />;
   };
 
   const sections = useMemo(() => {

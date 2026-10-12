@@ -127,7 +127,7 @@ func resolveRow(rowNumber int, cells map[string]string, lookups importLookups) (
 		return dto.ImportRow{}, fmt.Sprintf("không tìm thấy ví %q", walletName)
 	case 1:
 	default:
-		return dto.ImportRow{}, fmt.Sprintf("có %d ví cùng tên %q — không xác định được ví nào", len(walletIDs), walletName)
+		return dto.ImportRow{}, fmt.Sprintf("có %d ví cùng tên %q, không xác định được ví nào", len(walletIDs), walletName)
 	}
 	walletID := walletIDs[0]
 

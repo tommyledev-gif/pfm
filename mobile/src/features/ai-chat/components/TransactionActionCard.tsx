@@ -196,7 +196,7 @@ export function TransactionActionCard({
             <PillTag label={walletName} />
           </View>
           {payload.items?.length ? (
-            <ProposalItemsList items={payload.items} currency={currency} testIDSuffix={testIDSuffix} />
+            <ProposalItemsList items={payload.items} adjustments={payload.adjustments} currency={currency} testIDSuffix={testIDSuffix} />
           ) : null}
           {walletRequired ? (
             <Text testID={`txt-wallet-required-${testIDSuffix}`} style={styles.walletRequired}>

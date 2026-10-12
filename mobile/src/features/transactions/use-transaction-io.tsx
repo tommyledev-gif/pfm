@@ -96,7 +96,7 @@ export function useTransactionIO({ range, walletId, currency }: TransactionIOPro
         // outlive it — say so plainly rather than showing a bare 401.
         useToastStore
           .getState()
-          .show(getErrorMessage(error, "Phiên nhập đã hết hạn — chọn lại tệp giúp mình nhé"), "error");
+          .show(getErrorMessage(error, "Phiên nhập đã hết hạn. Chọn lại tệp."), "error");
         setModalOpen(false);
       },
     });

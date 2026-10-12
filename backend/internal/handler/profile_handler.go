@@ -54,6 +54,24 @@ func (h *ProfileHandler) UpdateMe(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, "profile updated successfully", dto.NewUserResponse(user))
 }
 
+// ClaimUsername handles PUT /users/me/username: an account with no tên đăng
+// nhập (activated before mig 030) sets one, once.
+func (h *ProfileHandler) ClaimUsername(c *fiber.Ctx) error {
+	userID, err := callerUUID(c)
+	if err != nil {
+		return response.Error(c, h.logger, common.ErrUnauthenticated)
+	}
+	var req dto.ClaimUsernameRequest
+	if err := dto.DecodeStrict(c.Body(), &req); err != nil {
+		return response.Error(c, h.logger, common.NewInvalidInputError("malformed request body or unrecognized field"))
+	}
+	user, err := h.profileService.ClaimUsername(c.Context(), userID, req.Username)
+	if err != nil {
+		return response.Error(c, h.logger, err)
+	}
+	return response.Success(c, fiber.StatusOK, "username set successfully", dto.NewUserResponse(user))
+}
+
 // UploadAvatar handles POST /users/me/avatar (multipart, field "file").
 func (h *ProfileHandler) UploadAvatar(c *fiber.Ctx) error {
 	userID, err := callerUUID(c)

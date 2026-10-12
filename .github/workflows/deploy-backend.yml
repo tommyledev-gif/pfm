@@ -104,8 +104,10 @@ jobs:
 
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
+            # umask: created owner-only, never readable even for a moment
+            # (deploy.sh also chmods it 600 on every run).
             if [ -n "${{ secrets.VPS_ENV_PROD }}" ]; then
-              printf '%s\n' "${{ secrets.VPS_ENV_PROD }}" | sed -e 's/\r$//' > .env.prod
+              (umask 077; printf '%s\n' "${{ secrets.VPS_ENV_PROD }}" | sed -e 's/\r$//' > .env.prod)
             fi
 
             chmod +x deploy.sh

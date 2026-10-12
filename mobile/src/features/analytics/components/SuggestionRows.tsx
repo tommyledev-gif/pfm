@@ -16,8 +16,8 @@ const MAX_ROWS = 3;
 const DISABLED_OPACITY = 0.5;
 
 /**
- * The questions under a reply that could not answer ("Mình chưa hiểu câu
- * này. Bạn thử:"). Full-width rows rather than chips: they ARE the reply —
+ * The questions under a reply that could not answer ("Chưa hiểu câu này.
+ * Thử:"). Full-width rows rather than chips: they ARE the reply —
  * the next step the User is being offered — so each one is a whole tappable
  * line that asks its complete question, never a quoted example to retype.
  * The same chip data the backend sends, so nothing here invents a question.

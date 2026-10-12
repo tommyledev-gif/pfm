@@ -55,7 +55,7 @@ export function useWizardSubmit() {
         setCreatedCount(data.created_count);
         return { count: data.created_count };
       } catch (e) {
-        return { error: getErrorMessage(e, "Chưa lưu được ngân sách, bạn thử lại nhé.") };
+        return { error: getErrorMessage(e, "Chưa lưu được ngân sách. Thử lại.") };
       }
     },
     [bulkCreate, createCategory],

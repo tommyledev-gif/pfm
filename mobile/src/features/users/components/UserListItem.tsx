@@ -4,7 +4,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { PillTag } from "@/components/ui/PillTag";
 import { colors, radii, spacing, typography, createStyles } from "@/lib/theme";
 import { User } from "@/features/users/types";
-import { ApproveRequestButton } from "@/features/users/components/ApproveRequestButton";
+import { AccessRequestActions } from "@/features/users/components/AccessRequestActions";
 import { ResendInviteButton } from "@/features/users/components/ResendInviteButton";
 import { RevokeSessionsButton } from "@/features/users/components/RevokeSessionsButton";
 import { useCurrentUserId } from "@/stores/use-current-user-id";
@@ -36,8 +36,9 @@ export function UserListItem({ user }: { user: User }) {
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>{displayName}</Text>
         <Text style={styles.email} numberOfLines={1}>{user.email}</Text>
-        {/* A request from the login screen: approving sends the activation email. */}
-        {user.status === "requested" ? <ApproveRequestButton userId={user.id} email={user.email} /> : null}
+        {/* A request from the login screen: approving sends the activation
+            email, rejecting removes the request. */}
+        {user.status === "requested" ? <AccessRequestActions userId={user.id} email={user.email} /> : null}
         {user.status === "pending" && user.invite_resend_available_at ? (
           <ResendInviteButton userId={user.id} availableAt={user.invite_resend_available_at} />
         ) : null}

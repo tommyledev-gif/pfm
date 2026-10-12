@@ -166,7 +166,7 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
         setPendingSavedRows(null);
       } catch (e) {
         setResult(null);
-        setError(getErrorMessage(e, "Chưa tính được ngân sách, bạn thử lại nhé."));
+        setError(getErrorMessage(e, "Chưa tính được ngân sách. Thử lại."));
       }
     },
     [proposals, income, fixed, savings, currency, cycleStartDay, pendingSavedRows, restoredFrom, keptCategories.keptPlan],

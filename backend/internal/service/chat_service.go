@@ -102,9 +102,9 @@ func (s *ChatService) Chat(ctx context.Context, userID uuid.UUID, req dto.ChatRe
 
 	actions, _, sawWalletDrop := resolveActions(wallets, categories, extractResp.Transactions)
 	if len(actions) == 0 {
-		message := "Mình chưa hiểu giao dịch này, bạn mô tả rõ hơn giúp mình nhé?"
+		message := "Chưa hiểu giao dịch này. Thử ghi kèm số tiền, ví dụ \"ăn trưa 50k\"."
 		if sawWalletDrop {
-			message = "Vui lòng cho biết bạn muốn dùng ví nào."
+			message = "Ghi vào ví nào?"
 		}
 		return s.respondAmbiguous(ctx, userID, conversationID, message)
 	}
@@ -178,12 +178,12 @@ func renderConfirmMessage(actions []dto.ChatActionResponse) string {
 	n := len(actions)
 	if anyLowConfidence {
 		if n == 1 {
-			return "Mình đoán giao dịch này như bên dưới — bạn xem lại giúp mình nhé."
+			return "Kiểm tra lại giao dịch bên dưới trước khi lưu."
 		}
-		return fmt.Sprintf("Mình đoán %d giao dịch như bên dưới — bạn xem lại giúp mình nhé.", n)
+		return fmt.Sprintf("Kiểm tra lại %d giao dịch bên dưới trước khi lưu.", n)
 	}
 	if n == 1 {
-		return "Đã đề xuất 1 giao dịch, vui lòng xác nhận."
+		return "1 giao dịch chờ xác nhận."
 	}
-	return fmt.Sprintf("Đã đề xuất %d giao dịch, vui lòng xác nhận.", n)
+	return fmt.Sprintf("%d giao dịch chờ xác nhận.", n)
 }

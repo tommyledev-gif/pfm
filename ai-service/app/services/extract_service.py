@@ -25,6 +25,7 @@ from fastapi.concurrency import run_in_threadpool
 from app.core.config import settings
 from app.core.groq_client import get_anthropic_client, get_groq_client
 from app.schemas.extract_schema import ChatTurn, ExtractRequest, ExtractResponse
+from app.services.item_names import clean_item_names
 from app.services.prompt_builder import build_system_prompt
 
 logger = logging.getLogger(__name__)
@@ -41,7 +42,13 @@ class ExtractionUnavailableError(Exception):
 
 async def extract_transactions(req: ExtractRequest) -> ExtractResponse:
     system_prompt = build_system_prompt(req.wallets, req.categories, req.now)
+    # The prompt and the tool schema ask for item names without prices, but
+    # neither is a guarantee: whatever either provider leaves in is stripped
+    # here (item_names.py).
+    return clean_item_names(await _extract_with_fallback(system_prompt, req))
 
+
+async def _extract_with_fallback(system_prompt: str, req: ExtractRequest) -> ExtractResponse:
     # The SDK clients are synchronous: called directly from this coroutine they
     # would freeze the event loop (every other request and /health with it)
     # for the whole provider round trip.

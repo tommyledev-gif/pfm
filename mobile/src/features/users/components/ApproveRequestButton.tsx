@@ -1,9 +1,10 @@
 import { ActivityIndicator, Pressable, Text } from "react-native";
 
-import { getErrorCode, getErrorMessage } from "@/lib/axios";
+import { getErrorMessage } from "@/lib/axios";
 import { useRequireOnline } from "@/lib/connectivity";
 import { createStyles, radii, spacing, typography, useColors } from "@/lib/theme";
 import { useToastStore } from "@/stores/toast-store";
+import { isRequestNoLongerWaiting, REQUEST_NOT_WAITING } from "@/features/users/access-request-errors";
 import { useApproveAccessRequestMutation } from "@/features/users/api/use-approve-access-request-mutation";
 
 interface ApproveRequestButtonProps {
@@ -11,8 +12,8 @@ interface ApproveRequestButtonProps {
   email: string;
 }
 
-// Approves an access request (status "requested"). Shown on the request's row
-// in Thành viên and on the admin's notification about it. After approval the
+// Approves an access request (status "requested"). Rendered by
+// AccessRequestActions, next to RejectRequestButton. After approval the
 // requester gets the activation email; the row then reads "Chờ kích hoạt".
 export function ApproveRequestButton({ userId, email }: ApproveRequestButtonProps) {
   const colors = useColors();
@@ -25,8 +26,9 @@ export function ApproveRequestButton({ userId, email }: ApproveRequestButtonProp
     approve.mutate(userId, {
       onSuccess: () => showToast(`Đã duyệt. Email kích hoạt đã gửi tới ${email}.`, "info"),
       onError: (error) => {
-        if (getErrorCode(error) === "ACCESS_REQUEST_HANDLED") {
-          showToast("Yêu cầu này đã được duyệt.", "info");
+        // Approved or rejected elsewhere; a reject leaves a 404, not a 409.
+        if (isRequestNoLongerWaiting(error)) {
+          showToast(REQUEST_NOT_WAITING, "info");
           return;
         }
         showToast(getErrorMessage(error, "Chưa duyệt được. Thử lại."), "error");
@@ -52,12 +54,11 @@ export function ApproveRequestButton({ userId, email }: ApproveRequestButtonProp
 }
 
 const useStyles = createStyles((colors) => ({
+  // Placement (top margin, left alignment) is AccessRequestActions' job.
   button: {
-    alignSelf: "flex-start",
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
-    marginTop: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: 6,
     borderRadius: radii.pill,

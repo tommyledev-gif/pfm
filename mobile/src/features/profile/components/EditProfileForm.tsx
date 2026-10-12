@@ -4,6 +4,7 @@ import * as ImagePicker from "expo-image-picker";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { PillButton } from "@/components/ui/PillButton";
+import { UploadButton } from "@/components/ui/UploadButton";
 import { getErrorMessage } from "@/lib/axios";
 import { withAlpha } from "@/lib/color";
 import { useRequireOnline } from "@/lib/connectivity";
@@ -14,6 +15,7 @@ import { accountDisplayName } from "@/features/accounts/account-registry-store";
 import { useRemoveAvatarMutation, useUploadAvatarMutation } from "@/features/profile/api/use-avatar-mutations";
 import { useProfileQuery } from "@/features/profile/api/use-profile-query";
 import { useUpdateProfileMutation } from "@/features/profile/api/use-update-profile-mutation";
+import { UsernameClaimField } from "@/features/profile/components/UsernameClaimField";
 
 // Longest name the server accepts (service.ProfileNameMaxLength).
 const NAME_MAX_LENGTH = 60;
@@ -102,10 +104,8 @@ export function EditProfileForm({ onSaved }: EditProfileFormProps) {
     const asset = result.assets[0];
     const mimeType = asset.mimeType ?? "image/jpeg";
     const fileName = asset.fileName ?? `avatar.${mimeType.split("/")[1] ?? "jpg"}`;
-    uploadAvatar.mutate(
-      { uri: asset.uri, name: fileName, mimeType },
-      { onSuccess: () => useToastStore.getState().show(COPY.photoChanged, "info") },
-    );
+    // No toast: UploadButton ends its run on "Đã đổi ảnh" itself.
+    uploadAvatar.mutate({ uri: asset.uri, name: fileName, mimeType });
   };
 
   const removePhoto = () => {
@@ -127,12 +127,12 @@ export function EditProfileForm({ onSaved }: EditProfileFormProps) {
       <View style={styles.photoBlock}>
         <Avatar name={displayName} iconUrl={profile?.avatar_url} size={AVATAR_SIZE} fallback="initial" />
         <View style={styles.photoActions}>
-          <PillButton
+          <UploadButton
+            status={uploadAvatar.status}
             label={COPY.changePhoto}
-            variant="outline"
+            doneLabel={COPY.photoChanged}
             onPress={() => requireOnline(pickPhoto)}
-            loading={uploadAvatar.isPending}
-            disabled={busy}
+            disabled={updateProfile.isPending || removeAvatar.isPending}
             testID="btn-profile-change-photo"
           />
           {profile?.avatar_url ? (
@@ -149,13 +149,15 @@ export function EditProfileForm({ onSaved }: EditProfileFormProps) {
       </View>
 
       {/* Read-only: chosen once on the activation page (backend mig 030).
-          Accounts activated before it existed have none, so nothing shows. */}
+          Accounts activated before it existed pick theirs here, once. */}
       {profile?.username ? (
         <View style={styles.usernameBlock} testID="text-profile-username">
           <Text style={styles.label}>{COPY.usernameLabel}</Text>
           <Text style={styles.usernameValue} selectable>{profile.username}</Text>
           <Text style={styles.hint}>{COPY.usernameHint}</Text>
         </View>
+      ) : profile ? (
+        <UsernameClaimField />
       ) : null}
 
       <Text style={styles.label}>{COPY.nameLabel}</Text>

@@ -3,7 +3,7 @@ import { Text, View } from "react-native";
 import { formatCurrency } from "@/lib/currency";
 import { createStyles, spacing, typography } from "@/lib/theme";
 import { ItemsEditor } from "@/features/transactions/items/use-items-editor";
-import { ADJUSTMENT_KIND_LABELS } from "@/features/transactions/components/AdjustmentLineEditor";
+import { ADJUSTMENT_KIND_LABELS } from "@/features/transactions/components/AdjustmentRow";
 
 interface TransactionItemsSectionProps {
   lines: ItemsEditor;

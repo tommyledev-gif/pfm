@@ -48,3 +48,13 @@ func (r *UserRepository) ApproveAccessRequest(ctx context.Context, id uuid.UUID,
 	}
 	return toModel(row), nil
 }
+
+// RejectAccessRequest soft-deletes a still-waiting request and clears its
+// approval token. pgx.ErrNoRows (wrapped) means it was no longer waiting.
+func (r *UserRepository) RejectAccessRequest(ctx context.Context, id uuid.UUID) (*model.User, error) {
+	row, err := r.q.RejectAccessRequest(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("repository.RejectAccessRequest: %w", err)
+	}
+	return toModel(row), nil
+}

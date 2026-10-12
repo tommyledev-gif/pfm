@@ -55,10 +55,27 @@ class ProposedItem(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    name: str
-    quantity: int = Field(default=1, ge=1)
-    unit_price_vnd: int | None = None
-    amount_vnd: int
+    # These descriptions reach the model inside the forced tool schema
+    # (extract_service._extract_tool_schema), which it follows more reliably
+    # than prose in the system prompt. Names polluted with the price and a
+    # remark ("sữa đặc 22k của duy") were observed live; the price part that
+    # still slips through is stripped by app/services/item_names.py.
+    name: str = Field(
+        description=(
+            "Product name only, in the user's words (keep brand, color, size such as 500ml). "
+            "Never include a price or amount (35k, 22k, 1tr2, 35.000, 35000đ) or a count "
+            '(x2, the 2 in "2 trà đá"): the count goes in quantity, prices go in unit_price_vnd '
+            'and amount_vnd. A remark about whose it is or who it is for ("của duy", "cho mẹ") '
+            "is not part of the name: append it to the transaction note instead. "
+            'Example: "sữa đặc 22k của duy" gives name "sữa đặc".'
+        )
+    )
+    quantity: int = Field(default=1, ge=1, description="How many were bought; 1 when the user gave no count.")
+    unit_price_vnd: int | None = Field(
+        default=None,
+        description="Price of one unit in whole VND, only when the user stated a per-unit price; otherwise null.",
+    )
+    amount_vnd: int = Field(description="Line total of this item in whole VND.")
 
 
 class ProposedTransaction(BaseModel):
@@ -73,7 +90,14 @@ class ProposedTransaction(BaseModel):
     # the caller; that is explicitly not this service's job.
     category_id: str
     wallet_id: str | None = None
-    note: str | None = None
+    note: str | None = Field(
+        default=None,
+        description=(
+            "Short note in the user's words: what was bought, where, with or for whom. "
+            "When the purchase has items, also append any remark the user attached to one item, "
+            'together with that item\'s name ("sữa đặc của duy"), since item names hold the product only.'
+        ),
+    )
     occurred_at: str  # YYYY-MM-DD
     confidence: float = Field(ge=0.0, le=1.0)
     # Filled only when one purchase lists several things bought together;

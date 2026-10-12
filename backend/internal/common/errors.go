@@ -215,9 +215,9 @@ var (
 
 // F-13.1 AI Budget Setup Wizard v2.
 var (
-	ErrDisposableNonPositive = &AppError{Code: ErrCodeDisposableNonPositive, Status: http.StatusBadRequest, Message: "chi phí cố định và tiết kiệm đã vượt thu nhập, bạn xem lại giúp nhé"}
-	ErrDisposableTooSmall    = &AppError{Code: ErrCodeDisposableTooSmall, Status: http.StatusBadRequest, Message: "số tiền còn lại quá nhỏ so với số danh mục bạn chọn, bạn bớt vài danh mục nhé"}
-	ErrPlanVersionConflict   = &AppError{Code: ErrCodePlanVersionConflict, Status: http.StatusConflict, Message: "ngân sách vừa được cập nhật ở thiết bị khác, bạn thử lại nhé"}
+	ErrDisposableNonPositive = &AppError{Code: ErrCodeDisposableNonPositive, Status: http.StatusBadRequest, Message: "Chi phí cố định và tiết kiệm đã vượt thu nhập. Kiểm tra lại các số này."}
+	ErrDisposableTooSmall    = &AppError{Code: ErrCodeDisposableTooSmall, Status: http.StatusBadRequest, Message: "Số tiền còn lại quá nhỏ so với số danh mục đã chọn. Bỏ bớt vài danh mục."}
+	ErrPlanVersionConflict   = &AppError{Code: ErrCodePlanVersionConflict, Status: http.StatusConflict, Message: "Ngân sách vừa được cập nhật ở thiết bị khác. Thử lại."}
 )
 
 // NewInvalidInputError builds a 400 INVALID_INPUT error with a field-specific message.

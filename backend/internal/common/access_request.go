@@ -13,12 +13,16 @@ const (
 	ErrCodeInvalidUsername = "INVALID_USERNAME"
 	// ErrCodeUsernameTaken: another live account already has it.
 	ErrCodeUsernameTaken = "USERNAME_TAKEN"
+	// ErrCodeUsernameAlreadySet: PUT /users/me/username on an account that
+	// already has one. A username is set once and never changed.
+	ErrCodeUsernameAlreadySet = "USERNAME_ALREADY_SET"
 	// ErrCodeAdminNotFound: the admin email on an access request is not an
 	// active admin. Said plainly so a typo can be fixed; whether the
 	// requester's own email has an account is never revealed.
 	ErrCodeAdminNotFound = "ADMIN_NOT_FOUND"
-	// ErrCodeAccessRequestHandled: approving a request that is no longer
-	// waiting (already approved, from the email or another admin).
+	// ErrCodeAccessRequestHandled: approving or rejecting a request that is
+	// no longer waiting (already approved or rejected, from the email link or
+	// another admin).
 	ErrCodeAccessRequestHandled = "ACCESS_REQUEST_HANDLED"
 	// ErrCodeAccountAwaitingApproval: login with the email of a request an
 	// admin has not approved yet.
@@ -27,8 +31,9 @@ const (
 
 var (
 	ErrUsernameTaken           = &AppError{Code: ErrCodeUsernameTaken, Status: http.StatusConflict, Message: "Tên đăng nhập đã có người dùng."}
+	ErrUsernameAlreadySet      = &AppError{Code: ErrCodeUsernameAlreadySet, Status: http.StatusConflict, Message: "Tài khoản đã có tên đăng nhập."}
 	ErrAdminNotFound           = &AppError{Code: ErrCodeAdminNotFound, Status: http.StatusUnprocessableEntity, Message: "Không có admin nào dùng email này."}
-	ErrAccessRequestHandled    = &AppError{Code: ErrCodeAccessRequestHandled, Status: http.StatusConflict, Message: "Yêu cầu này đã được duyệt."}
+	ErrAccessRequestHandled    = &AppError{Code: ErrCodeAccessRequestHandled, Status: http.StatusConflict, Message: "Yêu cầu này không còn chờ duyệt."}
 	ErrAccountAwaitingApproval = &AppError{Code: ErrCodeAccountAwaitingApproval, Status: http.StatusUnauthorized, Message: "Yêu cầu tạo tài khoản đang chờ admin duyệt."}
 )
 

@@ -11,7 +11,7 @@ import { Notification } from "@/features/notifications/types";
 // README: "Each row: colored icon circle, title + timestamp, body text.
 // Unread rows get a 3px green left border."
 // `action` sits under the body text: an admin's access-request notification
-// carries its "Duyệt yêu cầu" button there.
+// carries its "Duyệt yêu cầu" and "Từ chối" buttons there.
 export function NotificationRow({ notification, action }: { notification: Notification; action?: ReactNode }) {
   const styles = useStyles();
   return (

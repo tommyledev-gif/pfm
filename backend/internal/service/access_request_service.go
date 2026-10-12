@@ -22,7 +22,7 @@ type AccessRequestNotifier interface {
 // AccessRequestService lets someone without an account ask an admin for one
 // (mig 031). A request is a users row in status 'requested'; approving it
 // turns it into an ordinary pending invite, so activation, resend and expiry
-// are the invite flow's own from there on.
+// are the invite flow's own from there on. Rejecting it soft-deletes the row.
 type AccessRequestService struct {
 	users    UserRepo
 	notifier AccessRequestNotifier
@@ -116,6 +116,32 @@ func (s *AccessRequestService) Approve(ctx context.Context, userID uuid.UUID) (*
 		return nil, common.ErrAccessRequestHandled
 	}
 	return s.approve(ctx, requester.ID)
+}
+
+// Reject turns a request down from the app. The row is soft-deleted, which
+// frees the email (its unique index covers live rows only) so the person can
+// ask again, and clears the approval token so the admin's email link stops
+// working. Nothing is emailed to the requester. Any admin may reject.
+func (s *AccessRequestService) Reject(ctx context.Context, userID uuid.UUID) error {
+	requester, err := s.users.GetUserByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return common.ErrNotFound
+		}
+		return fmt.Errorf("service.Reject: %w", err)
+	}
+	if requester.Status != model.UserStatusRequested {
+		return common.ErrAccessRequestHandled
+	}
+	// Same race arbiter as approve: the conditional UPDATE matches no row
+	// when an approval (email link or app) or another rejection got there first.
+	if _, err := s.users.RejectAccessRequest(ctx, requester.ID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return common.ErrAccessRequestHandled
+		}
+		return fmt.Errorf("service.Reject: %w", err)
+	}
+	return nil
 }
 
 // approve turns the request into a pending invite and emails the requester

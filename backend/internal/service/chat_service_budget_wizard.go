@@ -18,7 +18,7 @@ import (
 // the usual Transaction confirmation cards. Kept in its own file, alongside
 // chat_service.go's own Feature-12 logic, per plan.md's file-size concern.
 func (s *ChatService) respondBudgetWizard(ctx context.Context, userID, conversationID uuid.UUID) (*dto.ChatResponse, error) {
-	message := "Mình có thể giúp bạn lên kế hoạch ngân sách! Nhấn vào đây để bắt đầu."
+	message := "Lập ngân sách theo thu nhập. Nhấn để bắt đầu."
 	intent := model.ChatIntentBudgetWizard
 	if _, err := s.repo.CreateChatMessage(ctx, repository.CreateChatMessageParams{
 		UserID: userID, ConversationID: conversationID, Role: model.ChatRoleAssistant, Content: message, Intent: &intent,

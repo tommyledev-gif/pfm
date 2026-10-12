@@ -25,11 +25,14 @@ Một khái niệm = một từ, ở cả VI và EN. Cột "Nguồn": `app` = đ
 | Item (dòng hàng của giao dịch) | món | item | app | Không có danh mục riêng; đếm "{{count}} món". Không dùng "mặt hàng", "sản phẩm" |
 | Adjustment | thuế, phí, giảm giá | tax, fee, discount | app | Gọi theo loại: "Thuế", "Phí", "Giảm giá", "Khác". Nhóm chung trên UI: "Thuế, phí, giảm giá"; tránh "khoản điều chỉnh" (Hán-Việt, khó hiểu) |
 | Items total | tổng các món | items total | app | Khác "số tiền" của giao dịch (số đã trả) |
-| Account (người dùng) | tài khoản | account | app | Chỉ cho tài khoản người dùng, không bao giờ cho ví |
-| Username | tên đăng nhập | username | app | Đặt một lần lúc kích hoạt, đăng nhập thay email. Khác "tên hiển thị" |
+| Lines total (sau thuế, phí, giảm giá) | tổng | total | app | Dòng duy nhất ở chân "Chi tiết món". Khớp số tiền giao dịch thì không nói gì thêm; lệch thì "Lệch {{amount}} so với số tiền giao dịch {{amount}}." |
+| Line amount / Unit price (của một món) | thành tiền / đơn giá | amount / unit price | app | Thành tiền là số gốc; đơn giá chỉ hiện khi số lượng trên 1 |
+| Undo | hoàn tác | undo | app | Sau khi xóa một dòng: "Đã xóa {{name}}" + [Hoàn tác] || Account (người dùng) | tài khoản | account | app | Chỉ cho tài khoản người dùng, không bao giờ cho ví |
+| Username | tên đăng nhập | username | app | Đặt một lần lúc kích hoạt, đăng nhập thay email. Khác "tên hiển thị". Tài khoản kích hoạt trước khi có nó tự đặt một lần trong Hồ sơ: [Đặt tên đăng nhập] |
 | Display name | tên hiển thị | display name | app | Tên người khác thấy, sửa được trong Hồ sơ |
 | Access request | yêu cầu tạo tài khoản | access request | app | Gửi từ màn đăng nhập. Trạng thái: "Chờ duyệt" → "Chờ kích hoạt" → "Đang dùng" |
 | Approve (yêu cầu) | duyệt | approve | app | Nút: "Duyệt yêu cầu" |
+| Reject (yêu cầu) | từ chối | reject | app | Nút: "Từ chối", nhánh an toàn "Giữ lại". Yêu cầu bị xóa khỏi danh sách, người gửi gửi lại được. Đã duyệt hoặc đã từ chối: "không còn chờ duyệt" |
 
 ## Từ tránh dùng trong UI
 

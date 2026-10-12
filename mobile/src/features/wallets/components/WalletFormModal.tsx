@@ -149,7 +149,7 @@ export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormM
         color={colors.mint}
         icon={icon}
         iconUrl={iconUrl ?? undefined}
-        uploading={uploadIcon.isPending}
+        uploadStatus={uploadIcon.status}
         onPress={iconPicker.open}
       />
 

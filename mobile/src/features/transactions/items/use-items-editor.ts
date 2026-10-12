@@ -18,14 +18,6 @@ import {
 type SourceItems = (TransactionItem | TransactionItemInput)[] | undefined;
 type SourceAdjustments = (TransactionAdjustment | TransactionAdjustmentInput)[] | undefined;
 
-function move<T>(list: T[], index: number, delta: number): T[] {
-  const target = index + delta;
-  if (index < 0 || target < 0 || target >= list.length) return list;
-  const next = [...list];
-  [next[index], next[target]] = [next[target], next[index]];
-  return next;
-}
-
 /**
  * Draft Items and Adjustments of the Transaction form (specs/transaction-line-
  * items US-01/US-03). Client form state — seeded from query data on open,
@@ -98,6 +90,21 @@ export function useItemsEditor(amount: AmountExpression) {
     });
   };
 
+  /**
+   * Undo of removeItem: back at its old position. `adjustments` are the ones
+   * removing the last Item took with it (BR-08), restored alongside.
+   */
+  const restoreItem = (item: ItemDraft, index: number, adjustmentsBefore?: AdjustmentDraft[]) => {
+    touch();
+    setItems((list) => [...list.slice(0, index), item, ...list.slice(index)]);
+    if (adjustmentsBefore) setAdjustments(adjustmentsBefore);
+  };
+
+  const restoreAdjustment = (adjustment: AdjustmentDraft, index: number) => {
+    touch();
+    setAdjustments((list) => [...list.slice(0, index), adjustment, ...list.slice(index)]);
+  };
+
   const updateAdjustment = (key: string, patch: Partial<AdjustmentDraft>) => {
     touch();
     setAdjustments((list) => list.map((a) => (a.key === key ? { ...a, ...patch } : a)));
@@ -136,28 +143,27 @@ export function useItemsEditor(amount: AmountExpression) {
     problem,
     reset,
     seedLines,
-    addItem: () => {
+    /** Returns the new line's key, so the editor can open it straight away. */
+    addItem: (): string => {
       touch();
-      setItems((list) => [...list, newItemDraft()]);
+      const draft = newItemDraft();
+      setItems((list) => [...list, draft]);
+      return draft.key;
     },
     updateItem,
     removeItem,
-    moveItem: (index: number, delta: number) => {
+    restoreItem,
+    addAdjustment: (kind: AdjustmentKind = "tax"): string => {
       touch();
-      setItems((list) => move(list, index, delta));
-    },
-    addAdjustment: (kind: AdjustmentKind = "tax") => {
-      touch();
-      setAdjustments((list) => [...list, newAdjustmentDraft(kind)]);
+      const draft = newAdjustmentDraft(kind);
+      setAdjustments((list) => [...list, draft]);
+      return draft.key;
     },
     updateAdjustment,
+    restoreAdjustment,
     removeAdjustment: (key: string) => {
       touch();
       setAdjustments((list) => list.filter((a) => a.key !== key));
-    },
-    moveAdjustment: (index: number, delta: number) => {
-      touch();
-      setAdjustments((list) => move(list, index, delta));
     },
     addDifference,
     applyTotalAsAmount,

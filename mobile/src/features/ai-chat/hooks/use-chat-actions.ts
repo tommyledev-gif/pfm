@@ -61,7 +61,7 @@ export function useChatActions({ onSent }: UseChatActionsOptions) {
         {
           id: nextMessageId(),
           role: "assistant",
-          text: isBusy ? "Hệ thống đang bận, vui lòng thử lại sau." : "Xin lỗi, mình chưa xử lý được. Vui lòng thử lại.",
+          text: isBusy ? "Hệ thống đang bận. Thử lại sau ít phút." : "Chưa xử lý được tin nhắn này. Thử lại.",
           offerManualEntry: isBusy,
           edited,
         },

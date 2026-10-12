@@ -48,6 +48,35 @@ func (s *ProfileService) UpdateFullName(ctx context.Context, userID uuid.UUID, r
 	return user, nil
 }
 
+// ClaimUsername gives an account activated before tên đăng nhập existed (mig
+// 030) its username. Same rule as the activation page: chosen once, never
+// changed, so an account that has one gets USERNAME_ALREADY_SET.
+func (s *ProfileService) ClaimUsername(ctx context.Context, userID uuid.UUID, raw string) (*model.User, error) {
+	username := common.NormalizeUsername(raw)
+	if problem := common.UsernameProblem(username); problem != "" {
+		return nil, common.NewInvalidUsernameError(problem)
+	}
+	user, err := s.users.SetUsernameOnce(ctx, userID, username)
+	if err == nil {
+		return user, nil
+	}
+	if isUniqueViolation(err) {
+		return nil, common.ErrUsernameTaken
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("service.Profile.ClaimUsername: %w", err)
+	}
+	// No row: the account is gone, or it already has a username. Say which.
+	current, getErr := s.users.GetUserByID(ctx, userID)
+	if getErr != nil {
+		return nil, profileLookupError("ClaimUsername", getErr)
+	}
+	if current.Username != nil {
+		return nil, common.ErrUsernameAlreadySet
+	}
+	return nil, profileLookupError("ClaimUsername", err)
+}
+
 // SetAvatar stores img as the user's avatar, then deletes the previous
 // object so replacing a picture never leaves an orphan on R2. The old object
 // goes last and best-effort: a failure there costs a few KB of storage,

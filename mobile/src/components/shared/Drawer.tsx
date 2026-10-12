@@ -28,6 +28,10 @@ export interface DrawerChild {
   // Rendered pinned below the panel body rather than after it, so the
   // confirm/reset actions stay reachable no matter how long the list is.
   footer?: ReactNode;
+  // Drops the back chevron for a panel whose footer already has its exit
+  // (the Items editor's "Xong"): two controls that do the same thing read as
+  // two different things. Close (X) stays.
+  hideBack?: boolean;
 }
 
 interface DrawerProps {

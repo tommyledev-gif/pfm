@@ -146,7 +146,7 @@ export function CategoryFormModal({ visible, onClose, editingCategory }: Categor
           color={editingCategory ? colorForCategory(editingCategory.id) : colors.lavender}
           icon={icon}
           iconUrl={iconUrl ?? undefined}
-          uploading={uploadIcon.isPending}
+          uploadStatus={uploadIcon.status}
           onPress={iconPicker.open}
         />
 

@@ -55,3 +55,19 @@ def test_prompt_states_grouping_and_day_month_rules():
     prompt = build_system_prompt([], [], "2026-10-11T00:00:00Z")
     assert "MỘT lần mua" in prompt
     assert '"10/11" = ngày 10 tháng 11' in prompt
+
+
+def test_prompt_keeps_prices_and_remarks_out_of_item_names():
+    prompt = build_system_prompt([], [], "2026-10-11T00:00:00Z")
+    assert "name CHỈ là tên món" in prompt
+    assert 'note: "sữa đặc của duy"' in prompt
+    assert "giữ đúng chữ người dùng viết" not in prompt
+
+
+def test_tool_schema_describes_clean_item_names_and_note():
+    schema = _extract_tool_schema()
+    tx_schema = schema["properties"]["transactions"]["items"]
+    name_description = tx_schema["properties"]["items"]["items"]["properties"]["name"]["description"]
+    assert "Never include a price" in name_description
+    assert "transaction note" in name_description
+    assert "remark" in tx_schema["properties"]["note"]["description"]

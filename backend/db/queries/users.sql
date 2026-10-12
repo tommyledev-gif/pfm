@@ -146,6 +146,19 @@ WHERE username = $1
   AND deleted_at IS NULL
 LIMIT 1;
 
+-- name: SetUsernameOnce :one
+-- PUT /users/me/username: an account activated before mig 030 sets its
+-- tên đăng nhập. `username IS NULL` makes it once-only; no row back means
+-- unknown user or one that already has a username. Hand-authored in
+-- sqlc/users_profile.sql.go (returns its profile columns).
+UPDATE users
+SET username   = $2,
+    updated_at = NOW()
+WHERE id = $1
+  AND username IS NULL
+  AND deleted_at IS NULL
+RETURNING *;
+
 -- name: CreateAccessRequest :one
 -- Someone without an account asks admin $2 for one. A unique violation means
 -- the email already has a live account (any status).
@@ -173,6 +186,22 @@ SET
     invite_sent_at      = NOW(),
     invite_resend_count = 0,
     updated_at          = NOW()
+WHERE id = $1
+  AND status = 'requested'
+  AND deleted_at IS NULL
+RETURNING *;
+
+-- name: RejectAccessRequest :one
+-- An admin turns a request down: the row is soft-deleted, not given a status
+-- of its own. The email unique index only covers live rows, so the person
+-- can ask again later; clearing approval_token kills the email "Duyệt" link.
+-- Same status condition as ApproveAccessRequest, so of an approval and a
+-- rejection at once exactly one matches the row.
+UPDATE users
+SET
+    deleted_at     = NOW(),
+    approval_token = NULL,
+    updated_at     = NOW()
 WHERE id = $1
   AND status = 'requested'
   AND deleted_at IS NULL

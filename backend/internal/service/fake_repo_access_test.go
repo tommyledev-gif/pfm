@@ -90,3 +90,29 @@ func (f *fakeUserRepo) ApproveAccessRequest(_ context.Context, id uuid.UUID, inv
 	}
 	return nil, pgx.ErrNoRows
 }
+
+// RejectAccessRequest mirrors the soft-delete: a still-requested row leaves
+// byEmail (the email is free again, like the partial unique index) and its
+// approval token stops resolving. Anything else gets pgx.ErrNoRows.
+func (f *fakeUserRepo) RejectAccessRequest(_ context.Context, id uuid.UUID) (*model.User, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	for email, u := range f.byEmail {
+		if u.ID != id || u.Status != model.UserStatusRequested {
+			continue
+		}
+		for token, t := range f.byToken {
+			if t.ID == id {
+				delete(f.byToken, token)
+			}
+		}
+		delete(f.byEmail, email)
+		now := time.Now().UTC()
+		u.DeletedAt = &now
+		u.UpdatedAt = now
+		cp := *u
+		return &cp, nil
+	}
+	return nil, pgx.ErrNoRows
+}

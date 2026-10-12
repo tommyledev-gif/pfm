@@ -37,6 +37,22 @@ func (q *Queries) SetUserAvatarURL(ctx context.Context, id uuid.UUID, avatarURL 
 	return scanProfile(q.db.QueryRow(ctx, setUserAvatarURL, id, avatarURL))
 }
 
+const setUsernameOnce = `-- name: SetUsernameOnce :one
+UPDATE users
+SET username   = $2,
+    updated_at = NOW()
+WHERE id = $1
+  AND username IS NULL
+  AND deleted_at IS NULL
+RETURNING ` + profileColumns
+
+// SetUsernameOnce gives an account activated before mig 030 its username.
+// pgx.ErrNoRows: unknown or soft-deleted user, or one that already has a
+// username. A unique violation: another live account has it.
+func (q *Queries) SetUsernameOnce(ctx context.Context, id uuid.UUID, username string) (User, error) {
+	return scanProfile(q.db.QueryRow(ctx, setUsernameOnce, id, username))
+}
+
 type rowScanner interface{ Scan(dest ...any) error }
 
 func scanProfile(row rowScanner) (User, error) {

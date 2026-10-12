@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	msgDayUnsupported = "Mình chỉ trả lời được cho một ngày đã qua hoặc hôm nay. Bạn thử câu dưới đây nhé."
+	msgDayUnsupported = "Chỉ trả lời được cho hôm nay hoặc một ngày đã qua. Thử câu bên dưới."
 	todayChipLabel    = "Hôm nay tiêu bao nhiêu?"
 )
 

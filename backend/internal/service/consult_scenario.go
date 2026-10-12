@@ -25,9 +25,9 @@ const (
 	scenarioRoundXu = 1_000 * common.VNDToCentsFactor
 	viDateFmt       = "02/01/2006"
 
-	msgScenarioPast    = "Mốc thời gian này đã qua rồi. Bạn cho mình một mốc trong tương lai nhé."
-	msgScenarioNoPlan  = "Mình chưa thấy khoản dư nào trong các tháng gần đây để ước tính thời gian. Bạn thử nói rõ mốc thời gian hoặc số tiền để dành mỗi tháng nhé."
-	msgScenarioTooLong = "Với mức này sẽ mất quá lâu để đạt mục tiêu. Bạn thử tăng số tiền để dành mỗi tháng nhé."
+	msgScenarioPast    = "Mốc thời gian này đã qua. Chọn một mốc trong tương lai."
+	msgScenarioNoPlan  = "Các tháng gần đây chưa có khoản dư để ước tính thời gian. Thử nêu mốc thời gian hoặc số tiền để dành mỗi tháng."
+	msgScenarioTooLong = "Với mức này sẽ mất quá lâu để đạt mục tiêu. Thử tăng số tiền để dành mỗi tháng."
 )
 
 // scenarioBaseline is the average monthly income/expense over the last
@@ -156,20 +156,20 @@ func summaryScenario(sc *dto.ConsultScenario, monthly bool) string {
 	switch {
 	case sc.Deadline != "":
 		d, _ := time.Parse(common.DateOnlyLayout, sc.Deadline)
-		head = fmt.Sprintf("Để có %s trước %s (còn %d tháng), mỗi tháng bạn cần để dành %s.", m(sc.Goal), d.Format(viDateFmt), sc.Months, m(sc.MonthlySave))
+		head = fmt.Sprintf("Để có %s trước %s (còn %d tháng), mỗi tháng cần để dành %s.", m(sc.Goal), d.Format(viDateFmt), sc.Months, m(sc.MonthlySave))
 	default:
-		head = fmt.Sprintf("Để dành %s mỗi tháng thì khoảng %d tháng nữa bạn sẽ có %s.", m(sc.MonthlySave), sc.Months, m(sc.Goal))
+		head = fmt.Sprintf("Để dành %s mỗi tháng thì khoảng %d tháng nữa sẽ có %s.", m(sc.MonthlySave), sc.Months, m(sc.Goal))
 	}
 	if sc.AvgIncome == nil {
-		return head + " Mình chưa có đủ dữ liệu thu chi các tháng trước để gợi ý mức chi."
+		return head + " Chưa đủ dữ liệu thu chi các tháng trước để gợi ý mức chi."
 	}
 	span := fmt.Sprintf("%d %s qua", sc.BaselineCycles, cycleUnit(monthly))
 	if *sc.SpendCap <= 0 {
-		return head + fmt.Sprintf(" Thu nhập trung bình %s là %s, chưa đủ để dành mức này — bạn cân nhắc lùi mốc hoặc giảm mục tiêu nhé.", span, m(*sc.AvgIncome))
+		return head + fmt.Sprintf(" Thu nhập trung bình %s là %s, chưa đủ để dành mức này. Thử lùi mốc hoặc giảm mục tiêu.", span, m(*sc.AvgIncome))
 	}
-	avg := fmt.Sprintf(" Trung bình %s bạn thu %s, chi %s", span, m(*sc.AvgIncome), m(*sc.AvgExpense))
+	avg := fmt.Sprintf(" Trung bình %s thu %s, chi %s", span, m(*sc.AvgIncome), m(*sc.AvgExpense))
 	if *sc.Feasible {
-		return head + avg + fmt.Sprintf(" — chỉ cần giữ chi tiêu dưới %s/tháng là đạt.", m(*sc.SpendCap))
+		return head + avg + fmt.Sprintf(". Giữ chi tiêu dưới %s/tháng là đạt.", m(*sc.SpendCap))
 	}
-	return head + avg + fmt.Sprintf(" — mỗi tháng nên chi tối đa %s, tức giảm khoảng %s so với hiện tại.", m(*sc.SpendCap), m(*sc.CutNeeded))
+	return head + avg + fmt.Sprintf(". Để đạt mục tiêu, mỗi tháng chi tối đa %s, tức giảm khoảng %s so với hiện tại.", m(*sc.SpendCap), m(*sc.CutNeeded))
 }

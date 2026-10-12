@@ -13,15 +13,15 @@ import (
 
 // Reply copy for every non-answer outcome (Vietnamese product copy).
 const (
-	// Both end on "Bạn thử:" — the client lists the reply's chips right
+	// Both end on "Thử:" — the client lists the reply's chips right
 	// under it as tappable rows, so the sentence leads straight into them.
-	msgDegraded     = "Lúc này mình chưa đọc được câu bạn gõ. Bạn thử:"
-	msgUnsupported  = "Mình chưa hiểu câu này. Bạn thử:"
-	msgPartial      = "Mình chưa hiểu hết câu hỏi nên không muốn đoán số. Bạn thử hỏi cụ thể hơn, hoặc chọn một gợi ý nhé."
-	msgNeedsContext = "Bạn hỏi đầy đủ giúp mình nhé, ví dụ \"tháng trước tiêu bao nhiêu\"."
-	msgComingLater  = "Đánh giá và thử kịch bản sẽ có trong bản sau. Trong lúc chờ, bạn xem số liệu này nhé."
-	msgSwitchMode   = "Có vẻ bạn muốn ghi một giao dịch. Chuyển sang chế độ Ghi giao dịch nhé."
-	msgPickCategory = "Ý bạn là hạng mục nào?"
+	msgDegraded     = "Lúc này chưa đọc được câu vừa gõ. Thử:"
+	msgUnsupported  = "Chưa hiểu câu này. Thử:"
+	msgPartial      = "Chưa hiểu hết câu hỏi nên chưa đưa số. Thử hỏi cụ thể hơn."
+	msgNeedsContext = "Câu hỏi còn thiếu ý. Hỏi đủ, ví dụ \"tháng trước tiêu bao nhiêu\"."
+	msgComingLater  = "Đánh giá và thử kịch bản sẽ có trong bản sau. Số liệu liên quan ở bên dưới."
+	msgSwitchMode   = "Câu này giống một giao dịch cần ghi. Chuyển sang chế độ Ghi giao dịch."
+	msgPickCategory = "Danh mục nào?"
 	msgAnswered     = ""
 )
 

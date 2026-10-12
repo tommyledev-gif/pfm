@@ -19,11 +19,11 @@ import { Category } from "@/features/categories/types";
 import { useChatStore } from "@/stores/chat-store";
 
 const RATE_LIMITED = "RATE_LIMITED";
-// Ends on "Bạn thử:" like the backend's own fallbacks — the reply's chips
+// Ends on "Thử:" like the backend's own fallbacks — the reply's chips
 // are listed right under it as tappable rows (SuggestionRows).
-const LIMIT_REACHED_TEXT = "Bạn đã gõ khá nhiều câu trong giờ qua, thử lại sau nhé. Trong lúc chờ, bạn thử:";
-const PICK_CATEGORY_TEXT = "Ý bạn là hạng mục nào?";
-const GENERIC_ERROR_TEXT = "Xin lỗi, mình chưa trả lời được. Vui lòng thử lại.";
+const LIMIT_REACHED_TEXT = "Đã đạt giới hạn câu hỏi trong giờ này. Trong lúc chờ, thử:";
+const PICK_CATEGORY_TEXT = "Danh mục nào?";
+const GENERIC_ERROR_TEXT = "Chưa trả lời được câu này. Thử lại.";
 
 interface UseConsultActionsOptions {
   /** Scrolls the thread to the newest message after the user asks. */

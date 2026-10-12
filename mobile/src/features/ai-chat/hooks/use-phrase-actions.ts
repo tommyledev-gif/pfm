@@ -5,7 +5,7 @@ import { useToastStore } from "@/stores/toast-store";
 
 const SAVED_MESSAGE = "Đã lưu câu mẫu";
 const REMOVED_MESSAGE = "Đã bỏ lưu câu mẫu";
-const FULL_MESSAGE = `Đã đủ ${MAX_SAVED_PHRASES} câu mẫu — bỏ bớt một câu trước nhé`;
+const FULL_MESSAGE = `Đã đủ ${MAX_SAVED_PHRASES} câu mẫu. Xóa bớt một câu để thêm câu mới.`;
 
 /**
  * Save / Remove-saved toggle for one phrase. Unavailable (and so never

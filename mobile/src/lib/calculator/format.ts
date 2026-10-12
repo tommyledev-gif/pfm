@@ -83,6 +83,20 @@ export function formatExpression(expression: string, currency: string, empty = "
     .trim();
 }
 
+/**
+ * The inverse of formatExpression for one typed amount: what a grouped field
+ * shows ("35.000" for VND, "1,234.5" for USD) back to plain digits[.digits].
+ * A VND amount has no decimals, so every mark in it is grouping.
+ */
+export function unformatAmount(text: string, currency: string): string {
+  const sep = separators(currency);
+  const ungrouped = text.split(sep.group).join("");
+  if (currencyDecimals(currency) === 0) return ungrouped.replace(/[^0-9]/g, "");
+  const clean = ungrouped.split(sep.decimal).join(".").replace(/[^0-9.]/g, "");
+  const firstDot = clean.indexOf(".");
+  return firstDot === -1 ? clean : clean.slice(0, firstDot + 1) + clean.slice(firstDot + 1).replace(/\./g, "");
+}
+
 /** A result value ("-5", "1234.5") in the same grouping, with a real minus sign. */
 export function formatValue(text: string, currency: string): string {
   const negative = text.startsWith("-");

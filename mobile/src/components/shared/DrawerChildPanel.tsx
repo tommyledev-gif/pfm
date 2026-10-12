@@ -12,6 +12,8 @@ interface DrawerChildPanelProps {
   title: string;
   children: ReactNode;
   footer?: ReactNode;
+  // See DrawerChild.hideBack.
+  hideBack?: boolean;
   // The overlay's own width, measured by Drawer — the panel parks exactly one
   // screen-width to the right when closed, so it is never partly visible at
   // rest regardless of device size.
@@ -37,6 +39,7 @@ export function DrawerChildPanel({
   title,
   children,
   footer,
+  hideBack = false,
   width,
   bottomInset,
 }: DrawerChildPanelProps) {
@@ -84,9 +87,14 @@ export function DrawerChildPanel({
       <View style={styles.surface} onLayout={drag.onSheetLayout}>
         <SheetHandle panHandlers={drag.panHandlers} />
         <View style={styles.header}>
-          <Pressable onPress={onClose} hitSlop={10}>
-            <ChevronLeftIcon size={20} color={colors.textPrimary} />
-          </Pressable>
+          {hideBack ? (
+            // Keeps the title centred between equal sides.
+            <View style={styles.backSpacer} />
+          ) : (
+            <Pressable onPress={onClose} hitSlop={10}>
+              <ChevronLeftIcon size={20} color={colors.textPrimary} />
+            </Pressable>
+          )}
           <Text style={styles.title} numberOfLines={1}>
             {title}
           </Text>
@@ -127,6 +135,8 @@ const useStyles = createStyles((colors) => ({
   // Centered between the two icon buttons, matching the reference sheet's
   // back / title / close header.
   title: { flex: 1, textAlign: "center", ...typography.cardTitle, color: colors.textPrimary },
+  // The chevron's width, so a panel without it keeps a centred title.
+  backSpacer: { width: 20 },
   body: { flex: 1, paddingHorizontal: spacing.xl, paddingTop: spacing.lg },
   footer: {
     flexDirection: "row",

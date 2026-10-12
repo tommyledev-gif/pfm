@@ -10,7 +10,7 @@ interface ReplyFanoutOptions {
   noWallets?: boolean;
 }
 
-const NO_WALLET_REPLY = "Bạn chưa có ví nào — giao dịch cần một ví để được lưu vào. Tạo ví mới rồi nhắn lại cho mình nhé.";
+const NO_WALLET_REPLY = "Chưa có ví. Tạo ví để ghi giao dịch.";
 
 /**
  * Turns one assistant reply into thread messages: one card per proposal, in

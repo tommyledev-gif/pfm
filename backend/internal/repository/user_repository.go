@@ -172,6 +172,17 @@ func (r *UserRepository) SetAvatarURL(ctx context.Context, id uuid.UUID, avatarU
 	return toModel(row), nil
 }
 
+// SetUsernameOnce stores the username of an account that has none. Returns
+// pgx.ErrNoRows (wrapped) when the user is unknown or already has one, and a
+// unique violation (wrapped) when another live account has it.
+func (r *UserRepository) SetUsernameOnce(ctx context.Context, id uuid.UUID, username string) (*model.User, error) {
+	row, err := r.q.SetUsernameOnce(ctx, id, username)
+	if err != nil {
+		return nil, fmt.Errorf("repository.SetUsernameOnce: %w", err)
+	}
+	return toModel(row), nil
+}
+
 func toModel(row sqlc.User) *model.User {
 	return &model.User{
 		ID:                row.ID,
