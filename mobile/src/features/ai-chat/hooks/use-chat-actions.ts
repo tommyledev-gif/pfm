@@ -9,7 +9,7 @@ import { toReplyMessages } from "@/features/ai-chat/reply-fanout";
 import { proposalLinesChanged } from "@/features/ai-chat/proposal-lines";
 import { useConfirmProposal } from "@/features/ai-chat/hooks/use-confirm-proposal";
 import { useNeedsFirstWallet } from "@/features/wallets/use-open-wallet-creator";
-import { useChatStore } from "@/stores/chat-store";
+import { captureChatEpoch, useChatStore } from "@/stores/chat-store";
 
 // The typing indicator is meant to be felt, not just technically present —
 // even a fast reply holds the dots for a beat before the answer appears.
@@ -75,7 +75,11 @@ export function useChatActions({ onSent }: UseChatActionsOptions) {
     addMessage({ id: nextMessageId(), role: "user", text: trimmed });
     onSent();
     setSending(true);
-    (await requestAssistantReply(trimmed)).forEach(addMessage);
+    const stillCurrent = captureChatEpoch();
+    const replies = await requestAssistantReply(trimmed);
+    // A reply that outlived a logout or account switch belongs to the
+    // previous session's thread, which is gone.
+    if (stillCurrent()) replies.forEach(addMessage);
     setSending(false);
   };
 
@@ -97,7 +101,9 @@ export function useChatActions({ onSent }: UseChatActionsOptions) {
     }
 
     setSending(true);
-    (await requestAssistantReply(trimmed, true)).forEach(addMessage);
+    const stillCurrent = captureChatEpoch();
+    const replies = await requestAssistantReply(trimmed, true);
+    if (stillCurrent()) replies.forEach(addMessage);
     setSending(false);
   };
 

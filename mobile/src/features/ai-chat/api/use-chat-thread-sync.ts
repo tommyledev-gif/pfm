@@ -4,8 +4,9 @@ import { apiClient, unwrap } from "@/lib/axios";
 import { ChatMessage } from "@/features/ai-chat/types";
 
 // Exported so chat-store.ts can keep this cache entry in step with what it
-// last pushed — see the setQueryData call there.
-export const CHAT_THREAD_QUERY_KEY = ["chat-thread"] as const;
+// last pushed — see the setQueryData call there. Keyed by User: one account's
+// late sync must never land in another account's entry.
+export const chatThreadQueryKey = (userId: string) => ["chat-thread", userId] as const;
 
 interface ChatThreadMessageWire {
   client_message_id: string;
@@ -47,10 +48,10 @@ export async function fetchChatThreadRequest(): Promise<ChatMessage[]> {
  * whether it still wants it; `data` being present says nothing about it being
  * newer than the local thread. See chat-store's hydrateThread.
  */
-export function useChatThreadQuery(enabled: boolean) {
+export function useChatThreadQuery(userId: string | null, enabled: boolean) {
   return useQuery({
-    queryKey: CHAT_THREAD_QUERY_KEY,
+    queryKey: chatThreadQueryKey(userId ?? ""),
     queryFn: fetchChatThreadRequest,
-    enabled,
+    enabled: enabled && userId !== null,
   });
 }

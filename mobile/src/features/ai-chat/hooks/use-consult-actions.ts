@@ -16,7 +16,7 @@ import {
   ConsultResponse,
 } from "@/features/analytics/types";
 import { Category } from "@/features/categories/types";
-import { useChatStore } from "@/stores/chat-store";
+import { captureChatEpoch, useChatStore } from "@/stores/chat-store";
 
 const RATE_LIMITED = "RATE_LIMITED";
 // Ends on "Thử:" like the backend's own fallbacks — the reply's chips
@@ -56,13 +56,15 @@ export function useConsultActions({ onSent, categories, onSwitchToRecording }: U
     addMessage({ id: nextMessageId(), role: "user", text: userText, consultQuestion: true });
     onSent();
     setSending(true);
+    const stillCurrent = captureChatEpoch();
     const startedAt = Date.now();
     const reply = await produce();
     const elapsed = Date.now() - startedAt;
     if (elapsed < MIN_TYPING_MS) {
       await new Promise((resolve) => setTimeout(resolve, MIN_TYPING_MS - elapsed));
     }
-    addMessage({ ...reply, sourceText: userText });
+    // Dropped if the session changed while the answer was on its way.
+    if (stillCurrent()) addMessage({ ...reply, sourceText: userText });
     setSending(false);
   };
 

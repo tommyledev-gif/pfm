@@ -22,6 +22,7 @@ import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useChatThreadQuery } from "@/features/ai-chat/api/use-chat-thread-sync";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { useChatStore } from "@/stores/chat-store";
+import { useCurrentUserId } from "@/stores/use-current-user-id";
 
 // A beat for the list to finish its mount/measure pass before scrolling to a
 // deep-linked message — RecordingPane retries if the row still was not measured.
@@ -31,8 +32,8 @@ export default function AiChatScreen() {
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
-  // Thread lives in a store, not local state — this screen unmounts on every
-  // bottom-nav tab change, which would otherwise lose the conversation.
+  // Thread lives in a store, not local state: it outlives this screen, and is
+  // reset per User by session-scoped-reset.ts.
   const thread = useChatStore((s) => s.thread);
   const updateMessage = useChatStore((s) => s.updateMessage);
   const hydrateThread = useChatStore((s) => s.hydrateThread);
@@ -66,22 +67,24 @@ export default function AiChatScreen() {
     openEdit?: string;
   }>();
 
-  // Restores the synced thread when the local copy is empty — i.e. after a
-  // logout, reinstall or new device wiped it.
+  // Restores the synced thread when the local copy is empty — after a logout,
+  // an account switch, a reinstall or a new device wiped it. At most once per
+  // User per app run (the store's restoredFor), so a cached server snapshot
+  // can never be replayed over local changes made since (a deleted
+  // transaction's tombstone reverting to a live card is how that showed up).
   //
-  // ⚠️ Frozen at mount rather than read live. This screen unmounts on every
-  // bottom-nav tab change, but the query's CACHED result does not go with it —
-  // so on the next mount `threadQuery.data` still holds the thread as the
-  // server had it at fetch time, and re-running the effect against it undid
-  // every local change since (a deleted transaction's tombstone reverting to a
-  // live card is how this showed up). The store refuses a hydrate over a
-  // non-empty thread as well; this keeps the request from being made at all.
-  const [needsServerThread] = useState(() => thread.length === 0);
-  const threadQuery = useChatThreadQuery(needsServerThread && thread.length === 0);
+  // ⚠️ Read live, not frozen at mount. Tabs stay mounted once visited, so this
+  // screen lives through logouts and account switches; a mount-time flag kept
+  // the previous account's answer and the next account's thread was never
+  // restored.
+  const userId = useCurrentUserId();
+  const ownerId = useChatStore((s) => s.ownerId);
+  const restoredFor = useChatStore((s) => s.restoredFor);
+  const needsServerThread = userId !== null && ownerId === userId && restoredFor !== userId && thread.length === 0;
+  const threadQuery = useChatThreadQuery(userId, needsServerThread);
   useEffect(() => {
-    if (!needsServerThread) return;
-    if (threadQuery.data?.length) hydrateThread(threadQuery.data);
-  }, [needsServerThread, threadQuery.data, hydrateThread]);
+    if (needsServerThread && userId && threadQuery.data) hydrateThread(threadQuery.data, userId);
+  }, [needsServerThread, userId, threadQuery.data, hydrateThread]);
 
   const wallets = useWalletsQuery();
   const categories = useCategoriesQuery();

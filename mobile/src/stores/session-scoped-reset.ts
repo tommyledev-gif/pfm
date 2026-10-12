@@ -56,10 +56,16 @@ interface SessionUserChange {
  */
 export function handleSessionUserChange({ nextUserId, isRestore }: SessionUserChange): void {
   if (nextUserId === null) {
-    useChatStore.getState().clear();
+    useChatStore.getState().clear(null);
     return;
   }
-  if (!isRestore) afterHydration(useChatStore, () => useChatStore.getState().clear());
+  // A restored session keeps the thread on disk only if it is this User's
+  // (chat-store records its owner); a session entered just now always starts
+  // empty and owned by them, and the chat screen restores their server copy.
+  afterHydration(useChatStore, () => {
+    if (isRestore) useChatStore.getState().claimFor(nextUserId);
+    else useChatStore.getState().clear(nextUserId);
+  });
   afterHydration(useSavedBudgetPlanStore, () => useSavedBudgetPlanStore.getState().claimFor(nextUserId, isRestore));
   void flushOutbox("session");
 }
