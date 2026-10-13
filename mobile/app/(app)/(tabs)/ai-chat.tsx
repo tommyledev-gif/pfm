@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, StyleSheet, View } from "react-native";
+import { FlatList, Keyboard, StyleSheet, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -27,6 +27,18 @@ import { useCurrentUserId } from "@/stores/use-current-user-id";
 // A beat for the list to finish its mount/measure pass before scrolling to a
 // deep-linked message — RecordingPane retries if the row still was not measured.
 const FOCUS_SCROLL_DELAY_MS = 50;
+
+// For anything that opens a Modal over the composer: close the keyboard
+// first. A Modal is its own Android window; taking focus hides the keyboard
+// but leaves the input focused, and neither React Native nor Reanimated hears
+// the keyboard go — the input bar stayed lifted under the overlay. Blurring
+// the input is what KeyboardLiftView reliably comes down on.
+const dismissKeyboardThen =
+  <A extends unknown[]>(open: (...args: A) => void) =>
+  (...args: A) => {
+    Keyboard.dismiss();
+    open(...args);
+  };
 
 export default function AiChatScreen() {
   const insets = useSafeAreaInsets();
@@ -150,7 +162,7 @@ export default function AiChatScreen() {
       {/* Outside the content View so its wash runs up under the status bar too. */}
       <ChatModeBackdrop mode={mode} />
       <View style={styles.screen}>
-        <ChatModeHeader mode={mode} onPressMode={() => setModePickerOpen(true)} />
+        <ChatModeHeader mode={mode} onPressMode={dismissKeyboardThen(() => setModePickerOpen(true))} />
 
         {mode === "consult" ? (
           <ConsultPane
@@ -177,9 +189,9 @@ export default function AiChatScreen() {
             mode={mode}
             onTriggerEdit={overlays.triggerEdit}
             onTriggerDelete={removal.request}
-            onPressHistory={overlays.openHistory}
-            onOpenBudgetWizard={overlays.openBudgetWizard}
-            onOpenManualEntry={() => overlays.setManualEntryOpen(true)}
+            onPressHistory={dismissKeyboardThen(overlays.openHistory)}
+            onOpenBudgetWizard={dismissKeyboardThen(overlays.openBudgetWizard)}
+            onOpenManualEntry={dismissKeyboardThen(() => overlays.setManualEntryOpen(true))}
           />
         )}
       </View>
@@ -208,10 +220,10 @@ export default function AiChatScreen() {
           if (target) void chat.editUserMessage(target, text);
         }}
         onCloseEditingAction={() => overlays.setEditingActionMessage(null)}
-        onSaveEditingAction={(payload) => {
+        onSaveEditingAction={(payload, savedPatch) => {
           const target = overlays.editingActionMessage;
           overlays.setEditingActionMessage(null);
-          if (target) chat.editAction(target, payload);
+          if (target) chat.editAction(target, payload, savedPatch);
         }}
         onCloseHistory={() => overlays.setHistoryMessage(null)}
         onCloseTombstone={() => overlays.setTombstoneMessage(null)}

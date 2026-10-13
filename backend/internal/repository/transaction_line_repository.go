@@ -119,15 +119,23 @@ func (r *TransactionRepository) CountActiveItems(ctx context.Context, userID uui
 	return counts, nil
 }
 
+// LockedTransaction is what LockTransactionForUpdate reads under the row lock:
+// the fields an update's balance moves and stale-copy check depend on.
+type LockedTransaction struct {
+	Amount    int64
+	UpdatedAt time.Time
+	WalletID  uuid.UUID
+}
+
 // LockTransactionForUpdate row-locks a live Transaction inside the caller's tx
-// and returns its current amount and updated_at. pgx.ErrNoRows means it is
-// gone (deleted meanwhile) or not the caller's.
-func (r *TransactionRepository) LockTransactionForUpdate(ctx context.Context, tx pgx.Tx, transactionID, userID uuid.UUID) (int64, time.Time, error) {
+// and returns its current amount, updated_at and Wallet. pgx.ErrNoRows means
+// it is gone (deleted meanwhile) or not the caller's.
+func (r *TransactionRepository) LockTransactionForUpdate(ctx context.Context, tx pgx.Tx, transactionID, userID uuid.UUID) (LockedTransaction, error) {
 	row, err := r.q.WithTx(tx).LockTransactionForUpdate(ctx, transactionID, userID)
 	if err != nil {
-		return 0, time.Time{}, err
+		return LockedTransaction{}, err
 	}
-	return row.Amount, row.UpdatedAt, nil
+	return LockedTransaction{Amount: row.Amount, UpdatedAt: row.UpdatedAt, WalletID: row.WalletID}, nil
 }
 
 func toTransactionLines(rows []sqlc.TransactionLine) TransactionLines {

@@ -1,6 +1,11 @@
 import { ConsultMessageData } from "@/features/analytics/types";
 import { TransactionType } from "@/lib/constants";
-import { TransactionAdjustmentInput, TransactionItemInput } from "@/features/transactions/types";
+import {
+  TransactionAdjustmentInput,
+  TransactionItemInput,
+  TransactionLocationInput,
+  UpdateTransactionRequest,
+} from "@/features/transactions/types";
 
 // Mirrors backend/internal/dto/chat_{request,response}.go — POST /ai/chat.
 export interface ChatRequest {
@@ -23,7 +28,17 @@ export interface TransactionActionPayload {
   // fee, discount) come from the User editing the proposal.
   items?: TransactionItemInput[];
   adjustments?: TransactionAdjustmentInput[];
+  // Where it was pinned, set by the User in the edit form — the AI never
+  // proposes one. Sent with the create on confirm (spread into POST
+  // /transactions); after that the pin can be moved and re-noted, never
+  // added or removed. Absent on proposals from before locations existed.
+  location?: TransactionLocationInput;
 }
+
+// What editing an already-saved proposal adds to its PATCH besides the
+// payload's own fields — each part only when it changed: the wallet it moves
+// to, the moved pin, the pin's note.
+export type SavedProposalPatch = Pick<UpdateTransactionRequest, "wallet_id" | "location" | "location_note">;
 
 export interface ChatAction {
   type: "create_transaction";

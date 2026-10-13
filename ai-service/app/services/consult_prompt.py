@@ -56,7 +56,8 @@ Bạn nhận câu gốc và một dạng đã chuẩn hoá (bỏ dấu, số ti�
 - "needs_context": câu thiếu chủ thể, phụ thuộc câu trước — "còn tháng trước?", "thế còn ăn uống?".
 - "transaction_like": đang mô tả một khoản chi/thu để ghi lại, không phải câu hỏi — "cafe 50k", "ăn trưa 35k". \
 Câu có từ hỏi (đâu, gì, nào, bao nhiêu, mấy) KHÔNG BAO GIỜ là transaction_like, kể cả khi không dấu: \
-"tien di dau hom nay" = query.
+"tien di dau hom nay" = query. transaction_like luôn có số tiền hoặc tên món cụ thể; câu chỉ có động từ chi tiêu \
+và một kỳ ("tiêu hnay", "chi tiêu tuần này", "danh mục tiêu hôm nay") là query.
 - "unsupported": mọi thứ khác — đầu tư, so với người khác, dự đoán cuối tháng, khoản bất thường, subscription, \
 hỏi theo tên cửa hàng/người/địa điểm/ghi chú (ví dụ "tốn bao nhiêu cho Grab" khi không có danh mục tên Grab), \
 mốc âm lịch ("từ Tết tới giờ").
@@ -64,14 +65,17 @@ Ví dụ ranh giới: "tháng này tiêu bao nhiêu" = query; "tháng này tiêu
 "ăn uống tháng này so tháng trước" = query; "ăn uống tháng này so tháng trước có tăng nhiều không" = evaluate.
 
 2. Khi kind = "query", chọn metric:
-- sum: tổng chi (tx_type=expense) hoặc tổng thu nhập (tx_type=income) trong một kỳ.
-- breakdown + group_by: category ("tiền đi đâu", "chi vào đâu"), wallet ("ví nào tiêu nhiều"), weekday ("hay tiêu vào thứ mấy").
+- sum: tổng chi (tx_type=expense) hoặc tổng thu nhập (tx_type=income) trong một kỳ. Câu chỉ có động từ chi tiêu \
+và kỳ ("tiêu hôm nay", "tháng này chi tiêu") cũng là sum.
+- breakdown + group_by: category, wallet ("ví nào tiêu nhiều"), weekday ("hay tiêu vào thứ mấy").
+- Hỏi tiền đã tiêu VÀO NHỮNG GÌ luôn là breakdown theo category, với bất kỳ kỳ nào, dù hỏi theo cách nào: \
+"tiền đi đâu", "chi vào đâu", "tiêu vào gì", "tiêu gì", "tiêu cái gì", "chi những gì", "đã mua gì", "danh mục nào", \
+"theo danh mục", hoặc chỉ "danh mục" kèm động từ/kỳ ("danh mục tiêu hôm nay" = "tiền đi đâu hôm nay").
 - compare: một kỳ so với kỳ liền trước (period chỉ được là this_cycle, last_cycle, this_week, last_30_days).
 - series: chi theo từng tháng qua nhiều tháng (period = last_3_cycles hoặc last_6_cycles).
 - top_n: các khoản chi lớn nhất (limit = số khoản được hỏi, mặc định bỏ trống); hoặc các khoản trên một mức tiền \
-(amount_min_vnd = mức tiền bằng đồng, ví dụ "trên 1tr" = 1000000). Hỏi liệt kê các khoản đã chi — "tiêu những gì", \
-"chi những khoản nào", "đã mua gì", "liệt kê" — cũng là top_n, limit bỏ trống.
-- "tiền đi đâu" / "tien di dau" luôn là breakdown theo category, với bất kỳ kỳ nào.
+(amount_min_vnd = mức tiền bằng đồng, ví dụ "trên 1tr" = 1000000). Hỏi liệt kê TỪNG KHOẢN — "chi những khoản nào", \
+"liệt kê các khoản chi", "những giao dịch nào" — cũng là top_n, limit bỏ trống.
 - max_tx: MỘT khoản chi lớn nhất.
 - avg_daily: trung bình mỗi ngày chi bao nhiêu.
 - budget_status: còn bao nhiêu ngân sách (period luôn = this_cycle).

@@ -90,6 +90,8 @@ export interface AnalyticsChart {
   more_rows?: AnalyticsTxRow[];
   total_matched?: number;
   budgets?: AnalyticsBudgetItem[];
+  // `rows` also rides on a "donut" or "number" answer whose period has only a
+  // few expenses (backend attachInlineRows) — listed under the chart.
 }
 
 export interface AnalyticsNotice {

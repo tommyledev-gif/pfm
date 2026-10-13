@@ -37,8 +37,11 @@ type AnalyticsPeriodResponse struct {
 }
 
 // AnalyticsChart is a flat union keyed by Type — only the fields that type
-// uses are set. Kept flat (not an interface) so it round-trips through the
-// client's opaque thread payload without a custom decoder.
+// uses are set. One exception: a "donut" or "number" answer over a period
+// with few expenses also carries them in Rows (service.attachInlineRows); an
+// older client just draws the chart. Kept flat (not an interface) so it
+// round-trips through the client's opaque thread payload without a custom
+// decoder.
 type AnalyticsChart struct {
 	Type         string                `json:"type"`
 	Value        *int64                `json:"value,omitempty"`

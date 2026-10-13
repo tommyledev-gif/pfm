@@ -94,9 +94,9 @@ func TestTransactionLines_RoundTripCountReplaceLock(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck // no-op once committed
-	amount, _, err := repo.LockTransactionForUpdate(ctx, tx, id, userID)
-	if err != nil || amount != 10800000 {
-		t.Fatalf("lock: amount=%d err=%v", amount, err)
+	locked, err := repo.LockTransactionForUpdate(ctx, tx, id, userID)
+	if err != nil || locked.Amount != 10800000 {
+		t.Fatalf("lock: amount=%d err=%v", locked.Amount, err)
 	}
 	if err := repo.SoftDeleteActiveLines(ctx, tx, id, userID); err != nil {
 		t.Fatal(err)

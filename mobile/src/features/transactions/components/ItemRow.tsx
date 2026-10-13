@@ -8,6 +8,7 @@ import { useColors } from "@/lib/theme";
 import { TRANSACTION_LINE_NAME_MAX_LENGTH } from "@/lib/constants";
 import { ItemDraft, isItemComplete, prefillAmount } from "@/features/transactions/items/line-math";
 import { useItemsEditorStyles } from "@/features/transactions/components/items-editor-styles";
+import { ExpandableLine } from "@/features/transactions/components/ExpandableLine";
 import { MoneyField } from "@/features/transactions/components/MoneyField";
 import { QuantityStepper } from "@/features/transactions/components/QuantityStepper";
 
@@ -30,8 +31,9 @@ const MISSING_NAME = "Món chưa có tên";
  * One Item, read first: its name and line amount on one line, "2 × 17.500 ₫"
  * under it only when the quantity is above 1. The line amount is the figure
  * of record (a receipt prints it, and 3 × 33.333 is not 100.000); the unit
- * price only pre-fills it (BR-05). Tapping opens the fields under the row;
- * swiping left reveals Xóa, and the list offers to undo it.
+ * price only pre-fills it (BR-05). Tapping opens the line as a card with its
+ * fields (ExpandableLine); swiping left reveals Xóa, and the list offers to
+ * undo it.
  */
 export function ItemRow({ item, index, currency, expanded, showErrors, closeSignal, onToggle, onChange, onRemove }: ItemRowProps) {
   const colors = useColors();
@@ -45,35 +47,40 @@ export function ItemRow({ item, index, currency, expanded, showErrors, closeSign
       : null;
 
   return (
-    <View>
-      <SwipeableRow
-        closeSignal={closeSignal}
-        disabled={expanded}
-        rightAction={{ Icon: TrashIcon, color: colors.peach, label: "Xóa", destructive: true, onPress: onRemove, testID: `btn-item-swipe-remove-${index}` }}
-      >
-        <Pressable
-          testID={`row-item-${index}`}
-          accessibilityRole="button"
-          accessibilityState={{ expanded }}
-          onPress={onToggle}
-          style={styles.row}
+    <ExpandableLine
+      expanded={expanded}
+      header={(open) => (
+        <SwipeableRow
+          closeSignal={closeSignal}
+          // Off until the fields have folded away: the row is see-through till then.
+          disabled={open}
+          rightAction={{ Icon: TrashIcon, color: colors.peach, label: "Xóa", destructive: true, onPress: onRemove, testID: `btn-item-swipe-remove-${index}` }}
         >
-          <View style={styles.rowText}>
-            <Text style={[styles.rowName, !name && styles.rowNameMissing]} numberOfLines={2}>
-              {name || MISSING_NAME}
-            </Text>
-            {detail ? <Text style={styles.rowSub}>{detail}</Text> : null}
-            {showErrors && !isItemComplete(item) ? <Text style={styles.error}>Điền tên, số lượng và thành tiền.</Text> : null}
-          </View>
-          {item.amount !== null ? (
-            <AmountText amountCents={item.amount} currency={currency} style={styles.rowAmount} testID={`text-item-amount-${index}`} />
-          ) : (
-            <Text style={styles.rowAmountMissing}>Chưa nhập</Text>
-          )}
-        </Pressable>
-      </SwipeableRow>
-      {expanded ? <ItemFields item={item} index={index} currency={currency} onChange={onChange} onRemove={onRemove} /> : null}
-    </View>
+          <Pressable
+            testID={`row-item-${index}`}
+            accessibilityRole="button"
+            accessibilityState={{ expanded }}
+            onPress={onToggle}
+            style={[styles.row, open && styles.rowOpen]}
+          >
+            <View style={styles.rowText}>
+              <Text style={[styles.rowName, !name && styles.rowNameMissing]} numberOfLines={2}>
+                {name || MISSING_NAME}
+              </Text>
+              {detail ? <Text style={styles.rowSub}>{detail}</Text> : null}
+              {showErrors && !isItemComplete(item) ? <Text style={styles.error}>Điền tên, số lượng và thành tiền.</Text> : null}
+            </View>
+            {item.amount !== null ? (
+              <AmountText amountCents={item.amount} currency={currency} style={styles.rowAmount} testID={`text-item-amount-${index}`} />
+            ) : (
+              <Text style={styles.rowAmountMissing}>Chưa nhập</Text>
+            )}
+          </Pressable>
+        </SwipeableRow>
+      )}
+    >
+      <ItemFields item={item} index={index} currency={currency} onChange={onChange} onRemove={onRemove} />
+    </ExpandableLine>
   );
 }
 

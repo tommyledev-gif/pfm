@@ -219,6 +219,9 @@ type UpdateTransactionParams struct {
 	LocationLat  *float64
 	LocationLng  *float64
 	LocationName *string
+	// WalletID moves the Transaction to another Wallet; nil leaves it. The
+	// service moves both balances in the same tx before this write.
+	WalletID *uuid.UUID
 }
 
 // UpdateTransaction is scoped by id + user_id, same visibility guarantee as
@@ -236,6 +239,7 @@ func (r *TransactionRepository) UpdateTransaction(ctx context.Context, tx pgx.Tx
 		LocationLat:  arg.LocationLat,
 		LocationLng:  arg.LocationLng,
 		LocationName: arg.LocationName,
+		WalletID:     arg.WalletID,
 	})
 	if err != nil {
 		return nil, err

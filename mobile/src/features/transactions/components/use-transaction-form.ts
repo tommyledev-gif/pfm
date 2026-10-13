@@ -191,6 +191,7 @@ export function useTransactionForm({ visible, onClose, editingTransaction, editi
           amount: cents,
           // A transfer's category is fixed server-side (and rejected if sent).
           category_id: isTransfer ? undefined : categoryId ?? undefined,
+          wallet_id: walletId !== editingTransaction.wallet_id ? walletId : undefined, // moves both balances
           occurred_at: occurredAt,
           note: note || undefined,
           location_note: location.locationNoteUpdate(),

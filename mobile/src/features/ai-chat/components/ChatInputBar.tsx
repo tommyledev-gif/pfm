@@ -4,6 +4,7 @@ import { Pressable, Text, TextInput, View } from "react-native";
 import { SendIcon, SparkleIcon } from "@/components/ui/Icon";
 import { CHAT_MODE_META, ChatMode } from "@/features/ai-chat/chat-mode";
 import { COMPOSER_NAV_CLEARANCE } from "@/features/ai-chat/components/chat-composer-metrics";
+import { useReportComposerFocus } from "@/features/ai-chat/components/KeyboardLiftView";
 import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
@@ -50,11 +51,15 @@ export function ChatInputBar({
   const colors = useColors();
   const styles = useStyles();
   const [focused, setFocused] = useState(false);
+  const reportComposerFocus = useReportComposerFocus();
   const canSend = value.trim().length > 0 && !sending;
   const tint = CHAT_MODE_META[mode].tint;
 
   const handleFocusChange = (next: boolean) => {
     setFocused(next);
+    // The pane's KeyboardLiftView lifts only for this input, and lets go the
+    // moment it blurs.
+    reportComposerFocus(next);
     onFocusChange?.(next);
   };
 

@@ -9,7 +9,7 @@ import { tombstoneKind } from "@/features/ai-chat/tombstone";
 import { BudgetWizardModal } from "@/features/budget-wizard/components/BudgetWizardModal";
 import { TransactionFormModal } from "@/features/transactions/components/TransactionFormModal";
 import { Category } from "@/features/categories/types";
-import { ChatMessage, TransactionActionPayload } from "@/features/ai-chat/types";
+import { ChatMessage, SavedProposalPatch, TransactionActionPayload } from "@/features/ai-chat/types";
 import { Wallet } from "@/features/wallets/types";
 
 const FALLBACK_CURRENCY = "VND";
@@ -27,7 +27,7 @@ interface ChatOverlaysProps {
   onCloseEditingMessage: () => void;
   onSaveEditingMessage: (text: string) => void;
   onCloseEditingAction: () => void;
-  onSaveEditingAction: (payload: TransactionActionPayload) => void;
+  onSaveEditingAction: (payload: TransactionActionPayload, savedPatch: SavedProposalPatch) => void;
   onCloseHistory: () => void;
   onCloseTombstone: () => void;
   onCloseManualEntry: () => void;
@@ -82,7 +82,8 @@ export function ChatOverlays({
       <EditTransactionModal
         visible={Boolean(editingActionMessage)}
         payload={editingActionMessage?.action?.payload ?? null}
-        lockWalletAndType={Boolean(editingActionMessage?.confirmed)}
+        confirmed={Boolean(editingActionMessage?.confirmed)}
+        transactionId={editingActionMessage?.transactionId ?? null}
         vndOnly={!editingActionMessage?.confirmed}
         onClose={onCloseEditingAction}
         onSave={onSaveEditingAction}

@@ -59,6 +59,10 @@ func (b followUpBuilder) forMetric(answer *dto.AnalyticsAnswerResponse) []dto.An
 		if hasCats {
 			return []dto.AnalyticsFollowUp{b.compare(), b.seriesOf(b.req.CategoryIDs), b.topOf(b.req.CategoryIDs)}
 		}
+		if answer.Chart.Type == string(model.AnalyticsChartDonut) {
+			// The total already shows where the money went (detailSum).
+			return append(b.listUnlessShown(answer), b.compare(), b.avgDaily())
+		}
 		return []dto.AnalyticsFollowUp{b.whereDidItGo(), b.compare(), b.avgDaily()}
 	case model.AnalyticsMetricCompare:
 		return []dto.AnalyticsFollowUp{b.seriesOf(b.req.CategoryIDs), b.whereDidItGo()}
@@ -91,7 +95,19 @@ func (b followUpBuilder) forBreakdown(answer *dto.AnalyticsAnswerResponse) []dto
 			out = append(out, f)
 		}
 	}
+	if b.req.TxType != string(model.TransactionTypeIncome) {
+		out = append(out, b.listUnlessShown(answer)...)
+	}
 	return append(out, b.compare(), b.byWallet())
+}
+
+// listUnlessShown offers the largest expenses of the same period, unless
+// the answer already lists its expenses (attachInlineRows).
+func (b followUpBuilder) listUnlessShown(answer *dto.AnalyticsAnswerResponse) []dto.AnalyticsFollowUp {
+	if len(answer.Chart.Rows) > 0 {
+		return nil
+	}
+	return []dto.AnalyticsFollowUp{b.topOf(nil)}
 }
 
 func (b followUpBuilder) forEmpty() []dto.AnalyticsFollowUp {

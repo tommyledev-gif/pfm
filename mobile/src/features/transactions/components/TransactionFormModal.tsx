@@ -18,6 +18,7 @@ import { WalletChipRow } from "@/features/transactions/components/WalletChipRow"
 import { LocationToggleRow } from "@/features/transactions/components/LocationToggleRow";
 import { TransactionLocationCard } from "@/features/transactions/components/TransactionLocationCard";
 import { useTransactionForm } from "@/features/transactions/components/use-transaction-form";
+import { useWalletChangeGuard } from "@/features/transactions/components/use-wallet-change-guard";
 import { TransactionTypeChips } from "@/features/transactions/components/TransactionTypeChips";
 import { ItemsEntryRow } from "@/features/transactions/components/ItemsEntryRow";
 import { TransactionItemsSection } from "@/features/transactions/components/TransactionItemsSection";
@@ -38,8 +39,10 @@ const NO_SAVED_WALLETS_MESSAGE = "Kết nối mạng để tải danh sách ví.
 
 // Manual "Add/Edit Transaction" form — the AI Chat screen was previously the
 // only way to create a transaction on mobile. Backend PATCH doesn't accept
-// wallet_id/type (dto.UpdateTransactionRequest), so both are locked once
-// editing, mirroring how currency is locked on WalletFormModal.
+// type (dto.UpdateTransactionRequest), so it is locked once editing, mirroring
+// how currency is locked on WalletFormModal. The wallet of a saved
+// income/expense can change within its currency (PATCH wallet_id moves both
+// balances), after a dialog; a transfer's wallets stay locked.
 //
 // Laid out after the keypad sheets in reference-ui/: the choices (type,
 // wallets) scroll in the body, while the amount — typed on a calculator
@@ -94,9 +97,27 @@ export function TransactionFormModal({ visible, onClose, editingTransaction, edi
     itemsLoading,
   } = useTransactionForm({ visible, onClose, editingTransaction, editingQueued, draft });
   const requireOnline = useRequireOnline();
+  // A saved income/expense can move to another wallet in its currency, after
+  // a dialog saying which balances move. A transfer's wallets never change.
+  const walletChange = useWalletChangeGuard({
+    enabled: isEditing && !isTransfer,
+    wallets: wallets.data ?? [],
+    originalWalletId: editingTransaction?.wallet_id ?? null,
+    selectedWalletId: walletId,
+    type,
+    originalAmount: editingTransaction?.amount ?? 0,
+    currentAmount: amount.cents,
+    onChange: (id) => {
+      setWalletId(id);
+      // The destination may now be the source itself, or in another currency.
+      setToWalletId(null);
+    },
+  });
+  const walletMoved = isEditing && walletId !== editingTransaction?.wallet_id;
 
   const activeError = mutation.isError ? mutation.error : deleteTransaction.isError ? deleteTransaction.error : null;
   const lockedSuffix = isEditing ? " (khóa sau khi tạo)" : "";
+  const walletLockedSuffix = isEditing && isTransfer ? lockedSuffix : "";
 
   return (
     <>
@@ -151,24 +172,25 @@ export function TransactionFormModal({ visible, onClose, editingTransaction, edi
 
         <Text style={styles.label}>
           {isTransfer ? "Từ ví" : "Ví"}
-          {lockedSuffix}
+          {walletLockedSuffix}
         </Text>
         <WalletChipRow
-          wallets={wallets.data ?? []}
+          wallets={walletChange.selectableWallets}
           selectedId={walletId}
-          locked={isEditing}
-          onSelect={(id) => {
-            setWalletId(id);
-            // The destination may now be the source itself, or in another currency.
-            setToWalletId(null);
-          }}
+          locked={isEditing && isTransfer}
+          onSelect={walletChange.select}
         />
         {noSavedWallets ? <Text style={styles.balanceHint}>{NO_SAVED_WALLETS_MESSAGE}</Text> : null}
+        {isEditing && walletChange.hidesOtherCurrencies ? (
+          <Text style={styles.balanceHint}>Chỉ hiện ví cùng loại tiền</Text>
+        ) : null}
         {submitAttempted ? <FieldError message={errors.wallet} /> : null}
         {selectedWallet ? (
           <Text style={styles.balanceHint}>
             Số dư khả dụng: {formatCurrency(selectedWallet.balance, selectedWallet.currency)}
-            {projectedBalance !== null
+            {/* A saved one is already in its wallet's balance: projected only
+                onto a wallet it is moving to. */}
+            {projectedBalance !== null && (!isEditing || walletMoved)
               ? ` → ${formatCurrency(projectedBalance, selectedWallet.currency)} sau giao dịch này`
               : ""}
           </Text>
@@ -243,6 +265,8 @@ export function TransactionFormModal({ visible, onClose, editingTransaction, edi
         }}
         loading={deleteTransaction.isPending}
       />
+
+      <ConfirmDialog {...walletChange.dialog} />
 
       <StaleEditDialog
         visible={stale.visible}

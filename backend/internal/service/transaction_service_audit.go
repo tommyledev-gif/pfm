@@ -113,6 +113,12 @@ func auditUpdateDiff(existing *model.Transaction, req dto.UpdateTransactionReque
 		before["category_id"] = existing.CategoryID
 		after["category_id"] = *req.CategoryID
 	}
+	// existing is the copy read under the row lock, so `before` names the
+	// Wallet the balance was actually taken back from.
+	if req.WalletID != nil {
+		before["wallet_id"] = existing.WalletID
+		after["wallet_id"] = *req.WalletID
+	}
 	if occurredAt != nil {
 		before["occurred_at"] = existing.OccurredAt
 		after["occurred_at"] = *occurredAt

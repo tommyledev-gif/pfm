@@ -18,8 +18,9 @@ import (
 // Balance rules, applied in the same DB transaction as the row write:
 //   - create: source is decremented with the same insufficient-balance floor
 //     as an expense; destination is incremented unconditionally.
-//   - update (amount only — wallets, type and category never change): the
-//     source moves by the signed delta, the destination by its opposite.
+//   - update (amount only — wallets, type and category never change; a
+//     wallet_id on a transfer is TRANSFER_WALLET_IMMUTABLE): the source
+//     moves by the signed delta, the destination by its opposite.
 //   - delete: both moves are reversed.
 // Neither side ever counts as income or expense; the aggregate queries
 // exclude type 'transfer' themselves.

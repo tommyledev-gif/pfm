@@ -166,6 +166,7 @@ const (
 // Question-log method/outcome values (021_intent_parse_log.sql CHECKs).
 const (
 	IntentMethodLLM         = "llm"
+	IntentMethodRegex       = "regex" // AI Service phrase rules, no model call (ai-service app/nlu/intent_rules.py)
 	IntentOutcomeAnswered   = "answered"
 	IntentOutcomeClarify    = "clarify"
 	IntentOutcomeUnsupport  = "unsupported"

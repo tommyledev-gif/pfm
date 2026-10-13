@@ -66,41 +66,42 @@ func resolveLineUpdate(existing *model.Transaction, req dto.UpdateTransactionReq
 	return update, nil
 }
 
-// needsLock reports whether this PATCH can affect the balance rule or must
-// detect a stale copy — the cases that take the row lock (plan F1, F17).
+// needsLock reports whether this PATCH can affect the balance rule, move a
+// balance or must detect a stale copy — the cases that take the row lock
+// (plan F1, F17).
 func (u lineUpdate) needsLock(req dto.UpdateTransactionRequest) bool {
-	return req.Amount != nil || u.replace || u.expectedUpdatedAt != nil
+	return req.Amount != nil || req.WalletID != nil || u.replace || u.expectedUpdatedAt != nil
 }
 
 // checkLinesInTx locks the row, refuses a stale edit, and enforces the balance
 // rule against the amount and lines as they will stand after this PATCH. Runs
 // before any write in the tx, so a refusal leaves everything unchanged. The
-// returned amount is the locked row's (fresher than the pre-tx read); without
-// the lock it is the caller's existing amount.
-func (s *TransactionService) checkLinesInTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, existing *model.Transaction, req dto.UpdateTransactionRequest, update lineUpdate) (repository.TransactionLines, int64, error) {
+// returned amount and Wallet are the locked row's (fresher than the pre-tx
+// read); without the lock they are the caller's existing ones.
+func (s *TransactionService) checkLinesInTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, existing *model.Transaction, req dto.UpdateTransactionRequest, update lineUpdate) (repository.TransactionLines, repository.LockedTransaction, error) {
 	transactionID := existing.ID
 	if !update.needsLock(req) {
-		return repository.TransactionLines{}, existing.Amount, nil
+		return repository.TransactionLines{}, repository.LockedTransaction{Amount: existing.Amount, UpdatedAt: existing.UpdatedAt, WalletID: existing.WalletID}, nil
 	}
-	currentAmount, updatedAt, err := s.repo.LockTransactionForUpdate(ctx, tx, transactionID, userID)
+	locked, err := s.repo.LockTransactionForUpdate(ctx, tx, transactionID, userID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return repository.TransactionLines{}, 0, common.ErrTransactionNotFound
+			return repository.TransactionLines{}, repository.LockedTransaction{}, common.ErrTransactionNotFound
 		}
-		return repository.TransactionLines{}, 0, fmt.Errorf("service.UpdateTransaction: %w", err)
+		return repository.TransactionLines{}, repository.LockedTransaction{}, fmt.Errorf("service.UpdateTransaction: %w", err)
 	}
-	if update.expectedUpdatedAt != nil && !update.expectedUpdatedAt.Equal(updatedAt) {
-		return repository.TransactionLines{}, 0, common.ErrTransactionChanged
+	if update.expectedUpdatedAt != nil && !update.expectedUpdatedAt.Equal(locked.UpdatedAt) {
+		return repository.TransactionLines{}, repository.LockedTransaction{}, common.ErrTransactionChanged
 	}
 
 	current, err := s.repo.ListActiveLines(ctx, tx, transactionID, userID)
 	if err != nil {
-		return repository.TransactionLines{}, 0, fmt.Errorf("service.UpdateTransaction: %w", err)
+		return repository.TransactionLines{}, repository.LockedTransaction{}, fmt.Errorf("service.UpdateTransaction: %w", err)
 	}
 	if req.Amount == nil && !update.replace {
-		return current, currentAmount, nil
+		return current, locked, nil
 	}
-	effectiveAmount := currentAmount
+	effectiveAmount := locked.Amount
 	if req.Amount != nil {
 		effectiveAmount = *req.Amount
 	}
@@ -109,9 +110,9 @@ func (s *TransactionService) checkLinesInTx(ctx context.Context, tx pgx.Tx, user
 		effectiveLines = update.lines
 	}
 	if err := reconcile(effectiveAmount, effectiveLines); err != nil {
-		return repository.TransactionLines{}, 0, err
+		return repository.TransactionLines{}, repository.LockedTransaction{}, err
 	}
-	return current, currentAmount, nil
+	return current, locked, nil
 }
 
 // applyLinesInTx replaces the list when the PATCH sent one and returns the

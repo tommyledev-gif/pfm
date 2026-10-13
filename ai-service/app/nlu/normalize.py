@@ -6,8 +6,8 @@ untouched on purpose — retrofitting it is a separate, riskier change that
 needs its own regression set first (brief §II.5.1, P7-b).
 
 The normalized form is what the question log keeps long-term (accent- and
-pronoun-stripped, spec.md US-07) and what a future regex fast path would
-match. The interpreter still receives the original wording alongside it:
+pronoun-stripped, spec.md US-07) and what the phrase rules read
+(intent_rules.py). The interpreter still receives the original wording alongside it:
 Vietnamese without diacritics is ambiguous, and the original is the richer
 signal.
 """
@@ -39,7 +39,13 @@ _TEENCODE = {
     "t2": "thu hai",
     "hnay": "hom nay",
     "hqua": "hom qua",
+    "hqa": "hom qua",
     "hum": "hom",
+    # "hôm wa", "nhiều wa": "wa" is "qua"/"quá", identical once unaccented.
+    "wa": "qua",
+    "nhiu": "nhieu",
+    "bnhiu": "bao nhieu",
+    "r": "roi",
 }
 
 # Informal "recently" phrasings all mean the last 30 days (brief §II.5.2
@@ -49,9 +55,18 @@ _TEENCODE = {
 # ⚠️ Order matters: Southern "bữa nay" means today, but "mấy bữa nay" means
 # "these past days". The longer phrase must be consumed first, or the today
 # rule would rewrite its tail (plan.md R-F23).
+#
+# Regional "this"/"last" forms go first, so the rules after them see one
+# spelling: Central "tháng nì", "bữa ni" → "nay"; "tuần rồi" (last week) →
+# "trước"; Southern "bữa qua"/"bữa kia" → "hôm qua"/"hôm kia"; and a bare
+# "nay" opening the question is Southern for "hôm nay" ("nay tiêu gì").
 _TIME_ALIASES = (
+    (re.compile(r"\b(thang|tuan|nam|hom|bua) ni\b"), r"\1 nay"),
+    (re.compile(r"\b(thang|tuan) roi\b"), r"\1 truoc"),
     (re.compile(r"\b(bua h|bua gio|dao nay|may bua nay|gan day)\b"), "30 ngay qua"),
     (re.compile(r"\bbua nay\b"), "hom nay"),
+    (re.compile(r"\bbua (qua|kia)\b"), r"hom \1"),
+    (re.compile(r"^nay\b"), "hom nay"),
 )
 
 _THOUSAND = 1_000

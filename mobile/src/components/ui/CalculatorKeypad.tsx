@@ -8,12 +8,15 @@ import { typography, createStyles, useColors } from "@/lib/theme";
 import { useJsIdle } from "@/lib/use-js-idle";
 import { useReduceMotion } from "@/lib/use-reduce-motion";
 
+// The operator column reads + − × ÷ from the bottom up, as on a phone's own
+// calculator: "+" sits beside the thumb, next to the 0 row, where the
+// commonest operator (adding up a split bill) belongs.
 const DIGIT_ROWS: { digits: KeypadKey[]; operator: KeypadKey }[] = [
-  { digits: ["7", "8", "9"], operator: "+" },
-  { digits: ["4", "5", "6"], operator: "−" },
-  { digits: ["1", "2", "3"], operator: "×" },
+  { digits: ["7", "8", "9"], operator: "÷" },
+  { digits: ["4", "5", "6"], operator: "×" },
+  { digits: ["1", "2", "3"], operator: "−" },
 ];
-const LAST_ROW_OPERATOR: KeypadKey = "÷";
+const LAST_ROW_OPERATOR: KeypadKey = "+";
 
 // What a screen reader says for each non-digit key — "×" read as "x" and "−"
 // as "dash" (or not at all) is the default otherwise.

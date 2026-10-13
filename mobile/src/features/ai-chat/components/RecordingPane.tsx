@@ -132,6 +132,9 @@ export function RecordingPane({
   // Connectivity is read at press time, like useRequireOnline does.
   const handleSend = () => {
     if (!onlineManager.isOnline()) {
+      // The dialog is a Modal: closing the keyboard first is what brings the
+      // input bar down under it (see KeyboardLiftView).
+      Keyboard.dismiss();
       setOfflineDialogOpen(true);
       return;
     }

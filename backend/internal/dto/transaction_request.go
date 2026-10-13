@@ -81,15 +81,23 @@ type TransactionLocationMoveRequest struct {
 }
 
 // UpdateTransactionRequest is the body of PATCH /transactions/{id}.
-// Deliberately has no wallet_id or type field at the type level (spec.md:
-// "never accepted by this endpoint" — Context #5) — decoded via
-// dto.DecodeStrict so an unrecognized field is rejected with 400, not
-// silently ignored, mirroring UpdateWalletRequest/UpdateBudgetRequest's
-// precedent. OccurredAt is a string for the same reason as
-// CreateTransactionRequest's.
+// Deliberately has no type field at the type level (spec.md: "never accepted
+// by this endpoint" — Context #5) — decoded via dto.DecodeStrict so an
+// unrecognized field is rejected with 400, not silently ignored, mirroring
+// UpdateWalletRequest/UpdateBudgetRequest's precedent. OccurredAt is a string
+// for the same reason as CreateTransactionRequest's.
 type UpdateTransactionRequest struct {
 	Amount     *int64     `json:"amount" validate:"omitempty,gt=0,lte=99999999999999"`
 	CategoryID *uuid.UUID `json:"category_id"`
+	// WalletID moves an income/expense Transaction to another of the caller's
+	// Wallets (2026-10-13; it used to be rejected like type). The old Wallet
+	// gets the Transaction's effect back and the new one takes it — at the
+	// new amount when Amount changes in the same PATCH — in the same DB
+	// transaction as the row update. Rejected for a transfer
+	// (TRANSFER_WALLET_IMMUTABLE) and for a Wallet in another currency
+	// (WALLET_CURRENCY_MISMATCH: the amount is in the old Wallet's currency
+	// and nothing converts it). Naming the current Wallet is not a move.
+	WalletID   *uuid.UUID `json:"wallet_id"`
 	OccurredAt *string    `json:"occurred_at"`
 	Note       *string    `json:"note" validate:"omitempty,max=500"`
 	// Location moves the Transaction's existing pin (coordinates + place
@@ -118,7 +126,7 @@ type UpdateTransactionRequest struct {
 // is a client mistake (400), not a no-op 200 (spec.md S-TRX-46). A
 // location_note of "" counts: clearing the note is an update.
 func (r UpdateTransactionRequest) HasUpdates() bool {
-	return r.Amount != nil || r.CategoryID != nil || r.OccurredAt != nil || r.Note != nil ||
+	return r.Amount != nil || r.CategoryID != nil || r.WalletID != nil || r.OccurredAt != nil || r.Note != nil ||
 		r.Location != nil || r.LocationNote != nil || r.Items != nil
 }
 

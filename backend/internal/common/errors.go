@@ -87,6 +87,12 @@ const (
 	ErrCodeTransferSameWallet        = "TRANSFER_SAME_WALLET"
 	ErrCodeTransferCurrencyMismatch  = "TRANSFER_CURRENCY_MISMATCH"
 	ErrCodeTransferCategoryImmutable = "TRANSFER_CATEGORY_IMMUTABLE"
+	// Moving a Transaction to another Wallet on PATCH (wallet_id): a
+	// transfer's two Wallets never change, and the amount is in the old
+	// Wallet's currency with nothing to convert it, so the new Wallet must
+	// share that currency. Both 422, same reasoning as the transfer codes.
+	ErrCodeTransferWalletImmutable = "TRANSFER_WALLET_IMMUTABLE"
+	ErrCodeWalletCurrencyMismatch  = "WALLET_CURRENCY_MISMATCH"
 	// Items of a Transaction (specs/transaction-line-items). ItemsTotalMismatch:
 	// Items + adding - subtracting Adjustments != amount (BR-07). ItemsNotAllowed:
 	// lines on a transfer (BR-02). Both 422. TransactionChanged: an edit made
@@ -201,6 +207,8 @@ var (
 	ErrTransferSameWallet         = &AppError{Code: ErrCodeTransferSameWallet, Status: http.StatusUnprocessableEntity, Message: "ví nguồn và ví nhận phải khác nhau"}
 	ErrTransferCurrencyMismatch   = &AppError{Code: ErrCodeTransferCurrencyMismatch, Status: http.StatusUnprocessableEntity, Message: "chỉ chuyển được giữa hai ví cùng đơn vị tiền tệ"}
 	ErrTransferCategoryImmutable  = &AppError{Code: ErrCodeTransferCategoryImmutable, Status: http.StatusUnprocessableEntity, Message: "không thể đổi danh mục của giao dịch chuyển khoản"}
+	ErrTransferWalletImmutable    = &AppError{Code: ErrCodeTransferWalletImmutable, Status: http.StatusUnprocessableEntity, Message: "không thể đổi ví của giao dịch chuyển khoản"}
+	ErrWalletCurrencyMismatch     = &AppError{Code: ErrCodeWalletCurrencyMismatch, Status: http.StatusUnprocessableEntity, Message: "chỉ đổi được sang ví cùng đơn vị tiền tệ"}
 	ErrItemsNotAllowed            = &AppError{Code: ErrCodeItemsNotAllowed, Status: http.StatusUnprocessableEntity, Message: "Giao dịch chuyển tiền không có món."}
 	ErrTransactionChanged         = &AppError{Code: ErrCodeTransactionChanged, Status: http.StatusConflict, Message: "Giao dịch đã được sửa ở nơi khác."}
 	ErrCurrencyLocked             = &AppError{Code: ErrCodeCurrencyLocked, Status: http.StatusConflict, Message: "không thể đổi đơn vị tiền tệ khi ví đã có giao dịch"}

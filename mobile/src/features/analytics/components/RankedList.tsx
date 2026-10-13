@@ -16,6 +16,9 @@ interface RankedListProps {
   moreRows?: AnalyticsTxRow[];
   currency: string;
   totalMatched?: number;
+  /** A chart's own colour per Category, when the list sits under one —
+   *  falls back to the Category's usual colour. */
+  colorFor?: (categoryId: string) => string | undefined;
 }
 
 const TILE_SIZE = 36;
@@ -37,7 +40,7 @@ function shortDate(iso: string): string {
 // Each row carries its Category's own tinted tile (TransactionRow's), so the
 // same Category has the same colour and icon here as in the Transactions list.
 // No rank number: the order is the ranking, and the column only added noise.
-export function RankedList({ rows, moreRows = [], currency, totalMatched }: RankedListProps) {
+export function RankedList({ rows, moreRows = [], currency, totalMatched, colorFor }: RankedListProps) {
   const colors = useColors();
   const styles = useStyles();
   const categories = useCategoryLookup();
@@ -52,7 +55,11 @@ export function RankedList({ rows, moreRows = [], currency, totalMatched }: Rank
     <View>
       {visible.map((row, i) => (
         <View key={row.id} style={[styles.row, i > 0 && styles.divider]}>
-          <CategoryTile row={row} category={row.category_id ? categories.get(row.category_id) : undefined} />
+          <CategoryTile
+            row={row}
+            category={row.category_id ? categories.get(row.category_id) : undefined}
+            color={row.category_id ? colorFor?.(row.category_id) : undefined}
+          />
           <View style={styles.middle}>
             <Text style={styles.title} numberOfLines={1}>
               {row.category_name}
@@ -94,11 +101,11 @@ export function RankedList({ rows, moreRows = [], currency, totalMatched }: Rank
 // the tile then falls back to a neutral one, never to a guessed colour.
 // ⚠️ The fallback must be a six-digit hex token: TintedIconTile appends an
 // alpha suffix to it, which turns an rgba() token into an invalid colour.
-function CategoryTile({ row, category }: { row: AnalyticsTxRow; category?: Category }) {
+function CategoryTile({ row, category, color }: { row: AnalyticsTxRow; category?: Category; color?: string }) {
   const colors = useColors();
   return (
     <TintedIconTile
-      color={row.category_id ? colorForCategory(row.category_id) : colors.textPrimary}
+      color={color ?? (row.category_id ? colorForCategory(row.category_id) : colors.textPrimary)}
       size={TILE_SIZE}
       icon={category?.icon}
       iconUrl={category?.icon_url}

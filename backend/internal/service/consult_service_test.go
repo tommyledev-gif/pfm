@@ -184,6 +184,26 @@ func TestConsult_LogFailureDoesNotFailAnswer(t *testing.T) {
 	ask(t, f, "nên đầu tư gì")
 }
 
+// A question the AI Service read by its phrase rules is logged as such, so
+// the question log tells rule reads from model reads.
+func TestConsult_LogsHowTheQuestionWasRead(t *testing.T) {
+	f := newConsultFixture(t)
+	f.client.parse = &AIConsultParse{Kind: model.ParseKindUnsupported, Method: model.IntentMethodRegex}
+	ask(t, f, "danh mục tiêu hnay")
+	f.client.parse = &AIConsultParse{Kind: model.ParseKindUnsupported}
+	ask(t, f, "nên đầu tư gì")
+	if f.logs.rows[0].Method != model.IntentMethodRegex || f.logs.rows[1].Method != model.IntentMethodLLM {
+		t.Fatalf("methods = %q, %q", f.logs.rows[0].Method, f.logs.rows[1].Method)
+	}
+	parse, err := fromConsultWire(consultWireResponse{Kind: "query", Method: "regex"})
+	if err != nil || parse.Method != model.IntentMethodRegex {
+		t.Fatalf("wire method not carried: %+v, %v", parse, err)
+	}
+	if parse, _ := fromConsultWire(consultWireResponse{Kind: "query"}); parse.Method != model.IntentMethodLLM {
+		t.Fatalf("an older AI Service (no method) must log llm, got %q", parse.Method)
+	}
+}
+
 // US-07: retention clears raw text at 30 days and rows at 12 months.
 func TestIntentLogRetention_Cutoffs(t *testing.T) {
 	logs := &fakeIntentLogRepo{}

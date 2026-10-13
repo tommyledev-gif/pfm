@@ -95,6 +95,19 @@ func summarySum(run *analyticsRun, total int64) string {
 	return fmt.Sprintf("%s bạn đã chi %s%s.", lead(run), money(run, total), forCategories(run))
 }
 
+// summaryTopCategory follows a total with what it went on: the largest
+// Category ("Ăn uống cao nhất: 150.000 ₫."), or the only one. items is
+// amount-descending and never empty.
+func summaryTopCategory(run *analyticsRun, items []dto.AnalyticsChartItem) string {
+	if len(items) == 1 {
+		if isIncome(run) {
+			return fmt.Sprintf("Tất cả từ %s.", items[0].Label)
+		}
+		return fmt.Sprintf("Tất cả cho %s.", items[0].Label)
+	}
+	return fmt.Sprintf("%s cao nhất: %s.", items[0].Label, money(run, items[0].Amount))
+}
+
 func summaryCompare(run *analyticsRun, c *dto.AnalyticsCompare) string {
 	subject := "Chi tiêu"
 	if isIncome(run) {

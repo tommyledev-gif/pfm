@@ -11,7 +11,7 @@ import { spacing, createStyles, useColors } from "@/lib/theme";
 
 const COPY = {
   title: "Yêu cầu tạo tài khoản",
-  sub: "Admin duyệt xong thì email kích hoạt gửi tới email của bạn.",
+  sub: "Sau khi admin duyệt, email kích hoạt sẽ được gửi tới email của bạn.",
   sentTitle: "Đã gửi yêu cầu",
   back: "Quay lại",
   backToLogin: "Về đăng nhập",
@@ -48,7 +48,7 @@ export default function RequestAccessScreen() {
         {sentTo ? (
           <View testID="request-access-sent">
             <Text style={styles.title} accessibilityRole="header">{COPY.sentTitle}</Text>
-            <Text style={styles.sub}>{`Admin duyệt xong thì email kích hoạt gửi tới ${sentTo}.`}</Text>
+            <Text style={styles.sub}>{`Sau khi admin duyệt, email kích hoạt sẽ được gửi tới ${sentTo}.`}</Text>
             <PillButton
               label={COPY.backToLogin}
               onPress={() => router.back()}

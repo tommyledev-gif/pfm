@@ -166,6 +166,9 @@ func (s *ConsultService) logParse(ctx context.Context, userID uuid.UUID, raw str
 	}
 	if p := r.parse; p != nil {
 		entry.Kind = p.Kind
+		if p.Method != "" {
+			entry.Method = p.Method
+		}
 		if p.NormalizedText != "" {
 			entry.NormalizedText = p.NormalizedText
 		}

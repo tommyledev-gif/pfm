@@ -101,9 +101,10 @@ func (h *TransactionHandler) GetTransaction(c *fiber.Ctx) error {
 }
 
 // UpdateTransaction handles PATCH /transactions/:id. Uses dto.DecodeStrict
-// instead of c.BodyParser so an unrecognized "wallet_id"/"type" field is
-// rejected with 400 rather than silently ignored (mirrors
-// UpdateWalletRequest/UpdateBudgetRequest's precedent).
+// instead of c.BodyParser so an unrecognized field such as "type" is rejected
+// with 400 rather than silently ignored (mirrors
+// UpdateWalletRequest/UpdateBudgetRequest's precedent). "wallet_id" is
+// accepted since 2026-10-13 (moving a Transaction to another Wallet).
 func (h *TransactionHandler) UpdateTransaction(c *fiber.Ctx) error {
 	userID, err := callerUUID(c)
 	if err != nil {

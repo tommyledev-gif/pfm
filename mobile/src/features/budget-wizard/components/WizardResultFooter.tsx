@@ -61,7 +61,9 @@ export function WizardResultFooter({
           disabled={submitting || !canSubmit}
           style={[styles.primaryBtn, (submitting || !canSubmit) && styles.primaryBtnDisabled]}
         >
-          <Text style={styles.primaryLabel}>{submitting ? "Đang lưu…" : "Áp dụng ngân sách"}</Text>
+          <Text style={styles.primaryLabel} numberOfLines={2}>
+            {submitting ? "Đang lưu…" : "Áp dụng ngân sách"}
+          </Text>
         </Pressable>
       </View>
 
@@ -107,7 +109,10 @@ const useStyles = createStyles((colors) => ({
     borderColor: colors.surfaceBorder,
   },
   ghostBtnDone: { borderColor: "transparent" },
-  ghostLabel: { ...typography.caption, color: colors.green, textAlign: "center" },
+  // Both labels share one size: side by side at equal width, a larger
+  // primary label read as a different kind of control rather than the
+  // stronger of two choices. The fill alone says which one commits.
+  ghostLabel: { ...typography.label, color: colors.green, textAlign: "center" },
   ghostLabelDone: { color: colors.textMuted },
   primaryBtn: {
     flex: 1,
@@ -118,5 +123,5 @@ const useStyles = createStyles((colors) => ({
     alignItems: "center",
   },
   primaryBtnDisabled: { opacity: 0.5 },
-  primaryLabel: { ...typography.body, color: colors.onGreen },
+  primaryLabel: { ...typography.label, color: colors.onGreen, textAlign: "center" },
 }));

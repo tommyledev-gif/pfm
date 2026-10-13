@@ -12,6 +12,8 @@ each deliberate:
 - Token usage, including cached tokens, is returned to the backend for the
   question log — the only way to verify the provider's cached-token
   accounting (brief §II.1.3).
+- A question made only of known phrases ("tiêu hnay", "danh mục tiêu hôm
+  nay") is read by app/nlu/intent_rules.py and never reaches the model.
 
 Only lengths and token counts are logged, never question text.
 """
@@ -25,6 +27,7 @@ from pydantic import ValidationError
 
 from app.core.config import settings
 from app.core.groq_client import get_groq_consult_client
+from app.nlu.intent_rules import read_simple_question
 from app.nlu.normalize import normalize
 from app.schemas.consult_schema import (
     ConsultQuery,
@@ -58,6 +61,13 @@ class _NoToolCallError(Exception):
 
 async def consult(req: ConsultRequest) -> ConsultResponse:
     normalized = normalize(req.message)
+    ruled = read_simple_question(normalized, req.today)
+    if ruled is not None:
+        # Read completely by the phrase rules: no tokens, no provider call.
+        logger.info("consult interpretation by phrase rules", extra={"prompt_chars": len(req.message)})
+        return ConsultResponse(
+            kind="query", coverage="full", query=ruled, normalized_text=normalized, usage=ConsultUsage(), method="regex"
+        )
     system_prompt = build_consult_prompt(req.categories, req.wallets, req.today, req.timezone)
     user_message = f"Câu gốc: {req.message}\nDạng chuẩn hoá: {normalized}"
     try:

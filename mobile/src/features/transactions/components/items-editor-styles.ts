@@ -4,15 +4,36 @@ import { withAlpha } from "@/lib/color";
 import { createStyles, radii, spacing, typography } from "@/lib/theme";
 
 // Shared by the Items editor's rows so an Item and an Adjustment read as one
-// list. One surface: lines split by hairlines, no card or border per line.
-// Hierarchy comes from size, weight and opacity; input fields appear only on
-// the line being edited, on a faint fill with no border. Lime is left to the
-// footer's CTA.
+// list. One surface: lines split by hairlines, no card or border per line —
+// except the line being edited, which opens as a card (ExpandableLine) with a
+// lime edge and a faint lift, so the eye finds it at once. Hierarchy comes
+// from size, weight and opacity; input fields appear only on that line, on a
+// faint fill with no border. A solid lime fill is left to the footer's CTA.
 const MIN_ROW_HEIGHT = 56;
 // Smallest tappable size (44pt).
 const HIT = 44;
 
+// The open line's card keeps the list's text where it was: its padding and
+// border bleed into the panel's gutter, and the list bleeds by as much so the
+// card's edge is not clipped. The border is there in both states and only
+// changes colour, so opening a line moves nothing by a pixel.
+const LINE_CARD_INSET = spacing.md;
+export const LINE_CARD_BORDER = 1;
+const LINE_CARD_BLEED = LINE_CARD_INSET + LINE_CARD_BORDER;
+
 export const useItemsEditorStyles = createStyles((colors) => ({
+  list: { marginHorizontal: -LINE_CARD_BLEED },
+  listContent: { paddingHorizontal: LINE_CARD_BLEED },
+  lineCard: {
+    marginHorizontal: -LINE_CARD_BLEED,
+    paddingHorizontal: LINE_CARD_INSET,
+    borderWidth: LINE_CARD_BORDER,
+    borderRadius: radii.listCard,
+    overflow: "hidden",
+  },
+  // Clips a swiped row at the text's edge, where the list used to clip it.
+  lineRow: { overflow: "hidden" },
+
   // A line at rest. Opaque: a swiped row slides over its action strip.
   row: {
     minHeight: MIN_ROW_HEIGHT,
@@ -22,6 +43,9 @@ export const useItemsEditorStyles = createStyles((colors) => ({
     paddingVertical: spacing.sm,
     backgroundColor: colors.surface,
   },
+  // Open (or still folding), the row lets its card's fill through. Swiping is
+  // off then, so there is no action strip behind it to hide.
+  rowOpen: { backgroundColor: "transparent" },
   rowText: { flex: 1, minWidth: 0, gap: 2 },
   rowName: { ...typography.body, color: colors.textPrimary },
   rowNameMissing: { color: colors.textMuted },
@@ -29,6 +53,8 @@ export const useItemsEditorStyles = createStyles((colors) => ({
   rowAmount: { ...typography.body, fontWeight: "600", color: colors.textPrimary },
   rowAmountMissing: { ...typography.caption, color: colors.textMuted },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.surfaceBorder },
+  // Beside the open card, whose edge already draws the line.
+  dividerHidden: { backgroundColor: "transparent" },
 
   // The expanded line's fields.
   editor: { gap: spacing.md, paddingBottom: spacing.md },
@@ -79,6 +105,7 @@ export const useItemsEditorStyles = createStyles((colors) => ({
   chipLabelActive: { color: colors.textPrimary, fontWeight: "700" },
 
   // What a removed line leaves for a few seconds.
+  undoClip: { overflow: "hidden" },
   undoRow: { minHeight: MIN_ROW_HEIGHT, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
   undoLabel: { ...typography.caption, color: colors.textMuted, flex: 1 },
   undoAction: { ...typography.body, fontWeight: "700", color: colors.textPrimary },

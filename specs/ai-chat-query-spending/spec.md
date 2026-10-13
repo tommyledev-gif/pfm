@@ -3,6 +3,7 @@
 > Source: `SRS.md` FR-09, BF-10 (step 2 "direct answer (spending query)"), Feature-12 **US-03 Query Spending via Chat [MVP]**. Design brief: `docs/new-tasks.md` Part II, question group **Q** (§II.3.1, §II.4, §II.7, §II.8, §II.13). The brief's working name "F-14" is **not** a feature id — this is Feature-12.
 > Status: Draft — spec + plan may proceed; **implementation is blocked** until F-13.1 US-03 (spending cycle window) ships. See Dependencies.
 > Revision 2026-09-28: **single-day periods and "what did I spend on" phrasing** (A-05, A-06, S-AIQ-49→S-AIQ-60, EC-29→EC-35). Found in live use: "hôm nay tiêu những gì", "tiền đi đâu hôm nay", "đã chi những khoản nào hôm nay" all reached the "temporarily unavailable" reply. Supported questions did too ("hay tiêu vào thứ mấy", "trung bình mỗi ngày tiêu bao nhiêu"). The cause was the interpretation failing to finish, not the Service being down, yet the User was told it was unavailable (S-AIQ-60). The spec did not state how a single day or a listing request is interpreted, so this revision states it.
+> Revision 2026-10-13: **"what did I spend on" is one question** (A-06 revised, S-AIQ-53/56 updated, S-AIQ-61→S-AIQ-63). "danh mục tiêu hnay" was not understood while "tiền đi đâu hnay" was, and "tiêu hnay" answered only a total and a count. Every way of asking what the money went on now gets the breakdown by Category, which also lists the expenses when the period has only a few; a total also names the Categories behind it. Short questions made only of known phrases are read without the model (method `regex`).
 > Related: [Feature-12 US-01 Create via Chat](../ai-chat-assistant/spec.md) (same chat surface), [F-07 Financial Reporting](../financial-reporting/spec.md) (every figure here must agree with it), [F-05 Budget Management](../budget-management/spec.md) (remaining-budget answers must agree with it), [F-13.1 AI Budget Wizard v2](../ai-budget-wizard-v2/spec.md) (owns the spending cycle definition and the three-tier Category class)
 
 ## Context
@@ -27,7 +28,7 @@ Client scope: **mobile only.** The web client's chat keeps its current behavior 
 3. **A-03 — Average per day** divides by the number of days in the period **that have at least one expense**, and the answer states that day count, so the figure is never presented as a per-calendar-day average.
 4. **A-04 — Single-turn interpretation.** Each free-text question is interpreted on its own; earlier messages are never used to fill in missing parts (US-04 replaces that need with follow-up chips).
 5. **A-05 — A single named day is a one-day date range.** "Hôm nay" / "bữa nay", "hôm qua", "hôm kia" and an explicit day ("ngày 15/9") resolve to the explicit date range that starts and ends on that local day, in the app's timezone. They are not a new kind of period. A day given without a year means its most recent occurrence that is not after today.
-6. **A-06 — "What did I spend on" is the ranked list with no count.** "Tiêu những gì", "chi những khoản nào", "liệt kê các khoản chi" ask for the Transactions themselves, so they are answered as Q5 with no count given, which uses the standard list length. The list is ordered by amount, largest first, like every Q5 answer (Open Question #6).
+6. **A-06 — "What did I spend on" is the breakdown by Category; "which expenses" is the ranked list.** (Revised 2026-10-13.) "Tiêu gì", "tiêu những gì", "tiêu vào gì", "tiền đi đâu", "danh mục tiêu hôm nay" all ask what the money went on, so they are answered as Q2; when the period has at most 5 expenses, the answer lists them too, largest first. "Chi những khoản nào", "liệt kê các khoản chi" ask for the Transactions one by one, so they are answered as Q5 with no count given, ordered by amount, largest first (Open Question #6). A total (Q1/Q10) not limited to one Category also shows the Categories behind it and, with at most 5 expenses, lists them.
 
 ## Preconditions (feature-level)
 
@@ -235,14 +236,17 @@ Read-only. The same question over unchanged data always returns the same figures
 | S-AIQ-31 | Question is a Transaction description ("cafe 50k") while in analysis mode | Question sent | Treated as a question that cannot be answered<br>and a chip offers switching to record-Transaction mode | No Transaction is ever created from analysis mode |
 | S-AIQ-32 | Empty or over-length text | User sends | Rejected as invalid input (4xx) before interpretation | Validation error |
 | S-AIQ-52 | Analysis mode, today is 28/09 | User types "hôm nay tiêu bao nhiêu" | Answered as Q1 for the single day 28/09 | A-05 |
-| S-AIQ-53 | Analysis mode | User types "hôm nay tiêu những gì" | Answered as Q5 with no count, for today | A-06 |
+| S-AIQ-53 | Analysis mode | User types "hôm nay tiêu những gì" | Answered as Q2 for today, with the expenses listed when there are at most 5 | A-06 (revised) |
 | S-AIQ-54 | Analysis mode | User types "đã chi những khoản nào hôm nay" | Answered as Q5 with no count, for today | A-06 |
 | S-AIQ-55 | Analysis mode | User types "tiền đi đâu hôm nay" | Answered as Q2 (breakdown by Category) for today | "Tiền đi đâu" stays Q2 whatever the period |
-| S-AIQ-56 | Analysis mode, today is 28/09 | User types "hom qua tieu nhung gi" (no accents) | Answered as Q5 with no count, for 27/09 | Accentless input |
+| S-AIQ-56 | Analysis mode, today is 28/09 | User types "hom qua tieu nhung gi" (no accents) | Answered as Q2 for 27/09 | Accentless input, A-06 (revised) |
 | S-AIQ-57 | Analysis mode | User types "hnay chi bn" or "bữa nay xài nhiêu" | Answered as Q1 for today | Shorthand and Southern "bữa nay" = today, while "mấy bữa nay" stays "recently" (last 30 days) |
 | S-AIQ-58 | Analysis mode, today is 28/09 | User types "hôm kia tiêu bao nhiêu" | Answered as Q1 for 26/09 | A-05 |
 | S-AIQ-59 | Analysis mode, today is 28/09/2026 | User types "ngày 15/9 chi bao nhiêu" | Answered as Q1 for 15/09/2026 | Year-less date = most recent not after today (A-05) |
 | S-AIQ-60 | The interpretation of a question falls outside the catalog (a period or question kind the System does not support) | Question sent | Treated as out of scope (S-AIQ-28)<br>and **never** as "temporarily unavailable" (S-AIQ-40)<br>and no figures are shown | The misleading reply seen in live use |
+| S-AIQ-61 | Analysis mode, today is 13/10 | User types "danh mục tiêu hnay", "tiêu vào gì hôm nay" or "nay tiêu gì" | Each answered as Q2 for 13/10, read without the model | A-06 (revised): one question however it is phrased |
+| S-AIQ-62 | Analysis mode, 3 expenses today in 2 Categories | User types "tiêu hnay" | The total, the larger Category named in the reply, the breakdown, and the 3 expenses listed | A-06 (revised) |
+| S-AIQ-63 | Analysis mode, 12 expenses today | User types "tiêu hnay" | The total and the breakdown; no expenses listed; a follow-up offers the largest expenses | Inline list cap: 5 |
 
 ### Edge Cases
 1. **EC-11** — ⚠️ **Any part of the question not covered by the interpretation** (an unmatched Category, an extra condition) means the System must not answer from the covered part alone — it either asks for clarification or says it cannot answer.

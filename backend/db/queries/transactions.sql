@@ -140,9 +140,11 @@ WHERE t.user_id = $1
 
 -- name: UpdateTransaction :one
 -- Partial update via COALESCE, same convention as UpdateWallet/UpdateCategory.
--- wallet_id and type are never columns this query can touch — they aren't
--- request fields at all (dto.UpdateTransactionRequest has no such fields,
--- spec.md Context #5).
+-- type is never a column this query can touch — it isn't a request field at
+-- all (spec.md Context #5). wallet_id moves an income/expense Transaction to
+-- another Wallet (2026-10-13): the service has already checked ownership,
+-- the same currency and "not a transfer", and moves both balances in the
+-- same DB transaction. NULL leaves it unchanged.
 -- location_note is the one nullable column a PATCH can clear, so it can't use
 -- COALESCE: NULL leaves it unchanged, '' clears it to NULL, anything else
 -- sets it. The service has already rejected a location_note on a Transaction
@@ -159,6 +161,7 @@ UPDATE transactions
 SET
     amount        = COALESCE(sqlc.narg('amount'), amount),
     category_id   = COALESCE(sqlc.narg('category_id'), category_id),
+    wallet_id     = COALESCE(sqlc.narg('wallet_id'), wallet_id),
     occurred_at   = COALESCE(sqlc.narg('occurred_at'), occurred_at),
     note          = COALESCE(sqlc.narg('note'), note),
     location_note = CASE

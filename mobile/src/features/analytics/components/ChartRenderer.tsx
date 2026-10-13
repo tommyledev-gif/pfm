@@ -6,6 +6,7 @@ import { BudgetStatusList } from "@/features/analytics/components/BudgetStatusLi
 import { ColumnBars, fitsColumns } from "@/features/analytics/components/ColumnBars";
 import { CompareBars } from "@/features/analytics/components/CompareBars";
 import { DonutAnswer } from "@/features/analytics/components/DonutAnswer";
+import { InlineTransactions } from "@/features/analytics/components/InlineTransactions";
 import { LineChart } from "@/features/analytics/components/LineChart";
 import { NumberStat } from "@/features/analytics/components/NumberStat";
 import { RankedList } from "@/features/analytics/components/RankedList";
@@ -44,10 +45,11 @@ export function ChartRenderer({ chart, currency, elapsed }: ChartRendererProps) 
             {chart.items && chart.items.length >= MIN_LINE_POINTS ? (
               <LineChart items={chart.items} currency={currency} />
             ) : null}
+            {chart.rows?.length ? <InlineTransactions rows={chart.rows} currency={currency} /> : null}
           </View>
         );
       case "donut":
-        return chart.items ? <DonutAnswer items={chart.items} currency={currency} /> : null;
+        return chart.items ? <DonutAnswer items={chart.items} currency={currency} rows={chart.rows} /> : null;
       case "bar":
       case "weekday":
         // Columns only when every label fits under one; names (Wallets) get
@@ -76,9 +78,11 @@ export function ChartRenderer({ chart, currency, elapsed }: ChartRendererProps) 
   if (!body) return null;
   // The one surface in an answer: the reply text sits on the app's own
   // ground, only the data gets a raised tone — no border, no card in a card.
-  // A list's rows already carry their own vertical padding.
+  // A list's rows already carry their own vertical padding; a chart with a
+  // few expenses listed under it (donut, number) keeps the chart's padding.
+  const listOnly = chart.type !== "donut" && chart.type !== "number" && Boolean(chart.rows || chart.budgets);
   return (
-    <View testID={`chart-analytics-${chart.type}`} style={[styles.surface, (chart.rows || chart.budgets) && styles.surfaceList]}>
+    <View testID={`chart-analytics-${chart.type}`} style={[styles.surface, listOnly && styles.surfaceList]}>
       {body}
     </View>
   );

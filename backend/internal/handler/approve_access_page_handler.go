@@ -18,7 +18,7 @@ const approveAccessPageHTML = pageHead + `<title>Duyệt yêu cầu tạo tài k
 <body>
   <div class="card" id="card">
     <h1>Duyệt yêu cầu tạo tài khoản</h1>
-    <p class="sub hide-when-done">Duyệt thì người gửi yêu cầu nhận email kích hoạt, rồi tự đặt tên đăng nhập và mật khẩu.</p>
+    <p class="sub hide-when-done">Sau khi duyệt, người gửi sẽ nhận email kích hoạt để tự đặt tên đăng nhập và mật khẩu.</p>
     <button id="approve" class="hide-when-done" type="button">Duyệt yêu cầu</button>
     <div id="msg" class="msg"></div>
   </div>

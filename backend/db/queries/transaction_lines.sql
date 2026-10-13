@@ -47,8 +47,10 @@ GROUP BY transaction_id;
 -- name: LockTransactionForUpdate :one
 -- Row lock taken inside UpdateTransaction's tx before the balance rule and the
 -- stale-edit check run (plan F1, F17), so two concurrent edits can never both
--- pass a check against a state the other is about to overwrite.
-SELECT amount, updated_at
+-- pass a check against a state the other is about to overwrite. wallet_id is
+-- read under the lock too: a wallet move reverses the effect on the Wallet
+-- the row is on NOW, not the one a pre-tx read saw.
+SELECT amount, updated_at, wallet_id
 FROM transactions
 WHERE id = $1
   AND user_id = $2

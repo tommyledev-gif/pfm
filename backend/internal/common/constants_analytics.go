@@ -48,6 +48,10 @@ const (
 	// ones its "và N khoản khác" line expands to in place (more_rows). Still
 	// a cap, under the same payload bound as every list above.
 	AnalyticsListExpandMaxRows = 30
+	// AnalyticsInlineRowsMax: a total or a Category breakdown over a period
+	// with at most this many expenses also lists those expenses, so "what
+	// did I spend on today" is answered without a second question.
+	AnalyticsInlineRowsMax      = 5
 	AnalyticsSeriesMaxCycles    = 6
 	AnalyticsSeriesShortCycles  = 3
 	AnalyticsCustomRangeMaxDays = 366

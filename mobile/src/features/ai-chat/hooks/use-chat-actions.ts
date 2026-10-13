@@ -3,13 +3,18 @@ import { useState } from "react";
 import { getErrorCode } from "@/lib/axios";
 import { useSendChatMessageMutation } from "@/features/ai-chat/api/use-send-chat-message-mutation";
 import { useUpdateTransactionMutation } from "@/features/transactions/api/use-update-transaction-mutation";
-import { ChatMessage, EditHistoryEntry, TransactionActionPayload } from "@/features/ai-chat/types";
+import { transactionSaveErrorMessage } from "@/features/transactions/items/save-error-message";
+import { ChatMessage, EditHistoryEntry, SavedProposalPatch, TransactionActionPayload } from "@/features/ai-chat/types";
 import { nextMessageId, newIdempotencyKey } from "@/features/ai-chat/message-id";
 import { toReplyMessages } from "@/features/ai-chat/reply-fanout";
 import { proposalLinesChanged } from "@/features/ai-chat/proposal-lines";
 import { useConfirmProposal } from "@/features/ai-chat/hooks/use-confirm-proposal";
 import { useNeedsFirstWallet } from "@/features/wallets/use-open-wallet-creator";
 import { captureChatEpoch, useChatStore } from "@/stores/chat-store";
+import { useToastStore } from "@/stores/toast-store";
+
+// A saved proposal's PATCH failed for a reason without its own copy.
+const SAVE_EDIT_FAILED = "Chưa lưu được thay đổi. Số dư chưa thay đổi.";
 
 // The typing indicator is meant to be felt, not just technically present —
 // even a fast reply holds the dots for a beat before the answer appears.
@@ -114,9 +119,11 @@ export function useChatActions({ onSent }: UseChatActionsOptions) {
    *
    * ⚠️ A confirmed proposal PATCHes its existing transaction. It must never
    * fall back to a create, which would leave a duplicate transaction behind
-   * and orphan the original.
+   * and orphan the original. savedPatch carries what only that PATCH needs,
+   * each part only when it changed: a new wallet (the server moves both
+   * balances), a moved pin, the pin's note.
    */
-  const editAction = (target: ChatMessage, payload: TransactionActionPayload) => {
+  const editAction = (target: ChatMessage, payload: TransactionActionPayload, savedPatch: SavedProposalPatch = {}) => {
     const timestamp = Date.now();
     const priorHistory: EditHistoryEntry[] =
       target.editHistory ?? (target.action ? [{ payload: target.action.payload, timestamp, source: "created" }] : []);
@@ -134,11 +141,16 @@ export function useChatActions({ onSent }: UseChatActionsOptions) {
             note: payload.note ?? undefined,
             // Both lists together, [] for "removed": PATCH replaces them as a pair.
             ...(linesChanged ? { items: payload.items ?? [], adjustments: payload.adjustments ?? [] } : {}),
+            ...savedPatch,
           },
         },
         {
           onSuccess: () =>
             updateMessage(target.id, { action: { ...target.action!, payload }, edited: true, editHistory }),
+          // The sheet is already closed, so the refusal (a wallet in another
+          // currency, a stale pin…) is said here; the card keeps its old values.
+          onError: (error) =>
+            useToastStore.getState().show(transactionSaveErrorMessage(error) ?? SAVE_EDIT_FAILED, "error"),
         },
       );
       return;

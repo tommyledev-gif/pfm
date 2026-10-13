@@ -25,10 +25,10 @@ func activationEmail(link string) emailContent {
 	return emailContent{
 		Subject:     activationSubject,
 		Heading:     "Lời mời dùng Budgest",
-		Paragraphs:  []string{"Admin đã mời bạn dùng Budgest.", "Đặt tên đăng nhập và mật khẩu để bắt đầu."},
+		Paragraphs:  []string{"Admin đã mời bạn dùng Budgest.", "Kích hoạt tài khoản để đặt tên đăng nhập và mật khẩu."},
 		ButtonLabel: "Kích hoạt tài khoản",
 		ButtonURL:   link,
-		Footnote:    "Liên kết hết hạn sau 72 giờ. Không biết lời mời này thì bỏ qua email.",
+		Footnote:    "Liên kết hết hạn sau 72 giờ. Nếu không nhận ra lời mời này, bỏ qua email.",
 	}
 }
 
@@ -36,7 +36,7 @@ func accessApprovedEmail(link string) emailContent {
 	return emailContent{
 		Subject:     "Yêu cầu tạo tài khoản Budgest đã được duyệt",
 		Heading:     "Yêu cầu đã được duyệt",
-		Paragraphs:  []string{"Admin đã duyệt yêu cầu tạo tài khoản Budgest.", "Đặt tên đăng nhập và mật khẩu để bắt đầu."},
+		Paragraphs:  []string{"Yêu cầu tạo tài khoản Budgest của bạn đã được duyệt.", "Kích hoạt tài khoản để đặt tên đăng nhập và mật khẩu."},
 		ButtonLabel: "Kích hoạt tài khoản",
 		ButtonURL:   link,
 		Footnote:    "Liên kết hết hạn sau 72 giờ.",
@@ -49,10 +49,10 @@ func accessRequestEmail(requesterEmail, link string) emailContent {
 	return emailContent{
 		Subject:     "Yêu cầu tạo tài khoản từ " + requesterEmail,
 		Heading:     "Yêu cầu tạo tài khoản",
-		Paragraphs:  []string{requesterEmail + " muốn có tài khoản Budgest.", "Duyệt thì người này nhận email kích hoạt."},
+		Paragraphs:  []string{requesterEmail + " đã gửi yêu cầu tạo tài khoản Budgest.", "Sau khi duyệt, người gửi sẽ nhận email kích hoạt tài khoản."},
 		ButtonLabel: "Xem và duyệt",
 		ButtonURL:   link,
-		Footnote:    "Không quen người này thì bỏ qua email. Yêu cầu cũng có trong mục Thông báo của app.",
+		Footnote:    "Nếu không nhận ra người gửi, bỏ qua email này. Yêu cầu cũng có trong mục Thông báo của ứng dụng.",
 	}
 }
 

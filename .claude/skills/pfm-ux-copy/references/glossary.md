@@ -10,6 +10,7 @@ Một khái niệm = một từ, ở cả VI và EN. Cột "Nguồn": `app` = đ
 | Expense | chi tiêu | spending | app | EN dùng "spending", không "expense(s)" trong UI chung; "expense" chỉ khi là một khoản cụ thể |
 | Category | danh mục | category | app | |
 | Budget | ngân sách | budget | app | Gắn với một ví/một loại tiền |
+| Currency (của ví) | loại tiền | currency | app | "Nhiều loại tiền", "Chỉ hiện ví cùng loại tiền", lỗi đổi ví khác loại tiền. Vài chỗ cũ còn "đơn vị tiền tệ": đổi dần sang "loại tiền" |
 | Net worth | tài sản ròng | net worth | app | |
 | Notification | thông báo | notification | app | |
 | Audit log | nhật ký giao dịch | transaction history | app | EN tránh "audit log" (jargon); VI đang là "Nhật ký giao dịch" |

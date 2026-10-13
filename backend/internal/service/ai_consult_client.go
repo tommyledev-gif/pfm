@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/example/pfm/backend/internal/common"
+	"github.com/example/pfm/backend/internal/model"
 )
 
 // AIConsultRequest is one free-text question plus the caller's own context
@@ -52,6 +53,9 @@ type AIConsultParse struct {
 	PromptTokens     int
 	CompletionTokens int
 	CachedTokens     int
+	// Method is how the question was read: model.IntentMethodRegex for the
+	// AI Service's phrase rules, else model.IntentMethodLLM.
+	Method string
 }
 
 type httpAIConsultClient struct {
@@ -101,14 +105,17 @@ type consultWireUsage struct {
 }
 
 type consultWireResponse struct {
-	Kind               string            `json:"kind"`
-	Coverage           string            `json:"coverage"`
+	Kind               string               `json:"kind"`
+	Coverage           string               `json:"coverage"`
 	Query              *consultWireQuery    `json:"query"`
 	Scenario           *consultWireScenario `json:"scenario"`
-	CategoryConfidence *float64          `json:"category_confidence"`
-	NormalizedText     string            `json:"normalized_text"`
-	Usage              consultWireUsage  `json:"usage"`
-	InvalidOutput      bool              `json:"invalid_output"`
+	CategoryConfidence *float64             `json:"category_confidence"`
+	NormalizedText     string               `json:"normalized_text"`
+	Usage              consultWireUsage     `json:"usage"`
+	InvalidOutput      bool                 `json:"invalid_output"`
+	// Method is "regex" when the AI Service read the question with its phrase
+	// rules and no model call; absent (older service) or "llm" otherwise.
+	Method string `json:"method"`
 }
 
 // Parse calls the AI Service's /consult endpoint. Any transport failure,
@@ -160,7 +167,10 @@ func fromConsultWire(w consultWireResponse) (*AIConsultParse, error) {
 	out := &AIConsultParse{
 		Kind: w.Kind, Coverage: w.Coverage, CategoryConfidence: w.CategoryConfidence,
 		NormalizedText: w.NormalizedText, InvalidOutput: w.InvalidOutput, PromptTokens: w.Usage.PromptTokens,
-		CompletionTokens: w.Usage.CompletionTokens, CachedTokens: w.Usage.CachedTokens,
+		CompletionTokens: w.Usage.CompletionTokens, CachedTokens: w.Usage.CachedTokens, Method: model.IntentMethodLLM,
+	}
+	if w.Method == model.IntentMethodRegex {
+		out.Method = model.IntentMethodRegex
 	}
 	if sc := w.Scenario; sc != nil {
 		goal := sc.GoalAmountVND

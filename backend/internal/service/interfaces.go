@@ -149,7 +149,7 @@ type TransactionRepo interface {
 	ListActiveLinesByTransactionIDs(ctx context.Context, userID uuid.UUID, transactionIDs []uuid.UUID) (map[uuid.UUID]repository.TransactionLines, error)
 	SoftDeleteActiveLines(ctx context.Context, tx pgx.Tx, transactionID, userID uuid.UUID) error
 	CountActiveItems(ctx context.Context, userID uuid.UUID, transactionIDs []uuid.UUID) (map[uuid.UUID]int, error)
-	LockTransactionForUpdate(ctx context.Context, tx pgx.Tx, transactionID, userID uuid.UUID) (int64, time.Time, error)
+	LockTransactionForUpdate(ctx context.Context, tx pgx.Tx, transactionID, userID uuid.UUID) (repository.LockedTransaction, error)
 }
 
 // AuditLogRepo is the read-side repository contract AuditLogService depends

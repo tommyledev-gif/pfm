@@ -43,3 +43,24 @@ func TestUpdateTransactionRequest_AmountCeiling(t *testing.T) {
 		t.Fatalf("update at the ceiling must pass, got %v", err)
 	}
 }
+
+// PATCH accepts wallet_id since 2026-10-13 (moving a Transaction to another
+// Wallet); type is still rejected by DecodeStrict.
+func TestUpdateTransactionRequest_WalletID(t *testing.T) {
+	walletID := uuid.New()
+	var req UpdateTransactionRequest
+	if err := DecodeStrict([]byte(`{"wallet_id":"`+walletID.String()+`"}`), &req); err != nil {
+		t.Fatalf("wallet_id must be accepted by DecodeStrict, got %v", err)
+	}
+	if req.WalletID == nil || *req.WalletID != walletID {
+		t.Fatalf("expected wallet_id %s, got %v", walletID, req.WalletID)
+	}
+	if !req.HasUpdates() {
+		t.Fatal("a wallet_id-only PATCH must count as an update")
+	}
+
+	var withType UpdateTransactionRequest
+	if err := DecodeStrict([]byte(`{"type":"income"}`), &withType); err == nil {
+		t.Fatal("type must still be rejected by DecodeStrict")
+	}
+}

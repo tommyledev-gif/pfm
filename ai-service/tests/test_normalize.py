@@ -21,6 +21,17 @@ from app.nlu.normalize import normalize, unaccent
         ("hum nay tiêu bao nhiêu", "hom nay tieu bao nhieu"),
         ("bữa nay xài nhiêu", "hom nay xai nhieu"),
         ("mấy bữa nay tiêu bao nhiêu", "30 ngay qua tieu bao nhieu"),
+        # Regional and chat forms of "this", "last", "today", "yesterday".
+        ("tháng nì tiêu bao nhiêu", "thang nay tieu bao nhieu"),
+        ("tuần ni chi gì", "tuan nay chi gi"),
+        ("mấy bữa ni tiêu gì", "30 ngay qua tieu gi"),
+        ("bữa ni xài gì", "hom nay xai gi"),
+        ("tháng rồi tiêu gì", "thang truoc tieu gi"),
+        ("bữa qua xài gì", "hom qua xai gi"),
+        ("hôm wa tiêu bnhiu", "hom qua tieu bao nhieu"),
+        ("nay tiêu gì", "hom nay tieu gi"),
+        ("sáng nay tiêu gì", "sang nay tieu gi"),
+        ("tiền đi đâu hết r", "tien di dau het roi"),
     ],
 )
 def test_normalize_text(raw: str, expected: str) -> None:

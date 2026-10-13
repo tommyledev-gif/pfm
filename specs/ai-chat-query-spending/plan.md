@@ -28,7 +28,7 @@
 | **F15** | CLAUDE.md: "server state via TanStack Query only, never copied into Zustand". Answers go into the chat store. | Convention note | Same accepted exception as US-01 action cards: an answer is an immutable **snapshot** (spec US-06 EC "never recomputed"), not live server state. Requests themselves go through TanStack `useMutation`. |
 | **F16** | `ai-chat.tsx` is 282 lines; `chat_service.go` is 339 (already over). | Convention | Consult never touches `chat_service.go` (separate `ConsultService`), so the brief's P1.5 split is **not** a prerequisite. Mobile: all consult logic in a new `use-consult-actions.ts` + new `features/analytics/`; `ai-chat.tsx` gains only mode-based dispatch and the starter-chip row (target net +15 lines). |
 | **F17** | Spec Open Question #5 (keep consult disabled until I-1 ships). | Open | Plan assumes **yes**: `CONSULT_MODE_ENABLED` flips to `true` in the last task, after I-1. |
-| **F18** | Spec asks for a regex fast path nowhere; brief §6.2 says the pattern set starts **empty**. | Scope | No regex matcher built. `method` column reserves values `chip`, `drilldown`, `llm` (and `regex` for later). |
+| **F18** | Spec asks for a regex fast path nowhere; brief §6.2 says the pattern set starts **empty**. | Scope | No regex matcher built. `method` column reserves values `chip`, `drilldown`, `llm` (and `regex` for later). **Revised 2026-10-13:** a phrase-table reader now runs first (`ai-service/app/nlu/intent_rules.py`); it answers only questions whose every word it knows and is logged as `regex` (spec.md A-06 revision). |
 
 ---
 

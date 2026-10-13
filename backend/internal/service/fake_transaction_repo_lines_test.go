@@ -70,14 +70,14 @@ func (f *fakeTransactionRepo) CountActiveItems(_ context.Context, userID uuid.UU
 	return out, nil
 }
 
-func (f *fakeTransactionRepo) LockTransactionForUpdate(_ context.Context, _ pgx.Tx, transactionID, userID uuid.UUID) (int64, time.Time, error) {
+func (f *fakeTransactionRepo) LockTransactionForUpdate(_ context.Context, _ pgx.Tx, transactionID, userID uuid.UUID) (repository.LockedTransaction, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	t, ok := f.transactions[transactionID]
 	if !ok || t.DeletedAt != nil || t.UserID != userID {
-		return 0, time.Time{}, pgx.ErrNoRows
+		return repository.LockedTransaction{}, pgx.ErrNoRows
 	}
-	return t.Amount, t.UpdatedAt, nil
+	return repository.LockedTransaction{Amount: t.Amount, UpdatedAt: t.UpdatedAt, WalletID: t.WalletID}, nil
 }
 
 // setUpdatedAt simulates an edit saved elsewhere (stale-edit tests).

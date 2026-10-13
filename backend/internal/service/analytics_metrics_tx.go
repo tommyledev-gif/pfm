@@ -41,13 +41,7 @@ func (s *AnalyticsService) computeTopExpenses(ctx context.Context, run *analytic
 		run.answer.Summary = summaryEmpty(run)
 		return nil
 	}
-	out := make([]dto.AnalyticsTxRow, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, dto.AnalyticsTxRow{
-			ID: r.ID, OccurredAt: r.OccurredAt, Amount: r.Amount,
-			CategoryID: r.CategoryID, CategoryName: r.CategoryName, WalletName: r.WalletName,
-		})
-	}
+	out := txRows(rows)
 	shown, more := out, []dto.AnalyticsTxRow(nil)
 	if len(out) > limit {
 		shown, more = out[:limit], out[limit:]

@@ -322,6 +322,7 @@ UPDATE transactions
 SET
     amount        = COALESCE($3, amount),
     category_id   = COALESCE($4, category_id),
+    wallet_id     = COALESCE($11, wallet_id),
     occurred_at   = COALESCE($5, occurred_at),
     note          = COALESCE($6, note),
     location_note = CASE
@@ -358,6 +359,9 @@ type UpdateTransactionParams struct {
 	LocationLat  *float64
 	LocationLng  *float64
 	LocationName *string
+	// WalletID ($11, appended so the other placeholders keep their numbers):
+	// nil leaves it unchanged, non-nil moves the Transaction to that Wallet.
+	WalletID *uuid.UUID
 }
 
 // UpdateTransaction returns every column explicitly — the Scan below includes
@@ -368,7 +372,7 @@ type UpdateTransactionParams struct {
 func (q *Queries) UpdateTransaction(ctx context.Context, arg UpdateTransactionParams) (Transaction, error) {
 	row := q.db.QueryRow(ctx, updateTransaction,
 		arg.ID, arg.UserID, arg.Amount, arg.CategoryID, arg.OccurredAt, arg.Note, arg.LocationNote,
-		arg.LocationLat, arg.LocationLng, arg.LocationName,
+		arg.LocationLat, arg.LocationLng, arg.LocationName, arg.WalletID,
 	)
 	var i Transaction
 	err := row.Scan(

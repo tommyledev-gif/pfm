@@ -118,3 +118,6 @@ class ConsultResponse(BaseModel):
     # True when the model answered but its output did not fit the catalog —
     # the backend replies "unsupported" and logs an error, never "degraded".
     invalid_output: bool = False
+    # "regex" when the phrase rules read the question (app/nlu/intent_rules.py)
+    # and no model was called; the backend logs it as the question's method.
+    method: Literal["llm", "regex"] = "llm"

@@ -214,6 +214,9 @@ func (f *fakeTransactionRepo) UpdateTransaction(_ context.Context, _ pgx.Tx, arg
 	if arg.CategoryID != nil {
 		t.CategoryID = *arg.CategoryID
 	}
+	if arg.WalletID != nil {
+		t.WalletID = *arg.WalletID
+	}
 	if arg.OccurredAt != nil {
 		t.OccurredAt = *arg.OccurredAt
 	}

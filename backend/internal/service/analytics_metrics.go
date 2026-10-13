@@ -68,7 +68,7 @@ func (s *AnalyticsService) countIn(ctx context.Context, run *analyticsRun, w mod
 	return s.analytics.CountTransactions(ctx, run.userID, f)
 }
 
-// computeSum answers Q1/Q10.
+// computeSum answers Q1/Q10: the total, then what it went on (detailSum).
 func (s *AnalyticsService) computeSum(ctx context.Context, run *analyticsRun) error {
 	total, err := s.sumReport(ctx, run, run.windows.whole)
 	if err != nil {
@@ -83,7 +83,7 @@ func (s *AnalyticsService) computeSum(ctx context.Context, run *analyticsRun) er
 	}
 	run.answer.Chart = dto.AnalyticsChart{Type: string(model.AnalyticsChartNumber), Value: &total}
 	run.answer.Summary = summarySum(run, total)
-	return nil
+	return s.detailSum(ctx, run, total)
 }
 
 // computeCompare answers Q4. A zero previous period yields no percentage
@@ -161,27 +161,11 @@ func (s *AnalyticsService) computeSeries(ctx context.Context, run *analyticsRun)
 
 // computeCategoryBreakdown answers Q2. Small Categories fold into "Other"
 // in the visual only; the total is unchanged (spec.md US-02 EC).
+// A period with only a few expenses also lists them (attachInlineRows).
 func (s *AnalyticsService) computeCategoryBreakdown(ctx context.Context, run *analyticsRun) error {
-	rows, err := s.reports.SumByCategory(ctx, run.userID, reportFilter(run.windows.whole, run.q.WalletID, run.q.TxType))
+	items, total, err := s.categoryItems(ctx, run)
 	if err != nil {
 		return err
-	}
-	wanted := make(map[uuid.UUID]bool, len(run.q.CategoryIDs))
-	for _, id := range run.q.CategoryIDs {
-		wanted[id] = true
-	}
-	var items []dto.AnalyticsChartItem
-	var total int64
-	for _, row := range rows {
-		if len(wanted) > 0 && !wanted[row.CategoryID] {
-			continue
-		}
-		amount := run.keep(row.Type, row.Currency, row.Amount)
-		if amount == 0 {
-			continue
-		}
-		items = append(items, dto.AnalyticsChartItem{Key: row.CategoryID.String(), Label: row.CategoryName, Amount: amount})
-		total += amount
 	}
 	if run.answer.TxCount, err = s.countIn(ctx, run, run.windows.whole); err != nil {
 		return err
@@ -192,7 +176,7 @@ func (s *AnalyticsService) computeCategoryBreakdown(ctx context.Context, run *an
 	}
 	run.answer.Chart = dto.AnalyticsChart{Type: string(model.AnalyticsChartDonut), Items: capSlices(items), Value: &total}
 	run.answer.Summary = summaryBreakdown(run, items[0], total)
-	return nil
+	return s.attachInlineRows(ctx, run)
 }
 
 // capSlices keeps the largest slices (input is amount-descending) and folds

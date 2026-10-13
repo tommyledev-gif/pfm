@@ -78,7 +78,7 @@ func (s *AccessRequestService) RequestAccess(ctx context.Context, email, adminEm
 	// The request row is the record; the notification is how the admin sees
 	// it in the app. Failing to write it must not fail the request, since the
 	// row already exists and the email still goes out.
-	if err := s.notifier.CreateAccessRequestNotification(ctx, admin.ID, "Yêu cầu tạo tài khoản", requester.Email+" muốn có tài khoản Budgest.", requester.ID); err != nil {
+	if err := s.notifier.CreateAccessRequestNotification(ctx, admin.ID, "Yêu cầu tạo tài khoản", requester.Email+" đã gửi yêu cầu tạo tài khoản Budgest.", requester.ID); err != nil {
 		s.logger.Error("access request: failed to notify admin", zap.Error(err))
 	}
 
