@@ -131,11 +131,14 @@ func auditUpdateDiff(existing *model.Transaction, req dto.UpdateTransactionReque
 		}
 		after["note"] = *req.Note
 	}
-	// Keyed on the PATCH field names, like the others. The service has already
-	// rejected location/location_note on a Transaction with no location, so
-	// existing.Location is non-nil here.
-	if location.Note != nil && existing.Location != nil {
-		before["location_note"] = nullableAuditString(existing.Location.Note)
+	// Keyed on the PATCH field names, like the others. A pin added by this
+	// PATCH (the Transaction had none) logs `before` as null, for the pin and
+	// for its note; the service rejects a note alone on a pin-less one.
+	if location.Note != nil {
+		before["location_note"] = nil
+		if existing.Location != nil {
+			before["location_note"] = nullableAuditString(existing.Location.Note)
+		}
 		if *location.Note == "" {
 			after["location_note"] = nil
 		} else {
@@ -144,8 +147,11 @@ func auditUpdateDiff(existing *model.Transaction, req dto.UpdateTransactionReque
 	}
 	// Same keys as auditSnapshot's `location`, minus `note` — a move never
 	// touches the note, which is logged under location_note when it changes.
-	if move := location.Move; move != nil && existing.Location != nil {
-		before["location"] = auditPin(existing.Location.Latitude, existing.Location.Longitude, existing.Location.PlaceName)
+	if move := location.Move; move != nil {
+		before["location"] = nil
+		if existing.Location != nil {
+			before["location"] = auditPin(existing.Location.Latitude, existing.Location.Longitude, existing.Location.PlaceName)
+		}
 		after["location"] = auditPin(move.Latitude, move.Longitude, move.PlaceName)
 	}
 

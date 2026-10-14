@@ -26,7 +26,7 @@ interface EntryTileProps {
   accessibilityLabel?: string;
 }
 
-const CHEVRON_SIZE = 18;
+const CHEVRON_SIZE = 16;
 const COMPACT_TRAILING_SIZE = 16;
 // Fits a summary plus its detail line, so two tiles side by side keep the
 // same height whether or not either one has a detail.
@@ -100,26 +100,26 @@ export function EntryTile({
 const useStyles = createStyles((colors) => ({
   // minWidth 0 lets a long place name ellipsize instead of widening the tile.
   compactColumn: { flex: 1, minWidth: 0 },
-  label: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.xs },
+  label: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.xs + 2, paddingHorizontal: spacing.xs },
+  // Borderless on the field fill, like the wallet bar above it (iOS grouped cells).
   tile: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
+    minHeight: 52,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderRadius: radii.listCard,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    backgroundColor: withAlpha(colors.overlayBase, 0.06),
+    backgroundColor: colors.fieldFill,
   },
   // A half-width tile is ~170dp on a 390dp phone: tighter gaps leave the text
-  // room for "Chỉ ghim lúc tạo" or an amount on one line.
+  // room for a place name or an amount on one line.
   tileCompact: { paddingHorizontal: spacing.md, gap: spacing.xs, minHeight: COMPACT_MIN_HEIGHT },
   tileLocked: { backgroundColor: withAlpha(colors.overlayBase, 0.03) },
-  pressed: { opacity: 0.85 },
+  pressed: { opacity: 0.7 },
   texts: { flex: 1, minWidth: 0, gap: 2 },
   value: { ...typography.body, color: colors.textPrimary },
   valueCompact: { ...typography.label, color: colors.textPrimary },
-  placeholder: { color: colors.textMuted },
+  placeholder: { color: colors.textMuted, fontWeight: "500" },
   detail: { ...typography.tiny, color: colors.textMuted },
 }));

@@ -1,8 +1,9 @@
 import { useMemo, useRef, useState } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { FlatList, StyleSheet, View } from "react-native";
 
 import { TypingIndicator } from "@/components/shared/TypingIndicator";
 import { ChatComposer } from "@/features/ai-chat/components/ChatComposer";
+import { ConsultEmptyState } from "@/features/ai-chat/components/ConsultEmptyState";
 import { ChatInputBar } from "@/features/ai-chat/components/ChatInputBar";
 import { ChatThreadList } from "@/features/ai-chat/components/ChatThreadList";
 import { KeyboardLiftView } from "@/features/ai-chat/components/KeyboardLiftView";
@@ -74,9 +75,7 @@ export function ConsultPane({
             const startsTurn = previous !== undefined && (item.role === "user" || previous.role === "assistant");
             return <ConsultMessageRow message={item} startsTurn={startsTurn} handlers={consult.handlers} />;
           }}
-          // No quoted example question here: it would look tappable and is
-          // not — the real, tappable ones are the chips right above the input.
-          ListEmptyComponent={<Text style={styles.hint}>Hỏi về chi tiêu, ngân sách hoặc ví.</Text>}
+          ListEmptyComponent={<ConsultEmptyState />}
           ListHeaderComponent={
             consult.sending ? (
               <View style={[styles.typingRow, consultStyles.typing]}>

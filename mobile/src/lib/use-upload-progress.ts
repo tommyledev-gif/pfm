@@ -1,31 +1,50 @@
 import { useEffect, useRef, useState } from "react";
 import type { MutationStatus } from "@tanstack/react-query";
-import { Easing, cancelAnimation, useAnimatedReaction, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import {
+  Easing,
+  cancelAnimation,
+  useAnimatedReaction,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
 import { useReduceMotion } from "@/lib/use-reduce-motion";
 
 /**
- * idle → progress (0-99%) → waiting (the upload outlasted the staged run) →
- * done → idle. The keys double as SlideSwap slot keys.
+ * idle → progress (climbing; back here for the 100% finish) → waiting (no
+ * answer yet after a while) → done → idle. The keys double as SlideSwap slot
+ * keys.
  */
 export type UploadPhase = "idle" | "progress" | "waiting" | "done";
 
 // The run is staged, not measured: the upload endpoints report no progress.
-// The bar climbs to 99% over MIN_RUN_MS and only reaches 100% once the server
-// has answered, so a fast upload still plays the whole run and a slow one
-// parks at 99% and says it is still uploading.
-const MIN_RUN_MS = 5000;
-const PROGRESS_CAP = 0.99;
-const FINISH_MS = 280;
+// Like Safari's loading bar, it climbs fast, then slows and never reaches the
+// end on its own. The server's answer is what takes it to 100%, right away:
+// the old staged run held a finished upload until a fixed 5 s had passed, so
+// the button crept through the 90s after the new picture was already showing.
+const CLIMB_MS = 2400;
+const CLIMB_TO = 0.9;
+const CRAWL_MS = 8000;
+const CRAWL_TO = 0.96;
+// Without an answer by then, the label stops counting and says it is uploading.
+const WAITING_AFTER_MS = 5000;
+// An instant answer still gets a short sweep, so the tap visibly did something.
+const MIN_RUN_MS = 600;
+const FINISH_MS = 320;
+// How long "100%" stays before the done label rolls in.
+const FULL_HOLD_MS = 380;
 const DONE_HOLD_MS = 1400;
 const FADE_MS = 240;
 
 /**
  * Drives an upload control from its mutation's status: the phase to show, the
- * whole percent for the label, and the style for the fill behind it.
+ * whole percent for the label, the 0–1 progress itself (for a ring) and the
+ * style for a fill behind the control.
  *
- * Reduce motion skips the staged run (no climbing bar, no minimum wait): the
+ * Reduce motion skips the staged run (no climbing fill, no 100% beat): the
  * control says it is uploading until the server answers.
  */
 export function useUploadProgress(status: MutationStatus) {
@@ -34,8 +53,7 @@ export function useUploadProgress(status: MutationStatus) {
   const fillOpacity = useSharedValue(0);
   const [phase, setPhase] = useState<UploadPhase>("idle");
   const [percent, setPercent] = useState(0);
-  const succeeded = useRef(false);
-  const minRunOver = useRef(false);
+  const startedAt = useRef(0);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const lastStatus = useRef<MutationStatus | null>(null);
 
@@ -56,32 +74,33 @@ export function useUploadProgress(status: MutationStatus) {
     const later = (fn: () => void, ms: number) => {
       timers.current.push(setTimeout(fn, ms));
     };
-    const reset = () => {
-      clearTimers();
-      succeeded.current = false;
-      cancelAnimation(progress);
-      progress.value = 0;
-      fillOpacity.value = 0;
-      setPhase("idle");
-    };
-    const finish = () => {
-      clearTimers();
-      succeeded.current = false;
-      progress.value = reduceMotion ? 1 : withTiming(1, { duration: FINISH_MS });
-      setPhase("done");
+    const settle = (afterMs: number) => {
       later(() => {
         setPhase("idle");
         fillOpacity.value = reduceMotion ? 0 : withTiming(0, { duration: FADE_MS });
         later(() => {
           progress.value = 0;
         }, FADE_MS);
-      }, DONE_HOLD_MS);
+      }, afterMs);
+    };
+    const finish = () => {
+      cancelAnimation(progress);
+      if (reduceMotion) {
+        progress.value = 1;
+        setPhase("done");
+        settle(DONE_HOLD_MS);
+        return;
+      }
+      // Back to the count, even from "waiting", so every run ends on 100%.
+      setPhase("progress");
+      progress.value = withTiming(1, { duration: FINISH_MS, easing: Easing.out(Easing.cubic) });
+      later(() => setPhase("done"), FINISH_MS + FULL_HOLD_MS);
+      settle(FINISH_MS + FULL_HOLD_MS + DONE_HOLD_MS);
     };
 
     if (status === "pending") {
       clearTimers();
-      succeeded.current = false;
-      minRunOver.current = false;
+      startedAt.current = Date.now();
       cancelAnimation(progress);
       progress.value = 0;
       fillOpacity.value = 1;
@@ -90,22 +109,29 @@ export function useUploadProgress(status: MutationStatus) {
         return;
       }
       setPhase("progress");
-      progress.value = withTiming(PROGRESS_CAP, { duration: MIN_RUN_MS, easing: Easing.out(Easing.quad) });
-      later(() => {
-        minRunOver.current = true;
-        if (succeeded.current) finish();
-        else setPhase("waiting");
-      }, MIN_RUN_MS);
+      progress.value = withSequence(
+        withTiming(CLIMB_TO, { duration: CLIMB_MS, easing: Easing.out(Easing.cubic) }),
+        withTiming(CRAWL_TO, { duration: CRAWL_MS, easing: Easing.out(Easing.quad) }),
+      );
+      later(() => setPhase("waiting"), WAITING_AFTER_MS);
       return;
     }
     // Only a run this hook watched start can finish: a form reopened over a
     // mutation that already succeeded stays idle.
     if (status === "success" && previous === "pending") {
-      if (reduceMotion || minRunOver.current) finish();
-      else succeeded.current = true;
+      clearTimers();
+      const remaining = reduceMotion ? 0 : MIN_RUN_MS - (Date.now() - startedAt.current);
+      if (remaining > 0) later(finish, remaining);
+      else finish();
       return;
     }
-    if (status === "error" || status === "idle") reset();
+    if (status === "error" || status === "idle") {
+      clearTimers();
+      cancelAnimation(progress);
+      progress.value = 0;
+      fillOpacity.value = 0;
+      setPhase("idle");
+    }
   }, [status, reduceMotion, progress, fillOpacity]);
 
   useEffect(() => {
@@ -118,5 +144,5 @@ export function useUploadProgress(status: MutationStatus) {
     opacity: fillOpacity.value,
   }));
 
-  return { phase, percent, fillStyle, busy: phase !== "idle" };
+  return { phase, percent, progress, fillStyle, busy: phase !== "idle" };
 }

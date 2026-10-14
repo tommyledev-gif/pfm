@@ -34,7 +34,7 @@ const SHAKE_STEP_MS = 40;
 
 /**
  * The bottom block every keypad-driven sheet shares (reference-ui/
- * KeypadSheetFooter.tsx): a summary chip and the amount on one row, then
+ * KeypadSheetFooter.tsx): a summary chip over the centred amount, then
  * whatever input and keypad sit under it. Meant for Drawer's pinned `footer`
  * slot, which already draws the divider above it, so the keypad stays put
  * while the pickers above it scroll.
@@ -109,16 +109,25 @@ export function KeypadSheetFooter({
   );
 }
 
+// The amount is the screen's centrepiece: large, centred, light in weight,
+// with the chip that says what it is for (category, transfer target) above it.
+const AMOUNT_FONT_SIZE = 46;
+
 const useStyles = createStyles((colors) => ({
   container: { gap: spacing.sm },
-  summaryRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: spacing.sm },
-  // The chip yields first: the amount is the one thing on this row that must
-  // never be cut short.
-  leading: { flexShrink: 1, minWidth: 0 },
-  amountWrap: { flexShrink: 1, flexDirection: "row", alignItems: "baseline", gap: spacing.xs, minWidth: 96 },
-  amount: { ...typography.hero, flexShrink: 1, textAlign: "right", fontVariant: ["tabular-nums"] },
-  suffix: { ...typography.caption, color: colors.textSecondary },
-  preview: { ...typography.label, color: colors.textSecondary, textAlign: "right", fontVariant: ["tabular-nums"] },
+  summaryRow: { alignItems: "center", gap: spacing.xs },
+  leading: { maxWidth: "100%", alignItems: "center" },
+  amountWrap: { maxWidth: "100%", flexDirection: "row", alignItems: "baseline", justifyContent: "center", gap: 6 },
+  amount: {
+    fontSize: AMOUNT_FONT_SIZE,
+    fontWeight: "600",
+    letterSpacing: -1,
+    flexShrink: 1,
+    textAlign: "center",
+    fontVariant: ["tabular-nums"],
+  },
+  suffix: { ...typography.body, fontWeight: "500", color: colors.textSecondary },
+  preview: { ...typography.label, color: colors.textSecondary, textAlign: "center", fontVariant: ["tabular-nums"] },
   previewError: { color: colors.peach },
-  error: { ...typography.caption, color: colors.peach },
+  error: { ...typography.caption, color: colors.peach, textAlign: "center" },
 }));

@@ -8,7 +8,6 @@ import { KeypadSheetFooter } from "@/components/shared/KeypadSheetFooter";
 import { colorForCategory } from "@/lib/category-color";
 import { TRANSACTION_NOTE_MAX_LENGTH, TransactionKind } from "@/lib/constants";
 import { formatDateShort } from "@/lib/format-date";
-import { withAlpha } from "@/lib/color";
 import { colors, radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { AmountExpression } from "@/lib/use-amount-expression";
 import { useKeyboardVisible } from "@/lib/use-keyboard-height";
@@ -167,30 +166,27 @@ export function TransactionKeypadFooter({
 }
 
 const useStyles = createStyles((colors) => ({
+  // Borderless, on the same field fill as the form's other controls.
   chip: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs + 2,
-    height: 36,
+    height: 34,
     paddingHorizontal: spacing.md,
     borderRadius: radii.pill,
-    backgroundColor: withAlpha(colors.overlayBase, 0.06),
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    alignSelf: "flex-start",
+    backgroundColor: colors.fieldFill,
     maxWidth: "100%",
   },
-  chipLabel: { ...typography.caption, color: colors.textPrimary, flexShrink: 1 },
-  chipPlaceholder: { color: colors.textMuted },
+  chipLabel: { ...typography.label, color: colors.textPrimary, flexShrink: 1 },
+  chipPlaceholder: { color: colors.textMuted, fontWeight: "500" },
   noteInput: {
-    backgroundColor: withAlpha(colors.overlayBase, 0.06),
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
+    backgroundColor: colors.fieldFill,
     borderRadius: radii.listCard,
     paddingHorizontal: spacing.lg,
-    paddingVertical: 10,
+    paddingVertical: 12,
     color: colors.textPrimary,
     ...typography.body,
+    fontWeight: "500",
   },
   error: { ...typography.caption, color: colors.peach },
   notice: { ...typography.caption, color: colors.mustardSoft },

@@ -24,6 +24,10 @@ interface TransactionExtrasRowProps {
   currency: string;
   onPressItems: () => void;
   itemsError?: string;
+  /** The manual form editing a saved one: its count until the lines load, and
+   *  the tile held shut while they do. The AI chat's sheet has neither. */
+  itemsPendingCount?: number;
+  itemsLoading?: boolean;
   // Hides the items tile (a transfer has no items); the location tile then
   // keeps its half width so it does not jump in size.
   showItems?: boolean;
@@ -43,6 +47,8 @@ export function TransactionExtrasRow({
   currency,
   onPressItems,
   itemsError,
+  itemsPendingCount = 0,
+  itemsLoading = false,
   showItems = true,
 }: TransactionExtrasRowProps) {
   const colors = useColors();
@@ -54,10 +60,10 @@ export function TransactionExtrasRow({
         compact
         label="Vị trí"
         summary={location.summary}
-        detail={location.detail}
+        // detail={location.detail}
         muted={location.muted}
         locked={location.locked}
-        icon={<MapPinIcon size={ICON_SIZE} color={location.pinned ? colors.green : colors.textMuted} />}
+        icon={<MapPinIcon size={ICON_SIZE} color={location.pinned ? colors.accentMuted : colors.textMuted} />}
         onPress={onPressLocation}
         testID="btn-edit-location-tile"
         accessibilityLabel={location.accessibilityLabel}
@@ -67,8 +73,8 @@ export function TransactionExtrasRow({
           compact
           lines={lines}
           currency={currency}
-          pendingCount={0}
-          loading={false}
+          pendingCount={itemsPendingCount}
+          loading={itemsLoading}
           onPress={onPressItems}
           error={itemsError}
         />

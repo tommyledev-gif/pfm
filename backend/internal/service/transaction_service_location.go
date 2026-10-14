@@ -14,9 +14,10 @@ import (
 //     validation and live on dto.TransactionLocationRequest.
 //   - update: an existing pin can be moved (new coordinates + new place
 //     name, PATCH `location`, 2026-10-07) and its note edited (PATCH
-//     `location_note`), independently. A pin can never be added or removed
-//     after creation: a Transaction created without one can gain neither a
-//     position nor a note (there is nothing for it to describe).
+//     `location_note`), independently. A Transaction created without a pin
+//     can gain one later through the same `location` field (2026-10-14), with
+//     its note in the same PATCH. A pin is never removed, and a note alone
+//     cannot go on a Transaction with no pin (there is nothing to describe).
 //   - empty or whitespace-only text is stored as NULL, never "".
 
 // newTransactionLocation converts the create request's location into the
@@ -54,12 +55,13 @@ func normalizeLocationText(value *string) *string {
 // locationNoteUpdate validates a PATCH's location_note against the existing
 // Transaction and returns what to hand UpdateTransaction: nil leaves the
 // column unchanged, "" clears it (whitespace-only counts as empty, same as on
-// create), anything else is the trimmed new note.
-func locationNoteUpdate(existing *model.Transaction, requested *string) (*string, error) {
+// create), anything else is the trimmed new note. addsPin is true when the
+// same PATCH gives a pin-less Transaction its pin, which the note then goes on.
+func locationNoteUpdate(existing *model.Transaction, requested *string, addsPin bool) (*string, error) {
 	if requested == nil {
 		return nil, nil
 	}
-	if existing.Location == nil {
+	if existing.Location == nil && !addsPin {
 		return nil, common.NewInvalidInputError("location_note can only be set on a transaction that has a location")
 	}
 	trimmed := strings.TrimSpace(*requested)
@@ -74,19 +76,15 @@ type locationMove struct {
 	PlaceName *string
 }
 
-// locationMoveUpdate validates a PATCH's location against the existing
-// Transaction: nil when the PATCH did not move the pin, otherwise the new
-// position. Only an existing pin can move — giving a pin-less Transaction one
-// is rejected the same way as a location_note on it. PlaceName is normalized
-// like on create; absent counts as "no name", never "keep the old one",
-// because the old name described the old position. The nil-coordinate check
-// repeats the DTO's `required`, same reason as newTransactionLocation.
-func locationMoveUpdate(existing *model.Transaction, requested *dto.TransactionLocationMoveRequest) (*locationMove, error) {
+// locationMoveUpdate validates a PATCH's location: nil when the PATCH did not
+// touch the pin, otherwise the new position — a move of the existing pin, or
+// the first pin of a Transaction that had none. PlaceName is normalized like
+// on create; absent counts as "no name", never "keep the old one", because
+// the old name described the old position. The nil-coordinate check repeats
+// the DTO's `required`, same reason as newTransactionLocation.
+func locationMoveUpdate(requested *dto.TransactionLocationMoveRequest) (*locationMove, error) {
 	if requested == nil {
 		return nil, nil
-	}
-	if existing.Location == nil {
-		return nil, common.NewInvalidInputError("location can only be moved on a transaction that has a location")
 	}
 	if requested.Latitude == nil || requested.Longitude == nil {
 		return nil, common.NewInvalidInputError("location.latitude and location.longitude are both required")
@@ -110,11 +108,11 @@ type locationUpdate struct {
 
 // resolveLocationUpdate validates both location fields of a PATCH.
 func resolveLocationUpdate(existing *model.Transaction, req dto.UpdateTransactionRequest) (locationUpdate, error) {
-	note, err := locationNoteUpdate(existing, req.LocationNote)
+	move, err := locationMoveUpdate(req.Location)
 	if err != nil {
 		return locationUpdate{}, err
 	}
-	move, err := locationMoveUpdate(existing, req.Location)
+	note, err := locationNoteUpdate(existing, req.LocationNote, move != nil && existing.Location == nil)
 	if err != nil {
 		return locationUpdate{}, err
 	}

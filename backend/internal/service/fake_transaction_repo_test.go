@@ -223,21 +223,10 @@ func (f *fakeTransactionRepo) UpdateTransaction(_ context.Context, _ pgx.Tx, arg
 	if arg.Note != nil {
 		t.Note = arg.Note
 	}
-	// Mirrors the real CASE: nil = unchanged, "" = NULL. Replaces Location
-	// rather than mutating it — copies handed out earlier share the pointer.
-	if arg.LocationNote != nil && t.Location != nil {
-		loc := *t.Location
-		loc.Note = nil
-		if *arg.LocationNote != "" {
-			note := *arg.LocationNote
-			loc.Note = &note
-		}
-		t.Location = &loc
-	}
 	// Mirrors the real move: non-nil lat/lng replace the position, and the
-	// place name with it ("" = NULL). Like the real query it does not check
-	// for an existing pin — rejecting a move on a pin-less Transaction is the
-	// service's job, so a test asserting that rejection exercises the service.
+	// place name with it ("" = NULL), or give a pin-less Transaction its pin.
+	// Applied before the note: the real UPDATE sets both in one statement, so
+	// a note sent with a new pin lands on it.
 	if arg.LocationLat != nil && arg.LocationLng != nil {
 		loc := model.TransactionLocation{}
 		if t.Location != nil {
@@ -249,6 +238,17 @@ func (f *fakeTransactionRepo) UpdateTransaction(_ context.Context, _ pgx.Tx, arg
 		if arg.LocationName != nil && *arg.LocationName != "" {
 			name := *arg.LocationName
 			loc.PlaceName = &name
+		}
+		t.Location = &loc
+	}
+	// Mirrors the real CASE: nil = unchanged, "" = NULL. Replaces Location
+	// rather than mutating it — copies handed out earlier share the pointer.
+	if arg.LocationNote != nil && t.Location != nil {
+		loc := *t.Location
+		loc.Note = nil
+		if *arg.LocationNote != "" {
+			note := *arg.LocationNote
+			loc.Note = &note
 		}
 		t.Location = &loc
 	}

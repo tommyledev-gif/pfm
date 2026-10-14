@@ -131,13 +131,13 @@ function WalletCarouselView({
                     accentColor={accentForIndex(index % wallets.length, wallets.length)}
                     animatedStyle={{
                       marginRight: isLast ? 0 : -CARD_OVERLAP,
+                      // The paint order on iOS, and which card a tap lands on
+                      // where two overlap. Android draws by the elevation
+                      // below first, which follows the scroll natively, so a
+                      // late re-render here no longer shows (see
+                      // wallet-carousel-motion).
                       zIndex: rendered.length - proximity,
-                      // Android orders siblings by elevation before zIndex, so
-                      // the two have to agree or the stack inverts there. Kept in
-                      // a small range because on Android elevation is also the
-                      // shadow's size — ordering by raw index would give the
-                      // centre card a shadow the size of the card.
-                      elevation: Math.max(0, 8 - proximity),
+                      elevation: motion.elevation,
                       transform: [
                         { perspective: CARD_PERSPECTIVE },
                         { translateX: motion.translateX },

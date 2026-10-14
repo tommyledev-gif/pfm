@@ -29,9 +29,8 @@ const toInput = (location: TransactionLocation): TransactionLocationInput => ({
  *
  * Before the proposal is saved, a pin can be added, moved or removed; it rides
  * on the proposal and is sent with the create. Once saved, the server allows
- * moving the pin and editing its note, never adding or removing it
- * (dto.UpdateTransactionRequest), so a saved proposal without a pin shows a
- * locked tile instead of hiding it.
+ * moving the pin, editing its note and, for one saved without a pin, adding
+ * one (2026-10-14), never removing it (dto.UpdateTransactionRequest).
  *
  * Every confirm spreads the payload into POST /transactions, so the payload
  * already says whether the saved transaction has a pin. The server copy is
@@ -55,6 +54,7 @@ export function useProposalLocation({ visible, payloadPin, transactionId }: UseP
     sheetVisible: visible,
     onConfirm: (location, intent) => {
       // A saved pin is moved, never removed: the server has no such update.
+      // A pin just added to a saved one ("adjust") can still be dropped.
       if (intent === "saved" && !location) return;
       setEdited(location);
     },
@@ -65,7 +65,15 @@ export function useProposalLocation({ visible, payloadPin, transactionId }: UseP
 
   /** The location half of a saved proposal's PATCH: only what changed. */
   const savedPatch = (): SavedProposalPatch => {
-    if (!saved || !pin || !basePin) return {};
+    if (!saved || !pin) return {};
+    // A pin added to a saved transaction that had none (2026-10-14), with its note.
+    if (!basePin) {
+      const note = pin.note?.trim() ?? "";
+      return {
+        location: { latitude: pin.latitude, longitude: pin.longitude, place_name: pin.place_name },
+        ...(note ? { location_note: note } : {}),
+      };
+    }
     const patch: SavedProposalPatch = {};
     if (moved) patch.location = { latitude: pin.latitude, longitude: pin.longitude, place_name: pin.place_name };
     const note = pin.note?.trim() ?? "";
@@ -82,22 +90,13 @@ export function useProposalLocation({ visible, payloadPin, transactionId }: UseP
         locked: false,
         accessibilityLabel: `Vị trí: ${pin.place_name ?? "chưa có tên khu vực"}. Mở bản đồ`,
       }
-    : saved && basePin === null
-      ? {
-          summary: "Chưa ghim",
-          detail: "Chỉ ghim lúc tạo",
-          muted: true,
-          pinned: false,
-          locked: true,
-          accessibilityLabel: "Vị trí: chưa ghim. Giao dịch đã lưu không thêm được vị trí.",
-        }
-      : {
-          summary: "Thêm vị trí",
-          muted: true,
-          pinned: false,
-          locked: false,
-          accessibilityLabel: "Thêm vị trí",
-        };
+    : {
+        summary: "Thêm vị trí",
+        muted: true,
+        pinned: false,
+        locked: false,
+        accessibilityLabel: "Thêm vị trí",
+      };
 
   return {
     tile,
@@ -105,8 +104,8 @@ export function useProposalLocation({ visible, payloadPin, transactionId }: UseP
     pin,
     savedPatch,
     stepChild: step.child,
-    // A saved pin opens to look at first ("saved"); an unsaved one can also be
+    // A saved pin opens to look at first ("saved"); any other can also be
     // removed from there ("Bỏ ghim"), and none yet takes a GPS fix.
-    open: () => step.open(pin, saved ? "saved" : "adjust"),
+    open: () => step.open(pin, saved && basePin ? "saved" : "adjust"),
   };
 }

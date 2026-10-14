@@ -41,7 +41,7 @@ export function ItemsEntryRow({ lines, currency, pendingCount, loading, onPress,
       summary={summary}
       detail={compact && !loading ? total : undefined}
       muted={count === 0}
-      icon={compact ? <ReceiptIcon size={ICON_SIZE} color={count > 0 ? colors.green : colors.textMuted} /> : undefined}
+      icon={compact ? <ReceiptIcon size={ICON_SIZE} color={count > 0 ? colors.accentMuted : colors.textMuted} /> : undefined}
       onPress={onPress}
       disabled={loading}
       compact={compact}

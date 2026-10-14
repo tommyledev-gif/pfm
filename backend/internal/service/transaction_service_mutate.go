@@ -18,9 +18,9 @@ import (
 // UpdateTransaction implements US-04. type is structurally excluded from
 // dto.UpdateTransactionRequest (Context #5) — only amount, category_id,
 // wallet_id (moving an income/expense to another same-currency Wallet, see
-// transaction_service_wallet_move.go), occurred_at, note, location (moving an
-// existing pin: new coordinates + place name) and location_note can ever
-// change; a pin can be moved but never added or removed. Always opens one DB
+// transaction_service_wallet_move.go), occurred_at, note, location (moving the
+// pin, or adding one to a Transaction without: new coordinates + place name)
+// and location_note can ever change; a pin is never removed. Always opens one DB
 // transaction (plan.md Finding #13), even when amount is unchanged, so the
 // balance adjustments (when present) and the row update never observably
 // split. The insufficient-balance floor does NOT apply here (spec.md

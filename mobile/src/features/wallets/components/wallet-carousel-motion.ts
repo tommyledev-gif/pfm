@@ -32,13 +32,18 @@ export const CARD_PERSPECTIVE = 900;
 // then sweeps in over it. The path is mirrored, so the outgoing card runs the
 // same one in reverse: out to the side, then tucking back under.
 //
-// ⚠️ Why: paint order is JS state (centreIndex) and flips at the halfway
-// mark. Resting neighbours overlap the centre card by design, so if the two
-// swapping cards still overlapped there, the incoming one would visibly jump
-// on top. Between 0.3 and 0.7 of a swipe the two cards do not overlap (8px
-// clear at the halfway mark, 3px at the window's edges, tilt and perspective
-// included), so the flip lands unseen even when the re-render is a few frames
-// late. Change a scale, tilt or position above and these need re-checking.
+// ⚠️ Why: paint order flips at the halfway mark. Resting neighbours overlap
+// the centre card by design, so if the two swapping cards still overlapped
+// there, the incoming one would visibly jump on top. Between 0.3 and 0.7 of a
+// swipe the two cards do not overlap (8px clear at the halfway mark, 3px at
+// the window's edges, tilt and perspective included), so the flip lands
+// unseen. Change a scale, tilt or position above and these need re-checking.
+//
+// On Android the flip is the elevation below, on the native driver, so it
+// lands exactly at the halfway mark at any swipe speed. It used to follow
+// the JS zIndex (centreIndex): a quick flick crossed the whole 0.3–0.7 window
+// before that re-render landed, and the cards swapped over while overlapping.
+// iOS still orders by that JS zIndex: Fabric there has no native zIndex.
 const SWAP_INNER_X = 106; // at 0.3
 const SWAP_CLEAR_X = 112; // from 0.5 to 0.7
 const KEYFRAMES: [offset: number, x: number][] = [
@@ -59,6 +64,14 @@ const SHUFFLE_OUTPUT = SHUFFLE_INPUT.map((offset) => {
 
 const NEAR = [-1, 0, 1];
 const FAR = [-2, -1, 0, 1, 2];
+
+// Android draws siblings in elevation order before zIndex. Falling steadily
+// with distance from the centre, it puts the incoming card over the outgoing
+// one exactly where their distances cross: the halfway mark. Kept in a small
+// range because elevation is also the shadow's size.
+const CENTRE_ELEVATION = 8;
+const NEIGHBOUR_ELEVATION = 7;
+const FAR_ELEVATION = 6;
 
 /**
  * Each rendered card's native-driven motion, built once per card count.
@@ -89,6 +102,11 @@ export function useCardMotion(count: number, scrollX: Animated.Value) {
           opacity: offset.interpolate({
             inputRange: FAR,
             outputRange: [0, NEIGHBOUR_OPACITY, 1, NEIGHBOUR_OPACITY, 0],
+            extrapolate: "clamp",
+          }),
+          elevation: offset.interpolate({
+            inputRange: FAR,
+            outputRange: [FAR_ELEVATION, NEIGHBOUR_ELEVATION, CENTRE_ELEVATION, NEIGHBOUR_ELEVATION, FAR_ELEVATION],
             extrapolate: "clamp",
           }),
           // Fades the accent border in on whichever card is centred.

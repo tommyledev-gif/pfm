@@ -11,8 +11,8 @@ import (
 )
 
 // Moving an existing pin via PATCH `location` (2026-10-07): new coordinates
-// and a new place name; the note is untouched; a pin-less Transaction cannot
-// gain one.
+// and a new place name; the note is untouched. A pin-less Transaction gains
+// one through the same field (2026-10-14).
 
 func moveReq(lat, lng float64, placeName *string) *dto.TransactionLocationMoveRequest {
 	return &dto.TransactionLocationMoveRequest{Latitude: &lat, Longitude: &lng, PlaceName: placeName}
@@ -67,25 +67,46 @@ func TestTransactionService_MoveLocation_UpdatesPinKeepsNote(t *testing.T) {
 	assertAuditPin(t, after["location"], 21.0285, 105.8542, "Hoàn Kiếm, Hà Nội")
 }
 
-func TestTransactionService_MoveLocation_RejectedWithoutLocation(t *testing.T) {
+// A Transaction created without a pin gains one through the same field
+// (2026-10-14), its note in the same PATCH; the log shows both as added.
+func TestTransactionService_MoveLocation_AddsPinWithoutLocation(t *testing.T) {
 	svc, txRepo, walletRepo, categoryRepo := newTestTransactionService(t)
 	userID := uuid.New()
 	transaction := createExpenseWithLocation(t, svc, txRepo, walletRepo, categoryRepo, userID, nil)
 
-	_, _, err := svc.UpdateTransaction(context.Background(), userID, transaction.ID, dto.UpdateTransactionRequest{
-		Location: moveReq(10.7769, 106.7009, strPtr("Quận 1")),
+	updated, _, err := svc.UpdateTransaction(context.Background(), userID, transaction.ID, dto.UpdateTransactionRequest{
+		Location:     moveReq(10.7769, 106.7009, strPtr("Quận 1")),
+		LocationNote: strPtr(" Hẻm 12 "),
 	})
-	assertAppErrCode(t, err, common.ErrCodeInvalidInput)
-
-	fetched, err := svc.GetTransaction(context.Background(), userID, transaction.ID)
 	if err != nil {
-		t.Fatalf("unexpected get error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if fetched.Location != nil {
-		t.Fatalf("a rejected move must not add a pin, got %+v", fetched.Location)
+	loc := updated.Location
+	if loc == nil || loc.Latitude != 10.7769 || loc.Longitude != 106.7009 {
+		t.Fatalf("expected a pin added at 10.7769,106.7009, got %+v", loc)
 	}
-	if entries := txRepo.auditLogsFor(transaction.ID); len(entries) != 1 {
-		t.Fatalf("a rejected update must write no audit entry, got %d entries", len(entries))
+	if loc.PlaceName == nil || *loc.PlaceName != "Quận 1" {
+		t.Fatalf("expected the place name stored, got %v", loc.PlaceName)
+	}
+	if loc.Note == nil || *loc.Note != "Hẻm 12" {
+		t.Fatalf("expected the note sent with the new pin, trimmed, got %v", loc.Note)
+	}
+
+	entries := txRepo.auditLogsFor(transaction.ID)
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 audit entries, got %d", len(entries))
+	}
+	before := decodeAuditSide(t, entries[1].Before)
+	after := decodeAuditSide(t, entries[1].After)
+	if v, ok := before["location"]; !ok || v != nil {
+		t.Fatalf("expected before.location=null for an added pin, got %v (present=%v)", v, ok)
+	}
+	if v, ok := before["location_note"]; !ok || v != nil {
+		t.Fatalf("expected before.location_note=null for an added pin, got %v (present=%v)", v, ok)
+	}
+	assertAuditPin(t, after["location"], 10.7769, 106.7009, "Quận 1")
+	if after["location_note"] != "Hẻm 12" {
+		t.Fatalf("expected after.location_note=Hẻm 12, got %v", after["location_note"])
 	}
 }
 

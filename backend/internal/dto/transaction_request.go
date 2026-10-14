@@ -100,16 +100,16 @@ type UpdateTransactionRequest struct {
 	WalletID   *uuid.UUID `json:"wallet_id"`
 	OccurredAt *string    `json:"occurred_at"`
 	Note       *string    `json:"note" validate:"omitempty,max=500"`
-	// Location moves the Transaction's existing pin (coordinates + place
-	// name). Absent (or null) leaves the pin unchanged — null does NOT remove
-	// it. Rejected by the service when the Transaction has no location: a pin
-	// can be moved, never added or removed after creation. The pin's note is
-	// untouched by this field; it changes only through LocationNote.
+	// Location moves the Transaction's pin (coordinates + place name), or adds
+	// one to a Transaction created without (2026-10-14). Absent (or null)
+	// leaves the pin unchanged — null does NOT remove it; a pin is never
+	// removed. The pin's note is untouched by this field; it changes only
+	// through LocationNote.
 	Location *TransactionLocationMoveRequest `json:"location"`
 	// LocationNote edits the note on the Transaction's location, independently
 	// of Location. Absent (or null) leaves it unchanged, a non-empty string
 	// sets it, "" clears it. Rejected by the service when the Transaction has
-	// no location.
+	// no location and this PATCH does not add one.
 	LocationNote *string `json:"location_note" validate:"omitempty,max=500"`
 	// Items replaces the whole Item and Adjustment list when present: absent or
 	// null leaves both unchanged, [] removes both (specs/transaction-line-items
