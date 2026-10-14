@@ -1,5 +1,6 @@
 import { formatCurrency } from "@/lib/currency";
 import { formatDateDMY, formatTime } from "@/lib/format-date";
+import { proposalAmountSign } from "@/features/ai-chat/proposal-kind";
 import { TransactionActionPayload } from "@/features/ai-chat/types";
 
 const COPY_LABELS = {
@@ -33,7 +34,7 @@ export function formatProposalForCopy({
   currency,
   createdAtMs,
 }: ProposalCopyInput): string {
-  const sign = payload.type === "income" ? "+" : "-";
+  const sign = proposalAmountSign(payload.type);
   const lines = [
     `${COPY_LABELS.date}: ${formatDateDMY(payload.occurred_at)}`,
     `${COPY_LABELS.amount}: ${sign}${formatCurrency(payload.amount, currency)}`,

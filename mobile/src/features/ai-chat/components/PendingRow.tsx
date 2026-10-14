@@ -5,6 +5,7 @@ import { CheckIcon, EditIcon, HistoryIcon, TrashIcon } from "@/components/ui/Ico
 import { formatCurrency } from "@/lib/currency";
 import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { proposalAmountSign } from "@/features/ai-chat/proposal-kind";
 import { ChatMessage } from "@/features/ai-chat/types";
 
 interface PendingRowProps {
@@ -26,7 +27,9 @@ interface PendingRowProps {
 export function PendingRow({ message, label, currency, closeSignal, onOpen, onRequestRemove }: PendingRowProps) {
   const colors = useColors();
   const styles = useStyles();
-  const isIncome = message.action?.payload.type === "income";
+  const type = message.action?.payload.type ?? "expense";
+  const isIncome = type === "income";
+  const isTransfer = type === "transfer";
 
   return (
     <SwipeableRow
@@ -59,15 +62,15 @@ export function PendingRow({ message, label, currency, closeSignal, onOpen, onRe
             {label}
           </Text>
           <Text style={styles.hint} numberOfLines={1}>
-            Chạm để duyệt mục {isIncome ? "thu" : "chi"}
+            Chạm để duyệt mục {isTransfer ? "chuyển khoản" : isIncome ? "thu" : "chi"}
           </Text>
         </View>
         <Text
           testID={`text-pending-amount-${message.id}`}
-          style={[styles.amount, { color: isIncome ? colors.green : colors.peach }]}
+          style={[styles.amount, { color: isTransfer ? colors.periwinkle : isIncome ? colors.green : colors.peach }]}
           numberOfLines={1}
         >
-          {isIncome ? "+" : "-"}
+          {proposalAmountSign(type)}
           {formatCurrency(message.action?.payload.amount ?? 0, currency)}
         </Text>
         <View style={styles.checkButton}>

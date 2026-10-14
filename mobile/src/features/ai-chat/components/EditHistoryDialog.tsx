@@ -3,6 +3,7 @@ import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { PillButton } from "@/components/ui/PillButton";
 import { formatCurrencyTruncated } from "@/lib/currency";
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
+import { proposalAmountSign } from "@/features/ai-chat/proposal-kind";
 import { EditHistoryEntry } from "@/features/ai-chat/types";
 
 interface EditHistoryDialogProps {
@@ -32,7 +33,6 @@ export function EditHistoryDialog({ visible, history, currency, onClose }: EditH
           <Text style={styles.title}>Lịch sử chỉnh sửa</Text>
           <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
             {newestFirst.map(({ entry, label }, index) => {
-              const isIncome = entry.payload.type === "income";
               const date = new Date(entry.timestamp);
               return (
                 <View key={`${entry.timestamp}_${index}`} style={styles.row}>
@@ -45,7 +45,7 @@ export function EditHistoryDialog({ visible, history, currency, onClose }: EditH
                     </Text>
                   </View>
                   <Text style={styles.rowDetail}>
-                    {isIncome ? "+" : "-"}
+                    {proposalAmountSign(entry.payload.type)}
                     {formatCurrencyTruncated(entry.payload.amount, currency)}
                     {entry.payload.note ? ` · ${entry.payload.note}` : ""}
                   </Text>

@@ -4,6 +4,7 @@ import { HistoryIcon, TrashIcon } from "@/components/ui/Icon";
 import { formatCurrencyTruncated } from "@/lib/currency";
 import { formatDateShort, formatTime } from "@/lib/format-date";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { proposalAmountSign } from "@/features/ai-chat/proposal-kind";
 import { TombstoneKind } from "@/features/ai-chat/tombstone";
 import { TransactionActionPayload } from "@/features/ai-chat/types";
 
@@ -65,7 +66,7 @@ export function TransactionTombstoneCard({
           {label}
         </Text>
         <Text style={styles.amount} numberOfLines={1}>
-          {payload.type === "income" ? "+" : "-"}
+          {proposalAmountSign(payload.type)}
           {formatCurrencyTruncated(payload.amount, currency)}
         </Text>
       </View>

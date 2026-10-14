@@ -1,5 +1,6 @@
 import { formatCurrency } from "@/lib/currency";
 import { formatDateShort } from "@/lib/format-date";
+import { proposalCategoryName } from "@/features/ai-chat/proposal-kind";
 import { ChatMessage } from "@/features/ai-chat/types";
 
 interface RemovalCopyOptions {
@@ -43,7 +44,7 @@ export function removalDialogCopy(
     };
   }
 
-  const name = payload.note || resolveCategoryName(payload.category_id) || "Giao dịch";
+  const name = payload.note || proposalCategoryName(payload, resolveCategoryName) || "Giao dịch";
   return {
     title: "Xóa giao dịch này?",
     message: [

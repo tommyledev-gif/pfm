@@ -36,9 +36,16 @@ export function useConfirmProposal() {
     if (!message.action || !wallets.data) return false;
     const { payload, idempotency_key } = message.action;
     if (payload.wallet_id === null || !isSavableProposal(payload, walletById)) return false;
+    // A transfer names its destination and goes without a category (the
+    // server files it under its own) or items (it has none); income/expense
+    // must not name a destination at all.
+    const { category_id, to_wallet_id, items, adjustments, ...common } = payload;
+    const kindFields =
+      payload.type === "transfer" ? { to_wallet_id: to_wallet_id ?? undefined } : { category_id, items, adjustments };
     try {
       const transaction = await createTransaction.mutateAsync({
-        ...payload,
+        ...common,
+        ...kindFields,
         wallet_id: payload.wallet_id,
         note: payload.note ?? undefined,
         idempotency_key,

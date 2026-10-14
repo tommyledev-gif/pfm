@@ -8,6 +8,7 @@ import { formatDateShort, formatTime } from "@/lib/format-date";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useAuditLogsQuery } from "@/features/audit-logs/api/use-audit-logs-query";
 import { AuditAction, AuditLogEntry } from "@/features/audit-logs/types";
+import { proposalAmountSign } from "@/features/ai-chat/proposal-kind";
 import { TombstoneKind } from "@/features/ai-chat/tombstone";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { AuditItemsDiff } from "@/features/audit-logs/components/AuditItemsDiff";
@@ -153,7 +154,7 @@ export function TransactionHistoryDrawer({
                     </Text>
                   </View>
                   <Text style={styles.entryDetail} numberOfLines={2}>
-                    {item.payload.type === "income" ? "+" : "-"}
+                    {proposalAmountSign(item.payload.type)}
                     {formatCurrencyTruncated(item.payload.amount, currency)}
                     {item.payload.note ? ` · ${item.payload.note}` : ""}
                   </Text>

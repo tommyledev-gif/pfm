@@ -1,7 +1,7 @@
 import { memo } from "react";
 
 import { ActionPopover } from "@/components/shared/ActionPopover";
-import { FALLBACK_CURRENCY } from "@/lib/constants";
+import { FALLBACK_CURRENCY, TRANSFER_CATEGORY_ICON } from "@/lib/constants";
 import { BudgetWizardCard } from "@/features/ai-chat/components/BudgetWizardCard";
 import { ChatBubble } from "@/features/ai-chat/components/ChatBubble";
 import { SwipeableMessageRow } from "@/features/ai-chat/components/SwipeableMessageRow";
@@ -10,7 +10,8 @@ import { TransactionTombstoneCard } from "@/features/ai-chat/components/Transact
 import { useHoldMenu } from "@/features/ai-chat/hooks/use-hold-menu";
 import { useMessageActions } from "@/features/ai-chat/hooks/use-message-actions";
 import { isEditLocked } from "@/features/ai-chat/edit-lock";
-import { isSavableProposal, NO_WALLET_LABEL } from "@/features/ai-chat/proposal-wallet";
+import { proposalCategoryName } from "@/features/ai-chat/proposal-kind";
+import { isSavableProposal, proposalWalletName } from "@/features/ai-chat/proposal-wallet";
 import { isRemovable, tombstoneKind } from "@/features/ai-chat/tombstone";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { Category } from "@/features/categories/types";
@@ -68,16 +69,22 @@ function ChatMessageRowView({
 }: ChatMessageRowProps) {
   const wallet = message.action ? walletById.get(message.action.payload.wallet_id ?? "") : undefined;
   const currency = wallet?.currency ?? FALLBACK_CURRENCY;
-  const budget = message.action
-    ? budgetByCategoryCurrency.get(`${message.action.payload.category_id}|${currency}`)
-    : undefined;
-  const category = message.action ? categoryById.get(message.action.payload.category_id) : undefined;
+  // Only an expense spends a budget.
+  const budget =
+    message.action?.payload.type === "expense"
+      ? budgetByCategoryCurrency.get(`${message.action.payload.category_id}|${currency}`)
+      : undefined;
+  const isTransfer = message.action?.payload.type === "transfer";
+  // A transfer is shown under the system transfer category, never the one it
+  // carried before it became one.
+  const category = message.action && !isTransfer ? categoryById.get(message.action.payload.category_id) : undefined;
   const kind = tombstoneKind(message);
-  const walletName = wallet?.name ?? (message.action?.payload.wallet_id === null ? NO_WALLET_LABEL : "Ví");
+  const walletName = message.action ? proposalWalletName(message.action.payload, walletById) : "Ví";
   // A proposal without a VND Wallet opens the edit form instead of saving
   // (spec AC-31, AC-32).
   const walletRequired = message.action ? !isSavableProposal(message.action.payload, walletById) : false;
-  const categoryName = category?.name ?? "Danh mục";
+  const categoryName =
+    (message.action && proposalCategoryName(message.action.payload, (id) => categoryById.get(id)?.name)) || "Danh mục";
   const onEdit = isEditLocked(message) ? undefined : () => onTriggerEdit(message);
   const onDelete = isRemovable(message) ? () => onTriggerDelete(message) : undefined;
 
@@ -125,7 +132,7 @@ function ChatMessageRowView({
             budgetSpent={budget?.spent}
             walletName={walletName}
             categoryName={categoryName}
-            categoryIcon={category?.icon}
+            categoryIcon={isTransfer ? TRANSFER_CATEGORY_ICON : category?.icon}
             categoryIconUrl={category?.icon_url}
             currency={currency}
             confirmed={Boolean(message.confirmed)}

@@ -17,7 +17,8 @@ interface TransactionTypeChipsProps {
 
 // The type as a segmented control, the app's own SegmentedTabs (2026-10-14,
 // was a row of chips): one choice out of three fixed ones, which is what a
-// segmented control is for. Split from TransactionFormModal for its 300-line limit.
+// segmented control is for. Split from TransactionFormModal for its 300-line
+// limit; the AI chat's edit sheet (EditTransactionChoices) uses it too.
 export function TransactionTypeChips({ type, locked, itemCount, onSelect, onClearItems }: TransactionTypeChipsProps) {
   const [confirmTransfer, setConfirmTransfer] = useState(false);
 

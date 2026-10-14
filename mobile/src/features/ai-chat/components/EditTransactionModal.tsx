@@ -5,7 +5,7 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Drawer } from "@/components/shared/Drawer";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
 import { SingleDatePickerModal } from "@/components/shared/SingleDatePickerModal";
-import { PROPOSAL_CURRENCY, TransactionType } from "@/lib/constants";
+import { PROPOSAL_CURRENCY, TransactionKind } from "@/lib/constants";
 import { useAmountExpression } from "@/lib/use-amount-expression";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
@@ -14,13 +14,12 @@ import { TransactionKeypadFooter } from "@/features/transactions/components/Tran
 import { TransactionExtrasRow } from "@/features/transactions/components/TransactionExtrasRow";
 import { buildItemsPanelChild } from "@/features/transactions/components/ItemsEditorPanel";
 import { useFormDrawerChild } from "@/features/transactions/components/use-form-drawer-child";
-import { useWalletChangeGuard } from "@/features/transactions/components/use-wallet-change-guard";
-import { useWalletPickerPanel } from "@/features/transactions/components/use-wallet-picker-panel";
 import { useVisibleDrawerChild } from "@/features/transactions/components/use-visible-drawer-child";
 import { useItemsEditor } from "@/features/transactions/items/use-items-editor";
 import { useOpenWalletCreator } from "@/features/wallets/use-open-wallet-creator";
 import { EditTransactionChoices } from "@/features/ai-chat/components/EditTransactionChoices";
 import { useProposalLocation } from "@/features/ai-chat/hooks/use-proposal-location";
+import { useProposalWallets } from "@/features/ai-chat/hooks/use-proposal-wallets";
 import { SavedProposalPatch, TransactionActionPayload } from "@/features/ai-chat/types";
 
 const FALLBACK_CURRENCY = "VND";
@@ -34,8 +33,9 @@ interface EditTransactionModalProps {
   onSave: (payload: TransactionActionPayload, savedPatch: SavedProposalPatch) => void;
   // True when target is already confirmed (a real Transaction exists) —
   // ai-chat.tsx's editAction then PATCHes that Transaction in place. PATCH
-  // has no `type`, so the type stays locked; the wallet can change (after a
-  // dialog saying which balances move), within the same currency.
+  // has no `type`, so the type stays locked; the wallet of an income/expense
+  // can change (after a dialog saying which balances move), within the same
+  // currency, while a transfer's wallets stay locked.
   confirmed?: boolean;
   // The Transaction behind a confirmed proposal. Without one (a message from
   // before ids were kept) nothing is PATCHed, so the wallet stays locked too.
@@ -50,7 +50,9 @@ interface EditTransactionModalProps {
 // date, wrong amount, …) — opened by swiping an assistant chat bubble that
 // carries a transaction action (see ai-chat.tsx). Editing an unconfirmed
 // proposal mutates it in place before it's ever saved; editing an
-// already-confirmed one PATCHes the real Transaction record in place.
+// already-confirmed one PATCHes the real Transaction record in place. An
+// unconfirmed one can also become a transfer between two VND Wallets, which
+// has no category and no items.
 //
 // Same keypad layout as TransactionFormModal (reference-ui/): type, wallet and
 // the "Vị trí" | "Các món" tiles scroll in the body; the amount keypad,
@@ -65,9 +67,11 @@ export function EditTransactionModal({
   transactionId = null,
   vndOnly,
 }: EditTransactionModalProps) {
-  const [type, setType] = useState<TransactionType>("expense");
+  const [type, setType] = useState<TransactionKind>("expense");
+  const isTransfer = type === "transfer";
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [walletId, setWalletId] = useState<string | null>(null);
+  const [toWalletId, setToWalletId] = useState<string | null>(null);
   const wallets = useWalletsQuery();
   const openWalletCreator = useOpenWalletCreator();
   const savedId = confirmed ? transactionId : null;
@@ -76,22 +80,21 @@ export function EditTransactionModal({
   // selected wallet's, which a saved one shares with its original wallet.
   const walletCurrency = wallets.data?.find((w) => w.id === walletId)?.currency;
   const amount = useAmountExpression(vndOnly ? PROPOSAL_CURRENCY : walletCurrency ?? FALLBACK_CURRENCY);
-  const walletChange = useWalletChangeGuard({
-    enabled: savedId !== null,
-    wallets: wallets.data ?? [],
-    originalWalletId: payload?.wallet_id ?? null,
-    selectedWalletId: walletId,
+  const proposalWallets = useProposalWallets({
+    wallets: wallets.data,
+    savedId,
+    vndOnly,
     type,
+    originalWalletId: payload?.wallet_id ?? null,
+    walletId,
+    onChangeWallet: setWalletId,
+    toWalletId,
+    onChangeToWallet: setToWalletId,
     originalAmount: payload?.amount ?? 0,
     currentAmount: amount.cents,
-    onChange: setWalletId,
   });
-  const selectableWallets = vndOnly
-    ? (wallets.data ?? []).filter((w) => w.currency === PROPOSAL_CURRENCY)
-    : walletChange.selectableWallets;
-  // A proposal kept on a non-VND Wallet (or none) starts with nothing chosen.
-  const chosenWalletId = selectableWallets.some((w) => w.id === walletId) ? walletId : null;
-  const currency = wallets.data?.find((w) => w.id === chosenWalletId)?.currency ?? FALLBACK_CURRENCY;
+  const { wallet, destination } = proposalWallets;
+  const currency = wallet?.currency ?? FALLBACK_CURRENCY;
   const { reset: resetAmount } = amount;
   const lines = useItemsEditor(amount);
   const { reset: resetLines } = lines;
@@ -102,7 +105,8 @@ export function EditTransactionModal({
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
 
-  const categories = useCategoriesQuery(type);
+  // A transfer has no category to pick; the expense list stays loaded for it.
+  const categories = useCategoriesQuery(isTransfer ? "expense" : type);
 
   useEffect(() => {
     if (!visible || !payload) return;
@@ -112,6 +116,7 @@ export function EditTransactionModal({
     setItemsOpen(false);
     setCategoryId(payload.category_id);
     setWalletId(payload.wallet_id);
+    setToWalletId(payload.to_wallet_id ?? null);
     // react-native-calendars requires a strict "YYYY-MM-DD" key, but
     // payload.occurred_at may be a full timestamp (see format-date.ts) —
     // the first 10 characters are "YYYY-MM-DD" either way.
@@ -122,11 +127,12 @@ export function EditTransactionModal({
 
   // Switching type can leave a category selected that belongs to the other
   // type's list (expense categories aren't valid once type flips to income).
+  // A transfer keeps the one it had, so switching back restores it.
   useEffect(() => {
-    if (!categories.data) return;
+    if (isTransfer || !categories.data) return;
     if (categoryId && categories.data.some((c) => c.id === categoryId)) return;
     setCategoryId(categories.data[0]?.id ?? null);
-  }, [type, categoryId, categories.data]);
+  }, [isTransfer, categoryId, categories.data]);
 
   const categoryPicker = useCategoryPicker({
     categories: categories.data ?? [],
@@ -158,20 +164,19 @@ export function EditTransactionModal({
     panels.claim("location");
     location.open();
   };
-  // The wallet list, a panel sliding in over the sheet like the category one.
-  const walletPicker = useWalletPickerPanel({
-    title: "Ví",
-    wallets: selectableWallets,
-    selectedId: chosenWalletId,
-    onSelect: walletChange.select,
-  });
-  const drawerChild = useVisibleDrawerChild([panels.drawerChild, walletPicker.child]);
+  const drawerChild = useVisibleDrawerChild([
+    panels.drawerChild,
+    proposalWallets.sourcePicker.child,
+    proposalWallets.destinationPicker.child,
+  ]);
 
+  // A saved transfer keeps the destination it has; only a new one needs one picked.
+  const destinationChosen = Boolean(destination) || savedId !== null;
   const amountValid = amount.cents !== null && amount.cents > 0;
-  const canSave = amountValid && Boolean(categoryId) && Boolean(chosenWalletId) && Boolean(occurredAt);
-  const errors = submitAttempted
-    ? [categoryId ? undefined : "Chọn danh mục.", amount.problem ?? (amountValid ? undefined : "Nhập số tiền.")]
-    : [];
+  const kindChosen = isTransfer ? destinationChosen : Boolean(categoryId);
+  const canSave = amountValid && kindChosen && Boolean(wallet) && Boolean(occurredAt);
+  const kindError = isTransfer ? (destinationChosen ? undefined : "Chọn ví nhận.") : categoryId ? undefined : "Chọn danh mục.";
+  const errors = submitAttempted ? [kindError, amount.problem ?? (amountValid ? undefined : "Nhập số tiền.")] : [];
 
   const submit = () => {
     Keyboard.dismiss();
@@ -179,25 +184,27 @@ export function EditTransactionModal({
     // Trims/evaluates an expression still being typed ("120+"), so what is
     // saved is exactly what the amount display then shows.
     const cents = amount.resolve();
-    if (cents === null || cents <= 0 || !categoryId || !chosenWalletId || !occurredAt) return;
+    if (cents === null || cents <= 0 || !kindChosen || !wallet || !occurredAt || !payload) return;
     // BR-07: an unfinished line, or lines that do not add up to the amount,
-    // block the save; the "Các món" tile says which.
-    if (lines.problem) return;
-    const lineInputs = lines.items.length > 0 ? lines.toInputs() : null;
-    const walletMoved = savedId !== null && chosenWalletId !== payload?.wallet_id;
+    // block the save; the "Các món" tile says which. A transfer has none.
+    if (!isTransfer && lines.problem) return;
+    const lineInputs = !isTransfer && lines.items.length > 0 ? lines.toInputs() : null;
+    const walletMoved = savedId !== null && wallet.id !== payload.wallet_id;
     onSave(
       {
-        wallet_id: chosenWalletId,
-        category_id: categoryId,
+        wallet_id: wallet.id,
+        // On a transfer, the category it had before: kept, never sent.
+        category_id: categoryId ?? payload.category_id,
         amount: cents,
         type,
         note: note.trim() || null,
         occurred_at: occurredAt,
+        ...(isTransfer ? { to_wallet_id: destination?.id ?? payload.to_wallet_id ?? null } : {}),
         ...(lineInputs ? { items: lineInputs.items } : {}),
         ...(lineInputs && lineInputs.adjustments.length > 0 ? { adjustments: lineInputs.adjustments } : {}),
         ...(location.pin ? { location: location.pin } : {}),
       },
-      savedId !== null ? { ...(walletMoved ? { wallet_id: chosenWalletId } : {}), ...location.savedPatch() } : {},
+      savedId !== null ? { ...(walletMoved ? { wallet_id: wallet.id } : {}), ...location.savedPatch() } : {},
     );
   };
 
@@ -213,6 +220,7 @@ export function EditTransactionModal({
             currency={currency}
             type={type}
             category={categoryPicker.selected[0] ?? null}
+            transferTarget={destination}
             onPressCategory={openCategoryPicker}
             note={note}
             onChangeNote={setNote}
@@ -235,17 +243,23 @@ export function EditTransactionModal({
           type={type}
           onChangeType={setType}
           typeLocked={confirmed}
-          wallet={selectableWallets.find((w) => w.id === chosenWalletId) ?? null}
-          onOpenWallets={walletPicker.open}
-          walletLocked={confirmed && savedId === null}
-          noVndWallet={Boolean(vndOnly && wallets.data && selectableWallets.length === 0)}
+          itemCount={lines.items.length}
+          onClearItems={lines.clear}
+          wallet={wallet}
+          onOpenWallets={proposalWallets.sourcePicker.open}
+          walletLocked={confirmed && (savedId === null || isTransfer)}
+          destination={destination}
+          destinationCount={proposalWallets.destinations.length}
+          onOpenDestinations={proposalWallets.destinationPicker.open}
+          destinationLocked={confirmed}
+          noVndWallet={Boolean(vndOnly && wallets.data && proposalWallets.selectable.length === 0)}
           // Closed first: the sheet would otherwise sit over the Wallets
           // screen it just opened.
           onCreateVndWallet={() => {
             onClose();
             openWalletCreator();
           }}
-          otherCurrenciesHidden={savedId !== null && walletChange.hidesOtherCurrencies}
+          otherCurrenciesHidden={savedId !== null && proposalWallets.hidesOtherCurrencies}
         />
 
         <TransactionExtrasRow
@@ -256,10 +270,11 @@ export function EditTransactionModal({
           currency={currency}
           onPressItems={openItemsEditor}
           itemsError={submitAttempted ? lines.problem : undefined}
+          showItems={!isTransfer}
         />
       </Drawer>
 
-      <ConfirmDialog {...walletChange.dialog} />
+      <ConfirmDialog {...proposalWallets.changeDialog} />
 
       <SingleDatePickerModal
         visible={datePickerOpen}

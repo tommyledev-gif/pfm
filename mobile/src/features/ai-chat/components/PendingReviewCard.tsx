@@ -6,8 +6,10 @@ import { colorForCategory } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
 import { formatDateShort } from "@/lib/format-date";
 import { withAlpha } from "@/lib/color";
+import { TRANSFER_CATEGORY_ICON } from "@/lib/constants";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { Category } from "@/features/categories/types";
+import { proposalAmountSign, proposalCategoryName } from "@/features/ai-chat/proposal-kind";
 import { ChatMessage } from "@/features/ai-chat/types";
 
 interface PendingReviewCardProps {
@@ -50,7 +52,8 @@ export function PendingReviewCard({
   if (!payload) return null;
 
   const isIncome = payload.type === "income";
-  const categoryName = category?.name ?? "Danh mục";
+  const isTransfer = payload.type === "transfer";
+  const categoryName = proposalCategoryName(payload, () => category?.name) ?? "Danh mục";
   const title = payload.note || categoryName;
   const busy = locked || confirming;
 
@@ -64,10 +67,10 @@ export function PendingReviewCard({
       <View style={styles.topRow}>
         <Avatar
           name={categoryName}
-          color={colorForCategory(payload.category_id)}
+          color={isTransfer ? colors.periwinkle : colorForCategory(payload.category_id)}
           size={40}
-          icon={category?.icon}
-          iconUrl={category?.icon_url}
+          icon={isTransfer ? TRANSFER_CATEGORY_ICON : category?.icon}
+          iconUrl={isTransfer ? undefined : category?.icon_url}
         />
         <View style={styles.identity}>
           <Text style={styles.title} numberOfLines={1}>
@@ -79,8 +82,11 @@ export function PendingReviewCard({
             {walletName}
           </Text>
         </View>
-        <Text style={[styles.amount, { color: isIncome ? colors.green : colors.textPrimary }]} numberOfLines={1}>
-          {isIncome ? "+" : "-"}
+        <Text
+          style={[styles.amount, { color: isTransfer ? colors.periwinkle : isIncome ? colors.green : colors.textPrimary }]}
+          numberOfLines={1}
+        >
+          {proposalAmountSign(payload.type)}
           {formatCurrency(payload.amount, currency)}
         </Text>
       </View>

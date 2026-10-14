@@ -16,8 +16,6 @@ interface UseSheetDragOptions {
   /** The sheet's own slide transform — dragging writes straight into it. */
   translateY: Animated.Value;
   onClose: () => void;
-  /** False for a sheet that is already full height (DrawerChildPanel). */
-  expandable?: boolean;
 }
 
 /**
@@ -31,7 +29,7 @@ interface UseSheetDragOptions {
  * ScrollView, and a sheet-wide responder would fight it for every vertical
  * scroll. Plain PanResponder — gesture-handler is not a dependency here.
  */
-export function useSheetDrag({ translateY, onClose, expandable = true }: UseSheetDragOptions) {
+export function useSheetDrag({ translateY, onClose }: UseSheetDragOptions) {
   const [expanded, setExpanded] = useState(false);
   const restingHeight = useRef(0);
 
@@ -77,7 +75,6 @@ export function useSheetDrag({ translateY, onClose, expandable = true }: UseShee
           return;
         }
         springBack();
-        if (!expandable) return;
         if (g.dy < -TOGGLE_DISTANCE) setExpandedAnimated(true);
         else if (g.dy > TOGGLE_DISTANCE) setExpandedAnimated(false);
       },

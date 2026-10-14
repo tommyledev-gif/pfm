@@ -18,7 +18,7 @@ import { useTransactionRemoval } from "@/features/ai-chat/components/use-transac
 import { useChatActions } from "@/features/ai-chat/hooks/use-chat-actions";
 import { useConfirmProposal } from "@/features/ai-chat/hooks/use-confirm-proposal";
 import { isPendingProposal } from "@/features/ai-chat/pending";
-import { isSavableProposal, NO_WALLET_LABEL } from "@/features/ai-chat/proposal-wallet";
+import { isSavableProposal, proposalWalletName } from "@/features/ai-chat/proposal-wallet";
 import { removalDialogCopy } from "@/features/ai-chat/removal-copy";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
@@ -66,10 +66,12 @@ export default function PendingReviewScreen() {
 
   // Net effect on wallet balances if everything in the tab were approved.
   // Only summable within one currency — a mixed set says so instead of
-  // adding VND to USD.
+  // adding VND to USD. A transfer moves money between two of the User's own
+  // wallets, so it adds nothing.
   const currencies = new Set(visible.map(currencyOf));
   const net = visible.reduce((sum, m) => {
     const p = m.action!.payload;
+    if (p.type === "transfer") return sum;
     return sum + (p.type === "income" ? p.amount : -p.amount);
   }, 0);
   const netLabel =
@@ -114,10 +116,7 @@ export default function PendingReviewScreen() {
           <PendingReviewCard
             message={item}
             category={categoryById.get(item.action?.payload.category_id ?? "")}
-            walletName={
-              walletById.get(item.action?.payload.wallet_id ?? "")?.name ??
-              (item.action?.payload.wallet_id === null ? NO_WALLET_LABEL : "Ví")
-            }
+            walletName={item.action ? proposalWalletName(item.action.payload, walletById) : "Ví"}
             currency={currencyOf(item)}
             confirming={proposals.confirmingId === item.id}
             locked={proposals.confirmingAll}

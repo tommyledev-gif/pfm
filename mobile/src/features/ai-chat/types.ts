@@ -1,5 +1,5 @@
 import { ConsultMessageData } from "@/features/analytics/types";
-import { TransactionType } from "@/lib/constants";
+import { TransactionKind } from "@/lib/constants";
 import {
   TransactionAdjustmentInput,
   TransactionItemInput,
@@ -17,9 +17,17 @@ export interface TransactionActionPayload {
   // null only when the User owns no VND Wallet — such a proposal must be
   // edited onto a VND Wallet before it can be saved (proposal-wallet.ts).
   wallet_id: string | null;
+  // For a transfer this is whatever category it had before the User made it
+  // one — kept for switching back, never sent or shown: the server files a
+  // transfer under its own system category.
   category_id: string;
   amount: number;
-  type: TransactionType;
+  // The AI only ever proposes income or expense; "transfer" comes from the
+  // User editing the proposal (EditTransactionModal).
+  type: TransactionKind;
+  // A transfer's destination Wallet, picked in the edit form. Absent or null
+  // on income/expense — the server refuses one there.
+  to_wallet_id?: string | null;
   note: string | null;
   occurred_at: string;
   // One purchase listed line by line (specs/transaction-line-items); amount

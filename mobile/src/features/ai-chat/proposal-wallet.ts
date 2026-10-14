@@ -21,6 +21,16 @@ export const NO_VND_WALLET_HINT = "Chưa có ví VND. Tạo ví VND để lưu g
  */
 export function isSavableProposal(payload: TransactionActionPayload, walletById: Map<string, Wallet>): boolean {
   if (payload.wallet_id === null) return false;
+  // The edit form never saves a transfer without one; this only guards a
+  // payload changed some other way.
+  if (payload.type === "transfer" && !payload.to_wallet_id) return false;
   const wallet = walletById.get(payload.wallet_id);
   return !wallet || wallet.currency === PROPOSAL_CURRENCY;
+}
+
+/** The Wallet a proposal names: "Chưa chọn ví" without one, "A → B" for a transfer. */
+export function proposalWalletName(payload: TransactionActionPayload, walletById: Map<string, Wallet>): string {
+  const nameOf = (id: string) => walletById.get(id)?.name ?? "Ví";
+  const source = payload.wallet_id === null ? NO_WALLET_LABEL : nameOf(payload.wallet_id);
+  return payload.type === "transfer" && payload.to_wallet_id ? `${source} → ${nameOf(payload.to_wallet_id)}` : source;
 }

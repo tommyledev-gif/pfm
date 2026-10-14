@@ -114,6 +114,10 @@ export const TRANSACTION_KIND_LABELS: Record<TransactionKind, string> = {
   transfer: "Chuyển khoản",
 };
 
+// Same emoji migration 022 seeds on the system transfer category — which is
+// never in the user's category list, so its icon cannot come from a lookup.
+export const TRANSFER_CATEGORY_ICON = "🔁";
+
 // Mirrors common.TransactionNoteMaxLength.
 export const TRANSACTION_NOTE_MAX_LENGTH = 500;
 

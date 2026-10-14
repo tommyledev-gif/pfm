@@ -6,6 +6,7 @@ import { FALLBACK_CURRENCY } from "@/lib/constants";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { Category } from "@/features/categories/types";
 import { PendingRow } from "@/features/ai-chat/components/PendingRow";
+import { proposalCategoryName } from "@/features/ai-chat/proposal-kind";
 import { sortProposalsNewestFirst } from "@/features/ai-chat/proposal-time";
 import { ChatMessage } from "@/features/ai-chat/types";
 
@@ -77,7 +78,9 @@ export function PendingConfirmationsSection({
           <PendingRow
             key={message.id}
             message={message}
-            label={payload?.note || categoryById.get(payload?.category_id ?? "")?.name || "Giao dịch"}
+            label={
+              payload?.note || (payload && proposalCategoryName(payload, (id) => categoryById.get(id)?.name)) || "Giao dịch"
+            }
             currency={walletCurrencyById.get(payload?.wallet_id ?? "") ?? FALLBACK_CURRENCY}
             closeSignal={closeSignal}
             onOpen={(openEdit) => onOpenMessage(message.id, openEdit)}

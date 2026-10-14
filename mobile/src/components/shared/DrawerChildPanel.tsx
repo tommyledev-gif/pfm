@@ -1,8 +1,6 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { Animated, Pressable, Text, View } from "react-native";
 
-import { SheetHandle } from "@/components/shared/SheetHandle";
-import { useSheetDrag } from "@/components/shared/use-sheet-drag";
 import { ChevronLeftIcon, CloseIcon } from "@/components/ui/Icon";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
@@ -33,6 +31,10 @@ const TOP_INSET = "10%";
 // The sliding half of Drawer's `child` prop — see the DrawerChild doc comment
 // there for why this lives on Drawer rather than being nested in its children.
 // Rendered only by Drawer, which supplies the geometry.
+//
+// No grab bar and no drag (2026-10-14): the panel is a step of the sheet under
+// it, not a sheet of its own, so dragging it down read as dismissing the whole
+// form. Back returns to the parent sheet; X does too.
 export function DrawerChildPanel({
   visible,
   onClose,
@@ -50,16 +52,10 @@ export function DrawerChildPanel({
   // sliding back out.
   const [rendered, setRendered] = useState(visible);
   const translateX = useRef(new Animated.Value(visible ? 0 : width)).current;
-  // Vertical drag from the handle, separate from the horizontal slide. The
-  // panel already fills the sheet's full height, so it only drags down to
-  // close (back to the parent sheet), never up.
-  const translateY = useRef(new Animated.Value(0)).current;
-  const drag = useSheetDrag({ translateY, onClose, expandable: false });
 
   useEffect(() => {
     if (visible) {
       setRendered(true);
-      translateY.setValue(0);
       Animated.spring(translateX, {
         toValue: 0,
         useNativeDriver: true,
@@ -79,13 +75,12 @@ export function DrawerChildPanel({
 
   return (
     <Animated.View
-      style={[styles.panel, { bottom: bottomInset, transform: [{ translateX }, { translateY }] }]}
+      style={[styles.panel, { bottom: bottomInset, transform: [{ translateX }] }]}
       // Nothing here should fall through to the backdrop underneath, which
       // would dismiss the parent sheet along with this panel.
       pointerEvents="box-none"
     >
-      <View style={styles.surface} onLayout={drag.onSheetLayout}>
-        <SheetHandle panHandlers={drag.panHandlers} />
+      <View style={styles.surface}>
         <View style={styles.header}>
           {hideBack ? (
             // Keeps the title centred between equal sides.
@@ -127,7 +122,9 @@ const useStyles = createStyles((colors) => ({
     alignItems: "center",
     gap: spacing.md,
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.xs,
+    // The same distance from the top edge the header had under the old grab
+    // bar's strip, so the title does not jump up against the rounded corner.
+    paddingTop: spacing.xxl,
     paddingBottom: spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.surfaceBorder,

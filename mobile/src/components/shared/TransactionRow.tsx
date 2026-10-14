@@ -4,14 +4,13 @@ import { Pressable, Text, View } from "react-native";
 import { AmountRevealPopup } from "@/components/ui/AmountRevealPopup";
 import { TintedIconTile } from "@/components/ui/TintedIconTile";
 import { colorForCategory } from "@/lib/category-color";
+import { TRANSFER_CATEGORY_ICON } from "@/lib/constants";
 import { formatCurrencyTruncated } from "@/lib/currency";
 import { formatDateDMY } from "@/lib/format-date";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { Transaction } from "@/features/transactions/types";
 
 const ICON_SIZE = 44;
-// Same emoji migration 022 seeds on the system transfer category.
-const TRANSFER_ICON = "🔁";
 
 // Home's "Recent Transactions" and the full Transactions list both render
 // this exact row shape (README: "Row = icon + name/time + amount + sub-label
@@ -51,7 +50,7 @@ export function TransactionRow({
         size={ICON_SIZE}
         // The system transfer category is never in the user's category list,
         // so its icon cannot come from the `category` lookup.
-        icon={isTransfer ? TRANSFER_ICON : category?.icon}
+        icon={isTransfer ? TRANSFER_CATEGORY_ICON : category?.icon}
         iconUrl={category?.icon_url}
         label={label}
       />

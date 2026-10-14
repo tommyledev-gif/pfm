@@ -1,10 +1,16 @@
 import { Fragment, memo } from "react";
 import { Text } from "react-native";
 
-// A hair space (U+200A) painted with a background: a caret one or two pixels
-// wide that sits in the text run itself, so it takes the amount's own font
-// size, baseline and shrink-to-fit with it.
+import { typography } from "@/lib/theme";
+
+// A hair space (U+200A) painted with a background: a caret that sits in the
+// text run itself, so it takes the amount's baseline and shrink-to-fit with it.
 const CARET_GLYPH = "\u200A";
+// The glyph's width follows its font size, and at the amount's own hero size
+// it painted a bar several points wide. Half the size halves the width; the
+// height stays, since a span's background fills the whole line on both
+// platforms, and shrink-to-fit scales this size along with the rest.
+const CARET_STYLE = { fontSize: typography.hero.fontSize / 2, fontWeight: "400" as const };
 
 interface AmountCaretTextProps {
   text: string;
@@ -27,7 +33,7 @@ interface AmountCaretTextProps {
  * above could not be scrolled.
  */
 export const AmountCaretText = memo(function AmountCaretText({ text, caret, caretColor, onPressChar }: AmountCaretTextProps) {
-  const mark = <Text style={{ backgroundColor: caretColor }}>{CARET_GLYPH}</Text>;
+  const mark = <Text style={[CARET_STYLE, { backgroundColor: caretColor }]}>{CARET_GLYPH}</Text>;
   const chars = Array.from(text);
 
   return (

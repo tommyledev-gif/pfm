@@ -11,6 +11,7 @@ import { colorForCategory } from "@/lib/category-color";
 import { formatCurrencyTruncated } from "@/lib/currency";
 import { formatDateShort } from "@/lib/format-date";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { proposalAmountSign } from "@/features/ai-chat/proposal-kind";
 import { NO_VND_WALLET_HINT, WALLET_REQUIRED_MESSAGE } from "@/features/ai-chat/proposal-wallet";
 import { ChatAction } from "@/features/ai-chat/types";
 import { ProposalItemsList } from "@/features/ai-chat/components/ProposalItemsList";
@@ -79,6 +80,9 @@ export function TransactionActionCard({
   const styles = useStyles();
   const { payload } = action;
   const isIncome = payload.type === "income";
+  const isTransfer = payload.type === "transfer";
+  // Same tones TransactionRow gives a stored one.
+  const amountColor = isTransfer ? colors.periwinkle : isIncome ? colors.green : colors.peach;
 
   /**
    * What this proposal would do to the category's budget, shown BEFORE it is
@@ -91,11 +95,11 @@ export function TransactionActionCard({
    * change what they press. No extra tap, no extra screen; they were already
    * looking at this card.
    *
-   * Only for expenses with a real budget: income does not consume one, and a
-   * category with no budget has no percentage to be at.
+   * Only for expenses with a real budget: income and transfers do not consume
+   * one, and a category with no budget has no percentage to be at.
    */
   const impact =
-    !isIncome && !confirmed && budgetLimit !== undefined && budgetLimit > 0
+    payload.type === "expense" && !confirmed && budgetLimit !== undefined && budgetLimit > 0
       ? (() => {
           const after = (budgetSpent ?? 0) + payload.amount;
           const ratio = after / budgetLimit;
@@ -121,10 +125,10 @@ export function TransactionActionCard({
   const amountText = (
     <Pressable onLongPress={() => setRevealVisible(true)}>
       <Text
-        style={[confirmed ? styles.compactAmount : styles.amount, { color: isIncome ? colors.green : colors.peach }]}
+        style={[confirmed ? styles.compactAmount : styles.amount, { color: amountColor }]}
         numberOfLines={1}
       >
-        {isIncome ? "+" : "-"}
+        {proposalAmountSign(payload.type)}
         {formatCurrencyTruncated(payload.amount, currency)}
       </Text>
     </Pressable>
@@ -154,7 +158,7 @@ export function TransactionActionCard({
           <View style={styles.topRow}>
             <Avatar
               name={categoryName}
-              color={colorForCategory(payload.category_id)}
+              color={isTransfer ? colors.periwinkle : colorForCategory(payload.category_id)}
               size={32}
               icon={categoryIcon}
               iconUrl={categoryIconUrl}

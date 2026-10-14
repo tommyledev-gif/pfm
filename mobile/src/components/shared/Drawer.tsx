@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
-import { Animated, BackHandler, Dimensions, Pressable, ScrollView, View } from "react-native";
+import { Animated, BackHandler, Dimensions, Keyboard, Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { DrawerChildPanel } from "@/components/shared/DrawerChildPanel";
@@ -92,6 +92,8 @@ const OFFSCREEN_Y = Dimensions.get("window").height;
 // How long after opening the overlay keeps re-checking where its host sits —
 // past a screen push (native-stack fade) and the safe-area padding landing.
 const ANCHOR_SETTLE_MS = 800;
+
+const claimTouch = () => true;
 
 export function Drawer({ visible, onClose, children, footer, child }: DrawerProps) {
   const styles = useStyles();
@@ -234,11 +236,21 @@ export function Drawer({ visible, onClose, children, footer, child }: DrawerProp
                 // scroll area once the sheet hits its 90% cap, rather than
                 // being pushed off the bottom of the screen by it.
                 style={[styles.sheetScroll, drag.expanded && styles.sheetScrollExpanded]}
-                contentContainerStyle={[styles.sheet, !footer && { paddingBottom: spacing.xl + navPad }]}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
               >
-                {children}
+                {/* ⚠️ Takes every touch nothing inside takes. Left to the
+                    Pressable above, its view (Android intercepts at the JS
+                    responder) swallowed the drag: the body scrolled only from
+                    a button. Inside the ScrollView it can still take the drag.
+                    Release dismisses the keyboard, as the ScrollView would. */}
+                <View
+                  style={[styles.sheet, !footer && { paddingBottom: spacing.xl + navPad }]}
+                  onStartShouldSetResponder={claimTouch}
+                  onResponderRelease={Keyboard.dismiss}
+                >
+                  {children}
+                </View>
               </ScrollView>
               {footer ? <View style={[styles.footer, { paddingBottom: spacing.xl + navPad }]}>{footer}</View> : null}
             </Pressable>

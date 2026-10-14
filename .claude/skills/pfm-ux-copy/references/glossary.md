@@ -8,6 +8,7 @@ Một khái niệm = một từ, ở cả VI và EN. Cột "Nguồn": `app` = đ
 | Transaction | giao dịch | transaction | app | |
 | Income | thu nhập | income | app | |
 | Expense | chi tiêu | spending | app | EN dùng "spending", không "expense(s)" trong UI chung; "expense" chỉ khi là một khoản cụ thể |
+| Transfer (giữa hai ví của user) | chuyển khoản | transfer | app | Tab loại: "Chuyển khoản". Hai ô: "Từ ví" / "Đến ví"; ví đích là "ví nhận" ("Chọn ví nhận"). Số tiền không có dấu +/-. Không có danh mục, không có món |
 | Category | danh mục | category | app | |
 | Budget | ngân sách | budget | app | Gắn với một ví/một loại tiền |
 | Currency (của ví) | loại tiền | currency | app | "Nhiều loại tiền", "Chỉ hiện ví cùng loại tiền", lỗi đổi ví khác loại tiền. Vài chỗ cũ còn "đơn vị tiền tệ": đổi dần sang "loại tiền" |

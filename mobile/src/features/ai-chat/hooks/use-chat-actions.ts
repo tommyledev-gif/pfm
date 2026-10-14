@@ -136,7 +136,9 @@ export function useChatActions({ onSent }: UseChatActionsOptions) {
           id: target.transactionId,
           body: {
             amount: payload.amount,
-            category_id: payload.category_id,
+            // A saved transfer stays under the system category: the server
+            // refuses any category_id for one (TRANSFER_CATEGORY_IMMUTABLE).
+            ...(payload.type === "transfer" ? {} : { category_id: payload.category_id }),
             occurred_at: payload.occurred_at,
             note: payload.note ?? undefined,
             // Both lists together, [] for "removed": PATCH replaces them as a pair.
