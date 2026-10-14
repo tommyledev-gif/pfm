@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent, ScrollView } from "react-native";
+import { LayoutChangeEvent } from "react-native";
+import Animated, { useAnimatedRef, useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
+
+import { useLatestCallback } from "@/lib/use-latest-callback";
 
 import { useReduceMotion } from "@/lib/use-reduce-motion";
 import { Wallet } from "@/features/wallets/types";
@@ -31,8 +35,11 @@ interface UseWalletCarouselOptions {
  * to end, the user always re-anchored into the middle one once motion stops.
  */
 export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChange }: UseWalletCarouselOptions) {
-  const scrollRef = useRef<ScrollView>(null);
-  const scrollX = useRef(new Animated.Value(0)).current;
+  const scrollRef = useAnimatedRef<Animated.ScrollView>();
+  // The scroll offset on the UI thread: every card and pager dot reads it.
+  const scrollX = useSharedValue(0);
+  // The nearest card as last reported to JS, so the handler only calls over on a change.
+  const lastIndex = useSharedValue(-1);
   const [containerWidth, setContainerWidth] = useState(0);
   // Which card is currently centred, in `rendered` indices. Orders the
   // overlapping cards — the centred one has to paint ON TOP of both its
@@ -92,21 +99,19 @@ export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChan
     onActiveWalletChange?.(wallets[initial].id);
   };
 
-  // ⚠️ Attached as the listener of the native-driven scroll event, not as a
-  // second onScroll: the animation stays on the native driver, and this only
-  // re-renders when the centred card actually changes — once per swipe, not
-  // once per frame.
-  const onScrollFrame = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+  // Called from the UI-thread scroll handler only when the nearest card
+  // changes, once per swipe, not once per frame. The cards' own motion and
+  // paint order never wait on this (wallet-carousel-motion); it only keeps
+  // the pager arrows, taps and the reported active wallet in step.
+  const onScrollIndex = (next: number) => {
     if (tapTarget.current !== null) return;
-    const next = Math.round(event.nativeEvent.contentOffset.x / SNAP_INTERVAL);
     setCentreIndex((prev) => (prev === next ? prev : next));
   };
 
   // ⚠️ The wrap happens only once motion has stopped. Re-anchoring mid-fling
   // would cancel the user's own momentum and read as the carousel snatching
   // the card back.
-  const onMomentumEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const x = event.nativeEvent.contentOffset.x;
+  const onMomentumEnd = (x: number) => {
     let landed = false;
     if (tapTarget.current !== null) {
       // ⚠️ A tap is itself a touch on the scroll view, and Android's
@@ -139,12 +144,10 @@ export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChan
    * on screen and inside the rendered copies, and onMomentumEnd re-anchors
    * into the middle copy once the slide lands, exactly as after a fling.
    *
-   * ⚠️ The tapped card is put on top at once, and the paint order is then
-   * held there — onScrollFrame is ignored — until the slide lands. Paint
-   * order is the one part of this carousel driven from JS, and letting it
-   * follow the slide frame by frame meant a JS re-render had to land mid-
-   * slide: on a slow device it landed late, leaving the previous card (by
-   * then half transparent) painted over the new centre and dimming it.
+   * ⚠️ The tapped card counts as centred at once, and that is then held,
+   * onScrollIndex ignored, until the slide lands: a second tap on it mid-slide
+   * must not "open" it (see pressCard). Paint order is not part of this; it
+   * follows the scroll on the UI thread (wallet-carousel-motion).
    */
   const scrollToCard = (index: number) => {
     if (index === centreIndex) return;
@@ -238,25 +241,49 @@ export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChan
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [centredId]);
 
+  // A drag takes over from any tap-started slide still in flight, and drops
+  // arrow presses still queued behind it.
+  const onBeginDrag = () => {
+    pendingSteps.current = 0;
+    releaseTapTarget();
+  };
+
+  // Stable identities for the worklet below, always running the latest code.
+  const reportIndex = useLatestCallback(onScrollIndex);
+  const reportMomentumEnd = useLatestCallback(onMomentumEnd);
+  const reportBeginDrag = useLatestCallback(onBeginDrag);
+  const scrollHandler = useAnimatedScrollHandler(
+    {
+      onScroll: (event) => {
+        scrollX.value = event.contentOffset.x;
+        const index = Math.round(event.contentOffset.x / SNAP_INTERVAL);
+        if (index !== lastIndex.value) {
+          lastIndex.value = index;
+          scheduleOnRN(reportIndex, index);
+        }
+      },
+      onBeginDrag: () => {
+        scheduleOnRN(reportBeginDrag);
+      },
+      onMomentumEnd: (event) => {
+        scheduleOnRN(reportMomentumEnd, event.contentOffset.x);
+      },
+    },
+    [reportIndex, reportMomentumEnd, reportBeginDrag],
+  );
+
   return {
     scrollRef,
     scrollX,
+    scrollHandler,
     containerWidth,
     centreIndex,
     rendered,
     sidePadding,
     onLayout,
     onContentSizeChange,
-    onScrollFrame,
-    onMomentumEnd,
     pressCard,
     step,
     looping,
-    // A drag takes over from any tap-started slide still in flight, and
-    // drops arrow presses still queued behind it.
-    onScrollBeginDrag: () => {
-      pendingSteps.current = 0;
-      releaseTapTarget();
-    },
   };
 }

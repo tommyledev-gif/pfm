@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
 
 import { API_MINOR_DIGITS, Evaluation, evaluateExpression } from "@/lib/calculator/evaluate";
-import { currencyDecimals, formatExpression, formatValue, spokenExpression } from "@/lib/calculator/format";
+import { backspaceAt, pressKeyAt } from "@/lib/calculator/caret";
+import { currencyDecimals, formatExpressionMapped, formatValue, spokenExpression } from "@/lib/calculator/format";
 import {
   CalcState,
   EMPTY_CALC,
@@ -27,6 +28,10 @@ export interface AmountExpression {
   cents: number | null;
   /** Display text, grouped in the currency's own locale; "0" when blank. */
   display: string;
+  /** Where the caret is drawn in `display` (a text index; its end by default). */
+  caret: number;
+  /** A tap on `display`'s character at this index: the caret goes right after it. */
+  placeCaretAfter: (displayIndex: number) => void;
   /** Screen-reader text: "5 cộng 3". */
   spoken: string;
   /** "= 8" under an expression, or why it has no value (÷0). */
@@ -57,6 +62,8 @@ interface Store {
   calcDecimals: number;
   rejectCount: number;
   notice: string | null;
+  /** Raw index keys are typed at; null = the end, the keypad's usual place. */
+  caret: number | null;
 }
 
 const ERROR_TEXT: Partial<Record<string, string>> = {
@@ -77,7 +84,7 @@ function valueOf(expression: string, decimals: number): Evaluation {
  */
 export function useAmountExpression(currency: string): AmountExpression {
   const decimals = currencyDecimals(currency);
-  const store = useRef<Store>({ calc: EMPTY_CALC, calcDecimals: decimals, rejectCount: 0, notice: null });
+  const store = useRef<Store>({ calc: EMPTY_CALC, calcDecimals: decimals, rejectCount: 0, notice: null, caret: null });
   const decimalsRef = useRef(decimals);
   decimalsRef.current = decimals;
   const [, render] = useReducer((n: number) => n + 1, 0);
@@ -100,27 +107,52 @@ export function useAmountExpression(currency: string): AmountExpression {
         : outcome.change === "cleared"
           ? `Đã xóa số tiền vì ${currency} không có phần lẻ.`
           : store.current.notice;
-    commit({ calc: outcome.state, calcDecimals: decimals, notice });
+    commit({ calc: outcome.state, calcDecimals: decimals, notice, caret: null });
   });
+
+  // A caret edit that lands at the end hands back to the plain end-of-text
+  // path, so ✓'s "the next digit starts over" keeps working there.
+  const commitCaretEdit = useCallback(
+    (expression: string, caret: number) =>
+      commit({ calc: { expression, justEvaluated: false }, caret: caret >= expression.length ? null : caret, notice: null }),
+    [commit],
+  );
 
   const insert = useCallback(
     (key: KeypadKey) => {
-      const result = pressKey(store.current.calc, key, decimalsRef.current);
+      const { calc, caret } = store.current;
+      if (caret !== null) {
+        const edit = pressKeyAt(calc, caret, key, decimalsRef.current);
+        return edit.accepted ? commitCaretEdit(edit.expression, edit.caret) : refuse();
+      }
+      const result = pressKey(calc, key, decimalsRef.current);
       if (!result.accepted) return refuse();
       commit({ calc: result.state, notice: null });
     },
-    [commit, refuse],
+    [commit, commitCaretEdit, refuse],
   );
   const backspace = useCallback(() => {
-    if (store.current.calc.expression === "") return refuse();
-    commit({ calc: backspaceState(store.current.calc), notice: null });
-  }, [commit, refuse]);
-  const clear = useCallback(() => commit({ calc: EMPTY_CALC, notice: null }), [commit]);
+    const { calc, caret } = store.current;
+    if (caret !== null) {
+      const edit = backspaceAt(calc, caret, decimalsRef.current);
+      return edit.accepted ? commitCaretEdit(edit.expression, edit.caret) : refuse();
+    }
+    if (calc.expression === "") return refuse();
+    commit({ calc: backspaceState(calc), notice: null });
+  }, [commit, commitCaretEdit, refuse]);
+  const clear = useCallback(() => commit({ calc: EMPTY_CALC, notice: null, caret: null }), [commit]);
   const reset = useCallback(
     (cents: number | null) =>
       // Seeded at full cent precision — lossless whatever the currency — and
       // narrowed by the effect above once the wallet's currency is in.
-      commit({ calc: seed(cents, API_MINOR_DIGITS), calcDecimals: API_MINOR_DIGITS, notice: null }),
+      commit({ calc: seed(cents, API_MINOR_DIGITS), calcDecimals: API_MINOR_DIGITS, notice: null, caret: null }),
+    [commit],
+  );
+  const placeCaretAt = useCallback(
+    (raw: number) => {
+      const next = raw >= store.current.calc.expression.length ? null : Math.max(0, raw);
+      if (next !== store.current.caret) commit({ caret: next });
+    },
     [commit],
   );
 
@@ -130,7 +162,7 @@ export function useAmountExpression(currency: string): AmountExpression {
       refuse();
       return null;
     }
-    commit({ calc: outcome.state });
+    commit({ calc: outcome.state, caret: null });
     const evaluation = evaluateExpression(outcome.state.expression, decimalsRef.current);
     return outcome.kind === "submit" && evaluation.ok ? evaluation.cents : null;
   };
@@ -139,15 +171,16 @@ export function useAmountExpression(currency: string): AmountExpression {
   const resolve = () => {
     const outcome = confirmState(store.current.calc, decimalsRef.current);
     if (outcome.kind === "evaluated") {
-      commit({ calc: outcome.state });
+      commit({ calc: outcome.state, caret: null });
       const evaluation = evaluateExpression(outcome.state.expression, decimalsRef.current);
       return evaluation.ok ? evaluation.cents : null;
     }
     return settle();
   };
 
-  const { calc, rejectCount, notice } = store.current;
+  const { calc, rejectCount, notice, caret } = store.current;
   const evaluation = valueOf(calc.expression, decimals);
+  const mapped = formatExpressionMapped(calc.expression, currency);
   const showPreview = hasOperator(calc.expression) && !calc.justEvaluated;
   const errorText = !evaluation.ok ? ERROR_TEXT[evaluation.error] : undefined;
 
@@ -165,7 +198,9 @@ export function useAmountExpression(currency: string): AmountExpression {
   return {
     expression: calc.expression,
     cents: evaluation.ok ? evaluation.cents : null,
-    display: formatExpression(calc.expression, currency),
+    display: mapped.text,
+    caret: mapped.caretAt[caret ?? calc.expression.length] ?? mapped.text.length,
+    placeCaretAfter: (displayIndex: number) => placeCaretAt(mapped.rawAfter[displayIndex] ?? calc.expression.length),
     spoken: calc.expression ? spokenExpression(calc.expression) : "Chưa nhập số tiền",
     preview,
     decimals,

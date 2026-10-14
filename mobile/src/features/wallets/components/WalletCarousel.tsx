@@ -1,5 +1,6 @@
 import { memo } from "react";
-import { Animated, Text, View } from "react-native";
+import { Animated as RNAnimated, Text, View } from "react-native";
+import Animated, { SharedValue } from "react-native-reanimated";
 
 import { spacing, typography, walletAccentPalette, createStyles } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
@@ -11,7 +12,7 @@ import {
   WalletStackCard,
 } from "@/features/wallets/components/WalletStackCard";
 import { SNAP_INTERVAL, useWalletCarousel } from "@/features/wallets/components/use-wallet-carousel";
-import { CARD_PERSPECTIVE, useCardMotion } from "@/features/wallets/components/wallet-carousel-motion";
+import { useCardMotion } from "@/features/wallets/components/wallet-carousel-motion";
 import { WalletCarouselPager } from "@/features/wallets/components/WalletCarouselPager";
 
 // Each wallet's accent by its position in the list. Colors are assigned by
@@ -37,7 +38,34 @@ interface WalletCarouselProps {
   /** Draws a fading "you picked this one" border on this wallet's card. */
   highlightWalletId?: string | null;
   /** The 1 → 0 opacity for that border — from useHighlightFade. */
-  highlightOpacity?: Animated.Value;
+  highlightOpacity?: RNAnimated.Value;
+}
+
+interface CarouselCardProps {
+  wallet: Wallet;
+  index: number;
+  isLast: boolean;
+  accentColor: string;
+  scrollX: SharedValue<number>;
+  onPress: () => void;
+  highlightOpacity?: RNAnimated.Value;
+}
+
+// One card, so each gets its own motion hook (hooks cannot run in a loop).
+function CarouselCard({ wallet, index, isLast, accentColor, scrollX, onPress, highlightOpacity }: CarouselCardProps) {
+  const motion = useCardMotion(index, scrollX);
+  return (
+    <WalletStackCard
+      wallet={wallet}
+      accentColor={accentColor}
+      motion={motion}
+      // The final card keeps its full width so the scrollable content is
+      // exactly long enough to bring it to the middle.
+      layoutStyle={{ marginRight: isLast ? 0 : -CARD_OVERLAP }}
+      onPress={onPress}
+      highlightOpacity={highlightOpacity}
+    />
+  );
 }
 
 /**
@@ -53,9 +81,10 @@ interface WalletCarouselProps {
  * every card outright is cheaper than the machinery to avoid it.
  *
  * The OS owns the scroll, so fling physics and the host screen's own vertical
- * scroll both keep working. No reanimated and no gesture-handler — neither is
- * a dependency of this project. Cards and pager dots both run off the one
- * native-driven scroll value.
+ * scroll both keep working. Cards and pager dots all run off one Reanimated
+ * scroll value on the UI thread, paint order included, so nothing about a
+ * swipe waits on a React render (2026-10-14: the native-driver version still
+ * flashed on a quick flick, its paint order being React state).
  */
 function WalletCarouselView({
   wallets,
@@ -69,20 +98,17 @@ function WalletCarouselView({
   const {
     scrollRef,
     scrollX,
+    scrollHandler,
     containerWidth,
     centreIndex,
     rendered,
     sidePadding,
     onLayout,
     onContentSizeChange,
-    onScrollFrame,
-    onMomentumEnd,
     pressCard,
     step,
     looping,
-    onScrollBeginDrag,
   } = useWalletCarousel({ wallets, initialWalletId, onActiveWalletChange });
-  const cardMotion = useCardMotion(rendered.length, scrollX);
 
   if (wallets.length === 0) {
     return <Text style={styles.empty}>Chưa có ví. Tạo ví để ghi giao dịch.</Text>;
@@ -106,58 +132,28 @@ function WalletCarouselView({
           contentContainerStyle={{ paddingHorizontal: sidePadding, paddingTop: CAROUSEL_SHADOW_BLEED_TOP, paddingBottom: CAROUSEL_SHADOW_BLEED_BOTTOM }}
           scrollEventThrottle={16}
           onContentSizeChange={onContentSizeChange}
-          onMomentumScrollEnd={onMomentumEnd}
-          onScrollBeginDrag={onScrollBeginDrag}
-          onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], {
-            useNativeDriver: true,
-            listener: onScrollFrame,
-          })}
+          // Scroll, drag start and momentum end, all in one UI-thread handler.
+          onScroll={scrollHandler}
         >
           {containerWidth === 0
             ? null
-            : rendered.map((wallet, index) => {
-                const motion = cardMotion[index];
-                // Nearest to the centre paints last. The final card keeps its
-                // full width so the scrollable content is exactly long enough to
-                // bring it to the middle.
-                const proximity = Math.abs(index - centreIndex);
-                const isLast = index === rendered.length - 1;
-
-                return (
-                  <WalletStackCard
-                    // Index, not wallet id — the loop copies repeat every id.
-                    key={`${wallet.id}-${index}`}
-                    wallet={wallet}
-                    accentColor={accentForIndex(index % wallets.length, wallets.length)}
-                    animatedStyle={{
-                      marginRight: isLast ? 0 : -CARD_OVERLAP,
-                      // The paint order on iOS, and which card a tap lands on
-                      // where two overlap. Android draws by the elevation
-                      // below first, which follows the scroll natively, so a
-                      // late re-render here no longer shows (see
-                      // wallet-carousel-motion).
-                      zIndex: rendered.length - proximity,
-                      elevation: motion.elevation,
-                      transform: [
-                        { perspective: CARD_PERSPECTIVE },
-                        { translateX: motion.translateX },
-                        { rotateY: motion.rotateY },
-                        { scale: motion.scale },
-                      ],
-                      opacity: motion.opacity,
-                    }}
-                    // Fades the accent border in on whichever card is
-                    // centred, without re-rendering on every scroll frame.
-                    activeOpacity={motion.active}
-                    // A side card is a shortcut for the swipe that would bring it
-                    // over; only the card already in the middle is "opened".
-                    onPress={() => pressCard(index, onPressWallet ? () => onPressWallet(wallet) : undefined)}
-                    // Every loop copy of the wallet gets it — whichever copy is
-                    // centred is the one the user sees.
-                    highlightOpacity={wallet.id === highlightWalletId ? highlightOpacity : undefined}
-                  />
-                );
-              })}
+            : rendered.map((wallet, index) => (
+                <CarouselCard
+                  // Index, not wallet id — the loop copies repeat every id.
+                  key={`${wallet.id}-${index}`}
+                  wallet={wallet}
+                  index={index}
+                  isLast={index === rendered.length - 1}
+                  accentColor={accentForIndex(index % wallets.length, wallets.length)}
+                  scrollX={scrollX}
+                  // A side card is a shortcut for the swipe that would bring it
+                  // over; only the card already in the middle is "opened".
+                  onPress={() => pressCard(index, onPressWallet ? () => onPressWallet(wallet) : undefined)}
+                  // Every loop copy of the wallet gets it — whichever copy is
+                  // centred is the one the user sees.
+                  highlightOpacity={wallet.id === highlightWalletId ? highlightOpacity : undefined}
+                />
+              ))}
         </Animated.ScrollView>
       </View>
 

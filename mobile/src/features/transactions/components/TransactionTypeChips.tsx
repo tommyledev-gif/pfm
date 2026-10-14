@@ -1,10 +1,10 @@
 import { useState } from "react";
+import { Pressable, Text, View } from "react-native";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 import { TRANSACTION_KIND_LABELS, TRANSACTION_KINDS, TransactionKind } from "@/lib/constants";
-
-const TYPE_OPTIONS = TRANSACTION_KINDS.map((value) => ({ value, label: TRANSACTION_KIND_LABELS[value] }));
 
 interface TransactionTypeChipsProps {
   type: TransactionKind;
@@ -17,6 +17,7 @@ interface TransactionTypeChipsProps {
 
 // Split from TransactionFormModal for its 300-line limit.
 export function TransactionTypeChips({ type, locked, itemCount, onSelect, onClearItems }: TransactionTypeChipsProps) {
+  const styles = useStyles();
   const [confirmTransfer, setConfirmTransfer] = useState(false);
 
   const pick = (next: TransactionKind) => {
@@ -30,13 +31,17 @@ export function TransactionTypeChips({ type, locked, itemCount, onSelect, onClea
 
   return (
     <>
-      <SegmentedControl
-        options={TYPE_OPTIONS}
-        value={type}
-        onChange={pick}
-        disabled={locked}
-        testID="segmented-transaction-type"
-      />
+      <View style={styles.chipRow}>
+        {TRANSACTION_KINDS.map((t) => (
+          <Pressable
+            key={t}
+            onPress={() => pick(t)}
+            style={[styles.chip, type === t && styles.chipActive, locked && styles.chipDisabled]}
+          >
+            <Text style={[styles.chipLabel, type === t && styles.chipLabelActive]}>{TRANSACTION_KIND_LABELS[t]}</Text>
+          </Pressable>
+        ))}
+      </View>
       <ConfirmDialog
         visible={confirmTransfer}
         title={`Bỏ ${itemCount} món?`}
@@ -55,3 +60,26 @@ export function TransactionTypeChips({ type, locked, itemCount, onSelect, onClea
   );
 }
 
+const CHIP_HEIGHT = 36;
+const CHIP_PADDING = 14;
+
+const useStyles = createStyles((colors) => ({
+  chipRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
+  // Fixed height + centred label, not vertical padding: the type chips and
+  // the wallet chips (a horizontal ScrollView, which stretches its children)
+  // used to come out at different heights.
+  chip: {
+    height: CHIP_HEIGHT,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: CHIP_PADDING,
+    borderRadius: radii.pill,
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+  },
+  chipActive: { backgroundColor: colors.green, borderColor: colors.green },
+  chipDisabled: { opacity: 0.5 },
+  chipLabel: { ...typography.caption, color: colors.textSecondary },
+  chipLabelActive: { color: colors.onGreen },
+}));

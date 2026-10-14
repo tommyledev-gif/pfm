@@ -63,7 +63,7 @@ export function TransactionExtrasRow({
         // detail={location.detail}
         muted={location.muted}
         locked={location.locked}
-        icon={<MapPinIcon size={ICON_SIZE} color={location.pinned ? colors.accentMuted : colors.textMuted} />}
+        icon={<MapPinIcon size={ICON_SIZE} color={location.pinned ? colors.green : colors.textMuted} />}
         onPress={onPressLocation}
         testID="btn-edit-location-tile"
         accessibilityLabel={location.accessibilityLabel}

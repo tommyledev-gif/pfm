@@ -41,9 +41,6 @@ interface DrawerProps {
   // Pinned below the sheet's scrolling body, same rationale as DrawerChild's.
   footer?: ReactNode;
   child?: DrawerChild;
-  // A whole screen on the app ground, clear of the status bar, instead of a
-  // rounded sheet: no handle or drag, no footer divider. The transaction forms.
-  fullScreen?: boolean;
 }
 
 // Reusable bottom-sheet chrome shared by every form/picker modal (Wallet/
@@ -96,13 +93,13 @@ const OFFSCREEN_Y = Dimensions.get("window").height;
 // past a screen push (native-stack fade) and the safe-area padding landing.
 const ANCHOR_SETTLE_MS = 800;
 
-export function Drawer({ visible, onClose, children, footer, child, fullScreen = false }: DrawerProps) {
+export function Drawer({ visible, onClose, children, footer, child }: DrawerProps) {
   const styles = useStyles();
   const keyboardHeight = useKeyboardHeight();
   // The sheet runs to the screen's bottom edge (edge-to-edge), so its last
   // row would sit under the gesture bar / nav buttons without this. With the
   // keyboard up the keyboard covers that strip and lifts the sheet anyway.
-  const { bottom: bottomInset, top: topInset } = useSafeAreaInsets();
+  const { bottom: bottomInset } = useSafeAreaInsets();
   const navPad = keyboardHeight > 0 ? 0 : bottomInset;
   // Kept mounted for the duration of the close animation — flipping
   // straight to `if (!visible) return null` would unmount mid-slide-down
@@ -222,36 +219,28 @@ export function Drawer({ visible, onClose, children, footer, child, fullScreen =
           <Animated.View
             style={[
               styles.sheetTouchArea,
-              (drag.expanded || fullScreen) && styles.sheetTouchAreaExpanded,
-              fullScreen && styles.sheetTouchAreaFull,
+              drag.expanded && styles.sheetTouchAreaExpanded,
               { transform: [{ translateY }] },
             ]}
           >
             <Pressable
               onPress={() => {}}
               onLayout={drag.onSheetLayout}
-              style={[
-                styles.sheetSurface,
-                (drag.expanded || fullScreen) && styles.sheetSurfaceExpanded,
-                fullScreen && [styles.sheetSurfaceFull, { paddingTop: topInset }],
-              ]}
+              style={[styles.sheetSurface, drag.expanded && styles.sheetSurfaceExpanded]}
             >
-              {fullScreen ? null : <SheetHandle panHandlers={drag.panHandlers} />}
+              <SheetHandle panHandlers={drag.panHandlers} />
               <ScrollView
-                // flexShrink: past the 90% cap a pinned footer takes its space
-                // from the scroll area instead of being pushed off-screen.
-                style={[styles.sheetScroll, (drag.expanded || fullScreen) && styles.sheetScrollExpanded]}
+                // flexShrink so a pinned footer can claim its space out of the
+                // scroll area once the sheet hits its 90% cap, rather than
+                // being pushed off the bottom of the screen by it.
+                style={[styles.sheetScroll, drag.expanded && styles.sheetScrollExpanded]}
                 contentContainerStyle={[styles.sheet, !footer && { paddingBottom: spacing.xl + navPad }]}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
               >
                 {children}
               </ScrollView>
-              {footer ? (
-                <View style={[styles.footer, fullScreen && styles.footerFull, { paddingBottom: spacing.xl + navPad }]}>
-                  {footer}
-                </View>
-              ) : null}
+              {footer ? <View style={[styles.footer, { paddingBottom: spacing.xl + navPad }]}>{footer}</View> : null}
             </Pressable>
           </Animated.View>
         </Pressable>
@@ -272,9 +261,6 @@ const useStyles = createStyles((colors) => ({
   sheetTouchAreaExpanded: { height: "94%", maxHeight: "94%" },
   sheetSurfaceExpanded: { flex: 1 },
   sheetScrollExpanded: { flex: 1 },
-  sheetTouchAreaFull: { height: "100%", maxHeight: "100%" },
-  sheetSurfaceFull: { borderTopLeftRadius: 0, borderTopRightRadius: 0, backgroundColor: colors.bgApp },
-  footerFull: { borderTopWidth: 0, paddingTop: spacing.sm },
   // The surface (background + rounded top) moved off the ScrollView's content
   // container and onto this wrapper once a pinned footer joined it — the
   // footer sits outside the scroll view and would otherwise have had to

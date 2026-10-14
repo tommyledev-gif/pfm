@@ -83,6 +83,64 @@ export function formatExpression(expression: string, currency: string, empty = "
     .trim();
 }
 
+export interface MappedExpression {
+  /** Exactly formatExpression's text. */
+  text: string;
+  /** Where the caret is drawn (a text index) for each raw index 0 … expression.length. */
+  caretAt: number[];
+  /** For each text character, the raw index just after it — a tap on it puts the caret there. */
+  rawAfter: number[];
+}
+
+const isOperatorChar = (ch: string) => ch === "+" || ch === "−" || ch === "×" || ch === "÷";
+
+/**
+ * formatExpression plus the map between the grouped text on screen and the
+ * raw expression, for a caret inside the amount. Group marks and the spaces
+ * around operators are not in the raw text: a caret after a digit sits before
+ * the mark that follows it, and one after an operator sits after its space.
+ */
+export function formatExpressionMapped(expression: string, currency: string, empty = "0"): MappedExpression {
+  if (expression === "") return { text: empty, caretAt: [empty.length], rawAfter: Array.from(empty, () => 0) };
+  const sep = separators(currency);
+  let text = "";
+  const caretAt: number[] = [0];
+  const rawAfter: number[] = [];
+  let raw = 0;
+  const push = (chunk: string, rawIndex: number) => {
+    text += chunk;
+    rawAfter.push(rawIndex);
+  };
+  const tokens = expression.match(/[0-9.]+|[+−×÷]/g) ?? [];
+  tokens.forEach((token, t) => {
+    if (isOperatorChar(token)) {
+      push(" ", raw);
+      raw += 1;
+      push(token, raw);
+      if (t < tokens.length - 1) push(" ", raw);
+      caretAt[raw] = text.length;
+      return;
+    }
+    const [whole, fraction] = token.split(".");
+    for (let i = 0; i < whole.length; i++) {
+      if (i > 0 && (whole.length - i) % 3 === 0) push(sep.group, raw);
+      raw += 1;
+      push(whole.charAt(i), raw);
+      caretAt[raw] = text.length;
+    }
+    if (fraction === undefined) return;
+    raw += 1;
+    push(sep.decimal, raw);
+    caretAt[raw] = text.length;
+    for (const digit of fraction) {
+      raw += 1;
+      push(digit, raw);
+      caretAt[raw] = text.length;
+    }
+  });
+  return { text, caretAt, rawAfter };
+}
+
 /**
  * The inverse of formatExpression for one typed amount: what a grouped field
  * shows ("35.000" for VND, "1,234.5" for USD) back to plain digits[.digits].

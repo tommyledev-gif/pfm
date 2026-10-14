@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Text, TextInput, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 
 import { Avatar } from "@/components/ui/Avatar";
@@ -28,6 +28,8 @@ const COPY = {
   usernameHint: "Đặt một lần lúc kích hoạt, không đổi được.",
   namePlaceholder: "Nguyễn Văn A",
   changePhoto: "Đổi ảnh",
+  // The bar's own label; next to "Đổi ảnh" it can only mean the photo.
+  remove: "Xóa",
   removePhoto: "Xóa ảnh",
   save: "Lưu",
   saved: "Đã lưu",
@@ -126,6 +128,7 @@ export function EditProfileForm({ onSaved }: EditProfileFormProps) {
     <View style={styles.form}>
       <View style={styles.photoBlock}>
         <Avatar name={displayName} iconUrl={profile?.avatar_url} size={AVATAR_SIZE} fallback="initial" />
+        {/* "Đổi ảnh" | "Xóa" in one bar; "Xóa" only once there is a picture. */}
         <View style={styles.photoActions}>
           <UploadButton
             status={uploadAvatar.status}
@@ -134,17 +137,18 @@ export function EditProfileForm({ onSaved }: EditProfileFormProps) {
             onPress={() => requireOnline(pickPhoto)}
             disabled={updateProfile.isPending || removeAvatar.isPending}
             testID="btn-profile-change-photo"
+            remove={
+              profile?.avatar_url
+                ? {
+                    label: COPY.remove,
+                    accessibilityLabel: COPY.removePhoto,
+                    onPress: () => requireOnline(removePhoto),
+                    disabled: busy,
+                    testID: "btn-profile-remove-photo",
+                  }
+                : undefined
+            }
           />
-          {profile?.avatar_url ? (
-            <Pressable
-              onPress={() => requireOnline(removePhoto)}
-              disabled={busy}
-              accessibilityRole="button"
-              testID="btn-profile-remove-photo"
-            >
-              <Text style={styles.removeLabel}>{COPY.removePhoto}</Text>
-            </Pressable>
-          ) : null}
         </View>
       </View>
 
@@ -192,8 +196,7 @@ export function EditProfileForm({ onSaved }: EditProfileFormProps) {
 const useStyles = createStyles((colors) => ({
   form: { gap: spacing.md },
   photoBlock: { flexDirection: "row", alignItems: "center", gap: spacing.lg },
-  photoActions: { gap: spacing.sm, alignItems: "flex-start" },
-  removeLabel: { ...typography.caption, color: colors.peach, paddingHorizontal: spacing.sm },
+  photoActions: { flexShrink: 1, alignItems: "flex-start" },
   label: { ...typography.caption, color: colors.textSecondary },
   usernameBlock: { gap: 4 },
   usernameValue: { ...typography.body, color: colors.textPrimary },

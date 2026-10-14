@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useRef } from "react";
 import { Animated, Pressable, Text, View } from "react-native";
 
+import { AmountCaretText } from "@/components/shared/AmountCaretText";
 import { useReduceMotion } from "@/lib/use-reduce-motion";
 import { colors, spacing, typography, createStyles } from "@/lib/theme";
 
@@ -23,6 +24,11 @@ interface KeypadSheetFooterProps {
   shakeKey?: number;
   /** Tapping the amount — e.g. to dismiss the note's keyboard and bring the keypad back. */
   onPressAmount?: () => void;
+  /** Where the caret is drawn in `amount` (a text index). With onPressChar,
+   *  the amount shows a caret and each character can be tapped to move it. */
+  caret?: number;
+  caretColor?: string;
+  onPressChar?: (index: number) => void;
   /** Field errors under the amount row; undefined entries are skipped. */
   errors?: (string | undefined)[];
   /** The note input, the submit error and the CalculatorKeypad, in that order. */
@@ -34,7 +40,7 @@ const SHAKE_STEP_MS = 40;
 
 /**
  * The bottom block every keypad-driven sheet shares (reference-ui/
- * KeypadSheetFooter.tsx): a summary chip over the centred amount, then
+ * KeypadSheetFooter.tsx): a summary chip and the amount on one row, then
  * whatever input and keypad sit under it. Meant for Drawer's pinned `footer`
  * slot, which already draws the divider above it, so the keypad stays put
  * while the pickers above it scroll.
@@ -49,6 +55,9 @@ export function KeypadSheetFooter({
   preview,
   shakeKey,
   onPressAmount,
+  caret,
+  caretColor = colors.green,
+  onPressChar,
   errors = [],
   children,
 }: KeypadSheetFooterProps) {
@@ -82,7 +91,11 @@ export function KeypadSheetFooter({
             // A long expression keeps its END in view — the part being typed.
             ellipsizeMode="head"
           >
-            {amount}
+            {caret !== undefined && onPressChar ? (
+              <AmountCaretText text={amount} caret={caret} caretColor={caretColor} onPressChar={onPressChar} />
+            ) : (
+              amount
+            )}
           </Animated.Text>
           {amountSuffix ? <Text style={styles.suffix}>{amountSuffix}</Text> : null}
         </Pressable>
@@ -109,25 +122,16 @@ export function KeypadSheetFooter({
   );
 }
 
-// The amount is the screen's centrepiece: large, centred, light in weight,
-// with the chip that says what it is for (category, transfer target) above it.
-const AMOUNT_FONT_SIZE = 46;
-
 const useStyles = createStyles((colors) => ({
   container: { gap: spacing.sm },
-  summaryRow: { alignItems: "center", gap: spacing.xs },
-  leading: { maxWidth: "100%", alignItems: "center" },
-  amountWrap: { maxWidth: "100%", flexDirection: "row", alignItems: "baseline", justifyContent: "center", gap: 6 },
-  amount: {
-    fontSize: AMOUNT_FONT_SIZE,
-    fontWeight: "600",
-    letterSpacing: -1,
-    flexShrink: 1,
-    textAlign: "center",
-    fontVariant: ["tabular-nums"],
-  },
-  suffix: { ...typography.body, fontWeight: "500", color: colors.textSecondary },
-  preview: { ...typography.label, color: colors.textSecondary, textAlign: "center", fontVariant: ["tabular-nums"] },
+  summaryRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: spacing.sm },
+  // The chip yields first: the amount is the one thing on this row that must
+  // never be cut short.
+  leading: { flexShrink: 1, minWidth: 0 },
+  amountWrap: { flexShrink: 1, flexDirection: "row", alignItems: "baseline", gap: spacing.xs, minWidth: 96 },
+  amount: { ...typography.hero, flexShrink: 1, textAlign: "right", fontVariant: ["tabular-nums"] },
+  suffix: { ...typography.caption, color: colors.textSecondary },
+  preview: { ...typography.label, color: colors.textSecondary, textAlign: "right", fontVariant: ["tabular-nums"] },
   previewError: { color: colors.peach },
-  error: { ...typography.caption, color: colors.peach, textAlign: "center" },
+  error: { ...typography.caption, color: colors.peach },
 }));

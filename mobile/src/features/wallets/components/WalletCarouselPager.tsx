@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { Animated, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
+import Animated, { Extrapolation, SharedValue, interpolate, useAnimatedStyle } from "react-native-reanimated";
 
 import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/Icon";
 import { withAlpha } from "@/lib/color";
@@ -26,57 +27,79 @@ export const PAGER_HEIGHT = 36;
 export const PAGER_OFFSET_TOP = 14 - CAROUSEL_SHADOW_BLEED_BOTTOM;
 
 /**
- * Per-dot motion, all on the native driver and keyed off the carousel's own
- * scroll position, so the dots track the finger frame by frame.
+ * One dot's motion, on the UI thread and keyed off the carousel's own scroll
+ * position (the same Reanimated value the cards read), so the dots track the
+ * finger frame by frame.
  *
- * Width and position are layout, which the native driver cannot animate, so
- * each dot is drawn as two half-caps and a middle piece: the middle scales
- * out from the left cap and the right cap rides its end. The row's re-flow
- * is a translate: every dot after the active one shifts right by STRETCH.
+ * Width is layout, so each dot is drawn as two half-caps and a middle piece:
+ * the middle scales out from the left cap and the right cap rides its end.
+ * The row's re-flow is a translate: every dot after the active one shifts
+ * right by STRETCH.
  *
  * Keyed on every rendered position (the loop copies too), not on the wallet
  * index: across the loop seam the last dot shrinks while the first grows,
  * and linear interpolation between neighbouring positions gives exactly the
  * in-between widths and shifts.
  */
-function useDotMotion(dotCount: number, positionCount: number, scrollX: Animated.Value) {
-  return useMemo(() => {
-    if (dotCount < 2 || positionCount < 2) return [];
-    const position = Animated.divide(scrollX, SNAP_INTERVAL);
-    const inputRange = Array.from({ length: positionCount }, (_, i) => i);
-    const along = (values: number[]) =>
-      position.interpolate({ inputRange, outputRange: values, extrapolate: "clamp" });
+function useDotMotion(dot: number, dotCount: number, positionCount: number, scrollX: SharedValue<number>) {
+  const ranges = useMemo(() => {
+    const input = Array.from({ length: positionCount }, (_, i) => i);
+    const active = input.map((i) => (i % dotCount === dot ? 1 : 0));
+    return {
+      input,
+      active,
+      shift: input.map((i) => (i % dotCount < dot ? STRETCH : 0)),
+      // Scales around its own centre, so it is moved back by the half it lost.
+      middleShift: active.map((v) => -(1 - v) * (STRETCH / 2)),
+      middleScale: active.map((v) => Math.max(COLLAPSED, v)),
+      capShift: active.map((v) => v * STRETCH),
+    };
+  }, [dot, dotCount, positionCount]);
 
-    return Array.from({ length: dotCount }, (_, dot) => {
-      const active = inputRange.map((i) => (i % dotCount === dot ? 1 : 0));
-      const activeIsBefore = inputRange.map((i) => (i % dotCount < dot ? 1 : 0));
-      return {
-        shift: along(activeIsBefore.map((v) => v * STRETCH)),
-        // Scales around its own centre, so it is moved back by the half it lost.
-        middleShift: along(active.map((v) => -(1 - v) * (STRETCH / 2))),
-        middleScale: along(active.map((v) => Math.max(COLLAPSED, v))),
-        capShift: along(active.map((v) => v * STRETCH)),
-        active: along(active),
-      };
-    });
-  }, [dotCount, positionCount, scrollX]);
+  const along = (values: number[]) => {
+    "worklet";
+    return interpolate(scrollX.value / SNAP_INTERVAL, ranges.input, values, Extrapolation.CLAMP);
+  };
+  const dotStyle = useAnimatedStyle(() => ({ transform: [{ translateX: along(ranges.shift) }] }));
+  const middleStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: along(ranges.middleShift) }, { scaleX: along(ranges.middleScale) }],
+  }));
+  const capStyle = useAnimatedStyle(() => ({ transform: [{ translateX: along(ranges.capShift) }] }));
+  const activeStyle = useAnimatedStyle(() => ({ opacity: along(ranges.active) }));
+  return { dotStyle, middleStyle, capStyle, activeStyle };
 }
 
-type DotMotion = ReturnType<typeof useDotMotion>[number];
+type DotMotion = ReturnType<typeof useDotMotion>;
 
 function Capsule({ motion, color }: { motion: DotMotion; color: string }) {
   const styles = useStyles();
   return (
     <>
       <View style={[styles.capLeft, { backgroundColor: color }]} />
-      <Animated.View
-        style={[
-          styles.middle,
-          { backgroundColor: color, transform: [{ translateX: motion.middleShift }, { scaleX: motion.middleScale }] },
-        ]}
-      />
-      <Animated.View style={[styles.capRight, { backgroundColor: color, transform: [{ translateX: motion.capShift }] }]} />
+      <Animated.View style={[styles.middle, { backgroundColor: color }, motion.middleStyle]} />
+      <Animated.View style={[styles.capRight, { backgroundColor: color }, motion.capStyle]} />
     </>
+  );
+}
+
+interface PagerDotProps {
+  dot: number;
+  dotCount: number;
+  positionCount: number;
+  scrollX: SharedValue<number>;
+}
+
+function PagerDot({ dot, dotCount, positionCount, scrollX }: PagerDotProps) {
+  const styles = useStyles();
+  const colors = useColors();
+  const motion = useDotMotion(dot, dotCount, positionCount, scrollX);
+  return (
+    <Animated.View style={[styles.dot, { left: dot * (DOT + DOT_GAP) }, motion.dotStyle]}>
+      <Capsule motion={motion} color={colors.trackMuted} />
+      <Animated.View style={[styles.dotActive, motion.activeStyle]}>
+        <Capsule motion={motion} color={colors.textPrimary} />
+      </Animated.View>
+    </Animated.View>
   );
 }
 
@@ -85,7 +108,7 @@ interface WalletCarouselPagerProps {
   dotCount: number;
   /** Rendered cards, loop copies included. */
   positionCount: number;
-  scrollX: Animated.Value;
+  scrollX: SharedValue<number>;
   canGoBack: boolean;
   canGoForward: boolean;
   onBack: () => void;
@@ -104,13 +127,13 @@ export function WalletCarouselPager({
 }: WalletCarouselPagerProps) {
   const styles = useStyles();
   const colors = useColors();
-  const dots = useDotMotion(dotCount, positionCount, scrollX);
+  const hasDots = dotCount >= 2 && positionCount >= 2;
 
   return (
     // box-none: the slot overlaps the cards' bottom shadow bleed and must not
     // swallow touches there, only the bar itself takes them.
     <View style={styles.slot} pointerEvents="box-none">
-      {dots.length > 0 ? (
+      {hasDots ? (
         <View style={styles.bar}>
           <Pressable
             onPress={onBack}
@@ -130,16 +153,8 @@ export function WalletCarouselPager({
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"
           >
-            {dots.map((motion, index) => (
-              <Animated.View
-                key={index}
-                style={[styles.dot, { left: index * (DOT + DOT_GAP), transform: [{ translateX: motion.shift }] }]}
-              >
-                <Capsule motion={motion} color={colors.trackMuted} />
-                <Animated.View style={[styles.dotActive, { opacity: motion.active }]}>
-                  <Capsule motion={motion} color={colors.textPrimary} />
-                </Animated.View>
-              </Animated.View>
+            {Array.from({ length: dotCount }, (_, dot) => (
+              <PagerDot key={dot} dot={dot} dotCount={dotCount} positionCount={positionCount} scrollX={scrollX} />
             ))}
           </View>
 

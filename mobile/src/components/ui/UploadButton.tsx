@@ -1,19 +1,19 @@
-import { Pressable, Text, View } from "react-native";
+import { useState } from "react";
+import { LayoutChangeEvent, Pressable, Text, View } from "react-native";
 import type { MutationStatus } from "@tanstack/react-query";
 
-import { CheckIcon, UploadIcon } from "@/components/ui/Icon";
+import { CheckIcon, TrashIcon, UploadIcon } from "@/components/ui/Icon";
 import { ProgressRing } from "@/components/ui/ProgressRing";
 import { SlideSwap } from "@/components/ui/SlideSwap";
 import { withAlpha } from "@/lib/color";
 import { formatPercent } from "@/lib/percent";
-import { radii, typography, createStyles, useColors } from "@/lib/theme";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useUploadProgress } from "@/lib/use-upload-progress";
 
 export const UPLOAD_WAITING_LABEL = "Đang tải ảnh lên…";
 const GLYPH_SIZE = 18;
 const RING_STROKE = 2.25;
-// Apple's minimum touch target.
-const MIN_HEIGHT = 44;
+const MIN_HEIGHT = 48;
 
 interface UploadButtonProps {
   /** The upload mutation's status; the button plays its run from this. */
@@ -24,32 +24,37 @@ interface UploadButtonProps {
   onPress: () => void;
   disabled?: boolean;
   testID?: string;
+  /** A second, destructive action in the same bar ("Xóa"), behind a divider. */
+  remove?: {
+    label: string;
+    accessibilityLabel: string;
+    onPress: () => void;
+    disabled?: boolean;
+    testID?: string;
+  };
 }
 
 /**
- * A tinted capsule (iOS's "tinted" button: the accent at low alpha behind
- * accent text, no border). While uploading, the leading glyph becomes a
- * progress ring beside the percent, the label rolls to "Đang tải ảnh lên…"
- * if the server is slow, ends on 100%, then a filled check and `doneLabel`.
- * Timing lives in useUploadProgress.
+ * One bordered bar: "Đổi ảnh" with an upload icon, and, when there is
+ * something to remove, a divider and a red "Xóa". While the upload runs, the
+ * upload half takes the whole bar (held at its resting width, so nothing
+ * jumps): a progress ring and the percent, "Đang tải ảnh lên…" if the server
+ * is slow, a check and `doneLabel` once it answers. Timing lives in
+ * useUploadProgress.
  */
-export function UploadButton({ status, label, doneLabel, onPress, disabled, testID }: UploadButtonProps) {
+export function UploadButton({ status, label, doneLabel, onPress, disabled, testID, remove }: UploadButtonProps) {
   const colors = useColors();
   const styles = useStyles();
   const upload = useUploadProgress(status);
+  const [restingWidth, setRestingWidth] = useState<number | null>(null);
+  const showRemove = Boolean(remove) && !upload.busy;
 
   const textFor = (key: string) =>
     key === "progress" ? formatPercent(upload.percent) : key === "waiting" ? UPLOAD_WAITING_LABEL : key === "done" ? doneLabel : label;
 
   const glyphFor = (key: string) => {
     if (key === "idle") return <UploadIcon size={GLYPH_SIZE} color={colors.green} />;
-    if (key === "done") {
-      return (
-        <View style={styles.doneBadge}>
-          <CheckIcon size={12} color={colors.onGreen} strokeWidth={3} />
-        </View>
-      );
-    }
+    if (key === "done") return <CheckIcon size={GLYPH_SIZE} color={colors.green} strokeWidth={2.6} />;
     return (
       <ProgressRing
         progress={upload.progress}
@@ -70,45 +75,76 @@ export function UploadButton({ status, label, doneLabel, onPress, disabled, test
     </View>
   );
 
+  // The resting width is what the busy bar keeps. A bar with no "Xóa" next to
+  // it has no room to give, so it is sized by its longest label instead.
+  const onLayout = (event: LayoutChangeEvent) => {
+    if (!upload.busy) setRestingWidth(event.nativeEvent.layout.width);
+  };
+  const sizer = renderSlot(remove && !upload.busy ? "idle" : "waiting");
   const inactive = disabled || upload.busy;
 
   return (
-    <Pressable
-      testID={testID}
-      onPress={onPress}
-      disabled={inactive}
-      accessibilityRole="button"
-      accessibilityLabel={textFor(upload.phase)}
-      accessibilityState={{ disabled: inactive, busy: upload.busy }}
-      style={({ pressed }) => [styles.base, disabled && !upload.busy && styles.disabled, pressed && styles.pressed]}
-    >
-      {/* Sized by the longest label, so the capsule does not jump between states. */}
-      <SlideSwap slotKey={upload.phase} renderSlot={renderSlot} sizer={renderSlot("waiting")} />
-    </Pressable>
+    <View style={[styles.bar, remove && upload.busy && restingWidth ? { width: restingWidth } : null]} onLayout={onLayout}>
+      <Pressable
+        testID={testID}
+        onPress={onPress}
+        disabled={inactive}
+        accessibilityRole="button"
+        accessibilityLabel={textFor(upload.phase)}
+        accessibilityState={{ disabled: inactive, busy: upload.busy }}
+        style={({ pressed }) => [
+          styles.segment,
+          upload.busy && styles.segmentFull,
+          disabled && !upload.busy && styles.disabled,
+          pressed && styles.pressed,
+        ]}
+      >
+        <SlideSwap slotKey={upload.phase} renderSlot={renderSlot} sizer={sizer} />
+      </Pressable>
+      {showRemove && remove ? (
+        <>
+          <View style={styles.divider} />
+          <Pressable
+            testID={remove.testID}
+            onPress={remove.onPress}
+            disabled={remove.disabled}
+            accessibilityRole="button"
+            accessibilityLabel={remove.accessibilityLabel}
+            accessibilityState={{ disabled: Boolean(remove.disabled) }}
+            style={({ pressed }) => [styles.segment, remove.disabled && styles.disabled, pressed && styles.pressed]}
+          >
+            <View style={styles.content}>
+              <TrashIcon size={GLYPH_SIZE} color={colors.danger} />
+              <Text style={[styles.label, styles.removeLabel]} numberOfLines={1}>
+                {remove.label}
+              </Text>
+            </View>
+          </Pressable>
+        </>
+      ) : null}
+    </View>
   );
 }
 
 const useStyles = createStyles((colors) => ({
-  base: {
+  bar: {
     minHeight: MIN_HEIGHT,
-    justifyContent: "center",
-    borderRadius: radii.pill,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    backgroundColor: withAlpha(colors.green, 0.14),
+    flexDirection: "row",
+    alignItems: "stretch",
+    alignSelf: "flex-start",
+    borderRadius: radii.listCard,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    backgroundColor: withAlpha(colors.overlayBase, 0.08),
+    overflow: "hidden",
   },
-  content: { flexDirection: "row", alignItems: "center", gap: 8 },
-  label: { ...typography.body, color: colors.green, letterSpacing: -0.2 },
+  segment: { justifyContent: "center", paddingHorizontal: spacing.lg },
+  segmentFull: { flex: 1, alignItems: "center" },
+  divider: { width: 1, marginVertical: spacing.md, backgroundColor: withAlpha(colors.overlayBase, 0.16) },
+  content: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  label: { ...typography.body, color: colors.textPrimary },
+  removeLabel: { color: colors.danger },
   tabular: { fontVariant: ["tabular-nums"] },
-  doneBadge: {
-    width: GLYPH_SIZE,
-    height: GLYPH_SIZE,
-    borderRadius: GLYPH_SIZE / 2,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.green,
-  },
-  // iOS dims a tinted button while it is held, with a slight press-in.
-  pressed: { opacity: 0.7, transform: [{ scale: 0.98 }] },
+  pressed: { opacity: 0.6 },
   disabled: { opacity: 0.4 },
 }));

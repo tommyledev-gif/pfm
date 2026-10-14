@@ -15,8 +15,6 @@ import { TransactionExtrasRow } from "@/features/transactions/components/Transac
 import { buildItemsPanelChild } from "@/features/transactions/components/ItemsEditorPanel";
 import { useFormDrawerChild } from "@/features/transactions/components/use-form-drawer-child";
 import { useWalletChangeGuard } from "@/features/transactions/components/use-wallet-change-guard";
-import { useWalletPickerPanel } from "@/features/transactions/components/use-wallet-picker-panel";
-import { useVisibleDrawerChild } from "@/features/transactions/components/use-visible-drawer-child";
 import { useItemsEditor } from "@/features/transactions/items/use-items-editor";
 import { useOpenWalletCreator } from "@/features/wallets/use-open-wallet-creator";
 import { EditTransactionChoices } from "@/features/ai-chat/components/EditTransactionChoices";
@@ -158,13 +156,6 @@ export function EditTransactionModal({
     panels.claim("location");
     location.open();
   };
-  const walletPicker = useWalletPickerPanel({
-    title: "Ví",
-    wallets: selectableWallets,
-    selectedId: chosenWalletId,
-    onSelect: walletChange.select,
-  });
-  const drawerChild = useVisibleDrawerChild([panels.drawerChild, walletPicker.child]);
 
   const amountValid = amount.cents !== null && amount.cents > 0;
   const canSave = amountValid && Boolean(categoryId) && Boolean(chosenWalletId) && Boolean(occurredAt);
@@ -205,8 +196,7 @@ export function EditTransactionModal({
       <Drawer
         visible={visible}
         onClose={onClose}
-        child={drawerChild}
-        fullScreen
+        child={panels.drawerChild}
         footer={
           <TransactionKeypadFooter
             amount={amount}
@@ -224,7 +214,6 @@ export function EditTransactionModal({
         }
       >
         <DrawerHeader
-          layout="nav"
           title="Sửa giao dịch"
           actions={[
             { label: "Hủy", onPress: onClose, variant: "secondary" },
@@ -236,9 +225,9 @@ export function EditTransactionModal({
           type={type}
           onChangeType={setType}
           typeLocked={confirmed}
-          wallet={selectableWallets.find((w) => w.id === chosenWalletId) ?? null}
-          walletCount={selectableWallets.length}
-          onOpenWallets={walletPicker.open}
+          wallets={selectableWallets}
+          selectedWalletId={chosenWalletId}
+          onSelectWallet={walletChange.select}
           walletLocked={confirmed && savedId === null}
           noVndWallet={Boolean(vndOnly && wallets.data && selectableWallets.length === 0)}
           // Closed first: the sheet would otherwise sit over the Wallets

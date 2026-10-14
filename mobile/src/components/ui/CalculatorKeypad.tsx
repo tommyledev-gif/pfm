@@ -33,15 +33,13 @@ const SPOKEN_KEY: Partial<Record<KeypadKey, string>> = {
 // their labels, so 200% text never spills out of — or clips inside — a key.
 const KEY_LABEL_MAX_FONT_SCALE = 1.4;
 const DATE_LABEL_MAX_FONT_SCALE = 1.2;
-// The operator column and the date key: the muted accent as a tint, so only
-// ✓ carries it solid.
-const ACCENT_TINT_ALPHA = 0.14;
+const OPERATOR_IDLE_ALPHA = 0.06;
+const OPERATOR_BORDER_ALPHA = 0.4;
+const OPERATOR_PRESSED_ALPHA = 0.18;
 
-// Borderless rounded squares in one fill (iOS's calculator), the keys told
-// apart by color alone: grey digits, tinted operators and date, a solid ✓.
-const KEY_HEIGHT = 52;
-const KEY_RADIUS = 14;
-const GAP = 8;
+const KEY_HEIGHT = 48;
+const KEY_RADIUS = 12;
+const GAP = 6;
 const DIGIT_BLOCK_COLUMNS = 4;
 const READY_FADE_MS = 140;
 
@@ -122,7 +120,7 @@ export function CalculatorKeypad({
         accessibilityRole="button"
         accessibilityLabel={SPOKEN_KEY[key] ?? key}
         onPress={() => onInsert(key)}
-        style={({ pressed }) => [styles.key, styles.digitKey, pressed && styles.keyPressed]}
+        style={({ pressed }) => [styles.key, styles.digitKey, pressed && styles.digitKeyPressed]}
       >
         <Text
           style={[styles.digitLabel, key === "000" && styles.thousandsLabel]}
@@ -142,7 +140,7 @@ export function CalculatorKeypad({
         accessibilityRole="button"
         accessibilityLabel={SPOKEN_KEY[glyph] ?? glyph}
         onPress={() => onInsert(glyph)}
-        style={({ pressed }) => [styles.key, styles.operatorKey, pressed && styles.keyPressed]}
+        style={({ pressed }) => [styles.key, styles.operatorKey, pressed && styles.operatorKeyPressed]}
       >
         <Text style={styles.operatorLabel} maxFontSizeMultiplier={KEY_LABEL_MAX_FONT_SCALE}>
           {glyph}
@@ -179,9 +177,9 @@ export function CalculatorKeypad({
               accessibilityHint={onClear ? "Nhấn giữ để xóa hết" : undefined}
               onPress={onBackspace}
               onLongPress={onClear}
-              style={({ pressed }) => [styles.key, styles.digitKey, pressed && styles.keyPressed]}
+              style={({ pressed }) => [styles.key, styles.digitKey, pressed && styles.digitKeyPressed]}
             >
-              <BackspaceIcon size={22} color={colors.textSecondary} />
+              <BackspaceIcon size={22} color={colors.textPrimary} />
             </Pressable>
           </KeyColumn>
           {operatorKey(LAST_ROW_OPERATOR)}
@@ -195,9 +193,9 @@ export function CalculatorKeypad({
             accessibilityRole="button"
             accessibilityLabel={dateAccessibilityLabel ?? dateLabel}
             onPress={onDatePress}
-            style={({ pressed }) => [styles.actionKey, styles.dateKey, pressed && styles.keyPressed]}
+            style={({ pressed }) => [styles.actionKey, styles.dateKey, pressed && styles.actionKeyPressed]}
           >
-            <CalendarIcon size={18} color={colors.accentMuted} strokeWidth={2} />
+            <CalendarIcon size={16} color={colors.onGreen} strokeWidth={2.25} />
             {dateLabel ? (
               <Text style={styles.dateLabel} numberOfLines={2} maxFontSizeMultiplier={DATE_LABEL_MAX_FONT_SCALE}>
                 {dateLabel}
@@ -215,13 +213,13 @@ export function CalculatorKeypad({
           style={({ pressed }) => [
             styles.actionKey,
             confirmDisabled ? styles.confirmKeyDisabled : styles.confirmKey,
-            pressed && !confirmBlocked && styles.keyPressed,
+            pressed && !confirmBlocked && styles.actionKeyPressed,
           ]}
         >
           {confirmLoading ? (
-            <ActivityIndicator color={colors.onAccentMuted} />
+            <ActivityIndicator color={colors.onGreen} />
           ) : (
-            <CheckIcon size={24} color={confirmDisabled ? colors.textMuted : colors.onAccentMuted} strokeWidth={2.4} />
+            <CheckIcon size={22} color={confirmDisabled ? colors.textMuted : colors.onGreen} strokeWidth={2.5} />
           )}
         </Pressable>
       </View>
@@ -241,23 +239,30 @@ const useStyles = createStyles((colors) => ({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: KEY_RADIUS,
+    borderWidth: 1,
   },
-  keyPressed: { opacity: 0.55 },
-  digitKey: { backgroundColor: colors.keyFill },
-  digitLabel: { fontSize: 24, fontWeight: "500", color: colors.textPrimary, fontVariant: ["tabular-nums"] },
-  thousandsLabel: { fontSize: 19 },
-  operatorKey: { backgroundColor: withAlpha(colors.accentMuted, ACCENT_TINT_ALPHA) },
-  operatorLabel: { fontSize: 24, fontWeight: "500", color: colors.accentMuted },
+  digitKey: { backgroundColor: withAlpha(colors.overlayBase, 0.06), borderColor: colors.surfaceBorder },
+  digitKeyPressed: { backgroundColor: withAlpha(colors.overlayBase, 0.14) },
+  digitLabel: { ...typography.title, color: colors.textPrimary },
+  thousandsLabel: { ...typography.cardTitle },
+  operatorKey: {
+    backgroundColor: withAlpha(colors.green, OPERATOR_IDLE_ALPHA),
+    borderColor: withAlpha(colors.green, OPERATOR_BORDER_ALPHA),
+  },
+  operatorKeyPressed: { backgroundColor: withAlpha(colors.green, OPERATOR_PRESSED_ALPHA) },
+  operatorLabel: { ...typography.title, color: colors.green },
   actionKey: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
+    gap: 2,
     paddingHorizontal: 2,
     borderRadius: KEY_RADIUS,
+    borderWidth: 1,
   },
-  dateKey: { backgroundColor: withAlpha(colors.accentMuted, ACCENT_TINT_ALPHA) },
-  dateLabel: { ...typography.caption, color: colors.accentMuted, textAlign: "center" },
-  confirmKey: { backgroundColor: colors.accentMuted },
-  confirmKeyDisabled: { backgroundColor: colors.keyFill },
+  actionKeyPressed: { opacity: 0.85 },
+  dateKey: { backgroundColor: colors.green, borderColor: colors.green },
+  dateLabel: { ...typography.tiny, fontWeight: "700", color: colors.onGreen, textAlign: "center" },
+  confirmKey: { backgroundColor: colors.green, borderColor: colors.green },
+  confirmKeyDisabled: { backgroundColor: withAlpha(colors.overlayBase, 0.06), borderColor: colors.surfaceBorder },
 }));

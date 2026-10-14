@@ -8,6 +8,7 @@ import { KeypadSheetFooter } from "@/components/shared/KeypadSheetFooter";
 import { colorForCategory } from "@/lib/category-color";
 import { TRANSACTION_NOTE_MAX_LENGTH, TransactionKind } from "@/lib/constants";
 import { formatDateShort } from "@/lib/format-date";
+import { withAlpha } from "@/lib/color";
 import { colors, radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { AmountExpression } from "@/lib/use-amount-expression";
 import { useKeyboardVisible } from "@/lib/use-keyboard-height";
@@ -125,7 +126,18 @@ export function TransactionKeypadFooter({
       shakeKey={amount.rejectCount}
       amountColor={amount.expression ? AMOUNT_COLOR[type] : colors.textMuted}
       amountTestID="text-transaction-amount"
-      onPressAmount={keyboardVisible ? Keyboard.dismiss : undefined}
+      // The amount carries a caret: tapping a digit moves it there, tapping
+      // beside the digits puts it back at the end. Either one also hands the
+      // keypad back from the note's keyboard.
+      caret={amount.caret}
+      onPressChar={(index) => {
+        if (keyboardVisible) Keyboard.dismiss();
+        amount.placeCaretAfter(index);
+      }}
+      onPressAmount={() => {
+        if (keyboardVisible) Keyboard.dismiss();
+        amount.placeCaretAfter(amount.display.length - 1);
+      }}
       errors={errors}
     >
       <TextInput
@@ -166,27 +178,30 @@ export function TransactionKeypadFooter({
 }
 
 const useStyles = createStyles((colors) => ({
-  // Borderless, on the same field fill as the form's other controls.
   chip: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs + 2,
-    height: 34,
+    height: 36,
     paddingHorizontal: spacing.md,
     borderRadius: radii.pill,
-    backgroundColor: colors.fieldFill,
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    alignSelf: "flex-start",
     maxWidth: "100%",
   },
-  chipLabel: { ...typography.label, color: colors.textPrimary, flexShrink: 1 },
-  chipPlaceholder: { color: colors.textMuted, fontWeight: "500" },
+  chipLabel: { ...typography.caption, color: colors.textPrimary, flexShrink: 1 },
+  chipPlaceholder: { color: colors.textMuted },
   noteInput: {
-    backgroundColor: colors.fieldFill,
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
     borderRadius: radii.listCard,
     paddingHorizontal: spacing.lg,
-    paddingVertical: 12,
+    paddingVertical: 10,
     color: colors.textPrimary,
     ...typography.body,
-    fontWeight: "500",
   },
   error: { ...typography.caption, color: colors.peach },
   notice: { ...typography.caption, color: colors.mustardSoft },

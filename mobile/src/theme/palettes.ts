@@ -66,17 +66,6 @@ const dark = {
   // dark ground lightens; the light theme's dark ink darkens by the same
   // alpha — never a literal rgba(255,255,255,a), which vanishes on white.
   overlayBase: "#FFFFFF",
-
-  // The transaction form's quieter set (2026-10-14 redesign, after Apple's
-  // grouped forms): a soft sage-teal instead of the neon on its keypad and
-  // header, grey-on-black fields and keys, and a segmented control whose
-  // selected segment is lifted rather than filled with the primary.
-  accentMuted: "#86C4A8",
-  onAccentMuted: "#0B1A14",
-  fieldFill: "#12161F",
-  keyFill: "#1A1F29",
-  controlTrack: "#12161F",
-  controlActive: "#2B313D",
 };
 
 export type Palette = { [K in keyof typeof dark]: string };
@@ -128,14 +117,6 @@ const light: Palette = {
   warning: "#9A6B00",
 
   overlayBase: "#0F172A",
-
-  // White fields and keys on the grey ground, white lifted segment on a grey track.
-  accentMuted: "#2E7D62",
-  onAccentMuted: "#FFFFFF",
-  fieldFill: "#FFFFFF",
-  keyFill: "#FFFFFF",
-  controlTrack: "#E4E8EE",
-  controlActive: "#FFFFFF",
 };
 
 export type ThemeName = "dark" | "light";

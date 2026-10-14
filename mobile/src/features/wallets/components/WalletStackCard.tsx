@@ -1,5 +1,6 @@
 import { useId } from "react";
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated as RNAnimated, Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
+import Animated from "react-native-reanimated";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 
 import { TintedIconTile } from "@/components/ui/TintedIconTile";
@@ -8,6 +9,7 @@ import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
 import { PendingBalanceHint, usePendingWalletCount } from "@/features/wallets/components/PendingBalanceHint";
+import type { CardMotion } from "@/features/wallets/components/wallet-carousel-motion";
 
 const TYPE_LABEL: Record<Wallet["type"], string> = {
   cash: "Tiền mặt",
@@ -43,16 +45,15 @@ interface WalletStackCardProps {
   /** This wallet's own color from walletAccentPalette — picked per wallet by
    *  the carousel, not per type, so two bank wallets never look alike. */
   accentColor: string;
-  /** Position transform from the carousel: lean, scale and opacity by distance
-   *  from the centre. */
-  animatedStyle: Animated.WithAnimatedValue<object>;
-  /** 1 when this card is the centred one, 0 when it is not. Drives the
-   *  accent border. */
-  activeOpacity: Animated.AnimatedInterpolation<number>;
+  /** The carousel's motion for this card (wallet-carousel-motion): position,
+   *  lean, scale, fade and paint order, plus the accent border's fade. */
+  motion: CardMotion;
+  /** Static layout from the carousel (the overlap margin). */
+  layoutStyle?: ViewStyle;
   onPress?: () => void;
   /** 1 → 0 from useHighlightFade: the "you picked this one" border, drawn
    *  over the accent border and faded out on the native driver. */
-  highlightOpacity?: Animated.Value;
+  highlightOpacity?: RNAnimated.Value;
 }
 
 /**
@@ -71,8 +72,8 @@ interface WalletStackCardProps {
 export function WalletStackCard({
   wallet,
   accentColor,
-  animatedStyle,
-  activeOpacity,
+  motion,
+  layoutStyle,
   onPress,
   highlightOpacity,
 }: WalletStackCardProps) {
@@ -83,7 +84,7 @@ export function WalletStackCard({
   const gradientId = `wallet-grad-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
 
   return (
-    <Animated.View testID={`card-wallet-${wallet.id}`} style={[styles.card, animatedStyle]}>
+    <Animated.View testID={`card-wallet-${wallet.id}`} style={[styles.card, layoutStyle, motion.card]}>
       <Svg width={CARD_WIDTH} height={CARD_HEIGHT} style={StyleSheet.absoluteFill} pointerEvents="none">
         <Defs>
           {/* Bottom-left (0,1) to top-right (1,0). */}
@@ -96,15 +97,12 @@ export function WalletStackCard({
         <Rect x="0" y="0" width={CARD_WIDTH} height={CARD_HEIGHT} fill={`url(#${gradientId})`} />
       </Svg>
 
-      {/* The accent border is its own overlay for the same reason as the tint:
-          borderColor cannot be animated on the native driver. */}
-      <Animated.View
-        pointerEvents="none"
-        style={[styles.accentBorder, { borderColor: `${accentColor}40`, opacity: activeOpacity }]}
-      />
+      {/* The accent border is its own overlay, faded by opacity alone: the
+          border colour itself stays fixed. */}
+      <Animated.View pointerEvents="none" style={[styles.accentBorder, { borderColor: `${accentColor}40` }, motion.active]} />
 
       {highlightOpacity ? (
-        <Animated.View pointerEvents="none" style={[styles.highlightBorder, { opacity: highlightOpacity }]} />
+        <RNAnimated.View pointerEvents="none" style={[styles.highlightBorder, { opacity: highlightOpacity }]} />
       ) : null}
 
       <Pressable

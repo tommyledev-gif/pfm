@@ -1,26 +1,20 @@
 import { Pressable, Text, View } from "react-native";
 
-import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { spacing, typography, createStyles } from "@/lib/theme";
-import { TransactionType } from "@/lib/constants";
-import { WalletPickerField } from "@/features/transactions/components/WalletPickerField";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
+import { TRANSACTION_TYPES, TransactionType } from "@/lib/constants";
+import { WalletChipRow } from "@/features/transactions/components/WalletChipRow";
 import { NO_VND_WALLET_HINT } from "@/features/ai-chat/proposal-wallet";
 import { Wallet } from "@/features/wallets/types";
-
-const TYPE_OPTIONS: { value: TransactionType; label: string }[] = [
-  { value: "expense", label: "Chi" },
-  { value: "income", label: "Thu" },
-];
 
 interface EditTransactionChoicesProps {
   type: TransactionType;
   onChangeType: (type: TransactionType) => void;
   // A saved transaction keeps its type: PATCH has no such field.
   typeLocked: boolean;
-  /** The chosen wallet, if it is one of those offered. */
-  wallet: Wallet | null;
-  walletCount: number;
-  onOpenWallets: () => void;
+  wallets: Wallet[];
+  selectedWalletId: string | null;
+  onSelectWallet: (id: string) => void;
   walletLocked: boolean;
   // Unsaved proposal and the User owns no VND wallet (spec AC-33).
   noVndWallet: boolean;
@@ -38,9 +32,9 @@ export function EditTransactionChoices({
   type,
   onChangeType,
   typeLocked,
-  wallet,
-  walletCount,
-  onOpenWallets,
+  wallets,
+  selectedWalletId,
+  onSelectWallet,
   walletLocked,
   noVndWallet,
   onCreateVndWallet,
@@ -52,27 +46,24 @@ export function EditTransactionChoices({
     <>
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>Loại</Text>
-        <SegmentedControl
-          options={TYPE_OPTIONS}
-          value={type}
-          onChange={onChangeType}
-          disabled={typeLocked}
-          testID="segmented-edit-type"
-        />
+        <View style={styles.chipRow}>
+          {TRANSACTION_TYPES.map((t) => (
+            <Pressable
+              key={t}
+              onPress={() => !typeLocked && onChangeType(t)}
+              disabled={typeLocked}
+              style={[styles.chip, type === t && styles.chipActive, typeLocked && styles.chipDisabled]}
+            >
+              <Text style={[styles.chipLabel, type === t && styles.chipLabelActive]}>{t === "expense" ? "Chi" : "Thu"}</Text>
+            </Pressable>
+          ))}
+        </View>
         {typeLocked ? <Text style={styles.hint}>Không đổi được loại của giao dịch đã lưu</Text> : null}
       </View>
 
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>Ví</Text>
-        <WalletPickerField
-          label="Ví"
-          wallet={wallet}
-          count={walletCount}
-          placeholder="Chọn ví"
-          onPress={onOpenWallets}
-          locked={walletLocked}
-          testID="field-edit-wallet"
-        />
+        <WalletChipRow wallets={wallets} selectedId={selectedWalletId} onSelect={onSelectWallet} locked={walletLocked} />
         {noVndWallet ? (
           <>
             <Text testID="txt-edit-no-vnd-wallet" style={styles.hint}>
@@ -90,8 +81,23 @@ export function EditTransactionChoices({
 }
 
 const useStyles = createStyles((colors) => ({
-  fieldGroup: { gap: spacing.xs + 2 },
-  label: { ...typography.caption, color: colors.textSecondary, paddingHorizontal: spacing.xs },
-  hint: { ...typography.tiny, color: colors.textMuted, paddingHorizontal: spacing.xs },
-  createWalletLink: { ...typography.caption, color: colors.accentMuted, paddingHorizontal: spacing.xs },
+  fieldGroup: { gap: spacing.xs },
+  label: { ...typography.caption, color: colors.textSecondary },
+  chipRow: { flexDirection: "row", gap: spacing.sm, flexWrap: "wrap" },
+  chip: {
+    height: 36,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    borderRadius: radii.pill,
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+  },
+  chipActive: { backgroundColor: colors.green, borderColor: colors.green },
+  chipDisabled: { opacity: 0.4 },
+  chipLabel: { ...typography.caption, color: colors.textSecondary },
+  chipLabelActive: { color: colors.onGreen },
+  hint: { ...typography.tiny, color: colors.textMuted },
+  createWalletLink: { ...typography.caption, color: colors.green },
 }));
