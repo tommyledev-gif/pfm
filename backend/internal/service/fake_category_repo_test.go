@@ -169,6 +169,20 @@ func (f *fakeCategoryRepo) GetCategoryByID(_ context.Context, id uuid.UUID) (*mo
 	return &cp, nil
 }
 
+func (f *fakeCategoryRepo) GetCategoriesByIDs(_ context.Context, ids []uuid.UUID) ([]*model.Category, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	var out []*model.Category
+	for _, id := range ids {
+		if c, ok := f.categories[id]; ok && c.DeletedAt == nil {
+			cp := *c
+			out = append(out, &cp)
+		}
+	}
+	return out, nil
+}
+
 func (f *fakeCategoryRepo) UpdateCategory(_ context.Context, arg repository.UpdateCategoryParams) (*model.Category, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

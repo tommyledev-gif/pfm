@@ -52,5 +52,8 @@ Một khái niệm = một từ, ở cả VI và EN. Cột "Nguồn": `app` = đ
 1. **"Ví" vs "nguồn tiền".** Code hiện tại dùng cả "Ví của bạn" (tiêu đề) và "{n} nguồn tiền" (đếm). Hai từ cho một thực thể vi phạm quy tắc 11. Đề xuất: chỉ dùng "ví".
 2. **"Ví" vs "Ví điện tử".** "Ví điện tử" là một *loại* ví (MoMo, ZaloPay) nằm trong thực thể "ví" của app. Dễ gây hiểu lầm ở màn tạo ví ("Ví điện tử" là loại hay là ví của app?). Cân nhắc nhãn loại: "Tiền mặt", "Ngân hàng", "MoMo/ZaloPay" hoặc "Ví điện tử (MoMo, ZaloPay...)" kèm ví dụ.
 3. **"Phân tích" vs "Tổng quan" vs "Thống kê"** cho màn insights: chọn một, đồng bộ tab và title.
-4. **"Hủy" vs "Giữ lại"** cho nhánh an toàn trong confirm xóa. Skill đề xuất "Giữ lại"; nếu đổi, đổi đồng loạt.
-5. **Tự xưng của AI chat**: mặc định bỏ chủ ngữ. Nếu muốn có persona ("mình"), quyết một lần, ghi vào đây, và cập nhật `llm-runtime-prompt.md`.
+4. **Tự xưng của AI chat**: mặc định bỏ chủ ngữ. Nếu muốn có persona ("mình"), quyết một lần, ghi vào đây, và cập nhật `llm-runtime-prompt.md`.
+
+## Quyết định đã chốt
+
+- **Nút an toàn trong confirm xóa / gỡ / bỏ: "Giữ lại"** (chốt 14/10/2026), không phải "Hủy". Nút nói việc sẽ xảy ra (quy tắc 6, CLAUDE.md: "Xóa giao dịch" / "Giữ lại"); trong hộp xóa, "Hủy" đọc được thành "hủy cái này" và nghe như cũng là xóa. Cụ thể hơn thì gọi tên thứ được giữ: "Giữ ví cũ". "Hủy" chỉ còn cho việc bỏ một form hoặc sheet đang nhập (nút "Hủy" ở đầu sheet). Code chưa theo hết: `ConfirmDialog` mặc định `cancelLabel = "Hủy"` và một chỗ còn "Huỷ"; đổi đồng loạt là việc riêng.

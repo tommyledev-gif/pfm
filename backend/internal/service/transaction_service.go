@@ -90,6 +90,34 @@ func (s *TransactionService) getVisibleCategory(ctx context.Context, userID, cat
 	return nil, common.ErrCategoryAccessDenied
 }
 
+// checkVisibleCategories is getVisibleCategory for a list, in one query
+// instead of one per id. The first id, in the order given, that is missing
+// or someone else's fails exactly as getVisibleCategory would: 404
+// CATEGORY_NOT_FOUND or 403 CATEGORY_ACCESS_DENIED.
+func (s *TransactionService) checkVisibleCategories(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	categories, err := s.categoryRepo.GetCategoriesByIDs(ctx, ids)
+	if err != nil {
+		return fmt.Errorf("service.checkVisibleCategories: %w", err)
+	}
+	byID := make(map[uuid.UUID]*model.Category, len(categories))
+	for _, category := range categories {
+		byID[category.ID] = category
+	}
+	for _, id := range ids {
+		category, ok := byID[id]
+		if !ok {
+			return common.ErrCategoryNotFound
+		}
+		if !category.IsSystem() && *category.UserID != userID {
+			return common.ErrCategoryAccessDenied
+		}
+	}
+	return nil
+}
+
 // parseFlexibleTimestamp accepts either a full RFC3339 timestamp or a plain
 // date ("2006-01-02", interpreted as UTC midnight) — SRS's own example
 // scenarios pass bare dates (e.g. "2025-12-23") for occurred_at, which

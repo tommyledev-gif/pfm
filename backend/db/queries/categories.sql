@@ -46,6 +46,14 @@ WHERE id = $1
   AND deleted_at IS NULL
 LIMIT 1;
 
+-- name: GetCategoriesByIDs :many
+-- GetCategoryByID for a list, in one round trip (the transaction list's
+-- category_ids filter). Unscoped the same way: the service decides
+-- visibility. Ids with no live Category are simply absent from the result.
+SELECT * FROM categories
+WHERE id = ANY(sqlc.arg('ids')::uuid[])
+  AND deleted_at IS NULL;
+
 -- name: UpdateCategory :one
 -- Scoped by user_id = caller — a system category (user_id IS NULL) or
 -- another user's category can never match this WHERE clause, so it always

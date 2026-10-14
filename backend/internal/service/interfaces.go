@@ -70,6 +70,9 @@ type CategoryRepo interface {
 	NameTypeExists(ctx context.Context, userID uuid.UUID, name, categoryType string, excludeID *uuid.UUID) (bool, error)
 	ListCategoriesForUser(ctx context.Context, userID uuid.UUID, categoryType *string) ([]*model.Category, error)
 	GetCategoryByID(ctx context.Context, id uuid.UUID) (*model.Category, error)
+	// GetCategoriesByIDs is GetCategoryByID for a list, in one query; ids with
+	// no live Category are left out of the result.
+	GetCategoriesByIDs(ctx context.Context, ids []uuid.UUID) ([]*model.Category, error)
 	// GetSystemCategoryByKey resolves the transfer Category (and any future
 	// server-assigned system Category) by its stable system_key.
 	GetSystemCategoryByKey(ctx context.Context, systemKey string) (*model.Category, error)

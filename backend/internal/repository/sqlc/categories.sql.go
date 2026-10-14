@@ -102,6 +102,34 @@ func (q *Queries) GetCategoryByID(ctx context.Context, id uuid.UUID) (Category, 
 	return i, err
 }
 
+const getCategoriesByIDs = `-- name: GetCategoriesByIDs :many
+SELECT id, user_id, name, icon, type, created_at, deleted_at, icon_url, system_key FROM categories
+WHERE id = ANY($1::uuid[])
+  AND deleted_at IS NULL
+`
+
+// GetCategoriesByIDs is GetCategoryByID for a list — see db/queries/categories.sql.
+func (q *Queries) GetCategoriesByIDs(ctx context.Context, ids []uuid.UUID) ([]Category, error) {
+	rows, err := q.db.Query(ctx, getCategoriesByIDs, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []Category
+	for rows.Next() {
+		var i Category
+		if err := rows.Scan(&i.ID, &i.UserID, &i.Name, &i.Icon, &i.Type, &i.CreatedAt, &i.DeletedAt, &i.IconURL, &i.SystemKey); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateCategory = `-- name: UpdateCategory :one
 UPDATE categories
 SET

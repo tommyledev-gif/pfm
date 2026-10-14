@@ -1,7 +1,7 @@
 import { ReactNode, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, TextInput, View } from "react-native";
 
-import { SendIcon, SparkleIcon } from "@/components/ui/Icon";
+import { SendIcon } from "@/components/ui/Icon";
 import { CHAT_MODE_META, ChatMode } from "@/features/ai-chat/chat-mode";
 import { COMPOSER_NAV_CLEARANCE } from "@/features/ai-chat/components/chat-composer-metrics";
 import { useReportComposerFocus } from "@/features/ai-chat/components/KeyboardLiftView";

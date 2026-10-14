@@ -68,10 +68,11 @@ func (s *TransactionService) ListTransactions(ctx context.Context, userID uuid.U
 			if err != nil {
 				return ListTransactionsResult{}, common.NewInvalidInputError("category_ids must be a comma-separated list of valid UUIDs")
 			}
-			if _, err := s.getVisibleCategory(ctx, userID, categoryID); err != nil {
-				return ListTransactionsResult{}, err
-			}
 			categoryIDs = append(categoryIDs, categoryID)
+		}
+		// One query for the whole list (it used to be one per id).
+		if err := s.checkVisibleCategories(ctx, userID, categoryIDs); err != nil {
+			return ListTransactionsResult{}, err
 		}
 		if len(categoryIDs) > 0 {
 			filter.CategoryIDs = categoryIDs

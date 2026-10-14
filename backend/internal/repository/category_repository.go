@@ -99,6 +99,21 @@ func (r *CategoryRepository) GetCategoryByID(ctx context.Context, id uuid.UUID) 
 	return toCategoryModel(row), nil
 }
 
+// GetCategoriesByIDs returns the live Categories among ids, in no set order;
+// an id with no live Category is simply absent (never an error). Unscoped,
+// like GetCategoryByID.
+func (r *CategoryRepository) GetCategoriesByIDs(ctx context.Context, ids []uuid.UUID) ([]*model.Category, error) {
+	rows, err := r.q.GetCategoriesByIDs(ctx, ids)
+	if err != nil {
+		return nil, fmt.Errorf("repository.GetCategoriesByIDs: %w", err)
+	}
+	categories := make([]*model.Category, 0, len(rows))
+	for _, row := range rows {
+		categories = append(categories, toCategoryModel(row))
+	}
+	return categories, nil
+}
+
 // GetSystemCategoryByKey returns pgx.ErrNoRows (unwrap with errors.Is) when no
 // live system Category carries that key.
 func (r *CategoryRepository) GetSystemCategoryByKey(ctx context.Context, systemKey string) (*model.Category, error) {
