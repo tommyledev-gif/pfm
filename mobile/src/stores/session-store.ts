@@ -46,6 +46,25 @@ function runDueRefresh(): void {
 // (specs/mobile-session-refresh/spec.md decision #4, S-REF-11).
 let refreshPromise: Promise<string> | null = null;
 
+// ⚠️ setTokens() and clear() run one at a time, in call order. Both await
+// secure storage (and a cache detach) before they set the state, and two
+// commits interleaving could land in either order: a renewal of the OUTGOING
+// User finishing during an account switch overwrote the new User's tokens
+// with the old ones, the switch then logged that old session out, and the
+// next request sent the User to the login screen instead of the account
+// they picked. Queued, a commit that must only apply to a given session
+// (onlyIfRefreshToken) can check it at its turn, right before it writes.
+let commitQueue: Promise<unknown> = Promise.resolve();
+
+function queueCommit<T>(commit: () => Promise<T>): Promise<T> {
+  const run = commitQueue.then(commit, commit);
+  commitQueue = run.catch(() => {});
+  return run;
+}
+
+/** A commit that was for a session that has since been replaced or ended. */
+class StaleSessionError extends Error {}
+
 // Global session state (dev.md: "Client/global state -> Zustand... auth
 // session" — the same reasoning that puts this in frontend/'s top-level
 // src/stores/, not nested under features/auth/). Route guards (app/(app)/
@@ -68,8 +87,16 @@ interface SessionState {
   role: UserRole | null;
   isHydrated: boolean;
   hydrate: () => Promise<void>;
-  setTokens: (accessToken: string, refreshToken: string, email: string) => Promise<void>;
-  clear: () => Promise<void>;
+  // onlyIfRefreshToken: commit only while the session still holds this
+  // refresh token (a renewal of it), else reject with nothing written.
+  setTokens: (
+    accessToken: string,
+    refreshToken: string,
+    email: string,
+    options?: { onlyIfRefreshToken: string },
+  ) => Promise<void>;
+  // Same onlyIfRefreshToken guard, for a session ended by its own refusal.
+  clear: (options?: { onlyIfRefreshToken: string }) => Promise<void>;
   // Refreshes the current session, de-duplicated across concurrent callers
   // (see the module-level refreshPromise above). Resolves with the new
   // access token. Rejects on any failure, but force-clears the session
@@ -102,52 +129,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     scheduleRefresh(runDueRefresh, remainingDelayMs(issuedAtMs));
   },
 
-  async setTokens(accessToken, refreshToken, email) {
-    const issuedAtMs = Date.now();
-    await Promise.all([
-      secureStorage.setItem(SECURE_STORE_ACCESS_TOKEN_KEY, accessToken),
-      secureStorage.setItem(SECURE_STORE_REFRESH_TOKEN_KEY, refreshToken),
-      secureStorage.setItem(SECURE_STORE_EMAIL_KEY, email),
-      secureStorage.setItem(SECURE_STORE_ISSUED_AT_KEY, String(issuedAtMs)),
-    ]);
-    // Every cached query (wallets, transactions, budgets, ...) is keyed
-    // globally, never per-user — without this, logging in as a different
-    // account renders the previous account's cached data for a moment
-    // before the first refetch overwrites it. Cleared before the session
-    // state flips so no protected screen can mount against stale data.
-    // Only when the User actually changes: a proactive rotation (every ~12
-    // min) keeps the same User, and clearing there wiped the whole cache
-    // mid-session for nothing.
-    const previousUserId = userIdFromAccessToken(get().accessToken);
-    if (previousUserId === null || previousUserId !== userIdFromAccessToken(accessToken)) {
-      // Detached first, or the clear would be saved as the previous User's
-      // cache. Kept on the device (remove: false) for switching back to them
-      // (specs/mobile-offline-support BR-OFF-P05, EC-OFF-09). The outbox is
-      // per User and is never touched here.
-      await detachQueryPersistence({ remove: false });
-      queryClient.clear();
-    }
-    set({ accessToken, refreshToken, email, role: roleFromAccessToken(accessToken) });
-
-    // Every new pair (login, activate, or a rotation) reschedules the next
-    // proactive refresh from scratch — never stacked with a prior pending
-    // timer (specs/mobile-session-refresh/spec.md Edge Case #3).
-    scheduleRefresh(runDueRefresh);
+  setTokens(accessToken, refreshToken, email, options) {
+    return queueCommit(() => commitTokens(accessToken, refreshToken, email, options));
   },
 
-  async clear() {
-    cancelScheduledRefresh();
-    await Promise.all([
-      secureStorage.removeItem(SECURE_STORE_ACCESS_TOKEN_KEY),
-      secureStorage.removeItem(SECURE_STORE_REFRESH_TOKEN_KEY),
-      secureStorage.removeItem(SECURE_STORE_EMAIL_KEY),
-      secureStorage.removeItem(SECURE_STORE_ISSUED_AT_KEY),
-    ]);
-    // Sign-out (tapped or forced) removes this User's saved cache (S-OFF-18)
-    // but never their outbox (BR-OFF-09).
-    await detachQueryPersistence({ remove: true });
-    queryClient.clear();
-    set({ accessToken: null, refreshToken: null, email: null, role: null });
+  clear(options) {
+    return queueCommit(() => commitClear(options));
   },
 
   refreshSession() {
@@ -171,7 +158,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         // Rejecting (not answering with the new User's token) also stops a
         // request of the previous User from being retried as the new one.
         if (isStale()) throw new Error("session changed during refresh");
-        await setTokens(pair.access_token, pair.refresh_token, email ?? "");
+        // Checked again at its turn in the commit queue: a switch can still
+        // land while this waits, and must win.
+        await setTokens(pair.access_token, pair.refresh_token, email ?? "", { onlyIfRefreshToken: refreshToken });
         return pair.access_token;
       })
       .catch(async (err) => {
@@ -187,7 +176,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           markRefreshDue();
           throw err;
         }
-        await clear();
+        // Rejects (and skips the toast) when a switch replaced the session
+        // while this waited its turn: the new session is not the one refused.
+        await clear({ onlyIfRefreshToken: refreshToken });
         // Only this path (the refresh token itself was rejected — expired or
         // revoked) counts as a session actually "ending" out from under the
         // user; an explicit Log out on Settings also calls clear() but
@@ -202,3 +193,64 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     return refreshPromise;
   },
 }));
+
+// setTokens() / clear() bodies, run through queueCommit (see there).
+async function commitTokens(
+  accessToken: string,
+  refreshToken: string,
+  email: string,
+  options?: { onlyIfRefreshToken: string },
+): Promise<void> {
+  const { getState, setState } = useSessionStore;
+  if (options && getState().refreshToken !== options.onlyIfRefreshToken) {
+    throw new StaleSessionError("session changed before this commit");
+  }
+  const issuedAtMs = Date.now();
+  await Promise.all([
+    secureStorage.setItem(SECURE_STORE_ACCESS_TOKEN_KEY, accessToken),
+    secureStorage.setItem(SECURE_STORE_REFRESH_TOKEN_KEY, refreshToken),
+    secureStorage.setItem(SECURE_STORE_EMAIL_KEY, email),
+    secureStorage.setItem(SECURE_STORE_ISSUED_AT_KEY, String(issuedAtMs)),
+  ]);
+  // Every cached query (wallets, transactions, budgets, ...) is keyed
+  // globally, never per-user — without this, logging in as a different
+  // account renders the previous account's cached data for a moment
+  // before the first refetch overwrites it. Cleared before the session
+  // state flips so no protected screen can mount against stale data.
+  // Only when the User actually changes: a proactive rotation (every ~12
+  // min) keeps the same User, and clearing there wiped the whole cache
+  // mid-session for nothing.
+  const previousUserId = userIdFromAccessToken(getState().accessToken);
+  if (previousUserId === null || previousUserId !== userIdFromAccessToken(accessToken)) {
+    // Detached first, or the clear would be saved as the previous User's
+    // cache. Kept on the device (remove: false) for switching back to them
+    // (specs/mobile-offline-support BR-OFF-P05, EC-OFF-09). The outbox is
+    // per User and is never touched here.
+    await detachQueryPersistence({ remove: false });
+    queryClient.clear();
+  }
+  setState({ accessToken, refreshToken, email, role: roleFromAccessToken(accessToken) });
+
+  // Every new pair (login, activate, or a rotation) reschedules the next
+  // proactive refresh from scratch — never stacked with a prior pending
+  // timer (specs/mobile-session-refresh/spec.md Edge Case #3).
+  scheduleRefresh(runDueRefresh);
+}
+
+async function commitClear(options?: { onlyIfRefreshToken: string }): Promise<void> {
+  if (options && useSessionStore.getState().refreshToken !== options.onlyIfRefreshToken) {
+    throw new StaleSessionError("session changed before this sign-out");
+  }
+  cancelScheduledRefresh();
+  await Promise.all([
+    secureStorage.removeItem(SECURE_STORE_ACCESS_TOKEN_KEY),
+    secureStorage.removeItem(SECURE_STORE_REFRESH_TOKEN_KEY),
+    secureStorage.removeItem(SECURE_STORE_EMAIL_KEY),
+    secureStorage.removeItem(SECURE_STORE_ISSUED_AT_KEY),
+  ]);
+  // Sign-out (tapped or forced) removes this User's saved cache (S-OFF-18)
+  // but never their outbox (BR-OFF-09).
+  await detachQueryPersistence({ remove: true });
+  queryClient.clear();
+  useSessionStore.setState({ accessToken: null, refreshToken: null, email: null, role: null });
+}

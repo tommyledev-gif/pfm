@@ -28,6 +28,8 @@ export interface SavedAccount {
   userId: string;
   email: string;
   fullName: string | null;
+  // Tên đăng nhập. Undefined on accounts saved before it was kept.
+  username?: string | null;
   // Undefined on accounts saved before avatars existed.
   avatarUrl?: string | null;
   role: UserRole;

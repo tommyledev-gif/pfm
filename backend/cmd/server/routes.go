@@ -78,8 +78,10 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	// Sign out everywhere, self (US-08) — the device gets a fresh pair.
 	auth.Post("/sessions/revoke-all", jwtAuth, sessionRevocationHandler.RevokeAllSelf)
 	// Access requests (mig 031): asked for from the login screen, approved
-	// from the admin's email link. Both unauthenticated, both IP-limited.
+	// from the admin's email link, and checked on by the requester's device
+	// before it lets them sign in. All unauthenticated, all IP-limited.
 	auth.Post("/access-requests", middleware.AccessRequestRateLimiter(logger), accessRequestHandler.RequestAccess)
+	auth.Post("/access-requests/status", middleware.AccessStatusRateLimiter(logger), accessRequestHandler.Status)
 	auth.Post("/access-requests/approve", middleware.AccessApproveRateLimiter(logger), accessRequestHandler.ApproveByToken)
 
 	admin := v1.Group("/admin", jwtAuth, middleware.RequireRole(string(model.UserRoleAdmin), logger))

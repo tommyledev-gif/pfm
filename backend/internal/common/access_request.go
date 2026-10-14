@@ -53,6 +53,11 @@ const (
 	// token is 32 random bytes, so this only stops pointless hammering.
 	AccessApproveRateLimit       = 20
 	AccessApproveRateLimitWindow = 15 * time.Minute
+	// AccessStatusRateLimit caps the requester's "approved yet?" check per
+	// client IP: room for a device polling every 30 s with the login screen
+	// open, not for walking a list of emails.
+	AccessStatusRateLimit       = 60
+	AccessStatusRateLimitWindow = 15 * time.Minute
 )
 
 // usernameChars is the allowed alphabet; UsernameProblem checks the rest of

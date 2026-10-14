@@ -1,56 +1,51 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { Screen } from "@/components/shared/Screen";
-import { ChevronLeftIcon } from "@/components/ui/Icon";
 import { BrandMark } from "@/features/auth/components/BrandMark";
 import { LoginForm } from "@/features/auth/components/LoginForm";
-import { useAccountRegistryStore } from "@/features/accounts/account-registry-store";
 import { SavedAccountLogin } from "@/features/accounts/components/SavedAccountLogin";
+import { SavedAccountsEntry } from "@/features/accounts/components/SavedAccountsEntry";
+import { useLoginCandidates } from "@/features/accounts/login-candidates";
 import { useKeyboardHeight } from "@/lib/use-keyboard-height";
-import { spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { spacing, typography, createStyles } from "@/lib/theme";
+import { useDebugTestAccountsStore } from "@/stores/debug-test-accounts-store";
 
 const COPY = {
   title: "Đăng nhập",
-  back: "Quay lại",
   noAccount: "Chưa có tài khoản?",
   requestAccess: "Gửi yêu cầu tạo tài khoản",
 } as const;
 
-// Two states, never both at once:
-//  A. an account is remembered here → SavedAccountLogin (who, then one way in);
-//  B. nothing remembered, or "Dùng tài khoản khác" → email + password.
+// Two views, never both at once:
+//  A. email + password, with a "Tài khoản đã lưu" row under the form when
+//     anyone is remembered here (saved accounts, a sent request, test accounts);
+//  B. that row opened: SavedAccountLogin (who, then one way in).
 export default function LoginScreen() {
-  const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
   const keyboardHeight = useKeyboardHeight();
-  const isHydrated = useAccountRegistryStore((s) => s.isHydrated);
-  const accounts = useAccountRegistryStore((s) => s.accounts);
-  const [useAnother, setUseAnother] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-
-  const ordered = [...accounts].sort((a, b) => Date.parse(b.lastUsedAt) - Date.parse(a.lastUsedAt));
-  // Falls back to the most recent one when nothing is picked yet, or when the
-  // picked one has just been removed from the device.
-  const selected = ordered.find((a) => a.userId === selectedId) ?? ordered[0];
-  const showSaved = !useAnother && selected !== undefined;
+  const { candidates, isHydrated } = useLoginCandidates();
+  const [showSaved, setShowSaved] = useState(false);
+  const revealPending = useDebugTestAccountsStore((s) => s.revealPending);
   const goHome = () => router.replace("/(app)/(tabs)");
+  const showForm = useCallback(() => setShowSaved(false), []);
+
+  // The debug console's "Test accounts" lands here with them listed.
+  useEffect(() => {
+    if (!revealPending) return;
+    useDebugTestAccountsStore.getState().consumeReveal();
+    setShowSaved(true);
+  }, [revealPending]);
 
   if (!isHydrated) return <Screen>{null}</Screen>;
 
-  // SavedAccountLogin scrolls on its own, so its sheets can sit beside the scroll view.
-  if (showSaved) {
+  // SavedAccountLogin scrolls on its own, so its dialog can sit beside the scroll view.
+  if (showSaved && candidates.length > 0) {
     return (
       <Screen>
-        <SavedAccountLogin
-          account={selected}
-          accounts={ordered}
-          onSelect={setSelectedId}
-          onUseAnother={() => setUseAnother(true)}
-          onDone={goHome}
-        />
+        <SavedAccountLogin candidates={candidates} onBack={showForm} onDone={goHome} />
       </Screen>
     );
   }
@@ -62,26 +57,18 @@ export default function LoginScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: spacing.xxl + keyboardHeight }]}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Back to the saved account when there is one; else the brand row. */}
         <View style={styles.header}>
-          {ordered.length > 0 ? (
-            <Pressable
-              onPress={() => setUseAnother(false)}
-              style={styles.back}
-              accessibilityRole="button"
-              accessibilityLabel={COPY.back}
-              testID="btn-login-back-to-saved"
-            >
-              <ChevronLeftIcon size={24} color={colors.textPrimary} />
-            </Pressable>
-          ) : (
-            <BrandMark />
-          )}
+          <BrandMark />
         </View>
         <Text style={styles.title} accessibilityRole="header">{COPY.title}</Text>
         <View style={styles.form}>
           <LoginForm onDone={goHome} />
         </View>
+        {candidates.length > 0 ? (
+          <View style={styles.saved}>
+            <SavedAccountsEntry candidates={candidates} onPress={() => setShowSaved(true)} />
+          </View>
+        ) : null}
         {/* Invite-only: without an invite, ask an admin for one. */}
         <View style={styles.requestRow}>
           <Text style={styles.requestHint}>{COPY.noAccount}</Text>
@@ -103,9 +90,9 @@ const useStyles = createStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bgApp },
   content: { flexGrow: 1, paddingHorizontal: spacing.xxl, paddingTop: spacing.md },
   header: { minHeight: 44, flexDirection: "row", alignItems: "center" },
-  back: { width: 44, height: 44, marginLeft: -10, alignItems: "center", justifyContent: "center" },
   title: { marginTop: 32, fontSize: 30, lineHeight: 38, fontWeight: "700", letterSpacing: -0.3, color: colors.textPrimary },
   form: { marginTop: 32 },
+  saved: { marginTop: spacing.xl },
   requestRow: { marginTop: spacing.xl, flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 6 },
   requestHint: { ...typography.label, color: colors.textSecondary },
   requestLink: { ...typography.label, fontWeight: "600", color: colors.green },

@@ -44,6 +44,24 @@ func (h *AccessRequestHandler) RequestAccess(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusAccepted, "access request received", nil)
 }
 
+// Status handles POST /auth/access-requests/status — public, IP rate-limited.
+// POST so the email travels in the body, never in a URL that proxies log.
+func (h *AccessRequestHandler) Status(c *fiber.Ctx) error {
+	var req dto.AccessRequestStatusRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, h.logger, common.NewInvalidInputError("malformed request body"))
+	}
+	if err := validate.Struct(req); err != nil {
+		return response.Error(c, h.logger, newValidationError(err))
+	}
+
+	awaiting, err := h.service.AwaitingApproval(c.Context(), req.Email)
+	if err != nil {
+		return response.Error(c, h.logger, err)
+	}
+	return response.Success(c, fiber.StatusOK, "access request status", dto.AccessRequestStatusResponse{AwaitingApproval: awaiting})
+}
+
 // ApproveByToken handles POST /auth/access-requests/approve — public; the
 // one-time approval token from the admin's email is the credential.
 func (h *AccessRequestHandler) ApproveByToken(c *fiber.Ctx) error {

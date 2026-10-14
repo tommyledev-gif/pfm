@@ -16,8 +16,12 @@ export type LoginFormMode = "login" | "add-account";
 interface LoginFormProps {
   /** "add-account" logs a second User in while another is active (US-03). */
   mode?: LoginFormMode;
-  /** Only ever the email of an expired saved account being renewed (EC-10). */
+  /** The email of a saved account (EC-10), a sent request or a test account. */
   initialEmail?: string;
+  /** A debug test account's password (lib/dev-login.ts TEST_ACCOUNTS). */
+  initialPassword?: string;
+  /** Shown but not usable: a sent request no admin has approved yet. */
+  disabled?: boolean;
   /**
    * The email is already known and shown above the form (a saved account),
    * so only the password is asked for. Needs `initialEmail`.
@@ -61,8 +65,12 @@ const FIELD_RADIUS = 16;
 
 // Dev builds start filled in with the test account (lib/dev-login.ts); its
 // password only goes with its own email, never a saved account being renewed.
-function initialFields(initialEmail: string | undefined): { email: string; password: string } {
+function initialFields(
+  initialEmail: string | undefined,
+  initialPassword: string | undefined,
+): { email: string; password: string } {
   const email = initialEmail ?? DEV_LOGIN?.email ?? "";
+  if (initialPassword !== undefined) return { email, password: initialPassword };
   return { email, password: DEV_LOGIN && email === DEV_LOGIN.email ? DEV_LOGIN.password : "" };
 }
 
@@ -73,10 +81,17 @@ function loginErrorMessage(error: unknown): string {
 
 // Labelled fields over a full-width primary button. The field being typed in
 // carries the accent border, so it is clear where the keyboard is writing.
-export function LoginForm({ mode = "login", initialEmail, hideEmail = false, onDone }: LoginFormProps) {
+export function LoginForm({
+  mode = "login",
+  initialEmail,
+  initialPassword,
+  disabled = false,
+  hideEmail = false,
+  onDone,
+}: LoginFormProps) {
   const colors = useColors();
   const styles = useStyles();
-  const [initial] = useState(() => initialFields(initialEmail));
+  const [initial] = useState(() => initialFields(initialEmail, initialPassword));
   const [email, setEmail] = useState(initial.email);
   const [password, setPassword] = useState(initial.password);
   const [showPassword, setShowPassword] = useState(false);
@@ -86,7 +101,7 @@ export function LoginForm({ mode = "login", initialEmail, hideEmail = false, onD
 
   const submit = () => {
     const identifier = email.trim();
-    if (!identifier || !password) return;
+    if (disabled || !identifier || !password) return;
     login.mutate(
       { email: identifier, password },
       // The account's own email, not what was typed: a tên đăng nhập works
@@ -139,7 +154,8 @@ export function LoginForm({ mode = "login", initialEmail, hideEmail = false, onD
               secureTextEntry={!showPassword}
               autoComplete="current-password"
               textContentType="password"
-              autoFocus={hideEmail}
+              autoFocus={hideEmail && !disabled}
+              editable={!disabled}
               // "Done" is the last field's submit: it closes the keyboard and logs in.
               returnKeyType="done"
               onSubmitEditing={() => {
@@ -175,7 +191,7 @@ export function LoginForm({ mode = "login", initialEmail, hideEmail = false, onD
       <PillButton
         label={SUBMIT_LABEL[mode]}
         loading={login.isPending}
-        disabled={!email || !password}
+        disabled={disabled || !email || !password}
         onPress={submit}
         style={[styles.button, hideEmail ? styles.buttonTight : styles.buttonLoose]}
         textStyle={styles.buttonLabel}

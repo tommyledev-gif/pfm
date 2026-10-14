@@ -78,7 +78,7 @@ interface RetriableRequestConfig {
 // /auth/refresh, which uses its own interceptor-free instance — see
 // features/auth/api/use-refresh-mutation.ts) — a 401 from either of those
 // is a credentials/invite failure, never a case for attempting a token
-// refresh.
+// refresh, and never a reason to end the session in use either.
 function isAuthEndpoint(url: string | undefined): boolean {
   return Boolean(url && (url.includes("/auth/login") || url.includes("/auth/activate")));
 }
@@ -150,7 +150,10 @@ apiClient.interceptors.response.use(
         // was refused, or kept it and scheduled a retry if the network
         // failed — either way, reject the original request below.
       }
-    } else if (error.response?.status === 401) {
+    } else if (error.response?.status === 401 && !isAuthEndpoint(config?.url)) {
+      // ⚠️ Not for a refused login: that is how "+ Thêm tài khoản" (or an
+      // expired account picked in the switch dialog) with a wrong password
+      // used to sign the CURRENT User out and drop them on the login screen.
       await useSessionStore.getState().clear();
     }
     return Promise.reject(error);

@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { FlatList, Modal, Pressable, Share, Text, View } from "react-native";
-import { usePathname } from "expo-router";
+import { usePathname, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
 import { LogEntry, useDebugLogStore } from "@/stores/debug-log-store";
+import { useDebugTestAccountsStore } from "@/stores/debug-test-accounts-store";
+import { useSessionStore } from "@/stores/session-store";
+import { useLogout } from "@/features/accounts/hooks/use-logout";
 
 interface DebugLogViewerProps {
   visible: boolean;
@@ -31,8 +34,21 @@ export function DebugLogViewer({ visible, onClose }: DebugLogViewerProps) {
   const entries = useDebugLogStore((s) => s.entries);
   const clear = useDebugLogStore((s) => s.clear);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const router = useRouter();
+  const { logout, loggingOut } = useLogout();
 
   const reversed = [...entries].reverse();
+
+  // Switching test accounts without typing: lists lib/dev-login.ts's
+  // TEST_ACCOUNTS on the login screen, passwords filled in, and opens that
+  // list there. Signed in, it signs out first (the auth guard then lands on
+  // login, which opens the list itself).
+  async function handleTestAccounts() {
+    onClose();
+    useDebugTestAccountsStore.getState().reveal();
+    if (useSessionStore.getState().accessToken) await logout();
+    else router.navigate("/login");
+  }
 
   async function handleShare() {
     await Share.share({ message: serializeLog(entries) || "No log entries yet." });
@@ -59,6 +75,14 @@ export function DebugLogViewer({ visible, onClose }: DebugLogViewerProps) {
           </Pressable>
           <Pressable testID="debug-log-clear-btn" style={styles.toolbarButton} onPress={clear}>
             <Text style={styles.actionLabel}>Clear</Text>
+          </Pressable>
+          <Pressable
+            testID="debug-test-accounts-btn"
+            style={styles.toolbarButton}
+            onPress={handleTestAccounts}
+            disabled={loggingOut}
+          >
+            <Text style={styles.actionLabel}>Test accounts</Text>
           </Pressable>
         </View>
 

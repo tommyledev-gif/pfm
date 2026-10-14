@@ -1,30 +1,38 @@
-import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { Screen } from "@/components/shared/Screen";
-import { PillButton } from "@/components/ui/PillButton";
 import { ChevronLeftIcon } from "@/components/ui/Icon";
+import { useAccessRequestStore } from "@/features/auth/access-request-store";
 import { RequestAccessForm } from "@/features/auth/components/RequestAccessForm";
 import { useKeyboardHeight } from "@/lib/use-keyboard-height";
 import { spacing, createStyles, useColors } from "@/lib/theme";
+import { useToastStore } from "@/stores/toast-store";
 
 const COPY = {
   title: "Yêu cầu tạo tài khoản",
   sub: "Sau khi admin duyệt, email kích hoạt sẽ được gửi tới email của bạn.",
-  sentTitle: "Đã gửi yêu cầu",
+  sent: "Đã gửi yêu cầu. Chờ admin duyệt.",
   back: "Quay lại",
-  backToLogin: "Về đăng nhập",
 } as const;
 
 // Entry point: the login screen's "Gửi yêu cầu tạo tài khoản". The app is
 // invite-only, so this is how someone without an invite asks for one.
+//
+// Once sent it goes straight back to login, where the request waits under
+// "Tài khoản đã lưu" with its sign-in held until an admin approves it.
 export default function RequestAccessScreen() {
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
   const keyboardHeight = useKeyboardHeight();
-  const [sentTo, setSentTo] = useState<string | null>(null);
+
+  const onSent = (email: string) => {
+    useAccessRequestStore.getState().add(email);
+    useToastStore.getState().show(COPY.sent, "info");
+    if (router.canGoBack()) router.back();
+    else router.replace("/login");
+  };
 
   return (
     <Screen>
@@ -45,27 +53,11 @@ export default function RequestAccessScreen() {
           </Pressable>
         </View>
 
-        {sentTo ? (
-          <View testID="request-access-sent">
-            <Text style={styles.title} accessibilityRole="header">{COPY.sentTitle}</Text>
-            <Text style={styles.sub}>{`Sau khi admin duyệt, email kích hoạt sẽ được gửi tới ${sentTo}.`}</Text>
-            <PillButton
-              label={COPY.backToLogin}
-              onPress={() => router.back()}
-              style={styles.button}
-              textStyle={styles.buttonLabel}
-              testID="btn-request-access-done"
-            />
-          </View>
-        ) : (
-          <>
-            <Text style={styles.title} accessibilityRole="header">{COPY.title}</Text>
-            <Text style={styles.sub}>{COPY.sub}</Text>
-            <View style={styles.form}>
-              <RequestAccessForm onSent={setSentTo} />
-            </View>
-          </>
-        )}
+        <Text style={styles.title} accessibilityRole="header">{COPY.title}</Text>
+        <Text style={styles.sub}>{COPY.sub}</Text>
+        <View style={styles.form}>
+          <RequestAccessForm onSent={onSent} />
+        </View>
       </ScrollView>
     </Screen>
   );
@@ -79,6 +71,4 @@ const useStyles = createStyles((colors) => ({
   title: { marginTop: 32, fontSize: 30, lineHeight: 38, fontWeight: "700", letterSpacing: -0.3, color: colors.textPrimary },
   sub: { marginTop: spacing.sm, fontSize: 15, lineHeight: 22, color: colors.textSecondary },
   form: { marginTop: 32 },
-  button: { height: 56, borderRadius: 16, marginTop: 32 },
-  buttonLabel: { fontSize: 16 },
 }));

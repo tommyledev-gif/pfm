@@ -88,6 +88,24 @@ func (s *AccessRequestService) RequestAccess(ctx context.Context, email, adminEm
 	return nil
 }
 
+// AwaitingApproval reports whether email has an access request no admin has
+// handled yet — what the requester's device asks before letting them sign in.
+//
+// Only that one fact, as a yes/no: an approved request, a rejected one, an
+// active account and an unknown email all answer false alike, so the route
+// tells no more about who is registered than POST /auth/login already does
+// (it answers ACCOUNT_AWAITING_APPROVAL for this status, password or not).
+func (s *AccessRequestService) AwaitingApproval(ctx context.Context, email string) (bool, error) {
+	user, err := s.users.GetUserByEmail(ctx, common.NormalizeEmail(email))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, nil
+		}
+		return false, fmt.Errorf("service.AwaitingApproval: %w", err)
+	}
+	return user.Status == model.UserStatusRequested, nil
+}
+
 // ApproveByToken approves the request behind an admin's email link; the
 // token is the credential, so no session is needed.
 func (s *AccessRequestService) ApproveByToken(ctx context.Context, approvalToken string) (*model.User, error) {

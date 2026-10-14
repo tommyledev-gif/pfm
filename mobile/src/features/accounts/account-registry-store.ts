@@ -123,6 +123,7 @@ export const useAccountRegistryStore = create<AccountRegistryState>((set, get) =
         userId: user.id,
         email: user.email,
         fullName: user.full_name,
+        username: user.username ?? null,
         avatarUrl: user.avatar_url ?? null,
         role: user.role,
         switchIssuedAt: nowIso,

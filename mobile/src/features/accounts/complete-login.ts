@@ -4,6 +4,7 @@ import { userIdFromAccessToken } from "@/lib/jwt";
 import { HTTP_STATUS, SWITCH_CHAT_FLUSH_TIMEOUT_MS } from "@/lib/constants";
 import { useSessionStore } from "@/stores/session-store";
 import { useToastStore } from "@/stores/toast-store";
+import { useAccessRequestStore } from "@/features/auth/access-request-store";
 import { LoginResponse } from "@/features/auth/types";
 import { useAccountRegistryStore } from "@/features/accounts/account-registry-store";
 import {
@@ -83,6 +84,9 @@ export async function completeLogin(pair: LoginResponse, email: string): Promise
   } finally {
     progress.setSwitching(false);
   }
+  // A request sent from here has become an account: the login screen lists
+  // it as a saved account from now on, not as a request.
+  useAccessRequestStore.getState().remove(email);
   void rememberActiveAccount();
   return "signed-in";
 }

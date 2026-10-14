@@ -26,6 +26,22 @@ func AccessRequestRateLimiter(logger *zap.Logger) fiber.Handler {
 	})
 }
 
+// AccessStatusRateLimiter caps POST /auth/access-requests/status per client
+// IP. Its answer is a yes/no that POST /auth/login already gives; the cap
+// only keeps it from being a faster way to ask.
+func AccessStatusRateLimiter(logger *zap.Logger) fiber.Handler {
+	return limiter.New(limiter.Config{
+		Max:        common.AccessStatusRateLimit,
+		Expiration: common.AccessStatusRateLimitWindow,
+		KeyGenerator: func(c *fiber.Ctx) string {
+			return "access-status:" + RateLimitIP(c)
+		},
+		LimitReached: func(c *fiber.Ctx) error {
+			return response.Error(c, logger, common.ErrRateLimited)
+		},
+	})
+}
+
 // AccessApproveRateLimiter caps the email-link approval per client IP. The
 // token cannot be guessed (32 random bytes); this only bounds the noise.
 func AccessApproveRateLimiter(logger *zap.Logger) fiber.Handler {
