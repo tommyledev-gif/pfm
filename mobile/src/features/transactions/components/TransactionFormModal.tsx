@@ -3,18 +3,18 @@ import { Text } from "react-native";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Drawer } from "@/components/shared/Drawer";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
-import { FieldError } from "@/components/ui/FieldError";
 import { PillButton } from "@/components/ui/PillButton";
 import { TrashIcon } from "@/components/ui/Icon";
 import { SingleDatePickerModal } from "@/components/shared/SingleDatePickerModal";
 import { useRequireOnline } from "@/lib/connectivity";
-import { formatCurrency } from "@/lib/currency";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { Transaction } from "@/features/transactions/types";
 import { OutboxItem } from "@/features/transactions/outbox/outbox-types";
 import { TransactionDraft } from "@/features/transactions/draft-from-text";
 import { TransactionKeypadFooter } from "@/features/transactions/components/TransactionKeypadFooter";
-import { WalletChipRow } from "@/features/transactions/components/WalletChipRow";
+import { TransactionWalletFields } from "@/features/transactions/components/TransactionWalletFields";
+import { useWalletPickerPanel } from "@/features/transactions/components/use-wallet-picker-panel";
+import { useVisibleDrawerChild } from "@/features/transactions/components/use-visible-drawer-child";
 import { TransactionExtrasRow } from "@/features/transactions/components/TransactionExtrasRow";
 import { useTransactionForm } from "@/features/transactions/components/use-transaction-form";
 import { useWalletChangeGuard } from "@/features/transactions/components/use-wallet-change-guard";
@@ -32,8 +32,6 @@ interface TransactionFormModalProps {
   editingQueued?: OutboxItem | null;
   draft?: TransactionDraft | null;
 }
-
-const NO_SAVED_WALLETS_MESSAGE = "Kết nối mạng để tải danh sách ví.";
 
 // Manual "Add/Edit Transaction" form — the AI Chat screen was previously the
 // only way to create a transaction on mobile. Backend PATCH doesn't accept
@@ -112,17 +110,30 @@ export function TransactionFormModal({ visible, onClose, editingTransaction, edi
     },
   });
   const walletMoved = isEditing && walletId !== editingTransaction?.wallet_id;
+  // The wallet lists, as panels sliding in over the form like the category one.
+  const sourcePicker = useWalletPickerPanel({
+    title: isTransfer ? "Từ ví" : "Ví",
+    wallets: walletChange.selectableWallets,
+    selectedId: walletId,
+    onSelect: walletChange.select,
+  });
+  const destinationPicker = useWalletPickerPanel({
+    title: "Đến ví",
+    wallets: destinationWallets,
+    selectedId: toWalletId,
+    onSelect: setToWalletId,
+  });
+  const child = useVisibleDrawerChild([drawerChild, sourcePicker.child, destinationPicker.child]);
 
   const activeError = mutation.isError ? mutation.error : deleteTransaction.isError ? deleteTransaction.error : null;
   const lockedSuffix = isEditing ? " (khóa sau khi tạo)" : "";
-  const walletLockedSuffix = isEditing && isTransfer ? lockedSuffix : "";
 
   return (
     <>
       <Drawer
         visible={visible}
         onClose={onClose}
-        child={drawerChild}
+        child={child}
         footer={
           <TransactionKeypadFooter
             amount={amount}
@@ -168,48 +179,24 @@ export function TransactionFormModal({ visible, onClose, editingTransaction, edi
           }}
         />
 
-        <Text style={styles.label}>
-          {isTransfer ? "Từ ví" : "Ví"}
-          {walletLockedSuffix}
-        </Text>
-        <WalletChipRow
-          wallets={walletChange.selectableWallets}
-          selectedId={walletId}
-          locked={isEditing && isTransfer}
-          onSelect={walletChange.select}
+        <TransactionWalletFields
+          isTransfer={isTransfer}
+          wallet={selectedWallet ?? null}
+          onOpenWallets={sourcePicker.open}
+          walletLocked={isEditing && isTransfer}
+          destination={transferTarget ?? null}
+          destinationCount={destinationWallets.length}
+          onOpenDestinations={destinationPicker.open}
+          destinationLocked={isEditing}
+          noSavedWallets={noSavedWallets}
+          otherCurrenciesHidden={isEditing && walletChange.hidesOtherCurrencies}
+          projectedBalance={projectedBalance}
+          // A saved one is already in its wallet's balance: projected only
+          // onto a wallet it is moving to.
+          showProjection={!isEditing || walletMoved}
+          walletError={submitAttempted ? errors.wallet : undefined}
+          destinationError={submitAttempted ? errors.toWallet : undefined}
         />
-        {noSavedWallets ? <Text style={styles.balanceHint}>{NO_SAVED_WALLETS_MESSAGE}</Text> : null}
-        {isEditing && walletChange.hidesOtherCurrencies ? (
-          <Text style={styles.balanceHint}>Chỉ hiện ví cùng loại tiền</Text>
-        ) : null}
-        {submitAttempted ? <FieldError message={errors.wallet} /> : null}
-        {selectedWallet ? (
-          <Text style={styles.balanceHint}>
-            Số dư khả dụng: {formatCurrency(selectedWallet.balance, selectedWallet.currency)}
-            {/* A saved one is already in its wallet's balance: projected only
-                onto a wallet it is moving to. */}
-            {projectedBalance !== null && (!isEditing || walletMoved)
-              ? ` → ${formatCurrency(projectedBalance, selectedWallet.currency)} sau giao dịch này`
-              : ""}
-          </Text>
-        ) : null}
-
-        {isTransfer ? (
-          <>
-            <Text style={styles.label}>Đến ví{lockedSuffix}</Text>
-            {destinationWallets.length > 0 ? (
-              <WalletChipRow
-                wallets={destinationWallets}
-                selectedId={toWalletId}
-                onSelect={setToWalletId}
-                locked={isEditing}
-              />
-            ) : (
-              <Text style={styles.balanceHint}>Cần thêm một ví khác cùng đơn vị tiền tệ để chuyển khoản.</Text>
-            )}
-            {submitAttempted ? <FieldError message={errors.toWallet} /> : null}
-          </>
-        ) : null}
 
         {/* "Vị trí" | "Các món", as on the AI chat's edit sheet. The location
             is picked here, before saving; a saved one without a pin can gain
@@ -217,6 +204,7 @@ export function TransactionFormModal({ visible, onClose, editingTransaction, edi
             instead (EC-09, AC-26). */}
         <TransactionExtrasRow
           location={location.tile}
+          pin={location.pin}
           onPressLocation={() => openLocationStep(location.tileIntent)}
           lines={lines}
           currency={selectedWallet?.currency ?? FALLBACK_CURRENCY}
@@ -276,7 +264,6 @@ export function TransactionFormModal({ visible, onClose, editingTransaction, edi
 
 const useStyles = createStyles((colors) => ({
   label: { ...typography.caption, color: colors.textSecondary },
-  balanceHint: { ...typography.tiny, color: colors.textMuted },
   deleteButton: { backgroundColor: colors.danger, marginTop: spacing.sm },
   deleteLabel: { color: colors.onDanger, fontWeight: "800" },
 }));

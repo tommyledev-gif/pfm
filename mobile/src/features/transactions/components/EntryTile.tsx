@@ -29,8 +29,11 @@ interface EntryTileProps {
 const CHEVRON_SIZE = 18;
 const COMPACT_TRAILING_SIZE = 16;
 // Fits a summary plus its detail line, so two tiles side by side keep the
-// same height whether or not either one has a detail.
-const COMPACT_MIN_HEIGHT = 58;
+// same height whether or not either one has a detail. Kept tight (was 58,
+// 2026-10-14): the tiles sit above the keypad, and every point here pushes
+// the pickers up out of view.
+const COMPACT_MIN_HEIGHT = 46;
+const TILE_PADDING_Y = spacing.sm;
 
 /**
  * A form's door to a panel: label, bordered tile with the current value, and
@@ -106,7 +109,9 @@ const useStyles = createStyles((colors) => ({
     alignItems: "center",
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingVertical: TILE_PADDING_Y,
+    // Still a full touch target.
+    minHeight: 44,
     borderRadius: radii.listCard,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,

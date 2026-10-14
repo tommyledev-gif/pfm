@@ -40,8 +40,9 @@ export function buildItemsPanelChild(options: ItemsPanelOptions): DrawerChild {
     visible: options.visible,
     onClose: options.onClose,
     title: "Chi tiết món",
-    // One way out besides X: "Xong". Neither discards; the form's Lưu saves.
-    hideBack: true,
+    // The back chevron, X and "Xong" all return to the form; none discards,
+    // the form's Lưu saves. Back is kept (2026-10-14): without it the panel
+    // read as a dead end over the form.
     children: <ItemsEditorBody {...options} />,
     footer: (
       <ItemsTotalsPanel lines={options.lines} amountCents={options.amountCents} currency={options.currency} onDone={options.onClose} />

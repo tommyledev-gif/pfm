@@ -19,6 +19,9 @@ interface SegmentedTabsProps<T extends string> {
   value: T;
   onChange: (value: T) => void;
   style?: StyleProp<ViewStyle>;
+  /** Shown but not changeable (a saved transaction's type). */
+  disabled?: boolean;
+  testID?: string;
 }
 
 // One-piece segmented control — a single rounded track with an active tab
@@ -27,16 +30,20 @@ interface SegmentedTabsProps<T extends string> {
 // Transactions' Tất cả/Chi tiêu/Thu nhập type filter) — mirrors the design
 // reference's "grid grid-cols-N" segmented control instead of Chip's
 // gap-separated pill row, which reads as multi-select even when it isn't.
-export function SegmentedTabs<T extends string>({ options, value, onChange, style }: SegmentedTabsProps<T>) {
+export function SegmentedTabs<T extends string>({ options, value, onChange, style, disabled, testID }: SegmentedTabsProps<T>) {
   const styles = useStyles();
   return (
-    <View style={[styles.track, style]}>
+    <View style={[styles.track, disabled && styles.disabled, style]} accessibilityRole="tablist" testID={testID}>
       {options.map((option) => {
         const active = option.value === value;
         return (
           <Pressable
             key={option.value}
             onPress={() => onChange(option.value)}
+            disabled={disabled}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active, disabled }}
+            testID={testID ? `${testID}-${option.value}` : undefined}
             style={[styles.tab, active && styles.tabActive]}
           >
             <Text style={[styles.label, active && styles.labelActive]} numberOfLines={1}>
@@ -72,4 +79,5 @@ const useStyles = createStyles((colors) => ({
   tabActive: { backgroundColor: colors.green },
   label: { ...typography.label, color: colors.textSecondary },
   labelActive: { color: colors.onGreen },
+  disabled: { opacity: 0.5 },
 }));

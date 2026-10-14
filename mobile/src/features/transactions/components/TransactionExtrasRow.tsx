@@ -5,6 +5,8 @@ import { createStyles, spacing, useColors } from "@/lib/theme";
 import { ItemsEditor } from "@/features/transactions/items/use-items-editor";
 import { EntryTile } from "@/features/transactions/components/EntryTile";
 import { ItemsEntryRow } from "@/features/transactions/components/ItemsEntryRow";
+import { TransactionLocationRow } from "@/features/transactions/components/TransactionLocationRow";
+import { TransactionLocationInput } from "@/features/transactions/types";
 
 /** What the "Vị trí" tile shows; built by whoever owns the location state. */
 export interface LocationTileView {
@@ -31,14 +33,18 @@ interface TransactionExtrasRowProps {
   // Hides the items tile (a transfer has no items); the location tile then
   // keeps its half width so it does not jump in size.
   showItems?: boolean;
+  /** The pin as the sheet has it. Once there is one, location and items
+   *  stop sharing a row: the pin gets its own row with a small map. */
+  pin?: TransactionLocationInput | null;
 }
 
 const ICON_SIZE = 16;
 
 /**
- * "Vị trí" and "Các món" side by side, equal width: the two optional extras
- * of a transaction, each opening its own panel in the sheet. Same tile look
- * as the full-width "Các món" row of the manual form.
+ * The two optional extras of a transaction, each opening its own panel in
+ * the sheet. Without a pin: "Vị trí" and "Các món" side by side, equal width.
+ * With one: the pin's own full-width row with a small map, and "Các món" as
+ * a full-width row under it.
  */
 export function TransactionExtrasRow({
   location,
@@ -50,9 +56,28 @@ export function TransactionExtrasRow({
   itemsPendingCount = 0,
   itemsLoading = false,
   showItems = true,
+  pin,
 }: TransactionExtrasRowProps) {
   const colors = useColors();
   const styles = useStyles();
+
+  if (pin) {
+    return (
+      <View style={styles.column}>
+        <TransactionLocationRow pin={pin} tile={location} onPress={onPressLocation} />
+        {showItems ? (
+          <ItemsEntryRow
+            lines={lines}
+            currency={currency}
+            pendingCount={itemsPendingCount}
+            loading={itemsLoading}
+            onPress={onPressItems}
+            error={itemsError}
+          />
+        ) : null}
+      </View>
+    );
+  }
 
   return (
     <View style={styles.row}>
@@ -88,5 +113,6 @@ export function TransactionExtrasRow({
 const useStyles = createStyles(() => ({
   // flex-start: an error under one tile must not stretch the other one.
   row: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
+  column: { gap: spacing.md },
   placeholder: { flex: 1 },
 }));

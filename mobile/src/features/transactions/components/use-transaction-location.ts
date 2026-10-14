@@ -158,6 +158,8 @@ export function useTransactionLocation({ visible, editingTransaction, editingQue
     // saved Transaction's pin ("saved").
     openStep,
     tile,
+    /** The pin the form shows (a saved one with its edits, or the one picked for a create). */
+    pin: shownPin,
     tileIntent: (savedPin ? "saved" : "adjust") as LocationStepIntent,
     stepChild: step.child,
     currentSavedPin,

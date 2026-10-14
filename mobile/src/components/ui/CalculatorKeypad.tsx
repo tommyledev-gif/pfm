@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useRef } from "react";
+import { ReactNode, memo, useEffect, useRef } from "react";
 import { ActivityIndicator, Animated, Pressable, Text, View } from "react-native";
 
 import { BackspaceIcon, CalendarIcon, CheckIcon } from "@/components/ui/Icon";
@@ -82,7 +82,7 @@ function KeyColumn({ children }: { children: ReactNode }) {
  * It stands in for the OS keyboard on the amount — the native keyboard only
  * ever appears for the note field.
  */
-export function CalculatorKeypad({
+function CalculatorKeypadView({
   onInsert,
   decimalKey = ".",
   onBackspace,
@@ -119,7 +119,8 @@ export function CalculatorKeypad({
         testID={keyId(key)}
         accessibilityRole="button"
         accessibilityLabel={SPOKEN_KEY[key] ?? key}
-        onPress={() => onInsert(key)}
+        // On touch-down, as a phone keypad does: nothing waits for the finger to lift.
+        onPressIn={() => onInsert(key)}
         style={({ pressed }) => [styles.key, styles.digitKey, pressed && styles.digitKeyPressed]}
       >
         <Text
@@ -139,7 +140,7 @@ export function CalculatorKeypad({
         testID={keyId(glyph)}
         accessibilityRole="button"
         accessibilityLabel={SPOKEN_KEY[glyph] ?? glyph}
-        onPress={() => onInsert(glyph)}
+        onPressIn={() => onInsert(glyph)}
         style={({ pressed }) => [styles.key, styles.operatorKey, pressed && styles.operatorKeyPressed]}
       >
         <Text style={styles.operatorLabel} maxFontSizeMultiplier={KEY_LABEL_MAX_FONT_SCALE}>
@@ -175,7 +176,7 @@ export function CalculatorKeypad({
               accessibilityRole="button"
               accessibilityLabel="Xóa"
               accessibilityHint={onClear ? "Nhấn giữ để xóa hết" : undefined}
-              onPress={onBackspace}
+              onPressIn={onBackspace}
               onLongPress={onClear}
               style={({ pressed }) => [styles.key, styles.digitKey, pressed && styles.digitKeyPressed]}
             >
@@ -226,6 +227,10 @@ export function CalculatorKeypad({
     </Animated.View>
   );
 }
+
+// Memoized: the sheet re-renders on every key (the amount changes), and the
+// twenty keys never need to. Its callers pass stable callbacks for this.
+export const CalculatorKeypad = memo(CalculatorKeypadView);
 
 const useStyles = createStyles((colors) => ({
   row: { flexDirection: "row", gap: GAP },

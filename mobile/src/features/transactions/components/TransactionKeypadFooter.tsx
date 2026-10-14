@@ -13,6 +13,7 @@ import { colors, radii, spacing, typography, createStyles, useColors } from "@/l
 import { AmountExpression } from "@/lib/use-amount-expression";
 import { useKeyboardVisible } from "@/lib/use-keyboard-height";
 import { todayDateOnly } from "@/lib/date-range";
+import { useLatestCallback } from "@/lib/use-latest-callback";
 import { Category } from "@/features/categories/types";
 import { Wallet } from "@/features/wallets/types";
 
@@ -97,6 +98,24 @@ export function TransactionKeypadFooter({
   // keypad is hidden then, and the keyboard already covers that strip.
   const safeBottom = keyboardVisible ? 0 : Math.max(0, insets.bottom - DRAWER_FOOTER_BOTTOM_PADDING);
 
+  // Stable identities, so the memoized keypad and amount text skip the
+  // re-render every key causes; each still runs the latest code.
+  const confirm = useLatestCallback(() => {
+    if (amount.confirm()) onSubmit();
+  });
+  const pressDate = useLatestCallback(onPressDate);
+  // The amount carries a caret: tapping a digit moves it there, tapping beside
+  // the digits puts it back at the end. Either one also hands the keypad back
+  // from the note's keyboard.
+  const pressChar = useLatestCallback((index: number) => {
+    if (keyboardVisible) Keyboard.dismiss();
+    amount.placeCaretAfter(index);
+  });
+  const pressAmount = useLatestCallback(() => {
+    if (keyboardVisible) Keyboard.dismiss();
+    amount.placeCaretAfter(amount.display.length - 1);
+  });
+
   const leading = isTransfer ? (
     <View style={styles.chip}>
       <WalletIcon size={16} color={colors.periwinkle} />
@@ -130,14 +149,8 @@ export function TransactionKeypadFooter({
       // beside the digits puts it back at the end. Either one also hands the
       // keypad back from the note's keyboard.
       caret={amount.caret}
-      onPressChar={(index) => {
-        if (keyboardVisible) Keyboard.dismiss();
-        amount.placeCaretAfter(index);
-      }}
-      onPressAmount={() => {
-        if (keyboardVisible) Keyboard.dismiss();
-        amount.placeCaretAfter(amount.display.length - 1);
-      }}
+      onPressChar={pressChar}
+      onPressAmount={pressAmount}
       errors={errors}
     >
       <TextInput
@@ -163,11 +176,9 @@ export function TransactionKeypadFooter({
           onInsert={amount.insert}
           onBackspace={amount.backspace}
           onClear={amount.clear}
-          onConfirm={() => {
-            if (amount.confirm()) onSubmit();
-          }}
+          onConfirm={confirm}
           confirmLoading={submitting}
-          onDatePress={onPressDate}
+          onDatePress={pressDate}
           dateLabel={shortDateLabel(occurredAt)}
           dateAccessibilityLabel={`Ngày giao dịch: ${formatDateShort(occurredAt)}`}
         />
