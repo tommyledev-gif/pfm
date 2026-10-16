@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import { NO_PHRASES, PhrasesByUser, StoredPhrase, moveToFront } from "@/stores/phrase-list";
+import { NO_PHRASES, PhrasesByUser, StoredPhrase, moveToFront, samePhrase } from "@/stores/phrase-list";
 
 // Recent phrases are history, not a choice: the oldest simply falls off.
 export const RECENT_PHRASES_LIMIT = 50;
@@ -10,6 +10,8 @@ export const RECENT_PHRASES_LIMIT = 50;
 interface RecentPhrasesState {
   byUser: PhrasesByUser;
   record: (userId: string, text: string) => void;
+  /** Forgets one phrase; confirming it again brings it back. */
+  remove: (userId: string, text: string) => void;
   /** Drops every phrase of a User removed from this device. */
   removeUser: (userId: string) => void;
 }
@@ -34,6 +36,13 @@ export const useRecentPhrasesStore = create<RecentPhrasesState>()(
           },
         }));
       },
+      remove: (userId, text) =>
+        set((s) => ({
+          byUser: {
+            ...s.byUser,
+            [userId]: (s.byUser[userId] ?? NO_PHRASES).filter((p) => !samePhrase(p.text, text)),
+          },
+        })),
       removeUser: (userId) =>
         set((s) => {
           const { [userId]: _dropped, ...rest } = s.byUser;

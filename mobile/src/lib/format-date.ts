@@ -19,10 +19,26 @@ export function formatDateDMY(iso: string): string {
   return `${day}/${month}/${year}`;
 }
 
+/**
+ * The calendar day a date or a range bound stands for, as YYYY-MM-DD.
+ *
+ * A plain date, or a timestamp at exactly UTC midnight (how the backend echoes
+ * a date it was sent), keeps its own date. Any other instant is read in local
+ * time: the report's default window starts at local midnight, which in UTC+7
+ * is 17:00Z the day before, and read as UTC it labelled 1 October "30/09".
+ */
+export function calendarDay(value: string): string {
+  if (!value.includes("T") || value.endsWith("T00:00:00Z")) return value.slice(0, 10);
+  const date = new Date(value);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
 // "01/09 – 30/09/2026" — the year only once, on the end date.
 export function formatDateRange(fromIso: string, toIso: string): string {
-  const from = formatDateShort(fromIso).slice(0, 5);
-  return `${from} – ${formatDateShort(toIso)}`;
+  const from = formatDateShort(calendarDay(fromIso)).slice(0, 5);
+  return `${from} – ${formatDateShort(calendarDay(toIso))}`;
 }
 
 // Accepts either a plain "YYYY-MM-DD" date-only string OR a full timestamp

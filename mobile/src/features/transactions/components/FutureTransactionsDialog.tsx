@@ -1,5 +1,5 @@
 import { Fragment, useMemo } from "react";
-import { Pressable, Text } from "react-native";
+import { Text } from "react-native";
 
 import { Drawer } from "@/components/shared/Drawer";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
@@ -64,13 +64,13 @@ export function FutureTransactionsDialog({
           <Fragment key={day.key}>
             <Text style={styles.dayLabel}>{day.label}</Text>
             {day.items.map((item) => (
-              <Pressable key={item.id} onPress={() => onSelect(item)}>
-                <TransactionRow
-                  transaction={item}
-                  currency={walletCurrencyMap.get(item.wallet_id)}
-                  category={categoryById.get(item.category_id)}
-                />
-              </Pressable>
+              <TransactionRow
+                key={item.id}
+                transaction={item}
+                currency={walletCurrencyMap.get(item.wallet_id)}
+                category={categoryById.get(item.category_id)}
+                onPress={() => onSelect(item)}
+              />
             ))}
           </Fragment>
         ))

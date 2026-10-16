@@ -50,6 +50,9 @@ type Config struct {
 	// DBMaxConns caps the pgx pool. pgx's own default is max(4, CPU count),
 	// which on a small VPS is a handful of connections for the whole API.
 	DBMaxConns int32
+
+	// Passkey configures WebAuthn sign-in (config_passkey.go).
+	Passkey PasskeyConfig
 }
 
 // MinJWTSecretBytes is the shortest JWT_SECRET accepted. The same key signs
@@ -98,6 +101,10 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	cfg.DBMaxConns = int32(maxConns)
+
+	if cfg.Passkey, err = loadPasskeyConfig(); err != nil {
+		return nil, err
+	}
 	return cfg, nil
 }
 

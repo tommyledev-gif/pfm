@@ -6,6 +6,9 @@ import { MapPinIcon } from "@/components/ui/Icon";
 import { PillButton } from "@/components/ui/PillButton";
 import { useColors } from "@/lib/theme";
 import { useLatestCallback } from "@/lib/use-latest-callback";
+import { useSavedPlaces, useSavedPlacesStore } from "@/stores/saved-places-store";
+import { useCurrentUserId } from "@/stores/use-current-user-id";
+import { PlacePick } from "@/features/transactions/components/PlaceSearch";
 import { TransactionLocationInput } from "@/features/transactions/types";
 import { captureCurrentLocation, Coordinates, LocationFailure } from "@/features/transactions/location/capture-location";
 import { resolvePlaceName } from "@/features/transactions/location/place-name";
@@ -58,6 +61,8 @@ export function useLocationStep({ sheetVisible, onConfirm }: UseLocationStepOpti
   // What the step opened with, so "Huỷ" can put a saved pin back.
   const original = useRef<TransactionLocationInput | null>(null);
   const colors = useColors();
+  const userId = useCurrentUserId();
+  const savedPlaces = useSavedPlaces(userId);
   // Bumped by whatever makes an in-flight lookup stale — closing, a retry, a
   // moved pin — so a late answer never lands on a pin it was not asked about.
   const generation = useRef(0);
@@ -119,6 +124,16 @@ export function useLocationStep({ sheetVisible, onConfirm }: UseLocationStepOpti
     void name(at, gen);
   };
 
+  // A searched address or a place pinned before: the pin jumps there and the
+  // map recentres on it (pin() bumps fixId). A saved place's note comes along
+  // unless one is already being written.
+  const pickPlace = ({ coords: at, placeName: label, note: placeNote }: PlacePick) => {
+    const gen = ++generation.current;
+    pin(at, label);
+    if (placeNote && !note.trim()) setNote(placeNote);
+    if (!label) void name(at, gen);
+  };
+
   // "Huỷ" in a saved pin's edit mode: back to exactly what was saved, and
   // recentred on it (a new fixId remounts the map at the pin).
   const cancelEdit = () => {
@@ -148,7 +163,10 @@ export function useLocationStep({ sheetVisible, onConfirm }: UseLocationStepOpti
     if (!coords) return;
     Keyboard.dismiss();
     close();
-    confirmLatest({ ...coords, place_name: placeName ?? undefined, note: note.trim() || undefined }, intent);
+    const location = { ...coords, place_name: placeName ?? undefined, note: note.trim() || undefined };
+    // Offered again next time, under "Đã ghim trước đây".
+    if (userId) useSavedPlacesStore.getState().record(userId, location);
+    confirmLatest(location, intent);
   };
 
   const skip = () => {
@@ -208,6 +226,11 @@ export function useLocationStep({ sheetVisible, onConfirm }: UseLocationStepOpti
         onChangeNote={setNote}
         onMovePin={movePin}
         onRetry={() => void locate()}
+        savedPlaces={savedPlaces}
+        onPickPlace={pickPlace}
+        onRemoveSavedPlace={(place) => {
+          if (userId) useSavedPlacesStore.getState().remove(userId, place);
+        }}
       />
     ),
     footer,

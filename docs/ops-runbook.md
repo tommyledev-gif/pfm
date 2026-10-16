@@ -55,7 +55,7 @@ Everything here is **(dashboard)** work: nothing ships with a deploy. The Free p
 
 **What the edge can do on Free**
 - **One rate limiting rule**, counted per IP only, over a fixed 10-second window, action Block for 10 seconds. It stops bursts, not a slow guessing run. Suggested rule: URI path starts with `/api/v1/auth/` → block above 20 requests per 10 seconds per IP. Keep it loose: mobile carriers put many users behind one IP.
-- **Custom WAF rules** (5 on Free). Suggested: block any request whose path does not start with `/api/v1/` or `/activate`; block methods other than GET, POST, PATCH, DELETE, OPTIONS.
+- **Custom WAF rules** (5 on Free). Suggested: block any request whose path does not start with `/api/v1/`, `/activate`, `/approve-access` or is not exactly `/.well-known/assetlinks.json` (passkeys stop working without it, §7); block methods other than GET, POST, PATCH, DELETE, OPTIONS.
 - **Free Managed Ruleset**: leave on. It is a short list of high-severity rules, not the OWASP Top 10.
 
 **What it cannot do**
@@ -92,3 +92,20 @@ A signed-in device is one row in `sessions` (migration 028). Access and refresh 
 5. **Admin password**: set a new strong `SEED_ADMIN_PASSWORD` in `VPS_ENV_PROD` and deploy; `cmd/seed` re-syncs the admin's password hash on every deploy. There is no change-password screen yet.
 6. **`POSTGRES_PASSWORD`**: changing it in the env file alone does not change it inside the existing volume; run `ALTER USER` first, then update the file.
 7. Optionally purge the file from history (`git filter-repo --path backend/.env.prod --invert-paths`, then force-push). Rotation is what protects you; purging only stops new clones from seeing the old values.
+
+## 7. Passkeys
+
+A passkey (WebAuthn, migration 032) is a key pair made on the phone; the server keeps the public half in `passkeys` and checks every sign-in and saved-account switch against it. Endpoints: `POST /api/v1/auth/passkeys/login/{begin,finish}` (no session, `LoginRateLimiter`), `GET|POST|DELETE /api/v1/users/me/passkeys…` (signed in).
+
+**Turn on:**
+1. Get the SHA-256 fingerprint of each certificate that signs the app: `eas credentials -p android` → the build profile → Keystore → "SHA256 Fingerprint". For a local dev build add the debug keystore's too: `keytool -list -v -keystore mobile/android/app/debug.keystore -alias androiddebugkey -storepass android -keypass android`.
+2. In `VPS_ENV_PROD`: `WEBAUTHN_RP_ID=api.example.com`, `ANDROID_APP_PACKAGE=com.example.pfm`, `ANDROID_CERT_SHA256=<fp>,<fp>` (colon hex, as printed). Deploy; migration 032 must run first (`deploy.sh` does).
+3. Check: `curl https://api.example.com/.well-known/assetlinks.json` lists the package and fingerprints. Android fetches this before it lets the app use a passkey; a WAF rule that blocks it (§4) turns every passkey attempt into a generic failure on the phone.
+4. Passkeys need a dev/EAS build (`react-native-passkey` is native); Expo Go hides them and keeps the device-only fingerprint check. On the phone: Cài đặt → Bảo mật → Thêm passkey.
+
+**Off:** leave `WEBAUTHN_RP_ID` blank. The endpoints answer 503 `PASSKEYS_UNAVAILABLE`, the app falls back to password sign-in and the device check, and stored passkeys are kept.
+
+**Known limits**
+- **iOS is not set up.** It needs `ios.bundleIdentifier` + `ios.associatedDomains: ["webcredentials:api.example.com"]` in `mobile/app.json` and an `apple-app-site-association` file served next to `assetlinks.json` (Team ID + bundle ID).
+- **A new signing key means new fingerprints.** Passkeys made under an old certificate stop verifying until its fingerprint is listed again.
+- **Look at them:** `SELECT id, name, created_at, last_used_at, deleted_at FROM passkeys WHERE user_id = '<id>';`

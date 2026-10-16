@@ -22,6 +22,11 @@ type TransactionActionPayload struct {
 	// Items of one purchase (specs/transaction-line-items, typed chat): when
 	// present, Amount equals their sum. Forwarded unchanged on confirm.
 	Items []ChatActionItem `json:"items,omitempty"`
+	// ToWalletID is a transfer's destination Wallet; nil on income/expense,
+	// and nil on a transfer whose destination the AI could not name (the
+	// client has the User pick one before saving). A transfer's CategoryID is
+	// uuid.Nil: the server files it under the system transfer category.
+	ToWalletID *uuid.UUID `json:"to_wallet_id,omitempty"`
 }
 
 // ChatActionItem has CreateTransactionRequest's item shape, money in xu.

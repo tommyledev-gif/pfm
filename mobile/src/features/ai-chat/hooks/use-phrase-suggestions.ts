@@ -28,16 +28,28 @@ function rank(candidate: Candidate, query: string): number | null {
   return tier + (candidate.saved ? 0 : 1);
 }
 
+interface PhraseSuggestionOptions {
+  /** The message already in the input: never suggested back to itself. */
+  exclude: string;
+  limit?: number;
+  /** With nothing typed: every phrase (true), or none at all (false). */
+  listAllWhenEmpty?: boolean;
+}
+
 /**
- * Saved phrases, then recently confirmed ones, filtered by what is typed —
- * ignoring case and diacritics — once typing pauses. Never lists the exact
- * text already in the input.
+ * Saved phrases, then recently confirmed ones, filtered by `query` — ignoring
+ * case and diacritics — once typing pauses. Never lists the exact text
+ * already in the input. `total` is how many phrases there are to search.
  */
-export function usePhraseSuggestions(input: string, userId: string | null): PhraseSuggestion[] {
+export function usePhraseSuggestions(
+  query: string,
+  userId: string | null,
+  { exclude, limit = MAX_PHRASE_SUGGESTIONS, listAllWhenEmpty = true }: PhraseSuggestionOptions,
+): { suggestions: PhraseSuggestion[]; total: number } {
   const saved = useSavedPhrases(userId);
   const recent = useRecentPhrases(userId);
-  const query = normalizeText(useDebouncedValue(input, PHRASE_FILTER_DEBOUNCE_MS));
-  const currentKey = normalizeText(input);
+  const debounced = normalizeText(useDebouncedValue(query, PHRASE_FILTER_DEBOUNCE_MS));
+  const currentKey = normalizeText(exclude);
 
   // Saved first, each list already newest first; a recent phrase that is also
   // saved shows once, as saved.
@@ -55,17 +67,20 @@ export function usePhraseSuggestions(input: string, userId: string | null): Phra
     return out;
   }, [saved, recent]);
 
-  return useMemo(() => {
+  const suggestions = useMemo(() => {
+    if (!debounced && !listAllWhenEmpty) return [];
     const ranked: { candidate: Candidate; score: number; order: number }[] = [];
     candidates.forEach((candidate, order) => {
       if (candidate.key === currentKey) return;
-      const score = rank(candidate, query);
+      const score = rank(candidate, debounced);
       if (score !== null) ranked.push({ candidate, score, order });
     });
     ranked.sort((a, b) => a.score - b.score || a.order - b.order);
-    return ranked.slice(0, MAX_PHRASE_SUGGESTIONS).map(({ candidate }) => ({
+    return ranked.slice(0, limit).map(({ candidate }) => ({
       text: candidate.text,
       saved: candidate.saved,
     }));
-  }, [candidates, query, currentKey]);
+  }, [candidates, debounced, currentKey, limit, listAllWhenEmpty]);
+
+  return { suggestions, total: candidates.length };
 }

@@ -1,16 +1,35 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Animated, Pressable, Text, View } from "react-native";
 
 import { AmountRevealPopup } from "@/components/ui/AmountRevealPopup";
 import { TintedIconTile } from "@/components/ui/TintedIconTile";
 import { colorForCategory } from "@/lib/category-color";
 import { TRANSFER_CATEGORY_ICON } from "@/lib/constants";
 import { formatCurrencyTruncated } from "@/lib/currency";
-import { formatDateDMY } from "@/lib/format-date";
-import { spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { Transaction } from "@/features/transactions/types";
 
 const ICON_SIZE = 44;
+// Joins the parts of the second line. The space before the dot is
+// non-breaking, so a wrapped line never starts with a dot.
+const SEPARATOR = " • ";
+const SUB_LINES = 2;
+
+interface TransactionRowProps {
+  transaction: Transaction;
+  currency?: string;
+  category?: { icon: string | null; icon_url: string | null };
+  /** Tapping anywhere on the row, the amount included. */
+  onPress?: () => void;
+  /**
+   * Holding the amount shows it in full (AmountRevealPopup). Off when the
+   * caller gives the whole row its own hold, which the amount would otherwise
+   * take for itself.
+   */
+  revealAmountOnHold?: boolean;
+  /** 1 → 0 from useHighlightFade: the "this is the one" border. */
+  highlightOpacity?: Animated.Value;
+}
 
 // Home's "Recent Transactions" and the full Transactions list both render
 // this exact row shape (README: "Row = icon + name/time + amount + sub-label
@@ -26,11 +45,10 @@ export function TransactionRow({
   transaction,
   currency,
   category,
-}: {
-  transaction: Transaction;
-  currency?: string;
-  category?: { icon: string | null; icon_url: string | null };
-}) {
+  onPress,
+  revealAmountOnHold = true,
+  highlightOpacity,
+}: TransactionRowProps) {
   const colors = useColors();
   const styles = useStyles();
   const isIncome = transaction.type === "income";
@@ -42,9 +60,20 @@ export function TransactionRow({
   const amountSign = isTransfer ? "" : isIncome ? "+" : "-";
   const [revealVisible, setRevealVisible] = useState(false);
   const itemCount = transaction.item_count ?? 0;
+  const walletLabel = isTransfer ? `${transaction.wallet_name} → ${transaction.to_wallet_name ?? "?"}` : transaction.wallet_name;
 
-  return (
-    <View style={styles.row}>
+  const amount = (
+    <Text style={[styles.amount, { color: amountColor }]} numberOfLines={1}>
+      {amountSign}
+      {formatCurrencyTruncated(transaction.amount, currency)}
+    </Text>
+  );
+
+  const content = (
+    <>
+      {highlightOpacity ? (
+        <Animated.View pointerEvents="none" style={[styles.highlightBorder, { opacity: highlightOpacity }]} />
+      ) : null}
       <TintedIconTile
         color={isTransfer ? colors.periwinkle : colorForCategory(transaction.category_id)}
         size={ICON_SIZE}
@@ -58,43 +87,51 @@ export function TransactionRow({
         <Text style={styles.title} numberOfLines={1}>
           {label}
         </Text>
-        <View style={styles.subRow}>
-          <Text style={styles.sub} numberOfLines={1}>
-            {transaction.category_name}
-          </Text>
-          <Text style={styles.subDivider}>•</Text>
-          <View style={styles.walletDot} />
-          <Text style={styles.sub} numberOfLines={1}>
-            {isTransfer ? `${transaction.wallet_name} → ${transaction.to_wallet_name ?? "?"}` : transaction.wallet_name}
-          </Text>
+        {/* One text, not a row of separately shrinking pieces: those each cut
+            themselves short ("Ăn u… • Vietco…") long before the line was
+            full. It wraps onto a second line now, and only cuts after that. */}
+        <Text style={styles.sub} numberOfLines={SUB_LINES}>
+          {transaction.category_name}
+          <Text style={styles.subDivider}>{SEPARATOR}</Text>
+          <Text style={styles.walletDot}>{"● "}</Text>
+          {walletLabel}
           {/* specs/transaction-line-items AC-14: only when it has Items. */}
           {itemCount > 0 ? (
             <>
-              <Text style={styles.subDivider}>•</Text>
-              <Text testID={`badge-item-count-${transaction.id}`} style={styles.sub} numberOfLines={1}>
-                {itemCount} món
-              </Text>
+              <Text style={styles.subDivider}>{SEPARATOR}</Text>
+              <Text testID={`badge-item-count-${transaction.id}`}>{itemCount} món</Text>
             </>
           ) : null}
-        </View>
-      </View>
-      {/* Long-press reveals the untruncated amount + Vietnamese words (AmountRevealPopup) — a nested
-          Pressable inside whatever outer row-tap the caller wraps this in, same idiom as the
-          chat-bubble long-press-to-edit flow; a plain tap still passes through to the outer row. */}
-      <Pressable style={styles.right} onLongPress={() => setRevealVisible(true)}>
-        <Text style={[styles.amount, { color: amountColor }]} numberOfLines={1}>
-          {amountSign}
-          {formatCurrencyTruncated(transaction.amount, currency)}
         </Text>
-      </Pressable>
+      </View>
+      {/* The amount is part of the row's tap: it used to be a Pressable of its
+          own with only a long-press, which still took every tap that landed on
+          it, so the right side of a row did nothing. Hold reveals the exact
+          amount + Vietnamese words (AmountRevealPopup). */}
+      {revealAmountOnHold ? (
+        <Pressable style={styles.right} onPress={onPress} onLongPress={() => setRevealVisible(true)}>
+          {amount}
+        </Pressable>
+      ) : (
+        <View style={styles.right}>{amount}</View>
+      )}
 
-      <AmountRevealPopup
-        visible={revealVisible}
-        onClose={() => setRevealVisible(false)}
-        amountCents={transaction.amount}
-        currency={currency ?? "VND"}
-      />
-    </View>
+      {revealAmountOnHold ? (
+        <AmountRevealPopup
+          visible={revealVisible}
+          onClose={() => setRevealVisible(false)}
+          amountCents={transaction.amount}
+          currency={currency ?? "VND"}
+        />
+      ) : null}
+    </>
+  );
+
+  if (!onPress) return <View style={styles.row}>{content}</View>;
+  return (
+    <Pressable style={styles.row} onPress={onPress}>
+      {content}
+    </Pressable>
   );
 }
 
@@ -102,11 +139,20 @@ const useStyles = createStyles((colors) => ({
   row: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm },
   middle: { flex: 1, gap: 2 },
   title: { ...typography.body, color: colors.textPrimary },
-  subRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  sub: { ...typography.tiny, color: colors.textSecondary, flexShrink: 1 },
-  subDivider: { ...typography.tiny, color: colors.textMuted },
-  walletDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: colors.periwinkle },
+  sub: { ...typography.tiny, color: colors.textSecondary },
+  subDivider: { color: colors.textMuted },
+  walletDot: { fontSize: 8, color: colors.periwinkle },
   right: { alignItems: "flex-end", gap: 2 },
   amount: { ...typography.body, fontWeight: "700" },
-  time: { ...typography.tiny, color: colors.textMuted },
+  // Bleeds past the row's content so the border does not touch the icon.
+  highlightBorder: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: -spacing.sm,
+    right: -spacing.sm,
+    borderRadius: radii.listCard,
+    borderWidth: 2,
+    borderColor: colors.green,
+  },
 }));

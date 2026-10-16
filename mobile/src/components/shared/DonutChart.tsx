@@ -6,6 +6,7 @@ import { formatCurrency, formatCurrencyCompact } from "@/lib/currency";
 import { formatPercent } from "@/lib/percent";
 import { useEntryAnimation } from "@/lib/use-entry-animation";
 import { typography, createStyles } from "@/lib/theme";
+import { arcPath, layoutArcLengths, polarToPoint, SEGMENT_GAP } from "@/components/shared/donut-geometry";
 
 export interface DonutSegment {
   key: string;
@@ -36,13 +37,6 @@ interface DonutChartProps {
 }
 
 const STROKE_WIDTH = 22;
-// Arc length, in px, carved off the end of every segment so neighbours read as
-// separate blocks instead of one continuous gradient. The gap is a real hole in
-// the stroke — the app background shows through it — which is why it reads as
-// black without painting anything black: a drawn divider would need its own
-// color, and that color would be wrong the moment this chart is placed on a
-// card instead of the screen.
-const SEGMENT_GAP = 4;
 const TOOLTIP_WIDTH = 130;
 const TOOLTIP_HEIGHT = 48;
 // The drill-down link adds a third line, and the tooltip's own placement math
@@ -53,29 +47,7 @@ const TOOLTIP_HEIGHT_WITH_LINK = 74;
 // reads as pointing at the arc rather than touching it.
 const TOOLTIP_GAP = 10;
 
-function polarToPoint(cx: number, cy: number, r: number, angleDeg: number) {
-  const rad = ((angleDeg - 90) * Math.PI) / 180;
-  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
-}
-
 const AnimatedPath = Animated.createAnimatedComponent(Path);
-
-// One segment as its own open arc path, clockwise from 12 o'clock-based
-// angles. Its own path (rather than a dash on a full circle) is what lets
-// the entry animation reveal it with the standard "draw a line" trick: a
-// dash exactly as long as the path, pulled in by strokeDashoffset. A full
-// 360° sweep can't be one SVG arc command, so it is drawn as two halves.
-function arcPath(cx: number, cy: number, r: number, startDeg: number, sweepDeg: number): string {
-  if (sweepDeg >= 359.99) {
-    const top = polarToPoint(cx, cy, r, startDeg);
-    const bottom = polarToPoint(cx, cy, r, startDeg + 180);
-    return `M ${top.x} ${top.y} A ${r} ${r} 0 1 1 ${bottom.x} ${bottom.y} A ${r} ${r} 0 1 1 ${top.x} ${top.y}`;
-  }
-  const start = polarToPoint(cx, cy, r, startDeg);
-  const end = polarToPoint(cx, cy, r, startDeg + sweepDeg);
-  const largeArc = sweepDeg > 180 ? 1 : 0;
-  return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y}`;
-}
 
 // Gentle continuous float while a tooltip is shown, so it reads as a live
 // callout rather than a static label — stops and resets the moment the
@@ -128,7 +100,8 @@ export function DonutChart({
   const circumference = 2 * Math.PI * radius;
   const total = segments.reduce((sum, s) => sum + s.amount, 0);
 
-  // `full` is the segment's true share of the ring and drives layout (where the
+  // `full` is the segment's share of the ring (layoutArcLengths: proportional,
+  // with tiny ones floored so they stay visible) and drives layout (where the
   // next one starts, where the tooltip points). `length` is what actually gets
   // stroked — `full` minus the separator gap. Keeping them apart matters: if
   // the gap were subtracted from the layout too, every segment after the first
@@ -137,9 +110,10 @@ export function DonutChart({
   // A segment shorter than twice the gap keeps its full length. Carving 4px off
   // a 5px sliver leaves a dot that reads as a rendering fault, and a single
   // segment has no neighbour to be separated from in the first place.
+  const lengths = layoutArcLengths(segments.map((s) => s.amount), circumference);
   let offset = 0;
-  const arcs = segments.map((seg) => {
-    const full = total > 0 ? (seg.amount / total) * circumference : 0;
+  const arcs = segments.map((seg, index) => {
+    const full = lengths[index];
     const gap = segments.length > 1 && full > SEGMENT_GAP * 2 ? SEGMENT_GAP : 0;
     const arc = { ...seg, full, length: Math.max(full - gap, 0), offset };
     offset += full;

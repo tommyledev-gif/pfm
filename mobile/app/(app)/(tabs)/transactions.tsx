@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Pressable, SectionList } from "react-native";
+import { SectionList } from "react-native";
+import { useLocalSearchParams } from "expo-router";
 
 import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
 import { Screen } from "@/components/shared/Screen";
@@ -26,6 +27,7 @@ import { PendingSyncEditor } from "@/features/transactions/components/PendingSyn
 import { TransactionDayHeader } from "@/features/transactions/components/TransactionDayHeader";
 import { ExpandRevealRow } from "@/features/transactions/components/ExpandRevealRow";
 import { useCollapsedDays } from "@/features/transactions/hooks/use-collapsed-days";
+import { useFocusTransaction } from "@/features/transactions/hooks/use-focus-transaction";
 import { useTransactionFilters } from "@/features/transactions/hooks/use-transaction-filters";
 import { TransactionsHeader, TypeFilterValue } from "@/features/transactions/components/TransactionsHeader";
 import { CategoryFilterModal } from "@/features/transactions/components/CategoryFilterModal";
@@ -49,6 +51,14 @@ export default function TransactionsScreen() {
   // while I look at something else" gesture, not a setting. Keys that stop
   // matching after a filter change are simply never looked up again.
   const { collapsedDays, toggleDay, isRevealing } = useCollapsedDays();
+  // Set by "Xem trong Giao dịch" (Insights' category drill-down): scroll to
+  // that row and flash a border on it. `focusedAt` is a nonce, so the same
+  // row can be jumped to twice in a row.
+  const { focusTransactionId, focusDay, focusedAt } = useLocalSearchParams<{
+    focusTransactionId?: string;
+    focusDay?: string;
+    focusedAt?: string;
+  }>();
   const wallets = useWalletsQuery();
   const categories = useCategoriesQuery();
 
@@ -106,6 +116,22 @@ export default function TransactionsScreen() {
     [upToToday, hasAmountSort, walletCurrencyMap, collapsedDays],
   );
 
+  const focus = useFocusTransaction({
+    focusId: focusTransactionId,
+    nonce: focusedAt,
+    focusDay,
+    sections,
+    future,
+    transactions,
+    resetView: () => {
+      filters.clearFilters();
+      setSortKeys([]);
+    },
+    collapsedDays,
+    toggleDay,
+    onFoundInFuture: () => setFutureOpen(true),
+  });
+
   const now = new Date();
   const currentMonthLabel = `Tháng ${now.getMonth() + 1}, ${now.getFullYear()}`;
   const dateRangeLabel =
@@ -147,6 +173,8 @@ export default function TransactionsScreen() {
   return (
     <Screen>
       <SectionList
+        ref={focus.listRef}
+        onScrollToIndexFailed={focus.onScrollToIndexFailed}
         style={styles.screen}
         contentContainerStyle={styles.content}
         sections={sections}
@@ -188,18 +216,16 @@ export default function TransactionsScreen() {
         }
         renderItem={({ item, section }) => (
           <ExpandRevealRow revealing={isRevealing(section.key)}>
-            <Pressable
+            <TransactionRow
+              transaction={item}
+              currency={walletCurrencyMap.get(item.wallet_id)}
+              category={categoryById.get(item.category_id)}
               onPress={() => {
                 setEditingTransaction(item);
                 setFormOpen(true);
               }}
-            >
-              <TransactionRow
-                transaction={item}
-                currency={walletCurrencyMap.get(item.wallet_id)}
-                category={categoryById.get(item.category_id)}
-              />
-            </Pressable>
+              highlightOpacity={item.id === focus.highlightId ? focus.highlightOpacity : undefined}
+            />
           </ExpandRevealRow>
         )}
         ListEmptyComponent={

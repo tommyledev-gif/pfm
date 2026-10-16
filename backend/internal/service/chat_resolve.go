@@ -38,7 +38,9 @@ const actionTypeCreateTransaction = "create_transaction"
 // resolution, and per-item idempotency-key generation. Deliberately does NOT
 // gate on Confidence — a below-threshold guess still becomes a confirmable
 // action (renderConfirmMessage frames it as a guess). A structurally invalid
-// item is omitted and counted in skipped — never a distinct error.
+// item is omitted and counted in skipped — never a distinct error. A
+// transfer between the caller's own Wallets has no category and goes through
+// resolveTransferAction instead.
 //
 // Takes no context and issues no repository calls: the caller's own
 // Wallets/Categories are already loaded, and membership in those slices IS
@@ -50,6 +52,16 @@ func resolveActions(wallets []*model.Wallet, categories []*model.Category, propo
 	actions = make([]dto.ChatActionResponse, 0, len(proposed))
 
 	for _, p := range proposed {
+		if p.TxType == string(model.TransactionTypeTransfer) {
+			action, reason := resolveTransferAction(wallets, walletByID, p)
+			if reason != dropReasonNone {
+				sawWalletDrop = sawWalletDrop || reason == dropReasonNoWallet
+				skipped++
+				continue
+			}
+			actions = append(actions, action)
+			continue
+		}
 		if p.TxType != string(model.TransactionTypeIncome) && p.TxType != string(model.TransactionTypeExpense) {
 			skipped++
 			continue

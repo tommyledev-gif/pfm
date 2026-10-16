@@ -65,10 +65,12 @@ mặc định occurred_at là ngày hiện tại ở trên. occurred_at LUÔN LU
    c. Giao dịch chỉ có một món thì để items rỗng.
    d. Tên đứng đầu danh sách trùng với tên một ví đã liệt kê ở trên thì dùng wallet_id của ví đó.
    e. Lời người dùng ghi kèm một món mà không phải tên món (của ai, cho ai, ví dụ "của duy", "cho mẹ") thì bỏ khỏi name và nối vào note của giao dịch cùng tên món đó, không được bỏ mất. Ví dụ "tương ớt chinsu 35k, sữa đặc 22k của duy, khăn giấy 18k" → items: "tương ớt chinsu" 35000, "sữa đặc" 22000, "khăn giấy" 18000; note: "sữa đặc của duy". note đã có nội dung (tên cửa hàng) thì nối thêm sau dấu phẩy.
-6. Xác định tx_type ("income" hay "expense") TRƯỚC, sau đó CHỈ được chọn category_id từ đúng danh sách tương ứng ở \
-trên — không bao giờ chọn một category_id thuộc nhóm còn lại, kể cả khi tên nghe có vẻ liên quan.
-7. category_id PHẢI là một trong các id đã liệt kê ở trên — không tự đặt tên danh mục mới.
-8. wallet_id là một trong các id ví đã liệt kê, hoặc để trống (null) nếu người dùng không nêu rõ ví nào.
+6. Xác định tx_type ("income", "expense" hay "transfer" theo quy tắc 15) TRƯỚC, sau đó CHỈ được chọn category_id từ \
+đúng danh sách tương ứng ở trên — không bao giờ chọn một category_id thuộc nhóm còn lại, kể cả khi tên nghe có vẻ liên \
+quan. Với "transfer", category_id là chuỗi rỗng "".
+7. category_id PHẢI là một trong các id đã liệt kê ở trên — không tự đặt tên danh mục mới (trừ "transfer": chuỗi rỗng).
+8. wallet_id là một trong các id ví đã liệt kê, hoặc để trống (null) nếu người dùng không nêu rõ ví nào. to_wallet_id \
+chỉ dùng cho "transfer" (quy tắc 15); với "income" và "expense" luôn là null.
 9. Chỉ đặt intent = "ambiguous" (và để transactions rỗng) khi KHÔNG THỂ xác định được số tiền, hoặc tin nhắn rõ \
 ràng không phải là một giao dịch tài chính (ví dụ: chào hỏi, hỏi thời tiết). Nếu có số tiền nhưng không chắc chắn \
 là thu hay chi, hoặc không chắc danh mục nào phù hợp nhất, vẫn PHẢI đoán ra lựa chọn hợp lý nhất dựa trên ngữ cảnh, \
@@ -95,4 +97,13 @@ thực sự của câu và ngữ cảnh hội thoại, đặc biệt khi câu ph
 thuẫn với ý nghĩa tổng thể của câu.
 14. Trường note phải phản ánh CỤ THỂ nội dung người dùng đã nói (mua gì, ở đâu, với ai, việc gì, ...) khi tin nhắn \
 có thông tin đó — không dùng một mô tả chung chung hoặc trùng lặp với tên danh mục. Với câu phức tạp hoặc nhiều chi \
-tiết, tóm tắt ngắn gọn nhưng giữ đúng thông tin quan trọng nhất thay vì đoán đại khái hoặc bỏ sót chi tiết chính."""
+tiết, tóm tắt ngắn gọn nhưng giữ đúng thông tin quan trọng nhất thay vì đoán đại khái hoặc bỏ sót chi tiết chính.
+15. CHUYỂN TIỀN GIỮA HAI VÍ CỦA CHÍNH NGƯỜI DÙNG: tiền chỉ đổi chỗ, không phải thu cũng không phải chi. Dùng \
+tx_type = "transfer" khi tin nhắn chuyển, nạp hoặc rút tiền từ một ví sang một ví khác và CẢ HAI đều là ví của người \
+dùng: khớp tên một ví trong danh sách ở trên, hoặc "tiền mặt" khi có ví tiền mặt. Ví dụ: "chuyển 2tr từ VCB sang \
+MoMo", "nạp 500k vào MoMo từ Techcombank", "rút 1tr từ VCB" (VCB sang ví tiền mặt), "chuyển 5tr vào ví tiết kiệm". \
+wallet_id là ví bị trừ tiền, to_wallet_id là ví nhận tiền, category_id là chuỗi rỗng "", items rỗng, note giữ nội dung \
+người dùng nói nếu có. Nếu chỉ nhận ra một trong hai ví, vẫn dùng "transfer", để null phía không rõ và đặt confidence \
+dưới 0.6. Chuyển cho MỘT NGƯỜI hoặc tới nơi không phải ví trong danh sách ("chuyển cho mẹ 1tr", "chuyển khoản tiền \
+nhà") là chi tiêu ("expense"); người khác chuyển vào ví của người dùng ("mẹ chuyển 2tr") là thu nhập ("income"). \
+Quy tắc 12 chỉ áp dụng cho các trường hợp đó, không áp dụng cho chuyển giữa hai ví của chính người dùng."""

@@ -184,7 +184,6 @@ export default function WalletsScreen() {
             {activeWallet ? (
               <>
                 <WalletActiveActions wallet={activeWallet} onEdit={() => openEditor(activeWallet)} />
-                <Text style={styles.hint}>Vuốt hoặc chạm thẻ bên cạnh để đổi ví · chạm thẻ giữa để sửa</Text>
               </>
             ) : null}
           </View>

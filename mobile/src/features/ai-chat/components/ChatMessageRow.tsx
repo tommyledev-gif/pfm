@@ -115,6 +115,8 @@ function ChatMessageRowView({
         text={kind ? "" : message.text}
         testID={`msg-chat-${message.id}`}
         onLongPress={menuActions.length > 0 ? menu.open : undefined}
+        // Only while a card is actually drawn under the text.
+        wide={Boolean(message.action) && (Boolean(kind) || !message.superseded)}
       >
         {kind && message.action ? (
           <TransactionTombstoneCard

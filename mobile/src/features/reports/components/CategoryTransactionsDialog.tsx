@@ -1,10 +1,15 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { useRouter } from "expo-router";
 
 import { Avatar } from "@/components/ui/Avatar";
+import { ListIcon } from "@/components/ui/Icon";
+import { ActionPopover, PopoverAnchor } from "@/components/shared/ActionPopover";
 import { Drawer } from "@/components/shared/Drawer";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
-import { TransactionRow } from "@/components/shared/TransactionRow";
+import { useHoldMenu } from "@/features/ai-chat/hooks/use-hold-menu";
+import { HoldableTransactionRow } from "@/features/reports/components/HoldableTransactionRow";
+import { Transaction } from "@/features/transactions/types";
 import { TransactionRowSkeleton } from "@/features/transactions/components/TransactionRowSkeleton";
 import { formatCurrency } from "@/lib/currency";
 import { formatDateRange } from "@/lib/format-date";
@@ -35,9 +40,10 @@ interface CategoryTransactionsDialogProps {
 
 // Drill-down behind the donut tooltip's "Xem giao dịch" link (DonutChart) —
 // the individual transactions making up one segment, for the same period the
-// chart covers. Purely read-only: tapping a row does nothing, because editing
-// from here would have to reconcile with the report summary the chart is
-// still holding, and Transactions is one tab away for that.
+// chart covers. Read-only: tapping a row does nothing, because editing from
+// here would have to reconcile with the report summary the chart is still
+// holding. Holding a row for a second opens a menu beside it whose one
+// action jumps to that row in the Transactions tab.
 //
 // Rows aren't paginated on scroll the way the Transactions screen's list is:
 // this is a Drawer (one ScrollView), so an inner infinite list would fight it
@@ -83,6 +89,32 @@ export function CategoryTransactionsDialog({
     [transactions.data],
   );
 
+  const router = useRouter();
+  const menu = useHoldMenu();
+  const [heldTransaction, setHeldTransaction] = useState<Transaction | null>(null);
+  const openRowMenu = (transaction: Transaction, anchor: PopoverAnchor) => {
+    setHeldTransaction(transaction);
+    menu.open(anchor);
+  };
+  const closeRowMenu = () => {
+    menu.close();
+    setHeldTransaction(null);
+  };
+  // Over to the Transactions tab, scrolled to this row with its border
+  // flashing (useFocusTransaction). `focusedAt` makes the same row jumpable
+  // twice; `focusDay` lets that screen unfold the row's day if it is folded.
+  const showInTransactions = (transaction: Transaction) => {
+    onClose();
+    router.navigate({
+      pathname: "/transactions",
+      params: {
+        focusTransactionId: transaction.id,
+        focusDay: transaction.occurred_at.slice(0, 10),
+        focusedAt: String(Date.now()),
+      },
+    });
+  };
+
   return (
     <Drawer visible={visible} onClose={onClose}>
       <DrawerHeader title="Giao dịch" actions={[{ label: "Đóng", onPress: onClose, variant: "secondary" }]} />
@@ -113,15 +145,36 @@ export function CategoryTransactionsDialog({
       ) : (
         <View>
           {items.map((item) => (
-            <TransactionRow
+            <HoldableTransactionRow
               key={item.id}
               transaction={item}
               currency={walletCurrencyMap.get(item.wallet_id)}
               category={categoryById.get(item.category_id)}
+              held={heldTransaction?.id === item.id}
+              onHold={openRowMenu}
             />
           ))}
         </View>
       )}
+
+      <ActionPopover
+        visible={menu.visible}
+        anchor={menu.anchor}
+        align="left"
+        onClose={closeRowMenu}
+        actions={
+          heldTransaction
+            ? [
+                {
+                  Icon: ListIcon,
+                  label: "Xem trong Giao dịch",
+                  onPress: () => showInTransactions(heldTransaction),
+                  testID: "btn-category-transaction-show",
+                },
+              ]
+            : []
+        }
+      />
 
       {transactions.hasNextPage ? (
         <Pressable

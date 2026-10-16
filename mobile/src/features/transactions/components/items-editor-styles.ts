@@ -105,7 +105,6 @@ export const useItemsEditorStyles = createStyles((colors) => ({
   chipLabelActive: { color: colors.textPrimary, fontWeight: "700" },
 
   // What a removed line leaves for a few seconds.
-  undoClip: { overflow: "hidden" },
   undoRow: { minHeight: MIN_ROW_HEIGHT, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
   undoLabel: { ...typography.caption, color: colors.textMuted, flex: 1 },
   undoAction: { ...typography.body, fontWeight: "700", color: colors.textPrimary },

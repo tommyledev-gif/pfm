@@ -50,7 +50,7 @@ export function AdjustmentRow({ adjustment, index, currency, expanded, showError
       header={(open) => (
         <SwipeableRow
           closeSignal={closeSignal}
-          // Off until the fields have folded away: the row is see-through till then.
+          // Off while the line is open: the row is see-through then.
           disabled={open}
           rightAction={{ Icon: TrashIcon, color: colors.peach, label: "Xóa", destructive: true, onPress: onRemove, testID: `btn-adjustment-swipe-remove-${index}` }}
         >

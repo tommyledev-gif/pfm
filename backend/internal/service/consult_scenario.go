@@ -21,9 +21,12 @@ const (
 	scenarioBaselineCycles = 3
 	// scenarioMaxMonths bounds a plan to something worth showing (50 years).
 	scenarioMaxMonths = 600
-	// scenarioRoundXu rounds the monthly amount up to whole 1.000đ.
-	scenarioRoundXu = 1_000 * common.VNDToCentsFactor
-	viDateFmt       = "02/01/2006"
+	// scenarioRoundXu is the step every VND figure of a plan lands on: 5.000đ.
+	// "để dành 1.234.567đ" is arithmetic output; 1.235.000đ is a plan.
+	scenarioRoundXu = 5_000 * common.VNDToCentsFactor
+	// scenarioRoundMinor is the step for any other currency: one whole unit.
+	scenarioRoundMinor = 100
+	viDateFmt          = "02/01/2006"
 
 	msgScenarioPast    = "Mốc thời gian này đã qua. Chọn một mốc trong tương lai."
 	msgScenarioNoPlan  = "Các tháng gần đây chưa có khoản dư để ước tính thời gian. Thử nêu mốc thời gian hoặc số tiền để dành mỗi tháng."
@@ -103,6 +106,10 @@ func (s *ConsultService) scenarioBaseline(ctx context.Context, userID uuid.UUID,
 func planScenario(p *AIConsultParse, base scenarioBaseline, today time.Time, loc *time.Location, currency string) (*dto.ConsultScenario, string) {
 	goal := *p.GoalAmountVND * common.VNDToCentsFactor
 	sc := &dto.ConsultScenario{Currency: currency, Goal: goal, BaselineCycles: base.cycles}
+	// Every worked-out figure sits on the same step, and the cap and cut are
+	// built from the rounded averages, so the numbers on screen still add up.
+	step := scenarioStep(currency)
+	income, expense := roundNearest(base.income, step), roundNearest(base.expense, step)
 
 	switch deadline, err := time.ParseInLocation(common.DateOnlyLayout, p.GoalDeadline, loc); {
 	case p.GoalDeadline != "" && err == nil:
@@ -111,12 +118,13 @@ func planScenario(p *AIConsultParse, base scenarioBaseline, today time.Time, loc
 		}
 		sc.Deadline = p.GoalDeadline
 		sc.Months = monthsUntil(today, deadline)
-		sc.MonthlySave = roundUpXu(divCeil(goal, int64(sc.Months)))
+		sc.MonthlySave = roundUp(divCeil(goal, int64(sc.Months)), step)
 	case p.MonthlySaveVND != nil:
+		// The user's own figure: kept as stated.
 		sc.MonthlySave = *p.MonthlySaveVND * common.VNDToCentsFactor
 		sc.Months = int(divCeil(goal, sc.MonthlySave))
-	case base.cycles > 0 && base.income > base.expense:
-		sc.MonthlySave = base.income - base.expense
+	case base.cycles > 0 && income > expense:
+		sc.MonthlySave = income - expense
 		sc.Months = int(divCeil(goal, sc.MonthlySave))
 	default:
 		return nil, msgScenarioNoPlan
@@ -126,7 +134,6 @@ func planScenario(p *AIConsultParse, base scenarioBaseline, today time.Time, loc
 	}
 
 	if base.cycles > 0 {
-		income, expense := base.income, base.expense
 		spendCap := income - sc.MonthlySave
 		cut := max(expense-spendCap, 0)
 		feasible := income-expense >= sc.MonthlySave
@@ -148,7 +155,15 @@ func monthsUntil(today, deadline time.Time) int {
 
 func divCeil(a, b int64) int64 { return (a + b - 1) / b }
 
-func roundUpXu(x int64) int64 { return divCeil(x, scenarioRoundXu) * scenarioRoundXu }
+func scenarioStep(currency string) int64 {
+	if currency == common.WalletDefaultCurrency {
+		return scenarioRoundXu
+	}
+	return scenarioRoundMinor
+}
+
+func roundUp(x, step int64) int64      { return divCeil(x, step) * step }
+func roundNearest(x, step int64) int64 { return (x + step/2) / step * step }
 
 func summaryScenario(sc *dto.ConsultScenario, monthly bool) string {
 	m := func(x int64) string { return common.FormatCentsVI(x, sc.Currency) }

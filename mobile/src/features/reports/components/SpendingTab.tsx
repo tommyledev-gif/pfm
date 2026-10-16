@@ -11,7 +11,9 @@ import { RevealableAmount } from "@/components/shared/RevealableAmount";
 import { CategoryTransactionsDialog } from "@/features/reports/components/CategoryTransactionsDialog";
 import { buildCategoryColorMap } from "@/lib/category-color";
 import { monthRange } from "@/lib/date-range";
-import { formatDateRange } from "@/lib/format-date";
+import { calendarDay, formatDateRange } from "@/lib/format-date";
+import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
+import { useReportCurrency } from "@/features/reports/hooks/use-report-currency";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
 import { isAwaitingFirstData, isWaitingForNetwork } from "@/lib/query-status";
@@ -51,6 +53,7 @@ export function SpendingTab({ focusCategoryId, focusNonce, onOpenBudgets }: Spen
   // separately from `selected` so closing the dialog leaves the chart's own
   // highlight exactly where the user left it.
   const [detailCategoryId, setDetailCategoryId] = useState<string | null>(null);
+  const reportCurrency = useReportCurrency(summary.data);
 
   // Both deps are plain strings, so this can't re-fire on identity alone — the
   // trap that made useCategoryPicker loop.
@@ -74,8 +77,8 @@ export function SpendingTab({ focusCategoryId, focusNonce, onOpenBudgets }: Spen
   }
 
   const { range, totals, by_category } = summary.data;
-  const primaryTotal = totals[0];
-  const currency = primaryTotal?.currency ?? "VND";
+  const { currency, currencies, setCurrency } = reportCurrency;
+  const primaryTotal = totals.find((t) => t.currency === currency);
 
   const categoryById = new Map(categories.data?.map((c) => [c.id, c]));
   const expenseCategories = by_category.filter((c) => c.type === "expense" && c.currency === currency);
@@ -108,13 +111,20 @@ export function SpendingTab({ focusCategoryId, focusNonce, onOpenBudgets }: Spen
   // window it was divided by. Comparing a single day's spend against a whole
   // month's limit was the thing worth avoiding, and prorating avoids it without
   // going silent.
+  //
+  // No filter at all is the backend's default window — the current budget
+  // cycle so far — so it is measured against the whole monthly total, never
+  // prorated: that note says "bạn chọn", and nothing was chosen.
   const thisMonth = monthRange(0);
-  const isCurrentMonthRange = range.from.slice(0, 10) === thisMonth.from && range.to.slice(0, 10) === thisMonth.to;
+  const fromDay = calendarDay(range.from);
+  const toDay = calendarDay(range.to);
+  const isDefaultWindow = !dateRange.from && !dateRange.to;
+  const isCurrentMonthRange = isDefaultWindow || (fromDay === thisMonth.from && toDay === thisMonth.to);
   const monthlyBudgetTotal = (budgets.data ?? []).reduce(
     (sum, b) => sum + (b.limits.find((l) => l.currency === currency)?.amount_limit ?? 0),
     0,
   );
-  const rangeDayCount = daysInRange(range.from, range.to);
+  const rangeDayCount = daysInRange(fromDay, toDay);
   const budgetTotal =
     monthlyBudgetTotal === 0
       ? null
@@ -124,10 +134,24 @@ export function SpendingTab({ focusCategoryId, focusNonce, onOpenBudgets }: Spen
 
   return (
     <View style={styles.container}>
-      <Pressable style={styles.rangeButton} onPress={() => setPickerOpen(true)}>
-        <CalendarIcon size={14} color={colors.textSecondary} />
-        <Text style={styles.range}>{formatDateRange(range.from, range.to)}</Text>
-      </Pressable>
+      <View style={styles.filterRow}>
+        <Pressable style={styles.rangeButton} onPress={() => setPickerOpen(true)}>
+          <CalendarIcon size={14} color={colors.textSecondary} />
+          <Text style={styles.range}>{formatDateRange(range.from, range.to)}</Text>
+        </Pressable>
+        {currencies.length > 1 ? (
+          <SegmentedTabs
+            options={currencies.map((c) => ({ value: c, label: c }))}
+            value={currency}
+            onChange={(next) => {
+              setCurrency(next);
+              setSelected(null);
+            }}
+            style={styles.currencyTabs}
+            testID="tabs-spending-currency"
+          />
+        ) : null}
+      </View>
 
       {/* The compact "~7tr100k" figures give up the exact amount on a hold,
           with the same fill-from-the-middle bar and pointing tooltip as the
@@ -228,6 +252,8 @@ export function SpendingTab({ focusCategoryId, focusNonce, onOpenBudgets }: Spen
 
 const useStyles = createStyles((colors) => ({
   container: { gap: spacing.md, flex: 1 },
+  filterRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
+  currencyTabs: { marginLeft: "auto" },
   rangeButton: {
     flexDirection: "row",
     alignSelf: "flex-start",

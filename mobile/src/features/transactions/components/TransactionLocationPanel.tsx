@@ -7,6 +7,8 @@ import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme
 import { Coordinates, LocationFailure } from "@/features/transactions/location/capture-location";
 import { formatCoordinates, openInGoogleMaps } from "@/features/transactions/location/map-support";
 import { LocationMap } from "@/features/transactions/components/LocationMap";
+import { PlacePick, PlaceSearch } from "@/features/transactions/components/PlaceSearch";
+import { SavedPlace } from "@/stores/saved-places-store";
 
 export type LocationStepStatus = "locating" | "ready" | "failed";
 // "view": a pin that already exists — look around, nothing moves until the
@@ -26,6 +28,10 @@ interface TransactionLocationPanelProps {
   onChangeNote: (note: string) => void;
   onMovePin: (coords: Coordinates) => void;
   onRetry: () => void;
+  /** Places pinned before, newest first — offered in edit mode. */
+  savedPlaces: SavedPlace[];
+  onPickPlace: (pick: PlacePick) => void;
+  onRemoveSavedPlace: (place: SavedPlace) => void;
 }
 
 const FAILURE_COPY: Record<LocationFailure, string> = {
@@ -47,6 +53,9 @@ export function TransactionLocationPanel({
   onChangeNote,
   onMovePin,
   onRetry,
+  savedPlaces,
+  onPickPlace,
+  onRemoveSavedPlace,
 }: TransactionLocationPanelProps) {
   const colors = useColors();
   const styles = useStyles();
@@ -76,17 +85,27 @@ export function TransactionLocationPanel({
   }
 
   const viewing = mode === "view";
+  // The same map instance in both modes (same key): switching to edit keeps
+  // wherever the User had panned to. A picked place is a new fixId, which
+  // remounts it centred there.
+  const map = (
+    <LocationMap
+      key={fixId}
+      coords={coords}
+      onMove={viewing ? undefined : onMovePin}
+      pannable={viewing}
+      style={styles.map}
+    />
+  );
   return (
     <View style={styles.ready}>
-      {/* The same map instance in both modes (same key): switching to edit
-          keeps wherever the User had panned to. */}
-      <LocationMap
-        key={fixId}
-        coords={coords}
-        onMove={viewing ? undefined : onMovePin}
-        pannable={viewing}
-        style={styles.map}
-      />
+      {viewing ? (
+        map
+      ) : (
+        <PlaceSearch savedPlaces={savedPlaces} onPick={onPickPlace} onRemoveSaved={onRemoveSavedPlace}>
+          {map}
+        </PlaceSearch>
+      )}
       <View style={styles.placeRow}>
         <MapPinIcon size={18} color={colors.green} />
         <Text style={styles.placeName} numberOfLines={2} testID="text-location-place">

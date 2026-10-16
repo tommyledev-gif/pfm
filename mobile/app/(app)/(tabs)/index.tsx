@@ -56,9 +56,7 @@ interface RecentRowProps {
 
 const RecentRow = memo(function RecentRow({ transaction, currency, category, onPress }: RecentRowProps) {
   return (
-    <Pressable onPress={() => onPress(transaction)}>
-      <TransactionRow transaction={transaction} currency={currency} category={category} />
-    </Pressable>
+    <TransactionRow transaction={transaction} currency={currency} category={category} onPress={() => onPress(transaction)} />
   );
 });
 

@@ -66,6 +66,9 @@ type AIProposedTransaction struct {
 	// Items lists one purchase line by line (specs/transaction-line-items);
 	// empty for an ordinary transaction. Untrusted, like every field here.
 	Items []AIProposedItem
+	// ToWalletID is a transfer's destination (TxType "transfer"), WalletID
+	// its source. Untrusted, like every field here.
+	ToWalletID *string
 }
 
 // AIProposedItem is one line of a purchase, in whole VND.
@@ -142,6 +145,7 @@ type aiWireTransaction struct {
 	OccurredAt string           `json:"occurred_at"`
 	Confidence float64          `json:"confidence"`
 	Items      []aiWireLineItem `json:"items"`
+	ToWalletID *string          `json:"to_wallet_id"`
 }
 
 type aiWireLineItem struct {
@@ -231,6 +235,7 @@ func fromWireResponse(resp aiWireResponse) *AIExtractResponse {
 			OccurredAt: t.OccurredAt,
 			Confidence: t.Confidence,
 			Items:      lines,
+			ToWalletID: t.ToWalletID,
 		})
 	}
 	return &AIExtractResponse{Intent: resp.Intent, Transactions: items}

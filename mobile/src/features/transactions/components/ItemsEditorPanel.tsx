@@ -1,15 +1,17 @@
 import { SetStateAction, useEffect, useRef, useState } from "react";
-import { Keyboard, LayoutChangeEvent, Pressable, ScrollView, Text, View } from "react-native";
+import { Keyboard, Pressable, ScrollView, Text, View } from "react-native";
 
 import { DrawerChild } from "@/components/shared/Drawer";
 import { ChevronRightIcon, PlusIcon } from "@/components/ui/Icon";
 import { createStyles, spacing, useColors } from "@/lib/theme";
 import { TRANSACTION_ADJUSTMENTS_MAX, TRANSACTION_ITEMS_MAX } from "@/lib/constants";
 import { useKeyboardHeight } from "@/lib/use-keyboard-height";
+import { useReduceMotion } from "@/lib/use-reduce-motion";
 import { ItemsEditor } from "@/features/transactions/items/use-items-editor";
 import { AdjustmentDraft, ItemDraft } from "@/features/transactions/items/line-math";
 import { useItemsEditorStyles } from "@/features/transactions/components/items-editor-styles";
 import { ItemRow } from "@/features/transactions/components/ItemRow";
+import { animateLineLayout } from "@/features/transactions/components/ExpandableLine";
 import { ADJUSTMENT_KIND_LABELS, AdjustmentRow } from "@/features/transactions/components/AdjustmentRow";
 import { ItemsTotalsPanel } from "@/features/transactions/components/ItemsTotalsPanel";
 import { ItemsUndoRow } from "@/features/transactions/components/ItemsUndoRow";
@@ -27,12 +29,9 @@ const ADD_ICON_SIZE = 16;
 // How long a removed line can be brought back.
 const UNDO_MS = 5000;
 
-type RemovedLine =
+type Removed =
   | { kind: "item"; line: ItemDraft; index: number; adjustmentsBefore?: AdjustmentDraft[] }
   | { kind: "adjustment"; line: AdjustmentDraft; index: number };
-// Plus what its undo row needs: the height it takes over, and whether its
-// time is up and it is folding away.
-type Removed = RemovedLine & { fromHeight: number; leaving: boolean };
 
 /** The Items editor as the form's slide-in child panel (specs/transaction-line-items US-01/US-03). */
 export function buildItemsPanelChild(options: ItemsPanelOptions): DrawerChild {
@@ -61,13 +60,12 @@ function ItemsEditorBody({ visible, lines, currency, showErrors }: ItemsPanelOpt
   const styles = useStyles();
   const lineStyles = useItemsEditorStyles();
   const keyboardHeight = useKeyboardHeight();
+  const reduceMotion = useReduceMotion();
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [removed, setRemoved] = useState<Removed | null>(null);
   // Bumped to close any parked swipe (scroll, another row opened).
   const [closeSignal, setCloseSignal] = useState(0);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Each line's last height (row, open fields, divider), for its undo row to start from.
-  const lineHeights = useRef(new Map<string, number>());
   const itemsFull = lines.items.length >= TRANSACTION_ITEMS_MAX;
   const adjustmentsFull = lines.adjustments.length >= TRANSACTION_ADJUSTMENTS_MAX;
 
@@ -76,32 +74,32 @@ function ItemsEditorBody({ visible, lines, currency, showErrors }: ItemsPanelOpt
     if (visible) return;
     setExpandedKey(null);
     setRemoved(null);
-    lineHeights.current.clear();
   }, [visible]);
   useEffect(() => () => {
     if (undoTimer.current) clearTimeout(undoTimer.current);
   }, []);
 
   const closeSwipes = () => setCloseSignal((n) => n + 1);
-  // A folding line keeps its fields mounted until they have folded away, so
-  // its input gives up the keyboard here, at once, as it did back when
-  // folding unmounted the fields straight away.
+  // Every change to which line is open (or to the lines themselves) goes
+  // through here or animates itself the same way: animateLineLayout makes the
+  // whole list move together. A folding line's input gives up the keyboard
+  // here, at once.
   const openLine = (next: SetStateAction<string | null>) => {
     Keyboard.dismiss();
+    animateLineLayout(reduceMotion);
     setExpandedKey(next);
   };
   const toggle = (key: string) => {
     closeSwipes();
     openLine((current) => (current === key ? null : key));
   };
-  const trackHeight = (key: string) => (event: LayoutChangeEvent) => {
-    lineHeights.current.set(key, event.nativeEvent.layout.height);
-  };
-
-  const offerUndo = (entry: RemovedLine) => {
+  const offerUndo = (entry: Removed) => {
     if (undoTimer.current) clearTimeout(undoTimer.current);
-    setRemoved({ ...entry, fromHeight: lineHeights.current.get(entry.line.key) ?? 0, leaving: false });
-    undoTimer.current = setTimeout(() => setRemoved((current) => (current ? { ...current, leaving: true } : null)), UNDO_MS);
+    setRemoved(entry);
+    undoTimer.current = setTimeout(() => {
+      animateLineLayout(reduceMotion);
+      setRemoved(null);
+    }, UNDO_MS);
   };
   const removeItem = (item: ItemDraft, index: number) => {
     // Removing the last Item takes the Adjustments with it (BR-08): keep them for the undo.
@@ -119,6 +117,7 @@ function ItemsEditorBody({ visible, lines, currency, showErrors }: ItemsPanelOpt
   };
   const undo = () => {
     if (!removed) return;
+    animateLineLayout(reduceMotion);
     if (removed.kind === "item") lines.restoreItem(removed.line, removed.index, removed.adjustmentsBefore);
     else lines.restoreAdjustment(removed.line, removed.index);
     if (undoTimer.current) clearTimeout(undoTimer.current);
@@ -131,18 +130,7 @@ function ItemsEditorBody({ visible, lines, currency, showErrors }: ItemsPanelOpt
       removed.kind === "item"
         ? removed.line.name.trim() || "món"
         : removed.line.kind === "other" && removed.line.label.trim() ? removed.line.label.trim() : ADJUSTMENT_KIND_LABELS[removed.line.kind];
-    const removedKey = removed.line.key;
-    return (
-      <ItemsUndoRow
-        key={removedKey}
-        label={`Đã xóa ${name}`}
-        fromHeight={removed.fromHeight}
-        leaving={removed.leaving}
-        onUndo={undo}
-        // Only its own entry: a later removal may have taken its place meanwhile.
-        onGone={() => setRemoved((current) => (current?.line.key === removedKey ? null : current))}
-      />
-    );
+    return <ItemsUndoRow key={removed.line.key} label={`Đã xóa ${name}`} onUndo={undo} />;
   };
 
   // The hairlines on either side of the open line give way to its card's edge.
@@ -163,7 +151,7 @@ function ItemsEditorBody({ visible, lines, currency, showErrors }: ItemsPanelOpt
       contentContainerStyle={[styles.body, lineStyles.listContent, { paddingBottom: spacing.xl + keyboardHeight }]}
     >
       {lines.items.map((item, index) => (
-        <View key={item.key} onLayout={trackHeight(item.key)}>
+        <View key={item.key}>
           {undoRow("item", index)}
           <ItemRow
             item={item}
@@ -194,7 +182,7 @@ function ItemsEditorBody({ visible, lines, currency, showErrors }: ItemsPanelOpt
         <>
           <Text style={lineStyles.sectionTitle}>Thuế, phí, giảm giá</Text>
           {lines.adjustments.map((adjustment, index) => (
-            <View key={adjustment.key} onLayout={trackHeight(adjustment.key)}>
+            <View key={adjustment.key}>
               {undoRow("adjustment", index)}
               <AdjustmentRow
                 adjustment={adjustment}

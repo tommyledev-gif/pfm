@@ -46,6 +46,31 @@ func TestPlanScenarioFromSurplus(t *testing.T) {
 	}
 }
 
+// Every worked-out VND figure lands on 5.000đ, even from odd averages, and the
+// cap and cut are built from the rounded averages so they still add up.
+func TestPlanScenarioRoundsToFiveThousand(t *testing.T) {
+	today := time.Date(2026, 10, 5, 0, 0, 0, 0, time.UTC)
+	goal := int64(10_000_001)
+	p := &AIConsultParse{GoalAmountVND: &goal, GoalDeadline: "2027-01-01"}
+	base := scenarioBaseline{cycles: 3, income: 12_345_678_00, expense: 9_876_543_21, monthly: true}
+
+	sc, msg := planScenario(p, base, today, time.UTC, "VND")
+	if sc == nil {
+		t.Fatalf("no plan: %s", msg)
+	}
+	const step = 5_000 * 100
+	for name, v := range map[string]int64{
+		"save": sc.MonthlySave, "income": *sc.AvgIncome, "expense": *sc.AvgExpense, "cap": *sc.SpendCap, "cut": *sc.CutNeeded,
+	} {
+		if v%step != 0 {
+			t.Errorf("%s = %d xu, not a multiple of 5.000đ", name, v)
+		}
+	}
+	if *sc.AvgIncome-sc.MonthlySave != *sc.SpendCap {
+		t.Errorf("cap %d != income %d - save %d", *sc.SpendCap, *sc.AvgIncome, sc.MonthlySave)
+	}
+}
+
 func TestMonthsUntil(t *testing.T) {
 	today := time.Date(2026, 10, 5, 0, 0, 0, 0, time.UTC)
 	cases := map[string]int{"2026-10-20": 1, "2026-11-03": 1, "2026-12-01": 2, "2026-12-31": 3, "2027-10-05": 12}

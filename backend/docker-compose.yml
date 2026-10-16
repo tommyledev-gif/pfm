@@ -114,6 +114,12 @@ services:
       R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
       R2_BUCKET: ${R2_BUCKET:-}
       R2_PUBLIC_BASE_URL: ${R2_PUBLIC_BASE_URL:-}
+      # Passkeys (WebAuthn, mig 032). Blank WEBAUTHN_RP_ID turns them off;
+      # see .env.prod.example for each value.
+      WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-}
+      WEBAUTHN_RP_ORIGINS: ${WEBAUTHN_RP_ORIGINS:-}
+      ANDROID_APP_PACKAGE: ${ANDROID_APP_PACKAGE:-}
+      ANDROID_CERT_SHA256: ${ANDROID_CERT_SHA256:-}
       # Read only by ./seed (see deploy.sh), not by the server process. Blank
       # means "skip admin bootstrap" — set these in .env.prod only for the
       # very first deploy of a fresh environment (invite-only auth has no one

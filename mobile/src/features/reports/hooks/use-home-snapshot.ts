@@ -82,7 +82,7 @@ export function useHomeSnapshot(homePeriod: HomePeriod) {
    * is actually available right now.
    */
   const daysLeft = daysLeftInMonth();
-  const remainingToday = budgetSnapshot ? remainingPerDay(budgetSnapshot.remaining, daysLeft) : null;
+  const remainingToday = budgetSnapshot ? remainingPerDay(budgetSnapshot.remaining, daysLeft, currency) : null;
   // What today started with: what is left plus what has already gone. Drives
   // the ring, so a heavy morning visibly fills it.
   const todayAllowance = remainingToday !== null ? remainingToday + periodSpent : null;

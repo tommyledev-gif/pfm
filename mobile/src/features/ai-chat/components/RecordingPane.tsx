@@ -17,7 +17,6 @@ import { RecordingEmptyState } from "@/features/ai-chat/components/RecordingEmpt
 import { useChatThreadStyles } from "@/features/ai-chat/components/chat-thread-styles";
 import { ChatMode } from "@/features/ai-chat/chat-mode";
 import { useChatActions } from "@/features/ai-chat/hooks/use-chat-actions";
-import { usePhraseSuggestions } from "@/features/ai-chat/hooks/use-phrase-suggestions";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { Category } from "@/features/categories/types";
@@ -27,10 +26,12 @@ import { useOpenWalletCreator } from "@/features/wallets/use-open-wallet-creator
 import { useRequireOnline } from "@/lib/connectivity";
 import { PROPOSAL_CURRENCY } from "@/lib/constants";
 import { useLatestCallback } from "@/lib/use-latest-callback";
+import { useLinger } from "@/lib/use-linger";
 import { useCurrentUserId } from "@/stores/use-current-user-id";
 
 // The suggestion area may take at most this share of the pane's height.
 const SUGGESTION_MAX_HEIGHT_RATIO = 0.2;
+const PHRASE_PANEL_LINGER_MS = 150;
 // Retry delay when a deep-linked row had not been measured yet.
 const FOCUS_RETRY_DELAY_MS = 100;
 
@@ -97,11 +98,15 @@ export function RecordingPane({
   const [offlineDialogOpen, setOfflineDialogOpen] = useState(false);
   const [paneHeight, setPaneHeight] = useState(0);
   const [inputFocused, setInputFocused] = useState(false);
+  const [phraseSearchFocused, setPhraseSearchFocused] = useState(false);
+  const [inputFocusNonce, setInputFocusNonce] = useState(0);
+  // Focus moving from the message to the phrase search blurs one before the
+  // other gains it; the panel holding the search must not unmount in between.
+  const phrasePanelOpen = useLinger(inputFocused || phraseSearchFocused, PHRASE_PANEL_LINGER_MS);
 
   // Read only, so an unconfirmed proposal can say what saving it would do to
   // the category's budget. The card never writes budgets.
   const budgets = useBudgetsQuery();
-  const suggestions = usePhraseSuggestions(input, userId);
   // Proposals are read as VND (proposal-wallet.ts), so without a VND Wallet a
   // card can never be saved — it offers to create one instead. Only once the
   // list has loaded, so it never flashes for an account that has one.
@@ -247,13 +252,20 @@ export function RecordingPane({
             mode={mode}
             autoFocus={autoFocusInput}
             onFocusChange={handleFocusChange}
+            focusNonce={inputFocusNonce}
             aboveInput={
-              inputFocused ? (
+              phrasePanelOpen ? (
                 <PhraseSuggestions
-                  suggestions={suggestions}
+                  input={input}
+                  userId={userId}
                   // Of the part of the pane the keyboard does not cover.
                   maxHeight={Math.max(0, paneHeight - keyboardHeight) * SUGGESTION_MAX_HEIGHT_RATIO}
-                  onSelect={onChangeInput}
+                  onSelect={(text, fromSearch) => {
+                    onChangeInput(text);
+                    // Picked from the search: the cursor goes back to the message.
+                    if (fromSearch) setInputFocusNonce((n) => n + 1);
+                  }}
+                  onSearchFocusChange={setPhraseSearchFocused}
                 />
               ) : null
             }

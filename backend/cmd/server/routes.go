@@ -22,7 +22,7 @@ type dbPinger interface {
 // (/api/v1). Auth/rate-limit middleware ordering matters: JWTAuth must run
 // before RequireRole (role comes from the token) and before
 // InviteRateLimiter (keyed by the caller's user ID from that same token).
-func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, transactionExportHandler *handler.TransactionExportHandler, transactionImportHandler *handler.TransactionImportHandler, auditLogHandler *handler.AuditLogHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, chatHandler *handler.ChatHandler, budgetWizardHandler *handler.BudgetWizardHandler, analyticsHandler *handler.AnalyticsHandler, accountSwitchHandler *handler.AccountSwitchHandler, sessionRevocationHandler *handler.SessionRevocationHandler, profileHandler *handler.ProfileHandler, accessRequestHandler *handler.AccessRequestHandler, accountDeletionHandler *handler.AccountDeletionHandler, tokens *service.TokenService, sessions *service.SessionService, db dbPinger, logger *zap.Logger) {
+func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, transactionExportHandler *handler.TransactionExportHandler, transactionImportHandler *handler.TransactionImportHandler, auditLogHandler *handler.AuditLogHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, chatHandler *handler.ChatHandler, budgetWizardHandler *handler.BudgetWizardHandler, analyticsHandler *handler.AnalyticsHandler, accountSwitchHandler *handler.AccountSwitchHandler, sessionRevocationHandler *handler.SessionRevocationHandler, profileHandler *handler.ProfileHandler, accessRequestHandler *handler.AccessRequestHandler, accountDeletionHandler *handler.AccountDeletionHandler, passkeyHandler *handler.PasskeyHandler, assetLinks fiber.Handler, tokens *service.TokenService, sessions *service.SessionService, db dbPinger, logger *zap.Logger) {
 	// One instance for every protected route: validates the access token and
 	// its session (see middleware.JWTAuth).
 	jwtAuth := middleware.JWTAuth(tokens, sessions, logger)
@@ -37,6 +37,8 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	app.Get("/activate", handler.ActivatePageHandler)
 	// The admin's "Xem và duyệt" email link (access requests, mig 031).
 	app.Get("/approve-access", handler.ApproveAccessPageHandler)
+	// Android reads this before it lets the app use passkeys for this domain.
+	app.Get("/.well-known/assetlinks.json", assetLinks)
 
 	v1 := app.Group("/api/v1")
 
@@ -83,6 +85,11 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	auth.Post("/access-requests", middleware.AccessRequestRateLimiter(logger), accessRequestHandler.RequestAccess)
 	auth.Post("/access-requests/status", middleware.AccessStatusRateLimiter(logger), accessRequestHandler.Status)
 	auth.Post("/access-requests/approve", middleware.AccessApproveRateLimiter(logger), accessRequestHandler.ApproveByToken)
+	// Passkey sign-in (mig 032): the assertion is the credential, so no
+	// session — rate-limited per IP like /auth/login, one shared counter.
+	passkeyLoginLimit := middleware.LoginRateLimiter(logger)
+	auth.Post("/passkeys/login/begin", passkeyLoginLimit, passkeyHandler.BeginLogin)
+	auth.Post("/passkeys/login/finish", passkeyLoginLimit, passkeyHandler.FinishLogin)
 
 	admin := v1.Group("/admin", jwtAuth, middleware.RequireRole(string(model.UserRoleAdmin), logger))
 	admin.Post("/users/invite", middleware.InviteRateLimiter(logger), userHandler.InviteUser)
@@ -112,6 +119,11 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	users.Put("/me/username", profileHandler.ClaimUsername)
 	users.Post("/me/avatar", uploadLimit, profileHandler.UploadAvatar)
 	users.Delete("/me/avatar", profileHandler.DeleteAvatar)
+	// The caller's own passkeys (mig 032).
+	users.Get("/me/passkeys", passkeyHandler.List)
+	users.Post("/me/passkeys/register/begin", passkeyHandler.BeginRegistration)
+	users.Post("/me/passkeys/register/finish", passkeyHandler.FinishRegistration)
+	users.Delete("/me/passkeys/:id", passkeyHandler.Delete)
 
 	// F-03 Wallet Management — no RequireRole gate: every active user manages
 	// only their own wallets (plan.md Security & Actor Resolution).

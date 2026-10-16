@@ -90,6 +90,7 @@ pfm/
 - Token expiry: 72h. Activation: atomic UPDATE (clear token + set status=active trong 1 query).
 - JWT: access token 15 phút, refresh token 7 ngày.
 - Session: mỗi thiết bị là 1 dòng `sessions` (mig 028); token mang `sid`, `JWTAuth` kiểm tra session mỗi request nên thu hồi có hiệu lực ngay. Tối đa 5 session/user (session dùng lâu nhất bị thu hồi), tuyệt đối 30 ngày, refresh token dùng lại → thu hồi cả session. Chi tiết: `docs/ops-runbook.md` §5.
+- Passkey (WebAuthn, mig 032): đăng nhập và chuyển tài khoản bằng passkey gắn với tài khoản, server xác minh (`PasskeyService`, go-webauthn). RP `api.example.com`, backend tự phục vụ `/.well-known/assetlinks.json`. Chỉ chạy trên dev/EAS build (`react-native-passkey`), Expo Go giữ check vân tay trên máy. Cách bật: `docs/ops-runbook.md` §7.
 - `JWT_SECRET` ≥ 32 byte (server và `deploy.sh` từ chối nếu ngắn hơn). Không commit `.env*` thật — `backend/.env.prod` từng bị commit (xem runbook §6).
 - Roles: `admin` | `member`.
 

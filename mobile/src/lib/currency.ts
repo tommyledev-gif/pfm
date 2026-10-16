@@ -152,15 +152,26 @@ export function formatCurrencyTruncated(amountCents: number, currency: string = 
   return `${full.slice(0, cutIndex + 1)}…${suffix}`;
 }
 
-// Per-day figures round DOWN to the nearest 1.000đ (100.000 xu).
-//
-// "còn 12.347đ" is arithmetic output; "còn 12.000đ" is something you can decide
-// against while standing at a counter. Down, never nearest: rounding up would
-// hand out money the budget does not have, and being a few hundred đồng
-// pessimistic costs nothing.
-const PER_DAY_ROUNDING_XU = 100_000;
+// Amounts the app works out for the user — a per-day allowance, a suggested
+// savings share — move in 5.000đ steps (500.000 xu): 15k, 255k, 30k, never an
+// odd figure. "còn 12.347đ" is arithmetic output; "còn 10.000đ" is something
+// you can decide against while standing at a counter. Amounts the user typed
+// are never rounded. (The budget engine's own ladder, budgetproposal
+// .roundStep, only ever lands on multiples of this step too.)
+export const SUGGESTED_AMOUNT_STEP_XU = 500_000;
+// Any other currency steps by one whole unit (100 cents): 5.000 of a dollar
+// would floor every daily figure to nothing.
+const SUGGESTED_AMOUNT_STEP_MINOR = 100;
 
-export function floorToPerDayStep(amountCents: number): number {
+/** A worked-out amount, rounded DOWN onto its currency's step (5.000đ for VND). */
+export function floorToSuggestedStep(amountCents: number, currency = "VND"): number {
   if (amountCents <= 0) return 0;
-  return Math.floor(amountCents / PER_DAY_ROUNDING_XU) * PER_DAY_ROUNDING_XU;
+  const step = currency === "VND" ? SUGGESTED_AMOUNT_STEP_XU : SUGGESTED_AMOUNT_STEP_MINOR;
+  return Math.floor(amountCents / step) * step;
+}
+
+// Per-day figures round DOWN, never to nearest: rounding up would hand out
+// money the budget does not have, and being a little pessimistic costs nothing.
+export function floorToPerDayStep(amountCents: number, currency = "VND"): number {
+  return floorToSuggestedStep(amountCents, currency);
 }

@@ -82,14 +82,26 @@ class ProposedTransaction(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     amount_vnd: int
-    tx_type: Literal["income", "expense"]
-    # category_id/wallet_id are untrusted, unvalidated strings from the LLM's
-    # own output — the Go Backend re-validates ownership before ever using
-    # them (specs/ai-chat-assistant/spec.md Resolved design decision #4).
-    # This service never asserts they are valid UUIDs or that they belong to
-    # the caller; that is explicitly not this service's job.
-    category_id: str
-    wallet_id: str | None = None
+    tx_type: Literal["income", "expense", "transfer"]
+    # category_id/wallet_id/to_wallet_id are untrusted, unvalidated strings
+    # from the LLM's own output — the Go Backend re-validates ownership before
+    # ever using them (specs/ai-chat-assistant/spec.md Resolved design
+    # decision #4). This service never asserts they are valid UUIDs or that
+    # they belong to the caller; that is explicitly not this service's job.
+    category_id: str = Field(
+        description='Id of an expense or income category from the lists given. For a transfer, an empty string "".'
+    )
+    wallet_id: str | None = Field(
+        default=None,
+        description="Id of the wallet the money is paid from or received into; for a transfer, the wallet it leaves. Null when not stated.",
+    )
+    to_wallet_id: str | None = Field(
+        default=None,
+        description=(
+            "Only for a transfer: id of the user's own wallet the money moves into. "
+            "Null for income and expense, and null when the receiving wallet is not one of the listed wallets."
+        ),
+    )
     note: str | None = Field(
         default=None,
         description=(
@@ -101,7 +113,7 @@ class ProposedTransaction(BaseModel):
     occurred_at: str  # YYYY-MM-DD
     confidence: float = Field(ge=0.0, le=1.0)
     # Filled only when one purchase lists several things bought together;
-    # empty for an ordinary single expense or income.
+    # empty for an ordinary single expense or income, and always for a transfer.
     items: list[ProposedItem] = Field(default_factory=list)
 
 

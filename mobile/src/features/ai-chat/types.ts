@@ -19,14 +19,18 @@ export interface TransactionActionPayload {
   wallet_id: string | null;
   // For a transfer this is whatever category it had before the User made it
   // one — kept for switching back, never sent or shown: the server files a
-  // transfer under its own system category.
+  // transfer under its own system category. A transfer the AI proposed itself
+  // carries the nil UUID; switching it to income/expense picks a real one
+  // (EditTransactionModal resets a category not in the list).
   category_id: string;
   amount: number;
-  // The AI only ever proposes income or expense; "transfer" comes from the
-  // User editing the proposal (EditTransactionModal).
+  // "transfer" when the message moves money between two of the User's own
+  // wallets ("chuyển 2tr từ VCB sang MoMo"), or after the User edits a
+  // proposal into one (EditTransactionModal).
   type: TransactionKind;
-  // A transfer's destination Wallet, picked in the edit form. Absent or null
-  // on income/expense — the server refuses one there.
+  // A transfer's destination Wallet. Null when the AI could not tell which
+  // of the User's wallets it goes to: saving then opens the edit form to pick
+  // one (isSavableProposal). Absent or null on income/expense.
   to_wallet_id?: string | null;
   note: string | null;
   occurred_at: string;

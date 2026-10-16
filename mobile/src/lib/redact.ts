@@ -18,11 +18,16 @@ const REDACTED_KEYS = new Set([
 ]);
 const REDACTED_VALUE = "***";
 
+// Only a string that opens like a JSON object or array is a serialized body.
+// Parsing every string turned plain values into other types in the log — a
+// category named "300000" showed up as the number 300000.
+const SERIALIZED_BODY = /^\s*[[{]/;
+
 export function redact(value: unknown): unknown {
   // axios request bodies arrive here as a JSON string, not an object —
   // parse before redacting so field-level keys (e.g. refresh_token) are
   // actually reachable, not hidden inside one opaque string.
-  if (typeof value === "string") {
+  if (typeof value === "string" && SERIALIZED_BODY.test(value)) {
     try {
       return redact(JSON.parse(value));
     } catch {

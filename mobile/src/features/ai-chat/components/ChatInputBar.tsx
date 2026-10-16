@@ -1,7 +1,8 @@
-import { ReactNode, useState } from "react";
-import { Pressable, TextInput, View } from "react-native";
+import { ReactNode, useEffect, useRef, useState } from "react";
+import { Keyboard, Pressable, TextInput, View } from "react-native";
 
-import { SendIcon } from "@/components/ui/Icon";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { CloseIcon, SendIcon } from "@/components/ui/Icon";
 import { CHAT_MODE_META, ChatMode } from "@/features/ai-chat/chat-mode";
 import { COMPOSER_NAV_CLEARANCE } from "@/features/ai-chat/components/chat-composer-metrics";
 import { useReportComposerFocus } from "@/features/ai-chat/components/KeyboardLiftView";
@@ -32,7 +33,11 @@ interface ChatInputBarProps {
   /** Focus the field as soon as it mounts (switching in from analysis mode). */
   autoFocus?: boolean;
   onFocusChange?: (focused: boolean) => void;
+  /** Each change puts the cursor back in the field (a phrase picked from search). */
+  focusNonce?: number;
 }
+
+const CLEAR_HIT_SLOP = 8;
 
 export function ChatInputBar({
   value,
@@ -47,10 +52,30 @@ export function ChatInputBar({
   aboveInput,
   autoFocus,
   onFocusChange,
+  focusNonce,
 }: ChatInputBarProps) {
   const colors = useColors();
   const styles = useStyles();
   const [focused, setFocused] = useState(false);
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
+  const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (focusNonce) inputRef.current?.focus();
+  }, [focusNonce]);
+
+  // A typed message can be long, and the clear button sits next to Send:
+  // asked first. The dialog is a Modal, so the keyboard goes down before it
+  // (see KeyboardLiftView), and the field gets it back after.
+  const askClear = () => {
+    Keyboard.dismiss();
+    setConfirmClearOpen(true);
+  };
+  const clear = () => {
+    setConfirmClearOpen(false);
+    onChangeText("");
+    inputRef.current?.focus();
+  };
   const reportComposerFocus = useReportComposerFocus();
   const canSend = value.trim().length > 0 && !sending;
   const tint = CHAT_MODE_META[mode].tint;
@@ -84,6 +109,7 @@ export function ChatInputBar({
         ]}
       >
         <TextInput
+          ref={inputRef}
           value={value}
           onChangeText={onChangeText}
           onFocus={() => handleFocusChange(true)}
@@ -95,6 +121,18 @@ export function ChatInputBar({
           multiline
           textAlignVertical="top"
         />
+        {value ? (
+          <Pressable
+            testID="btn-chat-clear"
+            accessibilityRole="button"
+            accessibilityLabel="Xóa nội dung đang nhập"
+            style={styles.clearButton}
+            onPress={askClear}
+            hitSlop={CLEAR_HIT_SLOP}
+          >
+            <CloseIcon size={16} color={colors.textMuted} />
+          </Pressable>
+        ) : null}
         {/* Accent only while there is something to send — a lit button that
             does nothing when tapped is a promise the screen does not keep. */}
         <Pressable
@@ -109,6 +147,17 @@ export function ChatInputBar({
           <SendIcon size={18} color={canSend ? colors.onGreen : colors.textMuted} />
         </Pressable>
       </View>
+
+      <ConfirmDialog
+        visible={confirmClearOpen}
+        title="Xóa nội dung đang nhập?"
+        message="Không thể hoàn tác."
+        confirmLabel="Xóa nội dung"
+        cancelLabel="Giữ lại"
+        onConfirm={clear}
+        onCancel={() => setConfirmClearOpen(false)}
+        testID="dialog-chat-clear"
+      />
     </>
   );
 }
@@ -155,6 +204,8 @@ const useStyles = createStyles((colors) => ({
     paddingVertical: spacing.sm,
     ...typography.body,
   },
+  // Lined up with the send button's centre.
+  clearButton: { width: 28, height: 40, alignItems: "center", justifyContent: "center" },
   sendButton: {
     width: 40,
     height: 40,

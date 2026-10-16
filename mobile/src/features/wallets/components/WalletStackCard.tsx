@@ -36,9 +36,13 @@ export const CARD_HEIGHT = 132;
 export const CARD_OVERLAP = 56;
 // Vertical room the card's drop shadow needs beyond the card (radius 14,
 // pushed 6 down, so more below than above). The carousel's scroll box clips
-// anything outside its bounds, so it reserves this much on each side.
+// anything outside its bounds, so it reserves this much on each side. The
+// bottom was 22, which cut off the tail of Android's elevation shadow: its
+// light sits above the screen, so a card's shadow falls further down the
+// lower the card is. The pager is pulled up by the same amount
+// (PAGER_OFFSET_TOP), so nothing below the cards moves.
 export const CAROUSEL_SHADOW_BLEED_TOP = 10;
-export const CAROUSEL_SHADOW_BLEED_BOTTOM = 22;
+export const CAROUSEL_SHADOW_BLEED_BOTTOM = 32;
 
 interface WalletStackCardProps {
   wallet: Wallet;
@@ -84,70 +88,75 @@ export function WalletStackCard({
   const gradientId = `wallet-grad-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
 
   return (
+    // Two layers: this one casts the shadow, the inner one clips the gradient
+    // to the rounded corners. One view doing both lost the shadow on iOS,
+    // which draws none at all for a view with overflow hidden.
     <Animated.View testID={`card-wallet-${wallet.id}`} style={[styles.card, layoutStyle, motion.card]}>
-      <Svg width={CARD_WIDTH} height={CARD_HEIGHT} style={StyleSheet.absoluteFill} pointerEvents="none">
-        <Defs>
-          {/* Bottom-left (0,1) to top-right (1,0). */}
-          <LinearGradient id={gradientId} x1="0" y1="1" x2="1" y2="0">
-            <Stop offset="0" stopColor={accentColor} stopOpacity={0.45} />
-            <Stop offset="0.55" stopColor={accentColor} stopOpacity={0.18} />
-            <Stop offset="1" stopColor={accentColor} stopOpacity={0.04} />
-          </LinearGradient>
-        </Defs>
-        <Rect x="0" y="0" width={CARD_WIDTH} height={CARD_HEIGHT} fill={`url(#${gradientId})`} />
-      </Svg>
+      <View style={styles.clip}>
+        <Svg width={CARD_WIDTH} height={CARD_HEIGHT} style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Defs>
+            {/* Bottom-left (0,1) to top-right (1,0). */}
+            <LinearGradient id={gradientId} x1="0" y1="1" x2="1" y2="0">
+              <Stop offset="0" stopColor={accentColor} stopOpacity={0.45} />
+              <Stop offset="0.55" stopColor={accentColor} stopOpacity={0.18} />
+              <Stop offset="1" stopColor={accentColor} stopOpacity={0.04} />
+            </LinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width={CARD_WIDTH} height={CARD_HEIGHT} fill={`url(#${gradientId})`} />
+        </Svg>
 
-      {/* The accent border is its own overlay, faded by opacity alone: the
-          border colour itself stays fixed. */}
-      <Animated.View pointerEvents="none" style={[styles.accentBorder, { borderColor: `${accentColor}40` }, motion.active]} />
+        {/* The accent border is its own overlay, faded by opacity alone: the
+            border colour itself stays fixed. */}
+        <Animated.View pointerEvents="none" style={[styles.accentBorder, { borderColor: `${accentColor}40` }, motion.active]} />
 
-      {highlightOpacity ? (
-        <RNAnimated.View pointerEvents="none" style={[styles.highlightBorder, { opacity: highlightOpacity }]} />
-      ) : null}
+        {highlightOpacity ? (
+          <RNAnimated.View pointerEvents="none" style={[styles.highlightBorder, { opacity: highlightOpacity }]} />
+        ) : null}
 
-      <Pressable
-        style={({ pressed }) => [styles.content, pressed && styles.contentPressed]}
-        onPress={onPress}
-        disabled={!onPress}
-        accessibilityRole={onPress ? "button" : undefined}
-        accessibilityLabel={`${wallet.name}, ${formatCurrency(wallet.balance, wallet.currency)}`}
-      >
-        <View style={styles.topRow}>
-          <TintedIconTile
-            color={accentColor}
-            size={32}
-            icon={wallet.icon}
-            iconUrl={wallet.icon_url}
-            label={wallet.name}
-          />
-          <View style={styles.identity}>
-            <Text style={styles.name} numberOfLines={1}>
-              {wallet.name}
-            </Text>
-            <View style={styles.typeRow}>
-              <View style={[styles.dot, { backgroundColor: accentColor }]} />
-              <Text style={styles.type} numberOfLines={1}>
-                {TYPE_LABEL[wallet.type]}
+        <Pressable
+          style={({ pressed }) => [styles.content, pressed && styles.contentPressed]}
+          onPress={onPress}
+          disabled={!onPress}
+          accessibilityRole={onPress ? "button" : undefined}
+          accessibilityLabel={`${wallet.name}, ${formatCurrency(wallet.balance, wallet.currency)}`}
+        >
+          <View style={styles.topRow}>
+            <TintedIconTile
+              color={accentColor}
+              size={32}
+              icon={wallet.icon}
+              iconUrl={wallet.icon_url}
+              label={wallet.name}
+            />
+            <View style={styles.identity}>
+              <Text style={styles.name} numberOfLines={1}>
+                {wallet.name}
               </Text>
+              <View style={styles.typeRow}>
+                <View style={[styles.dot, { backgroundColor: accentColor }]} />
+                <Text style={styles.type} numberOfLines={1}>
+                  {TYPE_LABEL[wallet.type]}
+                </Text>
+              </View>
             </View>
           </View>
-        </View>
 
-        <View style={styles.balanceBlock}>
-          {/* The card has no room for a third line: while queued Transactions
-              exist, the "not counted yet" hint takes the label's place. */}
-          {pendingCount > 0 ? (
-            <PendingBalanceHint count={pendingCount} style={styles.balanceLabel} />
-          ) : (
-            <Text style={styles.balanceLabel} numberOfLines={1}>
-              {BALANCE_LABEL[wallet.type]}
+          <View style={styles.balanceBlock}>
+            {/* The card has no room for a third line: while queued Transactions
+                exist, the "not counted yet" hint takes the label's place. */}
+            {pendingCount > 0 ? (
+              <PendingBalanceHint count={pendingCount} style={styles.balanceLabel} />
+            ) : (
+              <Text style={styles.balanceLabel} numberOfLines={1}>
+                {BALANCE_LABEL[wallet.type]}
+              </Text>
+            )}
+            <Text style={styles.balance} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+              {formatCurrency(wallet.balance, wallet.currency)}
             </Text>
-          )}
-          <Text style={styles.balance} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
-            {formatCurrency(wallet.balance, wallet.currency)}
-          </Text>
-        </View>
-      </Pressable>
+          </View>
+        </Pressable>
+      </View>
     </Animated.View>
   );
 }
@@ -161,7 +170,6 @@ const useStyles = createStyles((colors) => ({
     // the cards, so a full-strength border only added noise.
     borderWidth: 1,
     borderColor: withAlpha(colors.overlayBase, 0.04),
-    overflow: "hidden",
     // Opaque, not translucent: the neighbouring cards now pass UNDERNEATH this
     // one, and a see-through surface would show their edges through it.
     backgroundColor: colors.surface,
@@ -173,6 +181,8 @@ const useStyles = createStyles((colors) => ({
     shadowRadius: 14,
     shadowOffset: { width: -6, height: 6 },
   },
+  // Inside the card's 1px border, so its corners are 1px tighter.
+  clip: { ...StyleSheet.absoluteFillObject, borderRadius: radii.card - 1, overflow: "hidden" },
   accentBorder: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: radii.card,

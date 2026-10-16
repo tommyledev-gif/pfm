@@ -55,6 +55,7 @@ func main() {
 	budgetPlanRepo := repository.NewBudgetPlanRepository(queries)
 	analyticsRepo := repository.NewAnalyticsRepository(queries)
 	intentLogRepo := repository.NewIntentParseLogRepository(queries)
+	passkeyRepo := repository.NewPasskeyRepository(queries)
 
 	tokenService := service.NewTokenService(cfg.JWTSecret)
 	emailSender := newEmailSender(cfg, logger)
@@ -94,6 +95,10 @@ func main() {
 	aiConsultClient := service.NewHTTPAIConsultClient(cfg.AIServiceURL)
 	consultService := service.NewConsultService(analyticsService, analyticsRepo, walletRepo, categoryRepo, aiConsultClient, consultTokens, intentLogRepo, cycleResolver, logger)
 	intentLogRetention := service.NewIntentLogRetention(intentLogRepo, logger)
+	passkeyService, err := service.NewPasskeyService(newPasskeyRelyingParty(cfg.Passkey, logger), passkeyRepo, userRepo, sessionService, logger)
+	if err != nil {
+		logger.Fatal("failed to configure passkeys", zap.Error(err))
+	}
 
 	userHandler := handler.NewUserHandler(userService, logger)
 	authHandler := handler.NewAuthHandler(authService, logger)
@@ -114,6 +119,8 @@ func main() {
 	chatHandler := handler.NewChatHandler(chatService, chatThreadService, logger)
 	budgetWizardHandler := handler.NewBudgetWizardHandler(budgetWizardService, logger)
 	analyticsHandler := handler.NewAnalyticsHandler(analyticsService, consultService, logger)
+	passkeyHandler := handler.NewPasskeyHandler(passkeyService, logger)
+	assetLinks := handler.NewAssetLinksHandler(cfg.Passkey.AndroidPackage, cfg.Passkey.AndroidCertSHA256)
 
 	app := fiber.New(fiber.Config{
 		BodyLimit:    common.HTTPBodyLimitBytes,
@@ -130,7 +137,7 @@ func main() {
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 		AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 	}))
-	registerRoutes(app, userHandler, authHandler, walletHandler, categoryHandler, budgetHandler, transactionHandler, transactionExportHandler, transactionImportHandler, auditLogHandler, reportHandler, notificationHandler, chatHandler, budgetWizardHandler, analyticsHandler, accountSwitchHandler, sessionRevocationHandler, profileHandler, accessRequestHandler, accountDeletionHandler, tokenService, sessionService, pool, logger)
+	registerRoutes(app, userHandler, authHandler, walletHandler, categoryHandler, budgetHandler, transactionHandler, transactionExportHandler, transactionImportHandler, auditLogHandler, reportHandler, notificationHandler, chatHandler, budgetWizardHandler, analyticsHandler, accountSwitchHandler, sessionRevocationHandler, profileHandler, accessRequestHandler, accountDeletionHandler, passkeyHandler, assetLinks, tokenService, sessionService, pool, logger)
 
 	go func() {
 		if err := app.Listen(":" + cfg.Port); err != nil {

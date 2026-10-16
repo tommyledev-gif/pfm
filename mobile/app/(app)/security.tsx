@@ -8,6 +8,7 @@ import { useSessionStore } from "@/stores/session-store";
 import { isAccountDeletionOperator } from "@/features/security/account-deletion";
 import { DeleteAccountsSection } from "@/features/security/components/DeleteAccountsSection";
 import { IdentityCheckToggleRow } from "@/features/security/components/IdentityCheckToggleRow";
+import { PasskeysSection } from "@/features/security/components/PasskeysSection";
 import { RevokeAllSessionsRow } from "@/features/security/components/RevokeAllSessionsRow";
 
 const TITLE = "Bảo mật";
@@ -30,6 +31,7 @@ export default function SecurityScreen() {
       {/* "handled": with the search keyboard open, the first tap on [Xóa] has
           to reach the row, not just close the keyboard. */}
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" testID="screen-security">
+        <PasskeysSection />
         <IdentityCheckToggleRow />
         <RevokeAllSessionsRow />
         {canDeleteAccounts ? <DeleteAccountsSection /> : null}

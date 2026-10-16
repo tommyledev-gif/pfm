@@ -131,9 +131,9 @@ export function budgetRowStatus(limit: BudgetLimit, monthElapsed: number): Budge
  * Mirrors the moment-of-spend formula the budget spec defines
  * (`(amount_max - spentThisCycle) / daysLeftInCycle`).
  */
-export function remainingPerDay(remaining: number, daysLeftInclusive: number): number {
+export function remainingPerDay(remaining: number, daysLeftInclusive: number, currency?: string): number {
   if (remaining <= 0 || daysLeftInclusive <= 0) return 0;
-  return floorToPerDayStep(remaining / daysLeftInclusive);
+  return floorToPerDayStep(remaining / daysLeftInclusive, currency);
 }
 
 /** Days from today to the end of the month, counting today. */

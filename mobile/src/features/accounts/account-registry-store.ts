@@ -10,6 +10,7 @@ import { secureStorage } from "@/lib/secure-storage";
 import { useSavedBudgetPlanStore } from "@/features/budget-wizard/saved-plan";
 import { useRecentPhrasesStore } from "@/stores/recent-phrases-store";
 import { useSavedPhrasesStore } from "@/stores/saved-phrases-store";
+import { useSavedPlacesStore } from "@/stores/saved-places-store";
 import { revokeSwitchTokenQuietly } from "@/features/accounts/api/account-switch-requests";
 import { IssuedSwitchToken, SavedAccount } from "@/features/accounts/types";
 import { User } from "@/features/users/types";
@@ -17,7 +18,7 @@ import { User } from "@/features/users/types";
 interface RemoveOptions {
   /** Ask the server to revoke the token (false when logout already did). */
   revoke: boolean;
-  /** Delete the User's local-only data (plan, phrases) — US-04, not logout. */
+  /** Delete the User's local-only data (plan, phrases, places) — US-04, not logout. */
   dropLocalData: boolean;
 }
 
@@ -70,6 +71,7 @@ function removeLocalUserData(userId: string): void {
   useSavedBudgetPlanStore.getState().removeUser(userId);
   useSavedPhrasesStore.getState().removeUser(userId);
   useRecentPhrasesStore.getState().removeUser(userId);
+  useSavedPlacesStore.getState().removeUser(userId);
   // Their saved read cache goes too — but never their outbox, which only the
   // owner may discard (specs/mobile-offline-support BR-OFF-09).
   void removeUserQueryCache(userId);
