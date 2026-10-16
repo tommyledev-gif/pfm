@@ -13,6 +13,7 @@ import { useDeletePasskeyMutation, usePasskeysQuery, useRegisterPasskeyMutation 
 import { PasskeyNativeError, passkeysAvailable } from "@/features/security/passkeys/native-passkey";
 import { PasskeyItem } from "@/features/security/passkeys/types";
 import { passkeyFailureMessage } from "@/features/security/passkeys/passkey-messages";
+import { PasskeyProviderHelp } from "@/features/security/components/PasskeyProviderHelp";
 
 const COPY = {
   title: "Passkey",
@@ -50,6 +51,7 @@ export function PasskeysSection() {
   const register = useRegisterPasskeyMutation();
   const remove = useDeletePasskeyMutation();
   const [confirming, setConfirming] = useState<PasskeyItem | null>(null);
+  const [needsProvider, setNeedsProvider] = useState(false);
   const toast = useToastStore.getState().show;
 
   const add = () => {
@@ -58,8 +60,17 @@ export function PasskeysSection() {
       return;
     }
     register.mutate(undefined, {
-      onSuccess: () => toast(COPY.added, "info"),
+      onSuccess: () => {
+        setNeedsProvider(false);
+        toast(COPY.added, "info");
+      },
       onError: (error) => {
+        // Nothing on the phone can keep a passkey: a toast cannot fix that,
+        // the guide with its settings button can.
+        if (error instanceof PasskeyNativeError && error.kind === "no-provider") {
+          setNeedsProvider(true);
+          return;
+        }
         if (error instanceof PasskeyNativeError) {
           const message = passkeyFailureMessage(error.kind, "add");
           if (message) toast(message, "warning");
@@ -118,7 +129,9 @@ export function PasskeysSection() {
         ))
       )}
 
-      {available ? (
+      {available && needsProvider ? (
+        <PasskeyProviderHelp onRetry={add} retrying={register.isPending} onDismiss={() => setNeedsProvider(false)} />
+      ) : available ? (
         <PillButton
           label={COPY.add}
           variant="outline"

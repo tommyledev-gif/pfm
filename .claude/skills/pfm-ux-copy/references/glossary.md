@@ -35,7 +35,7 @@ Một khái niệm = một từ, ở cả VI và EN. Cột "Nguồn": `app` = đ
 | Access request | yêu cầu tạo tài khoản | access request | app | Gửi từ màn đăng nhập. Trạng thái: "Chờ duyệt" → "Chờ kích hoạt" → "Đang dùng" |
 | Approve (yêu cầu) | duyệt | approve | app | Nút: "Duyệt yêu cầu" |
 | Reject (yêu cầu) | từ chối | reject | app | Nút: "Từ chối", nhánh an toàn "Giữ lại". Yêu cầu bị xóa khỏi danh sách, người gửi gửi lại được. Đã duyệt hoặc đã từ chối: "không còn chờ duyệt" |
-| Passkey | passkey | passkey | app | Khóa đăng nhập lưu trên điện thoại, mở bằng vân tay/khuôn mặt, gắn với tài khoản. Giữ nguyên chữ "passkey" (Google/Apple cũng gọi vậy), viết thường giữa câu. Nút: "Đăng nhập bằng passkey", "Thêm passkey", "Xóa passkey" |
+| Passkey | passkey | passkey | app | Khóa đăng nhập lưu trên điện thoại, mở bằng vân tay/khuôn mặt, gắn với tài khoản. Giữ nguyên chữ "passkey" (Google/Apple cũng gọi vậy), viết thường giữa câu. Nút: "Đăng nhập bằng passkey", "Thêm passkey", "Xóa passkey". Chỉ khi chỉ đường vào Cài đặt của Android mới dùng chữ của máy: "khóa truy cập" (mục "Mật khẩu, khóa truy cập và tài khoản") |
 | Saved place | nơi đã ghim | saved place | app | Vị trí từng ghim cho giao dịch, lưu trên máy để chọn lại ở bước "Ghim vị trí". Tiêu đề nhóm: "Đã ghim trước đây"; nút xóa: "Xóa nơi đã ghim" |
 | Phrase (câu mẫu) | câu mẫu | saved phrase | app | Câu từng nhắn để ghi giao dịch, gợi ý lại trên ô chat. Ô tìm: "Tìm trong {{count}} câu mẫu"; nút: "Lưu câu mẫu" / "Bỏ lưu câu mẫu" / "Xóa câu mẫu" |
 
