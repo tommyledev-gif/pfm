@@ -12,6 +12,7 @@ import { useToastStore } from "@/stores/toast-store";
 import { useDeletePasskeyMutation, usePasskeysQuery, useRegisterPasskeyMutation } from "@/features/security/api/use-passkeys-query";
 import { PasskeyNativeError, passkeysAvailable } from "@/features/security/passkeys/native-passkey";
 import { PasskeyItem } from "@/features/security/passkeys/types";
+import { passkeyFailureMessage } from "@/features/security/passkeys/passkey-messages";
 
 const COPY = {
   title: "Passkey",
@@ -21,7 +22,6 @@ const COPY = {
   empty: "Chưa có passkey.",
   loadFailed: "Chưa tải được danh sách passkey.",
   added: "Đã thêm passkey",
-  exists: "Máy này đã có passkey cho tài khoản này.",
   addFailed: "Chưa thêm được passkey. Thử lại.",
   offline: "Cần kết nối mạng để thêm passkey.",
   deleted: "Đã xóa passkey",
@@ -61,8 +61,8 @@ export function PasskeysSection() {
       onSuccess: () => toast(COPY.added, "info"),
       onError: (error) => {
         if (error instanceof PasskeyNativeError) {
-          if (error.kind === "cancelled") return;
-          toast(error.kind === "exists" ? COPY.exists : COPY.addFailed, "warning");
+          const message = passkeyFailureMessage(error.kind, "add");
+          if (message) toast(message, "warning");
           return;
         }
         toast(getErrorMessage(error, COPY.addFailed), "warning");

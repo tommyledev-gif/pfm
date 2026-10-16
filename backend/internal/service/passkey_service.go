@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-webauthn/webauthn/protocol"
+	"github.com/go-webauthn/webauthn/protocol/webauthncose"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -28,6 +29,16 @@ type PasskeyRepo interface {
 	Delete(ctx context.Context, id, userID uuid.UUID) (bool, error)
 	CreateChallenge(ctx context.Context, userID *uuid.UUID, purpose model.PasskeyChallengePurpose, session []byte, expiresAt time.Time) (uuid.UUID, error)
 	ConsumeChallenge(ctx context.Context, id uuid.UUID, purpose model.PasskeyChallengePurpose) (*uuid.UUID, []byte, error)
+}
+
+// passkeyCredentialParameters are the key types a new passkey may use: ES256,
+// which every platform authenticator makes, and RS256 for Windows Hello.
+// The library's default list also offered EdDSA, PS* and the larger EC/RSA
+// curves; Google's passkey guidance asks for just these two, and a shorter
+// list leaves the phone nothing to stumble on.
+var passkeyCredentialParameters = []protocol.CredentialParameter{
+	{Type: protocol.PublicKeyCredentialType, Algorithm: webauthncose.AlgES256},
+	{Type: protocol.PublicKeyCredentialType, Algorithm: webauthncose.AlgRS256},
 }
 
 // PasskeyRelyingParty is the passkey half of the server config.
@@ -68,6 +79,10 @@ func NewPasskeyService(rp *PasskeyRelyingParty, repo PasskeyRepo, users UserRepo
 		// collected and ignored.
 		AttestationPreference: protocol.PreferNoAttestation,
 		AuthenticatorSelection: protocol.AuthenticatorSelection{
+			// The phone's own credential manager (Google Password Manager,
+			// iCloud Keychain), never a USB key or another device's QR flow:
+			// the passkey is for signing in on this app.
+			AuthenticatorAttachment: protocol.Platform,
 			// Discoverable, so sign-in needs no username: the phone offers
 			// the passkeys it holds for this app.
 			ResidentKey:        protocol.ResidentKeyRequirementRequired,
@@ -107,7 +122,10 @@ func (s *PasskeyService) BeginRegistration(ctx context.Context, userID uuid.UUID
 	for _, c := range existing.creds {
 		exclusions = append(exclusions, c.Descriptor())
 	}
-	creation, session, err := s.wa.BeginRegistration(existing, webauthn.WithExclusions(exclusions))
+	creation, session, err := s.wa.BeginRegistration(existing,
+		webauthn.WithExclusions(exclusions),
+		webauthn.WithCredentialParameters(passkeyCredentialParameters),
+	)
 	if err != nil {
 		return uuid.Nil, none, fmt.Errorf("service.PasskeyService.BeginRegistration: %w", err)
 	}

@@ -6,7 +6,7 @@ import { formatCurrency, formatCurrencyCompact } from "@/lib/currency";
 import { formatPercent } from "@/lib/percent";
 import { useEntryAnimation } from "@/lib/use-entry-animation";
 import { typography, createStyles } from "@/lib/theme";
-import { arcPath, layoutArcLengths, polarToPoint, SEGMENT_GAP } from "@/components/shared/donut-geometry";
+import { arcPath, layoutArcLengths, polarToPoint, segmentGap } from "@/components/shared/donut-geometry";
 
 export interface DonutSegment {
   key: string;
@@ -107,14 +107,13 @@ export function DonutChart({
   // the gap were subtracted from the layout too, every segment after the first
   // would creep backwards and the ring would no longer close.
   //
-  // A segment shorter than twice the gap keeps its full length. Carving 4px off
-  // a 5px sliver leaves a dot that reads as a rendering fault, and a single
-  // segment has no neighbour to be separated from in the first place.
-  const lengths = layoutArcLengths(segments.map((s) => s.amount), circumference);
+  // A floored segment gets only a hairline gap (segmentGap): with the full gap
+  // a run of "~1%" categories showed mostly gaps and hardly any colour.
+  const layout = layoutArcLengths(segments.map((s) => s.amount), circumference);
   let offset = 0;
   const arcs = segments.map((seg, index) => {
-    const full = lengths[index];
-    const gap = segments.length > 1 && full > SEGMENT_GAP * 2 ? SEGMENT_GAP : 0;
+    const full = layout[index].full;
+    const gap = segmentGap(layout[index], segments.length);
     const arc = { ...seg, full, length: Math.max(full - gap, 0), offset };
     offset += full;
     return arc;

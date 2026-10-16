@@ -8,10 +8,9 @@ import { completeLogin, LoginOutcome } from "@/features/accounts/complete-login"
 import { loginErrorMessage } from "@/features/auth/login-error";
 import { PasskeyNativeError, passkeysAvailable } from "@/features/security/passkeys/native-passkey";
 import { signInWithPasskey } from "@/features/security/passkeys/passkey-requests";
+import { passkeyFailureMessage } from "@/features/security/passkeys/passkey-messages";
 
 const LABEL = "Đăng nhập bằng passkey";
-const NO_PASSKEY = "Máy này chưa có passkey. Đăng nhập bằng mật khẩu, rồi thêm passkey trong Bảo mật.";
-const FAILED = "Không xác minh được passkey. Thử lại.";
 
 interface PasskeySignInButtonProps {
   disabled?: boolean;
@@ -40,7 +39,7 @@ export function PasskeySignInButton({ disabled, onDone }: PasskeySignInButtonPro
       onDone?.(await completeLogin(result, result.email ?? ""));
     } catch (e) {
       if (e instanceof PasskeyNativeError) {
-        if (e.kind !== "cancelled") setError(e.kind === "no-credential" ? NO_PASSKEY : FAILED);
+        setError(passkeyFailureMessage(e.kind, "sign-in"));
         return;
       }
       setError(loginErrorMessage(e));

@@ -1,12 +1,10 @@
 import { useState } from "react";
-import { Text, TextInput, View } from "react-native";
+import { View } from "react-native";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { PillButton } from "@/components/ui/PillButton";
+import { InlineActionField } from "@/components/shared/InlineActionField";
 import { getErrorMessage } from "@/lib/axios";
-import { withAlpha } from "@/lib/color";
 import { useRequireOnline } from "@/lib/connectivity";
-import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useToastStore } from "@/stores/toast-store";
 import { useClaimUsernameMutation } from "@/features/profile/api/use-claim-username-mutation";
 
@@ -17,7 +15,8 @@ const COPY = {
   label: "Tên đăng nhập",
   placeholder: "vd: lan.nguyen",
   hint: "Đặt một lần, không đổi được.",
-  submit: "Đặt tên đăng nhập",
+  // Short: it sits inside the field, beside what is typed.
+  submit: "Đặt",
   confirmMessage: "Tên này không đổi được sau khi đặt.",
   confirm: "Đặt tên",
   cancel: "Sửa lại",
@@ -32,8 +31,6 @@ const COPY = {
  * while the profile has no username; afterwards the read-only value replaces it.
  */
 export function UsernameClaimField() {
-  const colors = useColors();
-  const styles = useStyles();
   const requireOnline = useRequireOnline();
   const claim = useClaimUsernameMutation();
   const [value, setValue] = useState("");
@@ -53,29 +50,25 @@ export function UsernameClaimField() {
   };
 
   return (
-    <View style={styles.block} testID="field-profile-claim-username">
-      <Text style={styles.label}>{COPY.label}</Text>
-      <TextInput
+    <View testID="field-profile-claim-username">
+      {/* Name and its button on one row: the button sits inside the field. */}
+      <InlineActionField
+        label={COPY.label}
         value={value}
         onChangeText={setValue}
         placeholder={COPY.placeholder}
-        placeholderTextColor={colors.textMuted}
         maxLength={USERNAME_MAX_LENGTH}
         autoCapitalize="none"
         autoCorrect={false}
         autoComplete="username-new"
-        style={styles.input}
+        actionLabel={COPY.submit}
+        onAction={() => requireOnline(() => setConfirmOpen(true))}
+        actionEnabled={username.length > 0}
+        loading={claim.isPending}
+        hint={COPY.hint}
+        error={claim.isError ? getErrorMessage(claim.error, COPY.failed) : null}
         testID="input-profile-username"
-      />
-      <Text style={styles.hint}>{COPY.hint}</Text>
-      {claim.isError ? <Text style={styles.error}>{getErrorMessage(claim.error, COPY.failed)}</Text> : null}
-      <PillButton
-        label={COPY.submit}
-        variant="outline"
-        onPress={() => requireOnline(() => setConfirmOpen(true))}
-        disabled={username.length === 0 || claim.isPending}
-        style={styles.button}
-        testID="btn-profile-claim-username"
+        actionTestID="btn-profile-claim-username"
       />
       <ConfirmDialog
         visible={confirmOpen}
@@ -91,21 +84,3 @@ export function UsernameClaimField() {
     </View>
   );
 }
-
-const useStyles = createStyles((colors) => ({
-  block: { gap: spacing.xs },
-  label: { ...typography.caption, color: colors.textSecondary },
-  input: {
-    backgroundColor: withAlpha(colors.overlayBase, 0.06),
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    borderRadius: radii.listCard,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: 12,
-    color: colors.textPrimary,
-    ...typography.body,
-  },
-  hint: { ...typography.tiny, color: colors.textMuted },
-  error: { color: colors.peach, ...typography.caption },
-  button: { alignSelf: "flex-start", marginTop: spacing.xs },
-}));

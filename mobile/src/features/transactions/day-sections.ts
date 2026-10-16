@@ -1,5 +1,6 @@
 import { dayLabelVi, formatDateViShort } from "@/lib/format-date";
 import { Transaction } from "@/features/transactions/types";
+import { mainCurrency } from "@/features/transactions/other-currencies";
 
 export interface DaySection {
   key: string;
@@ -18,14 +19,15 @@ export interface DaySection {
   // reads as "+2.000.000 / -350.000", which is the actual question being
   // asked of a day header, where a single net figure hides half of it.
   //
-  // Both go undefined once the day mixes currencies (a multi-wallet day) —
-  // a subtotal that silently added VND cents to USD cents would be exactly
-  // the "never sum incompatible currencies" bug wallet-totals.ts/
-  // budget-totals.ts both already guard against, so this omits the totals
-  // entirely rather than risk it.
+  // In ONE currency only: a day that mixes them (a multi-wallet day) shows
+  // its main one (VND when present) and names the rest in otherCurrencies —
+  // a subtotal that added VND cents to USD cents would be the "never sum
+  // incompatible currencies" bug wallet-totals.ts/budget-totals.ts guard
+  // against. Undefined only while a row's wallet (so its currency) is unknown.
   income: number | undefined;
   expense: number | undefined;
   currency: string | undefined;
+  otherCurrencies: string[];
   collapsed: boolean;
 }
 
@@ -60,12 +62,16 @@ export function buildDaySections(
         income: undefined,
         expense: undefined,
         currency: undefined,
+        otherCurrencies: [],
         collapsed: false,
       },
     ];
   }
 
   const groups: DaySection[] = [];
+  // Per day: each currency's own income/expense, and whether any row's
+  // currency is unknown (its wallet not loaded yet).
+  const sums = new Map<string, { byCurrency: Map<string, { income: number; expense: number }>; unknown: boolean }>();
   for (const item of items) {
     const dayKey = item.occurred_at.slice(0, 10);
     let group = groups.find((g) => g.key === dayKey);
@@ -76,30 +82,42 @@ export function buildDaySections(
         dateLabel: formatDateViShort(item.occurred_at),
         data: [],
         count: 0,
-        income: 0,
-        expense: 0,
+        income: undefined,
+        expense: undefined,
         currency: undefined,
+        otherCurrencies: [],
         collapsed: collapsedDays.has(dayKey),
       };
       groups.push(group);
+      sums.set(dayKey, { byCurrency: new Map(), unknown: false });
     }
 
+    const day = sums.get(dayKey)!;
     const itemCurrency = walletCurrencyMap.get(item.wallet_id);
-    const runningIncome = group.income;
-    const runningExpense = group.expense;
-    if (runningIncome !== undefined && runningExpense !== undefined) {
-      if (!itemCurrency || (group.count > 0 && itemCurrency !== group.currency)) {
-        group.income = undefined;
-        group.expense = undefined;
-      } else {
-        if (group.count === 0) group.currency = itemCurrency;
-        group.income = item.type === "income" ? runningIncome + item.amount : runningIncome;
-        group.expense = item.type === "expense" ? runningExpense + item.amount : runningExpense;
-      }
+    if (!itemCurrency) {
+      day.unknown = true;
+    } else {
+      const running = day.byCurrency.get(itemCurrency) ?? { income: 0, expense: 0 };
+      if (item.type === "income") running.income += item.amount;
+      if (item.type === "expense") running.expense += item.amount;
+      day.byCurrency.set(itemCurrency, running);
     }
 
     group.count += 1;
     group.data.push(item);
+  }
+
+  for (const group of groups) {
+    const day = sums.get(group.key)!;
+    if (day.unknown) continue;
+    const currencies = [...day.byCurrency.keys()];
+    const main = mainCurrency(currencies);
+    if (!main) continue;
+    const totals = day.byCurrency.get(main)!;
+    group.currency = main;
+    group.income = totals.income;
+    group.expense = totals.expense;
+    group.otherCurrencies = currencies.filter((c) => c !== main);
   }
 
   // After the loop, not instead of the push: count and the subtotals above

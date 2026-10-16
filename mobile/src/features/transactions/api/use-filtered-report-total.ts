@@ -2,6 +2,7 @@ import { useMemo } from "react";
 
 import { ReportTotal } from "@/features/reports/types";
 import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary-query";
+import { mainCurrency } from "@/features/transactions/other-currencies";
 
 // The income/expense totals for a window, narrowed to a set of categories.
 //
@@ -20,7 +21,7 @@ import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary
 export function useFilteredReportTotal(
   range: { from?: string; to?: string },
   categoryIds: string[],
-): { total: ReportTotal | null; refetch: () => Promise<unknown> } {
+): { total: ReportTotal | null; otherCurrencies: string[]; refetch: () => Promise<unknown> } {
   const summary = useReportSummaryQuery(range);
   const data = summary.data;
   const { refetch } = summary;
@@ -28,15 +29,25 @@ export function useFilteredReportTotal(
   // caller does) doesn't defeat the memo.
   const categoryKey = categoryIds.join(",");
 
-  const total = useMemo(() => {
-    const summaryTotal = data?.totals[0];
-    if (!summaryTotal) return null;
-    if (!categoryKey) return summaryTotal;
+  // The total speaks for one currency — VND when the period has it (it used
+  // to be the report's first, sorted by code, so one USD row took over); the
+  // others are named beside it instead (otherCurrenciesLabel).
+  const { total, otherCurrencies } = useMemo(() => {
+    const selected = categoryKey ? new Set(categoryKey.split(",")) : null;
+    const periodCurrencies = [...new Set((data?.totals ?? []).map((t) => t.currency))];
+    // With a category filter, only the currencies those categories were spent
+    // in, falling back to the whole period when none of them has a row.
+    const filtered = selected
+      ? [...new Set((data?.by_category ?? []).filter((c) => selected.has(c.category_id)).map((c) => c.currency))]
+      : periodCurrencies;
+    const currency = mainCurrency(filtered.length > 0 ? filtered : periodCurrencies);
+    const others = filtered.filter((c) => c !== currency);
+    const summaryTotal = data?.totals.find((t) => t.currency === currency);
+    if (!summaryTotal) return { total: null, otherCurrencies: others };
+    if (!selected) return { total: summaryTotal, otherCurrencies: others };
 
-    const selected = new Set(categoryKey.split(","));
     // Entries in another currency are dropped rather than added in — the same
-    // "never sum incompatible currencies" rule the day subtotals follow; this
-    // only ever speaks for the primary currency.
+    // "never sum incompatible currencies" rule the day subtotals follow.
     const totals = (data?.by_category ?? [])
       .filter((c) => c.currency === summaryTotal.currency && selected.has(c.category_id))
       .reduce(
@@ -48,11 +59,10 @@ export function useFilteredReportTotal(
       );
 
     return {
-      currency: summaryTotal.currency,
-      ...totals,
-      net: totals.total_income - totals.total_expense,
+      total: { currency: summaryTotal.currency, ...totals, net: totals.total_income - totals.total_expense },
+      otherCurrencies: others,
     };
   }, [data, categoryKey]);
 
-  return { total, refetch };
+  return { total, otherCurrencies, refetch };
 }

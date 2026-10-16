@@ -179,6 +179,8 @@ export default function HomeScreen() {
                   periodIndex={PERIODS.findIndex((p) => p.value === homePeriod)}
                   isDay={homePeriod === "day"}
                   currency={snapshot.currency}
+                  currencies={snapshot.currencies}
+                  onChangeCurrency={snapshot.setCurrency}
                   periodSpent={snapshot.periodSpent}
                   spentDelta={snapshot.spentDelta}
                   previousPeriodLabel={previousPeriodLabel(homePeriod)}

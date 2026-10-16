@@ -9,6 +9,7 @@ import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { TransactionKind } from "@/lib/constants";
 import { ReportTotal } from "@/features/reports/types";
+import { otherCurrenciesLabel } from "@/features/transactions/other-currencies";
 
 export type TypeFilterValue = "all" | TransactionKind;
 
@@ -21,6 +22,8 @@ interface TransactionsHeaderProps {
   // Already narrowed to the selected categories by the screen — null until
   // the report summary lands.
   headerTotal: ReportTotal | null;
+  /** The period's currencies other than headerTotal's — named under it. */
+  otherCurrencies?: string[];
   typeFilter: TypeFilterValue;
   onChangeTypeFilter: (value: TypeFilterValue) => void;
   searchInput: string;
@@ -56,6 +59,7 @@ export function TransactionsHeader({
   allTypesMatchedCount,
   periodLabel,
   headerTotal,
+  otherCurrencies = [],
   typeFilter,
   onChangeTypeFilter,
   searchInput,
@@ -93,6 +97,7 @@ export function TransactionsHeader({
           color: colors.peach,
         }
     : null;
+  const otherNote = otherCurrenciesLabel(otherCurrencies);
 
   const typeOptions = [
     {
@@ -143,6 +148,12 @@ export function TransactionsHeader({
           </Text>
         ) : null}
       </Text>
+      {/* The total is one currency; the period's others are named, not added in. */}
+      {otherNote ? (
+        <Text style={styles.otherCurrencies} testID="text-transactions-other-currencies">
+          {otherNote}
+        </Text>
+      ) : null}
 
       <View style={styles.searchRow}>
         <SearchIcon size={16} color={colors.textSecondary} />
@@ -230,6 +241,7 @@ const useStyles = createStyles((colors) => ({
   periodNote: { ...typography.tiny, color: colors.textMuted, marginTop: 2 },
   subtitle: { ...typography.caption, color: colors.textSecondary },
   subtitleAmount: { fontWeight: "700" },
+  otherCurrencies: { ...typography.tiny, color: colors.textMuted, marginTop: -spacing.xs },
   segmentTrailing: { ...typography.tiny, color: colors.textMuted, fontWeight: "700" },
   searchRow: {
     flexDirection: "row",

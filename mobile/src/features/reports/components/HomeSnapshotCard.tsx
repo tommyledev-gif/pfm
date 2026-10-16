@@ -6,9 +6,9 @@ import { LiquidCircle } from "@/components/shared/LiquidCircle";
 import { SnapshotCardSkeleton } from "@/components/shared/SnapshotCardSkeleton";
 import { SnapshotProgressRow } from "@/components/shared/SnapshotProgressRow";
 import { RowPlaceholders, SnapshotHeader } from "@/features/reports/components/SnapshotColumnParts";
+import { SnapshotTopRow } from "@/features/reports/components/SnapshotTopRow";
 import { colorForCategory } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
-import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { Category } from "@/features/categories/types";
 import { ReportCategoryEntry } from "@/features/reports/types";
@@ -36,6 +36,9 @@ interface HomeSnapshotCardProps {
   periodIndex: number; // the active Ngày / Tháng / Năm tab's position — sets the slide's direction
   isDay: boolean;
   currency: string;
+  /** Every currency the card can switch to (SnapshotTopRow). */
+  currencies: string[];
+  onChangeCurrency: (currency: string) => void;
   periodSpent: number;
   spentDelta: number;
   previousPeriodLabel: string;
@@ -64,6 +67,8 @@ export const HomeSnapshotCard = memo(function HomeSnapshotCard({
   periodIndex,
   isDay,
   currency,
+  currencies,
+  onChangeCurrency,
   periodSpent,
   spentDelta,
   previousPeriodLabel,
@@ -125,19 +130,13 @@ export const HomeSnapshotCard = memo(function HomeSnapshotCard({
           pointerEvents={loading ? "none" : "auto"}
           importantForAccessibility={loading ? "no-hide-descendants" : "auto"}
         >
-          {/* In flow and right-aligned, not pinned to the corner — the trend
-              text's length varies with the amount, and a fixed overlay
-              collided with the column below it for all but the shortest. */}
-          <View style={[styles.trendBadge, spentDelta > 0 ? styles.trendNegative : styles.trendPositive]}>
-            <Text
-              style={[styles.trendLabel, { color: spentDelta > 0 ? colors.peach : colors.green }]}
-              numberOfLines={1}
-            >
-              {spentDelta === 0
-                ? `Bằng ${previousPeriodLabel}`
-                : `${spentDelta > 0 ? "Nhiều hơn" : "Ít hơn"} ${formatCurrency(Math.abs(spentDelta), currency)} so với ${previousPeriodLabel}`}
-            </Text>
-          </View>
+          <SnapshotTopRow
+            currency={currency}
+            currencies={currencies}
+            onChangeCurrency={onChangeCurrency}
+            spentDelta={spentDelta}
+            previousPeriodLabel={previousPeriodLabel}
+          />
 
           <View
             style={[styles.row, { minHeight: contentMinHeight }]}
@@ -267,20 +266,6 @@ const useStyles = createStyles((colors) => ({
   card: { gap: spacing.md, overflow: "hidden" }, // clips the period slide at the rounded edge
   body: { gap: spacing.md },
   hidden: { opacity: 0 },
-  // A translucent tinted pill, not a solid fill — a loud block read as jarring
-  // against the rest of this dark, low-saturation card.
-  trendBadge: {
-    alignSelf: "flex-end",
-    maxWidth: "100%",
-    paddingVertical: 6,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.navBorder,
-  },
-  trendNegative: { backgroundColor: withAlpha(colors.peach, 0.12), borderColor: withAlpha(colors.peach, 0.35) },
-  trendPositive: { backgroundColor: withAlpha(colors.green, 0.1), borderColor: withAlpha(colors.green, 0.3) },
-  trendLabel: { ...typography.tiny },
   row: { flexDirection: "row", gap: spacing.md, alignItems: "flex-start" },
   // Widened from 3/9 (the ring column was narrower than its contents). Both
   // need a zero minimum, or a long category name widens the right column and

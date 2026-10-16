@@ -14,12 +14,11 @@ import {
 } from "@/features/budgets/budget-pace";
 import { Budget } from "@/features/budgets/types";
 import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary-query";
+import { useCurrencyChoice } from "@/features/reports/hooks/use-report-currency";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
-import { primaryCurrency } from "@/features/wallets/wallet-totals";
 import { HomePeriod } from "@/stores/ui-prefs-store";
 
 const TOP_CATEGORIES_COUNT = 3;
-const FALLBACK_CURRENCY = "VND";
 
 /** One budget limit running hot enough to show on the snapshot card. */
 export interface AtRiskBudgetRow {
@@ -55,16 +54,19 @@ export function useHomeSnapshot(homePeriod: HomePeriod) {
   const previousRange = useMemo(() => previousPeriodRange(homePeriod), [homePeriod]);
   const previousPeriodSummary = useReportSummaryQuery(previousRange);
 
-  // The report's own currency is the source of truth for the whole snapshot;
-  // the wallets' primary currency is only a fallback while the report has not
-  // loaded or has no transactions in range at all.
-  const currency =
-    periodSummary.data?.totals[0]?.currency ??
-    (wallets.data ? primaryCurrency(wallets.data) : undefined) ??
-    FALLBACK_CURRENCY;
+  // One currency at a time, switchable on the card (useCurrencyChoice, VND
+  // first). It used to be the report's first total — sorted by code, so a
+  // single USD transaction turned the whole card into USD. Offered: every
+  // currency the user holds a wallet in or spent in this month or period.
+  const { currency, currencies, setCurrency } = useCurrencyChoice([
+    ...(wallets.data?.map((w) => w.currency) ?? []),
+    ...(periodSummary.data?.totals.map((t) => t.currency) ?? []),
+    ...(thisMonthSummary.data?.totals.map((t) => t.currency) ?? []),
+  ]);
 
-  const periodSpent = periodSummary.data?.totals[0]?.total_expense ?? 0;
-  const previousPeriodSpent = previousPeriodSummary.data?.totals[0]?.total_expense ?? 0;
+  const periodSpent = periodSummary.data?.totals.find((t) => t.currency === currency)?.total_expense ?? 0;
+  const previousPeriodSpent =
+    previousPeriodSummary.data?.totals.find((t) => t.currency === currency)?.total_expense ?? 0;
   // Memoized like every other object handed to the (memoized) card — a fresh
   // one per render would redraw it on every Home render regardless.
   const budgetSnapshot = useMemo(
@@ -112,9 +114,12 @@ export function useHomeSnapshot(homePeriod: HomePeriod) {
   }, [budgets.data, currency, themeName]);
 
   const topCategories = useMemo(() => {
-    const expenses = thisMonthSummary.data?.by_category.filter((c) => c.type === "expense") ?? [];
+    // Same currency as the rest of the card: a USD row ranked against VND ones
+    // compared numbers that mean different things.
+    const expenses =
+      thisMonthSummary.data?.by_category.filter((c) => c.type === "expense" && c.currency === currency) ?? [];
     return [...expenses].sort((a, b) => b.amount - a.amount).slice(0, TOP_CATEGORIES_COUNT);
-  }, [thisMonthSummary.data]);
+  }, [thisMonthSummary.data, currency]);
 
   // The same currency-matched total the Insights donut divides by, reused so
   // the compact rows can show a share of the month rather than a currency
@@ -124,6 +129,8 @@ export function useHomeSnapshot(homePeriod: HomePeriod) {
 
   return {
     currency,
+    currencies,
+    setCurrency,
     periodRange,
     periodSpent,
     spentDelta: periodSpent - previousPeriodSpent,

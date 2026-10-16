@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { Text, TextInput, View } from "react-native";
+import { Text, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 
 import { Avatar } from "@/components/ui/Avatar";
-import { PillButton } from "@/components/ui/PillButton";
+import { LockIcon } from "@/components/ui/Icon";
 import { UploadButton } from "@/components/ui/UploadButton";
+import { InlineActionField } from "@/components/shared/InlineActionField";
 import { getErrorMessage } from "@/lib/axios";
-import { withAlpha } from "@/lib/color";
 import { useRequireOnline } from "@/lib/connectivity";
+import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useSessionStore } from "@/stores/session-store";
 import { useToastStore } from "@/stores/toast-store";
@@ -116,13 +117,14 @@ export function EditProfileForm({ onSaved }: EditProfileFormProps) {
     });
   };
 
-  const error = updateProfile.isError
-    ? getErrorMessage(updateProfile.error, COPY.saveFailed)
-    : uploadAvatar.isError
-      ? getErrorMessage(uploadAvatar.error, COPY.photoFailed)
-      : removeAvatar.isError
-        ? getErrorMessage(removeAvatar.error, COPY.removeFailed)
-        : null;
+  // Under the field it belongs to: the name's under the name, the photo's
+  // under the form.
+  const nameError = updateProfile.isError ? getErrorMessage(updateProfile.error, COPY.saveFailed) : null;
+  const photoError = uploadAvatar.isError
+    ? getErrorMessage(uploadAvatar.error, COPY.photoFailed)
+    : removeAvatar.isError
+      ? getErrorMessage(removeAvatar.error, COPY.removeFailed)
+      : null;
 
   return (
     <View style={styles.form}>
@@ -157,38 +159,38 @@ export function EditProfileForm({ onSaved }: EditProfileFormProps) {
       {profile?.username ? (
         <View style={styles.usernameBlock} testID="text-profile-username">
           <Text style={styles.label}>{COPY.usernameLabel}</Text>
-          <Text style={styles.usernameValue} selectable>{profile.username}</Text>
+          {/* Same box as the field below, locked: it reads as a value, not a typo. */}
+          <View style={styles.lockedBox}>
+            <Text style={styles.usernameValue} selectable numberOfLines={1}>
+              {profile.username}
+            </Text>
+            <LockIcon size={16} color={colors.textMuted} />
+          </View>
           <Text style={styles.hint}>{COPY.usernameHint}</Text>
         </View>
       ) : profile ? (
         <UsernameClaimField />
       ) : null}
 
-      <Text style={styles.label}>{COPY.nameLabel}</Text>
-      <TextInput
+      {/* Name and its Lưu on one row: the button sits inside the field. */}
+      <InlineActionField
+        label={COPY.nameLabel}
         value={name}
         onChangeText={changeName}
         placeholder={COPY.namePlaceholder}
-        placeholderTextColor={colors.textMuted}
         maxLength={NAME_MAX_LENGTH}
         autoCapitalize="words"
         autoCorrect={false}
-        returnKeyType="done"
-        onSubmitEditing={() => canSave && requireOnline(save)}
-        style={styles.input}
-        testID="input-profile-name"
-      />
-
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-
-      <PillButton
-        label={COPY.save}
-        onPress={() => requireOnline(save)}
+        actionLabel={COPY.save}
+        onAction={() => requireOnline(save)}
+        actionEnabled={canSave && !busy}
         loading={updateProfile.isPending}
-        disabled={!canSave || busy}
-        style={styles.saveButton}
-        testID="btn-profile-save"
+        error={nameError}
+        testID="input-profile-name"
+        actionTestID="btn-profile-save"
       />
+
+      {photoError ? <Text style={styles.error}>{photoError}</Text> : null}
     </View>
   );
 }
@@ -198,19 +200,19 @@ const useStyles = createStyles((colors) => ({
   photoBlock: { flexDirection: "row", alignItems: "center", gap: spacing.lg },
   photoActions: { flexShrink: 1, alignItems: "flex-start" },
   label: { ...typography.caption, color: colors.textSecondary },
-  usernameBlock: { gap: 4 },
-  usernameValue: { ...typography.body, color: colors.textPrimary },
-  hint: { ...typography.tiny, color: colors.textMuted },
-  input: {
-    backgroundColor: withAlpha(colors.overlayBase, 0.06),
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    borderRadius: radii.listCard,
+  usernameBlock: { gap: spacing.xs },
+  lockedBox: {
+    height: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
     paddingHorizontal: spacing.lg,
-    paddingVertical: 12,
-    color: colors.textPrimary,
-    ...typography.body,
+    borderRadius: radii.pill,
+    borderWidth: 1.5,
+    borderColor: colors.surfaceBorder,
+    backgroundColor: withAlpha(colors.overlayBase, 0.03),
   },
+  usernameValue: { flex: 1, ...typography.body, color: colors.textSecondary },
+  hint: { ...typography.tiny, color: colors.textMuted },
   error: { color: colors.peach, ...typography.caption },
-  saveButton: { marginTop: spacing.sm },
 }));

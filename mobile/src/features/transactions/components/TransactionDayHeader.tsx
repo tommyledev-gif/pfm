@@ -5,6 +5,7 @@ import { ChevronRightIcon } from "@/components/ui/Icon";
 import { formatCurrency } from "@/lib/currency";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { DaySection } from "@/features/transactions/day-sections";
+import { otherCurrenciesLabel } from "@/features/transactions/other-currencies";
 import { DAY_TOGGLE_ANIMATION_MS } from "@/features/transactions/hooks/use-collapsed-days";
 import { useReduceMotion } from "@/lib/use-reduce-motion";
 
@@ -31,6 +32,7 @@ export function TransactionDayHeader({ section, onToggle }: { section: DaySectio
   }, [section.collapsed, reduceMotion, openness]);
 
   const rotate = openness.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "90deg"] });
+  const otherNote = otherCurrenciesLabel(section.otherCurrencies);
 
   return (
     <Pressable style={styles.row} onPress={onToggle} hitSlop={6} testID={`btn-day-header-${section.key}`}>
@@ -50,6 +52,12 @@ export function TransactionDayHeader({ section, onToggle }: { section: DaySectio
         {section.expense ? (
           <Text style={[styles.subtotal, { color: colors.peach }]} numberOfLines={1}>
             -{formatCurrency(section.expense, section.currency)}
+          </Text>
+        ) : null}
+        {/* The subtotals above are one currency; the day's others are named. */}
+        {otherNote ? (
+          <Text style={styles.other} numberOfLines={1} testID={`text-day-other-currencies-${section.key}`}>
+            {otherNote}
           </Text>
         ) : null}
       </View>
@@ -75,4 +83,5 @@ const useStyles = createStyles((colors) => ({
   count: { ...typography.tiny, color: colors.textMuted },
   totals: { alignItems: "flex-end", flexShrink: 0 },
   subtotal: { ...typography.label, fontWeight: "700" },
+  other: { ...typography.tiny, color: colors.textMuted },
 }));

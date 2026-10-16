@@ -1,34 +1,41 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { FALLBACK_CURRENCY } from "@/lib/constants";
 import { ReportSummary } from "@/features/reports/types";
 
 /**
- * The currency the Spending tab is drawn in, and every currency the period
- * has. Amounts in different currencies never add up, so the tab shows one at
- * a time, with a switch whenever there is more than one.
+ * Which one of several currencies a figure is shown in, and the list to pick
+ * from. Amounts in different currencies never add up, so a screen shows one
+ * at a time, with a switch whenever there is more than one.
  *
- * It used to take whichever currency the backend listed first, and the
- * backend sorts them by code: one USD transaction anywhere in the period
- * turned the whole tab into a USD report of that single row ("USD" < "VND"),
- * so a wider range showed fewer categories than a narrower one. VND is the
- * default now; a period without any VND falls back to the first currency.
+ * VND is the default. Taking whichever currency a report listed first was the
+ * old bug: the backend sorts them by code, so one USD transaction anywhere in
+ * the period turned the whole screen into a USD report of that single row
+ * ("USD" < "VND"). A period without any VND falls back to the first one.
  */
-export function useReportCurrency(summary: ReportSummary | undefined) {
+export function useCurrencyChoice(available: string[]) {
   const [picked, setPicked] = useState<string | null>(null);
-  const currencies = summary ? listCurrencies(summary) : [];
+  // Same array while the set is the same: memoized cards take it as a prop.
+  const key = sortCurrencies(available).join(",");
+  const currencies = useMemo(() => (key ? key.split(",") : []), [key]);
   const fallback = currencies.includes(FALLBACK_CURRENCY) ? FALLBACK_CURRENCY : currencies[0] ?? FALLBACK_CURRENCY;
-  // A pick the new period no longer has falls back instead of showing nothing.
+  // A pick the new data no longer has falls back instead of showing nothing.
   const currency = picked && currencies.includes(picked) ? picked : fallback;
   return { currency, currencies, setCurrency: setPicked };
 }
 
-// VND first, then the rest by code — the switch reads the same in every period.
-function listCurrencies({ totals, by_category }: ReportSummary): string[] {
-  const seen = new Set<string>();
-  for (const total of totals) seen.add(total.currency);
-  for (const entry of by_category) seen.add(entry.currency);
-  return [...seen].sort((a, b) => {
+/** The Spending tab's currency: every currency the report has an amount in. */
+export function useReportCurrency(summary: ReportSummary | undefined) {
+  return useCurrencyChoice(summary ? summaryCurrencies(summary) : []);
+}
+
+export function summaryCurrencies({ totals, by_category }: ReportSummary): string[] {
+  return [...totals.map((t) => t.currency), ...by_category.map((c) => c.currency)];
+}
+
+// Unique, VND first, then the rest by code — the switch reads the same everywhere.
+export function sortCurrencies(currencies: string[]): string[] {
+  return [...new Set(currencies)].sort((a, b) => {
     if (a === FALLBACK_CURRENCY) return -1;
     if (b === FALLBACK_CURRENCY) return 1;
     return a.localeCompare(b);

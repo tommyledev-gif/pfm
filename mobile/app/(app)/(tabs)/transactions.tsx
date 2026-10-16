@@ -137,7 +137,7 @@ export default function TransactionsScreen() {
   const dateRangeLabel =
     hasDateFilter && dateRange.from ? formatDateRange(dateRange.from, dateRange.to ?? dateRange.from) : null;
   const headerRange = hasDateFilter ? { from: dateRange.from, to: dateRange.to } : monthRange(0);
-  const { total: headerTotal, refetch: refetchHeaderTotal } = useFilteredReportTotal(headerRange, categoryIds);
+  const { total: headerTotal, otherCurrencies, refetch: refetchHeaderTotal } = useFilteredReportTotal(headerRange, categoryIds);
 
   // Export and import both act on the period the user is currently looking at
   // — the explicit date filter when there is one, otherwise the same current
@@ -154,14 +154,13 @@ export default function TransactionsScreen() {
     currency: headerTotal?.currency ?? "VND",
   });
 
-  // Everything the screen shows, not just the list: the header's period total
-  // and the "Tất cả" tab count are separate requests, and leaving either
-  // behind on a pull would show a total that disagrees with the rows under it.
   const openCreateForm = () => {
     setEditingTransaction(null);
     setFormOpen(true);
   };
 
+  // Everything the screen shows, not just the list: leaving the header total or
+  // the "Tất cả" count behind on a pull would disagree with the rows under it.
   const { refreshControl } = useRefresh([
     transactions,
     allTypesCount,
@@ -191,6 +190,7 @@ export default function TransactionsScreen() {
             allTypesMatchedCount={allTypesMatchedCount}
             periodLabel={dateRangeLabel ?? currentMonthLabel}
             headerTotal={headerTotal}
+            otherCurrencies={otherCurrencies}
             typeFilter={filter ?? "all"}
             onChangeTypeFilter={(value: TypeFilterValue) => setFilter(value === "all" ? undefined : value)}
             searchInput={searchInput}

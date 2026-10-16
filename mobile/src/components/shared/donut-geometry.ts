@@ -8,11 +8,22 @@
 // color, and that color would be wrong the moment this chart is placed on a
 // card instead of the screen.
 export const SEGMENT_GAP = 4;
-// Shortest arc, in px along the ring and gap included, a non-zero segment is
-// laid out with. A 80.000 ₫ slice beside 396.000.000 ₫ is 0.02% of the ring,
-// well under a pixel: it vanished, and only the gap carved off its big
-// neighbour stayed, an empty notch where the small ones should have been.
-export const MIN_SEGMENT_ARC = SEGMENT_GAP + 8;
+// The gap carved off a floored (tiny) segment. A full 4px gap on a sliver that
+// is only a few pixels long left mostly gap: a row of tiny categories read as
+// a dotted notch, not as segments. A hairline still tells two neighbours apart.
+export const SMALL_SEGMENT_GAP = 1.5;
+// Shortest share of the ring a non-zero segment is laid out with. A 80.000 ₫
+// slice beside 396.000.000 ₫ is 0.02% of the ring, well under a pixel; at this
+// floor a "~1%" category is a short, plainly visible arc (about 17px on the
+// Spending donut) instead of a dot.
+const MIN_SEGMENT_SHARE = 0.03;
+
+export interface ArcLayout {
+  /** Arc length along the ring, gap included. */
+  full: number;
+  /** Raised to the floor: drawn with SMALL_SEGMENT_GAP. */
+  floored: boolean;
+}
 
 export function polarToPoint(cx: number, cy: number, r: number, angleDeg: number) {
   const rad = ((angleDeg - 90) * Math.PI) / 180;
@@ -21,27 +32,33 @@ export function polarToPoint(cx: number, cy: number, r: number, angleDeg: number
 
 /**
  * Each segment's arc length around the ring. Proportional to its amount,
- * except that every non-zero segment gets at least MIN_SEGMENT_ARC, taken back
- * from the segments above the floor in proportion to their size — so the
- * ring still closes and the big ones keep their relative sizes. Only the
- * drawing is floored: percentages and the tooltip use the real amounts.
+ * except that every non-zero segment gets at least MIN_SEGMENT_SHARE of the
+ * ring, taken back from the segments above the floor in proportion to their
+ * size — so the ring still closes and the big ones keep their relative sizes.
+ * Only the drawing is floored: percentages and the tooltip use the real amounts.
  */
-export function layoutArcLengths(amounts: number[], circumference: number): number[] {
+export function layoutArcLengths(amounts: number[], circumference: number): ArcLayout[] {
   const total = amounts.reduce((sum, a) => sum + a, 0);
-  if (total <= 0) return amounts.map(() => 0);
+  if (total <= 0) return amounts.map(() => ({ full: 0, floored: false }));
   const raw = amounts.map((a) => (a / total) * circumference);
   const nonZero = amounts.filter((a) => a > 0).length;
-  if (nonZero <= 1) return raw;
+  if (nonZero <= 1) return raw.map((full) => ({ full, floored: false }));
   // Never more than half the ring between them, however many small ones.
-  const floor = Math.min(MIN_SEGMENT_ARC, circumference / nonZero / 2);
+  const floor = Math.min(circumference * MIN_SEGMENT_SHARE, circumference / nonZero / 2);
   const isSmall = (length: number) => length > 0 && length < floor;
   const borrowed = raw.reduce((sum, length) => sum + (isSmall(length) ? floor - length : 0), 0);
   const largeTotal = raw.reduce((sum, length) => sum + (isSmall(length) ? 0 : length), 0);
   return raw.map((length) => {
-    if (length === 0) return 0;
-    if (isSmall(length)) return floor;
-    return length - (largeTotal > 0 ? borrowed * (length / largeTotal) : 0);
+    if (length === 0) return { full: 0, floored: false };
+    if (isSmall(length)) return { full: floor, floored: true };
+    return { full: length - (largeTotal > 0 ? borrowed * (length / largeTotal) : 0), floored: false };
   });
+}
+
+/** What is carved off the end of a segment so it reads apart from the next. */
+export function segmentGap(arc: ArcLayout, segmentCount: number): number {
+  if (segmentCount <= 1) return 0;
+  return arc.floored ? SMALL_SEGMENT_GAP : arc.full > SEGMENT_GAP * 2 ? SEGMENT_GAP : 0;
 }
 
 // One segment as its own open arc path, clockwise from 12 o'clock-based

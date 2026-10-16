@@ -1,13 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { Avatar } from "@/components/ui/Avatar";
-import { ListIcon } from "@/components/ui/Icon";
-import { ActionPopover, PopoverAnchor } from "@/components/shared/ActionPopover";
 import { Drawer } from "@/components/shared/Drawer";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
-import { useHoldMenu } from "@/features/ai-chat/hooks/use-hold-menu";
 import { HoldableTransactionRow } from "@/features/reports/components/HoldableTransactionRow";
 import { Transaction } from "@/features/transactions/types";
 import { TransactionRowSkeleton } from "@/features/transactions/components/TransactionRowSkeleton";
@@ -42,8 +39,8 @@ interface CategoryTransactionsDialogProps {
 // the individual transactions making up one segment, for the same period the
 // chart covers. Read-only: tapping a row does nothing, because editing from
 // here would have to reconcile with the report summary the chart is still
-// holding. Holding a row for a second opens a menu beside it whose one
-// action jumps to that row in the Transactions tab.
+// holding. Holding a row for a second opens a tooltip under it whose one
+// action jumps to that row in the Transactions tab (HoldableTransactionRow).
 //
 // Rows aren't paginated on scroll the way the Transactions screen's list is:
 // this is a Drawer (one ScrollView), so an inner infinite list would fight it
@@ -90,16 +87,11 @@ export function CategoryTransactionsDialog({
   );
 
   const router = useRouter();
-  const menu = useHoldMenu();
-  const [heldTransaction, setHeldTransaction] = useState<Transaction | null>(null);
-  const openRowMenu = (transaction: Transaction, anchor: PopoverAnchor) => {
-    setHeldTransaction(transaction);
-    menu.open(anchor);
-  };
-  const closeRowMenu = () => {
-    menu.close();
-    setHeldTransaction(null);
-  };
+  // The row whose tooltip is open — one at a time; a new hold moves it.
+  const [heldId, setHeldId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!visible) setHeldId(null);
+  }, [visible]);
   // Over to the Transactions tab, scrolled to this row with its border
   // flashing (useFocusTransaction). `focusedAt` makes the same row jumpable
   // twice; `focusDay` lets that screen unfold the row's day if it is folded.
@@ -150,31 +142,14 @@ export function CategoryTransactionsDialog({
               transaction={item}
               currency={walletCurrencyMap.get(item.wallet_id)}
               category={categoryById.get(item.category_id)}
-              held={heldTransaction?.id === item.id}
-              onHold={openRowMenu}
+              open={heldId === item.id}
+              onOpen={setHeldId}
+              onClose={() => setHeldId(null)}
+              onShowInTransactions={showInTransactions}
             />
           ))}
         </View>
       )}
-
-      <ActionPopover
-        visible={menu.visible}
-        anchor={menu.anchor}
-        align="left"
-        onClose={closeRowMenu}
-        actions={
-          heldTransaction
-            ? [
-                {
-                  Icon: ListIcon,
-                  label: "Xem trong Giao dịch",
-                  onPress: () => showInTransactions(heldTransaction),
-                  testID: "btn-category-transaction-show",
-                },
-              ]
-            : []
-        }
-      />
 
       {transactions.hasNextPage ? (
         <Pressable

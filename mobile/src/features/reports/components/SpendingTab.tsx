@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 
 import { CalendarIcon } from "@/components/ui/Icon";
 import { Card } from "@/components/ui/Card";
+import { useFabBottom } from "@/components/ui/Fab";
 import { CategoryPickerDrawer } from "@/components/shared/CategoryPickerDrawer";
 import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
 import { DonutChart } from "@/components/shared/DonutChart";
@@ -12,7 +13,7 @@ import { CategoryTransactionsDialog } from "@/features/reports/components/Catego
 import { buildCategoryColorMap } from "@/lib/category-color";
 import { monthRange } from "@/lib/date-range";
 import { calendarDay, formatDateRange } from "@/lib/format-date";
-import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
+import { CurrencySwitch } from "@/components/shared/CurrencySwitch";
 import { useReportCurrency } from "@/features/reports/hooks/use-report-currency";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
@@ -54,6 +55,7 @@ export function SpendingTab({ focusCategoryId, focusNonce, onOpenBudgets }: Spen
   // highlight exactly where the user left it.
   const [detailCategoryId, setDetailCategoryId] = useState<string | null>(null);
   const reportCurrency = useReportCurrency(summary.data);
+  const navClearance = useFabBottom();
 
   // Both deps are plain strings, so this can't re-fire on identity alone — the
   // trap that made useCategoryPicker loop.
@@ -139,18 +141,16 @@ export function SpendingTab({ focusCategoryId, focusNonce, onOpenBudgets }: Spen
           <CalendarIcon size={14} color={colors.textSecondary} />
           <Text style={styles.range}>{formatDateRange(range.from, range.to)}</Text>
         </Pressable>
-        {currencies.length > 1 ? (
-          <SegmentedTabs
-            options={currencies.map((c) => ({ value: c, label: c }))}
-            value={currency}
-            onChange={(next) => {
-              setCurrency(next);
-              setSelected(null);
-            }}
-            style={styles.currencyTabs}
-            testID="tabs-spending-currency"
-          />
-        ) : null}
+        <CurrencySwitch
+          currencies={currencies}
+          value={currency}
+          onChange={(next) => {
+            setCurrency(next);
+            setSelected(null);
+          }}
+          style={styles.currencyTabs}
+          testID="tabs-spending-currency"
+        />
       </View>
 
       {/* The compact "~7tr100k" figures give up the exact amount on a hold,
@@ -199,7 +199,9 @@ export function SpendingTab({ focusCategoryId, focusNonce, onOpenBudgets }: Spen
             ) : null}
           </Card>
 
-          <ScrollView showsVerticalScrollIndicator={false}>
+          {/* Padded past the floating nav: the list runs to the screen's
+              bottom edge, so its last row sat under the bar. */}
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: navClearance }}>
             {segments.map((seg) => (
               <DonutLegendRow
                 key={seg.key}
