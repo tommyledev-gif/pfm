@@ -44,8 +44,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Budgest cần truy cập ảnh để bạn chọn ảnh đại diện và biểu tượng cho ví, danh mục, ngân sách.",
-          "cameraPermission": false
+          "photosPermission": "Budgest dùng ảnh được chọn làm ảnh đại diện, biểu tượng, hoặc để đọc hóa đơn thành giao dịch.",
+          "cameraPermission": "Budgest dùng camera để chụp hóa đơn và đọc thành giao dịch."
         }
       ],
       [

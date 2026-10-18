@@ -17,6 +17,10 @@ const REDACTED_KEYS = new Set([
   "password",
 ]);
 const REDACTED_VALUE = "***";
+// A multipart body (photo for reading, icon upload) never reaches the log:
+// its parts are a device file path and, for a photo, the caption
+// (specs/ai-chat-image-capture AC-28, plan F6).
+const MULTIPART_OMITTED = "[multipart omitted]";
 
 // Only a string that opens like a JSON object or array is a serialized body.
 // Parsing every string turned plain values into other types in the log — a
@@ -24,6 +28,7 @@ const REDACTED_VALUE = "***";
 const SERIALIZED_BODY = /^\s*[[{]/;
 
 export function redact(value: unknown): unknown {
+  if (typeof FormData !== "undefined" && value instanceof FormData) return MULTIPART_OMITTED;
   // axios request bodies arrive here as a JSON string, not an object —
   // parse before redacting so field-level keys (e.g. refresh_token) are
   // actually reachable, not hidden inside one opaque string.

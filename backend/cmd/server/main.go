@@ -84,6 +84,7 @@ func main() {
 	notificationService := service.NewNotificationService(notificationRepo, budgetRepo, cycleResolver, logger)
 	aiServiceClient := service.NewHTTPAIServiceClient(cfg.AIServiceURL)
 	chatService := service.NewChatService(chatRepo, walletRepo, categoryRepo, aiServiceClient, logger)
+	chatImageService := service.NewChatImageService(walletRepo, categoryRepo, transactionRepo, service.NewHTTPAIImageClient(cfg.AIServiceURL), logger)
 	chatThreadService := service.NewChatThreadService(chatThreadRepo)
 	aiBudgetClient := service.NewHTTPAIBudgetClient(cfg.AIServiceURL)
 	budgetWizardService := service.NewBudgetWizardService(budgetRepo, categoryRepo, walletRepo, aiBudgetClient, logger)
@@ -117,6 +118,7 @@ func main() {
 	reportHandler := handler.NewReportHandler(reportService, logger)
 	notificationHandler := handler.NewNotificationHandler(notificationService, logger)
 	chatHandler := handler.NewChatHandler(chatService, chatThreadService, logger)
+	chatImageHandler := handler.NewChatImageHandler(chatImageService, cfg.AIImageEnabled, logger)
 	budgetWizardHandler := handler.NewBudgetWizardHandler(budgetWizardService, logger)
 	analyticsHandler := handler.NewAnalyticsHandler(analyticsService, consultService, logger)
 	passkeyHandler := handler.NewPasskeyHandler(passkeyService, logger)
@@ -137,7 +139,7 @@ func main() {
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 		AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 	}))
-	registerRoutes(app, userHandler, authHandler, walletHandler, categoryHandler, budgetHandler, transactionHandler, transactionExportHandler, transactionImportHandler, auditLogHandler, reportHandler, notificationHandler, chatHandler, budgetWizardHandler, analyticsHandler, accountSwitchHandler, sessionRevocationHandler, profileHandler, accessRequestHandler, accountDeletionHandler, passkeyHandler, assetLinks, tokenService, sessionService, pool, logger)
+	registerRoutes(app, userHandler, authHandler, walletHandler, categoryHandler, budgetHandler, transactionHandler, transactionExportHandler, transactionImportHandler, auditLogHandler, reportHandler, notificationHandler, chatHandler, chatImageHandler, budgetWizardHandler, analyticsHandler, accountSwitchHandler, sessionRevocationHandler, profileHandler, accessRequestHandler, accountDeletionHandler, passkeyHandler, assetLinks, tokenService, sessionService, pool, logger)
 
 	go func() {
 		if err := app.Listen(":" + cfg.Port); err != nil {

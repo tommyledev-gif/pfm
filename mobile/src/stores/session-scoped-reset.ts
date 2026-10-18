@@ -1,4 +1,5 @@
 import { useSavedBudgetPlanStore } from "@/features/budget-wizard/saved-plan";
+import { deleteAllCaptures } from "@/features/ai-chat/image-capture";
 import { userIdFromAccessToken } from "@/lib/jwt";
 import { flushOutbox } from "@/features/transactions/outbox/flush-outbox";
 import { useChatStore } from "@/stores/chat-store";
@@ -57,8 +58,11 @@ interface SessionUserChange {
 export function handleSessionUserChange({ nextUserId, isRestore }: SessionUserChange): void {
   if (nextUserId === null) {
     useChatStore.getState().clear(null);
+    // Kept photos go with the thread they belong to (specs/ai-chat-image-capture AC-26).
+    deleteAllCaptures();
     return;
   }
+  if (!isRestore) deleteAllCaptures();
   // A restored session keeps the thread on disk only if it is this User's
   // (chat-store records its owner); a session entered just now always starts
   // empty and owned by them, and the chat screen restores their server copy.

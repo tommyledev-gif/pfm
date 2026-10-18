@@ -92,6 +92,9 @@ export const FALLBACK_CURRENCY: WalletCurrency = "VND";
 // The only currency an AI proposal may be saved to — the AI reads every
 // amount as VND and never converts. Mirrors the backend's proposalCurrency.
 export const PROPOSAL_CURRENCY: WalletCurrency = "VND";
+// Mirrors backend common.AIChatConfidenceThreshold: below it an image proposal
+// carries the low-confidence label (specs/ai-chat-image-capture BR-09).
+export const AI_CONFIDENCE_THRESHOLD = 0.6;
 
 export const CATEGORY_TYPES = ["income", "expense"] as const;
 export type CategoryType = (typeof CATEGORY_TYPES)[number];

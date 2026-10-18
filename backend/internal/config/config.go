@@ -35,6 +35,11 @@ type Config struct {
 	// degrades to 502 AI_SERVICE_UNAVAILABLE rather than failing startup.
 	AIServiceURL string
 
+	// AIImageEnabled is the operator switch for image reading
+	// (specs/ai-chat-image-capture BR-18, plan F35). Off unless AI_IMAGE_ENABLED
+	// is "true"; flipping it needs a restart, not a release.
+	AIImageEnabled bool
+
 	// R2* configures the Cloudflare R2 bucket that stores user-uploaded
 	// category icons (service.R2IconUploader). R2AccountID empty means "not
 	// configured yet" — main.go falls back to
@@ -78,7 +83,8 @@ func Load() (*Config, error) {
 		SMTPFromName:  getEnvOrDefault("SMTP_FROM_NAME", "PFM"),
 		AppBaseURL:    getEnvOrDefault("APP_BASE_URL", "http://localhost:8082"),
 
-		AIServiceURL: getEnvOrDefault("AI_SERVICE_URL", "http://ai-service:8000"),
+		AIServiceURL:   getEnvOrDefault("AI_SERVICE_URL", "http://ai-service:8000"),
+		AIImageEnabled: os.Getenv("AI_IMAGE_ENABLED") == "true",
 
 		R2AccountID:       os.Getenv("R2_ACCOUNT_ID"),
 		R2AccessKeyID:     os.Getenv("R2_ACCESS_KEY_ID"),

@@ -24,7 +24,7 @@ interface ChatThreadMessageWire {
 // sync" set client-side.
 export async function syncChatThreadRequest(messages: ChatMessage[]): Promise<void> {
   const body = {
-    messages: messages.map((m): ChatThreadMessageWire => ({ client_message_id: m.id, payload: m })),
+    messages: messages.map((m): ChatThreadMessageWire => ({ client_message_id: m.id, payload: withoutDevicePath(m) })),
   };
   await apiClient.post("/ai/chat/thread/sync", body);
 }
@@ -32,6 +32,14 @@ export async function syncChatThreadRequest(messages: ChatMessage[]): Promise<vo
 // Restores a device's synced thread — used once, on ai-chat.tsx mount, only
 // when the local (AsyncStorage-persisted) thread is empty, i.e. after a
 // logout/reinstall/new device wiped it.
+// ⚠️ A photo never leaves the device: its message syncs as the caption only,
+// without the file path (specs/ai-chat-image-capture AC-23). Another device
+// shows a placeholder (AC-24).
+function withoutDevicePath(message: ChatMessage): ChatMessage {
+  if (!message.imageCapture?.localUri) return message;
+  return { ...message, imageCapture: { caption: message.imageCapture.caption } };
+}
+
 export async function fetchChatThreadRequest(): Promise<ChatMessage[]> {
   const res = await apiClient.get<{ success: boolean; message: string; data?: { messages: ChatThreadMessageWire[] } }>(
     "/ai/chat/thread",

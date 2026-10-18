@@ -57,6 +57,41 @@ export interface ChatAction {
   payload: TransactionActionPayload;
   idempotency_key: string;
   confidence: number;
+  // Image proposals only (specs/ai-chat-image-capture). Kept beside the
+  // payload, never inside it: the payload is what a confirm sends.
+  // Lines read with doubt, by index into payload.items / payload.adjustments
+  // as received — turned into content keys on arrival (line-review.ts).
+  review_lines?: ProposalReviewLines;
+  // The latest saved Transaction this proposal looks like (same Wallet, type,
+  // amount, day). A warning; cleared when the User edits the card (BR-17).
+  possible_duplicate?: ProposalDuplicate;
+}
+
+export interface ProposalReviewLines {
+  items: number[];
+  adjustments: number[];
+}
+
+export interface ProposalDuplicate {
+  amount: number;
+  occurred_at: string;
+}
+
+// Mirrors backend/internal/dto/chat_image_response.go —
+// POST /transactions/image-proposals.
+export interface ImageProposalsResponse {
+  message: string;
+  intent: "create_transaction" | "ambiguous";
+  actions: ChatAction[];
+  truncated: boolean;
+  skipped_count: number;
+}
+
+// The photo behind a user's image message. localUri lives on this device
+// only and is stripped before the thread syncs (AC-23).
+export interface ImageCapture {
+  localUri?: string;
+  caption?: string;
 }
 
 export interface ChatResponse {
@@ -157,4 +192,14 @@ export interface ChatMessage {
   // recording" carry the question over, and lets a confirmed proposal's
   // wording become a recent phrase. Absent on replies from older versions.
   sourceText?: string;
+  // specs/ai-chat-image-capture. On the user's image message: its photo.
+  // Never text-editable (AC-27).
+  imageCapture?: ImageCapture;
+  // On a proposal read from an image: shows the low-confidence label when the
+  // confidence is low (BR-09).
+  imageOrigin?: boolean;
+  // Content keys (line-review.ts) of the lines marked "Cần kiểm tra" (BR-16).
+  reviewLineKeys?: string[];
+  // On a failed image reply: the image message to re-send on retry (EC-11, EC-20).
+  retryImageMessageId?: string;
 }

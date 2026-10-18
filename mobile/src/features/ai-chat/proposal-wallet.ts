@@ -1,5 +1,5 @@
 import { PROPOSAL_CURRENCY } from "@/lib/constants";
-import { TransactionActionPayload } from "@/features/ai-chat/types";
+import { ChatMessage, TransactionActionPayload } from "@/features/ai-chat/types";
 import { Wallet } from "@/features/wallets/types";
 
 /** Shown on a card that cannot be saved until a VND Wallet is chosen. */
@@ -33,4 +33,30 @@ export function proposalWalletName(payload: TransactionActionPayload, walletById
   const nameOf = (id: string) => walletById.get(id)?.name ?? "Ví";
   const source = payload.wallet_id === null ? NO_WALLET_LABEL : nameOf(payload.wallet_id);
   return payload.type === "transfer" && payload.to_wallet_id ? `${source} → ${nameOf(payload.to_wallet_id)}` : source;
+}
+
+/**
+ * How far an image proposal's lines are from its amount, in xu: items, plus
+ * tax and fee, minus discounts. 0 when they add up or there are no items.
+ * Image proposals keep the printed total even when the lines miss it
+ * (spec BR-15); typed proposals always add up.
+ */
+export function proposalLinesGap(payload: TransactionActionPayload): number {
+  const items = payload.items ?? [];
+  if (items.length === 0) return 0;
+  let total = items.reduce((sum, item) => sum + item.amount, 0);
+  for (const adjustment of payload.adjustments ?? []) {
+    const direction = adjustment.direction ?? (adjustment.kind === "discount" ? "subtract" : "add");
+    total += direction === "subtract" ? -adjustment.amount : adjustment.amount;
+  }
+  return total - payload.amount;
+}
+
+/**
+ * Whether "confirm all" on the pending-review screen may save this card.
+ * ⚠️ A card that looks like a saved Transaction is skipped and counted as not
+ * saved (spec BR-17): saving it is the User's call, on the card itself.
+ */
+export function isConfirmAllEligible(message: ChatMessage): boolean {
+  return Boolean(message.action) && !message.action?.possible_duplicate && proposalLinesGap(message.action!.payload) === 0;
 }

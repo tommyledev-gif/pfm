@@ -12,9 +12,10 @@ import { formatCurrencyTruncated } from "@/lib/currency";
 import { formatDateShort } from "@/lib/format-date";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { proposalAmountSign } from "@/features/ai-chat/proposal-kind";
-import { NO_VND_WALLET_HINT, WALLET_REQUIRED_MESSAGE } from "@/features/ai-chat/proposal-wallet";
+import { NO_VND_WALLET_HINT, WALLET_REQUIRED_MESSAGE, proposalLinesGap } from "@/features/ai-chat/proposal-wallet";
 import { ChatAction } from "@/features/ai-chat/types";
 import { ProposalItemsList } from "@/features/ai-chat/components/ProposalItemsList";
+import { ProposalNotices } from "@/features/ai-chat/components/ProposalNotices";
 
 // Share of the budget at which the bar stops being neutral and starts
 // leaning amber. Below it the number is just a number; at 80% the next
@@ -48,6 +49,10 @@ interface TransactionActionCardProps {
   onCreateWallet?: () => void;
   /** The message id, for per-card testIDs. */
   testIDSuffix?: string;
+  /** An image proposal the AI was unsure about (spec BR-09). */
+  lowConfidence?: boolean;
+  /** Line marks of an image proposal (line-review.ts keys, spec BR-16). */
+  reviewLineKeys?: string[];
 }
 
 // Renders inside an AI assistant chat bubble once a transaction has been
@@ -75,6 +80,8 @@ export function TransactionActionCard({
   walletRequired,
   onCreateWallet,
   testIDSuffix,
+  lowConfidence = false,
+  reviewLineKeys,
 }: TransactionActionCardProps) {
   const colors = useColors();
   const styles = useStyles();
@@ -199,8 +206,22 @@ export function TransactionActionCard({
             <PillTag label={categoryName} />
             <PillTag label={walletName} />
           </View>
+          <ProposalNotices
+            lowConfidence={lowConfidence}
+            duplicate={action.possible_duplicate}
+            currency={currency}
+            testIDSuffix={testIDSuffix}
+          />
           {payload.items?.length ? (
-            <ProposalItemsList items={payload.items} adjustments={payload.adjustments} currency={currency} testIDSuffix={testIDSuffix} />
+            <ProposalItemsList
+              items={payload.items}
+              adjustments={payload.adjustments}
+              currency={currency}
+              testIDSuffix={testIDSuffix}
+              reviewKeys={reviewLineKeys}
+              gap={proposalLinesGap(payload)}
+              amount={payload.amount}
+            />
           ) : null}
           {walletRequired ? (
             <Text testID={`txt-wallet-required-${testIDSuffix}`} style={styles.walletRequired}>
@@ -218,7 +239,8 @@ export function TransactionActionCard({
               />
             ) : (
               <PillButton
-                label="Lưu"
+                // A possible duplicate saves just the same, but says so (BR-17).
+                label={action.possible_duplicate ? "Vẫn lưu" : "Lưu"}
                 onPress={onConfirm}
                 loading={saving}
                 style={styles.confirmButton}

@@ -35,6 +35,8 @@ interface ChatInputBarProps {
   onFocusChange?: (focused: boolean) => void;
   /** Each change puts the cursor back in the field (a phrase picked from search). */
   focusNonce?: number;
+  /** Inside the field, before the text — the recording pane's attach-image button. */
+  leading?: ReactNode;
 }
 
 const CLEAR_HIT_SLOP = 8;
@@ -53,6 +55,7 @@ export function ChatInputBar({
   autoFocus,
   onFocusChange,
   focusNonce,
+  leading,
 }: ChatInputBarProps) {
   const colors = useColors();
   const styles = useStyles();
@@ -108,6 +111,7 @@ export function ChatInputBar({
           { borderColor: withAlpha(tint, focused ? FOCUS_RING_ALPHA : IDLE_RING_ALPHA) },
         ]}
       >
+        {leading}
         <TextInput
           ref={inputRef}
           value={value}

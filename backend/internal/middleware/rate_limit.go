@@ -73,6 +73,26 @@ func AIConsultRateLimiter(logger *zap.Logger) fiber.Handler {
 	})
 }
 
+// AIImageRateLimiter caps image readings per user (specs/ai-chat-image-capture
+// spec BR-10, plan AIIMG-T18). Attached to POST /transactions/image-proposals
+// only — never to the /ai group — so it and AIChatRateLimiter never spend
+// each other's budget (S-AIIMG-20, S-AIIMG-21). SkipFailedRequests: busy,
+// feature-off and rejected uploads never count (S-AIIMG-60).
+func AIImageRateLimiter(logger *zap.Logger) fiber.Handler {
+	return limiter.New(limiter.Config{
+		Max:                common.AIImageRateLimit,
+		Expiration:         common.AIImageRateLimitWindow,
+		SkipFailedRequests: true,
+		KeyGenerator: func(c *fiber.Ctx) string {
+			userID, _ := c.Locals(common.LocalsUserID).(string)
+			return userID
+		},
+		LimitReached: func(c *fiber.Ctx) error {
+			return response.Error(c, logger, common.ErrRateLimited)
+		},
+	})
+}
+
 // LoginRateLimiter enforces spec.md S-SEC-07 (10 attempts/15min/IP).
 //
 // Deliberate simplification: this counts every request to /auth/login from

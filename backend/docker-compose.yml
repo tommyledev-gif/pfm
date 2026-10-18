@@ -105,6 +105,10 @@ services:
       # ai-service is down/misconfigured, POST /ai/chat just degrades to
       # 502 AI_SERVICE_UNAVAILABLE instead of failing backend startup.
       AI_SERVICE_URL: ${AI_SERVICE_URL:-}
+      # Operator switch for reading receipt photos (specs/ai-chat-image-capture
+      # BR-18). Anything but "true" keeps POST /transactions/image-proposals
+      # answering 503 AI_IMAGE_DISABLED. Flip it, then `docker compose up -d backend`.
+      AI_IMAGE_ENABLED: ${AI_IMAGE_ENABLED:-false}
       # Cloudflare R2 storage for user-uploaded category icons (see
       # service.R2IconUploader). Blank R2_ACCOUNT_ID means "not configured
       # yet" — main.go falls back to service.UnconfiguredIconUploader and

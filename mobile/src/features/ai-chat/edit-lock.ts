@@ -28,6 +28,9 @@ export function isEditLocked(message: ChatMessage): boolean {
   // the edit path for a user message re-runs transaction extraction — a
   // question must never be resent as a transaction description.
   if (message.consult || message.consultQuestion) return true;
+  // A photo message: editing it as text would re-run a typed reading on the
+  // caption (specs/ai-chat-image-capture AC-27).
+  if (message.imageCapture) return true;
   if (message.role !== "assistant") return false;
   return !message.action;
 }

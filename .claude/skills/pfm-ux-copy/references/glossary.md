@@ -38,6 +38,8 @@ Một khái niệm = một từ, ở cả VI và EN. Cột "Nguồn": `app` = đ
 | Passkey | passkey | passkey | app | Khóa đăng nhập lưu trên điện thoại, mở bằng vân tay/khuôn mặt, gắn với tài khoản. Giữ nguyên chữ "passkey" (Google/Apple cũng gọi vậy), viết thường giữa câu. Nút: "Đăng nhập bằng passkey", "Thêm passkey", "Xóa passkey". Chỉ khi chỉ đường vào Cài đặt của Android mới dùng chữ của máy: "khóa truy cập" (mục "Mật khẩu, khóa truy cập và tài khoản") |
 | Saved place | nơi đã ghim | saved place | app | Vị trí từng ghim cho giao dịch, lưu trên máy để chọn lại ở bước "Ghim vị trí". Tiêu đề nhóm: "Đã ghim trước đây"; nút xóa: "Xóa nơi đã ghim" |
 | Phrase (câu mẫu) | câu mẫu | saved phrase | app | Câu từng nhắn để ghi giao dịch, gợi ý lại trên ô chat. Ô tìm: "Tìm trong {{count}} câu mẫu"; nút: "Lưu câu mẫu" / "Bỏ lưu câu mẫu" / "Xóa câu mẫu" |
+| Needs-review mark (một món/dòng AI đọc từ ảnh chưa chắc) | cần kiểm tra | check this | đề xuất | Nhãn cạnh từng món trong "Chi tiết món" của thẻ đọc từ ảnh. Khác "Độ tin cậy thấp" (nhãn cho cả thẻ). Không chặn lưu |
+| Possible duplicate (thẻ đọc từ ảnh trùng giao dịch đã lưu) | giống giao dịch | looks like a saved transaction | đề xuất | Dòng trên thẻ: "Giống giao dịch {{amount}} ngày {{date}}"; nút lưu đổi thành "Vẫn lưu". Không chặn lưu |
 
 ## Từ tránh dùng trong UI
 

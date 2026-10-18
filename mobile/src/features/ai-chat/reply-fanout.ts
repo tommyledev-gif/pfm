@@ -1,5 +1,6 @@
 import { nextMessageId } from "@/features/ai-chat/message-id";
-import { ChatAction, ChatMessage, ChatResponse } from "@/features/ai-chat/types";
+import { toReviewLineKeys } from "@/features/ai-chat/line-review";
+import { ChatAction, ChatMessage, ChatResponse, ImageProposalsResponse } from "@/features/ai-chat/types";
 
 interface ReplyFanoutOptions {
   /** The user's own words that produced this reply — kept on every card so a
@@ -8,6 +9,9 @@ interface ReplyFanoutOptions {
   edited?: boolean;
   /** The User's wallet list has loaded and is empty. */
   noWallets?: boolean;
+  /** The reply was read from a photo (specs/ai-chat-image-capture): its cards
+   *  carry the low-confidence label and the line marks. Never a sourceText. */
+  imageOrigin?: boolean;
 }
 
 const NO_WALLET_REPLY = "Chưa có ví. Tạo ví để ghi giao dịch.";
@@ -21,7 +25,10 @@ const NO_WALLET_REPLY = "Chưa có ví. Tạo ví để ghi giao dịch.";
  * each proposal follows as its own card, so confirm / edit / discard /
  * swipe-delete keep acting on one proposal at a time (AC-37).
  */
-export function toReplyMessages(reply: ChatResponse, { sourceText, edited, noWallets }: ReplyFanoutOptions): ChatMessage[] {
+export function toReplyMessages(
+  reply: ChatResponse | ImageProposalsResponse,
+  { sourceText, edited, noWallets, imageOrigin }: ReplyFanoutOptions,
+): ChatMessage[] {
   // With zero wallets the backend never reaches the AI: it always answers
   // with an "ambiguous" reply telling the User to create a wallet
   // (chat_service.go). That reply gets the app's own copy plus a button that
@@ -45,14 +52,14 @@ export function toReplyMessages(reply: ChatResponse, { sourceText, edited, noWal
     role: "assistant",
     text: reply.message,
     intent: reply.intent === "ambiguous" ? "ambiguous" : undefined,
-    actionType: reply.action_type,
+    actionType: "action_type" in reply ? reply.action_type : undefined,
     edited,
     sourceText,
   };
 
   if (reply.actions.length <= 1) {
     const action = reply.actions[0];
-    return [action ? { ...leadIn, ...cardFields(action) } : leadIn];
+    return [action ? { ...leadIn, ...cardFields(action, imageOrigin) } : leadIn];
   }
 
   return [
@@ -63,11 +70,13 @@ export function toReplyMessages(reply: ChatResponse, { sourceText, edited, noWal
       text: "",
       edited,
       sourceText,
-      ...cardFields(action),
+      ...cardFields(action, imageOrigin),
     })),
   ];
 }
 
-function cardFields(action: ChatAction): Pick<ChatMessage, "action" | "editHistory"> {
-  return { action, editHistory: [{ payload: action.payload, timestamp: Date.now(), source: "created" }] };
+function cardFields(action: ChatAction, imageOrigin?: boolean): Pick<ChatMessage, "action" | "editHistory" | "imageOrigin" | "reviewLineKeys"> {
+  const fields = { action, editHistory: [{ payload: action.payload, timestamp: Date.now(), source: "created" as const }] };
+  if (!imageOrigin) return fields;
+  return { ...fields, imageOrigin, reviewLineKeys: toReviewLineKeys(action.payload, action.review_lines) };
 }

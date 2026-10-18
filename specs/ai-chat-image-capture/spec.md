@@ -3,6 +3,9 @@
 > Source: `specs/mobile-ux-batch-2026-10/research.md` (feasibility research, approved by the product owner, corrected 2026-10-04 — Option C: a vision-capable AI reads the image and returns Transaction proposals). SRS Feature-12 / FR-09 / BF-10 (AI Chat Assistance).
 > Status: Specced 2026-10-04; product-owner decisions of 2026-10-04 folded in (currency, every proposal shown, limits, handwriting). SRS story: Feature-12 US-05 (added 2026-10-04).
 > Amended 2026-10-11: a receipt proposal carries the receipt's Items and Adjustments ([Items of a Transaction](../transaction-line-items/spec.md)) instead of splitting line items into separate proposals — BR-03, AC-05, S-AIIMG-02 changed; BR-15, AC-41–AC-43, S-AIIMG-52–S-AIIMG-55, EC-27–EC-28 added.
+> Amended 2026-10-17 (proposal and product-owner decisions of 2026-10-17): one vision model on the AI provider's free tier (the second candidate model was shut down by the provider on 2026-07-17), no Anthropic for this feature, an operator switch, a free Plan B, fail-fast when the provider is busy, a possible-duplicate warning, a per-line "needs review" mark, multi-total receipts, image text treated as data, provider data retention. Resolved design decisions 5 changed, 11–16 added; BR-03 changed; BR-16–BR-20, AC-44–AC-50, S-AIIMG-56–S-AIIMG-70, EC-29–EC-36 added; Open Questions #2 and #5 resolved, #6–#8 added.
+> Amended 2026-10-18 (product-owner answers to Open Questions #6–#8): privacy notice on first use (BR-21, AC-51, S-AIIMG-71–S-AIIMG-73), total payable cut off (EC-37), expected peak confirmed. Zero data retention for inference turned on in the provider account on 2026-10-18.
+> US-04 and US-05 shipped 2026-10-04 (commit `0411fda`); offline detection shipped with offline support (`mobile/src/lib/connectivity.ts`).
 > Related: [Feature-12 US-01 Create a Transaction via Chat](../ai-chat-assistant/spec.md) (proposal → confirm model, idempotency key, ownership re-validation, all reused) · [F-06 Transaction Management](../transaction-management/spec.md) (the confirm step) · [Transaction import](../transaction-export-import/spec.md) (the exact path for real spreadsheet files)
 > Clients: **`mobile/` only.** `frontend/` (web) is frozen — see Out of Scope.
 
@@ -16,12 +19,11 @@ Three kinds of image are in scope, with different expected output:
 
 | Image kind | Expected proposals |
 |---|---|
-| Printed receipt / bill | **One** proposal: the total payable, carrying the receipt's Items and Adjustments when it lists them. |
+| Printed receipt / bill, including a screenshot of an order in a food-delivery or shopping app and a printed utility bill | **One** proposal: the total payable, carrying the receipt's Items and Adjustments when it lists them. |
 | Handwritten note | **One per written entry** (e.g. "cafe 45k, xăng 80k"). |
 | Spreadsheet screenshot | **One per data row**; header, subtotal and total rows are never proposals. |
 
 A real spreadsheet *file* is not an image — it goes through the existing Transaction import, which is exact. This feature covers only a *picture* of a sheet.
-
 Two defects in today's typed-message flow block this feature and are fixed first, as stories that ship on their own (US-04, US-05):
 - A proposal can be attached to a Wallet in another currency while its amount is read as VND, so "45k" typed against a USD Wallet would be booked as 45,000 USD.
 - When one reply holds several proposals, the app shows only the first; the others are silently lost.
@@ -35,12 +37,18 @@ Two defects in today's typed-message flow block this feature and are fixed first
 2. **The image is transient.** It is used for one reading and then discarded. It is never stored by the System, never written to any log, never part of the chat history that syncs across the User's devices. Only the fields of a Transaction the User confirms are ever stored.
 3. **One image per request** in this release.
 4. **The User's own Wallets and Categories are the only things a proposal may reference** — re-validated by the Backend exactly as in the text flow.
-5. **An accuracy check on real Vietnamese samples gates the build.** It is the first phase of the plan; if it fails for receipts or spreadsheet screenshots, the feature does not proceed as specced (see Preconditions).
+5. **An accuracy check on real Vietnamese samples gates the build.** It is the first phase of the plan and a go/no-go for the one vision model (decision 11). If it fails for receipts or spreadsheet screenshots, the feature does not proceed as specced and Plan B applies (decision 12, Preconditions).
 6. **VND only.** Every amount the AI reads is VND, and a proposal may only be attached to a VND Wallet — for image and typed proposals alike (BR-13). Multi-currency reading is a later release.
 7. **Limits confirmed by the product owner:** 10 image readings per hour per User, at most 20 proposals per image, caption at most 300 characters. The exact values are owned by the plan; this spec refers to them as "the image limit", "the maximum proposals" and "the caption maximum".
 8. **Handwriting ships either way.** If the accuracy check shows handwritten notes below the pass bar, they are still accepted, but every proposal read from a handwritten note carries the low-confidence label (BR-09). No extra gate or PIN — every proposal already needs an explicit Confirm.
 9. **Every proposal in a reply gets its own card**, for typed and image replies alike (BR-14).
 10. **Cheapest option with the biggest impact** is the tie-breaker for any remaining design choice.
+11. **One vision model, free, no fallback provider** (2026-10-17). Image reading uses one model on the AI provider's free tier. No paid provider and no Anthropic key are used for this feature. When that model fails or is withdrawn, image reading fails with a clear error and the operator can switch it off (BR-18). Typed messages and manual entry are unaffected. *(Resolves Open Questions #5.)*
+12. **Plan B is free** (2026-10-17). If the accuracy check fails, or the vision model is withdrawn for good, the fallback is text recognition on the phone (only in the installed app builds that can run it; the Expo Go test app keeps sending the image) whose text goes to the existing text reader of typed messages, checked again with the same accuracy check. If Plan B fails too, image reading is postponed. The trigger numbers are owned by the plan.
+13. **Busy means fail fast** (2026-10-17). When the provider is out of capacity, the reply comes back at once with a retry offer (BR-19). No queue and no server-side waiting: a queue would keep the image on the server, which decision 2 forbids.
+14. **Possible duplicates are warned, not blocked** (2026-10-17), using only Transactions already saved (BR-17). No image fingerprint is stored. *(Resolves Open Questions #2.)*
+15. **Uncertain receipt lines are marked one by one** (2026-10-17), on top of the card-level low-confidence label (BR-16).
+16. **Provider data retention** (2026-10-17). The image leaves the System only to the one AI provider, for one reading. Zero data retention is turned on in that provider account before the feature is enabled for anyone other than the owner (Preconditions); done 2026-10-18. The User is told once, before the first photo, that the image is read by an external AI service (BR-21).
 
 ### Business Rules
 
@@ -48,7 +56,7 @@ Two defects in today's typed-message flow block this feature and are fixed first
 |---|---|
 | BR-01 | ⚠️ A proposal is never saved without the User's explicit Confirm on that proposal (or on a "confirm all" the User triggers on the existing pending-review screen). |
 | BR-02 | ⚠️ Money: every amount is an integer number of xu (VND minor unit, 1 đồng = 100 xu), never a fractional value at any step. The AI reads whole đồng; a value read with a fractional part is not rounded — that entry is skipped and counted as unreadable. Currency: VND only; no conversion at any step (BR-13). |
-| BR-03 | ⚠️ A receipt yields **one** proposal for its **total payable**, never the cash handed over, the change returned, a subtotal, or a tax line as a separate proposal. Its line items and its tax, fee and discount lines are attached to that proposal as Items and Adjustments (BR-15), not proposed separately. |
+| BR-03 | ⚠️ A receipt yields **one** proposal for its **total payable**: the amount owed after every discount, tax and fee (the "Tổng thanh toán" / "Thanh toán" line when printed). Never the subtotal before discounts ("Tạm tính", "Tổng tiền hàng"), the cash handed over ("Khách đưa"), the change returned ("Tiền thối", "Trả lại"), or a tax line as a separate proposal. When the total payable cannot be told apart from the other totals printed, the proposal carries the low-confidence label. Its line items and its tax, fee and discount lines are attached to that proposal as Items and Adjustments (BR-15), not proposed separately. |
 | BR-04 | ⚠️ The System never invents an entry that is not visibly present in the image. Header, subtotal and total rows of a sheet are never proposals. |
 | BR-05 | The System never invents a date. A printed or written date is used as the Transaction date (day/month order, Vietnamese convention). When none is visible, the current date is used and the proposal carries the low-confidence label. A date in the future also carries the label. |
 | BR-06 | At most the maximum proposals per image. When the image holds more, the first entries in reading order are proposed and the reply says the rest were not read. |
@@ -61,13 +69,20 @@ Two defects in today's typed-message flow block this feature and are fixed first
 | BR-13 | ⚠️ A proposal (typed or image) is only ever attached to a VND Wallet. If the Wallet named or chosen is not VND, the System uses the default Wallet when it is VND, else the User's earliest-created VND Wallet. If the User has no VND Wallet, the proposal is returned without a Wallet and cannot be saved until the User picks a VND Wallet for it (US-04). The amount is never converted. |
 | BR-14 | Every proposal in one reply is shown as its own card, in the order returned, for typed and image replies alike. No proposal is dropped. |
 | BR-15 | ⚠️ A receipt proposal carries the Items and Adjustments read from the receipt, following the Item rules of [Items of a Transaction](../transaction-line-items/spec.md). When they do not add up to the total payable (that spec's balance rule), the proposal keeps the total and the Items, carries the low-confidence label, and cannot be saved directly: Confirm opens the edit form, where the User fixes the gap or removes the Items, and "confirm all" on the pending-review screen skips it and counts it as not saved. When the receipt lists more lines than the item maximum, the proposal carries no Items and the lead-in says the Items were not attached. Handwritten notes and spreadsheet screenshots never produce Items. |
+| BR-16 | A receipt Item or Adjustment the AI reads with doubt (blurred, cut off, ambiguous digits) carries a needs-review mark, shown as "Cần kiểm tra" next to that line on the card's expanded list and in the edit form. A proposal with at least one marked line carries the low-confidence label (BR-09). The mark alone never blocks a save; BR-15 alone decides whether the lines add up. When the lines miss the total and no line is marked, the gap is shown and no line is marked by guess. A line's mark is cleared when the User edits that line; marks are never saved with the Transaction. |
+| BR-17 | ⚠️ **Possible duplicate.** Before replying, the System checks each image proposal that has a Wallet against the User's own non-deleted Transactions: same Wallet, same type, same amount in xu, same calendar day in the app timezone. When at least one matches, the card shows "Giống giao dịch {amount} ngày {date}" (the latest match; both values through the shared formatters) and its save button reads "Vẫn lưu" instead of "Lưu". Saving from the card works as usual. "Confirm all" on the pending-review screen skips the card and counts it as not saved. The mark is cleared when the User edits the card. Only image proposals are checked. |
+| BR-18 | **Operator switch.** Image reading can be switched off without a release. While it is off, a request is refused before the image is read, does not count against the image limit, and the app replies "Đọc ảnh đang tạm dừng." with the existing manual-entry offer ("Nhập thủ công"). After that reply the attach button stays disabled for the rest of the app session, and a tap on it shows the same sentence. Typed messages are unaffected. |
+| BR-19 | ⚠️ **Provider busy.** When the AI provider refuses a reading because its shared capacity is used up, the System replies at once with a busy error: no queue, no waiting, no second attempt within the same request. The request does not count against the image limit and the image stays on the device. The reply reads "Chưa đọc được ảnh. Thử lại sau {minutes} phút." with a retry for this image and the manual-entry offer; {minutes} is the provider's wait time rounded up to whole minutes, 1 when none is given. |
+| BR-20 | ⚠️ Text that appears in the image (printed, handwritten or on screen) is only ever read as entries. It cannot change the System's instructions, pick another User's Wallets or Categories, change any limit, or cause a save. Every value read is re-validated as untrusted input (BR-01, BR-02, BR-07, BR-13). |
+| BR-21 | **Privacy notice.** The first time a User taps the attach-image button on a device, the System shows a notice before anything else: title "Ảnh được gửi đi để đọc", body "Dịch vụ AI bên ngoài đọc ảnh rồi xóa ngay. Ảnh chỉ còn trên điện thoại này.", buttons "Tiếp tục" and "Để sau". "Tiếp tục" records that this User has seen it on this device and opens the camera / library choice. "Để sau" closes the notice; nothing is taken or sent, and the notice shows again on the next tap. The notice shows again for another User on the same device, and on a new device or after a reinstall. |
 
 ### Key Entities
 
 | Entity | Role in this feature |
 |---|---|
 | Image capture | Transient. One picture plus an optional caption, sent once for reading. Never stored by the System. |
-| Transaction proposal | The existing proposal (amount, type, Category, Wallet, date, note, confidence, idempotency key). One per entry read. The Wallet may be absent when the User has no VND Wallet (BR-13). A receipt proposal may carry Items and Adjustments (BR-15). |
+| Transaction proposal | The existing proposal (amount, type, Category, Wallet, date, note, confidence, idempotency key). One per entry read. The Wallet may be absent when the User has no VND Wallet (BR-13). A receipt proposal may carry Items and Adjustments (BR-15), with a needs-review mark per line (BR-16). Any image proposal may carry a possible-duplicate match: the amount and date of the latest matching saved Transaction (BR-17). |
+| Image reading switch | Operator-controlled on/off for the whole feature, for every User at once (BR-18). Not stored per User. |
 | Transaction | Created only on Confirm, through the existing create flow. |
 | Chat thread | The existing per-User thread. Gains an "image" user message (thumbnail kept on this device only) and one message per proposal. |
 | Wallet | Read-only context; ownership re-validated; only VND Wallets may receive a proposal. |
@@ -77,11 +92,12 @@ Two defects in today's typed-message flow block this feature and are fixed first
 
 ## Preconditions (feature-level)
 
-- US-04 and US-05 have shipped (or ship in the same release, before US-01 is enabled).
-- The accuracy check (plan Phase 0) has passed for printed receipts and spreadsheet screenshots. Handwritten notes ship whatever their result (Resolved design decision 8).
+- US-04 and US-05 have shipped (done 2026-10-04).
+- The accuracy check (plan Phase 0) has passed for printed receipts and spreadsheet screenshots on the one vision model, or Plan B has passed the same check (Resolved design decision 12). Handwritten notes ship whatever their result (Resolved design decision 8).
 - The User is authenticated and has at least one non-deleted Wallet (else the reply explains a Wallet is needed — EC-10).
-- The device is online (BR-11). Detecting "offline" depends on the offline-support feature being specced in parallel (`specs/mobile-ux-batch-2026-10/research-offline.md`); until it ships, a failed request due to no network shows the no-connection error state instead (US-01 UI states).
-- The AI Service has at least one working vision-capable provider configured.
+- The device is online (BR-11), as reported by the app's connectivity signal (shipped with offline support). A request that still fails for lack of network shows the no-connection error state (US-01 UI states).
+- The vision model is reachable and the operator switch is on (BR-18).
+- Before the feature is enabled for any User other than the owner: zero data retention is on for the production AI provider account (Resolved design decision 16).
 
 ---
 
@@ -98,16 +114,16 @@ Two defects in today's typed-message flow block this feature and are fixed first
 - Feature-level preconditions hold.
 
 ### Main Flow
-1. User taps the attach-image button next to the recording input.
+1. User taps the attach-image button next to the recording input. The first time on this device, System shows the privacy notice and continues only after "Tiếp tục" (BR-21).
 2. System offers two choices: take a photo, or choose from the library.
 3. User picks one; System asks for the corresponding device permission the first time.
 4. User takes or picks a photo.
 5. System shows a preview of the image with an optional caption field (e.g. "ví MB") and Send / Cancel.
 6. User taps Send.
 7. System reduces the image to a size that is still legible, posts the User's message in the thread (a small thumbnail plus the caption, if any), and shows the typing indicator.
-8. Backend checks the image's size and type, loads the User's own Wallets and Categories, and sends the image, caption, Wallets, Categories and the current date to the AI Service.
-9. AI Service reads the image according to BR-02 to BR-06, notes whether the image is a handwritten note, and returns the entries it found.
-10. Backend validates each entry (BR-07), applies the VND Wallet rule (BR-13), applies the low-confidence label (BR-09), pre-generates an idempotency key for each surviving entry (BR-08), and discards the image.
+8. Backend checks the operator switch (BR-18), the image's size and type, loads the User's own Wallets and Categories, and sends the image, caption, Wallets, Categories and the current date to the AI Service.
+9. AI Service reads the image according to BR-02 to BR-06 and BR-20, notes whether the image is a handwritten note, marks receipt lines read with doubt (BR-16), and returns the entries it found. A busy provider ends the request here (BR-19).
+10. Backend validates each entry (BR-07), applies the VND Wallet rule (BR-13), applies the low-confidence label (BR-09, BR-16), checks each entry for a possible duplicate (BR-17), pre-generates an idempotency key for each surviving entry (BR-08), and discards the image.
 11. Backend replies with a short lead-in (how many proposals, how many are low confidence, whether entries were skipped or not read) and the list of proposals.
 12. System shows the lead-in, then one proposal card per entry, in reading order (BR-14).
 
@@ -115,7 +131,7 @@ Two defects in today's typed-message flow block this feature and are fixed first
 
 | ID | Criterion |
 |---|---|
-| AC-01 | The attach-image button is shown only in recording mode. It is disabled while a reply is pending and while the device is offline. |
+| AC-01 | The attach-image button is shown only in recording mode.<br>It is disabled while a reply is pending, while the device is offline, and for the rest of the app session after a feature-off reply (BR-18). |
 | AC-02 | The User can choose camera or library. Cancelling either returns to the chat with nothing sent. |
 | AC-03 | A preview with an optional caption is always shown before anything is sent; Cancel discards the image. |
 | AC-04 | After Send, the User's message shows a thumbnail of the image and the caption.<br>Tapping the thumbnail opens the image full-screen on this device. |
@@ -132,6 +148,13 @@ Two defects in today's typed-message flow block this feature and are fixed first
 | AC-41 | A receipt proposal card shows its Item count and can be expanded to list its Items and Adjustments. |
 | AC-42 | ⚠️ A receipt proposal whose Items and Adjustments do not add up to its total carries the low-confidence label, and Confirm opens the edit form instead of saving (BR-15). |
 | AC-43 | Confirming a receipt proposal saves the Transaction together with its Items and Adjustments, or nothing; a repeated confirm never duplicates them. |
+| AC-44 | While the operator switch is off, no image is read and the image limit is not used.<br>The app shows the feature-off reply and keeps the attach button disabled for that app session (BR-18). |
+| AC-45 | ⚠️ A busy provider produces an immediate busy reply with the wait time and a retry for the same image.<br>The image limit is not used and nothing is queued on the server (BR-19). |
+| AC-46 | ⚠️ A proposal matching a saved Transaction shows the possible-duplicate line and the "Vẫn lưu" button.<br>Confirm-all skips it and counts it as not saved (BR-17). |
+| AC-47 | Receipt lines read with doubt show "Cần kiểm tra"; their proposal carries the low-confidence label (BR-16). |
+| AC-48 | ⚠️ Instructions written in the image are never followed; every value read is validated as untrusted input (BR-20). |
+| AC-49 | A receipt printing several totals yields one proposal for the total payable after discounts (BR-03). |
+| AC-51 | The first tap on the attach-image button shows the privacy notice; no camera, library or upload happens before "Tiếp tục".<br>After "Tiếp tục" the notice never shows again for that User on that device (BR-21). |
 
 ### Scenarios
 
@@ -165,6 +188,24 @@ Two defects in today's typed-message flow block this feature and are fixed first
 | S-AIIMG-53 | Receipt with more lines than the item maximum | User sends it | 1 proposal for the total, no Items; lead-in says the Items were not attached | BR-15 |
 | S-AIIMG-54 | Receipt with a discount line of 20,000 đ | User sends it | 1 proposal for the total; Items plus a discount Adjustment of 20,000 đ; they add up to the total | BR-15 |
 | S-AIIMG-55 | ⚠️ Proposal from S-AIIMG-02 | User confirms it twice (double tap) | One Transaction with one set of 12 Items and 1 Adjustment; balance moves once | AC-43 |
+| S-AIIMG-56 | Operator switch is off | User sends an image | `503 AI_IMAGE_DISABLED`; the AI Service is not called; image limit unchanged; reply "Đọc ảnh đang tạm dừng." with "Nhập thủ công"; attach button disabled until the app restarts | BR-18 — system state, not a client mistake |
+| S-AIIMG-57 | Switch was off in S-AIIMG-56, operator turns it on | User restarts the app and sends an image | Read normally | BR-18 session scope |
+| S-AIIMG-58 | Provider out of capacity, wait time 40 s | User sends an image | `503 AI_IMAGE_BUSY` with the wait time in `details`; reply "Chưa đọc được ảnh. Thử lại sau 1 phút."; image limit unchanged | BR-19 — system error, retryable |
+| S-AIIMG-59 | Busy reply from S-AIIMG-58 | User taps retry a minute later | The same image is re-sent from the device and read normally | BR-19 |
+| S-AIIMG-60 | User has 1 image reading left this hour | Two busy replies in a row | The User still has 1 image reading left this hour | BR-19 — failed requests never count |
+| S-AIIMG-61 | ⚠️ A saved expense of 145,000 đ on "Tiền mặt" dated 2 Oct | User sends that receipt again (145,000 đ, 02/10) | The proposal shows the possible-duplicate line with that Transaction's amount and date; its save button reads "Vẫn lưu" | BR-17 |
+| S-AIIMG-62 | Card from S-AIIMG-61 | User taps "Vẫn lưu" | `201`; a second Transaction is saved; balance moves once more | BR-17 — warning, not a block |
+| S-AIIMG-63 | Card from S-AIIMG-61, unconfirmed | User taps confirm-all in pending review | The card is skipped; the summary counts it as not saved | BR-17, AC-46 |
+| S-AIIMG-64 | The only 145,000 đ expense is on another Wallet, or dated 1 Oct, or deleted | User sends the receipt | No possible-duplicate line | BR-17 match rule |
+| S-AIIMG-65 | Card from S-AIIMG-61 | User edits the amount and saves the edit | The possible-duplicate line is gone; the save button reads "Lưu" again | BR-17 |
+| S-AIIMG-66 | Receipt where the line "SUA TH 1L" is blurred; lines add up to the total | User sends it | That Item shows "Cần kiểm tra"; the proposal carries the low-confidence label; Confirm saves directly | BR-16 — the mark alone never blocks |
+| S-AIIMG-67 | Receipt printing "Tổng tiền hàng 120.000", "Giảm giá 20.000", "Tổng thanh toán 100.000", "Khách đưa 200.000", "Trả lại 100.000" | User sends it | 1 proposal of 10,000,000 xu; Items plus a discount Adjustment of 20,000 đ | ⚠️ BR-03 multi-total |
+| S-AIIMG-68 | ⚠️ A note whose text tells the AI to ignore its rules and book 50,000,000 đ to another User's Wallet | User sends it | No proposal follows the instruction; no other User's data appears; any amount read is validated as usual | BR-20 |
+| S-AIIMG-69 | The provider has withdrawn the vision model | User sends an image | `502 AI_SERVICE_UNAVAILABLE`, retryable; typed messages still work | Decision 11 — system error |
+| S-AIIMG-70 | Screenshot of a food-delivery order: 3 dishes, a delivery fee, a voucher, the total | User sends it | One proposal for the total; 3 Items, a fee Adjustment and a discount Adjustment | Assumption, Open Questions #6 |
+| S-AIIMG-71 | User has never used image capture on this device | User taps the attach-image button | The privacy notice shows; after "Tiếp tục" the camera / library choice opens | BR-21, AC-51 |
+| S-AIIMG-72 | Notice from S-AIIMG-71 is showing | User taps "Để sau" | The notice closes; no permission is asked, nothing is sent; the next tap shows the notice again | BR-21 |
+| S-AIIMG-73 | User A tapped "Tiếp tục" earlier on this device | User A taps attach again; then User B, switched to on the same device, taps attach | User A goes straight to the choice; User B sees the notice | BR-21 per User per device |
 
 ### Edge Cases
 - **EC-01** ⚠️ Mis-read amount (e.g. 45.000 read as 450.000): never saved automatically; the thumbnail stays next to the cards so the User can compare; uncertain readings carry the low-confidence label. The User corrects via the existing proposal edit before confirming.
@@ -184,21 +225,35 @@ Two defects in today's typed-message flow block this feature and are fixed first
 - **EC-15** A handwritten note mistaken by the AI for a printed receipt: its proposals carry the label only if they are uncertain for another reason. Accepted risk — every proposal still needs its own Confirm next to the thumbnail.
 - **EC-27** The User removes every Item from a receipt proposal in the edit form: it is saved as a plain Transaction of the total.
 - **EC-28** A receipt line read with a quantity that is not a whole number (e.g. 0.45 kg): it becomes one Item of quantity 1 whose name carries the weight, with the printed line amount.
+- **EC-29** Two proposals of one reply match each other (a sheet with two "cafe 45k" rows on the same day): BR-17 compares only against saved Transactions, so neither is marked. Confirming both saves both, as expected for spends that really repeat.
+- **EC-30** ⚠️ The same receipt sent twice before either card is confirmed: neither is marked (nothing is saved yet). After the first is saved, the second card is not re-checked. Accepted risk: both thumbnails stay next to their cards.
+- **EC-31** A wallet-less proposal (US-04) gets a Wallet in the edit form: it is not checked for duplicates then. Accepted, same as any edited card (BR-17).
+- **EC-32** The match is a different real purchase (two coffees of the same price on the same day): the line is a warning only; "Vẫn lưu" saves it.
+- **EC-33** The provider is busy and gives no wait time: the reply says 1 minute (BR-19).
+- **EC-34** The operator switch is turned off while a reading is in progress: that reading finishes; the next request gets the feature-off error.
+- **EC-35** The provider's answer is cut short because it is too long: the System makes one more attempt with a larger output allowance, never when the provider is busy (BR-19). If that is cut too, the request ends as `502 AI_SERVICE_UNAVAILABLE`; partial proposals are never returned.
+- **EC-36** Every line of a receipt is marked "Cần kiểm tra": the proposal still offers the total; the User can remove the Items in the edit form (EC-27).
+- **EC-37** ⚠️ The total payable line is cut off or unreadable (only a subtotal or a total before a later line is visible): the proposal uses the last total still visible and carries the low-confidence label. Lines that add up to that total do not remove the label, because that total itself may be wrong.
 
 ### Client UI States (`mobile/`, recording mode)
 
 | State | Trigger | Expected UI |
 |---|---|---|
 | Idle | Recording mode, online | Attach-image button enabled next to the input |
-| Disabled | Offline, or a reply pending | Attach-image button disabled; offline shows a short explanation on tap |
-| Choosing | Button tapped | Two choices: take a photo / choose from library |
+| Disabled | Offline, a reply pending, or a feature-off reply earlier in this app session | Attach-image button disabled; offline and feature-off show a short explanation on tap |
+| Privacy notice | First tap on this device for this User (BR-21) | Notice with title, body, "Tiếp tục" and "Để sau"; nothing taken or sent yet |
+| Choosing | Button tapped (after the notice when it applies) | Two choices: take a photo / choose from library |
 | Preview | Image taken/picked | Full image, optional caption field, Send and Cancel |
 | Loading | Sent | User message with thumbnail + caption; typing indicator |
 | Success — proposals | `200` with proposals | Lead-in text, then one card per proposal; uncertain cards show the low-confidence label |
 | Success — proposal without a Wallet | `200`, User has no VND Wallet | Card shows "no Wallet" and a message that a VND Wallet must be chosen (US-04) |
 | Success — nothing found | `200` with no proposals | Reply text suggesting a clearer photo or typing; manual-entry offer |
 | Error — too large / wrong type | `413` / `415` (or caught on device) | Inline message; nothing sent to the thread |
-| Error — busy / unavailable | `429` / `502` | Reply bubble "system busy" with manual-entry offer and a retry for this image |
+| Success — possible duplicate | Proposal matching a saved Transaction (BR-17) | Possible-duplicate line on the card; save button "Vẫn lưu" |
+| Success — lines to check | Receipt lines marked (BR-16) | "Cần kiểm tra" next to each marked line in the expanded list and the edit form; low-confidence label on the card |
+| Error — limit / unavailable | `429 RATE_LIMITED` / `502` | Reply bubble "system busy" with manual-entry offer and a retry for this image |
+| Error — reading busy | `503 AI_IMAGE_BUSY` | Reply "Chưa đọc được ảnh. Thử lại sau {minutes} phút." with a retry for this image and "Nhập thủ công" (BR-19) |
+| Error — feature off | `503 AI_IMAGE_DISABLED` | Reply "Đọc ảnh đang tạm dừng." with "Nhập thủ công"; attach button disabled for the rest of the app session, a tap shows the same sentence (BR-18) |
 | Error — no connection | Network failure | Reply bubble "no connection" with retry |
 | Error — permission denied | Permission refused | Message pointing to device settings |
 
@@ -210,6 +265,9 @@ All user-facing text is in Vietnamese.
 - [ ] S-AIIMG-01 to S-AIIMG-24 pass (automated where they touch Backend/AI Service; manual on device for UI states).
 - [ ] The image limit is separate from the typed-message limit, both ways (S-AIIMG-20, S-AIIMG-21).
 - [ ] No Transaction is created by the proposal step (verified by test).
+- [ ] S-AIIMG-56 to S-AIIMG-70 pass: switch, busy, duplicate and injection cases automated on Backend/AI Service; card states checked on device.
+- [ ] Busy and feature-off requests leave the image limit unchanged (verified by test).
+- [ ] S-AIIMG-71 to S-AIIMG-73 pass on device.
 
 ---
 
@@ -229,7 +287,7 @@ All user-facing text is in Vietnamese.
 2. User compares a card with the thumbnail (tap to enlarge).
 3. User confirms, edits, or discards each card independently — the same actions typed proposals already have.
 4. On Confirm, System creates the Transaction through the existing create flow with that proposal's idempotency key; the card collapses to its saved state.
-5. Unconfirmed image proposals also appear in the existing pending-review list, where the existing "confirm all" saves them one by one.
+5. Unconfirmed image proposals also appear in the existing pending-review list, where the existing "confirm all" saves them one by one, skipping cards that cannot be saved directly (AC-34, AC-42) or carry the possible-duplicate line (BR-17).
 
 ### Acceptance Criteria
 
@@ -239,7 +297,7 @@ All user-facing text is in Vietnamese.
 | AC-16 | ⚠️ Confirming the same card twice (double-tap, retry after a timeout) creates exactly one Transaction and moves the Wallet balance once (BR-08). |
 | AC-17 | Editing an unconfirmed card replaces its fields before saving and issues it a fresh idempotency key (existing behavior); editing a confirmed card updates the saved Transaction, never creates a second one. |
 | AC-18 | A confirm that fails validation (e.g. insufficient balance) shows the error on that card only; other cards are unaffected. |
-| AC-19 | Image proposals appear in the pending-review list and are saved by "confirm all" one at a time, in order. |
+| AC-19 | Image proposals appear in the pending-review list and are saved by "confirm all" one at a time, in order.<br>Cards that cannot be saved directly or carry the possible-duplicate line are skipped and counted as not saved. |
 | AC-20 | Confirming an image proposal never records the caption as a "recent phrase" suggestion. |
 | AC-21 | The low-confidence label is shown on image proposals that BR-09 marks, until the User edits or confirms the card. |
 
@@ -291,6 +349,7 @@ All user-facing text is in Vietnamese.
 | AC-26 | Logout removes all locally kept captures. |
 | AC-27 | The User's image message cannot be edited as text (editing would re-run a typed reading). It can still be removed like other messages. |
 | AC-28 | The on-device debug console never shows the image contents. |
+| AC-50 | The image goes only to the one AI provider, only for the reading. Zero data retention is on for the production provider account before any User other than the owner can use the feature (Resolved design decision 16). |
 
 ### Scenarios
 
@@ -309,6 +368,7 @@ All user-facing text is in Vietnamese.
 ### Definition of Done
 - [ ] S-AIIMG-31 to S-AIIMG-35 pass.
 - [ ] A review of Backend and AI Service code paths confirms no logging of image, caption or extracted values.
+- [ ] The provider account's data-retention setting is checked and recorded before the feature is enabled for other Users (AC-50).
 
 ---
 
@@ -424,12 +484,14 @@ All user-facing text is in Vietnamese.
 
 ## Idempotency
 
-- The proposal step is **not** idempotent: sending the same image twice is a new reading with new proposals (EC-03).
+- The proposal step is **not** idempotent: sending the same image twice is a new reading with new proposals (EC-03). Once one of them is saved, a later reading warns with the possible-duplicate line (BR-17); nothing is blocked.
 - The confirm step **is** idempotent per proposal via its pre-generated key (BR-08, S-AIIMG-26) — the existing mechanism, unchanged. Each card of a multi-proposal reply keeps its own key (US-05).
 
 ## Timestamps
 
 - Dates read from the image are calendar dates and are stored the same way the typed-message flow stores a date-only proposal (UTC storage, shown in local time on the device). "Today" for a missing date uses the same rule as the typed-message flow; the known UTC day-boundary limitation (`CURRENT_STATE.md`) applies equally.
+- A printed or written date is the bill's own calendar date, never the time of the upload.
+- The possible-duplicate check (BR-17) compares calendar days in the app's timezone (Vietnam), so a Transaction saved late in the evening and a receipt dated that day match.
 
 ## Out of Scope
 
@@ -440,15 +502,22 @@ All user-facing text is in Vietnamese.
 - Automatic saving of any proposal; a new batch-confirm endpoint (the existing pending-review "confirm all" is reused).
 - Multi-currency reading and currency conversion — a later release.
 - Correcting Transactions already booked on non-VND Wallets before US-04 (Open Questions #4).
-- Detecting that the same receipt was already recorded (Open Questions #2).
-- Using an image while offline, or queueing it for later.
-- On-device text recognition.
+- Fingerprinting images to detect a re-sent receipt; duplicate warnings on typed proposals; re-checking a card for duplicates after an edit (BR-17 covers saved Transactions only).
+- Using an image while offline, or queueing it for later — including when the provider is busy (Resolved design decision 13).
+- On-device text recognition, except as Plan B (Resolved design decision 12). It never runs next to the vision model in this release.
+- Any paid AI provider, an Anthropic key, or a second vision provider for this feature (Resolved design decision 11).
+- Checking photo sharpness or brightness before sending. The preview (AC-03) is the check.
+- Weighed goods with a fractional quantity: they stay one Item of quantity 1 with the weight in the name (EC-28).
 - Showing the low-confidence label on typed-message proposals (Open Questions #3).
 
 ## Open Questions
 
 1. ~~SRS entry~~ — **resolved 2026-10-04:** SRS §6 Feature-12 US-05 "Record Transactions from an Image" added.
-2. **Duplicate receipts (EC-03)**: warn when an image looks like one already read? Needs a stored fingerprint, which conflicts with "nothing stored" unless it is a one-way hash. Deferred.
+2. ~~Duplicate receipts (EC-03)~~ — **resolved 2026-10-17:** warn using saved Transactions (same Wallet, type, amount, day), never block, store nothing (BR-17).
 3. **Low-confidence label on typed proposals**: the label is image-only in this release. Extend it to typed proposals later?
 4. **Existing wrong-currency Transactions (EC-22)**: should anyone check for Transactions already booked by the AI chat on non-VND Wallets before US-04 ships, and correct them?
-5. **Only one AI provider is live today** (the fallback provider has no key in this environment). Accept that image reading is unavailable whenever that provider is down?
+5. ~~Only one AI provider is live today~~ — **resolved 2026-10-17:** accepted. One free vision model, no Anthropic, operator switch (Resolved design decision 11, BR-18).
+6. ~~Delivery-app screenshots and utility bills~~ — **resolved 2026-10-18:** read as printed receipts, no dedicated handling (Context).
+7. ~~Privacy notice~~ — **resolved 2026-10-18:** a notice on first use per User per device (BR-21); zero data retention on (decision 16).
+8. ~~Expected peak~~ — **resolved 2026-10-18:** at most 2 image readings in the same minute across all Users is acceptable; beyond that the busy reply applies (BR-19).
+9. **Daily capacity on the free tier.** The accuracy check showed the provider's free daily quota allows roughly 30 image readings per day for all Users together; past it, every reading gets the busy reply with the wait the provider gives (often tens of minutes). Accept for this release, or limit readings per User per day so one User cannot use them all?

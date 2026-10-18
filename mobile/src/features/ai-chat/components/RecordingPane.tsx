@@ -6,6 +6,7 @@ import { onlineManager } from "@tanstack/react-query";
 import { TypingIndicator } from "@/components/shared/TypingIndicator";
 import { ChatComposer } from "@/features/ai-chat/components/ChatComposer";
 import { ChatInputBar } from "@/features/ai-chat/components/ChatInputBar";
+import { ImageAttachButton } from "@/features/ai-chat/components/ImageAttachButton";
 import { ChatMessageRow } from "@/features/ai-chat/components/ChatMessageRow";
 import { ChatThreadList } from "@/features/ai-chat/components/ChatThreadList";
 import { KeyboardLiftView } from "@/features/ai-chat/components/KeyboardLiftView";
@@ -165,6 +166,7 @@ export function RecordingPane({
   const handlePressHistory = useLatestCallback(onPressHistory);
   const handleOpenWizard = useLatestCallback((message: ChatMessage) => onOpenBudgetWizard(message.id));
   const handleOpenManualEntry = useLatestCallback(onOpenManualEntry);
+  const handleRetryImage = useLatestCallback((message: ChatMessage) => void chat.retryImage(message));
   const confirmingId = chat.confirmingId;
 
   const renderItem = useCallback(
@@ -182,6 +184,7 @@ export function RecordingPane({
         onPressHistory={handlePressHistory}
         onOpenBudgetWizard={handleOpenWizard}
         onOpenManualEntry={handleOpenManualEntry}
+        onRetryImage={handleRetryImage}
         onCreateWallet={handleCreateWallet}
         onOpenWalletCreator={openWalletCreator}
       />
@@ -198,6 +201,7 @@ export function RecordingPane({
       handlePressHistory,
       handleOpenWizard,
       handleOpenManualEntry,
+      handleRetryImage,
       handleCreateWallet,
       openWalletCreator,
     ],
@@ -253,6 +257,7 @@ export function RecordingPane({
             autoFocus={autoFocusInput}
             onFocusChange={handleFocusChange}
             focusNonce={inputFocusNonce}
+            leading={<ImageAttachButton disabled={chat.sending} onSend={(uri, caption) => void chat.sendImage(uri, caption)} />}
             aboveInput={
               phrasePanelOpen ? (
                 <PhraseSuggestions

@@ -39,3 +39,6 @@ __pycache__/
 
 # Lark app credentials (local only)
 lark-credentials.json
+
+# Phase 0 receipt samples and spike output (real bills carry PII; specs/ai-chat-image-capture plan §2.1)
+docs/ocr-img-sample/

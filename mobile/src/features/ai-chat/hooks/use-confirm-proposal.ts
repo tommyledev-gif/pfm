@@ -4,7 +4,7 @@ import { getErrorCode, getErrorMessage } from "@/lib/axios";
 import { userIdFromAccessToken } from "@/lib/jwt";
 import { useCreateTransactionMutation } from "@/features/transactions/api/use-create-transaction-mutation";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
-import { isSavableProposal } from "@/features/ai-chat/proposal-wallet";
+import { isConfirmAllEligible, isSavableProposal, proposalLinesGap } from "@/features/ai-chat/proposal-wallet";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { useChatStore } from "@/stores/chat-store";
 import { useRecentPhrasesStore } from "@/stores/recent-phrases-store";
@@ -36,6 +36,9 @@ export function useConfirmProposal() {
     if (!message.action || !wallets.data) return false;
     const { payload, idempotency_key } = message.action;
     if (payload.wallet_id === null || !isSavableProposal(payload, walletById)) return false;
+    // ⚠️ Lines that miss the amount are never sent (spec BR-15): the card's
+    // Save opens the edit form instead, where the User closes the gap.
+    if (proposalLinesGap(payload) !== 0) return false;
     // A transfer names its destination and goes without a category (the
     // server files it under its own) or items (it has none); income/expense
     // must not name a destination at all.
@@ -80,6 +83,8 @@ export function useConfirmProposal() {
     setConfirmingAll(true);
     let saved = 0;
     for (const message of messages) {
+      // A possible duplicate is the User's call on its own card (spec BR-17).
+      if (!isConfirmAllEligible(message)) continue;
       setConfirmingId(message.id);
       if (await save(message)) saved += 1;
     }

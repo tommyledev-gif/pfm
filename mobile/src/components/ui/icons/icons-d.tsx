@@ -105,3 +105,27 @@ export function WifiOffIcon({ size, color = colors.textSecondary, strokeWidth = 
     </Svg>
   );
 }
+
+export function CameraIcon({ size, color = colors.textPrimary, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <Svg {...base(size)} fill="none">
+      <Path
+        d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2.2l1.3-2h6l1.3 2h2.2A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5z"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinejoin="round"
+      />
+      <Circle cx="12" cy="13" r="3.2" stroke={color} strokeWidth={strokeWidth} />
+    </Svg>
+  );
+}
+
+export function ImageIcon({ size, color = colors.textPrimary, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <Svg {...base(size)} fill="none">
+      <Rect x="4" y="5" width="16" height="14" rx="2" stroke={color} strokeWidth={strokeWidth} />
+      <Circle cx="9" cy="10" r="1.5" stroke={color} strokeWidth={strokeWidth} />
+      <Path d="M5 17l4.5-4.5 3 3L15 13l4 4" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}

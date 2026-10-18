@@ -34,6 +34,14 @@ def get_groq_consult_client() -> groq.Groq:
 
 
 @lru_cache(maxsize=1)
+def get_groq_vision_client() -> groq.Groq:
+    """Image reading's own client (specs/ai-chat-image-capture plan F34): no
+    SDK retries — a 429 must come back at once as a busy reply, never be
+    retried behind the User's back."""
+    return groq.Groq(api_key=settings.groq_api_key, max_retries=0, timeout=settings.vision_timeout_seconds)
+
+
+@lru_cache(maxsize=1)
 def get_anthropic_client() -> anthropic.Anthropic:
     """Fallback client: the SDK default timeout is 10 minutes, far past the
     Go backend's 15 s budget, so it is capped to what is left after the

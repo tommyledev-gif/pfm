@@ -9,6 +9,8 @@ import { nextMessageId, newIdempotencyKey } from "@/features/ai-chat/message-id"
 import { toReplyMessages } from "@/features/ai-chat/reply-fanout";
 import { proposalLinesChanged } from "@/features/ai-chat/proposal-lines";
 import { useConfirmProposal } from "@/features/ai-chat/hooks/use-confirm-proposal";
+import { useImageCaptureActions } from "@/features/ai-chat/hooks/use-image-capture-actions";
+import { survivingReviewLineKeys } from "@/features/ai-chat/line-review";
 import { useNeedsFirstWallet } from "@/features/wallets/use-open-wallet-creator";
 import { captureChatEpoch, useChatStore } from "@/stores/chat-store";
 import { useToastStore } from "@/stores/toast-store";
@@ -44,6 +46,8 @@ export function useChatActions({ onSent }: UseChatActionsOptions) {
   const sendMessage = useSendChatMessageMutation();
   const noWallets = useNeedsFirstWallet();
   const updateTransaction = useUpdateTransactionMutation();
+  // Photos share the typing state with typed messages (specs/ai-chat-image-capture).
+  const { sendImage, retryImage } = useImageCaptureActions({ sending, setSending, onSent, minTypingMs: MIN_TYPING_MS });
 
   // Shared by a fresh send and a resend-after-editing flow — same pacing
   // either way, only the resulting message's `edited` flag differs. A
@@ -160,12 +164,15 @@ export function useChatActions({ onSent }: UseChatActionsOptions) {
 
     // A fresh idempotency key: the one on record may already have been spent
     // by a prior failed attempt.
+    // The User checked the card: the possible-duplicate line goes, and a line
+    // mark stays only on a line left unchanged (spec BR-16, BR-17).
     updateMessage(target.id, {
-      action: { ...target.action!, payload, idempotency_key: newIdempotencyKey() },
+      action: { ...target.action!, payload, idempotency_key: newIdempotencyKey(), possible_duplicate: undefined },
       edited: true,
       editHistory,
+      reviewLineKeys: survivingReviewLineKeys(target.reviewLineKeys, payload),
     });
   };
 
-  return { sending, confirmingId, send, editUserMessage, editAction, confirmAction };
+  return { sending, confirmingId, send, editUserMessage, editAction, confirmAction, sendImage, retryImage };
 }

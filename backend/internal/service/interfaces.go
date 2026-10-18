@@ -192,6 +192,12 @@ type AIServiceClient interface {
 	Extract(ctx context.Context, req AIExtractRequest) (*AIExtractResponse, error)
 }
 
+// AIImageClient is ChatImageService's contract for POST /extract-image
+// (specs/ai-chat-image-capture plan AIIMG-T13). Busy → *AIImageBusyError.
+type AIImageClient interface {
+	ExtractImage(ctx context.Context, req AIExtractImageRequest) (*AIExtractImageResponse, error)
+}
+
 // AIBudgetClient is the contract BudgetWizardService depends on for the one
 // AI-Service-backed call this feature makes — SuggestCategoryName only
 // (specs/ai-budget-wizard/plan.md Finding #6). The allocation-proposal math

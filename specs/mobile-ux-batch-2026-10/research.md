@@ -104,4 +104,40 @@ Next steps if approved:
 2. Run the spike; record per-type accuracy here.
 3. `/cook-ba` → `/cook-plan` for a dedicated `specs/ai-chat-image-capture/`.
 
+## 8. Phase 0 results — 2026-10-18 (`specs/ai-chat-image-capture` plan §2)
+
+Model `qwen/qwen3.8-27b` on Groq's free tier, `reasoning_effort = none`, forced tool call, 1600 px JPEG q 0.7, temperature 0. Samples: 12 real images + 3 synthetic (`docs/ocr-img-sample/`, git-ignored; ground truth drafted by Claude in `phase0/labels.json`, **to be verified by the owner**). Raw output: `phase0/results.jsonl`, `phase0/summary.md`. Counts are a smoke test (plan §2.2), not a measured accuracy.
+
+| Metric | Result | Threshold |
+|---|---|---|
+| Receipt total payable exact | **16/16** (2 runs × 8 receipts) | ≥ 90 % |
+| Tendered / change / subtotal / decoy used | 0 | 0 |
+| Receipt date correct when printed | 10/10 | ≥ 80 % |
+| Foreign-currency receipt proposed | 0/2 | 0 |
+| Receipt line amount exact | 62/68 = 91 % | ≥ 90 % |
+| Receipt line count exact | 10/10 | ≥ 80 % |
+| Lines reconcile when they should | 4/12 = 33 % ✗ → **1/1 after the fix** below | ≥ 80 % |
+| VAT / fee / discount as Adjustments | 0/10 ✗ → **1/1 after the fix** | ≥ 90 % |
+| Cut-off receipt lines do not reconcile | 4/4 (backend then caps confidence) | — |
+| Handwritten row amount exact | 54/56 = 96 % | ≥ 80 % |
+| Handwritten phantom rows / confident misses | 0 / 0 | ≤ 1 / ≤ 10 % |
+| Handwritten wrong income/expense type | 2 ("Tiền nhà" read as income, same in both runs) | — |
+| Sheet row amount exact | 82/82 | ≥ 95 % |
+| Sheet header / total row proposed; truncated flag | 0; 6/6 correct | 0 |
+| Instruction in the image followed | 0/2 | 0 |
+| 10× / 100× magnitude errors | 0 | 0 |
+| Schema-valid tool calls; `finish_reason = length` | 29/29; 0 at 2500 | ≥ 95 %; ≤ 5 % |
+| Latency p50 / p95 | 1.6 s / 3.6 s | ≤ 12 s |
+| Tokens per reading (prompt + completion) | median 4,691 (prompt 4,517, mostly text and schema) | recorded |
+
+Findings:
+- **Optional tool fields are silently omitted.** `adjustments` never appeared while optional; making every field required fixed it (restaurant receipt: service charge + VAT captured, lines reconcile). The other receipts' re-run was cut short by the daily quota — re-run before the verdict on lines.
+- **Confidence stays high on a cut-off total** (0.95). Added a yes/no `total_visible` field; the backend caps confidence when it is false (spec EC-37). Not yet measured.
+- **Missed rows:** the notebook's salary line (income) was skipped in both runs.
+- **Free-tier capacity is the binding limit.** 429s came with spare tokens/min and a 37-minute wait once the day's usage reached ~142k tokens: the reserved `max_tokens` counts against the 200k tokens/day too. ~7k per reading at `max_tokens = 2500` ≈ 28 readings/day for all Users; `vision_max_tokens` lowered to 1500 (p95 completion 1,253 + 20 %).
+- **G2 (plan §2.6)**: 2 readings/min × 4.7k = 9.4k > 8k tokens/min — fires by calculation; the daily quota bites first anyway.
+- Size run (1280 px) and the remaining receipt re-runs not done (quota).
+
+Verdict (provisional): Option C **passes** for totals, sheets and handwriting. Receipt lines: pending the re-run with required fields. Capacity (~30 readings/day free) needs the owner's acceptance (spec Open Questions #9).
+
 Sources: [Groq — Images and Vision](https://console.groq.com/docs/vision) · [Groq — Tool Use](https://console.groq.com/docs/tool-use/overview)

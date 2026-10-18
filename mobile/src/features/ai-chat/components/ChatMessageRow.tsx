@@ -1,7 +1,7 @@
 import { memo } from "react";
 
 import { ActionPopover } from "@/components/shared/ActionPopover";
-import { FALLBACK_CURRENCY, TRANSFER_CATEGORY_ICON } from "@/lib/constants";
+import { AI_CONFIDENCE_THRESHOLD, FALLBACK_CURRENCY, TRANSFER_CATEGORY_ICON } from "@/lib/constants";
 import { BudgetWizardCard } from "@/features/ai-chat/components/BudgetWizardCard";
 import { ChatBubble } from "@/features/ai-chat/components/ChatBubble";
 import { SwipeableMessageRow } from "@/features/ai-chat/components/SwipeableMessageRow";
@@ -11,13 +11,15 @@ import { useHoldMenu } from "@/features/ai-chat/hooks/use-hold-menu";
 import { useMessageActions } from "@/features/ai-chat/hooks/use-message-actions";
 import { isEditLocked } from "@/features/ai-chat/edit-lock";
 import { proposalCategoryName } from "@/features/ai-chat/proposal-kind";
-import { isSavableProposal, proposalWalletName } from "@/features/ai-chat/proposal-wallet";
+import { isSavableProposal, proposalLinesGap, proposalWalletName } from "@/features/ai-chat/proposal-wallet";
 import { isRemovable, tombstoneKind } from "@/features/ai-chat/tombstone";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { Category } from "@/features/categories/types";
 import { Wallet } from "@/features/wallets/types";
 import { ManualEntryButton } from "@/features/ai-chat/components/ManualEntryButton";
 import { CreateWalletButton } from "@/features/ai-chat/components/CreateWalletButton";
+import { ImageThumbnail } from "@/features/ai-chat/components/ImageThumbnail";
+import { RetryImageButton } from "@/features/ai-chat/components/RetryImageButton";
 
 interface ChatMessageRowProps {
   message: ChatMessage;
@@ -35,6 +37,8 @@ interface ChatMessageRowProps {
   onPressHistory: (message: ChatMessage) => void;
   onOpenBudgetWizard: (message: ChatMessage) => void;
   onOpenManualEntry: () => void;
+  /** Re-sends the photo of a failed image reading. */
+  onRetryImage: (message: ChatMessage) => void;
   /** Present only while the User owns no VND Wallet — see TransactionActionCard. */
   onCreateWallet?: () => void;
   /** Opens the new-wallet form — for a reply flagged `offerCreateWallet`. */
@@ -64,6 +68,7 @@ function ChatMessageRowView({
   onPressHistory,
   onOpenBudgetWizard,
   onOpenManualEntry,
+  onRetryImage,
   onCreateWallet,
   onOpenWalletCreator,
 }: ChatMessageRowProps) {
@@ -83,6 +88,12 @@ function ChatMessageRowView({
   // A proposal without a VND Wallet opens the edit form instead of saving
   // (spec AC-31, AC-32).
   const walletRequired = message.action ? !isSavableProposal(message.action.payload, walletById) : false;
+  // Lines that miss the amount are fixed in the edit form first (spec BR-15, AC-42).
+  const mustEdit = walletRequired || (message.action ? proposalLinesGap(message.action.payload) !== 0 : false);
+  // Shown until the User edits or saves the card (AC-21).
+  const lowConfidence =
+    Boolean(message.imageOrigin && message.action && !message.edited) &&
+    (message.action?.confidence ?? 1) < AI_CONFIDENCE_THRESHOLD;
   const categoryName =
     (message.action && proposalCategoryName(message.action.payload, (id) => categoryById.get(id)?.name)) || "Danh mục";
   const onEdit = isEditLocked(message) ? undefined : () => onTriggerEdit(message);
@@ -139,12 +150,14 @@ function ChatMessageRowView({
             currency={currency}
             confirmed={Boolean(message.confirmed)}
             saving={confirming}
-            onConfirm={() => (walletRequired ? onTriggerEdit(message) : onConfirm(message))}
+            onConfirm={() => (mustEdit ? onTriggerEdit(message) : onConfirm(message))}
             walletRequired={walletRequired}
             onCreateWallet={onCreateWallet}
             testIDSuffix={message.id}
             edited={message.edited}
             onPressHistory={message.editHistory ? () => onPressHistory(message) : undefined}
+            lowConfidence={lowConfidence}
+            reviewLineKeys={message.reviewLineKeys}
           />
         ) : message.actionType === "budget_wizard" ? (
           <BudgetWizardCard
@@ -152,8 +165,13 @@ function ChatMessageRowView({
             createdCount={message.budgetWizardCreatedCount}
             onPress={() => onOpenBudgetWizard(message)}
           />
-        ) : message.offerManualEntry ? (
-          <ManualEntryButton onPress={onOpenManualEntry} />
+        ) : message.imageCapture ? (
+          <ImageThumbnail capture={message.imageCapture} messageId={message.id} />
+        ) : message.retryImageMessageId || message.offerManualEntry ? (
+          <>
+            {message.retryImageMessageId ? <RetryImageButton messageId={message.id} onPress={() => onRetryImage(message)} /> : null}
+            {message.offerManualEntry ? <ManualEntryButton onPress={onOpenManualEntry} /> : null}
+          </>
         ) : message.offerCreateWallet ? (
           <CreateWalletButton onPress={onOpenWalletCreator} />
         ) : null}

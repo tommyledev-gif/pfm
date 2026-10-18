@@ -73,5 +73,19 @@ class Settings(BaseSettings):
     consult_max_tokens: int = 600
     consult_timeout_seconds: float = 7.0
 
+    # Image reading (specs/ai-chat-image-capture plan §3.5, §3.6). One model,
+    # no fallback provider (plan F29, F32). reasoning_effort "none": no hidden
+    # reasoning tokens against the 8,000 tokens/min free-tier window (F30,
+    # F48). One retry at vision_retry_max_tokens only when the tool call was
+    # cut off (F40); two attempts must stay inside the Go client's 30 s.
+    groq_vision_model: str = "qwen/qwen3.8-27b"
+    groq_vision_reasoning_effort: str = "none"
+    # Phase 0 (2026-10-18): completion p95 1253, never cut at 2500 → p95 + 20 %.
+    # The reservation also counts against the daily token quota (plan F50).
+    vision_max_tokens: int = 1500
+    vision_retry_max_tokens: int = 4000
+    vision_timeout_seconds: float = 12.0
+    vision_max_items: int = 20
+
 
 settings = Settings()

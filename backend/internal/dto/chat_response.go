@@ -22,6 +22,11 @@ type TransactionActionPayload struct {
 	// Items of one purchase (specs/transaction-line-items, typed chat): when
 	// present, Amount equals their sum. Forwarded unchanged on confirm.
 	Items []ChatActionItem `json:"items,omitempty"`
+	// Adjustments read from a receipt image (ai-chat-image-capture BR-15):
+	// tax, fee and discount lines, same shape as CreateTransactionRequest's.
+	// Image proposals keep the printed total as Amount — the lines may not
+	// add up, which the client checks before a direct save.
+	Adjustments []ChatActionAdjustment `json:"adjustments,omitempty"`
 	// ToWalletID is a transfer's destination Wallet; nil on income/expense,
 	// and nil on a transfer whose destination the AI could not name (the
 	// client has the User pick one before saving). A transfer's CategoryID is
@@ -37,6 +42,31 @@ type ChatActionItem struct {
 	Amount    int64  `json:"amount"`
 }
 
+// ChatActionAdjustment has CreateTransactionRequest's adjustment shape,
+// money in xu. Direction is always set (it matches the kind for tax, fee
+// and discount).
+type ChatActionAdjustment struct {
+	Kind      string  `json:"kind"`
+	Direction string  `json:"direction"`
+	Label     *string `json:"label,omitempty"`
+	Amount    int64   `json:"amount"`
+}
+
+// ChatActionReviewLines lists, by index into the payload's Items and
+// Adjustments, the lines read with doubt (ai-chat-image-capture BR-16).
+// Kept beside the payload, never inside it: the confirm body is strict.
+type ChatActionReviewLines struct {
+	Items       []int `json:"items"`
+	Adjustments []int `json:"adjustments"`
+}
+
+// ChatActionDuplicate is the latest saved Transaction an image proposal
+// looks like (same Wallet, type, amount and day — BR-17). A warning only.
+type ChatActionDuplicate struct {
+	Amount     int64     `json:"amount"`
+	OccurredAt time.Time `json:"occurred_at"`
+}
+
 // ChatActionResponse is one proposed Transaction the User must explicitly
 // confirm — IdempotencyKey is pre-generated server-side (specs/ai-chat-assistant/spec.md
 // Edge Case #2), never client- or AI-Service-supplied.
@@ -45,6 +75,9 @@ type ChatActionResponse struct {
 	Payload        TransactionActionPayload `json:"payload"`
 	IdempotencyKey uuid.UUID                `json:"idempotency_key"`
 	Confidence     float64                  `json:"confidence"`
+	// Image proposals only; nil (omitted) on typed replies.
+	ReviewLines       *ChatActionReviewLines `json:"review_lines,omitempty"`
+	PossibleDuplicate *ChatActionDuplicate   `json:"possible_duplicate,omitempty"`
 }
 
 // ChatResponse is the body of POST /ai/chat's 200 response. Intent is

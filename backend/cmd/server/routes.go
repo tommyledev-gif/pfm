@@ -22,7 +22,7 @@ type dbPinger interface {
 // (/api/v1). Auth/rate-limit middleware ordering matters: JWTAuth must run
 // before RequireRole (role comes from the token) and before
 // InviteRateLimiter (keyed by the caller's user ID from that same token).
-func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, transactionExportHandler *handler.TransactionExportHandler, transactionImportHandler *handler.TransactionImportHandler, auditLogHandler *handler.AuditLogHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, chatHandler *handler.ChatHandler, budgetWizardHandler *handler.BudgetWizardHandler, analyticsHandler *handler.AnalyticsHandler, accountSwitchHandler *handler.AccountSwitchHandler, sessionRevocationHandler *handler.SessionRevocationHandler, profileHandler *handler.ProfileHandler, accessRequestHandler *handler.AccessRequestHandler, accountDeletionHandler *handler.AccountDeletionHandler, passkeyHandler *handler.PasskeyHandler, assetLinks fiber.Handler, tokens *service.TokenService, sessions *service.SessionService, db dbPinger, logger *zap.Logger) {
+func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, transactionExportHandler *handler.TransactionExportHandler, transactionImportHandler *handler.TransactionImportHandler, auditLogHandler *handler.AuditLogHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, chatHandler *handler.ChatHandler, chatImageHandler *handler.ChatImageHandler, budgetWizardHandler *handler.BudgetWizardHandler, analyticsHandler *handler.AnalyticsHandler, accountSwitchHandler *handler.AccountSwitchHandler, sessionRevocationHandler *handler.SessionRevocationHandler, profileHandler *handler.ProfileHandler, accessRequestHandler *handler.AccessRequestHandler, accountDeletionHandler *handler.AccountDeletionHandler, passkeyHandler *handler.PasskeyHandler, assetLinks fiber.Handler, tokens *service.TokenService, sessions *service.SessionService, db dbPinger, logger *zap.Logger) {
 	// One instance for every protected route: validates the access token and
 	// its session (see middleware.JWTAuth).
 	jwtAuth := middleware.JWTAuth(tokens, sessions, logger)
@@ -187,6 +187,10 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	transactions.Get("/export", transactionExportHandler.ExportTransactions)
 	transactions.Post("/import/preview", transactionImportHandler.Preview)
 	transactions.Post("/import/commit", transactionImportHandler.Commit)
+	// Image readings live outside the /ai group so they never spend
+	// AIChatRateLimiter's budget (specs/ai-chat-image-capture plan F3). The
+	// switch runs before the limiter: a refused request never counts (BR-18).
+	transactions.Post("/image-proposals", chatImageHandler.Switch, middleware.AIImageRateLimiter(logger), chatImageHandler.ProposeFromImage)
 	transactions.Get("/:id", transactionHandler.GetTransaction)
 	transactions.Patch("/:id", transactionHandler.UpdateTransaction)
 	transactions.Delete("/:id", transactionHandler.DeleteTransaction)
