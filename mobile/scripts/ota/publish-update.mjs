@@ -23,7 +23,7 @@ import {
   run,
   step,
 } from "./lib.mjs";
-import { publishManifest, signManifest } from "./manifest.mjs";
+import { publishManifest, signManifest, verifyLive } from "./manifest.mjs";
 
 const env = loadEnv();
 assertProdApi(env);
@@ -79,6 +79,9 @@ signManifest(manifest, out, env);
 step("Uploading");
 publishManifest(target, runtimeDir, out, updateId);
 fs.rmSync(stage, { recursive: true, force: true });
+
+step("Checking that production serves it");
+await verifyLive(runtimeVersion, updateId);
 
 console.log(`
 ✔ Update ${updateId} is live for runtime ${runtimeVersion}.

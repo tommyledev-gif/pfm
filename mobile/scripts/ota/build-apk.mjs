@@ -20,6 +20,7 @@ import {
   fail,
   loadEnv,
   readAppJson,
+  readZipEntry,
   remote,
   resolveRuntimeVersion,
   run,
@@ -50,12 +51,33 @@ run("npx", ["expo", "prebuild", "--platform", "android", "--no-install"], {
 });
 
 step("Building the release APK (Gradle, takes a few minutes)");
-run(shellPath(path.join(ANDROID_DIR, IS_WINDOWS ? "gradlew.bat" : "gradlew")), ["assembleRelease"], { cwd: ANDROID_DIR });
+run(
+  shellPath(path.join(ANDROID_DIR, IS_WINDOWS ? "gradlew.bat" : "gradlew")),
+  [
+    // The task that writes the runtime version into the APK. Gradle does not
+    // see most of what the fingerprint covers (.gitignore, node_modules, the
+    // app config), so left alone it shipped a stale value: phones then asked
+    // for a runtime no update was published to, and never updated.
+    ":app:createReleaseUpdatesResources",
+    "--rerun",
+    "assembleRelease",
+    // arm64 only: every phone that can run passkeys (Android 9+) is arm64,
+    // and the template's four ABIs (x86 ones are for emulators) made it 124 MB.
+    "-PreactNativeArchitectures=arm64-v8a",
+  ],
+  { cwd: ANDROID_DIR },
+);
 
-step("Checking the APK's signature");
+step("Checking the APK's signature and runtime version");
 verifySignature(APK);
-
 const runtimeVersion = resolveRuntimeVersion();
+const embedded = readZipEntry(APK, "assets/fingerprint")?.toString("utf8").trim();
+if (embedded !== runtimeVersion) {
+  fail(
+    `The APK says runtime ${embedded ?? "(none)"}, this checkout resolves to ${runtimeVersion}.\n` +
+      "  Updates published from here would never reach it. Run `npm run apk` again.",
+  );
+}
 console.log(`  runtime version ${runtimeVersion}`);
 
 if (!target) {
@@ -90,6 +112,8 @@ ssh(`mv ${quote(`${apkDir}/.latest.json.part`)} ${quote(`${apkDir}/latest.json`)
 // Marks this runtime as one that has an APK: publish-update.mjs refuses to
 // publish for a runtime no phone can run.
 put(path.join(stage, "apk.json"), `${runtimeDir}/apk.json`);
+// pfm-backend reads these as another user (see manifest.mjs publishManifest).
+ssh(`chmod -R a+rX ${quote(apkDir)} ${quote(runtimeDir)}`);
 fs.rmSync(stage, { recursive: true, force: true });
 
 console.log(`

@@ -1,11 +1,13 @@
 // Shared helpers for the release scripts in this folder: build-apk.mjs,
 // publish-update.mjs and rollback-update.mjs. How they fit together:
 // docs/ops-runbook.md §8.
+import { Buffer } from "node:buffer";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import zlib from "node:zlib";
 
 export const MOBILE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -52,27 +54,25 @@ export function assertProdApi(env) {
   }
 }
 
+// npx and gradlew are .cmd/.bat files on Windows, so they run through cmd
+// there (pass shell: false for real executables such as ssh). A shell gets
+// one command line: an args array would be joined unescaped anyway, which is
+// what Node warns about (DEP0190).
+function spawn(command, args, options) {
+  const shell = IS_WINDOWS && options.shell !== false;
+  const settings = { cwd: MOBILE_ROOT, ...options, shell };
+  return shell ? spawnSync([command, ...args].join(" "), settings) : spawnSync(command, args, settings);
+}
+
 // Runs a command with live output; any non-zero exit stops the script.
-// npx and gradlew are .cmd/.bat files on Windows, hence the shell there.
 export function run(command, args, options = {}) {
-  const result = spawnSync(command, args, {
-    cwd: MOBILE_ROOT,
-    stdio: "inherit",
-    shell: IS_WINDOWS && options.shell !== false,
-    ...options,
-  });
+  const result = spawn(command, args, { stdio: "inherit", ...options });
   if (result.status !== 0) fail(`${command} ${args.join(" ")} exited with ${result.status ?? result.signal}`);
 }
 
 // Runs a command and returns its stdout.
 export function capture(command, args, options = {}) {
-  const result = spawnSync(command, args, {
-    cwd: MOBILE_ROOT,
-    encoding: "utf8",
-    maxBuffer: 64 * 1024 * 1024,
-    shell: IS_WINDOWS && options.shell !== false,
-    ...options,
-  });
+  const result = spawn(command, args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, ...options });
   if (result.status !== 0) {
     fail(`${command} ${args.join(" ")} exited with ${result.status ?? result.signal}\n${result.stderr ?? ""}`);
   }
@@ -126,4 +126,24 @@ export function remote(env) {
       run("scp", args, { cwd: path.dirname(localPath), shell: false });
     },
   };
+}
+
+// Reads one file out of the APK (a zip): the central directory gives each
+// entry's offset, size and compression (0 stored, 8 deflated).
+export function readZipEntry(zipPath, name) {
+  const zip = fs.readFileSync(zipPath);
+  const end = zip.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  if (end === -1) return null;
+  let entry = zip.readUInt32LE(end + 16);
+  for (let i = zip.readUInt16LE(end + 10); i > 0; i--) {
+    const nameLength = zip.readUInt16LE(entry + 28);
+    if (zip.toString("utf8", entry + 46, entry + 46 + nameLength) === name) {
+      const local = zip.readUInt32LE(entry + 42);
+      const start = local + 30 + zip.readUInt16LE(local + 26) + zip.readUInt16LE(local + 28);
+      const data = zip.subarray(start, start + zip.readUInt32LE(entry + 20));
+      return zip.readUInt16LE(entry + 10) === 0 ? data : zlib.inflateRawSync(data);
+    }
+    entry += 46 + nameLength + zip.readUInt16LE(entry + 30) + zip.readUInt16LE(entry + 32);
+  }
+  return null;
 }

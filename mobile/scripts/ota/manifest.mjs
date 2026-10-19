@@ -5,7 +5,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-import { MOBILE_ROOT, fail, readAppJson } from "./lib.mjs";
+import { MOBILE_ROOT, UPDATES_BASE_URL, fail, readAppJson } from "./lib.mjs";
 
 // Writes manifest.json and manifest.sig into dir. The signature is what
 // expo-updates verifies: RSA-SHA256 over the exact manifest bytes, sent as
@@ -31,6 +31,35 @@ export function signManifest(manifest, dir, env) {
   );
 }
 
+// Asks production for the live update the way a phone does and fails unless
+// it is this one, signed. Without this, a server-side problem (a file it
+// cannot read, an old backend) looks exactly like a successful publish:
+// phones just keep what they have and say nothing.
+export async function verifyLive(runtimeVersion, updateId) {
+  const res = await fetch(`${UPDATES_BASE_URL}/manifest`, {
+    headers: {
+      "expo-platform": "android",
+      "expo-runtime-version": runtimeVersion,
+      "expo-protocol-version": "1",
+      accept: "application/expo+json,application/json",
+    },
+  });
+  const body = await res.text();
+  let liveId;
+  try {
+    liveId = JSON.parse(body).id;
+  } catch {
+    liveId = undefined;
+  }
+  if (res.status !== 200 || liveId !== updateId || !res.headers.get("expo-signature")) {
+    fail(
+      `Uploaded, but ${UPDATES_BASE_URL}/manifest does not serve it: HTTP ${res.status}, id ${liveId ?? "none"}.\n` +
+        `  ${body.slice(0, 200)}\n` +
+        "  Check `docker logs pfm-backend-container` on the VPS.",
+    );
+  }
+}
+
 // Uploads an update folder under a temporary name, renames it into place,
 // then points `current` at it, so a phone never gets a manifest whose files
 // are still uploading. Each publish is also logged to `history`, which
@@ -43,6 +72,10 @@ export function publishManifest(target, runtimeDir, dir, updateId, note = "") {
   upload(dir, part);
   ssh(
     [
+      // scp from Windows creates folders as drwx------, which pfm-backend
+      // (another user inside its container) cannot read: every manifest
+      // request then fails with 500 and phones silently keep their version.
+      `chmod -R a+rX ${quote(part)}`,
       `mv ${quote(part)} ${quote(`${runtimeDir}/${updateId}`)}`,
       `printf '%s\\n' ${quote(updateId)} > ${quote(`${runtimeDir}/.current.part`)}`,
       `mv ${quote(`${runtimeDir}/.current.part`)} ${quote(`${runtimeDir}/current`)}`,

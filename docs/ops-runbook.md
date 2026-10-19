@@ -135,7 +135,7 @@ JS/TS and images reach phones as OTA updates; nothing to install. Native changes
 | JS/TS, images, copy | `npm run ota:publish` | Nothing: open the app, close it, open it again |
 | Native: a library with native code, a plugin or permission in `app.json`, the Maps key, an Expo SDK upgrade | `npm run apk`, then `npm run ota:publish` | Download from the APK link, install over the old app |
 
-There is no need to judge which case applies: `ota:publish` refuses when native code changed since the last APK, because no phone could run that update. `npm run apk` bumps `android.versionCode`, prebuilds, builds, checks the signature against the release key and uploads; `-- --no-upload` only builds.
+There is no need to judge which case applies: `ota:publish` refuses when native code changed since the last APK, because no phone could run that update. After uploading, `ota:publish` asks production for the manifest the way a phone does and fails unless the new update comes back signed; uploaded folders are made world-readable, since pfm-backend reads them as another user. `npm run apk` bumps `android.versionCode`, prebuilds, builds, checks the signature against the release key and that the runtime version written inside the APK matches this checkout (Gradle once shipped a stale one, so no update ever reached that APK), then uploads; `-- --no-upload` only builds.
 
 **Rollback:** `npm run ota:rollback` puts the previous update back, `-- --list` shows the history, `-- --to <id>` picks one. The old update is republished with a new id and date, since a phone only ever moves to a newer update.
 
@@ -144,4 +144,4 @@ There is no need to judge which case applies: `ota:publish` refuses when native 
 - **A new APK is a manual install.** Android does not let an app update itself silently; the user taps Install. The first install signed with the release key (after the template debug key) needs an uninstall, once.
 - **Old updates are kept.** Nothing prunes `app-updates/android/<runtime>/<id>`. Delete the folder of a runtime no phone runs any more; inside a live runtime, keep every update listed in `history`, since a rollback copy points at the original's files.
 - **iOS is not set up.** The server accepts `expo-platform: ios`, but no script builds or publishes for it.
-- **Big downloads and `HTTPWriteTimeout` (60 s).** The APK is about 50 MB. Cloudflare takes it from the origin at full speed and feeds the phone itself, so the timeout does not bite in practice; if APK downloads ever stop after about a minute on a slow connection, that limit is the reason.
+- **Big downloads and `HTTPWriteTimeout` (60 s).** The APK (arm64 only, see build-apk.mjs) is tens of MB. Cloudflare takes it from the origin at full speed and feeds the phone itself, so the timeout does not bite in practice; if APK downloads ever stop after about a minute on a slow connection, that limit is the reason.

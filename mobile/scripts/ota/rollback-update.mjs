@@ -14,7 +14,7 @@ import path from "node:path";
 import process from "node:process";
 
 import { fail, loadEnv, remote, resolveRuntimeVersion, step } from "./lib.mjs";
-import { publishManifest, signManifest } from "./manifest.mjs";
+import { publishManifest, signManifest, verifyLive } from "./manifest.mjs";
 
 const args = process.argv.slice(2);
 const argValue = (name) => {
@@ -63,5 +63,6 @@ fs.mkdirSync(out);
 signManifest({ ...old, id: updateId, createdAt: new Date().toISOString() }, out, env);
 publishManifest(target, runtimeDir, out, updateId, `rollback-to ${chosen}`);
 fs.rmSync(stage, { recursive: true, force: true });
+await verifyLive(runtimeVersion, updateId);
 
 console.log(`\n✔ ${chosen} is live again (as ${updateId}). Phones switch on their next two launches.\n`);
