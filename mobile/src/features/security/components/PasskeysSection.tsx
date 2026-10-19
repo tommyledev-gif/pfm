@@ -52,7 +52,14 @@ export function PasskeysSection() {
   const remove = useDeletePasskeyMutation();
   const [confirming, setConfirming] = useState<PasskeyItem | null>(null);
   const [needsProvider, setNeedsProvider] = useState(false);
+  // The guide was already up and the retry hit the same wall.
+  const [providerStillMissing, setProviderStillMissing] = useState(false);
   const toast = useToastStore.getState().show;
+
+  const closeProviderHelp = () => {
+    setNeedsProvider(false);
+    setProviderStillMissing(false);
+  };
 
   const add = () => {
     if (!onlineManager.isOnline()) {
@@ -61,13 +68,14 @@ export function PasskeysSection() {
     }
     register.mutate(undefined, {
       onSuccess: () => {
-        setNeedsProvider(false);
+        closeProviderHelp();
         toast(COPY.added, "info");
       },
       onError: (error) => {
         // Nothing on the phone can keep a passkey: a toast cannot fix that,
         // the guide with its settings button can.
         if (error instanceof PasskeyNativeError && error.kind === "no-provider") {
+          setProviderStillMissing(needsProvider);
           setNeedsProvider(true);
           return;
         }
@@ -130,7 +138,12 @@ export function PasskeysSection() {
       )}
 
       {available && needsProvider ? (
-        <PasskeyProviderHelp onRetry={add} retrying={register.isPending} onDismiss={() => setNeedsProvider(false)} />
+        <PasskeyProviderHelp
+          onRetry={add}
+          retrying={register.isPending}
+          onDismiss={closeProviderHelp}
+          stillMissing={providerStillMissing}
+        />
       ) : available ? (
         <PillButton
           label={COPY.add}

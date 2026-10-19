@@ -4,6 +4,19 @@
     "slug": "pfm-mobile",
     "scheme": "pfm",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://api.example.com/api/v1/app-updates/manifest",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0,
+      "codeSigningCertificate": "./certs/certificate.pem",
+      "codeSigningMetadata": {
+        "keyid": "main",
+        "alg": "rsa-v1_5-sha256"
+      }
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -20,6 +33,7 @@
       "predictiveBackGestureEnabled": false,
       "allowBackup": false,
       "package": "com.example.pfm",
+      "versionCode": 2,
       "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
@@ -27,6 +41,7 @@
       "bundler": "metro"
     },
     "plugins": [
+      "./plugins/with-release-signing",
       "expo-router",
       "expo-secure-store",
       [

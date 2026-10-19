@@ -1,4 +1,5 @@
-import { Pressable, Text, View } from "react-native";
+import { useEffect, useRef } from "react";
+import { AppState, Pressable, Text, View } from "react-native";
 
 import { PillButton } from "@/components/ui/PillButton";
 import { CloseIcon } from "@/components/ui/Icon";
@@ -10,36 +11,64 @@ interface PasskeyProviderHelpProps {
   onRetry: () => void;
   retrying?: boolean;
   onDismiss: () => void;
+  /** The automatic retry after Settings failed the same way again. */
+  stillMissing?: boolean;
 }
 
-// Android 14+: the phone has to have a passkey service chosen (Google).
+// Android 14+: the phone keeps passkeys in whichever password services are
+// switched on under "Mật khẩu, khóa truy cập và tài khoản"; with none on,
+// Credential Manager refuses at once.
 const PROVIDER_COPY = {
-  title: "Máy chưa chọn nơi lưu passkey",
-  steps: ["Bấm Mở cài đặt bên dưới.", "Chọn Google trong danh sách dịch vụ mật khẩu và khóa truy cập."],
-  open: "Mở cài đặt",
-  notFound: "Không thấy danh sách đó: tìm “khóa truy cập” trong Cài đặt.",
+  title: "Máy chưa bật dịch vụ lưu passkey",
+  why: "Passkey nằm trong trình quản lý mật khẩu của máy, thường là Google.",
+  steps: ["Bấm Mở Cài đặt.", "Bật Google trong danh sách dịch vụ."],
+  open: "Mở Cài đặt",
+  notFound: "Không thấy danh sách: tìm “khóa truy cập” trong Cài đặt.",
+  stillMissing: "Máy vẫn chưa bật dịch vụ nào. Bật Google rồi quay lại.",
 } as const;
 
 // Before Android 14: passkeys always go to Google, which needs an account.
 const ACCOUNT_COPY = {
   title: "Máy chưa có tài khoản Google",
-  steps: ["Bấm Thêm tài khoản Google bên dưới.", "Đăng nhập một tài khoản Google."],
+  why: "Passkey được lưu vào tài khoản Google trên máy.",
+  steps: ["Bấm Thêm tài khoản Google.", "Đăng nhập một tài khoản Google."],
   open: "Thêm tài khoản Google",
   notFound: null,
+  stillMissing: "Máy vẫn chưa có tài khoản Google. Thêm tài khoản rồi quay lại.",
 } as const;
+
+const RETURN_STEP = "Quay lại đây, passkey tự thêm tiếp.";
+const RETRY_LABEL = "Thử lại";
 
 /**
  * What to do when the phone has nowhere to keep a passkey (Credential
- * Manager's NoCreateOption): the steps, a button straight to the screen that
- * fixes it, and a retry for when the User comes back. Shown in place of a
- * one-line toast, which said what was wrong but left the User to find the
- * setting alone.
+ * Manager's NoCreateOption / NotConfigured). No app may pick or switch on a
+ * password service for the User: Android keeps that choice in Settings. So
+ * this opens the exact screen and, the moment the User comes back from it,
+ * runs the passkey step again on its own; "Thử lại" stays for a phone where
+ * that return is missed.
  */
-export function PasskeyProviderHelp({ onRetry, retrying, onDismiss }: PasskeyProviderHelpProps) {
+export function PasskeyProviderHelp({ onRetry, retrying, onDismiss, stillMissing }: PasskeyProviderHelpProps) {
   const colors = useColors();
   const styles = useStyles();
   const copy = choosesPasskeyProvider() ? PROVIDER_COPY : ACCOUNT_COPY;
   const steps = [...copy.steps, RETURN_STEP];
+
+  // Set when Settings is opened from here; the next return to the app spends it.
+  const awaitingReturn = useRef(false);
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state !== "active" || !awaitingReturn.current) return;
+      awaitingReturn.current = false;
+      onRetry();
+    });
+    return () => subscription.remove();
+  }, [onRetry]);
+
+  const openSettings = () => {
+    awaitingReturn.current = true;
+    void openPasskeySettings();
+  };
 
   return (
     <View style={styles.card} testID="card-passkey-provider-help">
@@ -49,6 +78,7 @@ export function PasskeyProviderHelp({ onRetry, retrying, onDismiss }: PasskeyPro
           <CloseIcon size={16} color={colors.textSecondary} />
         </Pressable>
       </View>
+      <Text style={styles.why}>{copy.why}</Text>
 
       {steps.map((step, index) => (
         <View key={step} style={styles.step}>
@@ -59,14 +89,14 @@ export function PasskeyProviderHelp({ onRetry, retrying, onDismiss }: PasskeyPro
         </View>
       ))}
       {copy.notFound ? <Text style={styles.note}>{copy.notFound}</Text> : null}
+      {stillMissing ? (
+        <Text style={styles.stillMissing} testID="text-passkey-still-missing">
+          {copy.stillMissing}
+        </Text>
+      ) : null}
 
       <View style={styles.actions}>
-        <PillButton
-          label={copy.open}
-          onPress={() => void openPasskeySettings()}
-          style={styles.action}
-          testID="btn-passkey-open-settings"
-        />
+        <PillButton label={copy.open} onPress={openSettings} style={styles.action} testID="btn-passkey-open-settings" />
         <PillButton
           label={RETRY_LABEL}
           variant="outline"
@@ -81,8 +111,6 @@ export function PasskeyProviderHelp({ onRetry, retrying, onDismiss }: PasskeyPro
 }
 
 const STEP_NUMBER_SIZE = 20;
-const RETRY_LABEL = "Thử lại";
-const RETURN_STEP = `Quay lại đây, bấm ${RETRY_LABEL}.`;
 
 const useStyles = createStyles((colors) => ({
   card: {
@@ -95,6 +123,7 @@ const useStyles = createStyles((colors) => ({
   },
   header: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
   title: { flex: 1, ...typography.body, fontWeight: "700", color: colors.textPrimary },
+  why: { ...typography.caption, color: colors.textSecondary },
   step: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
   stepNumber: {
     width: STEP_NUMBER_SIZE,
@@ -107,6 +136,7 @@ const useStyles = createStyles((colors) => ({
   stepNumberLabel: { ...typography.tiny, fontWeight: "700", color: colors.textPrimary },
   stepText: { flex: 1, ...typography.caption, color: colors.textPrimary },
   note: { ...typography.tiny, color: colors.textSecondary },
+  stillMissing: { ...typography.caption, fontWeight: "600", color: colors.peach },
   actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.xs },
   action: { flex: 1 },
 }));

@@ -111,6 +111,13 @@ for service in $services; do
   pull_with_retry "$service"
 done
 
+# Mobile OTA updates and APKs, bind-mounted read-only into pfm-backend
+# (docs/ops-runbook.md §8). Created here, as the deploy user, before compose
+# touches it: a bind mount whose host directory is missing gets created by
+# Docker as root, and the publish scripts (scp as this user) could then
+# never write to it.
+mkdir -p app-updates
+
 # Apply any pending migrations before anything else touches the database.
 #
 # docker-entrypoint-initdb.d (the migration mounts in docker-compose.yml) only

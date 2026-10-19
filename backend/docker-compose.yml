@@ -124,6 +124,8 @@ services:
       WEBAUTHN_RP_ORIGINS: ${WEBAUTHN_RP_ORIGINS:-}
       ANDROID_APP_PACKAGE: ${ANDROID_APP_PACKAGE:-}
       ANDROID_CERT_SHA256: ${ANDROID_CERT_SHA256:-}
+      # Mobile OTA updates and APKs, mounted below (docs/ops-runbook.md §8).
+      APP_UPDATES_DIR: /data/app-updates
       # Read only by ./seed (see deploy.sh), not by the server process. Blank
       # means "skip admin bootstrap" — set these in .env.prod only for the
       # very first deploy of a fresh environment (invite-only auth has no one
@@ -139,6 +141,10 @@ services:
       # (docs/ops-runbook.md §Cloudflare Tunnel). The default keeps the old
       # public port so a deploy without a tunnel never takes the API down.
       - "${BACKEND_BIND_ADDRESS:-0.0.0.0}:${BACKEND_PORT_EXTERNAL:-80}:8080"
+    volumes:
+      # Uploaded over SSH by mobile/scripts/ota/*.mjs; deploy.sh creates the
+      # host directory. Read-only: the API only serves these files.
+      - ./app-updates:/data/app-updates:ro
     healthcheck:
       test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:8080/api/v1/health"]
       interval: 10s

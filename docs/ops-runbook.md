@@ -109,3 +109,39 @@ A passkey (WebAuthn, migration 032) is a key pair made on the phone; the server 
 - **iOS is not set up.** It needs `ios.bundleIdentifier` + `ios.associatedDomains: ["webcredentials:api.example.com"]` in `mobile/app.json` and an `apple-app-site-association` file served next to `assetlinks.json` (Team ID + bundle ID).
 - **A new signing key means new fingerprints.** Passkeys made under an old certificate stop verifying until its fingerprint is listed again.
 - **Look at them:** `SELECT id, name, created_at, last_used_at, deleted_at FROM passkeys WHERE user_id = '<id>';`
+
+## 8. Mobile app updates (OTA + APK)
+
+JS/TS and images reach phones as OTA updates; nothing to install. Native changes need a new APK, which installs over the old app and keeps its data. Both are free and unmetered: `expo-updates` talks to pfm-backend, not to EAS.
+
+**How it fits together**
+- **App:** `expo-updates` checks `GET /api/v1/app-updates/manifest` on every launch, downloads a newer update in the background and runs it from the next launch. It only takes updates whose `runtimeVersion` matches its own native code (app.json policy `fingerprint`; what counts as native is in `mobile/fingerprint.config.js`) and whose signature verifies against `mobile/certs/certificate.pem`, built into the APK.
+- **Server:** `AppUpdateHandler` serves files from `<VPS_APP_DIR>/backend/app-updates`, mounted read-only at `/data/app-updates` (`APP_UPDATES_DIR`; `deploy.sh` creates the folder). 204 means "no update". Bundles and assets live under `/api/v1/app-updates/files/…`; the newest APK downloads from `/api/v1/app-updates/apk`. Everything is under `/api/v1`, so the §4 path rule lets it through. No token: nothing here is user data, and a forged update fails the signature check on the phone.
+- **Scripts** (`mobile/scripts/ota/`, run from `mobile/`): `npm run apk`, `npm run ota:publish`, `npm run ota:rollback`. They upload over SSH.
+
+**Keys: back both up in two places, never commit them**
+- **APK signing key** `D:\keys\budgest-release.keystore` (alias `budgest`, SHA-256 `37:F1:8E:…:2A:6D`). Gradle reads it from `~/.gradle/gradle.properties` (`BUDGEST_STORE_FILE`, `BUDGEST_STORE_PASSWORD`, `BUDGEST_KEY_ALIAS`, `BUDGEST_KEY_PASSWORD`) through `mobile/plugins/with-release-signing.js`. Lost, no APK can ever install over the app again: every phone uninstalls (local data gone) and `ANDROID_CERT_SHA256` (§7) and the Maps key restriction need the new fingerprints.
+- **Update signing key** `D:\keys\ota\private-key.pem`, made by `npx expo-updates codesigning:generate`. Lost, generate a new pair with `codesigning:configure`; phones accept updates signed with it only after installing an APK that carries the new certificate.
+
+**Set up a machine to release**
+1. The two keys above, and `gradle.properties` filled in.
+2. `mobile/.env`: `OTA_SSH_HOST` (`deploy@<VPS IP>`), `OTA_SSH_PORT`, `OTA_SSH_KEY` (the key file `ssh -i` takes, if not a default one in `~/.ssh`), `OTA_REMOTE_DIR` (`/opt/pfm/backend/app-updates`), `OTA_PRIVATE_KEY` (see `.env.example`). `EXPO_PUBLIC_API_BASE_URL` must be the production URL; the scripts refuse anything else.
+3. The machine's SSH public key authorized on the VPS (`add-ssh-key.yml`). With a passphrase, load it into `ssh-agent` first: the scripts open several SSH connections.
+
+**Releasing**
+
+| Change | Run | On the phone |
+|--------|-----|--------------|
+| JS/TS, images, copy | `npm run ota:publish` | Nothing: open the app, close it, open it again |
+| Native: a library with native code, a plugin or permission in `app.json`, the Maps key, an Expo SDK upgrade | `npm run apk`, then `npm run ota:publish` | Download from the APK link, install over the old app |
+
+There is no need to judge which case applies: `ota:publish` refuses when native code changed since the last APK, because no phone could run that update. `npm run apk` bumps `android.versionCode`, prebuilds, builds, checks the signature against the release key and uploads; `-- --no-upload` only builds.
+
+**Rollback:** `npm run ota:rollback` puts the previous update back, `-- --list` shows the history, `-- --to <id>` picks one. The old update is republished with a new id and date, since a phone only ever moves to a newer update.
+
+**Known limits**
+- **Two launches.** An update downloads on one launch and runs on the next. Making it apply at once means calling `Updates.reloadAsync()` after a fetch, at the cost of a slower start.
+- **A new APK is a manual install.** Android does not let an app update itself silently; the user taps Install. The first install signed with the release key (after the template debug key) needs an uninstall, once.
+- **Old updates are kept.** Nothing prunes `app-updates/android/<runtime>/<id>`. Delete the folder of a runtime no phone runs any more; inside a live runtime, keep every update listed in `history`, since a rollback copy points at the original's files.
+- **iOS is not set up.** The server accepts `expo-platform: ios`, but no script builds or publishes for it.
+- **Big downloads and `HTTPWriteTimeout` (60 s).** The APK is about 50 MB. Cloudflare takes it from the origin at full speed and feeds the phone itself, so the timeout does not bite in practice; if APK downloads ever stop after about a minute on a slow connection, that limit is the reason.

@@ -27,6 +27,7 @@
     "expo-sharing": "~14.0.8",
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",
+    "expo-updates": "~29.0.20",
     "phosphor-react-native": "^3.0.6",
     "react": "19.1.0",
     "react-dom": "19.1.0",
@@ -54,7 +55,10 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "apk": "node scripts/ota/build-apk.mjs",
+    "ota:publish": "node scripts/ota/publish-update.mjs",
+    "ota:rollback": "node scripts/ota/rollback-update.mjs"
   },
   "private": true
 }

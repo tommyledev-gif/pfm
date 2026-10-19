@@ -58,6 +58,11 @@ type Config struct {
 
 	// Passkey configures WebAuthn sign-in (config_passkey.go).
 	Passkey PasskeyConfig
+
+	// AppUpdatesDir holds the mobile app's published OTA updates and APKs
+	// (service.AppUpdateService, docs/ops-runbook.md §8). Missing or empty is
+	// fine: every client is told "no update" and the APK link answers 404.
+	AppUpdatesDir string
 }
 
 // MinJWTSecretBytes is the shortest JWT_SECRET accepted. The same key signs
@@ -91,6 +96,8 @@ func Load() (*Config, error) {
 		R2SecretAccessKey: os.Getenv("R2_SECRET_ACCESS_KEY"),
 		R2Bucket:          os.Getenv("R2_BUCKET"),
 		R2PublicBaseURL:   os.Getenv("R2_PUBLIC_BASE_URL"),
+
+		AppUpdatesDir: getEnvOrDefault("APP_UPDATES_DIR", "/data/app-updates"),
 	}
 	if cfg.DatabaseURL == "" {
 		return nil, fmt.Errorf("config.Load: DATABASE_URL is required")

@@ -140,6 +140,7 @@ func main() {
 		AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 	}))
 	registerRoutes(app, userHandler, authHandler, walletHandler, categoryHandler, budgetHandler, transactionHandler, transactionExportHandler, transactionImportHandler, auditLogHandler, reportHandler, notificationHandler, chatHandler, chatImageHandler, budgetWizardHandler, analyticsHandler, accountSwitchHandler, sessionRevocationHandler, profileHandler, accessRequestHandler, accountDeletionHandler, passkeyHandler, assetLinks, tokenService, sessionService, pool, logger)
+	registerAppUpdateRoutes(app, handler.NewAppUpdateHandler(service.NewAppUpdateService(cfg.AppUpdatesDir), logger), cfg.AppUpdatesDir)
 
 	go func() {
 		if err := app.Listen(":" + cfg.Port); err != nil {
