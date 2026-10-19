@@ -12,7 +12,6 @@ import { useAccountRegistryStore, isAccountExpired } from "@/features/accounts/a
 import { logoutQuietly, revokeSwitchTokenQuietly, switchRequest } from "@/features/accounts/api/account-switch-requests";
 import { flushChatWithin, swapSession } from "@/features/accounts/commit-session";
 import { useSwitchProgressStore } from "@/features/accounts/switch-progress-store";
-import { trySwitchWithPasskey } from "@/features/accounts/switch-with-passkey";
 
 export type SwitchOutcome = "switched" | "cancelled" | "failed" | "expired" | "ignored";
 
@@ -70,11 +69,10 @@ async function runSwitch(userId: string): Promise<SwitchOutcome> {
     toast(SWITCH_COPY.offline);
     return "failed";
   }
-  // A passkey on the account is the identity check, verified by the server,
-  // and its answer is the new session. Only without one does the device
-  // check + switch token below run.
-  const viaPasskey = await trySwitchWithPasskey(userId);
-  if (viaPasskey !== "no-passkey") return viaPasskey;
+  // The phone's own fingerprint / face / screen-lock prompt, never a
+  // passkey: the saved session is the credential, so a passkey here would
+  // only add the Google Password Manager sheet to every switch. Passkeys stay
+  // opt-in — "Đăng nhập bằng passkey" on the login screen.
   if (!(await passSwitchIdentityCheck(account.role))) return "cancelled";
 
   useSwitchProgressStore.getState().setSwitching(true);

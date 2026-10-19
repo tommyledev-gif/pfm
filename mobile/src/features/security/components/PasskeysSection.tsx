@@ -17,7 +17,9 @@ import { PasskeyProviderHelp } from "@/features/security/components/PasskeyProvi
 
 const COPY = {
   title: "Passkey",
-  hint: "Đăng nhập và chuyển sang tài khoản này bằng vân tay hoặc khuôn mặt, không cần mật khẩu.",
+  // Optional: switching and the app lock use the phone's own check, never a
+  // passkey. A passkey only needs the phone's password service (Google…).
+  hint: "Không bắt buộc. Đăng nhập không cần mật khẩu, kể cả trên máy mới.",
   add: "Thêm passkey",
   unsupported: "Bản ứng dụng này chưa dùng được passkey.",
   empty: "Chưa có passkey.",

@@ -259,7 +259,7 @@ mobile/
             ├── account-registry-store.ts         # Zustand + SecureStore index; upsert/evict/remove/markExpired ("Hết phiên")/touch
             ├── commit-session.ts                 # shared "swap the session" step (switch + add-account + chooser)
             ├── switch-account.ts                 # switchToAccount(userId) orchestration + in-flight guard
-            ├── switch-with-passkey.ts            # passkey sign-in for a saved account (mig 032)
+            ├── (switch-with-passkey.ts removed 2026-10-19: switching never tries a passkey)
             ├── complete-login.ts                 # after a password login (plain or add-account)
             ├── convert-legacy-accounts.ts        # NEW 2026-10-19 — one-time switch token → session (R-08)
             ├── hooks/use-logout.ts               # logout incl. server call + registry removal
