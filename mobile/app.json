@@ -33,7 +33,7 @@
       "predictiveBackGestureEnabled": false,
       "allowBackup": false,
       "package": "com.example.pfm",
-      "versionCode": 5,
+      "versionCode": 6,
       "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
