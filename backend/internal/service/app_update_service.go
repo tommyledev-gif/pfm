@@ -78,16 +78,9 @@ func (s *AppUpdateService) Latest(platform, runtimeVersion string) (*model.AppUp
 // LatestAPK returns the newest APK's path on disk and its description, or
 // ErrNoAppUpdate before the first upload.
 func (s *AppUpdateService) LatestAPK() (string, *model.AppRelease, error) {
-	raw, err := readOptional(filepath.Join(s.dir, "apk", "latest.json"))
+	release, err := s.readRelease(filepath.Join(s.dir, "apk", "latest.json"))
 	if err != nil {
 		return "", nil, fmt.Errorf("service.AppUpdate.LatestAPK: %w", err)
-	}
-	if raw == nil {
-		return "", nil, ErrNoAppUpdate
-	}
-	var release model.AppRelease
-	if err := json.Unmarshal(raw, &release); err != nil {
-		return "", nil, fmt.Errorf("service.AppUpdate.LatestAPK: latest.json: %w", err)
 	}
 	if !filepath.IsLocal(release.File) || filepath.Base(release.File) != release.File || filepath.Ext(release.File) != ".apk" {
 		return "", nil, fmt.Errorf("service.AppUpdate.LatestAPK: latest.json names %q, not an .apk file in apk/", release.File)
@@ -96,7 +89,59 @@ func (s *AppUpdateService) LatestAPK() (string, *model.AppRelease, error) {
 	if _, err := os.Stat(path); err != nil {
 		return "", nil, fmt.Errorf("service.AppUpdate.LatestAPK: %w", err)
 	}
-	return path, &release, nil
+	return path, release, nil
+}
+
+// NativeUpdate says whether a phone running runtimeVersion must install the
+// newest APK: OTA updates only reach phones whose native code matches, so a
+// phone left on an older APK would otherwise never change again. It returns
+// the newest APK (nil before the first upload) and the verdict.
+//
+// Required only when the phone's runtime is one an APK was uploaded for
+// (its apk.json, written by build-apk.mjs) with a lower versionCode than
+// the newest. A runtime the server never saw (a build made on a dev machine
+// and not uploaded) is never told to "update" to an older APK, and neither
+// is a phone already newer than latest (an APK rolled back by hand).
+func (s *AppUpdateService) NativeUpdate(platform, runtimeVersion string) (*model.AppRelease, bool, error) {
+	latest, err := s.readRelease(filepath.Join(s.dir, "apk", "latest.json"))
+	if errors.Is(err, ErrNoAppUpdate) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("service.AppUpdate.NativeUpdate: %w", err)
+	}
+	if platform != "android" || latest.RuntimeVersion == runtimeVersion {
+		return latest, false, nil
+	}
+	runtimeDir, err := s.localPath(platform, runtimeVersion)
+	if err != nil {
+		return nil, false, fmt.Errorf("service.AppUpdate.NativeUpdate: %w", err)
+	}
+	installed, err := s.readRelease(filepath.Join(runtimeDir, "apk.json"))
+	if errors.Is(err, ErrNoAppUpdate) {
+		return latest, false, nil
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("service.AppUpdate.NativeUpdate: %w", err)
+	}
+	return latest, installed.VersionCode < latest.VersionCode, nil
+}
+
+// readRelease reads an APK description (latest.json, apk.json), or
+// ErrNoAppUpdate when the file does not exist.
+func (s *AppUpdateService) readRelease(path string) (*model.AppRelease, error) {
+	raw, err := readOptional(path)
+	if err != nil {
+		return nil, err
+	}
+	if raw == nil {
+		return nil, ErrNoAppUpdate
+	}
+	var release model.AppRelease
+	if err := json.Unmarshal(raw, &release); err != nil {
+		return nil, fmt.Errorf("%s: %w", filepath.Base(path), err)
+	}
+	return &release, nil
 }
 
 // localPath joins segments under dir, refusing anything that would leave it.

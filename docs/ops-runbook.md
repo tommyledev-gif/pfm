@@ -117,6 +117,7 @@ JS/TS and images reach phones as OTA updates; nothing to install. Native changes
 **How it fits together**
 - **App:** `expo-updates` checks `GET /api/v1/app-updates/manifest` on every launch, downloads a newer update in the background and runs it from the next launch. It only takes updates whose `runtimeVersion` matches its own native code (app.json policy `fingerprint`; what counts as native is in `mobile/fingerprint.config.js`) and whose signature verifies against `mobile/certs/certificate.pem`, built into the APK.
 - **Server:** `AppUpdateHandler` serves files from `<VPS_APP_DIR>/backend/app-updates`, mounted read-only at `/data/app-updates` (`APP_UPDATES_DIR`; `deploy.sh` creates the folder). 204 means "no update". Bundles and assets live under `/api/v1/app-updates/files/…`; the newest APK downloads from `/api/v1/app-updates/apk`. Everything is under `/api/v1`, so the §4 path rule lets it through. No token: nothing here is user data, and a forged update fails the signature check on the phone.
+- **Phones left on an old APK:** every launch, the app asks `GET /api/v1/app-updates/apk/status?platform=android&runtime_version=…`. If an APK was uploaded for its runtime and has a lower versionCode than the newest (`service.NativeUpdate`, from each runtime's `apk.json`), `NativeUpdateDialog` blocks every screen, login included, with one button that opens the APK link in the browser. Installing over restarts the app on the new APK, and the dialog is gone. A runtime the server never saw (a dev machine's build) and a phone newer than `latest.json` are never blocked.
 - **Scripts** (`mobile/scripts/ota/`, run from `mobile/`): `npm run apk`, `npm run ota:publish`, `npm run ota:rollback`. They upload over SSH.
 
 **Keys: back both up in two places, never commit them**
@@ -133,7 +134,7 @@ JS/TS and images reach phones as OTA updates; nothing to install. Native changes
 | Change | Run | On the phone |
 |--------|-----|--------------|
 | JS/TS, images, copy | `npm run ota:publish` | Nothing: open the app, close it, open it again |
-| Native: a library with native code, a plugin or permission in `app.json`, the Maps key, an Expo SDK upgrade | `npm run apk`, then `npm run ota:publish` | Download from the APK link, install over the old app |
+| Native: a library with native code, a plugin or permission in `app.json`, the Maps key, an Expo SDK upgrade | `npm run apk`, then `npm run ota:publish` | Next launch: a blocking "Cần cài bản Budgest mới" dialog, [Tải bản mới], install over the old app |
 
 There is no need to judge which case applies: `ota:publish` refuses when native code changed since the last APK, because no phone could run that update. After uploading, `ota:publish` asks production for the manifest the way a phone does and fails unless the new update comes back signed; uploaded folders are made world-readable, since pfm-backend reads them as another user. `npm run apk` bumps `android.versionCode`, prebuilds, builds, checks the signature against the release key and that the runtime version written inside the APK matches this checkout (Gradle once shipped a stale one, so no update ever reached that APK), then uploads; `-- --no-upload` only builds.
 

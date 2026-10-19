@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/example/pfm/backend/internal/common"
+	"github.com/example/pfm/backend/internal/dto"
 	"github.com/example/pfm/backend/internal/response"
 	"github.com/example/pfm/backend/internal/service"
 )
@@ -60,6 +61,27 @@ func (h *AppUpdateHandler) Manifest(c *fiber.Ctx) error {
 	}
 	c.Set(fiber.HeaderContentType, "application/json; charset=utf-8")
 	return c.Send(update.Manifest)
+}
+
+// NativeStatus serves GET /api/v1/app-updates/apk/status?platform=…&runtime_version=…:
+// whether this phone's APK is too old for the OTA updates now being published
+// and has to be replaced by the newest one (service.NativeUpdate). The app
+// asks on every launch and, when told so, blocks until the User installs it.
+func (h *AppUpdateHandler) NativeStatus(c *fiber.Ctx) error {
+	c.Set(fiber.HeaderCacheControl, "no-store")
+	platform := c.Query("platform")
+	runtimeVersion := c.Query("runtime_version")
+	if platform != "android" && platform != "ios" {
+		return response.Error(c, h.logger, common.NewInvalidInputError("platform must be android or ios"))
+	}
+	if !runtimeVersionPattern.MatchString(runtimeVersion) {
+		return response.Error(c, h.logger, common.NewInvalidInputError("runtime_version is missing or malformed"))
+	}
+	latest, required, err := h.svc.NativeUpdate(platform, runtimeVersion)
+	if err != nil {
+		return response.Error(c, h.logger, err)
+	}
+	return response.Success(c, fiber.StatusOK, "app native status", dto.NewAppNativeStatusResponse(latest, required))
 }
 
 // DownloadAPK serves GET /api/v1/app-updates/apk: the newest APK, for a

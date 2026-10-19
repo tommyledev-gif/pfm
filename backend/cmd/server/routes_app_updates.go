@@ -19,5 +19,6 @@ func registerAppUpdateRoutes(app *fiber.App, h *handler.AppUpdateHandler, filesD
 	updates := app.Group("/api/v1/app-updates")
 	updates.Get("/manifest", h.Manifest)
 	updates.Get("/apk", h.DownloadAPK)
+	updates.Get("/apk/status", h.NativeStatus)
 	updates.Static("/files", filesDir, fiber.Static{ByteRange: true, MaxAge: appUpdateFileMaxAge})
 }

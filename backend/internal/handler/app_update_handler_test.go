@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -171,5 +172,70 @@ func TestAppUpdateAPK_LatestNamingAnotherPathIsRefused(t *testing.T) {
 	}
 	if resp.StatusCode != fiber.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500", resp.StatusCode)
+	}
+}
+
+func nativeStatus(t *testing.T, dir, query string) (int, map[string]any) {
+	t.Helper()
+	app := fiber.New()
+	app.Get("/status", NewAppUpdateHandler(service.NewAppUpdateService(dir), zap.NewNop()).NativeStatus)
+	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/status?"+query, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body struct {
+		Data map[string]any `json:"data"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&body)
+	return resp.StatusCode, body.Data
+}
+
+// Five published APKs: latest is 5 on runtime "new"; 4 was on runtime "old".
+func publishedAPKs(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "apk", "latest.json"), `{"file":"budgest-5.apk","versionCode":5,"versionName":"1.0.0","runtimeVersion":"new"}`)
+	writeFile(t, filepath.Join(dir, "android", "new", "apk.json"), `{"versionCode":5,"runtimeVersion":"new"}`)
+	writeFile(t, filepath.Join(dir, "android", "old", "apk.json"), `{"versionCode":4,"runtimeVersion":"old"}`)
+	writeFile(t, filepath.Join(dir, "android", "ahead", "apk.json"), `{"versionCode":6,"runtimeVersion":"ahead"}`)
+	return dir
+}
+
+func TestAppNativeStatus(t *testing.T) {
+	dir := publishedAPKs(t)
+	for _, tc := range []struct {
+		name, query string
+		required    bool
+	}{
+		{"older APK must update", "platform=android&runtime_version=old", true},
+		{"newest APK is fine", "platform=android&runtime_version=new", false},
+		// A build never uploaded (a dev machine's) is not sent to an older APK.
+		{"unknown runtime is left alone", "platform=android&runtime_version=devbuild", false},
+		// latest.json rolled back by hand: the newer phone cannot install it.
+		{"phone ahead of latest is left alone", "platform=android&runtime_version=ahead", false},
+		{"iOS has no APK", "platform=ios&runtime_version=old", false},
+	} {
+		status, data := nativeStatus(t, dir, tc.query)
+		if status != fiber.StatusOK || data["update_required"] != tc.required {
+			t.Fatalf("%s: status %d, data %v, want update_required=%v", tc.name, status, data, tc.required)
+		}
+	}
+	if _, data := nativeStatus(t, dir, "platform=android&runtime_version=old"); data["version_code"] != float64(5) {
+		t.Fatalf("version_code = %v, want 5", data["version_code"])
+	}
+}
+
+func TestAppNativeStatus_NothingPublishedYet(t *testing.T) {
+	status, data := nativeStatus(t, t.TempDir(), "platform=android&runtime_version=old")
+	if status != fiber.StatusOK || data["update_required"] != false {
+		t.Fatalf("status %d, data %v, want 200 and no update", status, data)
+	}
+}
+
+func TestAppNativeStatus_RejectsBadInput(t *testing.T) {
+	for _, query := range []string{"platform=android", "platform=android&runtime_version=../apk", "platform=web&runtime_version=old"} {
+		if status, _ := nativeStatus(t, t.TempDir(), query); status != fiber.StatusBadRequest {
+			t.Fatalf("%q: status %d, want 400", query, status)
+		}
 	}
 }
