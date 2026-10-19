@@ -5,9 +5,10 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { MAX_SAVED_ACCOUNTS } from "@/lib/constants";
 import { createStyles, radii, spacing, typography } from "@/lib/theme";
 import { REMOVE_ACCOUNT_COPY } from "@/features/accounts/account-copy";
-import { accountDisplayName, isAccountExpired, useAccountRegistryStore } from "@/features/accounts/account-registry-store";
+import { accountDisplayName, isAccountExpired } from "@/features/accounts/account-registry-store";
 import { AccountRow } from "@/features/accounts/components/AccountRow";
 import { useSavedAccounts } from "@/features/accounts/hooks/use-saved-accounts";
+import { removeActiveAccount, removeSavedAccount } from "@/features/accounts/remove-account";
 import { switchToAccount } from "@/features/accounts/switch-account";
 import { SavedAccount } from "@/features/accounts/types";
 
@@ -25,7 +26,9 @@ const LIMIT_HINT = `Đã đạt tối đa ${MAX_SAVED_ACCOUNTS} tài khoản tr�
 /**
  * Every saved account (spec US-02 step 4): the active one first, labelled
  * "Đang dùng" and not tappable — shown even when it is the only one (AC-07);
- * expired ones open the login form; inactive ones can be removed (US-04).
+ * expired ones open the login form; locked ones (logged out here) open with
+ * the fingerprint. Every row, the active one too, can be removed from the
+ * device after a confirm (US-04).
  */
 export function AccountSwitchDialog({ visible, onClose, onAddAccount }: AccountSwitchDialogProps) {
   const styles = useStyles();
@@ -45,7 +48,14 @@ export function AccountSwitchDialog({ visible, onClose, onAddAccount }: AccountS
   const confirmRemoval = async () => {
     const account = pendingRemoval;
     setPendingRemoval(null);
-    if (account) await useAccountRegistryStore.getState().remove(account.userId, { endSession: true, dropLocalData: true });
+    if (!account) return;
+    if (account.userId === active?.userId) {
+      // The account in use: the login screen takes over.
+      onClose();
+      await removeActiveAccount();
+      return;
+    }
+    await removeSavedAccount(account.userId);
   };
 
   return (
@@ -55,7 +65,13 @@ export function AccountSwitchDialog({ visible, onClose, onAddAccount }: AccountS
           <Text style={styles.title}>{TITLE}</Text>
           <View>
             {active ? (
-              <AccountRow account={active} isActive onPress={() => {}} testID={`row-account-${active.userId}`} />
+              <AccountRow
+                account={active}
+                isActive
+                onPress={() => {}}
+                onRemove={setPendingRemoval}
+                testID={`row-account-${active.userId}`}
+              />
             ) : null}
             {others.map((account) => (
               <View key={account.userId} style={styles.divided}>

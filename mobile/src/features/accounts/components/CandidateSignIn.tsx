@@ -29,7 +29,7 @@ interface CandidateSignInProps {
 /**
  * The chosen person and one way in (specs/mobile-account-switch US-05):
  *  - saved, session still valid: one tap switches in (identity check first);
- *  - saved but "Hết phiên", or a test account: the password, nothing else
+ *  - saved but "Cần đăng nhập lại", or a test account: the password, nothing else
  *    (filled in for a test account). A session the server refused — expired,
  *    signed out from another device, password changed — cannot be renewed,
  *    so no fingerprint shortcut there;

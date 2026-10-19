@@ -159,6 +159,9 @@ export const SECURE_STORE_ACCOUNT_REFRESH_KEY_PREFIX = "pfm_account_rt_";
 // Read once to trade them for sessions (convert-legacy-accounts.ts), then
 // deleted.
 export const SECURE_STORE_SWITCH_TOKEN_KEY_PREFIX = "pfm_account_st_";
+// A locked account's refresh token, sealed by the biometric vault (logout =
+// lock). Encrypted already; SecureStore only keeps it off backups.
+export const SECURE_STORE_ACCOUNT_SEALED_KEY_PREFIX = "pfm_account_sealed_";
 // This install's random device id (lib/device-identity.ts).
 export const SECURE_STORE_DEVICE_ID_KEY = "pfm_device_id";
 // Device-wide security preferences (identity check) — AsyncStorage, not a secret.

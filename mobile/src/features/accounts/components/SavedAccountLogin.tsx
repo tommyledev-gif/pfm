@@ -8,10 +8,10 @@ import { useKeyboardHeight } from "@/lib/use-keyboard-height";
 import { useAccessRequestStore } from "@/features/auth/access-request-store";
 import { BrandMark } from "@/features/auth/components/BrandMark";
 import { REMOVE_ACCOUNT_COPY } from "@/features/accounts/account-copy";
-import { useAccountRegistryStore } from "@/features/accounts/account-registry-store";
 import { CandidateSignIn } from "@/features/accounts/components/CandidateSignIn";
 import { CandidateRow } from "@/features/accounts/components/LoginCandidateViews";
 import { candidateName, LoginCandidate } from "@/features/accounts/login-candidates";
+import { removeSavedAccount } from "@/features/accounts/remove-account";
 
 const COPY = {
   back: "Quay lại",
@@ -57,7 +57,7 @@ export function SavedAccountLogin({ candidates, onBack, onDone }: SavedAccountLo
     const target = pendingRemoval;
     setPendingRemoval(null);
     if (target?.kind === "saved") {
-      await useAccountRegistryStore.getState().remove(target.account.userId, { endSession: true, dropLocalData: true });
+      await removeSavedAccount(target.account.userId);
     } else if (target?.kind === "requested") {
       useAccessRequestStore.getState().remove(target.email);
     }

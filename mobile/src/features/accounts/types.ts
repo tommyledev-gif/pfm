@@ -35,10 +35,16 @@ export interface SavedAccount {
   lastUsedAt: string;
   /**
    * The server refused this account's session (401/400): expired, signed out
-   * from another device, password changed. Shown as "Hết phiên"; the next
+   * from another device, password changed. Shown as "Cần đăng nhập lại"; the next
    * sign-in needs the password (or a passkey).
    */
   expired: boolean;
   /** The last switch got no answer, so its token may be used up (BR-16). */
   switchInterrupted: boolean;
+  /**
+   * Logged out on this device = locked: its session stays on the server, its
+   * refresh token is kept only sealed by the biometric vault, and the
+   * fingerprint (or screen lock) brings it back. Undefined on older entries.
+   */
+  locked?: boolean;
 }

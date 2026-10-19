@@ -2,6 +2,7 @@ import { onlineManager } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 
 import { accountTokens } from "@/lib/account-tokens";
+import { forgetAccountKey, openAccountToken, VaultError } from "@/lib/biometric-vault";
 import { getErrorMessage, isNetworkError } from "@/lib/api-envelope";
 import { HTTP_STATUS, SWITCH_CHAT_FLUSH_TIMEOUT_MS, SWITCH_REQUEST_TIMEOUT_MS } from "@/lib/constants";
 import { useToastStore } from "@/stores/toast-store";
@@ -21,7 +22,12 @@ export const SWITCH_COPY = {
   interrupted: "Lần chuyển trước bị gián đoạn. Cần đăng nhập lại tài khoản này.",
   offline: "Cần kết nối mạng để chuyển tài khoản.",
   generic: "Chưa chuyển được tài khoản. Thử lại sau.",
+  needsPassword: "Cần đăng nhập lại bằng mật khẩu.",
+  notVerified: "Không xác minh được. Thử lại sau.",
 } as const;
+
+// The system prompt that opens a locked account.
+const UNLOCK_PROMPT = "Mở khóa tài khoản";
 
 // Module-level, taken BEFORE the identity prompt: a second tap anywhere
 // (dialog, direct switch, login chooser) while one switch is running —
@@ -69,6 +75,7 @@ async function runSwitch(userId: string): Promise<SwitchOutcome> {
     toast(SWITCH_COPY.offline);
     return "failed";
   }
+  if (account.locked) return unlockAccount(userId, account.email);
   // The phone's own fingerprint / face / screen-lock prompt, never a
   // passkey: the saved session is the credential, so a passkey here would
   // only add the Google Password Manager sheet to every switch. Passkeys stay
@@ -100,6 +107,61 @@ async function runSwitch(userId: string): Promise<SwitchOutcome> {
     return "switched";
   } catch (error) {
     return handleSwitchError(userId, error, token);
+  }
+}
+
+/**
+ * A locked account (logged out on this device): the vault's prompt — its
+ * fingerprint, or from Android 11 the screen lock — is the identity check and
+ * the only way to read its token. Then its session is renewed like any
+ * switch. A key the phone has invalidated (a fingerprint added, the screen
+ * lock removed) or a session the server refuses means the password, never a
+ * way around it.
+ */
+async function unlockAccount(userId: string, email: string): Promise<SwitchOutcome> {
+  const registry = useAccountRegistryStore.getState();
+  const sealed = await accountTokens.getSealed(userId);
+  if (!sealed) {
+    registry.markExpired(userId);
+    toast(SWITCH_COPY.needsPassword);
+    return "expired";
+  }
+
+  let token: string;
+  try {
+    token = await openAccountToken(userId, sealed, UNLOCK_PROMPT);
+  } catch (error) {
+    const kind = error instanceof VaultError ? error.kind : "failed";
+    if (kind === "cancelled") return "cancelled";
+    if (kind === "invalidated" || kind === "unavailable") {
+      registry.markExpired(userId);
+      toast(SWITCH_COPY.needsPassword);
+      return "expired";
+    }
+    toast(SWITCH_COPY.notVerified);
+    return "failed";
+  }
+
+  useSwitchProgressStore.getState().setSwitching(true);
+  await flushChatWithin(SWITCH_CHAT_FLUSH_TIMEOUT_MS);
+  try {
+    const pair = await refreshTokenRequest(token, SWITCH_REQUEST_TIMEOUT_MS);
+    // In use again: kept plain like any active session (it renews every few
+    // minutes), the sealed copy and its key are done with.
+    await accountTokens.set(userId, pair.refresh_token);
+    await accountTokens.removeSealed(userId);
+    forgetAccountKey(userId);
+    if (!useAccountRegistryStore.getState().accounts.some((a) => a.userId === userId)) {
+      logoutQuietly(pair.refresh_token);
+      toast(SWITCH_COPY.generic);
+      return "failed";
+    }
+    useAccountRegistryStore.getState().touch(userId);
+    await swapSession(pair, email);
+    return "switched";
+  } catch (error) {
+    // Offline or 5xx: still locked, the sealed token still the current one.
+    return handleSwitchError(userId, error, null);
   }
 }
 

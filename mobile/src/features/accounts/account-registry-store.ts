@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 import { MAX_SAVED_ACCOUNTS, SECURE_STORE_ACCOUNTS_KEY } from "@/lib/constants";
 import { accountTokens } from "@/lib/account-tokens";
+import { forgetAccountKey } from "@/lib/biometric-vault";
 import { tokenExpiresAt } from "@/lib/jwt";
 import { removeUserQueryCache } from "@/lib/query-persistence/user-cache-persister";
 import { secureStorage } from "@/lib/secure-storage";
@@ -41,9 +42,11 @@ interface AccountRegistryState {
   remove: (userId: string, options: RemoveOptions) => Promise<void>;
   /** Keeps a saved account's name and picture in step with the profile. */
   updateIdentity: (userId: string, identity: { fullName: string | null; avatarUrl: string | null }) => void;
-  /** A switch into the account just succeeded. */
+  /** A switch into the account just succeeded (unlocks it too). */
   touch: (userId: string) => void;
-  /** The account's session was renewed: move its expiry, clear "Hết phiên". */
+  /** Logged out on this device: kept, sealed, fingerprint to come back. */
+  lock: (userId: string) => void;
+  /** The account's session was renewed: move its expiry, clear "Cần đăng nhập lại". */
   renewed: (userId: string, refreshToken: string) => void;
   markExpired: (userId: string) => void;
   setInterrupted: (userId: string, interrupted: boolean) => void;
@@ -90,6 +93,12 @@ function removeLocalUserData(userId: string): void {
   void removeUserQueryCache(userId);
 }
 
+/** A locked account's sealed token and its Keystore key: gone for good. */
+async function dropSealedToken(userId: string): Promise<void> {
+  await accountTokens.removeSealed(userId).catch(() => {});
+  forgetAccountKey(userId);
+}
+
 /** A switch token an older build left for the account: no longer needed. */
 async function dropLegacySwitchToken(userId: string): Promise<void> {
   const legacy = await accountTokens.getLegacySwitchToken(userId);
@@ -107,8 +116,10 @@ async function dropLegacySwitchToken(userId: string): Promise<void> {
  * renewal.
  *
  * Deliberately NOT touched by session-store.clear(): a session that ends on
- * its own keeps its account listed, marked "Hết phiên" (AC-22). Only logout
- * and remove take an account off the list.
+ * its own keeps its account listed, marked "Cần đăng nhập lại" (AC-22), and a
+ * logout keeps it too, locked (hooks/use-logout.ts). Only "Gỡ khỏi thiết bị"
+ * — or a logout on a phone with no screen lock to guard it — takes an
+ * account off the list.
  */
 export const useAccountRegistryStore = create<AccountRegistryState>((set, get) => {
   const persistIndex = (): Promise<void> => {
@@ -159,6 +170,7 @@ export const useAccountRegistryStore = create<AccountRegistryState>((set, get) =
         lastUsedAt: nowIso,
         expired: false,
         switchInterrupted: false,
+        locked: false,
       };
       set((s) => ({ accounts: [entry, ...s.accounts.filter((a) => a.userId !== user.id)] }));
 
@@ -172,9 +184,10 @@ export const useAccountRegistryStore = create<AccountRegistryState>((set, get) =
         await get().remove(account.userId, { endSession: true, dropLocalData: true });
       }
       await persistIndex();
-      // The account now has a session here; a switch token from an older
-      // build is dead weight.
+      // The account now has a live session here: a switch token from an older
+      // build, or a sealed one from when it was locked, is dead weight.
       await dropLegacySwitchToken(user.id);
+      await dropSealedToken(user.id);
     },
 
     async remove(userId, { endSession, dropLocalData }) {
@@ -183,6 +196,7 @@ export const useAccountRegistryStore = create<AccountRegistryState>((set, get) =
       await accountTokens.remove(userId).catch(() => {});
       await persistIndex().catch(() => {});
       await dropLegacySwitchToken(userId).catch(() => {});
+      await dropSealedToken(userId);
       if (dropLocalData) removeLocalUserData(userId);
       if (endSession && token) logoutQuietly(token);
     },
@@ -190,7 +204,9 @@ export const useAccountRegistryStore = create<AccountRegistryState>((set, get) =
     updateIdentity: (userId, { fullName, avatarUrl }) => patch(userId, { fullName, avatarUrl }),
 
     touch: (userId) =>
-      patch(userId, { lastUsedAt: new Date().toISOString(), expired: false, switchInterrupted: false }),
+      patch(userId, { lastUsedAt: new Date().toISOString(), expired: false, switchInterrupted: false, locked: false }),
+
+    lock: (userId) => patch(userId, { locked: true, switchInterrupted: false }),
 
     renewed(userId, refreshToken) {
       const expiresAt = tokenExpiresAt(refreshToken);
@@ -199,7 +215,12 @@ export const useAccountRegistryStore = create<AccountRegistryState>((set, get) =
       patch(userId, { expiresAt, expired: false });
     },
 
-    markExpired: (userId) => patch(userId, { expired: true, switchInterrupted: false }),
+    // Needs the password now; a sealed token is useless (and never a way
+    // around that), so it goes too.
+    markExpired: (userId) => {
+      patch(userId, { expired: true, switchInterrupted: false, locked: false });
+      void dropSealedToken(userId);
+    },
 
     setInterrupted: (userId, interrupted) => patch(userId, { switchInterrupted: interrupted }),
 

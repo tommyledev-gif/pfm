@@ -13,7 +13,7 @@ interface AccountRowProps {
   account: SavedAccount;
   isActive: boolean;
   onPress: (account: SavedAccount) => void;
-  /** Omitted for the active row — it leaves via "Đăng xuất" (AC-17). */
+  /** "Gỡ khỏi thiết bị" — offered on every row, the active one too. */
   onRemove?: (account: SavedAccount) => void;
   /** Half-hide the email — on the login screen, which anyone holding the phone can see. */
   maskEmail?: boolean;
@@ -23,7 +23,7 @@ interface AccountRowProps {
 const AVATAR_SIZE = 40;
 export const ACCOUNT_STATUS_COPY = {
   active: "Đang dùng",
-  expired: "Hết phiên",
+  expired: "Cần đăng nhập lại",
 } as const;
 
 /** One saved account in the switch dialog / login chooser (spec US-02 step 4). */
@@ -56,7 +56,7 @@ export function AccountRow({ account, isActive, onPress, onRemove, maskEmail: ma
           {status ? <Text style={[styles.status, isActive && styles.statusActive]}>{status}</Text> : null}
         </View>
       </Pressable>
-      {onRemove && !isActive ? (
+      {onRemove ? (
         <Pressable
           onPress={() => onRemove(account)}
           hitSlop={8}

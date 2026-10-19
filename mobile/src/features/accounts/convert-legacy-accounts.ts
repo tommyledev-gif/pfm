@@ -15,7 +15,7 @@ let running: Promise<void> | null = null;
  * account still holding one trades it, once, for its own session on this
  * device (POST /auth/switch naming the device; no new switch token comes
  * back). Online only; an account whose trade fails on the network is tried
- * again next time, one the server refuses is marked "Hết phiên". The active
+ * again next time, one the server refuses is marked "Cần đăng nhập lại". The active
  * account needs no trade — its session is already kept under it — so its
  * switch token is simply revoked.
  *

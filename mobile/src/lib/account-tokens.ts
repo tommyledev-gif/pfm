@@ -1,4 +1,8 @@
-import { SECURE_STORE_ACCOUNT_REFRESH_KEY_PREFIX, SECURE_STORE_SWITCH_TOKEN_KEY_PREFIX } from "@/lib/constants";
+import {
+  SECURE_STORE_ACCOUNT_REFRESH_KEY_PREFIX,
+  SECURE_STORE_ACCOUNT_SEALED_KEY_PREFIX,
+  SECURE_STORE_SWITCH_TOKEN_KEY_PREFIX,
+} from "@/lib/constants";
 import { secureStorage } from "@/lib/secure-storage";
 
 /**
@@ -18,6 +22,7 @@ import { secureStorage } from "@/lib/secure-storage";
  */
 const refreshKey = (userId: string) => `${SECURE_STORE_ACCOUNT_REFRESH_KEY_PREFIX}${userId}`;
 const legacyKey = (userId: string) => `${SECURE_STORE_SWITCH_TOKEN_KEY_PREFIX}${userId}`;
+const sealedKey = (userId: string) => `${SECURE_STORE_ACCOUNT_SEALED_KEY_PREFIX}${userId}`;
 
 // Writes to one account's key run one at a time, so a compare-and-set can
 // never interleave with another write to the same key.
@@ -69,6 +74,23 @@ export const accountTokens = {
       await secureStorage.removeItem(refreshKey(userId));
       return true;
     });
+  },
+
+  /**
+   * A locked account (logged out on this device) keeps its refresh token only
+   * sealed by the biometric vault (lib/biometric-vault.ts), never in the
+   * plain key above.
+   */
+  getSealed(userId: string): Promise<string | null> {
+    return secureStorage.getItem(sealedKey(userId));
+  },
+
+  setSealed(userId: string, sealed: string): Promise<void> {
+    return serialize(userId, () => secureStorage.setItem(sealedKey(userId), sealed));
+  },
+
+  removeSealed(userId: string): Promise<void> {
+    return serialize(userId, () => secureStorage.removeItem(sealedKey(userId)));
   },
 
   /** A switch token an older build saved for this account, if one is left. */

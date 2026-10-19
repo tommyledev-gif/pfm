@@ -1,0 +1,20 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'vn.budgest'
+version = '1.0.0'
+
+android {
+  namespace "expo.modules.biometricvault"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+}
+
+dependencies {
+  // Same version expo-local-authentication pins, so Gradle resolves one copy.
+  implementation "androidx.biometric:biometric:1.2.0-alpha04"
+}
