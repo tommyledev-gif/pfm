@@ -25,6 +25,7 @@ import { useThemeStore } from "@/stores/theme-store";
 import { installOutboxSync } from "@/features/transactions/outbox/install-outbox-sync";
 import { useAccountRegistryStore } from "@/features/accounts/account-registry-store";
 import { useSwitchProgressStore } from "@/features/accounts/switch-progress-store";
+import { NativeUpdateDialog } from "@/features/app-update/components/NativeUpdateDialog";
 
 // Installed once at module scope, not inside the component — a global
 // error handler must be wired before the very first render, not after an
@@ -135,6 +136,9 @@ export default function RootLayout() {
               chooser alike; input is blocked until it ends (AC-12). */}
           <BusyOverlay visible={switching} testID="overlay-account-switch" />
           <Toast />
+          {/* An APK too old for the published updates blocks every screen,
+              login included, until the newest one is installed. */}
+          {isHydrated ? <NativeUpdateDialog /> : null}
           <BrandSplash ready={isHydrated} />
           <ThemeTransitionHost />
         </QueryClientProvider>
