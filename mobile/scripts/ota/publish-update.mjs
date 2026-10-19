@@ -4,16 +4,16 @@
 // native code (runtime version), with no new APK. Phones download it on the
 // next launch and run it from the launch after that.
 //
+// The bundle and assets go to R2 (r2.mjs); the VPS keeps only the manifest.
 // The manifest is signed here with the private key from OTA_PRIVATE_KEY
 // (outside the repo); the app accepts only manifests that verify against
-// certs/certificate.pem, so the server never holds the key.
+// certs/certificate.pem, so neither the server nor R2 can slip in code.
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
 import {
-  UPDATES_BASE_URL,
   assertProdApi,
   capture,
   fail,
@@ -24,6 +24,7 @@ import {
   step,
 } from "./lib.mjs";
 import { publishManifest, signManifest, verifyLive } from "./manifest.mjs";
+import { R2_PREFIX, r2 } from "./r2.mjs";
 
 const env = loadEnv();
 assertProdApi(env);
@@ -43,40 +44,62 @@ if (target.ssh(`test -f ${target.quote(`${runtimeDir}/apk.json`)} && echo yes ||
 
 step("Exporting the JS bundle and assets");
 const stage = fs.mkdtempSync(path.join(os.tmpdir(), "budgest-ota-"));
-const updateId = crypto.randomUUID();
-const out = path.join(stage, updateId);
-run("npx", ["expo", "export", "--platform", "android", "--output-dir", out]);
+const exported = path.join(stage, "export");
+run("npx", ["expo", "export", "--platform", "android", "--output-dir", exported]);
+
+step("Uploading the bundle and assets to R2");
+const metadata = JSON.parse(fs.readFileSync(path.join(exported, "metadata.json"), "utf8")).fileMetadata.android;
+const store = r2(target);
+const files = [
+  { relPath: metadata.bundle, ext: "bundle", contentType: "application/javascript" },
+  ...metadata.assets.map((asset) => ({ relPath: asset.path, ext: asset.ext, contentType: contentTypeFor(asset.ext) })),
+].map((f) => {
+  const bytes = fs.readFileSync(path.join(exported, f.relPath));
+  const sha256 = crypto.createHash("sha256").update(bytes);
+  // Stored under its own SHA-256: an image or bundle that did not change
+  // since the last publish is already there and is not uploaded again.
+  return { ...f, bytes, r2Key: `${R2_PREFIX}/blobs/${sha256.copy().digest("hex")}`, hash: sha256.digest("base64url") };
+});
+const { uploaded, skipped } = store.upload(
+  exported,
+  files.map((f) => ({
+    file: f.relPath.replace(/\\/g, "/"),
+    key: f.r2Key,
+    contentType: f.contentType,
+    cacheControl: "public, max-age=31536000, immutable",
+    skipIfPresent: true,
+  })),
+);
+console.log(`  ${uploaded} uploaded, ${skipped} already in R2`);
 
 step("Writing and signing the manifest");
-const metadata = JSON.parse(fs.readFileSync(path.join(out, "metadata.json"), "utf8")).fileMetadata.android;
-const filesUrl = `${UPDATES_BASE_URL}/files/android/${runtimeVersion}/${updateId}`;
-const describe = (relPath, ext, contentType) => {
-  const file = path.join(out, relPath);
-  const bytes = fs.readFileSync(file);
-  return {
-    // What the client checks the download against: SHA-256, base64url.
-    hash: crypto.createHash("sha256").update(bytes).digest("base64url"),
-    // MD5 of the content, the same key the APK's embedded assets use, so a
-    // phone never downloads an image it already has.
-    key: crypto.createHash("md5").update(bytes).digest("hex"),
-    contentType,
-    fileExtension: `.${ext}`,
-    url: `${filesUrl}/${relPath.replace(/\\/g, "/")}`,
-  };
-};
+const updateId = crypto.randomUUID();
+const describe = (f) => ({
+  // What the client checks the download against: SHA-256, base64url.
+  hash: f.hash,
+  // MD5 of the content, the same key the APK's embedded assets use, so a
+  // phone never downloads an image it already has.
+  key: crypto.createHash("md5").update(f.bytes).digest("hex"),
+  contentType: f.contentType,
+  fileExtension: `.${f.ext}`,
+  url: store.publicUrl(f.r2Key),
+});
 const manifest = {
   id: updateId,
   createdAt: new Date().toISOString(),
   runtimeVersion,
-  launchAsset: describe(metadata.bundle, "bundle", "application/javascript"),
-  assets: metadata.assets.map((asset) => describe(asset.path, asset.ext, contentTypeFor(asset.ext))),
+  launchAsset: describe(files[0]),
+  assets: files.slice(1).map(describe),
   metadata: {},
   // What Constants.expoConfig returns while this update runs.
   extra: { expoClient: JSON.parse(capture("npx", ["expo", "config", "--json", "--type", "public"])) },
 };
+// Only the manifest and its signature go to the VPS: a few KB per publish.
+const out = path.join(stage, updateId);
+fs.mkdirSync(out);
 signManifest(manifest, out, env);
 
-step("Uploading");
+step("Making it live");
 publishManifest(target, runtimeDir, out, updateId);
 fs.rmSync(stage, { recursive: true, force: true });
 

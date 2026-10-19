@@ -1,10 +1,10 @@
 // npm run apk [-- --no-upload]
 //
-// Builds a release APK signed with the Budgest key and uploads it as the
-// newest download (GET /api/v1/app-updates/apk). Needed only when native code
-// changed: publish-update.mjs says so. Phones install it over the old app,
-// keeping their data, because the key and package stay the same and the
-// versionCode only goes up.
+// Builds a release APK signed with the Budgest key, puts it in R2 and points
+// the download link (GET /api/v1/app-updates/apk, a redirect) at it. Needed
+// only when native code changed: publish-update.mjs says so. Phones install
+// it over the old app, keeping their data, because the key and package stay
+// the same and the versionCode only goes up.
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -27,6 +27,7 @@ import {
   step,
   writeAppJson,
 } from "./lib.mjs";
+import { R2_PREFIX, r2 } from "./r2.mjs";
 
 const IS_WINDOWS = process.platform === "win32";
 const ANDROID_DIR = path.join(MOBILE_ROOT, "android");
@@ -85,33 +86,51 @@ if (!target) {
   process.exit(0);
 }
 
-step("Uploading");
+step("Uploading the APK to R2");
 const fileName = `budgest-${versionCode}.apk`;
 const stage = fs.mkdtempSync(path.join(os.tmpdir(), "budgest-apk-"));
-fs.copyFileSync(APK, path.join(stage, fileName));
+const apkStage = path.join(stage, "apk");
+const metaStage = path.join(stage, "meta");
+fs.mkdirSync(apkStage);
+fs.mkdirSync(metaStage);
+fs.copyFileSync(APK, path.join(apkStage, fileName));
+const store = r2(target);
+const apkKey = `${R2_PREFIX}/apk/${fileName}`;
+store.upload(apkStage, [
+  {
+    file: fileName,
+    key: apkKey,
+    contentType: "application/vnd.android.package-archive",
+    // A versionCode is never built twice, so the file at this key never changes.
+    cacheControl: "public, max-age=31536000, immutable",
+    contentDisposition: `attachment; filename="budgest-${appJson.expo.version}-${versionCode}.apk"`,
+  },
+]);
+
+step("Pointing the download link at it");
 const release = {
   file: fileName,
+  // Where GET /api/v1/app-updates/apk redirects to (AppUpdateHandler.DownloadAPK).
+  url: store.publicUrl(apkKey),
   versionCode,
   versionName: appJson.expo.version,
   runtimeVersion,
   sha256: crypto.createHash("sha256").update(fs.readFileSync(APK)).digest("hex"),
 };
-fs.writeFileSync(path.join(stage, "latest.json"), JSON.stringify(release, null, 2) + "\n");
-fs.writeFileSync(path.join(stage, "apk.json"), JSON.stringify(release, null, 2) + "\n");
+fs.writeFileSync(path.join(metaStage, "latest.json"), JSON.stringify(release, null, 2) + "\n");
+fs.writeFileSync(path.join(metaStage, "apk.json"), JSON.stringify(release, null, 2) + "\n");
 
 const { dir, quote, ssh, upload: put } = target;
 const apkDir = `${dir}/apk`;
 const runtimeDir = `${dir}/android/${runtimeVersion}`;
 ssh(`mkdir -p ${quote(apkDir)} ${quote(runtimeDir)}`);
-// Each file lands under a temporary name and is renamed into place, so a
-// download never sees half an APK. The APK goes first, then the pointer to it.
-put(path.join(stage, fileName), `${apkDir}/.${fileName}.part`);
-ssh(`mv ${quote(`${apkDir}/.${fileName}.part`)} ${quote(`${apkDir}/${fileName}`)}`);
-put(path.join(stage, "latest.json"), `${apkDir}/.latest.json.part`);
+// The pointer is written under a temporary name and renamed into place, so
+// no request ever reads half of it. The APK itself is already in R2.
+put(path.join(metaStage, "latest.json"), `${apkDir}/.latest.json.part`);
 ssh(`mv ${quote(`${apkDir}/.latest.json.part`)} ${quote(`${apkDir}/latest.json`)}`);
 // Marks this runtime as one that has an APK: publish-update.mjs refuses to
 // publish for a runtime no phone can run.
-put(path.join(stage, "apk.json"), `${runtimeDir}/apk.json`);
+put(path.join(metaStage, "apk.json"), `${runtimeDir}/apk.json`);
 // pfm-backend reads these as another user (see manifest.mjs publishManifest).
 ssh(`chmod -R a+rX ${quote(apkDir)} ${quote(runtimeDir)}`);
 fs.rmSync(stage, { recursive: true, force: true });
@@ -121,7 +140,8 @@ console.log(`
   ${UPDATES_BASE_URL}/apk
 
   OTA updates now go to runtime ${runtimeVersion}. A phone on an older APK
-  keeps the version it has until it installs this one (no uninstall needed).
+  is blocked by "Cần cài bản Budgest mới" until it installs this one over
+  the old app (no uninstall needed).
 `);
 
 // Fails before the long build when the release key is not configured.

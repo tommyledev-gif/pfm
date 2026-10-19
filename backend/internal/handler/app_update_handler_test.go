@@ -239,3 +239,30 @@ func TestAppNativeStatus_RejectsBadInput(t *testing.T) {
 		}
 	}
 }
+
+func TestAppUpdateAPK_InR2RedirectsThere(t *testing.T) {
+	dir := t.TempDir()
+	url := "https://pub-test.r2.dev/app-updates/apk/budgest-6.apk"
+	writeFile(t, filepath.Join(dir, "apk", "latest.json"), `{"file":"budgest-6.apk","url":"`+url+`","versionCode":6}`)
+
+	resp, err := appUpdateApp(dir).Test(httptest.NewRequest(http.MethodGet, "/apk", nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != fiber.StatusFound || resp.Header.Get("Location") != url {
+		t.Fatalf("status %d, Location %q; want 302 to %s", resp.StatusCode, resp.Header.Get("Location"), url)
+	}
+}
+
+func TestAppUpdateAPK_NonHTTPSURLIsRefused(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "apk", "latest.json"), `{"file":"budgest-6.apk","url":"javascript:alert(1)","versionCode":6}`)
+
+	resp, err := appUpdateApp(dir).Test(httptest.NewRequest(http.MethodGet, "/apk", nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != fiber.StatusInternalServerError {
+		t.Fatalf("status %d, want 500", resp.StatusCode)
+	}
+}

@@ -82,6 +82,13 @@ func (s *AppUpdateService) LatestAPK() (string, *model.AppRelease, error) {
 	if err != nil {
 		return "", nil, fmt.Errorf("service.AppUpdate.LatestAPK: %w", err)
 	}
+	// In R2: no local path, the caller redirects to the URL.
+	if release.URL != "" {
+		if !strings.HasPrefix(release.URL, "https://") {
+			return "", nil, fmt.Errorf("service.AppUpdate.LatestAPK: latest.json url %q is not https", release.URL)
+		}
+		return "", release, nil
+	}
 	if !filepath.IsLocal(release.File) || filepath.Base(release.File) != release.File || filepath.Ext(release.File) != ".apk" {
 		return "", nil, fmt.Errorf("service.AppUpdate.LatestAPK: latest.json names %q, not an .apk file in apk/", release.File)
 	}

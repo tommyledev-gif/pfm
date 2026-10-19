@@ -16,7 +16,10 @@ type AppUpdate struct {
 // AppRelease describes the newest APK (apk/latest.json, written by
 // mobile/scripts/ota/build-apk.mjs).
 type AppRelease struct {
-	File           string `json:"file"`
+	File string `json:"file"`
+	// URL is where the APK is stored (R2, public). Empty for the APKs that
+	// were kept on the VPS disk before they moved to R2, served from apk/File.
+	URL            string `json:"url"`
 	VersionCode    int    `json:"versionCode"`
 	VersionName    string `json:"versionName"`
 	RuntimeVersion string `json:"runtimeVersion"`

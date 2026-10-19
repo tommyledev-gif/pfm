@@ -32,17 +32,20 @@ export function step(message) {
   console.log(`\n▸ ${message}`);
 }
 
+// KEY=value lines of an env file; {} when the file does not exist.
+export function readEnvFile(file) {
+  const env = {};
+  if (!fs.existsSync(file)) return env;
+  for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
+    const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
+    if (match) env[match[1]] = match[2].replace(/^(['"])(.*)\1$/, "$2");
+  }
+  return env;
+}
+
 // mobile/.env (gitignored) under process.env; a variable set in the shell wins.
 export function loadEnv() {
-  const env = {};
-  const file = path.join(MOBILE_ROOT, ".env");
-  if (fs.existsSync(file)) {
-    for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
-      const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
-      if (match) env[match[1]] = match[2].replace(/^(['"])(.*)\1$/, "$2");
-    }
-  }
-  return { ...env, ...process.env };
+  return { ...readEnvFile(path.join(MOBILE_ROOT, ".env")), ...process.env };
 }
 
 export function assertProdApi(env) {

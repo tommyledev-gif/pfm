@@ -95,6 +95,11 @@ func (h *AppUpdateHandler) DownloadAPK(c *fiber.Ctx) error {
 		return response.Error(c, h.logger, err)
 	}
 	c.Set(fiber.HeaderCacheControl, "no-store")
+	// Stored in R2: send the browser there. The link itself stays the same
+	// for every release; only where it points changes.
+	if path == "" {
+		return c.Redirect(release.URL, fiber.StatusFound)
+	}
 	c.Attachment(fmt.Sprintf("budgest-%s-%d.apk", release.VersionName, release.VersionCode))
 	if err := c.SendFile(path); err != nil {
 		return response.Error(c, h.logger, fmt.Errorf("handler.AppUpdate.DownloadAPK: %w", err))
