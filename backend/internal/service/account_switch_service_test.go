@@ -59,7 +59,7 @@ func TestAccountSwitchService_Switch(t *testing.T) {
 		user := seedUser(f.users, "a@example.com", model.UserStatusActive)
 		token, _, _ := f.tokens.IssueSwitchToken(user.ID)
 
-		session, err := f.switches.Switch(ctx, token)
+		session, err := f.switches.Switch(ctx, token, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -69,10 +69,10 @@ func TestAccountSwitchService_Switch(t *testing.T) {
 		if session.User.ID != user.ID {
 			t.Fatal("session for the wrong user")
 		}
-		if _, err := f.switches.Switch(ctx, session.SwitchToken); err != nil {
+		if _, err := f.switches.Switch(ctx, session.SwitchToken, nil); err != nil {
 			t.Fatalf("rotated token must work: %v", err)
 		}
-		_, err = f.switches.Switch(ctx, token)
+		_, err = f.switches.Switch(ctx, token, nil)
 		wantAppCode(t, err, common.ErrCodeUnauthenticated)
 	})
 
@@ -88,7 +88,7 @@ func TestAccountSwitchService_Switch(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				if _, err := f.switches.Switch(ctx, token); err == nil {
+				if _, err := f.switches.Switch(ctx, token, nil); err == nil {
 					mu.Lock()
 					successes++
 					mu.Unlock()
@@ -108,7 +108,7 @@ func TestAccountSwitchService_Switch(t *testing.T) {
 		if err := f.switches.Revoke(ctx, token); err != nil {
 			t.Fatalf("revoke: %v", err)
 		}
-		_, err := f.switches.Switch(ctx, token)
+		_, err := f.switches.Switch(ctx, token, nil)
 		wantAppCode(t, err, common.ErrCodeUnauthenticated)
 	})
 
@@ -117,7 +117,7 @@ func TestAccountSwitchService_Switch(t *testing.T) {
 		user := seedUser(f.users, "a@example.com", model.UserStatusActive)
 		now := time.Now().UTC()
 		token := backdatedSwitchToken(t, user.ID, now.Add(-200*24*time.Hour), now.Add(-time.Hour))
-		_, err := f.switches.Switch(ctx, token)
+		_, err := f.switches.Switch(ctx, token, nil)
 		wantAppCode(t, err, common.ErrCodeUnauthenticated)
 	})
 
@@ -127,7 +127,7 @@ func TestAccountSwitchService_Switch(t *testing.T) {
 		access, refresh, _ := f.tokens.GenerateTokenPair(user)
 		importToken, _ := f.tokens.IssueImportToken(user.ID, nil)
 		for name, token := range map[string]string{"access": access, "refresh": refresh, "import": importToken} {
-			_, err := f.switches.Switch(ctx, token)
+			_, err := f.switches.Switch(ctx, token, nil)
 			if err == nil {
 				t.Fatalf("%s token accepted as a switch token", name)
 			}
@@ -139,7 +139,7 @@ func TestAccountSwitchService_Switch(t *testing.T) {
 		f := newSwitchFixture(t)
 		user := seedUser(f.users, "a@example.com", model.UserStatusActive)
 		token, _, _ := NewTokenService("another-key").IssueSwitchToken(user.ID)
-		_, err := f.switches.Switch(ctx, token)
+		_, err := f.switches.Switch(ctx, token, nil)
 		wantAppCode(t, err, common.ErrCodeUnauthenticated)
 	})
 
@@ -150,7 +150,7 @@ func TestAccountSwitchService_Switch(t *testing.T) {
 		f.users.softDelete("x@example.com")
 		for _, id := range []uuid.UUID{disabled.ID, deleted.ID} {
 			token, _, _ := f.tokens.IssueSwitchToken(id)
-			_, err := f.switches.Switch(ctx, token)
+			_, err := f.switches.Switch(ctx, token, nil)
 			wantAppCode(t, err, common.ErrCodeUnauthenticated)
 		}
 	})
@@ -161,7 +161,7 @@ func TestAccountSwitchService_Switch(t *testing.T) {
 		now := time.Now().UTC()
 		token := backdatedSwitchToken(t, user.ID, now.Add(-time.Hour), now.Add(time.Hour))
 		f.users.setTokensValidAfter(user.ID, now.Truncate(time.Second))
-		_, err := f.switches.Switch(ctx, token)
+		_, err := f.switches.Switch(ctx, token, nil)
 		wantAppCode(t, err, common.ErrCodeUnauthenticated)
 		if got := f.revoked.revokedCount(); got != 0 {
 			t.Fatalf("refused token must not be claimed, got %d rows", got)
@@ -174,14 +174,14 @@ func TestAccountSwitchService_Switch(t *testing.T) {
 		token, _, _ := f.tokens.IssueSwitchToken(user.ID)
 		claims, _ := f.tokens.ParseSwitchToken(token)
 		f.users.setTokensValidAfter(user.ID, claims.IssuedAt.Time.Add(500*time.Millisecond))
-		if _, err := f.switches.Switch(ctx, token); err != nil {
+		if _, err := f.switches.Switch(ctx, token, nil); err != nil {
 			t.Fatalf("expected success, got %v", err)
 		}
 	})
 
 	t.Run("malformed value is invalid input", func(t *testing.T) {
 		f := newSwitchFixture(t)
-		_, err := f.switches.Switch(ctx, "not-a-jwt")
+		_, err := f.switches.Switch(ctx, "not-a-jwt", nil)
 		wantAppCode(t, err, common.ErrCodeInvalidInput)
 	})
 }

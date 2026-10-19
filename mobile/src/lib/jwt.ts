@@ -43,6 +43,8 @@ function decodeBase64Url(input: string): string | null {
 export interface AccessTokenClaims {
   user_id?: string;
   role?: string;
+  /** Seconds since epoch (every token the backend signs carries one). */
+  exp?: number;
 }
 
 // Returns null for anything that isn't a well-formed three-part JWT with a
@@ -75,4 +77,14 @@ export function roleFromAccessToken(token: string | null): UserRole | null {
 export function userIdFromAccessToken(token: string | null): string | null {
   const userId = decodeAccessTokenClaims(token)?.user_id;
   return typeof userId === "string" && userId.length > 0 ? userId : null;
+}
+
+/**
+ * When a token stops working, as an ISO UTC string — for a saved account,
+ * when its session on this device runs out (the refresh token's exp already
+ * takes the session's 180-day cap into account). null when unreadable.
+ */
+export function tokenExpiresAt(token: string | null): string | null {
+  const exp = decodeAccessTokenClaims(token)?.exp;
+  return typeof exp === "number" && Number.isFinite(exp) ? new Date(exp * 1000).toISOString() : null;
 }

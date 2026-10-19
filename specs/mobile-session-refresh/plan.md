@@ -7,6 +7,10 @@
 - **Related plans:** [security](../security/plan.md) (original JWT issuance this extends), [mobile-debug-console](../mobile-debug-console/plan.md) (refresh attempts/failures surfaced in its log viewer)
 - **Client scope:** Backend (Go Fiber) + `mobile/` (React Native/Expo) only. `frontend/` (web) is explicitly out of scope (spec.md Out of Scope) — the new endpoint is available for a future web fast-follow with zero backend changes.
 
+> **Changed since this plan was written** (details in [spec.md](./spec.md)'s header note and [mobile-account-switch plan](../mobile-account-switch/plan.md) "Revision 2026-10-19"):
+> - **Sessions (migration 028)** replaced the "revoke the old jti in `revoked_tokens`" rotation below. `AuthService.Refresh` now delegates to `SessionService.Refresh`: compare-and-swap of the session's `refresh_jti`, previous jti accepted for `RefreshReuseGrace` (5 min), anything older revokes the session; `JWTAuth` checks the session on every request. The domain table, business rules and diagrams below that name `revoked_tokens`/`IsRevoked` as the mechanism are historical; `revoked_tokens` still covers pre-session refresh tokens (7-day window after 028) and the deprecated switch tokens.
+> - **2026-10-19 (migration 033):** `RefreshTokenTTL` 7 d → 60 d idle (sliding, `expires_at = min(now + 60 d, absolute_expires_at)`), `SessionAbsoluteTTL` 30 d → 180 d, new `LegacyRefreshTokenTTL = 7 d` for the pre-session window; refresh reads `X-Device-Id`/`X-Device-Name` and records a missing device. Mobile: the refresh runs per saved account (`src/lib/account-tokens.ts`, single flight per account) and its result is written to the owning account's slot by compare-and-set, even after a switch — the "discard a stale result" guard became "store it under its owner".
+
 ## Pre-flight: Spec Review Findings
 
 | # | Type | Finding | Resolution / Open Task |
@@ -64,7 +68,7 @@ No new migration, no new DTO file, no new repository — `RefreshRequest` is add
 
 | Entity | Table | Key Fields | Notes |
 |--------|-------|------------|-------|
-| (none new) | `revoked_tokens` (existing, `003_revoked_tokens.sql`) | `token_jti`, `user_id`, `expires_at` | Reused unchanged — `Refresh` calls the existing `RevokedTokenRepo.Revoke`/`IsRevoked`, same as `Logout` |
+| (none new) | `revoked_tokens` (existing, `003_revoked_tokens.sql`) | `token_jti`, `user_id`, `expires_at` | Reused unchanged — `Refresh` calls the existing `RevokedTokenRepo.Revoke`/`IsRevoked`, same as `Logout`. **Superseded by `sessions` (mig 028, device columns mig 033)** for every session-bound refresh token |
 | (none new) | `users` (existing) | `id`, `status`, `deleted_at` | Reused unchanged — `Refresh` calls the existing `UserRepo.GetUserByID` for the S-REF-05/S-REF-06 active-user check |
 
 ### Business Rules
@@ -73,7 +77,7 @@ No new migration, no new DTO file, no new repository — `RefreshRequest` is add
 |------|--------|-------------|
 | A refresh token, once used successfully, cannot be reused | AC S-REF-03 | `AuthService.Refresh()` (Go) → checks `RevokedTokenRepo.IsRevoked` before issuing, 401 `UNAUTHENTICATED` |
 | Refresh requires the user to still be `active` (not disabled/deleted) | AC S-REF-05, S-REF-06 | `AuthService.Refresh()` → `UserRepo.GetUserByID`, 401 `UNAUTHENTICATED` if not `active` or not found |
-| Refresh token `exp` must not have passed | AC S-REF-02 | `AuthService.Refresh()` → compares `claims.ExpiresAt` to `time.Now().UTC()`, 401 `UNAUTHENTICATED` |
+| Refresh token `exp` must not have passed | AC S-REF-02 | `AuthService.Refresh()` → compares `claims.ExpiresAt` to `time.Now().UTC()`, 401 `UNAUTHENTICATED`. Since 2026-10-19 the session's own `expires_at` (60 d idle, sliding) and `absolute_expires_at` (180 d) are checked too |
 | New pair generated before old token is revoked (rotation ordering) | Edge Case #1, Pre-flight Finding #1 | `AuthService.Refresh()` — `GenerateTokenPair` call precedes `Revoke` call in source order |
 | Malformed refresh token in request body | AC S-REF-04, S-REF-07 | `AuthHandler.Refresh()` validator tag (missing) + `AuthService.Refresh()`'s `ParseRefreshTokenUnverified` failure (malformed), both 400 `INVALID_INPUT` |
 | Mobile schedules one proactive refresh at `AccessTokenTTL - 3min` from token issuance, cancels/reschedules on every `setTokens`/`clear` | AC S-REF-09, S-REF-15, Edge Case #3 (mobile) | `mobile/src/lib/refresh-scheduler.ts` |

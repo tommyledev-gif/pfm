@@ -96,12 +96,3 @@ export async function getPasskeyAssertion(options: unknown): Promise<Record<stri
   return { ...result, rawId: result.rawId ?? result.id, type: result.type ?? "public-key" };
 }
 
-/** "Samsung SM-S918B" — what the Security list calls the phone a passkey was made on. */
-export function deviceName(): string {
-  const constants = Platform.constants as { Brand?: string; Model?: string; Manufacturer?: string };
-  if (Platform.OS === "ios") return "iPhone";
-  const brand = constants.Brand ?? constants.Manufacturer ?? "";
-  const model = constants.Model ?? "";
-  const name = `${brand.charAt(0).toUpperCase()}${brand.slice(1)} ${model}`.trim();
-  return name || "Điện thoại";
-}

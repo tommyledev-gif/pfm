@@ -57,6 +57,9 @@ Software Requirement Specification (SRS)
     - [US-03: Switch Between Saved Accounts [Release 1]](#us-03-switch-between-saved-accounts-release-1)
     - [US-04: Require Device Unlock Before Switching [Release 1]](#us-04-require-device-unlock-before-switching-release-1)
     - [US-05: Log Out of All Devices [Release 1]](#us-05-log-out-of-all-devices-release-1)
+    - [US-06: See and Sign Out Signed-in Devices [Release 1]](#us-06-see-and-sign-out-signed-in-devices-release-1)
+    - [US-07: Change Password [Release 1]](#us-07-change-password-release-1)
+    - [US-08: Lock the App [Release 1]](#us-08-lock-the-app-release-1)
   - [Feature-03: Wallet Management](#feature-03-wallet-management)
     - [US-01: Create a Wallet [MVP]](#us-01-create-a-wallet-mvp)
     - [US-02: View a list of Wallets [MVP]](#us-02-view-a-list-of-wallets-mvp)
@@ -520,7 +523,7 @@ The User Stories of this feature are described below.
 
 ## Feature-02: System Security {#feature-02-system-security}
 
-Ensures secure access to the System by allowing Users to log in and log out safely, protecting personal financial data. Moreover, each User is authorized to see only his/her financial data. On mobile, several Users sharing one device can switch between their accounts without logging out or re-entering a password, protected by the device's own unlock.  
+Ensures secure access to the System by allowing Users to log in and log out safely, protecting personal financial data. Moreover, each User is authorized to see only his/her financial data. On mobile, several Users sharing one device can switch between their accounts without logging out or re-entering a password, protected by the device's own unlock: each account types its password once per device and then keeps its own signed-in session on that device, until it goes 60 days unused or 180 days have passed since that sign-in. A User can see which devices are signed in to the account and sign one out, sign out every other device at once, change the password, and lock the app behind the device's unlock.  
 The User Stories of this feature are described below.
 
 ### US-01: Login [MVP] {#us-01-login-mvp}
@@ -556,11 +559,24 @@ The User Stories of this feature are described below.
     **Then** the System saves the new account  
      And the System removes the least recently used account that is not currently logged in
 
-  **Scenario: Require a password again after 180 days without use**  
-    **Given** "Bình" has not been used on this device for more than 180 days  
+  **Scenario: Require a password again after 60 days unused**  
+    **Given** "Bình" has not been used on this device for more than 60 days  
     **When** the User selects "Bình" in the account list  
     **Then** the System does not switch  
-     And the System marks "Bình" as expired and asks for the password of "Bình"
+     And the System marks "Bình" as "Hết phiên" and asks for the password of "Bình"
+
+  **Scenario: Require a password again 180 days after signing in**  
+    **Given** "Bình" logged in with a password on this device more than 180 days ago  
+     And "Bình" has been used on this device every week since  
+    **When** the User selects "Bình" in the account list  
+    **Then** the System does not switch  
+     And the System marks "Bình" as "Hết phiên" and asks for the password of "Bình"
+
+  **Scenario: Keep the other saved accounts when one needs a password again**  
+    **Given** "Bình" is marked "Hết phiên" on this device  
+     And User "Chi" is also saved on this device  
+    **When** the User selects "Chi"  
+    **Then** the System switches to "Chi" without asking for a password
 
   **Scenario: Keep the current account when a switch fails**  
     **Given** the device is offline  
@@ -626,6 +642,111 @@ The User Stories of this feature are described below.
     **When** this device next contacts the System  
     **Then** the System signs "An" out on this device  
      And the System shows the login screen
+
+### US-06: See and Sign Out Signed-in Devices [Release 1] {#us-06-see-and-sign-out-signed-in-devices-release-1}
+
+*As a User*  
+*I want to see which devices are signed in to my account and sign one of them out*  
+*so that a lost or sold phone loses access without signing out all my other devices.*
+
+  **Background**:  
+    **Given** User "An" is logged in on this phone and on a second phone  
+     And "An" is saved for account switching on a third phone
+
+  **Scenario: List the signed-in devices**  
+    **When** the User opens "Thiết bị đang đăng nhập" under "Bảo mật"  
+    **Then** the System lists every device where "An" is signed in, most recently used first  
+     And this phone is marked "Thiết bị này" and cannot be signed out from the list  
+     And every other device shows when it was last used, for example "Hoạt động 18/10/2026"  
+     And a device that did not report its name shows "Thiết bị không rõ tên"
+
+  **Scenario: Sign out one device**  
+    **When** the User taps "Đăng xuất" on the second phone  
+     And the User confirms "Đăng xuất thiết bị"  
+    **Then** the System shows "Đã đăng xuất {device}"  
+     And the second phone is signed out of "An" on its next contact with the System  
+     And "An" on the third phone and on this phone are not affected
+
+  **Scenario: A signed-out device needs the password again**  
+    **Given** the User signed the third phone out  
+    **When** someone selects "An" in the account list of the third phone  
+    **Then** the System does not switch  
+     And the System marks "An" as "Hết phiên" on the third phone and asks for the password of "An"
+
+  **Scenario: Keep everything when the device cannot be signed out**  
+    **Given** this phone is offline  
+    **When** the User confirms "Đăng xuất thiết bị"  
+    **Then** no device is signed out  
+     And the System shows error "Cần kết nối mạng để đăng xuất thiết bị."
+
+### US-07: Change Password [Release 1] {#us-07-change-password-release-1}
+
+*As a User*  
+*I want to change my password from the app*  
+*so that whoever knows my old password, and every device signed in with it, is locked out.*
+
+  **Background**:  
+    **Given** User "An" is logged in on this phone and on a second phone  
+     And the User is on the "Đổi mật khẩu" screen under "Bảo mật"
+
+  **Scenario: Change the password**  
+    **When** the User enters the current password  
+     And the User enters a new password of at least 8 characters twice  
+     And the User taps "Đổi mật khẩu"  
+    **Then** the System saves the new password  
+     And this phone stays logged in  
+     And the System shows "Đã đổi mật khẩu. Thiết bị khác cần đăng nhập lại."  
+     And the second phone is signed out of "An" on its next contact with the System
+
+  **Scenario: Reject a wrong current password**  
+    **When** the User enters a wrong current password and taps "Đổi mật khẩu"  
+    **Then** the System keeps the old password  
+     And the System shows error "Mật khẩu hiện tại không đúng."  
+     And this phone stays logged in
+
+  **Scenario: Reject a new password that is too short or the same as the current one**  
+    **When** the User enters a new password shorter than 8 characters, or equal to the current password  
+    **Then** the System keeps the old password  
+     And the System shows "Mật khẩu mới cần ít nhất 8 ký tự." or "Mật khẩu mới trùng mật khẩu hiện tại."
+
+  **Scenario: Limit wrong tries**  
+    **Given** the User entered a wrong current password 5 times in the last 15 minutes  
+    **When** the User tries again  
+    **Then** the System rejects the request  
+     And the System shows error "Thử quá nhiều lần. Thử lại sau 15 phút."
+
+### US-08: Lock the App [Release 1] {#us-08-lock-the-app-release-1}
+
+*As a User*  
+*I want the app to ask for the device's fingerprint, face or screen-lock code when it opens*  
+*so that someone picking up my unlocked phone cannot read my finances.*
+
+  **Background**:  
+    **Given** User "An" is logged in  
+     And the device has a fingerprint or screen lock set up
+
+  **Scenario: App lock is off by default**  
+    **Given** "Khóa ứng dụng" under "Bảo mật" has not been changed  
+    **When** the User opens the app  
+    **Then** the System shows the app without asking for device unlock
+
+  **Scenario: Ask for device unlock when the app opens**  
+    **Given** the User has turned on "Khóa ứng dụng" after passing the device unlock  
+    **When** the User opens the app, or comes back to it after 5 minutes or more  
+    **Then** the System shows "Ứng dụng đang khóa" and nothing of the User's data  
+    **When** the device confirms the unlock  
+    **Then** the System shows the screen the User was on
+
+  **Scenario: Do not ask again within 5 minutes**  
+    **Given** "Khóa ứng dụng" is on  
+    **When** the User comes back to the app after less than 5 minutes  
+    **Then** the System shows the app without asking for device unlock
+
+  **Scenario: Cannot turn on app lock without a screen lock**  
+    **Given** the device has no fingerprint, face or screen lock set up  
+    **When** the User turns on "Khóa ứng dụng"  
+    **Then** app lock stays off  
+     And the System shows "Máy chưa cài khóa màn hình nên chưa bật được khóa ứng dụng."
 
 ## Feature-03: Wallet Management {#feature-03-wallet-management}
 
@@ -1290,7 +1411,7 @@ The MVP includes eight core features to ensure a usable and valuable first relea
 | No. | Feature | MVP | Release 1 | Release 2 | Note |
 | :---: | ----- | :---: | :---: | :---: | ----- |
 | 1 | **User Management** | ✔ | ✔ | ✔ | Core user identity and profile management |
-| 2 | **System Security** | ✔ | ✔ | ✔ | Authentication, authorization, and data protection; Release 1 adds mobile account switching (device-unlock protected) and log out of all devices |
+| 2 | **System Security** | ✔ | ✔ | ✔ | Authentication, authorization, and data protection; Release 1 adds mobile account switching (device-unlock protected), log out of all devices, signed-in devices with per-device sign-out, change password, and app lock |
 | 3 | **Wallet Management** | ✔ | ✔ | ✔ | Core financial structure |
 | 4 | **Category Management** | ✔ | ✔ |  | Basic categorization is sufficient for early stages |
 | 5 | **Budget Management** | ✔ | ✔ | ✔ | Essential for spending control and planning |

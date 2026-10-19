@@ -48,7 +48,8 @@ const legacyRefreshMigration = "028_sessions.sql"
 
 // openLegacyRefreshWindow lets refresh tokens issued before sessions existed
 // be traded for session-bound ones, until the day they have all expired on
-// their own: when migration 028 was applied plus the refresh token lifetime.
+// their own: when migration 028 was applied plus the lifetime they were
+// issued with.
 // If that moment cannot be read (no ledger, as on a database built outside
 // cmd/migrate), the window stays shut and those few users sign in again,
 // which is the safe failure.
@@ -58,7 +59,7 @@ func openLegacyRefreshWindow(ctx context.Context, queries *sqlc.Queries, auth *s
 		logger.Warn("pre-session refresh tokens will not be accepted: could not read when sessions were introduced", zap.Error(err))
 		return
 	}
-	deadline := appliedAt.Add(common.RefreshTokenTTL)
+	deadline := appliedAt.Add(common.LegacyRefreshTokenTTL)
 	auth.SetLegacyRefreshDeadline(deadline)
 	logger.Info("pre-session refresh tokens accepted until", zap.Time("until", deadline))
 }

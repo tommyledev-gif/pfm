@@ -7,7 +7,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// Session mirrors the sessions table exactly (028_sessions.sql).
+// Session mirrors the sessions table (028_sessions.sql, device columns from
+// 033_session_devices.sql; public_key is reserved and not read).
 type Session struct {
 	ID                uuid.UUID
 	UserID            uuid.UUID
@@ -20,6 +21,8 @@ type Session struct {
 	AbsoluteExpiresAt time.Time
 	RevokedAt         *time.Time
 	RevokedReason     *string
+	DeviceID          *uuid.UUID
+	DeviceName        *string
 }
 
 const lockUserForSession = `-- name: LockUserForSession :one
@@ -63,9 +66,28 @@ func (q *Queries) RevokeSessionsBeyondLimit(ctx context.Context, userID uuid.UUI
 	return result.RowsAffected(), nil
 }
 
+const revokeSessionsOnDevice = `-- name: RevokeSessionsOnDevice :execrows
+UPDATE sessions
+SET revoked_at     = NOW(),
+    revoked_reason = 'replaced'
+WHERE user_id = $1
+  AND device_id = $2
+  AND revoked_at IS NULL
+`
+
+// RevokeSessionsOnDevice ends the user's live sessions on one device, so a
+// new sign-in there replaces them.
+func (q *Queries) RevokeSessionsOnDevice(ctx context.Context, userID, deviceID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeSessionsOnDevice, userID, deviceID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const createSession = `-- name: CreateSession :exec
-INSERT INTO sessions (id, user_id, refresh_jti, expires_at, absolute_expires_at)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO sessions (id, user_id, refresh_jti, expires_at, absolute_expires_at, device_id, device_name)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 `
 
 type CreateSessionParams struct {
@@ -74,16 +96,19 @@ type CreateSessionParams struct {
 	RefreshJTI        string
 	ExpiresAt         time.Time
 	AbsoluteExpiresAt time.Time
+	DeviceID          *uuid.UUID
+	DeviceName        *string
 }
 
 func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) error {
-	_, err := q.db.Exec(ctx, createSession, arg.ID, arg.UserID, arg.RefreshJTI, arg.ExpiresAt, arg.AbsoluteExpiresAt)
+	_, err := q.db.Exec(ctx, createSession, arg.ID, arg.UserID, arg.RefreshJTI, arg.ExpiresAt, arg.AbsoluteExpiresAt, arg.DeviceID, arg.DeviceName)
 	return err
 }
 
 const getSession = `-- name: GetSession :one
 SELECT id, user_id, refresh_jti, prev_refresh_jti, rotated_at, created_at,
-       last_used_at, expires_at, absolute_expires_at, revoked_at, revoked_reason
+       last_used_at, expires_at, absolute_expires_at, revoked_at, revoked_reason,
+       device_id, device_name
 FROM sessions
 WHERE id = $1
 `
@@ -95,6 +120,7 @@ func (q *Queries) GetSession(ctx context.Context, id uuid.UUID) (Session, error)
 	err := row.Scan(
 		&s.ID, &s.UserID, &s.RefreshJTI, &s.PrevRefreshJTI, &s.RotatedAt, &s.CreatedAt,
 		&s.LastUsedAt, &s.ExpiresAt, &s.AbsoluteExpiresAt, &s.RevokedAt, &s.RevokedReason,
+		&s.DeviceID, &s.DeviceName,
 	)
 	return s, err
 }
@@ -105,7 +131,9 @@ SET prev_refresh_jti = refresh_jti,
     refresh_jti      = $3,
     rotated_at       = NOW(),
     last_used_at     = NOW(),
-    expires_at       = $4
+    expires_at       = $4,
+    device_id        = COALESCE(device_id, $5),
+    device_name      = COALESCE(device_name, $6)
 WHERE id = $1
   AND refresh_jti = $2
   AND revoked_at IS NULL
@@ -116,13 +144,17 @@ type RotateSessionRefreshParams struct {
 	CurrentJTI string
 	NewJTI     string
 	ExpiresAt  time.Time
+	// DeviceID/DeviceName fill a session that has no device yet; nil keeps
+	// whatever is stored.
+	DeviceID   *uuid.UUID
+	DeviceName *string
 }
 
 // RotateSessionRefresh returns 1 when this call rotated the session, 0 when
 // the current jti was no longer the presented one (lost a race) or the
 // session is revoked.
 func (q *Queries) RotateSessionRefresh(ctx context.Context, arg RotateSessionRefreshParams) (int64, error) {
-	result, err := q.db.Exec(ctx, rotateSessionRefresh, arg.ID, arg.CurrentJTI, arg.NewJTI, arg.ExpiresAt)
+	result, err := q.db.Exec(ctx, rotateSessionRefresh, arg.ID, arg.CurrentJTI, arg.NewJTI, arg.ExpiresAt, arg.DeviceID, arg.DeviceName)
 	if err != nil {
 		return 0, err
 	}
@@ -144,6 +176,42 @@ func (q *Queries) RevokeSession(ctx context.Context, id, userID uuid.UUID, reaso
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const listLiveSessionsForUser = `-- name: ListLiveSessionsForUser :many
+SELECT id, device_name, created_at, last_used_at
+FROM sessions
+WHERE user_id = $1
+  AND revoked_at IS NULL
+  AND expires_at > NOW()
+  AND absolute_expires_at > NOW()
+ORDER BY last_used_at DESC, created_at DESC, id
+`
+
+type ListLiveSessionsForUserRow struct {
+	ID         uuid.UUID
+	DeviceName *string
+	CreatedAt  time.Time
+	LastUsedAt time.Time
+}
+
+// ListLiveSessionsForUser returns the user's usable sessions, most recently
+// used first.
+func (q *Queries) ListLiveSessionsForUser(ctx context.Context, userID uuid.UUID) ([]ListLiveSessionsForUserRow, error) {
+	rows, err := q.db.Query(ctx, listLiveSessionsForUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListLiveSessionsForUserRow
+	for rows.Next() {
+		var r ListLiveSessionsForUserRow
+		if err := rows.Scan(&r.ID, &r.DeviceName, &r.CreatedAt, &r.LastUsedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, r)
+	}
+	return items, rows.Err()
 }
 
 const revokeAllSessionsForUser = `-- name: RevokeAllSessionsForUser :execrows

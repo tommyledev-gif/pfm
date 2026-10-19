@@ -137,7 +137,7 @@ func TestSessionCreateEvictsTheLeastRecentlyUsed(t *testing.T) {
 		created = append(created, s)
 	}
 	// Make the first one the most recently used by rotating it.
-	if ok, err := repo.Rotate(context.Background(), created[0].ID, created[0].RefreshJTI, uuid.NewString(), time.Now().Add(time.Hour)); err != nil || !ok {
+	if ok, err := repo.Rotate(context.Background(), created[0].ID, created[0].RefreshJTI, uuid.NewString(), time.Now().Add(time.Hour), nil); err != nil || !ok {
 		t.Fatalf("rotate: ok=%v err=%v", ok, err)
 	}
 	// The second one is now the least recently used.
@@ -185,7 +185,7 @@ func TestSessionRotateIsCompareAndSwap(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			ok, err := repo.Rotate(context.Background(), s.ID, s.RefreshJTI, uuid.NewString(), time.Now().Add(time.Hour))
+			ok, err := repo.Rotate(context.Background(), s.ID, s.RefreshJTI, uuid.NewString(), time.Now().Add(time.Hour), nil)
 			if err != nil {
 				t.Errorf("Rotate: %v", err)
 			}
@@ -216,7 +216,7 @@ func TestSessionRotateRefusesARevokedSession(t *testing.T) {
 	if ok, err := repo.Revoke(context.Background(), s.ID, user, model.SessionRevokedLogout); err != nil || !ok {
 		t.Fatalf("revoke: ok=%v err=%v", ok, err)
 	}
-	if ok, err := repo.Rotate(context.Background(), s.ID, s.RefreshJTI, uuid.NewString(), time.Now().Add(time.Hour)); err != nil || ok {
+	if ok, err := repo.Rotate(context.Background(), s.ID, s.RefreshJTI, uuid.NewString(), time.Now().Add(time.Hour), nil); err != nil || ok {
 		t.Fatalf("rotating a revoked session: ok=%v err=%v, want false, nil", ok, err)
 	}
 }
@@ -358,5 +358,56 @@ func TestRevokedTokenDeleteExpired(t *testing.T) {
 	}
 	if revoked, _ := repo.IsRevoked(ctx, valid); !revoked {
 		t.Error("a deny-list row for a token that is still valid must be kept")
+	}
+}
+
+// Mig 033: a sign-in on a device replaces the user's session there, the list
+// shows only live sessions, and a refresh records a device only once.
+func TestSessionDevices(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+	repo := NewSessionRepository(sqlc.New(pool), pool)
+	userID := newUser(t, pool)
+	phone := uuid.New()
+	name := "Pixel 8"
+
+	first := newSession(userID)
+	first.DeviceID, first.DeviceName = &phone, &name
+	if err := repo.Create(ctx, first, 5); err != nil {
+		t.Fatalf("create first: %v", err)
+	}
+	legacy := newSession(userID) // no device, like a session from before mig 033
+	if err := repo.Create(ctx, legacy, 5); err != nil {
+		t.Fatalf("create legacy: %v", err)
+	}
+	second := newSession(userID)
+	second.DeviceID = &phone
+	if err := repo.Create(ctx, second, 5); err != nil {
+		t.Fatalf("create second: %v", err)
+	}
+
+	got, err := repo.Get(ctx, first.ID)
+	if err != nil || got.RevokedAt == nil || *got.RevokedReason != model.SessionRevokedReplaced {
+		t.Fatalf("first session on the phone = %+v (err %v), want replaced", got, err)
+	}
+	items, err := repo.ListLive(ctx, userID)
+	if err != nil || len(items) != 2 {
+		t.Fatalf("ListLive = %+v (err %v), want the second and the legacy session", items, err)
+	}
+
+	tablet := uuid.New()
+	if ok, err := repo.Rotate(ctx, legacy.ID, legacy.RefreshJTI, uuid.NewString(), time.Now().Add(time.Hour), &model.SessionDevice{ID: tablet, Name: "Tab S9"}); err != nil || !ok {
+		t.Fatalf("rotate legacy: ok=%v err=%v", ok, err)
+	}
+	got, _ = repo.Get(ctx, legacy.ID)
+	if got.DeviceID == nil || *got.DeviceID != tablet || got.DeviceName == nil || *got.DeviceName != "Tab S9" {
+		t.Fatalf("legacy session did not learn its device: %+v", got)
+	}
+	if ok, err := repo.Rotate(ctx, legacy.ID, got.RefreshJTI, uuid.NewString(), time.Now().Add(time.Hour), &model.SessionDevice{ID: uuid.New(), Name: "Other"}); err != nil || !ok {
+		t.Fatalf("rotate again: ok=%v err=%v", ok, err)
+	}
+	got, _ = repo.Get(ctx, legacy.ID)
+	if *got.DeviceID != tablet || *got.DeviceName != "Tab S9" {
+		t.Fatalf("a recorded device was overwritten: %+v", got)
 	}
 }

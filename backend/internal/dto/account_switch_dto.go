@@ -22,13 +22,14 @@ type SwitchTokenResponse struct {
 }
 
 // SwitchResponse is the 200 body of POST /auth/switch and (same shape) of
-// POST /auth/sessions/revoke-all — a fresh session pair plus the rotated
-// switch token for the device.
+// POST /auth/sessions/revoke-all — a fresh session pair for the device, plus
+// a rotated switch token only for a client that sent no X-Device-Id (an app
+// build from before device-bound sessions); omitted otherwise.
 type SwitchResponse struct {
 	AccessToken          string       `json:"access_token"`
 	RefreshToken         string       `json:"refresh_token"`
-	SwitchToken          string       `json:"switch_token"`
-	SwitchTokenExpiresAt time.Time    `json:"switch_token_expires_at"`
+	SwitchToken          string       `json:"switch_token,omitempty"`
+	SwitchTokenExpiresAt *time.Time   `json:"switch_token_expires_at,omitempty"`
 	User                 UserResponse `json:"user"`
 }
 

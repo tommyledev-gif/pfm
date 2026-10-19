@@ -36,8 +36,9 @@ func (c *testClock) Advance(d time.Duration) {
 }
 
 // fakeSessionRepo is an in-memory SessionRepo that follows the SQL's
-// semantics (db/queries/sessions.sql): least-recently-used eviction on
-// Create, compare-and-swap Rotate, user-scoped Revoke.
+// semantics (db/queries/sessions.sql): same-device replacement then
+// least-recently-used eviction on Create, compare-and-swap Rotate (filling a
+// missing device), user-scoped Revoke.
 type fakeSessionRepo struct {
 	mu       sync.Mutex
 	clock    *testClock
@@ -69,6 +70,16 @@ func (f *fakeSessionRepo) Create(_ context.Context, s model.Session, maxActive i
 		return f.failCreate
 	}
 
+	now := f.clock.Now()
+	if s.DeviceID != nil {
+		for _, existing := range f.sessions {
+			if existing.UserID == s.UserID && existing.RevokedAt == nil && existing.DeviceID != nil && *existing.DeviceID == *s.DeviceID {
+				reason := model.SessionRevokedReplaced
+				existing.RevokedAt, existing.RevokedReason = &now, &reason
+			}
+		}
+	}
+
 	var mine []*model.Session
 	for _, existing := range f.sessions {
 		if existing.UserID == s.UserID && f.live(existing) {
@@ -84,7 +95,6 @@ func (f *fakeSessionRepo) Create(_ context.Context, s model.Session, maxActive i
 		}
 		return mine[i].ID.String() < mine[j].ID.String()
 	})
-	now := f.clock.Now()
 	for i := maxActive - 1; i < len(mine); i++ {
 		mine[i].RevokedAt = &now
 		reason := model.SessionRevokedLimit
@@ -108,7 +118,7 @@ func (f *fakeSessionRepo) Get(_ context.Context, id uuid.UUID) (*model.Session, 
 	return &cp, nil
 }
 
-func (f *fakeSessionRepo) Rotate(_ context.Context, id uuid.UUID, currentJTI, newJTI string, expiresAt time.Time) (bool, error) {
+func (f *fakeSessionRepo) Rotate(_ context.Context, id uuid.UUID, currentJTI, newJTI string, expiresAt time.Time, device *model.SessionDevice) (bool, error) {
 	if hook := f.beforeRotate; hook != nil {
 		f.beforeRotate = nil
 		hook()
@@ -123,7 +133,28 @@ func (f *fakeSessionRepo) Rotate(_ context.Context, id uuid.UUID, currentJTI, ne
 	prev := s.RefreshJTI
 	s.PrevRefreshJTI, s.RefreshJTI = &prev, newJTI
 	s.RotatedAt, s.LastUsedAt, s.ExpiresAt = &now, now, expiresAt
+	if device != nil && s.DeviceID == nil {
+		id := device.ID
+		s.DeviceID = &id
+	}
+	if device != nil && device.Name != "" && s.DeviceName == nil {
+		name := device.Name
+		s.DeviceName = &name
+	}
 	return true, nil
+}
+
+func (f *fakeSessionRepo) ListLive(_ context.Context, userID uuid.UUID) ([]model.SessionSummary, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var items []model.SessionSummary
+	for _, s := range f.sessions {
+		if s.UserID == userID && f.live(s) {
+			items = append(items, model.SessionSummary{ID: s.ID, DeviceName: s.DeviceName, CreatedAt: s.CreatedAt, LastUsedAt: s.LastUsedAt})
+		}
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].LastUsedAt.After(items[j].LastUsedAt) })
+	return items, nil
 }
 
 func (f *fakeSessionRepo) Revoke(_ context.Context, id, userID uuid.UUID, reason string) (bool, error) {

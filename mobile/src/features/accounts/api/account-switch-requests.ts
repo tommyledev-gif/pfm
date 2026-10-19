@@ -1,22 +1,26 @@
 import axios, { isAxiosError } from "axios";
 
-import { apiClient } from "@/lib/axios";
-import { unwrap, type ApiEnvelope } from "@/lib/api-envelope";
+import { type ApiEnvelope } from "@/lib/api-envelope";
 import { Config } from "@/lib/config";
+import { withDeviceHeaders } from "@/lib/device-identity";
 import { SWITCH_REQUEST_TIMEOUT_MS } from "@/lib/constants";
 import { redact } from "@/lib/redact";
 import { useDebugLogStore } from "@/stores/debug-log-store";
-import { SwitchResponse, SwitchTokenResponse } from "@/features/accounts/types";
+import { SwitchResponse } from "@/features/accounts/types";
 
-// Plain async functions, not hooks: switching, logout and renewal run
-// outside any one screen (same precedent as refreshTokenRequest).
+// Plain async functions, not hooks: logout, removing a saved account and
+// trading old switch tokens run outside any one screen (same precedent as
+// refreshTokenRequest).
 //
-// Switch / revoke / logout go through an interceptor-free client: they carry
+// They go through a client without apiClient's interceptors: they carry
 // their own credential in the body, must never attach the CURRENT User's
 // bearer, and a 401 from them must never trigger apiClient's
-// refresh-or-logout handling of the current session. Its short timeout is
-// what keeps a switch under 10 s on a dead network (spec AC-08).
+// refresh-or-logout handling of the current session. Its short timeout keeps
+// them inside the logout cap and a switch under 10 s (spec AC-08). It does
+// say which device it is, so a traded switch token becomes this device's
+// session.
 const accountsClient = axios.create({ baseURL: Config.apiBaseUrl, timeout: SWITCH_REQUEST_TIMEOUT_MS });
+accountsClient.interceptors.request.use(withDeviceHeaders);
 
 function logOutcome(path: string, outcome: unknown, body: unknown): void {
   const status = isAxiosError(outcome) ? (outcome.response?.status ?? "ERR") : 200;
@@ -37,13 +41,11 @@ async function postWithoutSession<T>(path: string, body: Record<string, string>)
   }
 }
 
-/** POST /auth/switch-token — as the CURRENT session (apiClient). */
-export async function issueSwitchTokenRequest(): Promise<SwitchTokenResponse> {
-  const res = await apiClient.post<ApiEnvelope<SwitchTokenResponse>>("/auth/switch-token");
-  return unwrap(res.data);
-}
-
-/** POST /auth/switch — the switch token is the only credential. */
+/**
+ * POST /auth/switch (deprecated) — trades a switch token an older build saved
+ * for a session on this device. The server sends no new switch token back to
+ * a request that names its device; an older server still might.
+ */
 export async function switchRequest(switchToken: string): Promise<SwitchResponse> {
   const data = await postWithoutSession<SwitchResponse>("/auth/switch", { switch_token: switchToken });
   if (!data) throw new Error("empty switch response");

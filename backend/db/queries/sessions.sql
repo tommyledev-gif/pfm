@@ -29,25 +29,41 @@ WHERE id IN (
     OFFSET $2
 );
 
+-- name: RevokeSessionsOnDevice :execrows
+-- One live session per (user, device): a new sign-in on a device first ends
+-- that user's previous session there. Called inside CreateSession's
+-- transaction, before the limit below.
+UPDATE sessions
+SET revoked_at     = NOW(),
+    revoked_reason = 'replaced'
+WHERE user_id = $1
+  AND device_id = $2
+  AND revoked_at IS NULL;
+
 -- name: CreateSession :exec
-INSERT INTO sessions (id, user_id, refresh_jti, expires_at, absolute_expires_at)
-VALUES ($1, $2, $3, $4, $5);
+INSERT INTO sessions (id, user_id, refresh_jti, expires_at, absolute_expires_at, device_id, device_name)
+VALUES ($1, $2, $3, $4, $5, $6, $7);
 
 -- name: GetSession :one
 SELECT id, user_id, refresh_jti, prev_refresh_jti, rotated_at, created_at,
-       last_used_at, expires_at, absolute_expires_at, revoked_at, revoked_reason
+       last_used_at, expires_at, absolute_expires_at, revoked_at, revoked_reason,
+       device_id, device_name
 FROM sessions
 WHERE id = $1;
 
 -- name: RotateSessionRefresh :execrows
 -- Compare-and-swap on the current refresh jti: of two refreshes presenting
 -- the same token only one matches. 0 rows = lost the race, or revoked.
+-- A session from before mig 033 learns its device here ($5/$6, NULL when the
+-- client sent none); a known device is never overwritten.
 UPDATE sessions
 SET prev_refresh_jti = refresh_jti,
     refresh_jti      = $3,
     rotated_at       = NOW(),
     last_used_at     = NOW(),
-    expires_at       = $4
+    expires_at       = $4,
+    device_id        = COALESCE(device_id, $5),
+    device_name      = COALESCE(device_name, $6)
 WHERE id = $1
   AND refresh_jti = $2
   AND revoked_at IS NULL;
@@ -59,6 +75,16 @@ SET revoked_at     = NOW(),
 WHERE id = $1
   AND user_id = $2
   AND revoked_at IS NULL;
+
+-- name: ListLiveSessionsForUser :many
+-- The Security screen's "Thiết bị đang đăng nhập": what still works.
+SELECT id, device_name, created_at, last_used_at
+FROM sessions
+WHERE user_id = $1
+  AND revoked_at IS NULL
+  AND expires_at > NOW()
+  AND absolute_expires_at > NOW()
+ORDER BY last_used_at DESC, created_at DESC, id;
 
 -- name: RevokeAllSessionsForUser :execrows
 UPDATE sessions

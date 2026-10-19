@@ -1,7 +1,8 @@
 import { apiClient, unwrap, type ApiEnvelope } from "@/lib/axios";
 import { LoginResult } from "@/features/auth/types";
 import { PasskeyItem } from "@/features/security/passkeys/types";
-import { createPasskeyCredential, deviceName, getPasskeyAssertion } from "@/features/security/passkeys/native-passkey";
+import { deviceName } from "@/lib/device-identity";
+import { createPasskeyCredential, getPasskeyAssertion } from "@/features/security/passkeys/native-passkey";
 
 // Mirrors backend/internal/dto/passkey.go.
 interface PasskeyOptionsResponse {

@@ -3,6 +3,7 @@ import { isAxiosError } from "axios";
 import { create } from "zustand";
 
 import { refreshTokenRequest } from "@/features/auth/api/use-refresh-mutation";
+import { accountTokens } from "@/lib/account-tokens";
 import { roleFromAccessToken, userIdFromAccessToken, type UserRole } from "@/lib/jwt";
 import { queryClient } from "@/lib/query-client";
 import { detachQueryPersistence } from "@/lib/query-persistence/query-persistence";
@@ -13,6 +14,7 @@ import {
   scheduleRefresh,
 } from "@/lib/refresh-scheduler";
 import { secureStorage } from "@/lib/secure-storage";
+import { emitSessionRefused, emitSessionRenewed } from "@/lib/session-events";
 import { useToastStore } from "@/stores/toast-store";
 import {
   SECURE_STORE_ACCESS_TOKEN_KEY,
@@ -21,6 +23,8 @@ import {
   SECURE_STORE_REFRESH_TOKEN_KEY,
   REFRESH_RETRY_DELAY_SECONDS,
 } from "@/lib/constants";
+
+const SESSION_ENDED_MESSAGE = "Phiên đăng nhập đã hết hạn.";
 
 // The server answered and refused the refresh token (expired, revoked,
 // malformed, User disabled) — the only failure that really ends a session.
@@ -103,6 +107,9 @@ interface SessionState {
   // (spec.md decision #5) only when the server refused the token — a
   // network/server failure keeps the session and schedules a retry.
   refreshSession: () => Promise<string>;
+  // Resolves once a renewal in flight (if any) has landed, success or not —
+  // so a switch reads the outgoing account's newest refresh token.
+  settleRefresh: () => Promise<void>;
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -122,6 +129,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set({ accessToken, refreshToken, email, role: roleFromAccessToken(accessToken), isHydrated: true });
 
     if (!accessToken) return;
+    // A session stored by a build from before device-bound sessions has no
+    // copy under its account yet; without one, switching away and back would
+    // find nothing to resume.
+    const userId = userIdFromAccessToken(accessToken);
+    if (userId && refreshToken && (await accountTokens.get(userId)) === null) {
+      await accountTokens.set(userId, refreshToken).catch(() => {});
+    }
     // No stored issuedAt (e.g. a session persisted before this feature
     // shipped) is treated as "already due" — the safe default, since we
     // have no better information (S-REF-13).
@@ -140,10 +154,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   refreshSession() {
     if (refreshPromise) return refreshPromise;
 
-    const { refreshToken, email, setTokens, clear } = get();
+    const { refreshToken, accessToken, email, setTokens, clear } = get();
     if (!refreshToken) {
       return Promise.reject(new Error("no refresh token to refresh with"));
     }
+    // The account this renewal is for — still the right one to write to even
+    // if the User switches away while it is in flight.
+    const userId = userIdFromAccessToken(accessToken);
 
     // Stale-result guard (specs/mobile-account-switch plan.md Finding #4):
     // an account switch, add-account or "sign out everywhere" can replace
@@ -155,6 +172,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const isStale = () => get().refreshToken !== refreshToken;
     refreshPromise = refreshTokenRequest(refreshToken)
       .then(async (pair) => {
+        // Kept under its own account first, switched away or not: that copy
+        // is what a later switch back presents, and the server only accepts
+        // the newest one (an older one reads as a stolen copy).
+        if (userId && (await accountTokens.replace(userId, refreshToken, pair.refresh_token))) {
+          emitSessionRenewed(userId, pair.refresh_token);
+        }
         // Rejecting (not answering with the new User's token) also stops a
         // request of the previous User from being retried as the new one.
         if (isStale()) throw new Error("session changed during refresh");
@@ -164,6 +187,16 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         return pair.access_token;
       })
       .catch(async (err) => {
+        // Refused: this account needs signing in again on this device. Only
+        // this one — every other saved account keeps its own session.
+        const refused = isRefreshRejected(err);
+        if (refused && userId) {
+          // Unless the account already holds a newer token (a password change
+          // or a new sign-in landed meanwhile): then this refusal is about a
+          // session that was replaced, not the one in use.
+          const dropped = await accountTokens.removeIf(userId, refreshToken).catch(() => false);
+          if (dropped || !isStale()) emitSessionRefused(userId);
+        }
         if (isStale()) throw err;
         // Offline, timeout or a 5xx says nothing about the refresh token
         // itself — keep the session (the app works from cache and the next
@@ -171,7 +204,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         // The renewal stays owed (markRefreshDue) so session-resume.ts
         // renews at once on reconnect / foreground instead of waiting out
         // the retry delay.
-        if (!isRefreshRejected(err)) {
+        if (!refused) {
           scheduleRefresh(runDueRefresh, REFRESH_RETRY_DELAY_SECONDS * 1000);
           markRefreshDue();
           throw err;
@@ -183,7 +216,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         // revoked) counts as a session actually "ending" out from under the
         // user; an explicit Log out on Settings also calls clear() but
         // already knows why it's happening, so it doesn't need telling.
-        useToastStore.getState().show("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.", "warning");
+        useToastStore.getState().show(SESSION_ENDED_MESSAGE, "warning");
         throw err;
       })
       .finally(() => {
@@ -191,6 +224,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       });
 
     return refreshPromise;
+  },
+
+  async settleRefresh() {
+    await refreshPromise?.catch(() => {});
   },
 }));
 
@@ -228,6 +265,13 @@ async function commitTokens(
     // per User and is never touched here.
     await detachQueryPersistence({ remove: false });
     queryClient.clear();
+  }
+  // Kept under the account too: it is the session this phone resumes when
+  // the User switches back to them (lib/account-tokens.ts).
+  const userId = userIdFromAccessToken(accessToken);
+  if (userId) {
+    await accountTokens.set(userId, refreshToken);
+    emitSessionRenewed(userId, refreshToken);
   }
   setState({ accessToken, refreshToken, email, role: roleFromAccessToken(accessToken) });
 

@@ -16,8 +16,11 @@ import (
 )
 
 // SwitchSession is what a successful switch (or self sign-out-everywhere)
-// hands back: a fresh session pair, a fresh switch token and the identity
-// the device shows on its saved-account row.
+// hands back: a fresh session pair, the identity the device shows on its
+// saved-account row and — for a client that sent no device id, i.e. an app
+// build from before device-bound sessions — a fresh switch token. Newer
+// builds keep the session itself as the saved account, so SwitchToken is
+// empty for them.
 type SwitchSession struct {
 	User                 *model.User
 	AccessToken          string
@@ -29,6 +32,11 @@ type SwitchSession struct {
 // AccountSwitchService issues, redeems and revokes account-switch tokens
 // (specs/mobile-account-switch US-01/02/04/06). Every write is one atomic
 // statement, so no DB transaction is needed (plan.md Finding #15).
+//
+// Deprecated 2026-10-19 for new app builds, which switch by refreshing the
+// saved account's own device-bound session. Kept so older builds keep
+// working, and so a newer build can trade the switch tokens it still holds
+// for sessions once (Switch with a device).
 type AccountSwitchService struct {
 	userRepo    UserRepo
 	revokedRepo RevokedTokenRepo
@@ -57,10 +65,11 @@ func (s *AccountSwitchService) Issue(ctx context.Context, callerID uuid.UUID, ca
 }
 
 // Switch redeems a switch token: parse → user (active, not signed out
-// everywhere since) → atomic single-use claim → new pair + rotated token.
-// A refused token is never claimed, so it is not consumed by the refusal.
-// Every refusal is the same 401 — the reason is never leaked.
-func (s *AccountSwitchService) Switch(ctx context.Context, switchToken string) (*SwitchSession, error) {
+// everywhere since) → atomic single-use claim → new pair (+ a rotated switch
+// token only for a client without a device id). A refused token is never
+// claimed, so it is not consumed by the refusal. Every refusal is the same
+// 401 — the reason is never leaked.
+func (s *AccountSwitchService) Switch(ctx context.Context, switchToken string, device *model.SessionDevice) (*SwitchSession, error) {
 	claims, err := s.tokens.ParseSwitchToken(switchToken)
 	if errors.Is(err, jwt.ErrTokenMalformed) {
 		return nil, common.NewInvalidInputError("switch token is malformed")
@@ -83,7 +92,7 @@ func (s *AccountSwitchService) Switch(ctx context.Context, switchToken string) (
 		return nil, common.ErrUnauthenticated
 	}
 
-	session, err := s.newSession(ctx, user)
+	session, err := s.newSession(ctx, user, device, wantsSwitchToken(device))
 	if err != nil {
 		// The token was claimed (single use) but nothing came of it. Give it
 		// back, or the client's retry would be refused and the account marked
@@ -109,25 +118,23 @@ func (s *AccountSwitchService) Revoke(ctx context.Context, switchToken string) e
 	return nil
 }
 
-// newSession opens a session for an already verified user and issues its
-// token pair and a switch token. Shared with
-// SessionRevocationService.RevokeAllForSelf.
-func (s *AccountSwitchService) newSession(ctx context.Context, user *model.User) (*SwitchSession, error) {
-	access, refresh, err := s.sessions.Start(ctx, user)
+// newSession opens a session for an already verified user on the calling
+// device and issues its token pair, plus a switch token when asked for one.
+// Shared with SessionRevocationService.RevokeAllForSelf and ChangePassword.
+func (s *AccountSwitchService) newSession(ctx context.Context, user *model.User, device *model.SessionDevice, withSwitchToken bool) (*SwitchSession, error) {
+	access, refresh, err := s.sessions.Start(ctx, user, device)
 	if err != nil {
 		return nil, fmt.Errorf("newSession: %w", err)
 	}
-	switchToken, expiresAt, err := s.tokens.IssueSwitchToken(user.ID)
+	session := &SwitchSession{User: user, AccessToken: access, RefreshToken: refresh}
+	if !withSwitchToken {
+		return session, nil
+	}
+	session.SwitchToken, session.SwitchTokenExpiresAt, err = s.tokens.IssueSwitchToken(user.ID)
 	if err != nil {
 		return nil, fmt.Errorf("newSession: %w", err)
 	}
-	return &SwitchSession{
-		User:                 user,
-		AccessToken:          access,
-		RefreshToken:         refresh,
-		SwitchToken:          switchToken,
-		SwitchTokenExpiresAt: expiresAt,
-	}, nil
+	return session, nil
 }
 
 // activeUser loads the user and applies the gates shared by every
@@ -149,4 +156,11 @@ func (s *AccountSwitchService) activeUser(ctx context.Context, userID uuid.UUID,
 		return nil, common.ErrUnauthenticated
 	}
 	return user, nil
+}
+
+// wantsSwitchToken: only a client that sends no device id — an app build from
+// before device-bound sessions — still saves accounts by switch token. Every
+// newer build sends one and keeps the session itself instead.
+func wantsSwitchToken(device *model.SessionDevice) bool {
+	return device == nil
 }

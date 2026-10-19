@@ -79,7 +79,7 @@ func (s *liveStack) get(t *testing.T, access string) (int, string) {
 
 func (s *liveStack) start(t *testing.T, user *model.User) (access, refresh string) {
 	t.Helper()
-	access, refresh, err := s.svc.Start(context.Background(), user)
+	access, refresh, err := s.svc.Start(context.Background(), user, nil)
 	if err != nil {
 		t.Fatalf("Start: %v", err)
 	}

@@ -88,8 +88,9 @@ pfm/
 - **Invite-only** — không có self-register. Admin invite → email với token → user activate.
 - Invite token: `crypto/rand` 32 bytes hex — không dùng UUID cho security token.
 - Token expiry: 72h. Activation: atomic UPDATE (clear token + set status=active trong 1 query).
-- JWT: access token 15 phút, refresh token 7 ngày.
-- Session: mỗi thiết bị là 1 dòng `sessions` (mig 028); token mang `sid`, `JWTAuth` kiểm tra session mỗi request nên thu hồi có hiệu lực ngay. Tối đa 5 session/user (session dùng lâu nhất bị thu hồi), tuyệt đối 30 ngày, refresh token dùng lại → thu hồi cả session. Chi tiết: `docs/ops-runbook.md` §5.
+- JWT: access token 15 phút, refresh token 60 ngày (trượt theo mỗi lần refresh, không quá hạn tuyệt đối của session).
+- Session: mỗi lần đăng nhập là 1 dòng `sessions` (mig 028); token mang `sid`, `JWTAuth` kiểm tra session mỗi request nên thu hồi có hiệu lực ngay. Session gắn với thiết bị (mig 033: `device_id`, `device_name` từ header `X-Device-Id` / `X-Device-Name`): mỗi thiết bị một session cho mỗi tài khoản, đăng nhập lại trên cùng máy thu hồi session cũ. Hết hạn sau 60 ngày không dùng hoặc tuyệt đối 180 ngày. Tối đa 5 session/user (session dùng lâu nhất bị thu hồi), refresh token dùng lại → thu hồi cả session. Đăng xuất một thiết bị (`DELETE /auth/sessions/:id`); đổi mật khẩu (`PUT /users/me/password`) thu hồi mọi session, thiết bị đang đổi nhận session mới. Chi tiết: `docs/ops-runbook.md` §5.
+- Mobile: mỗi tài khoản đã lưu trên máy giữ refresh token của session riêng; chuyển tài khoản = `POST /auth/refresh` bằng token của tài khoản đó. Switch token 180 ngày (`/auth/switch-token`, `/auth/switch`, `/auth/switch-token/revoke`) đã deprecated, chỉ còn cho bản app cũ. Spec: `specs/mobile-account-switch/` (bản sửa 2026-10-19).
 - Passkey (WebAuthn, mig 032): đăng nhập và chuyển tài khoản bằng passkey gắn với tài khoản, server xác minh (`PasskeyService`, go-webauthn). RP `api.example.com`, backend tự phục vụ `/.well-known/assetlinks.json`. Chỉ chạy trên dev/EAS build (`react-native-passkey`), Expo Go giữ check vân tay trên máy. Cách bật: `docs/ops-runbook.md` §7.
 - `JWT_SECRET` ≥ 32 byte (server và `deploy.sh` từ chối nếu ngắn hơn). Không commit `.env*` thật — `backend/.env.prod` từng bị commit (xem runbook §6).
 - Roles: `admin` | `member`.

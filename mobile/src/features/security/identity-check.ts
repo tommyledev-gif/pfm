@@ -8,6 +8,8 @@ export type IdentityCheckResult = "passed" | "cancelled" | "failed" | "unavailab
 
 // Spec US-07 copy.
 const PROMPT_MESSAGE = "Xác minh để chuyển tài khoản";
+// Turning a Security screen switch (identity check, app lock) on or off.
+export const CHANGE_SETTING_PROMPT = "Xác minh để đổi cài đặt bảo mật";
 const CANCEL_LABEL = "Hủy";
 export const IDENTITY_CHECK_FAILED_MESSAGE = "Không xác minh được. Chưa chuyển tài khoản.";
 const NO_LOCK_WARNING =
@@ -36,13 +38,13 @@ const UNAVAILABLE_ERRORS: readonly LocalAuthentication.LocalAuthenticationError[
  * A UI gate only — the stored credentials themselves are not locked
  * behind it (spec Out of Scope).
  */
-export async function confirmOwner(): Promise<IdentityCheckResult> {
+export async function confirmOwner(promptMessage: string = PROMPT_MESSAGE): Promise<IdentityCheckResult> {
   try {
     const level = await LocalAuthentication.getEnrolledLevelAsync();
     if (level === LocalAuthentication.SecurityLevel.NONE) return "unavailable";
 
     const result = await LocalAuthentication.authenticateAsync({
-      promptMessage: PROMPT_MESSAGE,
+      promptMessage,
       cancelLabel: CANCEL_LABEL,
       disableDeviceFallback: false,
     });

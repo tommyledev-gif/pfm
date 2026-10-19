@@ -25,11 +25,12 @@ func NewSessionRepository(q *sqlc.Queries, pool Beginner) *SessionRepository {
 	return &SessionRepository{q: q, pool: pool}
 }
 
-// Create inserts a session after revoking the user's least recently used
-// live sessions so that, counting the new one, at most maxActive remain. The
-// user row is locked first, so two simultaneous sign-ins of one user queue
-// instead of both seeing room. Returns pgx.ErrNoRows (wrapped) for an
-// unknown or soft-deleted user.
+// Create inserts a session after revoking the user's live sessions on the
+// same device (when s.DeviceID is set) and then the least recently used ones,
+// so that, counting the new one, at most maxActive remain. The user row is
+// locked first, so two simultaneous sign-ins of one user queue instead of
+// both seeing room. Returns pgx.ErrNoRows (wrapped) for an unknown or
+// soft-deleted user.
 func (r *SessionRepository) Create(ctx context.Context, s model.Session, maxActive int) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -41,6 +42,11 @@ func (r *SessionRepository) Create(ctx context.Context, s model.Session, maxActi
 	if _, err := q.LockUserForSession(ctx, s.UserID); err != nil {
 		return fmt.Errorf("repository.CreateSession: lock user: %w", err)
 	}
+	if s.DeviceID != nil {
+		if _, err := q.RevokeSessionsOnDevice(ctx, s.UserID, *s.DeviceID); err != nil {
+			return fmt.Errorf("repository.CreateSession: replace device session: %w", err)
+		}
+	}
 	if _, err := q.RevokeSessionsBeyondLimit(ctx, s.UserID, int64(maxActive-1)); err != nil {
 		return fmt.Errorf("repository.CreateSession: enforce limit: %w", err)
 	}
@@ -50,6 +56,8 @@ func (r *SessionRepository) Create(ctx context.Context, s model.Session, maxActi
 		RefreshJTI:        s.RefreshJTI,
 		ExpiresAt:         s.ExpiresAt,
 		AbsoluteExpiresAt: s.AbsoluteExpiresAt,
+		DeviceID:          s.DeviceID,
+		DeviceName:        s.DeviceName,
 	}); err != nil {
 		return fmt.Errorf("repository.CreateSession: insert: %w", err)
 	}
@@ -77,19 +85,24 @@ func (r *SessionRepository) Get(ctx context.Context, id uuid.UUID) (*model.Sessi
 		AbsoluteExpiresAt: row.AbsoluteExpiresAt,
 		RevokedAt:         row.RevokedAt,
 		RevokedReason:     row.RevokedReason,
+		DeviceID:          row.DeviceID,
+		DeviceName:        row.DeviceName,
 	}, nil
 }
 
 // Rotate swaps the session's current refresh jti for newJTI and moves its
-// idle expiry. False means the current jti was no longer currentJTI (another
-// refresh won) or the session is revoked.
-func (r *SessionRepository) Rotate(ctx context.Context, id uuid.UUID, currentJTI, newJTI string, expiresAt time.Time) (bool, error) {
-	n, err := r.q.RotateSessionRefresh(ctx, sqlc.RotateSessionRefreshParams{
+// idle expiry; device fills in a session that has no device recorded yet.
+// False means the current jti was no longer currentJTI (another refresh won)
+// or the session is revoked.
+func (r *SessionRepository) Rotate(ctx context.Context, id uuid.UUID, currentJTI, newJTI string, expiresAt time.Time, device *model.SessionDevice) (bool, error) {
+	params := sqlc.RotateSessionRefreshParams{
 		ID:         id,
 		CurrentJTI: currentJTI,
 		NewJTI:     newJTI,
 		ExpiresAt:  expiresAt,
-	})
+	}
+	params.DeviceID, params.DeviceName = deviceColumns(device)
+	n, err := r.q.RotateSessionRefresh(ctx, params)
 	if err != nil {
 		return false, fmt.Errorf("repository.RotateSessionRefresh: %w", err)
 	}
@@ -104,6 +117,24 @@ func (r *SessionRepository) Revoke(ctx context.Context, id, userID uuid.UUID, re
 		return false, fmt.Errorf("repository.RevokeSession: %w", err)
 	}
 	return n > 0, nil
+}
+
+// ListLive returns the user's usable sessions, most recently used first.
+func (r *SessionRepository) ListLive(ctx context.Context, userID uuid.UUID) ([]model.SessionSummary, error) {
+	rows, err := r.q.ListLiveSessionsForUser(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("repository.ListLiveSessionsForUser: %w", err)
+	}
+	items := make([]model.SessionSummary, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, model.SessionSummary{
+			ID:         row.ID,
+			DeviceName: row.DeviceName,
+			CreatedAt:  row.CreatedAt,
+			LastUsedAt: row.LastUsedAt,
+		})
+	}
+	return items, nil
 }
 
 func (r *SessionRepository) RevokeAllForUser(ctx context.Context, userID uuid.UUID, reason string) (int64, error) {
@@ -142,4 +173,18 @@ func (r *SessionRepository) DeleteExpired(ctx context.Context, cutoff time.Time)
 		return 0, fmt.Errorf("repository.DeleteExpiredSessions: %w", err)
 	}
 	return n, nil
+}
+
+// deviceColumns turns the reported device into the two nullable columns; an
+// empty name is stored as NULL.
+func deviceColumns(device *model.SessionDevice) (*uuid.UUID, *string) {
+	if device == nil {
+		return nil, nil
+	}
+	id := device.ID
+	if device.Name == "" {
+		return &id, nil
+	}
+	name := device.Name
+	return &id, &name
 }

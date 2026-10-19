@@ -149,10 +149,10 @@ Every `S-SEC-*` scenario in `spec.md` has at least one TC — no scenario is mis
 **ID:** TC-SEC-13
 **Type:** unit
 **Layer:** service
-**Title:** Issued refresh token expires in exactly 7 days
+**Title:** Issued refresh token expires in exactly 60 days
 **Preconditions:** A successful login
 **Steps:** Decode the returned `refresh_token`; compute `exp - iat`
-**Expected:** `exp - iat == 604800` seconds (7 days)
+**Expected:** `exp - iat == 5184000` seconds (60 days, `RefreshTokenTTL`). Changed 2026-10-19: was `604800` (7 days). Each refresh slides it again, never past the session's 180-day absolute limit (`SessionAbsoluteTTL`).
 **Priority:** P1
 
 **ID:** TC-SEC-14

@@ -310,7 +310,7 @@ Every `S-USR-*` scenario in `spec.md` has at least one TC — no scenario is mis
 **Title:** Successful activation issues correctly-scoped tokens
 **Preconditions:** A valid pending invite
 **Steps:** Activate; decode the returned `access_token` and `refresh_token` JWTs
-**Expected:** `access_token.exp - iat ≈ 15 minutes`; `refresh_token.exp - iat ≈ 7 days`; both tokens' `sub` claim equals the newly-activated user's ID
+**Expected:** `access_token.exp - iat ≈ 15 minutes`; `refresh_token.exp - iat ≈ 60 days` (changed 2026-10-19, was 7 days); both tokens' `sub` claim equals the newly-activated user's ID
 **Priority:** P1
 
 **ID:** TC-USR-29

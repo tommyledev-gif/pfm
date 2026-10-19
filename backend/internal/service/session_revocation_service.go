@@ -31,12 +31,13 @@ func NewSessionRevocationService(userRepo UserRepo, switches *AccountSwitchServi
 }
 
 // RevokeAllForSelf signs the caller out everywhere and returns a fresh
-// session + switch token for the requesting device (BR-12). The fresh
+// session for the requesting device (BR-12) — plus a switch token for an
+// older build that sends no device id. The fresh
 // credentials are generated AFTER the write, so their iat is never before
 // the stored point (plan.md Finding #18). Stale access (granted before an
 // earlier sign-out) is refused, so a lost device cannot undo the owner's
 // sign-out (S-ASW-63).
-func (s *SessionRevocationService) RevokeAllForSelf(ctx context.Context, callerID uuid.UUID, callerIssuedAt *jwt.NumericDate) (*SwitchSession, error) {
+func (s *SessionRevocationService) RevokeAllForSelf(ctx context.Context, callerID uuid.UUID, callerIssuedAt *jwt.NumericDate, device *model.SessionDevice) (*SwitchSession, error) {
 	user, err := s.switches.activeUser(ctx, callerID, callerIssuedAt)
 	if err != nil {
 		return nil, fmt.Errorf("service.RevokeAllForSelf: %w", err)
@@ -54,7 +55,7 @@ func (s *SessionRevocationService) RevokeAllForSelf(ctx context.Context, callerI
 		return nil, fmt.Errorf("service.RevokeAllForSelf: %w", err)
 	}
 
-	session, err := s.switches.newSession(ctx, user)
+	session, err := s.switches.newSession(ctx, user, device, wantsSwitchToken(device))
 	if err != nil {
 		return nil, fmt.Errorf("service.RevokeAllForSelf: %w", err)
 	}

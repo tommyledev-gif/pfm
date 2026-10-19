@@ -116,7 +116,7 @@ func (h *PasskeyHandler) FinishLogin(c *fiber.Ctx) error {
 	if err != nil {
 		return response.Error(c, h.logger, err)
 	}
-	user, accessToken, refreshToken, err := h.passkeys.FinishLogin(c.Context(), challengeID, req.Credential)
+	user, accessToken, refreshToken, err := h.passkeys.FinishLogin(c.Context(), challengeID, req.Credential, requestDevice(c))
 	if err != nil {
 		return response.Error(c, h.logger, err)
 	}

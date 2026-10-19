@@ -57,7 +57,7 @@ export function SavedAccountLogin({ candidates, onBack, onDone }: SavedAccountLo
     const target = pendingRemoval;
     setPendingRemoval(null);
     if (target?.kind === "saved") {
-      await useAccountRegistryStore.getState().remove(target.account.userId, { revoke: true, dropLocalData: true });
+      await useAccountRegistryStore.getState().remove(target.account.userId, { endSession: true, dropLocalData: true });
     } else if (target?.kind === "requested") {
       useAccessRequestStore.getState().remove(target.email);
     }

@@ -23,7 +23,7 @@ func TestAuthService_ActivateWithUsernameThenLoginByIt(t *testing.T) {
 		t.Fatalf("username stored as %v, want lowercase trimmed bart.simpson", user.Username)
 	}
 
-	signedIn, access, refresh, err := svc.Login(context.Background(), "BART.SIMPSON", "correcthorse1")
+	signedIn, access, refresh, err := svc.Login(context.Background(), "BART.SIMPSON", "correcthorse1", nil)
 	if err != nil {
 		t.Fatalf("Login by username: %v", err)
 	}
@@ -31,10 +31,10 @@ func TestAuthService_ActivateWithUsernameThenLoginByIt(t *testing.T) {
 		t.Fatalf("Login by username returned email %q, tokens %t/%t", signedIn.Email, access != "", refresh != "")
 	}
 
-	if _, _, _, err := svc.Login(context.Background(), "bart.simpson", "wrongpassword"); !errors.Is(err, common.ErrInvalidCredentials) {
+	if _, _, _, err := svc.Login(context.Background(), "bart.simpson", "wrongpassword", nil); !errors.Is(err, common.ErrInvalidCredentials) {
 		t.Fatalf("wrong password by username: got %v, want INVALID_CREDENTIALS", err)
 	}
-	if _, _, _, err := svc.Login(context.Background(), "nobody", "correcthorse1"); !errors.Is(err, common.ErrInvalidCredentials) {
+	if _, _, _, err := svc.Login(context.Background(), "nobody", "correcthorse1", nil); !errors.Is(err, common.ErrInvalidCredentials) {
 		t.Fatalf("unknown username: got %v, want INVALID_CREDENTIALS", err)
 	}
 }
@@ -71,7 +71,7 @@ func TestAuthService_LoginAwaitingApproval(t *testing.T) {
 	svc, repo, _ := newTestAuthService(t)
 	seedActiveUser(t, repo, "waiting@example.com", "correcthorse1", model.UserStatusRequested)
 
-	if _, _, _, err := svc.Login(context.Background(), "waiting@example.com", "correcthorse1"); !errors.Is(err, common.ErrAccountAwaitingApproval) {
+	if _, _, _, err := svc.Login(context.Background(), "waiting@example.com", "correcthorse1", nil); !errors.Is(err, common.ErrAccountAwaitingApproval) {
 		t.Fatalf("got %v, want ACCOUNT_AWAITING_APPROVAL", err)
 	}
 }

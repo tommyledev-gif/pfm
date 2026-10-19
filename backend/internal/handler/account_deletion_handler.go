@@ -68,7 +68,7 @@ func (h *AccountDeletionHandler) DeleteUser(c *fiber.Ctx) error {
 		return response.Error(c, h.logger, err)
 	}
 
-	// Ids, role and ip only — never an email (same rule as auditRevokeAll).
+	// Ids, role and ip only — never an email (same rule as SessionRevocationHandler.audit).
 	actorRole, _ := c.Locals(common.LocalsRole).(string)
 	h.logger.Info("audit",
 		zap.Time("timestamp", time.Now().UTC()),

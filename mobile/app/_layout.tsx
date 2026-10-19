@@ -25,6 +25,7 @@ import { useThemeStore } from "@/stores/theme-store";
 import { installOutboxSync } from "@/features/transactions/outbox/install-outbox-sync";
 import { useAccountRegistryStore } from "@/features/accounts/account-registry-store";
 import { useSwitchProgressStore } from "@/features/accounts/switch-progress-store";
+import { installAppLock } from "@/features/security/app-lock";
 import { NativeUpdateDialog } from "@/features/app-update/components/NativeUpdateDialog";
 
 // Installed once at module scope, not inside the component — a global
@@ -38,6 +39,9 @@ installSessionScopedReset();
 // onlineManager that installConnectivity() feeds (specs/mobile-offline-support).
 installConnectivity();
 installSessionResume();
+// Before hydrate() too: a session restored from storage opens behind the app
+// lock when the User turned it on (Security screen).
+installAppLock();
 // After connectivity too: its reconnect trigger listens to the same manager.
 installOutboxSync();
 

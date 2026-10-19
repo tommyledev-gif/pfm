@@ -6,8 +6,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// Session is one signed-in device (sessions table, mig 028). Like User it
-// holds zero framework imports.
+// Session is one signed-in device (sessions table, mig 028; device columns
+// mig 033). Like User it holds zero framework imports.
 type Session struct {
 	ID     uuid.UUID
 	UserID uuid.UUID
@@ -27,6 +27,27 @@ type Session struct {
 	AbsoluteExpiresAt time.Time
 	RevokedAt         *time.Time
 	RevokedReason     *string
+
+	// DeviceID/DeviceName are what the client reported (X-Device-Id /
+	// X-Device-Name); nil for a session started before mig 033 that has not
+	// refreshed since, or by a client that sends neither (web).
+	DeviceID   *uuid.UUID
+	DeviceName *string
+}
+
+// SessionDevice is the device a request comes from, as the client reported
+// it. Name may be empty; a nil *SessionDevice means "no device id sent".
+type SessionDevice struct {
+	ID   uuid.UUID
+	Name string
+}
+
+// SessionSummary is one row of the user's "signed-in devices" list.
+type SessionSummary struct {
+	ID         uuid.UUID
+	DeviceName *string
+	CreatedAt  time.Time
+	LastUsedAt time.Time
 }
 
 // SessionAuthState is what JWTAuth needs to decide on one request.
@@ -47,4 +68,10 @@ const (
 	SessionRevokedAdmin        = "admin_sign_out"
 	SessionRevokedLimit        = "session_limit"
 	SessionRevokedRefreshReuse = "refresh_reuse"
+	// A new sign-in of the same user on the same device took its place.
+	SessionRevokedReplaced = "replaced"
+	// The user signed this device out from another one (device list).
+	SessionRevokedDeviceSignOut = "device_sign_out"
+	// The user changed their password; every session ends.
+	SessionRevokedPasswordChanged = "password_changed"
 )

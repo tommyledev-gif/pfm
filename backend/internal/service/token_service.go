@@ -71,16 +71,17 @@ func NewTokenService(signingKey string) *TokenService {
 }
 
 // GenerateTokenPair issues a session-less 15-minute access token and 7-day
-// refresh token for the given user (no `sid`).
+// refresh token for the given user (no `sid`) — the shape tokens had before
+// sessions existed.
 //
 // ⚠️ Production code issues credentials through SessionService, which binds
 // them to a sessions row. This exists for tests of the legacy paths (JWTAuth
 // refusing a token with no `sid`, AuthService.Refresh upgrading a
 // pre-session refresh token); JWTAuth rejects what it returns as an access
 // token. Both durations are named constants (common.AccessTokenTTL /
-// common.RefreshTokenTTL) — never inlined.
+// common.LegacyRefreshTokenTTL) — never inlined.
 func (s *TokenService) GenerateTokenPair(user *model.User) (accessToken string, refreshToken string, err error) {
-	return s.sign(user, uuid.Nil, uuid.NewString(), time.Now().UTC().Add(common.RefreshTokenTTL))
+	return s.sign(user, uuid.Nil, uuid.NewString(), time.Now().UTC().Add(common.LegacyRefreshTokenTTL))
 }
 
 // IssueSessionTokens signs an access/refresh pair bound to sessionID. The

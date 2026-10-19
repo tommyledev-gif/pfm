@@ -24,13 +24,17 @@ type RevokedTokenRepo interface {
 // *repository.SessionRepository satisfies it structurally; tests substitute
 // an in-memory fake.
 type SessionRepo interface {
-	// Create revokes the user's least recently used live sessions so that,
-	// with the new one, at most maxActive remain, then inserts it.
+	// Create revokes the user's live sessions on s.DeviceID (when set) and
+	// then the least recently used ones so that, with the new one, at most
+	// maxActive remain, then inserts it.
 	Create(ctx context.Context, s model.Session, maxActive int) error
 	Get(ctx context.Context, id uuid.UUID) (*model.Session, error)
-	// Rotate is a compare-and-swap on the current refresh jti.
-	Rotate(ctx context.Context, id uuid.UUID, currentJTI, newJTI string, expiresAt time.Time) (bool, error)
+	// Rotate is a compare-and-swap on the current refresh jti. device fills a
+	// session that has no device recorded yet (nil = leave as is).
+	Rotate(ctx context.Context, id uuid.UUID, currentJTI, newJTI string, expiresAt time.Time, device *model.SessionDevice) (bool, error)
 	Revoke(ctx context.Context, id, userID uuid.UUID, reason string) (bool, error)
+	// ListLive returns the user's usable sessions, most recently used first.
+	ListLive(ctx context.Context, userID uuid.UUID) ([]model.SessionSummary, error)
 	RevokeAllForUser(ctx context.Context, userID uuid.UUID, reason string) (int64, error)
 	// AuthState returns nil, nil when there is no such session for the user.
 	AuthState(ctx context.Context, id, userID uuid.UUID) (*model.SessionAuthState, error)

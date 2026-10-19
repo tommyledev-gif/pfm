@@ -24,7 +24,7 @@ _Command: /cook-state_
 | Feature | Backend | Web (frontend/, frozen) | Mobile |
 |---|---|---|---|
 | F-01 User Management (+ resend invite, mig 024) | ✅ | ✅ | ✅ (`app/(app)/users.tsx`) |
-| F-02 System Security (JWT, `/auth/refresh`) | ✅ | ✅ | ✅ silent refresh |
+| F-02 System Security (JWT, `/auth/refresh`; sessions mig 028; device-bound sessions mig 033, 2026-10-19) | ✅ | ✅ | ✅ silent refresh, account switching, device list, change password, app lock (2026-10-19 revision in progress) |
 | F-03 Wallet Management (+ icon) | ✅ | ✅ | ✅ (carousel on Home + Wallets) |
 | F-04 Category Management (+ icon, `system_key`) | ✅ | ✅ | ✅ |
 | F-05 Budget Management (+ icon, bulk) | ✅ | ✅ | ✅ |
@@ -61,7 +61,7 @@ _Command: /cook-state_
 | Decision | Value | Reason |
 |----------|-------|--------|
 | Money storage | BIGINT xu everywhere; overflow-safe `common/money.go` | Float precision |
-| JWT strategy | access 15m + refresh 7d, `revoked_tokens`; mobile refreshes silently | Session UX |
+| JWT strategy | access 15m + refresh bound to a `sessions` row (mig 028), one per user per device (mig 033), 60 d idle / 180 d absolute, rotation + reuse detection; mobile refreshes silently, each saved account keeps its own session (switch = refresh). Updated 2026-10-19 (was refresh 7d + `revoked_tokens`) | Session UX |
 | DB access | sqlc only; local sqlc CLI version differs → hand-write new queries into generated files | Avoid unreviewable regen diff |
 | Error format | `{error_code, message, details?}` | Consistent |
 | Cursor pagination | `{id, created_at}` base64 cursor | Scale-ready |
@@ -133,6 +133,9 @@ _Command: /cook-state_
 | GET | /activate | No | ActivatePageHandler (HTML) |
 | GET | /api/v1/health | No | inline |
 | POST | /auth/activate · /login · /logout · /refresh | No | AuthHandler |
+| GET · DELETE · POST | /auth/sessions · /auth/sessions/:id · /auth/sessions/revoke-all | JWT | device list, sign out one device (2026-10-19), sign out everywhere |
+| PUT | /users/me/password | JWT + per-user failed-try limit | change password (2026-10-19) |
+| POST | /auth/switch-token · /auth/switch · /auth/switch-token/revoke | JWT · No · No | AccountSwitchHandler — deprecated 2026-10-19 (older app builds) |
 | POST · GET · POST | /admin/users/invite · /admin/users · /admin/users/:id/resend-invite | admin | UserHandler |
 | POST · GET · GET · PATCH · POST | /wallets/icon · / · /:id · /:id · /:id/set-default | JWT | WalletHandler |
 | POST · POST · GET · GET · PATCH · DELETE | /categories/icon · / · / · /:id · /:id · /:id | JWT | CategoryHandler |

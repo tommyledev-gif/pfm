@@ -6,7 +6,10 @@ import { ChevronLeftIcon } from "@/components/ui/Icon";
 import { spacing, typography, createStyles } from "@/lib/theme";
 import { useSessionStore } from "@/stores/session-store";
 import { isAccountDeletionOperator } from "@/features/security/account-deletion";
+import { AppLockToggleRow } from "@/features/security/components/AppLockToggleRow";
+import { ChangePasswordRow } from "@/features/security/components/ChangePasswordRow";
 import { DeleteAccountsSection } from "@/features/security/components/DeleteAccountsSection";
+import { DeviceSessionsSection } from "@/features/security/components/DeviceSessionsSection";
 import { IdentityCheckToggleRow } from "@/features/security/components/IdentityCheckToggleRow";
 import { PasskeysSection } from "@/features/security/components/PasskeysSection";
 import { RevokeAllSessionsRow } from "@/features/security/components/RevokeAllSessionsRow";
@@ -15,6 +18,10 @@ const TITLE = "Bảo mật";
 
 // Entry point: Settings' "Bảo mật" row (spec US-07 step 1, AC-34). Back
 // returns to Settings; BottomNav keeps Settings highlighted.
+//
+// Order follows what a User comes here to do: see where the account is
+// signed in (and sign a lost phone out), change the password, then the
+// device's own protections, then the account-wide sign-out.
 export default function SecurityScreen() {
   const styles = useStyles();
   const router = useRouter();
@@ -31,8 +38,11 @@ export default function SecurityScreen() {
       {/* "handled": with the search keyboard open, the first tap on [Xóa] has
           to reach the row, not just close the keyboard. */}
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" testID="screen-security">
-        <PasskeysSection />
+        <DeviceSessionsSection />
+        <ChangePasswordRow />
+        <AppLockToggleRow />
         <IdentityCheckToggleRow />
+        <PasskeysSection />
         <RevokeAllSessionsRow />
         {canDeleteAccounts ? <DeleteAccountsSection /> : null}
       </ScrollView>
@@ -51,5 +61,5 @@ const useStyles = createStyles((colors) => ({
     paddingBottom: spacing.lg,
   },
   title: { flex: 1, ...typography.title, color: colors.textPrimary },
-  content: { paddingHorizontal: spacing.xl, gap: spacing.md },
+  content: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl, gap: spacing.md },
 }));

@@ -33,7 +33,7 @@ func TestAuthService_Refresh_PreSessionTokenWindow(t *testing.T) {
 	t.Run("accepted before the deadline", func(t *testing.T) {
 		svc, repo, _ := newTestAuthService(t)
 		svc.SetLegacyRefreshDeadline(time.Now().Add(time.Hour))
-		if _, _, err := svc.Refresh(ctx, mint(t, svc, repo)); err != nil {
+		if _, _, err := svc.Refresh(ctx, mint(t, svc, repo), nil); err != nil {
 			t.Fatalf("Refresh before the deadline: %v", err)
 		}
 	})
@@ -41,7 +41,7 @@ func TestAuthService_Refresh_PreSessionTokenWindow(t *testing.T) {
 	t.Run("refused after the deadline", func(t *testing.T) {
 		svc, repo, revoked := newTestAuthService(t)
 		svc.SetLegacyRefreshDeadline(time.Now().Add(-time.Second))
-		_, _, err := svc.Refresh(ctx, mint(t, svc, repo))
+		_, _, err := svc.Refresh(ctx, mint(t, svc, repo), nil)
 		wantAppCode(t, err, common.ErrCodeUnauthenticated)
 		if revoked.revokedCount() != 0 || countRevokedSessions(svc) != 0 {
 			t.Fatal("a refused token must not leave any trace")
@@ -56,7 +56,7 @@ func TestAuthService_Refresh_PreSessionTokenWindow(t *testing.T) {
 		sessions := NewSessionService(newFakeSessionRepo(clock, users), tokens, zap.NewNop())
 		svc := NewAuthService(users, revoked, tokens, sessions, zap.NewNop())
 
-		_, _, err := svc.Refresh(ctx, mint(t, svc, users))
+		_, _, err := svc.Refresh(ctx, mint(t, svc, users), nil)
 		wantAppCode(t, err, common.ErrCodeUnauthenticated)
 	})
 
@@ -64,11 +64,11 @@ func TestAuthService_Refresh_PreSessionTokenWindow(t *testing.T) {
 		svc, repo, _ := newTestAuthService(t)
 		svc.SetLegacyRefreshDeadline(time.Now().Add(-time.Hour))
 		seedActiveUser(t, repo, "homer@example.com", "correcthorse1", model.UserStatusActive)
-		_, _, refresh, err := svc.Login(ctx, "homer@example.com", "correcthorse1")
+		_, _, refresh, err := svc.Login(ctx, "homer@example.com", "correcthorse1", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, _, err := svc.Refresh(ctx, refresh); err != nil {
+		if _, _, err := svc.Refresh(ctx, refresh, nil); err != nil {
 			t.Fatalf("a session refresh token must work whatever the legacy deadline is: %v", err)
 		}
 	})
@@ -88,7 +88,7 @@ func TestAccountSwitchService_Switch_ReleasesTheTokenWhenTheSessionCannotBeCreat
 	}
 
 	f.sessionRepo.failCreate = errors.New("connection reset")
-	_, err = f.switches.Switch(ctx, token)
+	_, err = f.switches.Switch(ctx, token, nil)
 	if err == nil {
 		t.Fatal("Switch must fail when the session cannot be created")
 	}
@@ -101,10 +101,10 @@ func TestAccountSwitchService_Switch_ReleasesTheTokenWhenTheSessionCannotBeCreat
 	}
 
 	f.sessionRepo.failCreate = nil
-	if _, err := f.switches.Switch(ctx, token); err != nil {
+	if _, err := f.switches.Switch(ctx, token, nil); err != nil {
 		t.Fatalf("the same token must work on the retry: %v", err)
 	}
 	// And once it has worked it is spent, as before.
-	_, err = f.switches.Switch(ctx, token)
+	_, err = f.switches.Switch(ctx, token, nil)
 	wantAppCode(t, err, common.ErrCodeUnauthenticated)
 }

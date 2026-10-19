@@ -87,7 +87,7 @@ Actors:
 | S-OFF-02 | Session signed in; renewal fails offline | Device reconnects | One renewal runs within seconds of reconnecting; screens refresh | New |
 | S-OFF-03 | App in background longer than the session's short lifetime | User brings the app to the foreground while online | Renewal runs at once; no request is first refused for an expired session | New |
 | S-OFF-04 | Device offline for a long time | Renewal retry time comes | No renewal request is attempted while offline | New — avoids pointless retries |
-| S-OFF-05 | Server answers the renewal with "credential refused" (expired after 7 days, revoked, User disabled, or the User chose "sign out of all devices" elsewhere) | Device is online | Session ends, User sees the existing "session expired" message and the sign-in screen | Unchanged behaviour; ⚠️ Queued Transactions are kept (US-07 S-OFF-59) |
+| S-OFF-05 | Server answers the renewal with "credential refused" (expired — since 2026-10-19 after 60 days unused or 180 days signed in, was 7 days — revoked, this device signed out from another one, password changed, User disabled, or the User chose "sign out of all devices" elsewhere) | Device is online | Session ends, User sees the existing "session expired" message and the sign-in screen | Unchanged behaviour; ⚠️ Queued Transactions are kept (US-07 S-OFF-59) |
 | S-OFF-06 | Reconnect and foreground happen at the same moment, plus a refused request | — | Exactly one renewal request is made | Reuses the existing single-in-flight rule |
 
 ### Edge Cases

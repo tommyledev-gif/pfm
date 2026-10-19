@@ -16,7 +16,8 @@
   thiết bị đều đã chạy trên mobile + backend.
 - **Feature còn thiếu hẳn:** F-08 Mục tiêu tài chính (Release 1), F-09 Đầu tư (Release 2), sửa giao dịch qua chat
   `sửa@` (F-12 US-02, ghi [MVP]), ghi giao dịch từ ảnh/OCR (F-12 US-05 — mới có spec + plan, **chưa có code** dù
-  commit `7cac897` ghi "OCR"), quên mật khẩu, sửa hồ sơ, khoá/vô hiệu hoá user.
+  commit `7cac897` ghi "OCR"), quên mật khẩu, khoá/vô hiệu hoá user. (Sửa hồ sơ đã có; đổi mật khẩu, danh sách thiết bị
+  đang đăng nhập và khóa ứng dụng thêm ngày 2026-10-19.)
 - **Production-readiness là điểm yếu chính:** không crash reporting, không metrics/alert, không timeout HTTP phía
   server, health check không chạm DB, mobile không có test, ai-service test không chạy trong CI, fallback AI thực tế
   không hoạt động, origin mặc định mở HTTP công khai, debug bubble bật sẵn trong mọi bản build.
@@ -28,9 +29,9 @@
 | # | Feature / US | Trạng thái | Còn thiếu | Ưu tiên | Công sức |
 |---|---|---|---|---|---|
 | F-01 US-01 | Đăng ký | Thay bằng invite-only (đúng CLAUDE.md) | Chốt lại SRS: bỏ self-register hoặc ghi rõ là invite | P2 (docs) | S |
-| F-01 US-02 | Cập nhật hồ sơ | **Thiếu** | `PATCH /users/me` (họ tên, đổi mật khẩu) + màn hình mobile | P1 | M |
+| F-01 US-02 | Cập nhật hồ sơ | **Xong.** Hồ sơ: `PATCH /users/me` + màn sửa hồ sơ. Đổi mật khẩu (2026-10-19): `PUT /users/me/password` + màn "Đổi mật khẩu", thu hồi mọi session (`specs/mobile-account-switch` US-11) | Chạy checklist trên máy | — | — |
 | F-01 (spec OQ3) | Vô hiệu hoá user | **Thiếu** | `POST /admin/users/:id/disable` (+ revoke-all session sẵn có), UI admin | P1 | S–M |
-| F-02 | Quên / đặt lại mật khẩu | **Thiếu** | Token reset (crypto/rand, hết hạn), email qua SMTP sẵn có, màn mobile | **P0** | M |
+| F-02 | Quên / đặt lại mật khẩu | **Thiếu** (vẫn thiếu 2026-10-19; mất máy thì có: đăng xuất từng thiết bị, đăng xuất mọi thiết bị, đổi mật khẩu) | Token reset (crypto/rand, hết hạn), email qua SMTP sẵn có, màn mobile | **P0** | M |
 | F-03 | Xoá / lưu trữ ví | **Thiếu** (spec OQ6) | Soft-delete/archive ví, chặn khi còn số dư hoặc giao dịch | P2 | M |
 | F-06 | Giao dịch định kỳ | **Thiếu** (SDS §11) | Bảng recurring + job sinh giao dịch | P2 | L |
 | F-06 | Nhập Excel trên mobile | Backend xong, **nút bị comment** | Bật lại pill tại `TransactionsHeader.tsx:203-209`, test trên máy | P1 | S |
@@ -61,7 +62,7 @@
 | Debug bubble bật mặc định | `ui-prefs-store.ts:38` `debugBubbleVisible: true` → tắt ở bản release (theo `__DEV__` hoặc build flag) | **P0** | S |
 | JWT secret không kiểm tra độ dài | `config.go` chỉ check có/không → bắt buộc ≥ 32 byte | P1 | S |
 | Upload icon tin `Content-Type`, cho phép SVG | `common/constants.go:95-102` → sniff magic bytes, bỏ SVG | P1 | S |
-| `/auth/refresh` không rate limit | Thêm limiter | P1 | S |
+| `/auth/refresh` không rate limit | Thêm limiter. Từ 2026-10-19 chuyển tài khoản trên mobile cũng đi qua `/auth/refresh` (giới hạn của `/auth/switch` chỉ còn cho bản app cũ) | P1 | S |
 | `revoked_tokens` không bao giờ dọn | Job purge token đã hết hạn | P2 | S |
 | Container chạy root | Thêm `USER` non-root trong 2 Dockerfile | P2 | S |
 | Trivy không chặn deploy | `exit-code: "0"` → `1` cho CRITICAL | P2 | S |
@@ -176,7 +177,7 @@ bind origin qua tunnel · sửa `add-ssh-key.yml` · tắt debug bubble ở rele
 uptime monitor · pytest ai-service vào CI · ErrorBoundary + Sentry.
 
 **Đợt 2 — Trước khi mời người dùng thật (≈ 1–2 tuần).**
-Quên mật khẩu · vô hiệu hoá user · sửa hồ sơ · màn đồng ý dữ liệu AI · siết weekly/quarterly · bật lại nhập Excel ·
+Quên mật khẩu · vô hiệu hoá user · màn đồng ý dữ liệu AI · siết weekly/quarterly · bật lại nhập Excel ·
 tách bucket rate limit `/ai` · timeout client AI · access log + request ID · staging · version/build number ·
 OTA update · Việt hoá tiêu đề thông báo · test repo với Postgres thật · kiểm tra lại 2 lỗi PATCH / filter `to=`.
 

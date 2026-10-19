@@ -2,6 +2,7 @@
 
 > Request 2026-10-04: "Switch account like Facebook. No 'remember me' — once an account has logged in on this device, the user can switch to it without logging out and without typing credentials. Saved accounts do expire. Up to 10 s per switch is acceptable."
 > Status: **Research / design — decisions confirmed 2026-10-04 (§1.1).** Next: `/cook-ba` → `/cook-plan`.
+> **Superseded in part 2026-10-19:** the switch token designed here (§3.1, 180 days, single-use) was retired for current app builds. Each saved account now keeps its own device-bound session, switching is `POST /auth/refresh` with that account's refresh token, and sessions last 60 days unused / 180 days at most. Kept as the record of the original research; the current design is in [mobile-account-switch spec](../mobile-account-switch/spec.md) and [plan](../mobile-account-switch/plan.md) ("Revision 2026-10-19").
 
 ---
 

@@ -27,20 +27,20 @@ func TestSessionRevocationService_RevokeAllForSelf(t *testing.T) {
 		}})
 		oldSwitch := backdatedSwitchToken(t, user.ID, earlier, earlier.Add(time.Hour))
 
-		session, err := f.sessions.RevokeAllForSelf(ctx, user.ID, jwt.NewNumericDate(time.Now().UTC()))
+		session, err := f.sessions.RevokeAllForSelf(ctx, user.ID, jwt.NewNumericDate(time.Now().UTC()), nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		if _, _, err := f.auth.Refresh(ctx, session.RefreshToken); err != nil {
+		if _, _, err := f.auth.Refresh(ctx, session.RefreshToken, nil); err != nil {
 			t.Fatalf("fresh refresh token must be accepted: %v", err)
 		}
-		if _, err := f.switches.Switch(ctx, session.SwitchToken); err != nil {
+		if _, err := f.switches.Switch(ctx, session.SwitchToken, nil); err != nil {
 			t.Fatalf("fresh switch token must be accepted: %v", err)
 		}
-		_, _, err = f.auth.Refresh(ctx, oldRefresh)
+		_, _, err = f.auth.Refresh(ctx, oldRefresh, nil)
 		wantAppCode(t, err, common.ErrCodeUnauthenticated)
-		_, err = f.switches.Switch(ctx, oldSwitch)
+		_, err = f.switches.Switch(ctx, oldSwitch, nil)
 		wantAppCode(t, err, common.ErrCodeUnauthenticated)
 	})
 
@@ -49,14 +49,14 @@ func TestSessionRevocationService_RevokeAllForSelf(t *testing.T) {
 		user := seedUser(f.users, "a@example.com", model.UserStatusActive)
 		f.users.setTokensValidAfter(user.ID, time.Now().UTC())
 		stale := jwt.NewNumericDate(time.Now().UTC().Add(-time.Minute))
-		_, err := f.sessions.RevokeAllForSelf(ctx, user.ID, stale)
+		_, err := f.sessions.RevokeAllForSelf(ctx, user.ID, stale, nil)
 		wantAppCode(t, err, common.ErrCodeUnauthenticated)
 	})
 
 	t.Run("inactive caller is refused", func(t *testing.T) {
 		f := newSwitchFixture(t)
 		user := seedUser(f.users, "d@example.com", model.UserStatusDisabled)
-		_, err := f.sessions.RevokeAllForSelf(ctx, user.ID, jwt.NewNumericDate(time.Now().UTC()))
+		_, err := f.sessions.RevokeAllForSelf(ctx, user.ID, jwt.NewNumericDate(time.Now().UTC()), nil)
 		wantAppCode(t, err, common.ErrCodeUnauthenticated)
 	})
 
@@ -65,7 +65,7 @@ func TestSessionRevocationService_RevokeAllForSelf(t *testing.T) {
 		user := seedUser(f.users, "a@example.com", model.UserStatusActive)
 		failing := failingSetUserRepo{f.users}
 		svc := NewSessionRevocationService(failing, NewAccountSwitchService(failing, f.revoked, f.tokens, f.sessionSvc, zap.NewNop()), f.sessionSvc, zap.NewNop())
-		_, err := svc.RevokeAllForSelf(ctx, user.ID, jwt.NewNumericDate(time.Now().UTC()))
+		_, err := svc.RevokeAllForSelf(ctx, user.ID, jwt.NewNumericDate(time.Now().UTC()), nil)
 		var appErr *common.AppError
 		if !errors.Is(err, errFakeWrite) || errors.As(err, &appErr) {
 			t.Fatalf("expected the wrapped write error, got %v", err)
@@ -83,7 +83,7 @@ func TestSessionRevocationService_RevokeAllForUser(t *testing.T) {
 		if err := f.sessions.RevokeAllForUser(ctx, uuid.New(), target.ID); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		_, err := f.switches.Switch(ctx, token)
+		_, err := f.switches.Switch(ctx, token, nil)
 		wantAppCode(t, err, common.ErrCodeUnauthenticated)
 	})
 

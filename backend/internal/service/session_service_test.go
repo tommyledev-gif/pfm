@@ -40,7 +40,7 @@ func (f *sessionFixture) activeUser(email string) *model.User {
 // start opens a session and returns its id and the refresh token.
 func (f *sessionFixture) start(t *testing.T, user *model.User) (uuid.UUID, string, string) {
 	t.Helper()
-	access, refresh, err := f.svc.Start(context.Background(), user)
+	access, refresh, err := f.svc.Start(context.Background(), user, nil)
 	if err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -61,7 +61,7 @@ func (f *sessionFixture) refresh(t *testing.T, user *model.User, refreshToken st
 	if err != nil {
 		t.Fatalf("ParseRefreshToken: %v", err)
 	}
-	return f.svc.Refresh(context.Background(), user, info)
+	return f.svc.Refresh(context.Background(), user, info, nil)
 }
 
 func (f *sessionFixture) authorized(sid uuid.UUID, user *model.User, access string) error {
@@ -283,11 +283,11 @@ func TestSessionRefreshSurvivesLosingARace(t *testing.T) {
 
 	f.repo.beforeRotate = func() {
 		// The competing refresh lands between our read and our write.
-		if ok, err := f.repo.Rotate(context.Background(), sid, info.JTI, uuid.NewString(), f.clock.Now().Add(time.Hour)); err != nil || !ok {
+		if ok, err := f.repo.Rotate(context.Background(), sid, info.JTI, uuid.NewString(), f.clock.Now().Add(time.Hour), nil); err != nil || !ok {
 			t.Errorf("competing rotate: ok=%v err=%v", ok, err)
 		}
 	}
-	if _, _, err := f.svc.Refresh(context.Background(), user, info); err != nil {
+	if _, _, err := f.svc.Refresh(context.Background(), user, info, nil); err != nil {
 		t.Fatalf("Refresh after losing a race = %v, want success", err)
 	}
 	if f.repo.sessionFor(sid).RevokedAt != nil {
@@ -300,13 +300,16 @@ func TestSessionRefreshNeverOutlivesTheAbsoluteLifetime(t *testing.T) {
 	user := f.activeUser("a@example.com")
 	sid, _, refresh := f.start(t, user)
 
-	// Keep the session alive by refreshing every 6 days until just before the
-	// 30-day hard stop.
-	for day := 6; day <= 24; day += 6 {
-		f.clock.Advance(6 * 24 * time.Hour)
+	// Keep the session alive by refreshing well inside the idle window until
+	// just before the hard stop.
+	step := common.RefreshTokenTTL / 2
+	elapsed := time.Duration(0)
+	for elapsed+step < common.SessionAbsoluteTTL {
+		f.clock.Advance(step)
+		elapsed += step
 		_, next, err := f.refresh(t, user, refresh)
 		if err != nil {
-			t.Fatalf("refresh on day %d: %v", day, err)
+			t.Fatalf("refresh after %v: %v", elapsed, err)
 		}
 		refresh = next
 	}
@@ -315,7 +318,8 @@ func TestSessionRefreshNeverOutlivesTheAbsoluteLifetime(t *testing.T) {
 		t.Fatalf("idle expiry %v must never pass the absolute %v", stored.ExpiresAt, stored.AbsoluteExpiresAt)
 	}
 
-	f.clock.Advance(7 * 24 * time.Hour) // day 31
+	// Past the hard stop, yet still inside the idle window of the last refresh.
+	f.clock.Advance(common.SessionAbsoluteTTL - elapsed + 24*time.Hour)
 	if _, _, err := f.refresh(t, user, refresh); !isUnauthenticated(err) {
 		t.Fatalf("refresh past the absolute lifetime = %v, want 401", err)
 	}
@@ -343,11 +347,11 @@ func TestSessionRefreshRejectsOtherUsersAndUnknownSessions(t *testing.T) {
 
 	info, _ := f.tokens.ParseRefreshToken(aliceRefresh)
 	info.SessionID = uuid.NewString()
-	if _, _, err := f.svc.Refresh(context.Background(), alice, info); !isUnauthenticated(err) {
+	if _, _, err := f.svc.Refresh(context.Background(), alice, info, nil); !isUnauthenticated(err) {
 		t.Fatalf("an unknown session = %v, want 401", err)
 	}
 	info.SessionID = "not-a-uuid"
-	if _, _, err := f.svc.Refresh(context.Background(), alice, info); !isUnauthenticated(err) {
+	if _, _, err := f.svc.Refresh(context.Background(), alice, info, nil); !isUnauthenticated(err) {
 		t.Fatalf("a malformed session id = %v, want 401", err)
 	}
 }

@@ -136,7 +136,7 @@ func main() {
 	app.Use(middleware.Recover(logger))
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: cfg.CORSAllowedOrigins,
-		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
+		AllowHeaders: "Origin, Content-Type, Accept, Authorization, " + common.HeaderDeviceID + ", " + common.HeaderDeviceName,
 		AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 	}))
 	registerRoutes(app, userHandler, authHandler, walletHandler, categoryHandler, budgetHandler, transactionHandler, transactionExportHandler, transactionImportHandler, auditLogHandler, reportHandler, notificationHandler, chatHandler, chatImageHandler, budgetWizardHandler, analyticsHandler, accountSwitchHandler, sessionRevocationHandler, profileHandler, accessRequestHandler, accountDeletionHandler, passkeyHandler, assetLinks, tokenService, sessionService, pool, logger)

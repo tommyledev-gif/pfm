@@ -25,6 +25,9 @@ type UserRepo interface {
 	ListUsers(ctx context.Context, p repository.ListUsersParams) ([]*model.User, error)
 	CountUsers(ctx context.Context, status, role *string) (int64, error)
 	SetTokensValidAfter(ctx context.Context, id uuid.UUID, at time.Time) (bool, error)
+	// ChangePassword stores a new hash and moves tokens_valid_after in one
+	// statement (false = unknown, deleted or inactive user).
+	ChangePassword(ctx context.Context, id uuid.UUID, passwordHash string, signOutAt time.Time) (bool, error)
 	UpdateFullName(ctx context.Context, id uuid.UUID, fullName string) (*model.User, error)
 	SetAvatarURL(ctx context.Context, id uuid.UUID, avatarURL *string) (*model.User, error)
 	// Tên đăng nhập (mig 030) and access requests (mig 031).

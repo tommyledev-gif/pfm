@@ -51,6 +51,7 @@ const SETTINGS_SUB_ROUTES = [
   "/audit-logs",
   "/developer",
   "/security",
+  "/change-password",
   "/edit-profile",
 ];
 

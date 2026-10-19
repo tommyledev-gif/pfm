@@ -4,7 +4,7 @@ import { Text, View } from "react-native";
 import { Toggle } from "@/components/ui/Toggle";
 import { createStyles, radii, spacing, typography } from "@/lib/theme";
 import { useSecurityPrefsStore } from "@/stores/security-prefs-store";
-import { confirmOwner } from "@/features/security/identity-check";
+import { CHANGE_SETTING_PROMPT, confirmOwner } from "@/features/security/identity-check";
 
 const TITLE = "Xác minh khi chuyển tài khoản";
 const HINT = "Yêu cầu vân tay, khuôn mặt hoặc mã khóa màn hình trước khi chuyển sang tài khoản đã lưu.";
@@ -28,7 +28,7 @@ export function IdentityCheckToggleRow() {
     }
     setChecking(true);
     try {
-      const result = await confirmOwner();
+      const result = await confirmOwner(CHANGE_SETTING_PROMPT);
       if (result === "passed" || result === "unavailable") setEnabled(false);
     } finally {
       setChecking(false);

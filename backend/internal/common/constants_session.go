@@ -2,16 +2,28 @@ package common
 
 import "time"
 
-// Sessions (mig 028, service.SessionService).
+// Sessions (mig 028, device-bound since mig 033; service.SessionService).
 const (
-	// SessionMaxActive is how many sessions one user may hold at once.
-	// Starting another revokes the least recently used one, so the newest
-	// sign-in always succeeds and an old, forgotten device is what drops.
+	// SessionMaxActive is how many sessions one user may hold at once — in
+	// effect devices, since a sign-in on a device replaces that user's session
+	// there. Starting another revokes the least recently used one, so the
+	// newest sign-in always succeeds and an old, forgotten device is what drops.
 	SessionMaxActive = 5
 
 	// SessionAbsoluteTTL is a session's hard stop: refreshing extends the
-	// idle window (RefreshTokenTTL) but never this.
-	SessionAbsoluteTTL = 30 * 24 * time.Hour
+	// idle window (RefreshTokenTTL) but never this. After it the account needs
+	// its password again on that device, however often it was used.
+	SessionAbsoluteTTL = 180 * 24 * time.Hour
+
+	// SessionDeviceNameMaxRunes caps the device name a client reports
+	// (X-Device-Name); a longer one is cut, never refused.
+	SessionDeviceNameMaxRunes = 64
+
+	// HeaderDeviceID / HeaderDeviceName carry the calling device: a random
+	// UUID the app made once, and its model name URI-encoded (OkHttp refuses
+	// non-ASCII header values). Sent on every mobile request; absent from web.
+	HeaderDeviceID   = "X-Device-Id"
+	HeaderDeviceName = "X-Device-Name"
 
 	// RefreshReuseGrace is how long the refresh token just replaced stays
 	// acceptable. A client whose refresh response was lost (dead mobile

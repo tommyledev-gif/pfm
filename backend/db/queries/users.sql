@@ -119,6 +119,18 @@ SET tokens_valid_after = $2,
 WHERE id = $1
   AND deleted_at IS NULL;
 
+-- name: ChangeUserPassword :execrows
+-- PUT /users/me/password (specs/mobile-account-switch US-11). The new hash
+-- and the sign-out point move together, so no credential issued before the
+-- change outlives it. Hand-authored in sqlc/users_password.sql.go.
+UPDATE users
+SET password_hash      = $2,
+    tokens_valid_after = $3,
+    updated_at         = NOW()
+WHERE id = $1
+  AND status = 'active'
+  AND deleted_at IS NULL;
+
 -- name: UpdateUserFullName :one
 -- Profile (mobile Account). Hand-authored in sqlc/users_profile.sql.go; returns
 -- only the columns a profile response needs, never password_hash.

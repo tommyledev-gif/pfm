@@ -20,9 +20,15 @@ import (
 // detection and the absolute lifetime), ending it, and answering JWTAuth's
 // per-request question "is this session still good?".
 //
-// Every credential-minting path (login, activation, account switch, sign-out
-// everywhere, and the upgrade of a pre-session refresh token) goes through
-// Start, so no token pair exists without a session row behind it.
+// Every credential-minting path (login, activation, passkey sign-in, account
+// switch, sign-out everywhere, password change, and the upgrade of a
+// pre-session refresh token) goes through Start, so no token pair exists
+// without a session row behind it.
+//
+// A session is bound to the device that started it when the client says
+// which one (X-Device-Id, mig 033): one live session per (user, device), and
+// every account saved on a phone keeps its own session there — switching
+// between them is a Refresh, not a new sign-in.
 type SessionService struct {
 	repo   SessionRepo
 	tokens *TokenService
@@ -35,22 +41,33 @@ func NewSessionService(repo SessionRepo, tokens *TokenService, logger *zap.Logge
 }
 
 // Start opens a session for an already verified user and returns its first
-// token pair. If the user already has common.SessionMaxActive live sessions,
-// the least recently used one is revoked to make room.
-func (s *SessionService) Start(ctx context.Context, user *model.User) (accessToken, refreshToken string, err error) {
+// token pair. A previous session of the user on the same device is revoked
+// (replaced); then, if the user already has common.SessionMaxActive live
+// sessions, the least recently used one is revoked to make room. device is
+// nil when the client did not say which device it is.
+func (s *SessionService) Start(ctx context.Context, user *model.User, device *model.SessionDevice) (accessToken, refreshToken string, err error) {
 	now := s.now()
 	sessionID := uuid.New()
 	refreshJTI := uuid.NewString()
 	absoluteExpiresAt := now.Add(common.SessionAbsoluteTTL)
 	expiresAt := earlier(now.Add(common.RefreshTokenTTL), absoluteExpiresAt)
 
-	err = s.repo.Create(ctx, model.Session{
+	session := model.Session{
 		ID:                sessionID,
 		UserID:            user.ID,
 		RefreshJTI:        refreshJTI,
 		ExpiresAt:         expiresAt,
 		AbsoluteExpiresAt: absoluteExpiresAt,
-	}, common.SessionMaxActive)
+	}
+	if device != nil {
+		deviceID := device.ID
+		session.DeviceID = &deviceID
+		if device.Name != "" {
+			name := device.Name
+			session.DeviceName = &name
+		}
+	}
+	err = s.repo.Create(ctx, session, common.SessionMaxActive)
 	if err != nil {
 		return "", "", fmt.Errorf("service.SessionService.Start: %w", err)
 	}
@@ -71,7 +88,10 @@ func (s *SessionService) Start(ctx context.Context, user *model.User) (accessTok
 // can retry. Any other jti is an old token coming back: someone kept a copy.
 // The whole session is revoked, which signs out the thief and the owner
 // alike; the owner signs in again and the stolen copy is dead.
-func (s *SessionService) Refresh(ctx context.Context, user *model.User, info *RefreshTokenInfo) (accessToken, refreshToken string, err error) {
+//
+// device, when given, is recorded on a session that has none yet (one
+// started before mig 033); a recorded device is never changed.
+func (s *SessionService) Refresh(ctx context.Context, user *model.User, info *RefreshTokenInfo, device *model.SessionDevice) (accessToken, refreshToken string, err error) {
 	sessionID, err := uuid.Parse(info.SessionID)
 	if err != nil {
 		return "", "", common.ErrUnauthenticated
@@ -104,7 +124,7 @@ func (s *SessionService) Refresh(ctx context.Context, user *model.User, info *Re
 
 		newJTI := uuid.NewString()
 		expiresAt := earlier(now.Add(common.RefreshTokenTTL), session.AbsoluteExpiresAt)
-		rotated, err := s.repo.Rotate(ctx, session.ID, session.RefreshJTI, newJTI, expiresAt)
+		rotated, err := s.repo.Rotate(ctx, session.ID, session.RefreshJTI, newJTI, expiresAt, device)
 		if err != nil {
 			return "", "", fmt.Errorf("service.SessionService.Refresh: %w", err)
 		}

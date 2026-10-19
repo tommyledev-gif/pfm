@@ -77,7 +77,11 @@ db/
 | POST | `/api/v1/auth/activate` | — | `AuthHandler.Activate` |
 | POST | `/api/v1/auth/login` | `LoginRateLimiter` | `AuthHandler.Login` |
 | POST | `/api/v1/auth/logout` | — | `AuthHandler.Logout` |
-| POST | `/api/v1/auth/refresh` | — | `AuthHandler.Refresh` |
+| POST | `/api/v1/auth/refresh` | — | `AuthHandler.Refresh` — also the mobile account switch since 2026-10-19 |
+| GET · DELETE | `/api/v1/auth/sessions` · `/api/v1/auth/sessions/:id` | `JWTAuth` | Device list · sign out one device (2026-10-19) |
+| POST | `/api/v1/auth/sessions/revoke-all` | `JWTAuth` | `SessionRevocationHandler.RevokeAllSelf` |
+| POST | `/api/v1/auth/switch-token` · `/switch` · `/switch-token/revoke` | `JWTAuth` · `SwitchRateLimiter` · — | `AccountSwitchHandler` — **deprecated 2026-10-19**, older app builds only |
+| PUT | `/api/v1/users/me/password` | `JWTAuth` → per-user failed-try limiter | Change password (2026-10-19) |
 | POST | `/api/v1/admin/users/invite` | `JWTAuth` → `RequireRole(admin)` → `InviteRateLimiter` | `UserHandler.InviteUser` |
 | GET | `/api/v1/admin/users` | `JWTAuth` → `RequireRole(admin)` | `UserHandler.ListUsers` |
 | POST | `/api/v1/wallets/icon` | `JWTAuth` | `WalletHandler.UploadIcon` |
@@ -235,7 +239,9 @@ The service holds **no database connection** and never writes. It receives conte
 ### Auth + silent refresh (mobile)
 
 ```
-login → POST /auth/login → access (15m) + refresh (7d) → expo-secure-store
+login → POST /auth/login (+ X-Device-Id / X-Device-Name) → access (15m) + refresh (60d idle, 180d max) → expo-secure-store
+       one session per account per device; every saved account keeps its own refresh token,
+       and switching account = POST /auth/refresh with that account's token (2026-10-19)
 any request → Authorization: Bearer <access>
 401 on a non-auth endpoint, not yet retried
    → session-store.refreshSession()           ← single in-flight promise,
@@ -284,7 +290,7 @@ POST /budgets/bulk              → ownership re-check, then atomic replace of a
 
 ## 7. Security Design
 
-- **Auth:** JWT access token **15 min** (`common.AccessTokenTTL`), refresh token **7 days** (`RefreshTokenTTL`), revocation via `revoked_tokens`. Invite token: `crypto/rand` 32-byte hex, **72 h** TTL (`InviteTokenTTL`), activation is one atomic UPDATE.
+- **Auth:** JWT access token **15 min** (`common.AccessTokenTTL`); refresh token bound to a `sessions` row (migration 028, device columns migration 033) that ends **60 days** after its last refresh (`RefreshTokenTTL`, sliding) or **180 days** after sign-in (`SessionAbsoluteTTL`); `JWTAuth` checks the session on every request, so logout, device sign-out, sign out everywhere and password change take effect at once. One live session per user per device, at most 5 per user; refresh rotation with reuse detection. `revoked_tokens` now only covers pre-session and deprecated switch tokens. Invite token: `crypto/rand` 32-byte hex, **72 h** TTL (`InviteTokenTTL`), activation is one atomic UPDATE. Details: `docs/ops-runbook.md` §5.
 - **Registration:** none. Invite-only, admin → email → activate.
 - **Authorization:** `RequireRole("admin")` on `/admin/*` only; every other endpoint scopes by `user_id` in the query itself.
 - **Rate limits:** login **10 / 15 min / IP**; invite **20 / hour / admin**; AI chat **30 / hour / user**. The two user-keyed limiters run *after* `JWTAuth` so `LocalsUserID` is populated.

@@ -70,7 +70,7 @@ func TestAuthService_Login(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, access, refresh, err := svc.Login(context.Background(), tt.email, tt.password)
+			_, access, refresh, err := svc.Login(context.Background(), tt.email, tt.password, nil)
 			if tt.wantErr == nil {
 				if err != nil {
 					t.Fatalf("expected success, got error: %v", err)
@@ -96,8 +96,8 @@ func TestAuthService_Login_EnumerationProtection(t *testing.T) {
 	svc, repo, _ := newTestAuthService(t)
 	seedActiveUser(t, repo, "homer@example.com", "correcthorse1", model.UserStatusActive)
 
-	_, _, _, wrongPasswordErr := svc.Login(context.Background(), "homer@example.com", "wrongpassword")
-	_, _, _, notFoundErr := svc.Login(context.Background(), "nobody@example.com", "anything1")
+	_, _, _, wrongPasswordErr := svc.Login(context.Background(), "homer@example.com", "wrongpassword", nil)
+	_, _, _, notFoundErr := svc.Login(context.Background(), "nobody@example.com", "anything1", nil)
 
 	var wrongPwAppErr, notFoundAppErr *common.AppError
 	if !errors.As(wrongPasswordErr, &wrongPwAppErr) || !errors.As(notFoundErr, &notFoundAppErr) {
@@ -114,7 +114,7 @@ func TestAuthService_Login_TokenExpiry(t *testing.T) {
 	seedActiveUser(t, repo, "homer@example.com", "correcthorse1", model.UserStatusActive)
 	tokens := svc.tokens
 
-	_, access, refresh, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1")
+	_, access, refresh, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -142,7 +142,7 @@ func TestAuthService_Login_TokenExpiry(t *testing.T) {
 func TestAuthService_Logout(t *testing.T) {
 	svc, repo, revokedRepo := newTestAuthService(t)
 	seedActiveUser(t, repo, "homer@example.com", "correcthorse1", model.UserStatusActive)
-	_, _, refresh, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1")
+	_, _, refresh, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1", nil)
 	if err != nil {
 		t.Fatalf("login failed: %v", err)
 	}
@@ -187,7 +187,7 @@ func TestAuthService_Logout_LegacyToken(t *testing.T) {
 func TestAuthService_Logout_ConcurrentRace(t *testing.T) {
 	svc, repo, revokedRepo := newTestAuthService(t)
 	seedActiveUser(t, repo, "homer@example.com", "correcthorse1", model.UserStatusActive)
-	_, _, refresh, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1")
+	_, _, refresh, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1", nil)
 	if err != nil {
 		t.Fatalf("login failed: %v", err)
 	}
@@ -222,12 +222,12 @@ func TestAuthService_Refresh(t *testing.T) {
 	t.Run("happy path rotates the token and issues a new pair", func(t *testing.T) {
 		svc, repo, revokedRepo := newTestAuthService(t)
 		seedActiveUser(t, repo, "homer@example.com", "correcthorse1", model.UserStatusActive)
-		_, _, refresh, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1")
+		_, _, refresh, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1", nil)
 		if err != nil {
 			t.Fatalf("login failed: %v", err)
 		}
 
-		access, newRefresh, err := svc.Refresh(context.Background(), refresh)
+		access, newRefresh, err := svc.Refresh(context.Background(), refresh, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -257,7 +257,7 @@ func TestAuthService_Refresh(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		access, newRefresh, err := svc.Refresh(context.Background(), legacy)
+		access, newRefresh, err := svc.Refresh(context.Background(), legacy, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -270,7 +270,7 @@ func TestAuthService_Refresh(t *testing.T) {
 			t.Fatalf("expected the old token on the deny-list (1 row), got %d", got)
 		}
 
-		_, _, err = svc.Refresh(context.Background(), legacy)
+		_, _, err = svc.Refresh(context.Background(), legacy, nil)
 		var appErr *common.AppError
 		if !errors.As(err, &appErr) || appErr.Code != common.ErrCodeUnauthenticated {
 			t.Fatalf("expected UNAUTHENTICATED when the old token is reused, got %v", err)
@@ -283,22 +283,22 @@ func TestAuthService_Refresh(t *testing.T) {
 	t.Run("reuse of an already-rotated token fails and revokes the session", func(t *testing.T) {
 		svc, repo, _ := newTestAuthService(t)
 		seedActiveUser(t, repo, "homer@example.com", "correcthorse1", model.UserStatusActive)
-		_, _, refresh, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1")
+		_, _, refresh, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1", nil)
 		if err != nil {
 			t.Fatalf("login failed: %v", err)
 		}
-		_, current, err := svc.Refresh(context.Background(), refresh)
+		_, current, err := svc.Refresh(context.Background(), refresh, nil)
 		if err != nil {
 			t.Fatalf("first refresh failed: %v", err)
 		}
 		fakeSessions(svc).clock.Advance(common.RefreshReuseGrace + time.Second)
 
-		_, _, err = svc.Refresh(context.Background(), refresh)
+		_, _, err = svc.Refresh(context.Background(), refresh, nil)
 		var appErr *common.AppError
 		if !errors.As(err, &appErr) || appErr.Code != common.ErrCodeUnauthenticated {
 			t.Fatalf("expected UNAUTHENTICATED on reuse, got %v", err)
 		}
-		if _, _, err := svc.Refresh(context.Background(), current); err == nil {
+		if _, _, err := svc.Refresh(context.Background(), current, nil); err == nil {
 			t.Fatal("the session must be dead, including its newest refresh token")
 		}
 	})
@@ -306,7 +306,7 @@ func TestAuthService_Refresh(t *testing.T) {
 	t.Run("logged-out token cannot be refreshed", func(t *testing.T) {
 		svc, repo, _ := newTestAuthService(t)
 		seedActiveUser(t, repo, "homer@example.com", "correcthorse1", model.UserStatusActive)
-		_, _, refresh, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1")
+		_, _, refresh, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1", nil)
 		if err != nil {
 			t.Fatalf("login failed: %v", err)
 		}
@@ -314,7 +314,7 @@ func TestAuthService_Refresh(t *testing.T) {
 			t.Fatalf("logout failed: %v", err)
 		}
 
-		_, _, err = svc.Refresh(context.Background(), refresh)
+		_, _, err = svc.Refresh(context.Background(), refresh, nil)
 		var appErr *common.AppError
 		if !errors.As(err, &appErr) || appErr.Code != common.ErrCodeUnauthenticated {
 			t.Fatalf("expected UNAUTHENTICATED, got %v", err)
@@ -341,7 +341,7 @@ func TestAuthService_Refresh(t *testing.T) {
 			t.Fatalf("failed to sign expired token: %v", err)
 		}
 
-		_, _, err = svc.Refresh(context.Background(), expiredStr)
+		_, _, err = svc.Refresh(context.Background(), expiredStr, nil)
 		var appErr *common.AppError
 		if !errors.As(err, &appErr) || appErr.Code != common.ErrCodeUnauthenticated {
 			t.Fatalf("expected UNAUTHENTICATED, got %v", err)
@@ -368,7 +368,7 @@ func TestAuthService_Refresh(t *testing.T) {
 			t.Fatalf("failed to sign forged token: %v", err)
 		}
 
-		_, _, err = svc.Refresh(context.Background(), forgedStr)
+		_, _, err = svc.Refresh(context.Background(), forgedStr, nil)
 		var appErr *common.AppError
 		if !errors.As(err, &appErr) || appErr.Code != common.ErrCodeUnauthenticated {
 			t.Fatalf("expected UNAUTHENTICATED for a forged token, got %v", err)
@@ -389,7 +389,7 @@ func TestAuthService_Refresh(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to build unsigned token: %v", err)
 		}
-		if _, _, err := svc.Refresh(context.Background(), unsignedStr); err == nil {
+		if _, _, err := svc.Refresh(context.Background(), unsignedStr, nil); err == nil {
 			t.Fatal("expected an alg=none token to be rejected")
 		}
 	})
@@ -397,11 +397,11 @@ func TestAuthService_Refresh(t *testing.T) {
 	t.Run("access token cannot be used as a refresh token", func(t *testing.T) {
 		svc, repo, _ := newTestAuthService(t)
 		seedActiveUser(t, repo, "homer@example.com", "correcthorse1", model.UserStatusActive)
-		_, access, _, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1")
+		_, access, _, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1", nil)
 		if err != nil {
 			t.Fatalf("login failed: %v", err)
 		}
-		_, _, err = svc.Refresh(context.Background(), access)
+		_, _, err = svc.Refresh(context.Background(), access, nil)
 		var appErr *common.AppError
 		if !errors.As(err, &appErr) || appErr.Code != common.ErrCodeUnauthenticated {
 			t.Fatalf("expected UNAUTHENTICATED for an access token, got %v", err)
@@ -410,7 +410,7 @@ func TestAuthService_Refresh(t *testing.T) {
 
 	t.Run("malformed refresh token is rejected as invalid input", func(t *testing.T) {
 		svc, _, _ := newTestAuthService(t)
-		_, _, err := svc.Refresh(context.Background(), "not-a-jwt")
+		_, _, err := svc.Refresh(context.Background(), "not-a-jwt", nil)
 		var appErr *common.AppError
 		if !errors.As(err, &appErr) || appErr.Code != common.ErrCodeInvalidInput {
 			t.Fatalf("expected INVALID_INPUT, got %v", err)
@@ -420,7 +420,7 @@ func TestAuthService_Refresh(t *testing.T) {
 	t.Run("disabled user cannot refresh", func(t *testing.T) {
 		svc, repo, _ := newTestAuthService(t)
 		seedActiveUser(t, repo, "homer@example.com", "correcthorse1", model.UserStatusActive)
-		_, _, refresh, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1")
+		_, _, refresh, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1", nil)
 		if err != nil {
 			t.Fatalf("login failed: %v", err)
 		}
@@ -428,7 +428,7 @@ func TestAuthService_Refresh(t *testing.T) {
 		repo.byEmail["homer@example.com"].Status = model.UserStatusDisabled
 		repo.mu.Unlock()
 
-		_, _, err = svc.Refresh(context.Background(), refresh)
+		_, _, err = svc.Refresh(context.Background(), refresh, nil)
 		var appErr *common.AppError
 		if !errors.As(err, &appErr) || appErr.Code != common.ErrCodeUnauthenticated {
 			t.Fatalf("expected UNAUTHENTICATED, got %v", err)
@@ -438,19 +438,19 @@ func TestAuthService_Refresh(t *testing.T) {
 	t.Run("two devices refresh independently", func(t *testing.T) {
 		svc, repo, _ := newTestAuthService(t)
 		seedActiveUser(t, repo, "homer@example.com", "correcthorse1", model.UserStatusActive)
-		_, _, refreshA, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1")
+		_, _, refreshA, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1", nil)
 		if err != nil {
 			t.Fatalf("device A login failed: %v", err)
 		}
-		_, _, refreshB, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1")
+		_, _, refreshB, err := svc.Login(context.Background(), "homer@example.com", "correcthorse1", nil)
 		if err != nil {
 			t.Fatalf("device B login failed: %v", err)
 		}
 
-		if _, _, err := svc.Refresh(context.Background(), refreshA); err != nil {
+		if _, _, err := svc.Refresh(context.Background(), refreshA, nil); err != nil {
 			t.Fatalf("device A refresh failed: %v", err)
 		}
-		if _, _, err := svc.Refresh(context.Background(), refreshB); err != nil {
+		if _, _, err := svc.Refresh(context.Background(), refreshB, nil); err != nil {
 			t.Fatalf("device B refresh should still succeed independently: %v", err)
 		}
 		if got := countRevokedSessions(svc); got != 0 {

@@ -23,7 +23,7 @@ A parallel finding: `docs/new-tasks.md` §20 and §21.9 audited v2's own spec ag
 
 **Implemented (backend + mobile + web unless noted):**
 - **User Management (F-01)** — invite-only, admin invite/list, HTML activation page
-- **System Security (F-02)** — JWT login/logout, invite-token activation, rate limiting, revoked-token table
+- **System Security (F-02)** — JWT login/logout, invite-token activation, rate limiting, revoked-token table. *Since this file was generated (see `specs/mobile-account-switch/`):* sessions table (mig 028), mobile account switching, sign out everywhere, passkeys (mig 032); revised 2026-10-19 to device-bound sessions (mig 033, 60 d idle / 180 d absolute), device list + sign out one device, change password, opt-in app lock — mobile only
 - **Wallet Management (F-03)** — CRUD, default-wallet DB uniqueness, emoji + uploaded-photo icons *(web lacks icon upload)*
 - **Category Management (F-04)** — CRUD, system + user categories, dedup index, icon/photo upload via R2
 - **Budget Management (F-05)** — per-category budget, per-currency limits, own icon independent of Category's *(web deferred)*

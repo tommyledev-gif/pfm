@@ -19,8 +19,8 @@ const byRecentUse = (a: SavedAccount, b: SavedAccount) => Date.parse(b.lastUsedA
 
 /**
  * The device's accounts as Settings shows them. The active User is listed
- * even before their switch token arrived (AC-04 retry window), built from
- * the session — it is never tappable anyway ("Đang dùng").
+ * even before their name and picture arrived (AC-04 retry window), built
+ * from the session — it is never tappable anyway ("Đang dùng").
  */
 export function useSavedAccounts(): SavedAccountsView {
   const accounts = useAccountRegistryStore((s) => s.accounts);
@@ -39,8 +39,7 @@ export function useSavedAccounts(): SavedAccountsView {
             email,
             fullName: null,
             role: role ?? "member",
-            switchIssuedAt: now,
-            switchExpiresAt: now,
+            expiresAt: now,
             lastUsedAt: now,
             expired: false,
             switchInterrupted: false,

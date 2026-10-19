@@ -1,6 +1,7 @@
 import axios, { CanceledError } from "axios";
 
 import { Config } from "@/lib/config";
+import { withDeviceHeaders } from "@/lib/device-identity";
 import { userIdFromAccessToken } from "@/lib/jwt";
 import { redact } from "@/lib/redact";
 import { useDebugLogStore } from "@/stores/debug-log-store";
@@ -44,6 +45,9 @@ apiClient.interceptors.request.use((config) => {
   }
   return config;
 });
+// Every request says which device it comes from: sign-ins bind their session
+// to it, and the Security screen lists sessions by device (mig 033).
+apiClient.interceptors.request.use(withDeviceHeaders);
 
 // responseType "arraybuffer" (GET /transactions/export is the only caller
 // today) applies to every response, not just the 2xx — so a 4xx JSON error

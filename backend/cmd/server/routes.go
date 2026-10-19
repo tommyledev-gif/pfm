@@ -74,11 +74,19 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	// Account switching (specs/mobile-account-switch). Issuing needs a
 	// session; switching and revoking do not (the switch token is the
 	// credential). Only /switch is rate-limited (S-ASW-20).
+	// Deprecated 2026-10-19: newer builds keep each saved account as its own
+	// device-bound session and switch with /auth/refresh. Kept for older
+	// builds, and for the one-time trade of their stored switch tokens.
 	auth.Post("/switch-token", jwtAuth, accountSwitchHandler.IssueSwitchToken)
 	auth.Post("/switch-token/revoke", accountSwitchHandler.RevokeSwitchToken)
 	auth.Post("/switch", middleware.SwitchRateLimiter(logger), accountSwitchHandler.Switch)
 	// Sign out everywhere, self (US-08) — the device gets a fresh pair.
 	auth.Post("/sessions/revoke-all", jwtAuth, sessionRevocationHandler.RevokeAllSelf)
+	// The caller's signed-in devices, and signing one out (mig 033, US-10).
+	// Registered after /sessions/revoke-all so ":id" never shadows it.
+	deviceSessionHandler := handler.NewDeviceSessionHandler(sessions, logger)
+	auth.Get("/sessions", jwtAuth, deviceSessionHandler.List)
+	auth.Delete("/sessions/:id", jwtAuth, deviceSessionHandler.SignOut)
 	// Access requests (mig 031): asked for from the login screen, approved
 	// from the admin's email link, and checked on by the requester's device
 	// before it lets them sign in. All unauthenticated, all IP-limited.
@@ -124,6 +132,9 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	users.Post("/me/passkeys/register/begin", passkeyHandler.BeginRegistration)
 	users.Post("/me/passkeys/register/finish", passkeyHandler.FinishRegistration)
 	users.Delete("/me/passkeys/:id", passkeyHandler.Delete)
+	// Change password (US-11): ends every session, this device gets a fresh
+	// pair. Failed attempts are capped per user.
+	users.Put("/me/password", middleware.PasswordChangeRateLimiter(logger), sessionRevocationHandler.ChangePassword)
 
 	// F-03 Wallet Management — no RequireRole gate: every active user manages
 	// only their own wallets (plan.md Security & Actor Resolution).

@@ -66,9 +66,10 @@ func (s *PasskeyService) BeginLogin(ctx context.Context, userID *uuid.UUID) (uui
 }
 
 // FinishLogin verifies the phone's assertion and starts a session for the
-// passkey's owner, with the same account-status rules as a password sign-in.
-// Every verification failure is ErrPasskeyFailed; the reason is only logged.
-func (s *PasskeyService) FinishLogin(ctx context.Context, challengeID uuid.UUID, credentialJSON []byte) (*model.User, string, string, error) {
+// passkey's owner on the calling device, with the same account-status rules
+// as a password sign-in. Every verification failure is ErrPasskeyFailed; the
+// reason is only logged.
+func (s *PasskeyService) FinishLogin(ctx context.Context, challengeID uuid.UUID, credentialJSON []byte, device *model.SessionDevice) (*model.User, string, string, error) {
 	if !s.Enabled() {
 		return nil, "", "", common.ErrPasskeysUnavailable
 	}
@@ -107,7 +108,7 @@ func (s *PasskeyService) FinishLogin(ctx context.Context, challengeID uuid.UUID,
 		}
 	}
 
-	accessToken, refreshToken, err := s.sessions.Start(ctx, owner.user)
+	accessToken, refreshToken, err := s.sessions.Start(ctx, owner.user, device)
 	if err != nil {
 		return nil, "", "", fmt.Errorf("service.PasskeyService.FinishLogin: %w", err)
 	}

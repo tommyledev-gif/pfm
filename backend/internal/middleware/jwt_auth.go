@@ -23,7 +23,7 @@ type SessionAuthorizer interface {
 
 // JWTAuth validates the access token's signature and expiry, then checks its
 // session on every request, and injects the caller's identity into Fiber
-// locals (common.LocalsUserID / LocalsRole) for downstream handlers/RequireRole
+// locals (common.LocalsUserID / LocalsRole / LocalsSessionID) for downstream handlers/RequireRole
 // to read.
 //
 // The session check is what makes revocation instant (sign out everywhere, an
@@ -82,6 +82,7 @@ func JWTAuth(tokens *service.TokenService, sessions SessionAuthorizer, logger *z
 		// loses admin rights on the next request instead of in 15 minutes.
 		c.Locals(common.LocalsRole, string(state.UserRole))
 		c.Locals(common.LocalsTokenIssuedAt, claims.IssuedAt)
+		c.Locals(common.LocalsSessionID, sessionID.String())
 		return c.Next()
 	}
 }

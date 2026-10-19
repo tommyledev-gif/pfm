@@ -33,6 +33,20 @@ func (f *fakeRevokedTokenRepo) Release(_ context.Context, tokenJTI string) error
 	return nil
 }
 
+// ChangePassword mirrors ChangeUserPassword: active users only (0 rows → false).
+func (f *fakeUserRepo) ChangePassword(_ context.Context, id uuid.UUID, passwordHash string, signOutAt time.Time) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, u := range f.byEmail {
+		if u.ID == id && u.Status == model.UserStatusActive {
+			hash, point := passwordHash, signOutAt
+			u.PasswordHash, u.TokensValidAfter = &hash, &point
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // SetTokensValidAfter mirrors SetUserTokensValidAfter (0 rows → false).
 func (f *fakeUserRepo) SetTokensValidAfter(_ context.Context, id uuid.UUID, at time.Time) (bool, error) {
 	f.mu.Lock()

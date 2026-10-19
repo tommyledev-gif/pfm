@@ -29,12 +29,17 @@ Một khái niệm = một từ, ở cả VI và EN. Cột "Nguồn": `app` = đ
 | Items total | tổng các món | items total | app | Khác "số tiền" của giao dịch (số đã trả) |
 | Lines total (sau thuế, phí, giảm giá) | tổng | total | app | Dòng duy nhất ở chân "Chi tiết món". Khớp số tiền giao dịch thì không nói gì thêm; lệch thì "Lệch {{amount}} so với số tiền giao dịch {{amount}}." |
 | Line amount / Unit price (của một món) | thành tiền / đơn giá | amount / unit price | app | Thành tiền là số gốc; đơn giá chỉ hiện khi số lượng trên 1 |
-| Undo | hoàn tác | undo | app | Sau khi xóa một dòng: "Đã xóa {{name}}" + [Hoàn tác] || Account (người dùng) | tài khoản | account | app | Chỉ cho tài khoản người dùng, không bao giờ cho ví |
+| Undo | hoàn tác | undo | app | Sau khi xóa một dòng: "Đã xóa {{name}}" + [Hoàn tác] |
+| Account (người dùng) | tài khoản | account | app | Chỉ cho tài khoản người dùng, không bao giờ cho ví |
 | Username | tên đăng nhập | username | app | Đặt một lần lúc kích hoạt, đăng nhập thay email. Khác "tên hiển thị". Tài khoản kích hoạt trước khi có nó tự đặt một lần trong Hồ sơ: [Đặt tên đăng nhập] |
 | Display name | tên hiển thị | display name | app | Tên người khác thấy, sửa được trong Hồ sơ |
 | Access request | yêu cầu tạo tài khoản | access request | app | Gửi từ màn đăng nhập. Trạng thái: "Chờ duyệt" → "Chờ kích hoạt" → "Đang dùng" |
 | Approve (yêu cầu) | duyệt | approve | app | Nút: "Duyệt yêu cầu" |
 | Reject (yêu cầu) | từ chối | reject | app | Nút: "Từ chối", nhánh an toàn "Giữ lại". Yêu cầu bị xóa khỏi danh sách, người gửi gửi lại được. Đã duyệt hoặc đã từ chối: "không còn chờ duyệt" |
+| Signed-in device | thiết bị đang đăng nhập | signed-in device | app | Một máy đang giữ phiên của tài khoản này. Tiêu đề mục trong Bảo mật: "Thiết bị đang đăng nhập". Máy không báo tên: "Thiết bị không rõ tên". Dòng phụ: "Thiết bị này" / "Hoạt động {{date}}". Nút trên dòng: "Đăng xuất"; nút xác nhận: "Đăng xuất thiết bị", nhánh an toàn "Giữ lại" |
+| Change password | đổi mật khẩu | change password | app | Dòng trong Bảo mật và tiêu đề màn: "Đổi mật khẩu"; nút cũng là "Đổi mật khẩu". Ba ô: "Mật khẩu hiện tại", "Mật khẩu mới", "Nhập lại mật khẩu mới". Khác "quên mật khẩu" (chưa có) |
+| App lock | khóa ứng dụng | app lock | app | Công tắc "Khóa ứng dụng", màn khóa "Ứng dụng đang khóa" + [Mở khóa]. Khác "khóa màn hình" (của máy) và "Xác minh khi chuyển tài khoản" (chỉ hỏi khi chuyển) |
+| Session ended (tài khoản đã lưu cần mật khẩu lại) | hết phiên | signed out | app | Nhãn trạng thái của tài khoản đã lưu trên máy: "Hết phiên". Câu khi bị từ chối: "Cần đăng nhập lại tài khoản này."; tài khoản đang dùng: "Phiên đăng nhập đã hết hạn.". Nhãn không dùng "Đã hết hạn" (bản cũ) |
 | Passkey | passkey | passkey | app | Khóa đăng nhập lưu trên điện thoại, mở bằng vân tay/khuôn mặt, gắn với tài khoản. Giữ nguyên chữ "passkey" (Google/Apple cũng gọi vậy), viết thường giữa câu. Nút: "Đăng nhập bằng passkey", "Thêm passkey", "Xóa passkey". Chỉ khi chỉ đường vào Cài đặt của Android mới dùng chữ của máy: "khóa truy cập" (mục "Mật khẩu, khóa truy cập và tài khoản") |
 | Saved place | nơi đã ghim | saved place | app | Vị trí từng ghim cho giao dịch, lưu trên máy để chọn lại ở bước "Ghim vị trí". Tiêu đề nhóm: "Đã ghim trước đây"; nút xóa: "Xóa nơi đã ghim" |
 | Phrase (câu mẫu) | câu mẫu | saved phrase | app | Câu từng nhắn để ghi giao dịch, gợi ý lại trên ô chat. Ô tìm: "Tìm trong {{count}} câu mẫu"; nút: "Lưu câu mẫu" / "Bỏ lưu câu mẫu" / "Xóa câu mẫu" |

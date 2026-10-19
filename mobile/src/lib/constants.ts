@@ -16,9 +16,10 @@ export const SECURE_STORE_EMAIL_KEY = "pfm_user_email";
 export const SECURE_STORE_ISSUED_AT_KEY = "pfm_tokens_issued_at";
 
 // Mirrors common.AccessTokenTTL / common.RefreshTokenTTL
-// (backend/internal/common/constants.go).
+// (backend/internal/common/constants.go). The refresh lifetime is idle and
+// sliding; the server also caps a session at 180 days.
 export const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
-export const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
+export const REFRESH_TOKEN_TTL_SECONDS = 60 * 24 * 60 * 60;
 // How long before the access token's expiry the mobile client proactively
 // calls POST /auth/refresh (specs/mobile-session-refresh/spec.md decision #3,
 // Open Question #1). Reactive refresh-on-401 (lib/axios.ts) is the fallback
@@ -149,19 +150,27 @@ export const CATEGORY_NAME_MAX_LENGTH = 50;
 export const CATEGORY_ICON_MAX_LENGTH = 32;
 
 // Account switching (specs/mobile-account-switch). Key names: the registry
-// index (no secrets) and one SecureStore key per saved account's switch
-// token, so every value stays far under SecureStore's ~2 KB guidance.
+// index (no secrets) and one SecureStore key per saved account's refresh
+// token — its own session on this device — so every value stays far under
+// SecureStore's ~2 KB guidance.
 export const SECURE_STORE_ACCOUNTS_KEY = "pfm_accounts";
+export const SECURE_STORE_ACCOUNT_REFRESH_KEY_PREFIX = "pfm_account_rt_";
+// Where builds before 2026-10-19 kept each saved account's switch token.
+// Read once to trade them for sessions (convert-legacy-accounts.ts), then
+// deleted.
 export const SECURE_STORE_SWITCH_TOKEN_KEY_PREFIX = "pfm_account_st_";
+// This install's random device id (lib/device-identity.ts).
+export const SECURE_STORE_DEVICE_ID_KEY = "pfm_device_id";
 // Device-wide security preferences (identity check) — AsyncStorage, not a secret.
 export const SECURITY_PREFS_STORAGE_KEY = "pfm_security_prefs";
 export const MAX_SAVED_ACCOUNTS = 5;
 // Settings row: avatars shown before the "+N" circle (spec AC-05).
 export const AVATAR_GROUP_MAX_VISIBLE = 3;
-// Mirrors common.AccountSwitchTokenTTL (180 days).
-export const ACCOUNT_SWITCH_TOKEN_TTL_SECONDS = 180 * 24 * 60 * 60;
-// The active account's switch token is renewed at most this often (US-06).
-export const SWITCH_TOKEN_RENEW_AFTER_SECONDS = 24 * 60 * 60;
+// Mirrors common.MinPasswordLength (backend/internal/common/constants.go).
+export const MIN_PASSWORD_LENGTH = 8;
+// App lock (Security screen, opt-in): back from the background after this
+// long, the app asks for the owner check again.
+export const APP_LOCK_AFTER_BACKGROUND_MS = 5 * 60 * 1000;
 // A switch completes within 10 s in every outcome (AC-08): the outgoing
 // User's chat gets this long to sync, the switch request this long to answer.
 export const SWITCH_CHAT_FLUSH_TIMEOUT_MS = 3000;

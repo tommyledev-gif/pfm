@@ -58,7 +58,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		return response.Error(c, h.logger, newValidationError(err))
 	}
 
-	user, accessToken, refreshToken, err := h.authService.Login(c.Context(), req.Email, req.Password)
+	user, accessToken, refreshToken, err := h.authService.Login(c.Context(), req.Email, req.Password, requestDevice(c))
 	if err != nil {
 		return response.Error(c, h.logger, err)
 	}
@@ -83,7 +83,7 @@ func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
 		return response.Error(c, h.logger, newValidationError(err))
 	}
 
-	accessToken, refreshToken, err := h.authService.Refresh(c.Context(), req.RefreshToken)
+	accessToken, refreshToken, err := h.authService.Refresh(c.Context(), req.RefreshToken, requestDevice(c))
 	if err != nil {
 		return response.Error(c, h.logger, err)
 	}

@@ -33,8 +33,17 @@ const (
 
 // Tokens (F-02)
 const (
-	AccessTokenTTL  = 15 * time.Minute
-	RefreshTokenTTL = 7 * 24 * time.Hour
+	AccessTokenTTL = 15 * time.Minute
+	// RefreshTokenTTL is a session's idle lifetime, sliding: every refresh
+	// pushes it forward, capped by SessionAbsoluteTTL. Long enough that an
+	// account saved on a shared phone and opened every few weeks keeps its
+	// session there (specs/mobile-account-switch, 2026-10-19 revision).
+	RefreshTokenTTL = 60 * 24 * time.Hour
+	// LegacyRefreshTokenTTL is what refresh tokens issued before sessions
+	// existed (mig 028) were minted with. It bounds the window in which such a
+	// token is still traded for a session (cmd/server/database.go), and must
+	// not follow RefreshTokenTTL.
+	LegacyRefreshTokenTTL = 7 * 24 * time.Hour
 )
 
 // Login (F-02 US-04)
@@ -64,6 +73,9 @@ const (
 	// so "sign out everywhere" can refuse stale access (account-switch
 	// Finding #19).
 	LocalsTokenIssuedAt = "tokenIssuedAt"
+	// LocalsSessionID holds the access token's session id (string) so the
+	// device list can mark, and refuse to sign out, the calling device.
+	LocalsSessionID = "sessionID"
 )
 
 // Wallets (F-03). Name length mirrored by frontend/src/lib/constants.ts so

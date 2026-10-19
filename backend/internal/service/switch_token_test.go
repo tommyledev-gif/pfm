@@ -107,7 +107,7 @@ func TestAuthService_Refresh_RejectsSwitchToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("issue: %v", err)
 	}
-	_, _, err = f.auth.Refresh(context.Background(), switchToken)
+	_, _, err = f.auth.Refresh(context.Background(), switchToken, nil)
 	wantAppCode(t, err, common.ErrCodeUnauthenticated)
 }
 
@@ -124,7 +124,7 @@ func TestAuthService_Refresh_RejectsTokenIssuedBeforeRevocation(t *testing.T) {
 	}})
 	f.users.setTokensValidAfter(user.ID, now.Truncate(time.Second))
 
-	_, _, err := f.auth.Refresh(context.Background(), refresh)
+	_, _, err := f.auth.Refresh(context.Background(), refresh, nil)
 	wantAppCode(t, err, common.ErrCodeUnauthenticated)
 }
 

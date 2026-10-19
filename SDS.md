@@ -44,6 +44,12 @@ Software Design Specification (SDS)
   - [2. Feature-02: System Security](#2-feature-02-system-security)
     - [1. US-02-01: Login](#1-us-02-01-login)
     - [2. US-02-02: Logout](#2-us-02-02-logout)
+    - [3. US-02-03: Switch Between Saved Accounts](#3-us-02-03-switch-between-saved-accounts)
+    - [4. US-02-04: Require Device Unlock Before Switching](#4-us-02-04-require-device-unlock-before-switching)
+    - [5. US-02-05: Log Out of All Devices](#5-us-02-05-log-out-of-all-devices)
+    - [6. US-02-06: See and Sign Out Signed-in Devices](#6-us-02-06-see-and-sign-out-signed-in-devices)
+    - [7. US-02-07: Change Password](#7-us-02-07-change-password)
+    - [8. US-02-08: Lock the App](#8-us-02-08-lock-the-app)
   - [3. Feature-03: Wallet Management](#3-feature-03-wallet-management)
     - [1. US-03-01: Create a Wallet](#1-us-03-01-create-a-wallet)
   - [4. Feature-04: Category Management](#4-feature-04-category-management)
@@ -76,6 +82,10 @@ Software Design Specification (SDS)
     - [9. `GET /ai/budget-wizard/prefill`](#9-get-aibudget-wizardprefill)
     - [10. `POST /ai/budget-proposals`](#10-post-aibudget-proposals)
     - [11. `POST /budgets/bulk`](#11-post-budgetsbulk)
+    - [12. `POST /auth/refresh`](#12-post-authrefresh)
+    - [13. `GET /auth/sessions`](#13-get-authsessions)
+    - [14. `DELETE /auth/sessions/{id}`](#14-delete-authsessionsid)
+    - [15. `PUT /users/me/password`](#15-put-usersmepassword)
   - [4. API  → User Story Traceability](#4-api-user-story-traceability)
 - [7. Security Design](#7-security-design)
   - [1. Authentication](#1-authentication)
@@ -482,6 +492,40 @@ This chapter provides build-ready design details per Feature and User Story, ali
 
 ### 2. US-02-02: Logout {#2-us-02-02-logout}
 
+* Logout ends the device's session on the server (`POST /auth/logout` with its refresh token); the access token stops working at its next request, because every request is checked against its session (§7.1).
+
+### 3. US-02-03: Switch Between Saved Accounts {#3-us-02-03-switch-between-saved-accounts}
+
+*Release 1, mobile only. Full design: `specs/mobile-account-switch/` (revised 2026-10-19).*
+
+* Every login on a phone saves that account on the phone (at most 5 per device) together with the refresh token of its own device-bound session.
+* Switching = `POST /auth/refresh` with the target account's refresh token. The previous account's session is not ended; it stays saved, so switching back needs no password either.
+* A refresh result is always stored for the account it belongs to, even if the phone switched to another account while it was running.
+* A refused refresh marks only that account "Hết phiên" (password or passkey needed); the other saved accounts are untouched.
+* *Changed 2026-10-19:* switching used to redeem a separate 180-day single-use switch token (`POST /auth/switch`); those endpoints are deprecated and kept only for older app builds (§6.2).
+
+### 4. US-02-04: Require Device Unlock Before Switching {#4-us-02-04-require-device-unlock-before-switching}
+
+* Before a switch, the phone asks for its fingerprint, face or screen-lock code (on by default, per device). The check runs on the phone only; no server call.
+
+### 5. US-02-05: Log Out of All Devices {#5-us-02-05-log-out-of-all-devices}
+
+* `POST /auth/sessions/revoke-all` (self) and `POST /admin/users/{id}/sessions/revoke-all` (admin) set the user's sign-out point and end every session of the user; the caller's own device gets a fresh session in the same answer. Other devices are refused at their next request.
+
+### 6. US-02-06: See and Sign Out Signed-in Devices {#6-us-02-06-see-and-sign-out-signed-in-devices}
+
+* `GET /auth/sessions` lists the caller's live sessions (device name or "Thiết bị không rõ tên", created, last used, `is_current`), most recently used first.
+* `DELETE /auth/sessions/{id}` ends one of them (reason `device_sign_out`, one audit log line). The current session is refused with 400 (it uses logout); another user's session is 404.
+
+### 7. US-02-07: Change Password {#7-us-02-07-change-password}
+
+* `PUT /users/me/password` checks the current password, then in one UPDATE stores the new hash and moves the sign-out point to now, ends every session of the user and returns a fresh session for the calling device.
+* A wrong current password is 400 `WRONG_CURRENT_PASSWORD`, never 401 (the mobile client reads 401 as "session over"). At most 5 failed tries per user per 15 minutes.
+
+### 8. US-02-08: Lock the App {#8-us-02-08-lock-the-app}
+
+* Opt-in, per device, off by default. When on, the app asks for the phone's fingerprint, face or screen-lock code on a cold start and after 5 minutes in the background, before any signed-in screen is visible. A screen gate only: stored tokens are not locked and background renewal continues (see §9).
+
       ## 
 
 ## 3. Feature-03: Wallet Management {#3-feature-03-wallet-management}
@@ -676,6 +720,19 @@ Main Flow
 | API-BWZ-01 | `GET /ai/budget-wizard/prefill` | AI Budget Setup Wizard |
 | API-BWZ-02 | `POST /ai/budget-proposals` | AI Budget Setup Wizard |
 | API-BUD-06 | `POST /budgets/bulk` | Budget Management / AI Budget Setup Wizard |
+| API-AUTH-01 | `POST /auth/login` | System Security |
+| API-AUTH-02 | `POST /auth/logout` | System Security (also removes a saved account from a device) |
+| API-AUTH-03 | `POST /auth/refresh` | System Security (also switches between saved accounts, since 2026-10-19) |
+| API-AUTH-04 | `POST /auth/sessions/revoke-all` | System Security |
+| API-AUTH-05 | `POST /admin/users/{id}/sessions/revoke-all` | System Security (admin) |
+| API-AUTH-06 | `GET /auth/sessions` | System Security — new 2026-10-19 |
+| API-AUTH-07 | `DELETE /auth/sessions/{id}` | System Security — new 2026-10-19 |
+| API-AUTH-08 | `PUT /users/me/password` | System Security — new 2026-10-19 |
+| API-AUTH-09 | `POST /auth/switch-token` | System Security — **deprecated 2026-10-19**, older app builds only |
+| API-AUTH-10 | `POST /auth/switch` | System Security — **deprecated 2026-10-19**, older app builds and the one-time upgrade only |
+| API-AUTH-11 | `POST /auth/switch-token/revoke` | System Security — **deprecated 2026-10-19**, older app builds and the one-time upgrade only |
+
+Every mobile request carries `X-Device-Id` (a random id the app creates once) and `X-Device-Name` (URI-encoded); API-AUTH-01, 03, 04, 08 and 10 use them to bind the session to the device.
 
 ## 3. API Specification {#3-api-specification}
 
@@ -725,6 +782,30 @@ Main Flow
 | ----- | ----- | ----- |
 | Controller validates input. Service re-validates ownership of every Category ID, then atomically replaces the caller's existing Budgets with the submitted set inside one DB transaction. | created_count budgets[] | 400: INVALID_INPUT 404: CATEGORY_NOT_FOUND 403: CATEGORY_ACCESS_DENIED 422: DUPLICATE_CATEGORY_IN_REQUEST |
 
+### 12. `POST /auth/refresh` {#12-post-authrefresh}
+
+| Main Flow | Success Response | Error Responses |
+| ----- | ----- | ----- |
+| No access token needed; the refresh token in the body is the credential. Service loads its session, checks it is live (not revoked, within 60 days of its last renewal and 180 days of its sign-in), that the token is the session's current one (or the one replaced less than 5 minutes ago), and that the user is active and not signed out after the token was issued. An older token revokes the whole session. Then it rotates the token (compare-and-swap), slides the idle expiry and records the device if the session has none. On mobile this is also how a saved account is switched into. | access_token refresh_token | 400: INVALID_INPUT 401: UNAUTHENTICATED |
+
+### 13. `GET /auth/sessions` {#13-get-authsessions}
+
+| Main Flow | Success Response | Error Responses |
+| ----- | ----- | ----- |
+| Controller reads the caller and the caller's session id from the access token. Service lists the caller's live sessions only, most recently used first, marking the current one. | data[] (id, device_name or null, created_at, last_used_at, is_current) | 401: UNAUTHENTICATED |
+
+### 14. `DELETE /auth/sessions/{id}` {#14-delete-authsessionsid}
+
+| Main Flow | Success Response | Error Responses |
+| ----- | ----- | ----- |
+| Controller validates the id. Service refuses the caller's current session, refuses a session that is not the caller's, treats an already-ended one as done, otherwise revokes it (reason `device_sign_out`) and writes one audit log line (ids, role, IP). That device is refused at its next request and its next refresh. | null | 400: INVALID_INPUT 401: UNAUTHENTICATED 404: NOT_FOUND |
+
+### 15. `PUT /users/me/password` {#15-put-usersmepassword}
+
+| Main Flow | Success Response | Error Responses |
+| ----- | ----- | ----- |
+| Controller validates the body (current_password, new_password). Service checks the current password, the minimum length and that the new one differs; then stores the new hash and sets the sign-out point in one UPDATE, ends every session of the user (reason `password_changed`) and starts a fresh session for the calling device. One audit log line, never the password. At most 5 failed tries per user per 15 minutes. | access_token refresh_token | 400: INVALID_INPUT, WRONG_CURRENT_PASSWORD, WEAK_PASSWORD, SAME_PASSWORD 401: UNAUTHENTICATED 429: RATE_LIMITED |
+
 ## 4. API  → User Story Traceability {#4-api-user-story-traceability}
 
 | API | Feature | US |
@@ -736,12 +817,28 @@ Main Flow
 | `GET /ai/budget-wizard/prefill` | AI Budget Setup Wizard | US-13-01 |
 | `POST /ai/budget-proposals` | AI Budget Setup Wizard | US-13-01 |
 | `POST /budgets/bulk` | Budget Management / AI Budget Setup Wizard | US-13-01 |
+| `POST /auth/login` | System Security | US-02-01, US-02-03 |
+| `POST /auth/logout` | System Security | US-02-02, US-02-03 |
+| `POST /auth/refresh` | System Security | US-02-03 |
+| `POST /auth/sessions/revoke-all`, `POST /admin/users/{id}/sessions/revoke-all` | System Security | US-02-05 |
+| `GET /auth/sessions`, `DELETE /auth/sessions/{id}` | System Security | US-02-06 |
+| `PUT /users/me/password` | System Security | US-02-07 |
 
 # 7. Security Design {#7-security-design}
 
 ## 1. Authentication {#1-authentication}
 
 All protected APIs require authenticated user context.
+
+**Device-bound sessions** (sessions since migration 028, bound to a device since migration 033, 2026-10-19):
+
+* Every sign-in (password or passkey) creates one row in `sessions`. The access token (15 minutes) and the refresh token both carry its id, and `JWTAuth` checks that session on **every request** (live, user active, not signed out since the token was issued), so ending a session takes effect at that device's next request.
+* The app creates a random device id once and sends it with the device name on every request. A user has at most **one live session per device**: signing in again on that device ends the previous one. At most 5 live sessions per user; a 6th ends the least recently used. Web sends no device id; its sessions show as "Thiết bị không rõ tên".
+* **Rotation and reuse detection:** every refresh replaces the refresh token. The server accepts only the current one, or the one it replaced less than 5 minutes ago (so an answer lost in a tunnel can be retried); presenting an older one revokes the whole session.
+* **Lifetimes:** a session ends 60 days after its last refresh (sliding) or 180 days after its sign-in, whichever comes first. Access tokens live 15 minutes. *(Changed 2026-10-19: was 7 days idle, 30 days absolute.)*
+* **Saved accounts on mobile:** each account saved on a phone keeps the refresh token of its own session there. Switching is a refresh of that session; there is no other long-lived credential. *(The 180-day switch token of 2026-10-04 is deprecated and served only to older app builds.)*
+* **Ending sessions:** logout (that session), "Gỡ khỏi thiết bị" (that saved account's session), sign out one device (`DELETE /auth/sessions/{id}`), sign out everywhere (self or admin: every session, plus a sign-out point that refuses any token issued earlier), and **password change, which ends every session** of the user and gives the calling device a fresh one.
+* **Storage on the phone:** tokens live in `expo-secure-store` (Keystore-encrypted, not biometric-bound — §9). Fingerprint, face or screen-lock code gate switching (on by default) and, optionally, opening the app (app lock).
 
 ## 2. Authorization {#2-authorization}
 
@@ -757,6 +854,10 @@ The same untrusted-input treatment applies to AI Budget Setup Wizard (Feature-13
 * **Duplicate transaction from double-confirm** — a repeated tap on the chat confirmation card must not create two Transactions. Mitigated by an idempotency key pre-generated per proposed action (see Domain Model §11 ChatMessage, schema note).  
 * **AI Service unavailability** — Groq/Anthropic outage must degrade to a clear retryable error on `POST /ai/chat`, never a crash or a silently-dropped write.  
 * **Bulk budget replace race** — two devices submitting the AI Budget Setup Wizard for the same User concurrently could otherwise interleave into an inconsistent set of Budgets. Mitigated by locking the User's existing Budget rows before replacing them, inside one transaction, so the two requests serialize instead of interleaving (full design in `specs/ai-budget-wizard/plan.md`).
+* **Lost or stolen phone** — whoever holds it can open every account saved on it until its sessions end. Mitigated by: signing that one device out from another device ("Thiết bị đang đăng nhập", `DELETE /auth/sessions/{id}`), "sign out everywhere", or changing the password (ends every session); each takes effect at the phone's next request. The identity check before switching and the optional app lock stop a casual finder of an unlocked phone. Residual: a passkey stored on that phone keeps working until it is deleted under "Passkey"; there is no password reset by email yet.
+* **Stolen refresh token** (copied off a phone or out of a log) — usable from anywhere until detected. Mitigated by rotation on every refresh with reuse detection: once the owner's phone or the thief refreshes, the other copy becomes stale and presenting it revokes the whole session (the 5-minute grace for lost answers is the only window). Tokens are never logged. Residual: a thief who refreshes before the owner and keeps pace could hold the session until the owner's next refresh fails; the real fix is **phase 2** — a key pair made in the phone's key store at sign-in, its public half on the session (`sessions.public_key`, reserved), every refresh signing a server challenge.
+* **Shared phone** — another household member using the same phone could walk into a saved account. Mitigated by the identity check before every switch (default on), the opt-in app lock on open and after 5 minutes in the background, "Gỡ khỏi thiết bị" (ends that account's session on the phone), and per-User separation of all local data on switch.
+* **Leaked `JWT_SECRET`** — a forged token for a known user id. Access and refresh tokens need a live session row, so they cannot be forged usefully; the deprecated switch tokens are not tied to a row and can be redeemed until the secret is rotated or those endpoints are removed (`docs/ops-runbook.md` §5).
 
    # 
 
@@ -780,6 +881,13 @@ The same untrusted-input treatment applies to AI Budget Setup Wizard (Feature-13
 * AI Chat Assistant (Feature-12) reuses the existing AI Service (Python/FastAPI, Groq SDK primary + Anthropic SDK fallback per CLAUDE.md tech stack) — no new LLM provider or client is introduced. Complexity-based model routing within the AI Service (e.g. a fast/cheap model for simple single-item extraction vs. a stronger model for multi-item or edit/query intents) is an AI Service implementation detail to be finalized at `/cook-plan` time, not a fixed choice baked into this SDS.  
 * Client surface for Feature-12 was `frontend/` (web) first, matching the project's original implementation priority; `mobile/` (React Native, not Flutter — rebuilt 2026-08-16) has since shipped its own AI Chat screen and reached feature parity for this flow.  
 * AI Budget Setup Wizard (Feature-13) computes its proposed allocation with a fixed, rule-based formula (income × preference weight, category baselines) **inside the Go Backend itself** — not a free-form LLM call, and not even a call to the AI Service, since the computation is pure deterministic arithmetic with nothing an LLM adds (`specs/ai-budget-wizard/plan.md` Finding #6). The AI Service is only involved in one narrow, optional sub-step: suggesting a name for a Category the User described but that doesn't exist yet. Full formula in `specs/ai-budget-wizard/spec.md`.
+* **Device-bound sessions (2026-10-19)** — each account saved on a phone keeps its own session there and switching is a refresh of it, replacing the separate 180-day switch token; lifetimes 60 days unused (sliding) / 180 days absolute. Adapted from the product owner's "device-bound session + biometric vault" proposal. **Not adopted, and why** (full list in `specs/mobile-account-switch/spec.md`):
+  * *Separate `devices` and `refresh_tokens` tables* — `sessions` already is the token family (rotation, reuse detection, per-session revoke); a parallel table would duplicate it. Device columns go on `sessions`; "a device" in the UI is one live session.
+  * *Storing a hash of the refresh token* — refresh tokens are signed JWTs and the row stores only the jti, which is useless without the signature.
+  * *Refresh token wrapped by a biometric-bound key in the phone's key store* — not possible with `expo-secure-store`: biometric only (no screen-lock code fallback), a prompt on every read and write, and the key is invalidated when a fingerprint is added; the active session rotates about every 12 minutes, so it would prompt constantly. Tokens stay in secure storage and the fingerprint is a screen gate (switch check, optional app lock). The phase-2 device key pair is the real fix for token theft; `sessions.public_key` is reserved for it.
+  * *Access token in memory only* — it lives 15 minutes and is checked against its session on every request, so revocation is already instant; keeping it in secure storage lets an offline cold start open from cached data.
+  * *Password reset by email code* — not built yet (no forgot-password feature); lost-device remedies are device sign-out, sign out everywhere and password change.
+  * *Admin resets a User's password* — no such feature; the admin tool is "sign out everywhere" for that User, which leaves an audit log line.
 
   # 
 

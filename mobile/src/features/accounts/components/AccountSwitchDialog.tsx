@@ -45,7 +45,7 @@ export function AccountSwitchDialog({ visible, onClose, onAddAccount }: AccountS
   const confirmRemoval = async () => {
     const account = pendingRemoval;
     setPendingRemoval(null);
-    if (account) await useAccountRegistryStore.getState().remove(account.userId, { revoke: true, dropLocalData: true });
+    if (account) await useAccountRegistryStore.getState().remove(account.userId, { endSession: true, dropLocalData: true });
   };
 
   return (

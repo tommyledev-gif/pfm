@@ -96,7 +96,7 @@ Not idempotent by design — repeated calls with the same email while `status=pe
 6. System validates that `token`, `password`, and `password_confirm` are all present, that password meets the strength policy (min 8 chars), and that `password == password_confirm` (handler-level shape validation).
 7. System hashes the password with bcrypt, cost factor 12.
 8. System atomically updates the user row: `status = active`, `password_hash = <hash>`, `activated_at = NOW()`, `invite_token = NULL`, `invite_expires_at = NULL` — single `UPDATE ... WHERE invite_token = $token AND status = 'pending'` statement.
-9. System issues a JWT access token (15 min) + refresh token (7 days) and returns them with the user object.
+9. System issues a JWT access token (15 min) + refresh token (7 days; since 2026-10-19 a session that lasts 60 days unused and at most 180 days — see [mobile-account-switch](../mobile-account-switch/spec.md)) and returns them with the user object.
 10. App stores tokens in `flutter_secure_storage` and navigates to the home screen.
 
 ### Scenarios

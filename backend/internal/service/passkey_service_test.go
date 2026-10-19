@@ -70,7 +70,7 @@ func (f passkeyFixture) login(t *testing.T, phone *virtualAuthenticator, forUser
 	if err != nil {
 		return nil, err
 	}
-	user, access, refresh, err := f.svc.FinishLogin(ctx, challengeID, phone.get(options))
+	user, access, refresh, err := f.svc.FinishLogin(ctx, challengeID, phone.get(options), nil)
 	if err == nil && (access == "" || refresh == "") {
 		t.Fatal("a passkey sign-in must start a session")
 	}
@@ -122,10 +122,10 @@ func TestPasskey_ChallengeIsSingleUse(t *testing.T) {
 		t.Fatal(err)
 	}
 	answer := phone.get(options)
-	if _, _, _, err := f.svc.FinishLogin(ctx, challengeID, answer); err != nil {
+	if _, _, _, err := f.svc.FinishLogin(ctx, challengeID, answer, nil); err != nil {
 		t.Fatalf("first answer: %v", err)
 	}
-	if _, _, _, err := f.svc.FinishLogin(ctx, challengeID, answer); !errors.Is(err, common.ErrPasskeyFailed) {
+	if _, _, _, err := f.svc.FinishLogin(ctx, challengeID, answer, nil); !errors.Is(err, common.ErrPasskeyFailed) {
 		t.Fatalf("replayed answer: want ErrPasskeyFailed, got %v", err)
 	}
 }

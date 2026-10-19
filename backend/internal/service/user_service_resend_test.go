@@ -102,7 +102,7 @@ func TestAuthService_Login_EmailIsCaseInsensitive(t *testing.T) {
 	svc, repo, _ := newTestAuthService(t)
 	seedActiveUser(t, repo, "user@gmail.com", "correcthorse1", model.UserStatusActive)
 
-	if _, _, _, err := svc.Login(context.Background(), " User@Gmail.com", "correcthorse1"); err != nil {
+	if _, _, _, err := svc.Login(context.Background(), " User@Gmail.com", "correcthorse1", nil); err != nil {
 		t.Fatalf("login with a differently-cased email should succeed: %v", err)
 	}
 }

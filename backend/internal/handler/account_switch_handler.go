@@ -55,7 +55,7 @@ func (h *AccountSwitchHandler) Switch(c *fiber.Ctx) error {
 		return response.Error(c, h.logger, newValidationError(err))
 	}
 
-	session, err := h.switchService.Switch(c.Context(), req.SwitchToken)
+	session, err := h.switchService.Switch(c.Context(), req.SwitchToken, requestDevice(c))
 	if err != nil {
 		return response.Error(c, h.logger, err)
 	}
@@ -81,14 +81,20 @@ func (h *AccountSwitchHandler) RevokeSwitchToken(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, "switch token revoked successfully", nil)
 }
 
+// newSwitchResponse leaves switch_token and its expiry out when none was
+// minted (the client sent a device id and keeps the session instead).
 func newSwitchResponse(session *service.SwitchSession) dto.SwitchResponse {
-	return dto.SwitchResponse{
-		AccessToken:          session.AccessToken,
-		RefreshToken:         session.RefreshToken,
-		SwitchToken:          session.SwitchToken,
-		SwitchTokenExpiresAt: session.SwitchTokenExpiresAt,
-		User:                 dto.NewUserResponse(session.User),
+	res := dto.SwitchResponse{
+		AccessToken:  session.AccessToken,
+		RefreshToken: session.RefreshToken,
+		User:         dto.NewUserResponse(session.User),
 	}
+	if session.SwitchToken != "" {
+		res.SwitchToken = session.SwitchToken
+		expiresAt := session.SwitchTokenExpiresAt
+		res.SwitchTokenExpiresAt = &expiresAt
+	}
+	return res
 }
 
 // callerTokenIssuedAt reads the access token's `iat` JWTAuth stored in

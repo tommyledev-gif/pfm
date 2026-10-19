@@ -7,7 +7,8 @@ import { useKeyboardVisible } from "@/lib/use-keyboard-height";
 import { usePrefetchRecordIcons } from "@/lib/use-prefetch-record-icons";
 import { useWarmUpFormatting } from "@/lib/warm-up-formatting";
 import { useSheetStore } from "@/stores/sheet-store";
-import { useSwitchTokenRenewal } from "@/features/accounts/hooks/use-switch-token-renewal";
+import { useSavedAccountSync } from "@/features/accounts/hooks/use-saved-account-sync";
+import { AppLockOverlay } from "@/features/security/components/AppLockOverlay";
 
 // Notifications is a full-screen overlay without the bottom nav (README:
 // bell opens a "full-screen Notifications overlay"). AI Chat keeps the nav
@@ -24,8 +25,8 @@ export default function AppLayout() {
   usePrefetchRecordIcons();
   // So the first transaction sheet's keypad is not the one paying for them.
   useWarmUpFormatting();
-  // Keeps the active account's switch token fresh (spec US-06).
-  useSwitchTokenRenewal();
+  // Keeps the device's saved accounts in step (spec US-06).
+  useSavedAccountSync();
   // BottomNav is an absolutely-positioned overlay outside any screen's own
   // keyboard handling, so it never moves out of the way on its own — a
   // focused input (AI Chat's, but any future one too) can end up sharing the
@@ -48,6 +49,8 @@ export default function AppLayout() {
       <Stack screenOptions={{ headerShown: false, animation: "fade" }} />
       {showNav ? <BottomNav /> : null}
       {/* No offline banner here — it is a strip inside Screen.tsx. */}
+      {/* Last, so it covers the nav and every screen (US-12). */}
+      <AppLockOverlay />
     </View>
   );
 }

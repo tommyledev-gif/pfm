@@ -6,6 +6,8 @@
 - **Spec:** [spec.md](./spec.md)
 - **Related plan:** [F-01 User Management](../user-management/plan.md) — US-02 (Activate) consumes the `TokenService` this plan owns
 
+> **Status 2026-10-19** — original Phase-0 plan, kept as written; its tasks shipped. Superseded parts: `POST /auth/refresh` (SEC-T9) was specified and built in [mobile-session-refresh](../mobile-session-refresh/plan.md); refresh tokens are bound to `sessions` rows (migration 028, device columns migration 033) instead of being checked against `revoked_tokens` only; `RefreshTokenTTL` is 60 days idle (sliding) with a 180-day absolute limit (`SessionAbsoluteTTL`), not 7 days; the mobile client is React Native, not Flutter. Device list, sign out one device and change password are planned in [mobile-account-switch plan](../mobile-account-switch/plan.md) "Revision 2026-10-19". Password reset is still not planned.
+
 ---
 
 ## 1. Pre-flight: Spec Review Findings

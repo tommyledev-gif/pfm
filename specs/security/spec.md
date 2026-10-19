@@ -3,6 +3,13 @@
 > Source: `docs/features.md` (Feature-02)
 > Status: Phase 0 — blocks all financial features
 > Related: [F-01 User Management](../user-management/spec.md) (login authenticates users created there; account activation in US-02 of that spec also issues the same token pair described here)
+>
+> **Status 2026-10-19** — this is the original Phase-0 spec, kept as written. Parts of it have since been superseded:
+> - **Refresh endpoint** (Out of Scope / Open Question 1 below) — exists: `POST /auth/refresh`, see [mobile-session-refresh](../mobile-session-refresh/spec.md).
+> - **Revocation storage and logout scope** (US-05, Open Questions 3 and 5) — every sign-in is a row in `sessions` (migration 028); logout ends that one session, "sign out everywhere" ends all of them, and `JWTAuth` checks the session on every request, so access tokens stop at their next request. `revoked_tokens` remains for pre-session and deprecated switch tokens.
+> - **Token lifetimes** — refresh tokens no longer live 7 days: a session lasts 60 days without use (sliding) and at most 180 days, bound to one device ([mobile-account-switch](../mobile-account-switch/spec.md), 2026-10-19). Access tokens are still 15 minutes.
+> - **Session/device management and password change** — in scope since 2026-10-19: [mobile-account-switch](../mobile-account-switch/spec.md) US-08/US-09 (sign out everywhere), US-10 (signed-in devices, sign out one device), US-11 (change password). Password reset remains out of scope.
+> - **Client** — the app is React Native (`mobile/`), not Flutter; tokens are kept in `expo-secure-store`.
 
 ## Context
 
@@ -110,12 +117,13 @@ Explicitly idempotent by this spec's assumption: calling logout multiple times w
 
 ## Out of Scope (Feature F-02)
 
-- **Token refresh endpoint** (`POST /auth/refresh` or similar) — the source doc describes issuing an access+refresh pair at login/activation, but never how the access token is renewed after 15 minutes without re-entering a password. This is a significant gap for a mobile app with a 7-day refresh window — flagged below as an Open Question, not silently assumed.
-- Password reset / forgot password flow for already-active users.
+- **Token refresh endpoint** (`POST /auth/refresh` or similar) — the source doc describes issuing an access+refresh pair at login/activation, but never how the access token is renewed after 15 minutes without re-entering a password. This is a significant gap for a mobile app with a 7-day refresh window — flagged below as an Open Question, not silently assumed. *(Resolved later: [mobile-session-refresh](../mobile-session-refresh/spec.md).)*
+- Password reset / forgot password flow for already-active users. *(Still out of scope 2026-10-19; tracked as production-readiness P0.)*
 - Multi-factor authentication.
-- Session/device management UI (viewing or revoking active sessions from a list).
+- ~~Session/device management UI (viewing or revoking active sessions from a list).~~ *(In scope since 2026-10-19: [mobile-account-switch](../mobile-account-switch/spec.md) US-10.)*
+- Changing the password of an active account — not covered by this Phase-0 spec. *(Added 2026-10-19: [mobile-account-switch](../mobile-account-switch/spec.md) US-11.)*
 - Account lockout after repeated failures (only rate limiting is in scope; a hard lockout requiring admin unlock is not).
-- Access token revocation (explicitly deferred per source doc — "acceptable for a personal app").
+- ~~Access token revocation (explicitly deferred per source doc — "acceptable for a personal app").~~ *(Done with sessions, migration 028: `JWTAuth` checks the session on every request.)*
 
 ## Open Questions
 

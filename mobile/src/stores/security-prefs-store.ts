@@ -12,7 +12,10 @@ interface SecurityPrefsState {
   identityCheckEnabled: boolean;
   /** The "no screen lock" warning is shown once per device (BR-15). */
   noLockWarningShown: boolean;
+  /** Ask for the owner check on opening the app (US-12, default off). */
+  appLockEnabled: boolean;
   setIdentityCheckEnabled: (enabled: boolean) => void;
+  setAppLockEnabled: (enabled: boolean) => void;
   markNoLockWarningShown: () => void;
 }
 
@@ -21,7 +24,9 @@ export const useSecurityPrefsStore = create<SecurityPrefsState>()(
     (set) => ({
       identityCheckEnabled: true,
       noLockWarningShown: false,
+      appLockEnabled: false,
       setIdentityCheckEnabled: (enabled) => set({ identityCheckEnabled: enabled }),
+      setAppLockEnabled: (enabled) => set({ appLockEnabled: enabled }),
       markNoLockWarningShown: () => set({ noLockWarningShown: true }),
     }),
     {
@@ -30,6 +35,7 @@ export const useSecurityPrefsStore = create<SecurityPrefsState>()(
       partialize: (state) => ({
         identityCheckEnabled: state.identityCheckEnabled,
         noLockWarningShown: state.noLockWarningShown,
+        appLockEnabled: state.appLockEnabled,
       }),
     },
   ),
