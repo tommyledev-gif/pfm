@@ -33,7 +33,7 @@
       "predictiveBackGestureEnabled": false,
       "allowBackup": false,
       "package": "com.example.pfm",
-      "versionCode": 8,
+      "versionCode": 9,
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "android.permission.REQUEST_INSTALL_PACKAGES"
