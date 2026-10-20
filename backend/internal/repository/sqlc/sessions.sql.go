@@ -161,6 +161,24 @@ func (q *Queries) RotateSessionRefresh(ctx context.Context, arg RotateSessionRef
 	return result.RowsAffected(), nil
 }
 
+const revokeUnboundSessions = `-- name: RevokeUnboundSessions :execrows
+UPDATE sessions
+SET revoked_at     = NOW(),
+    revoked_reason = 'unbound_stale'
+WHERE user_id = $1
+  AND device_id IS NULL
+  AND revoked_at IS NULL
+  AND last_used_at < $2
+`
+
+func (q *Queries) RevokeUnboundSessions(ctx context.Context, userID uuid.UUID, lastUsedBefore time.Time) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeUnboundSessions, userID, lastUsedBefore)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const revokeSession = `-- name: RevokeSession :execrows
 UPDATE sessions
 SET revoked_at     = NOW(),

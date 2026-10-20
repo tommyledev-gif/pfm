@@ -38,6 +38,7 @@ const env = loadEnv();
 assertProdApi(env);
 const target = upload ? remote(env) : null;
 checkSigningProperties();
+await checkAssetLinks();
 
 step("Bumping android.versionCode in app.json");
 const appJson = readAppJson();
@@ -47,6 +48,7 @@ writeAppJson(appJson);
 console.log(`  versionCode ${versionCode}, version ${appJson.expo.version}`);
 
 step("Regenerating android/ (expo prebuild)");
+clearStalePermissionBlocks();
 run("npx", ["expo", "prebuild", "--platform", "android", "--no-install"], {
   env: { ...process.env, EXPO_NO_GIT_STATUS: "1" },
 });
@@ -69,8 +71,9 @@ run(
   { cwd: ANDROID_DIR },
 );
 
-step("Checking the APK's signature and runtime version");
+step("Checking the APK's signature, permissions and runtime version");
 verifySignature(APK);
+verifyPermissions(APK);
 const runtimeVersion = resolveRuntimeVersion();
 const embedded = readZipEntry(APK, "assets/fingerprint")?.toString("utf8").trim();
 if (embedded !== runtimeVersion) {
@@ -160,7 +163,7 @@ function checkSigningProperties() {
 
 function verifySignature(apk) {
   if (!fs.existsSync(apk)) fail(`No APK at ${apk}.`);
-  const out = capture(shellPath(findApksigner()), ["verify", "--print-certs", shellPath(apk)]);
+  const out = capture(shellPath(findBuildTool(IS_WINDOWS ? "apksigner.bat" : "apksigner")), ["verify", "--print-certs", shellPath(apk)]);
   const digest = out.match(/certificate SHA-256 digest:\s*([0-9a-f]+)/i)?.[1]?.toUpperCase();
   if (digest !== RELEASE_CERT_SHA256) {
     fail(
@@ -171,13 +174,59 @@ function verifySignature(apk) {
   console.log("  signed with the Budgest release key");
 }
 
+// Passkeys only work for an APK whose signing key the relying party lists in
+// assetlinks.json (ANDROID_CERT_SHA256, docs/ops-runbook.md §7). Without it
+// Android refuses every passkey with "no create option", which the app can
+// only read as "no passkey service on this phone". A warning, not a failure:
+// the APK itself is fine, and this machine's network may block the check.
+async function checkAssetLinks() {
+  const url = new URL("/.well-known/assetlinks.json", UPDATES_BASE_URL).href;
+  const wanted = RELEASE_CERT_SHA256.replace(/(..)(?!$)/g, "$1:");
+  try {
+    const res = await fetch(url);
+    const body = res.ok ? await res.text() : "";
+    if (!body.toUpperCase().includes(wanted)) {
+      console.warn(`\n⚠ ${url} does not list the release key ${wanted}.\n  Passkeys fail on this APK until ANDROID_CERT_SHA256 includes it (VPS_ENV_PROD, then deploy).\n`);
+    }
+  } catch (error) {
+    console.warn(`\n⚠ Could not read ${url} (${error.message}): check by hand that it lists ${wanted}.\n`);
+  }
+}
+
+// prebuild edits the existing android/ in place instead of starting over, and
+// it never takes back a permission block (tools:node="remove") an older config
+// asked for: `cameraPermission: false` once left CAMERA blocked long after the
+// receipt camera shipped, so the app could not even ask for it and Android's
+// app settings had no camera switch to turn on. Dropped here, every block the
+// current config still wants is written again by the prebuild that follows.
+function clearStalePermissionBlocks() {
+  const manifest = path.join(ANDROID_DIR, "app", "src", "main", "AndroidManifest.xml");
+  if (!fs.existsSync(manifest)) return;
+  const xml = fs.readFileSync(manifest, "utf8");
+  const cleaned = xml.replace(/^[ \t]*<uses-permission\b[^>]*tools:node="remove"[^>]*\/>\r?\n/gm, "");
+  if (cleaned !== xml) fs.writeFileSync(manifest, cleaned);
+}
+
+// What the app asks for at runtime: missing from the APK, the ask fails
+// without any prompt (camera: receipt photos; install: the in-app update).
+const REQUIRED_PERMISSIONS = ["android.permission.CAMERA", "android.permission.REQUEST_INSTALL_PACKAGES"];
+
+function verifyPermissions(apk) {
+  const out = capture(shellPath(findBuildTool(IS_WINDOWS ? "aapt2.exe" : "aapt2")), ["dump", "permissions", shellPath(apk)]);
+  const missing = REQUIRED_PERMISSIONS.filter((p) => !out.includes(`'${p}'`));
+  if (missing.length > 0) {
+    fail(`The APK does not declare ${missing.join(", ")}. Check app.json (plugins, android.permissions).`);
+  }
+  console.log(`  declares ${REQUIRED_PERMISSIONS.map((p) => p.split(".").pop()).join(", ")}`);
+}
+
 // On Windows the .bat files run through cmd, which splits an unquoted path
 // at its first space.
 function shellPath(p) {
   return IS_WINDOWS && p.includes(" ") ? `"${p}"` : p;
 }
 
-function findApksigner() {
+function findBuildTool(name) {
   let sdk = env.ANDROID_HOME || env.ANDROID_SDK_ROOT;
   const localProps = path.join(ANDROID_DIR, "local.properties");
   if (!sdk && fs.existsSync(localProps)) {
@@ -189,8 +238,8 @@ function findApksigner() {
     .readdirSync(buildTools)
     .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
   for (const version of versions) {
-    const candidate = path.join(buildTools, version, IS_WINDOWS ? "apksigner.bat" : "apksigner");
+    const candidate = path.join(buildTools, version, name);
     if (fs.existsSync(candidate)) return candidate;
   }
-  fail(`No apksigner in ${buildTools}.`);
+  fail(`No ${name} in ${buildTools}.`);
 }

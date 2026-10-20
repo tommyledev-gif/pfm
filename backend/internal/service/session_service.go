@@ -34,10 +34,21 @@ type SessionService struct {
 	tokens *TokenService
 	logger *zap.Logger
 	now    func() time.Time
+	// unboundBefore is when device-bound sessions went live (mig 033 applied);
+	// nil leaves sessions without a device alone. See SetUnboundCutoff.
+	unboundBefore *time.Time
 }
 
 func NewSessionService(repo SessionRepo, tokens *TokenService, logger *zap.Logger) *SessionService {
 	return &SessionService{repo: repo, tokens: tokens, logger: logger, now: func() time.Time { return time.Now().UTC() }}
+}
+
+// SetUnboundCutoff turns on the clean-up in Start: a sign-in on a device ends
+// the user's sessions that have no device and were not used since t. Called
+// once at startup with the moment device-bound sessions went live; not safe
+// to call while requests are being served.
+func (s *SessionService) SetUnboundCutoff(t time.Time) {
+	s.unboundBefore = &t
 }
 
 // Start opens a session for an already verified user and returns its first
@@ -45,7 +56,19 @@ func NewSessionService(repo SessionRepo, tokens *TokenService, logger *zap.Logge
 // (replaced); then, if the user already has common.SessionMaxActive live
 // sessions, the least recently used one is revoked to make room. device is
 // nil when the client did not say which device it is.
+//
+// A sign-in on a device first ends the user's stale unbound sessions (see
+// SetUnboundCutoff): the copies an app build from before device-bound
+// sessions dropped without ending. Nobody holds their tokens, yet they listed
+// as "Thiết bị không rõ tên" on the user's own phone and filled the session
+// limit. A failure here never blocks the sign-in.
 func (s *SessionService) Start(ctx context.Context, user *model.User, device *model.SessionDevice) (accessToken, refreshToken string, err error) {
+	if device != nil && s.unboundBefore != nil {
+		if _, err := s.repo.RevokeUnbound(ctx, user.ID, *s.unboundBefore); err != nil {
+			s.logger.Warn("stale unbound sessions not revoked", zap.String("user_id", user.ID.String()), zap.Error(err))
+		}
+	}
+
 	now := s.now()
 	sessionID := uuid.New()
 	refreshJTI := uuid.NewString()

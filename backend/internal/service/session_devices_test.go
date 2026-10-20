@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -81,6 +82,34 @@ func TestSessionRefresh_RecordsADeviceOnlyOnce(t *testing.T) {
 	}
 	if s := f.repo.sessionFor(sid); *s.DeviceID != phone.ID || *s.DeviceName != "Galaxy S24" {
 		t.Fatalf("a recorded device was overwritten: %+v", s)
+	}
+}
+
+func TestSessionStart_OnADeviceEndsStaleUnboundSessions(t *testing.T) {
+	f := newSessionFixture(t)
+	alice := f.activeUser("alice@example.com")
+	bob := f.activeUser("bob@example.com")
+	// Left behind by an old build, before devices were introduced.
+	orphan, _ := f.startOn(t, alice, nil)
+	bobsOrphan, _ := f.startOn(t, bob, nil)
+	f.clock.Advance(time.Hour)
+	f.svc.SetUnboundCutoff(f.clock.Now())
+	f.clock.Advance(time.Minute)
+	// A web sign-in since then: still in use, must survive.
+	web, _ := f.startOn(t, alice, nil)
+
+	if s := f.repo.sessionFor(orphan); s.RevokedAt != nil {
+		t.Fatalf("a sign-in without a device cleaned up (%s)", *s.RevokedReason)
+	}
+	phone, _ := f.startOn(t, alice, &model.SessionDevice{ID: uuid.New(), Name: "Pixel 8"})
+
+	if s := f.repo.sessionFor(orphan); s.RevokedAt == nil || *s.RevokedReason != model.SessionRevokedUnboundStale {
+		t.Fatalf("orphan = %+v, want revoked as unbound_stale", s)
+	}
+	for name, id := range map[string]uuid.UUID{"recent web session": web, "the new phone session": phone, "another user's orphan": bobsOrphan} {
+		if s := f.repo.sessionFor(id); s.RevokedAt != nil {
+			t.Fatalf("%s was revoked (%s)", name, *s.RevokedReason)
+		}
 	}
 }
 

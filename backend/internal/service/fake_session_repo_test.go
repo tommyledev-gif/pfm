@@ -169,6 +169,21 @@ func (f *fakeSessionRepo) Revoke(_ context.Context, id, userID uuid.UUID, reason
 	return true, nil
 }
 
+func (f *fakeSessionRepo) RevokeUnbound(_ context.Context, userID uuid.UUID, lastUsedBefore time.Time) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var n int64
+	now := f.clock.Now()
+	for _, s := range f.sessions {
+		if s.UserID == userID && s.DeviceID == nil && s.RevokedAt == nil && s.LastUsedAt.Before(lastUsedBefore) {
+			reason := model.SessionRevokedUnboundStale
+			s.RevokedAt, s.RevokedReason = &now, &reason
+			n++
+		}
+	}
+	return n, nil
+}
+
 func (f *fakeSessionRepo) RevokeAllForUser(_ context.Context, userID uuid.UUID, reason string) (int64, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

@@ -109,6 +109,16 @@ func (r *SessionRepository) Rotate(ctx context.Context, id uuid.UUID, currentJTI
 	return n > 0, nil
 }
 
+// RevokeUnbound ends the user's live sessions that have no device and were
+// last used before lastUsedBefore; returns how many.
+func (r *SessionRepository) RevokeUnbound(ctx context.Context, userID uuid.UUID, lastUsedBefore time.Time) (int64, error) {
+	n, err := r.q.RevokeUnboundSessions(ctx, userID, lastUsedBefore)
+	if err != nil {
+		return 0, fmt.Errorf("repository.RevokeUnboundSessions: %w", err)
+	}
+	return n, nil
+}
+
 // Revoke ends one session of the user; false when it was already ended or
 // is not theirs.
 func (r *SessionRepository) Revoke(ctx context.Context, id, userID uuid.UUID, reason string) (bool, error) {

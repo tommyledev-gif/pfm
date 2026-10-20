@@ -46,6 +46,24 @@ func newPool(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
 // legacyRefreshMigration is the migration that introduced sessions.
 const legacyRefreshMigration = "028_sessions.sql"
 
+// deviceSessionsMigration is the migration that bound sessions to devices.
+const deviceSessionsMigration = "033_session_devices.sql"
+
+// enableUnboundSessionCleanup lets a sign-in on a device end the user's
+// sessions that never learned a device and were not used since migration
+// 033 was applied (SessionService.SetUnboundCutoff). Unreadable, the
+// clean-up stays off: those rows only linger in the device list, the same
+// safe failure as openLegacyRefreshWindow's.
+func enableUnboundSessionCleanup(ctx context.Context, queries *sqlc.Queries, sessions *service.SessionService, logger *zap.Logger) {
+	appliedAt, err := queries.GetMigrationAppliedAt(ctx, deviceSessionsMigration)
+	if err != nil {
+		logger.Warn("sessions without a device will not be cleaned up: could not read when device-bound sessions were introduced", zap.Error(err))
+		return
+	}
+	sessions.SetUnboundCutoff(appliedAt)
+	logger.Info("sign-ins on a device end unbound sessions unused since", zap.Time("since", appliedAt))
+}
+
 // openLegacyRefreshWindow lets refresh tokens issued before sessions existed
 // be traded for session-bound ones, until the day they have all expired on
 // their own: when migration 028 was applied plus the lifetime they were

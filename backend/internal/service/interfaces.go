@@ -33,6 +33,9 @@ type SessionRepo interface {
 	// session that has no device recorded yet (nil = leave as is).
 	Rotate(ctx context.Context, id uuid.UUID, currentJTI, newJTI string, expiresAt time.Time, device *model.SessionDevice) (bool, error)
 	Revoke(ctx context.Context, id, userID uuid.UUID, reason string) (bool, error)
+	// RevokeUnbound ends the user's live sessions with no device that were
+	// last used before lastUsedBefore.
+	RevokeUnbound(ctx context.Context, userID uuid.UUID, lastUsedBefore time.Time) (int64, error)
 	// ListLive returns the user's usable sessions, most recently used first.
 	ListLive(ctx context.Context, userID uuid.UUID) ([]model.SessionSummary, error)
 	RevokeAllForUser(ctx context.Context, userID uuid.UUID, reason string) (int64, error)

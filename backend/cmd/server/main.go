@@ -70,6 +70,7 @@ func main() {
 	sessionRevocationService := service.NewSessionRevocationService(userRepo, accountSwitchService, sessionService, logger)
 	tokenRetention := service.NewTokenRetention(sessionRepo, revokedRepo, logger)
 	openLegacyRefreshWindow(context.Background(), queries, authService, logger)
+	enableUnboundSessionCleanup(context.Background(), queries, sessionService, logger)
 	walletService := service.NewWalletService(walletRepo, logger)
 	categoryService := service.NewCategoryService(categoryRepo, logger)
 	budgetService := service.NewBudgetService(budgetRepo, cycleResolver, logger)

@@ -40,6 +40,23 @@ WHERE user_id = $1
   AND device_id = $2
   AND revoked_at IS NULL;
 
+-- name: RevokeUnboundSessions :execrows
+-- Sessions that never learned a device and have not been renewed since $2
+-- (when device-bound sessions went live, mig 033): any app build since then
+-- names its device on every renewal (RotateSessionRefresh), so these are
+-- tokens nobody holds any more (an old build's sign-in or switch whose
+-- session was dropped, not ended), or a web sign-in left idle since. A
+-- sign-in on a device clears them, so the device list stops showing
+-- "Thiết bị không rõ tên" rows the user cannot place, and they no longer
+-- count toward the session limit below.
+UPDATE sessions
+SET revoked_at     = NOW(),
+    revoked_reason = 'unbound_stale'
+WHERE user_id = $1
+  AND device_id IS NULL
+  AND revoked_at IS NULL
+  AND last_used_at < $2;
+
 -- name: CreateSession :exec
 INSERT INTO sessions (id, user_id, refresh_jti, expires_at, absolute_expires_at, device_id, device_name)
 VALUES ($1, $2, $3, $4, $5, $6, $7);
