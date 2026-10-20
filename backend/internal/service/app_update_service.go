@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -35,10 +36,18 @@ var updateIDPattern = regexp.MustCompile(`^[A-Za-z0-9-]{1,64}$`)
 //	apk/<file>.apk
 type AppUpdateService struct {
 	dir string
+	// apkStore fetches an APK kept in R2 (OpenStoredAPK).
+	apkStore *http.Client
 }
 
 func NewAppUpdateService(dir string) *AppUpdateService {
-	return &AppUpdateService{dir: dir}
+	return NewAppUpdateServiceWithClient(dir, newAPKStoreClient())
+}
+
+// NewAppUpdateServiceWithClient is NewAppUpdateService with the HTTP client
+// that fetches APKs from R2 supplied — tests point it at a local server.
+func NewAppUpdateServiceWithClient(dir string, apkStore *http.Client) *AppUpdateService {
+	return &AppUpdateService{dir: dir, apkStore: apkStore}
 }
 
 // Latest returns the live update for a platform and runtime version, or
@@ -82,7 +91,7 @@ func (s *AppUpdateService) LatestAPK() (string, *model.AppRelease, error) {
 	if err != nil {
 		return "", nil, fmt.Errorf("service.AppUpdate.LatestAPK: %w", err)
 	}
-	// In R2: no local path, the caller redirects to the URL.
+	// In R2: no local path, the caller streams it through OpenStoredAPK.
 	if release.URL != "" {
 		if !strings.HasPrefix(release.URL, "https://") {
 			return "", nil, fmt.Errorf("service.AppUpdate.LatestAPK: latest.json url %q is not https", release.URL)

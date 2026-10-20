@@ -3,13 +3,17 @@ package handler
 import (
 	"errors"
 	"fmt"
+	"io"
+	"net"
 	"regexp"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/zap"
 
 	"github.com/example/pfm/backend/internal/common"
 	"github.com/example/pfm/backend/internal/dto"
+	"github.com/example/pfm/backend/internal/model"
 	"github.com/example/pfm/backend/internal/response"
 	"github.com/example/pfm/backend/internal/service"
 )
@@ -95,16 +99,65 @@ func (h *AppUpdateHandler) DownloadAPK(c *fiber.Ctx) error {
 		return response.Error(c, h.logger, err)
 	}
 	c.Set(fiber.HeaderCacheControl, "no-store")
-	// Stored in R2: send the browser there. The link itself stays the same
-	// for every release; only where it points changes.
+	fileName := fmt.Sprintf("budgest-%s-%d.apk", release.VersionName, release.VersionCode)
+	// Stored in R2: the bytes are passed through here rather than the client
+	// being redirected to the bucket, so the only address a phone or browser
+	// ever sees is this API's own.
 	if path == "" {
-		return c.Redirect(release.URL, fiber.StatusFound)
+		return h.streamStoredAPK(c, release, fileName)
 	}
-	c.Attachment(fmt.Sprintf("budgest-%s-%d.apk", release.VersionName, release.VersionCode))
+	c.Attachment(fileName)
 	if err := c.SendFile(path); err != nil {
 		return response.Error(c, h.logger, fmt.Errorf("handler.AppUpdate.DownloadAPK: %w", err))
 	}
 	// Set after SendFile, which guesses the type from the extension.
-	c.Set(fiber.HeaderContentType, "application/vnd.android.package-archive")
+	c.Set(fiber.HeaderContentType, apkContentType)
 	return nil
 }
+
+const apkContentType = "application/vnd.android.package-archive"
+
+// apkWriteIdleTimeout is how long one chunk of a streamed APK may take to
+// reach the client. The server's WriteTimeout (60s) is set once per response
+// and would cut a slow phone off partway through a download of tens of MB;
+// for this response it slides instead, renewed before every chunk.
+const apkWriteIdleTimeout = 60 * time.Second
+
+func (h *AppUpdateHandler) streamStoredAPK(c *fiber.Ctx, release *model.AppRelease, fileName string) error {
+	stored, err := h.svc.OpenStoredAPK(release, c.Method(), c.Get(fiber.HeaderRange))
+	if err != nil {
+		return response.Error(c, h.logger, fmt.Errorf("handler.AppUpdate.DownloadAPK: %w", err))
+	}
+	c.Set(fiber.HeaderAcceptRanges, "bytes")
+	if stored.ContentRange != "" {
+		c.Set(fiber.HeaderContentRange, stored.ContentRange)
+	}
+	if stored.Body == nil {
+		return c.SendStatus(stored.Status)
+	}
+	c.Attachment(fileName)
+	c.Set(fiber.HeaderContentType, apkContentType)
+	c.Status(stored.Status)
+	// fasthttp closes the stream once it is written, or on a failed write.
+	c.Response().SetBodyStream(&writeIdleBody{body: stored.Body, conn: c.Context().Conn(), idle: apkWriteIdleTimeout}, int(stored.Size))
+	return nil
+}
+
+// writeIdleBody renews the connection's write deadline before each chunk is
+// handed to fasthttp to write, turning the per-response WriteTimeout into a
+// per-chunk one for this stream.
+type writeIdleBody struct {
+	body io.ReadCloser
+	conn net.Conn
+	idle time.Duration
+}
+
+func (b *writeIdleBody) Read(p []byte) (int, error) {
+	n, err := b.body.Read(p)
+	if b.conn != nil {
+		_ = b.conn.SetWriteDeadline(time.Now().Add(b.idle))
+	}
+	return n, err
+}
+
+func (b *writeIdleBody) Close() error { return b.body.Close() }
