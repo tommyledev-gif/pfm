@@ -16,15 +16,18 @@ interface PasskeyProviderHelpProps {
 }
 
 // Android 14+: the phone keeps passkeys in whichever password services are
-// switched on under "Mật khẩu, khóa truy cập và tài khoản"; with none on,
-// Credential Manager refuses at once.
+// switched on under "Mật khẩu, khóa truy cập và tài khoản". Credential
+// Manager's NoCreateOption only says no service took the request: none is on,
+// OR the one that is on refused Budgest (its check of the server's
+// assetlinks.json, cached on the phone for up to an hour). So the copy states
+// what failed and offers the usual fix, never that the settings are off.
 const PROVIDER_COPY = {
-  title: "Máy chưa bật dịch vụ lưu passkey",
+  title: "Máy chưa lưu được passkey",
   why: "Passkey nằm trong trình quản lý mật khẩu của máy, thường là Google.",
-  steps: ["Bấm Mở Cài đặt.", "Bật Google trong danh sách dịch vụ."],
+  steps: ["Bấm Mở Cài đặt.", "Kiểm tra Google đang bật trong danh sách dịch vụ."],
   open: "Mở Cài đặt",
   notFound: "Không thấy danh sách: tìm “khóa truy cập” trong Cài đặt.",
-  stillMissing: "Máy vẫn chưa bật dịch vụ nào. Bật Google rồi quay lại.",
+  stillMissing: "Vẫn chưa lưu được passkey. Google đã bật thì thử lại sau.",
 } as const;
 
 // Before Android 14: passkeys always go to Google, which needs an account.

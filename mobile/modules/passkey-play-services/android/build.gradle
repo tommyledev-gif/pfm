@@ -1,0 +1,22 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'vn.budgest'
+version = '1.0.0'
+
+android {
+  namespace "expo.modules.passkeyplayservices"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+}
+
+dependencies {
+  // The version react-native-passkey already brings in (through
+  // androidx.credentials:credentials-play-services-auth 1.6.0), so Gradle
+  // resolves one copy.
+  implementation "com.google.android.gms:play-services-fido:21.0.0"
+}
