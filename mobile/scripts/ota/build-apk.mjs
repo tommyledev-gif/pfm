@@ -32,6 +32,11 @@ import { R2_PREFIX, r2 } from "./r2.mjs";
 const IS_WINDOWS = process.platform === "win32";
 const ANDROID_DIR = path.join(MOBILE_ROOT, "android");
 const APK = path.join(ANDROID_DIR, "app", "build", "outputs", "apk", "release", "app-release.apk");
+// What the app asks for at runtime: missing from the APK, the ask fails
+// without any prompt (camera: receipt photos; install: the in-app update).
+// Up here, not beside verifyPermissions: the steps below run at module load,
+// before any later `const` exists.
+const REQUIRED_PERMISSIONS = ["android.permission.CAMERA", "android.permission.REQUEST_INSTALL_PACKAGES"];
 
 const upload = !process.argv.includes("--no-upload");
 const env = loadEnv();
@@ -206,10 +211,6 @@ function clearStalePermissionBlocks() {
   const cleaned = xml.replace(/^[ \t]*<uses-permission\b[^>]*tools:node="remove"[^>]*\/>\r?\n/gm, "");
   if (cleaned !== xml) fs.writeFileSync(manifest, cleaned);
 }
-
-// What the app asks for at runtime: missing from the APK, the ask fails
-// without any prompt (camera: receipt photos; install: the in-app update).
-const REQUIRED_PERMISSIONS = ["android.permission.CAMERA", "android.permission.REQUEST_INSTALL_PACKAGES"];
 
 function verifyPermissions(apk) {
   const out = capture(shellPath(findBuildTool(IS_WINDOWS ? "aapt2.exe" : "aapt2")), ["dump", "permissions", shellPath(apk)]);

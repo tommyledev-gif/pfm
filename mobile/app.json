@@ -35,7 +35,9 @@
       "package": "com.example.pfm",
       "versionCode": 6,
       "softwareKeyboardLayoutMode": "resize",
-      "permissions": ["android.permission.REQUEST_INSTALL_PACKAGES"]
+      "permissions": [
+        "android.permission.REQUEST_INSTALL_PACKAGES"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
