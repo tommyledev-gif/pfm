@@ -1,25 +1,32 @@
 import { Pressable, Text, View } from "react-native";
+import Animated, { ZoomIn } from "react-native-reanimated";
 
-import { CheckIcon } from "@/components/ui/Icon";
-import { createStyles, radii, spacing, typography, useThemeName } from "@/lib/theme";
+import { CheckIcon, PaletteIcon } from "@/components/ui/Icon";
+import { createStyles, radii, spacing, typography, useColors, useThemeName } from "@/lib/theme";
 import { THEME_NAMES, THEMES, ThemeName } from "@/theme/palettes";
 import { useSwitchTheme } from "@/theme/use-switch-theme";
 
 const SWATCH_HEIGHT = 64;
 
-// Settings → Giao diện screen. One tile per entry in THEMES, each a miniature of
-// that theme painted in its OWN palette (ground, a card, the primary) — not
-// the active one — so every option previews what it switches to. Tiles wrap,
-// so adding a palette needs nothing here.
+// Cài đặt người dùng → the "Giao diện" section, shown in place (it used to be
+// a screen of its own behind a row). One tile per entry in THEMES, each a
+// miniature of that theme painted in its OWN palette (ground, a card, the
+// primary) — not the active one — so every option previews what it switches
+// to. Tiles wrap, so adding a palette needs nothing here.
 export function ThemePicker() {
   const styles = useStyles();
+  const colors = useColors();
   const active = useThemeName();
   const switchTheme = useSwitchTheme();
 
   return (
-    <View style={styles.card}>
-      {/* The screen is already titled "Giao diện"; this names the choice. */}
-      <Text style={styles.title}>Chủ đề</Text>
+    <View style={styles.card} testID="section-settings-appearance">
+      {/* Same icon + label the old "Giao diện" row carried, so the section
+          reads as the row it replaced, opened. */}
+      <View style={styles.titleRow}>
+        <PaletteIcon size={20} color={colors.textSecondary} />
+        <Text style={styles.title}>Giao diện</Text>
+      </View>
       <View style={styles.options}>
         {THEME_NAMES.map((name) => (
           <ThemeOption
@@ -53,7 +60,12 @@ function ThemeOption({ name, selected, onPress }: { name: ThemeName; selected: b
           <View style={[styles.swatchLineShort, { backgroundColor: palette.textMuted }]} />
         </View>
         <View style={[styles.swatchDot, { backgroundColor: palette.green }]}>
-          {selected ? <CheckIcon size={12} color={palette.onGreen} strokeWidth={3} /> : null}
+          {/* Springs in on the tile just picked, so the choice visibly lands. */}
+          {selected ? (
+            <Animated.View entering={ZoomIn.springify().damping(12)}>
+              <CheckIcon size={12} color={palette.onGreen} strokeWidth={3} />
+            </Animated.View>
+          ) : null}
         </View>
       </View>
       <Text style={[styles.label, selected && styles.labelSelected]}>{label}</Text>
@@ -70,7 +82,8 @@ const useStyles = createStyles((colors) => ({
     borderColor: colors.surfaceBorder,
     borderRadius: 16,
   },
-  title: { ...typography.body, color: colors.textPrimary },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  title: { flex: 1, ...typography.body, color: colors.textPrimary },
   options: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
   option: { flexGrow: 1, flexBasis: "40%", gap: spacing.sm, alignItems: "center" },
   swatch: {

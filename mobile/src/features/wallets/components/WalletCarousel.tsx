@@ -12,7 +12,7 @@ import {
   WalletStackCard,
 } from "@/features/wallets/components/WalletStackCard";
 import { SNAP_INTERVAL, useWalletCarousel } from "@/features/wallets/components/use-wallet-carousel";
-import { useCardMotion } from "@/features/wallets/components/wallet-carousel-motion";
+import { useCardMotion, useCardPress, useCarouselIntro } from "@/features/wallets/components/wallet-carousel-motion";
 import { WalletCarouselPager } from "@/features/wallets/components/WalletCarouselPager";
 
 // Each wallet's accent by its position in the list. Colors are assigned by
@@ -47,13 +47,15 @@ interface CarouselCardProps {
   isLast: boolean;
   accentColor: string;
   scrollX: SharedValue<number>;
+  intro: SharedValue<number>;
   onPress: () => void;
   highlightOpacity?: RNAnimated.Value;
 }
 
-// One card, so each gets its own motion hook (hooks cannot run in a loop).
-function CarouselCard({ wallet, index, isLast, accentColor, scrollX, onPress, highlightOpacity }: CarouselCardProps) {
-  const motion = useCardMotion(index, scrollX);
+// One card, so each gets its own motion hooks (hooks cannot run in a loop).
+function CarouselCard({ wallet, index, isLast, accentColor, scrollX, intro, onPress, highlightOpacity }: CarouselCardProps) {
+  const press = useCardPress();
+  const motion = useCardMotion(index, scrollX, intro, press.pressed);
   return (
     <WalletStackCard
       wallet={wallet}
@@ -63,6 +65,8 @@ function CarouselCard({ wallet, index, isLast, accentColor, scrollX, onPress, hi
       // exactly long enough to bring it to the middle.
       layoutStyle={{ marginRight: isLast ? 0 : -CARD_OVERLAP }}
       onPress={onPress}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
       highlightOpacity={highlightOpacity}
     />
   );
@@ -72,7 +76,9 @@ function CarouselCard({ wallet, index, isLast, accentColor, scrollX, onPress, hi
  * The wallets section: the selected wallet centred, its neighbours tucked
  * behind it on both sides and turned away, wrapping around at either end,
  * with a ‹ • ━ • › pager under it. Shared by Home and the Wallets screen's
- * card view, so a wallet keeps the same accent color on both.
+ * card view, so a wallet keeps the same accent color on both. On first
+ * layout the cards are dealt out from a stack under the centre one
+ * (useCarouselIntro).
  *
  * ⚠️ A plain ScrollView rather than a FlatList, deliberately. Looping means
  * silently jumping the scroll offset by a whole copy's width once the user
@@ -109,6 +115,9 @@ function WalletCarouselView({
     step,
     looping,
   } = useWalletCarousel({ wallets, initialWalletId, onActiveWalletChange });
+  // Cards are only rendered once the width is known, so that is when the deck
+  // is dealt.
+  const intro = useCarouselIntro(containerWidth > 0 && wallets.length > 0);
 
   if (wallets.length === 0) {
     return <Text style={styles.empty}>Chưa có ví. Tạo ví để ghi giao dịch.</Text>;
@@ -146,6 +155,7 @@ function WalletCarouselView({
                   isLast={index === rendered.length - 1}
                   accentColor={accentForIndex(index % wallets.length, wallets.length)}
                   scrollX={scrollX}
+                  intro={intro}
                   // A side card is a shortcut for the swipe that would bring it
                   // over; only the card already in the middle is "opened".
                   onPress={() => pressCard(index, onPressWallet ? () => onPressWallet(wallet) : undefined)}
@@ -159,6 +169,8 @@ function WalletCarouselView({
 
       <WalletCarouselPager
         dotCount={wallets.length}
+        // The active dot wears its wallet's card colour, tying the bar to the card above it.
+        dotColors={wallets.map((_, i) => accentForIndex(i, wallets.length))}
         positionCount={rendered.length}
         scrollX={scrollX}
         canGoBack={looping || centreIndex > 0}

@@ -87,9 +87,10 @@ interface PagerDotProps {
   dotCount: number;
   positionCount: number;
   scrollX: SharedValue<number>;
+  activeColor?: string;
 }
 
-function PagerDot({ dot, dotCount, positionCount, scrollX }: PagerDotProps) {
+function PagerDot({ dot, dotCount, positionCount, scrollX, activeColor }: PagerDotProps) {
   const styles = useStyles();
   const colors = useColors();
   const motion = useDotMotion(dot, dotCount, positionCount, scrollX);
@@ -97,7 +98,7 @@ function PagerDot({ dot, dotCount, positionCount, scrollX }: PagerDotProps) {
     <Animated.View style={[styles.dot, { left: dot * (DOT + DOT_GAP) }, motion.dotStyle]}>
       <Capsule motion={motion} color={colors.trackMuted} />
       <Animated.View style={[styles.dotActive, motion.activeStyle]}>
-        <Capsule motion={motion} color={colors.textPrimary} />
+        <Capsule motion={motion} color={activeColor ?? colors.textPrimary} />
       </Animated.View>
     </Animated.View>
   );
@@ -106,6 +107,8 @@ function PagerDot({ dot, dotCount, positionCount, scrollX }: PagerDotProps) {
 interface WalletCarouselPagerProps {
   /** Distinct wallets — one dot each. */
   dotCount: number;
+  /** Each dot's colour while active, by wallet index; textPrimary otherwise. */
+  dotColors?: string[];
   /** Rendered cards, loop copies included. */
   positionCount: number;
   scrollX: SharedValue<number>;
@@ -118,6 +121,7 @@ interface WalletCarouselPagerProps {
 /** The ‹ • ━ • › bar under the wallet cards. */
 export function WalletCarouselPager({
   dotCount,
+  dotColors,
   positionCount,
   scrollX,
   canGoBack,
@@ -154,7 +158,14 @@ export function WalletCarouselPager({
             importantForAccessibility="no-hide-descendants"
           >
             {Array.from({ length: dotCount }, (_, dot) => (
-              <PagerDot key={dot} dot={dot} dotCount={dotCount} positionCount={positionCount} scrollX={scrollX} />
+              <PagerDot
+                key={dot}
+                dot={dot}
+                dotCount={dotCount}
+                positionCount={positionCount}
+                scrollX={scrollX}
+                activeColor={dotColors?.[dot]}
+              />
             ))}
           </View>
 

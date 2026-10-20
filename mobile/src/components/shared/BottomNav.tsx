@@ -44,7 +44,7 @@ export const TABS = [
 // whichever tab was active before the push, which read as the nav losing
 // track of where you are.
 const SETTINGS_SUB_ROUTES = [
-  "/appearance",
+  "/user-settings",
   "/wallets",
   "/categories",
   "/users",

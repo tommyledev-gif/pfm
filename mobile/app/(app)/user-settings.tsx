@@ -1,29 +1,23 @@
-import { useRef } from "react";
 import { useRouter } from "expo-router";
 import { Pressable, ScrollView, Text, View } from "react-native";
 
 import { Screen } from "@/components/shared/Screen";
-import { ChevronLeftIcon, ChevronRightIcon, PaletteIcon } from "@/components/ui/Icon";
+import { useFabBottom } from "@/components/ui/Fab";
+import { ChevronLeftIcon } from "@/components/ui/Icon";
+import { ThemePicker } from "@/features/settings/components/ThemePicker";
 import { PinLocationPreferenceRow } from "@/features/transactions/components/PinLocationPreferenceRow";
-import { spacing, typography, createStyles, useColors } from "@/lib/theme";
-
-// Taps closer together than this count as one (same guard as Settings' rows).
-const ROW_TAP_GUARD_MS = 600;
+import { spacing, typography, createStyles } from "@/lib/theme";
 
 // Entry point: Settings' "Cài đặt người dùng" row. How the app looks and
 // behaves for this User, kept apart from the data-management rows there.
+// The theme tiles sit right here rather than behind a "Giao diện" row: there
+// are only two of them, and a screen of their own was one tap too many. The
+// picker applies a theme the moment it is tapped, so there is no save step.
 export default function UserSettingsScreen() {
-  const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
-  const lastPushAt = useRef(0);
-
-  const openAppearance = () => {
-    const now = Date.now();
-    if (now - lastPushAt.current < ROW_TAP_GUARD_MS) return;
-    lastPushAt.current = now;
-    router.push("/appearance");
-  };
+  // Clear of the floating BottomNav, which covers the screen's foot.
+  const navClearance = useFabBottom();
 
   return (
     <Screen style={styles.screen}>
@@ -33,12 +27,8 @@ export default function UserSettingsScreen() {
         </Pressable>
         <Text style={styles.title}>Cài đặt người dùng</Text>
       </View>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Pressable style={styles.row} onPress={openAppearance} testID="row-settings-appearance">
-          <PaletteIcon size={20} color={colors.textSecondary} />
-          <Text style={styles.rowLabel}>Giao diện</Text>
-          <ChevronRightIcon size={18} color={colors.textMuted} />
-        </Pressable>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: navClearance }]}>
+        <ThemePicker />
         <PinLocationPreferenceRow />
       </ScrollView>
     </Screen>
@@ -56,18 +46,5 @@ const useStyles = createStyles((colors) => ({
     paddingBottom: spacing.lg,
   },
   title: { flex: 1, ...typography.title, color: colors.textPrimary },
-  content: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl, gap: spacing.xs },
-  // Settings' menu-row look, so this list reads like the one it came from.
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    borderRadius: 16,
-  },
-  rowLabel: { flex: 1, ...typography.body, color: colors.textPrimary },
+  content: { paddingHorizontal: spacing.xl, gap: spacing.md },
 }));

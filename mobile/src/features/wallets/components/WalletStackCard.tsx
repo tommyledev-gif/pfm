@@ -1,15 +1,27 @@
 import { useId } from "react";
 import { Animated as RNAnimated, Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
 import Animated from "react-native-reanimated";
-import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 
 import { TintedIconTile } from "@/components/ui/TintedIconTile";
 import { formatCurrency } from "@/lib/currency";
-import { withAlpha } from "@/lib/color";
-import { radii, spacing, typography, createStyles } from "@/lib/theme";
+import { readableInk, withAlpha } from "@/lib/color";
+import { radii, spacing, typography, walletCardInk, createStyles } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
 import { PendingBalanceHint, usePendingWalletCount } from "@/features/wallets/components/PendingBalanceHint";
+import { WalletCardArt } from "@/features/wallets/components/WalletCardArt";
+import { WalletCardSheen } from "@/features/wallets/components/WalletCardSheen";
+import { CARD_HEIGHT, CARD_WIDTH } from "@/features/wallets/components/wallet-card-geometry";
 import type { CardMotion } from "@/features/wallets/components/wallet-carousel-motion";
+
+// Kept importable from here: the skeleton, the pager and the carousel read the
+// card's geometry through this module.
+export {
+  CARD_HEIGHT,
+  CARD_OVERLAP,
+  CARD_WIDTH,
+  CAROUSEL_SHADOW_BLEED_BOTTOM,
+  CAROUSEL_SHADOW_BLEED_TOP,
+} from "@/features/wallets/components/wallet-card-geometry";
 
 const TYPE_LABEL: Record<Wallet["type"], string> = {
   cash: "Tiền mặt",
@@ -27,22 +39,8 @@ const BALANCE_LABEL: Record<Wallet["type"], string> = {
   other: "Số dư hiện có",
 };
 
-export const CARD_WIDTH = 236;
-export const CARD_HEIGHT = 132;
-// How far each card sits UNDER the one before it, as a negative margin rather
-// than a gap. The cards used to be laid out with 12px of background between
-// them, which read as a filmstrip of unrelated tiles; overlapping them makes
-// the row read as one stack of cards with the active one lifted off the top.
-export const CARD_OVERLAP = 56;
-// Vertical room the card's drop shadow needs beyond the card (radius 14,
-// pushed 6 down, so more below than above). The carousel's scroll box clips
-// anything outside its bounds, so it reserves this much on each side. The
-// bottom was 22, which cut off the tail of Android's elevation shadow: its
-// light sits above the screen, so a card's shadow falls further down the
-// lower the card is. The pager is pulled up by the same amount
-// (PAGER_OFFSET_TOP), so nothing below the cards moves.
-export const CAROUSEL_SHADOW_BLEED_TOP = 10;
-export const CAROUSEL_SHADOW_BLEED_BOTTOM = 32;
+// Secondary text on the card (type, balance label): the ink, pulled back.
+const SECONDARY_INK_ALPHA = 0.72;
 
 interface WalletStackCardProps {
   wallet: Wallet;
@@ -50,25 +48,30 @@ interface WalletStackCardProps {
    *  the carousel, not per type, so two bank wallets never look alike. */
   accentColor: string;
   /** The carousel's motion for this card (wallet-carousel-motion): position,
-   *  lean, scale, fade and paint order, plus the accent border's fade. */
+   *  lean, scale, fade and paint order, the rim's fade and the light streak. */
   motion: CardMotion;
   /** Static layout from the carousel (the overlap margin). */
   layoutStyle?: ViewStyle;
   onPress?: () => void;
+  /** Drive the card's press depth (useCardPress). */
+  onPressIn?: () => void;
+  onPressOut?: () => void;
   /** 1 → 0 from useHighlightFade: the "you picked this one" border, drawn
-   *  over the accent border and faded out on the native driver. */
+   *  over the rim and faded out on the native driver. */
   highlightOpacity?: RNAnimated.Value;
 }
 
 /**
- * One card in the wallet carousel.
+ * One card in the wallet carousel, styled as a bank card: the wallet's accent
+ * at full strength with light falling on it (WalletCardArt), a glow in its own
+ * colour under it, and a streak of light that crosses it as it swipes in
+ * (WalletCardSheen).
  *
  * ⚠️ The active treatment is faded in by an animated value rather than a
  * boolean prop, so scrolling does not re-render every card on every frame.
  *
- * The background is a diagonal gradient of the wallet's own accent, strongest
- * in the bottom-left corner and fading out toward the top-right, drawn with
- * react-native-svg (no gradient package is a dependency of this project).
+ * Text takes whichever ink contrasts more with the accent, since the face is
+ * the same bright colour in every theme.
  *
  * The balance is never abbreviated: it shrinks to fit, because a clipped
  * balance is a wrong balance.
@@ -79,65 +82,53 @@ export function WalletStackCard({
   motion,
   layoutStyle,
   onPress,
+  onPressIn,
+  onPressOut,
   highlightOpacity,
 }: WalletStackCardProps) {
   const styles = useStyles();
   const pendingCount = usePendingWalletCount(wallet.id);
-  // SVG gradient ids must be unique on screen — the loop copies render the
-  // same wallet several times. useId's colons are not valid in url(#…).
-  const gradientId = `wallet-grad-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
+  const sheenId = `wallet-sheen-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
+  const ink = readableInk(accentColor, walletCardInk.dark, walletCardInk.light);
+  const secondaryInk = withAlpha(ink, SECONDARY_INK_ALPHA);
 
   return (
-    // Two layers: this one casts the shadow, the inner one clips the gradient
-    // to the rounded corners. One view doing both lost the shadow on iOS,
-    // which draws none at all for a view with overflow hidden.
-    <Animated.View testID={`card-wallet-${wallet.id}`} style={[styles.card, layoutStyle, motion.card]}>
+    // Two layers: this one casts the shadow, the inner one clips the art to
+    // the rounded corners. One view doing both lost the shadow on iOS, which
+    // draws none at all for a view with overflow hidden.
+    <Animated.View
+      testID={`card-wallet-${wallet.id}`}
+      style={[styles.card, { backgroundColor: accentColor, shadowColor: accentColor }, layoutStyle, motion.card]}
+    >
       <View style={styles.clip}>
-        <Svg width={CARD_WIDTH} height={CARD_HEIGHT} style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Defs>
-            {/* Bottom-left (0,1) to top-right (1,0). */}
-            <LinearGradient id={gradientId} x1="0" y1="1" x2="1" y2="0">
-              <Stop offset="0" stopColor={accentColor} stopOpacity={0.45} />
-              <Stop offset="0.55" stopColor={accentColor} stopOpacity={0.18} />
-              <Stop offset="1" stopColor={accentColor} stopOpacity={0.04} />
-            </LinearGradient>
-          </Defs>
-          <Rect x="0" y="0" width={CARD_WIDTH} height={CARD_HEIGHT} fill={`url(#${gradientId})`} />
-        </Svg>
+        <WalletCardArt accentColor={accentColor} width={CARD_WIDTH} height={CARD_HEIGHT} />
+        <WalletCardSheen motion={motion} id={sheenId} />
 
-        {/* The accent border is its own overlay, faded by opacity alone: the
-            border colour itself stays fixed. */}
-        <Animated.View pointerEvents="none" style={[styles.accentBorder, { borderColor: `${accentColor}40` }, motion.active]} />
+        {/* A glassy inner rim on the centred card, faded by opacity alone. */}
+        <Animated.View pointerEvents="none" style={[styles.rim, motion.active]} />
 
         {highlightOpacity ? (
           <RNAnimated.View pointerEvents="none" style={[styles.highlightBorder, { opacity: highlightOpacity }]} />
         ) : null}
 
         <Pressable
-          style={({ pressed }) => [styles.content, pressed && styles.contentPressed]}
+          style={styles.content}
           onPress={onPress}
+          onPressIn={onPressIn}
+          onPressOut={onPressOut}
           disabled={!onPress}
           accessibilityRole={onPress ? "button" : undefined}
           accessibilityLabel={`${wallet.name}, ${formatCurrency(wallet.balance, wallet.currency)}`}
         >
           <View style={styles.topRow}>
-            <TintedIconTile
-              color={accentColor}
-              size={32}
-              icon={wallet.icon}
-              iconUrl={wallet.icon_url}
-              label={wallet.name}
-            />
+            <TintedIconTile color={ink} size={32} icon={wallet.icon} iconUrl={wallet.icon_url} label={wallet.name} />
             <View style={styles.identity}>
-              <Text style={styles.name} numberOfLines={1}>
+              <Text style={[styles.name, { color: ink }]} numberOfLines={1}>
                 {wallet.name}
               </Text>
-              <View style={styles.typeRow}>
-                <View style={[styles.dot, { backgroundColor: accentColor }]} />
-                <Text style={styles.type} numberOfLines={1}>
-                  {TYPE_LABEL[wallet.type]}
-                </Text>
-              </View>
+              <Text style={[styles.type, { color: secondaryInk }]} numberOfLines={1}>
+                {TYPE_LABEL[wallet.type]}
+              </Text>
             </View>
           </View>
 
@@ -145,13 +136,18 @@ export function WalletStackCard({
             {/* The card has no room for a third line: while queued Transactions
                 exist, the "not counted yet" hint takes the label's place. */}
             {pendingCount > 0 ? (
-              <PendingBalanceHint count={pendingCount} style={styles.balanceLabel} />
+              <PendingBalanceHint count={pendingCount} style={[styles.balanceLabel, { color: secondaryInk }]} />
             ) : (
-              <Text style={styles.balanceLabel} numberOfLines={1}>
+              <Text style={[styles.balanceLabel, { color: secondaryInk }]} numberOfLines={1}>
                 {BALANCE_LABEL[wallet.type]}
               </Text>
             )}
-            <Text style={styles.balance} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+            <Text
+              style={[styles.balance, { color: ink }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.6}
+            >
               {formatCurrency(wallet.balance, wallet.currency)}
             </Text>
           </View>
@@ -166,27 +162,22 @@ const useStyles = createStyles((colors) => ({
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
     borderRadius: radii.card,
-    // Barely-there hairline: the gradient and the drop shadow already separate
-    // the cards, so a full-strength border only added noise.
-    borderWidth: 1,
-    borderColor: withAlpha(colors.overlayBase, 0.04),
-    // Opaque, not translucent: the neighbouring cards now pass UNDERNEATH this
-    // one, and a see-through surface would show their edges through it.
-    backgroundColor: colors.surface,
-    // The drop shadow is what separates the overlapping cards from each other
-    // now that no background shows between them. iOS reads these; Android
-    // takes the animated elevation the carousel supplies per card.
-    shadowColor: "#000",
-    shadowOpacity: 0.45,
+    // Opaque (the accent itself, set inline): the neighbouring cards pass
+    // UNDERNEATH this one, and a see-through card would show their edges.
+    // The drop shadow takes the card's own colour, so the centred card glows
+    // rather than casting a grey smudge. iOS reads these; Android takes the
+    // animated elevation the carousel supplies per card, tinted by
+    // shadowColor from Android 9.
+    shadowOpacity: 0.5,
     shadowRadius: 14,
     shadowOffset: { width: -6, height: 6 },
   },
-  // Inside the card's 1px border, so its corners are 1px tighter.
-  clip: { ...StyleSheet.absoluteFillObject, borderRadius: radii.card - 1, overflow: "hidden" },
-  accentBorder: {
+  clip: { ...StyleSheet.absoluteFillObject, borderRadius: radii.card, overflow: "hidden" },
+  rim: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: radii.card,
     borderWidth: 1,
+    borderColor: withAlpha(walletCardInk.light, 0.45),
   },
   highlightBorder: {
     ...StyleSheet.absoluteFillObject,
@@ -198,14 +189,11 @@ const useStyles = createStyles((colors) => ({
   // them to the card's edges left a pool of dead space in the middle that made
   // the name and the balance look unrelated.
   content: { flex: 1, padding: spacing.md, gap: spacing.md, justifyContent: "center" },
-  contentPressed: { opacity: 0.8 },
   topRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   identity: { flex: 1, minWidth: 0, gap: 1 },
-  name: { ...typography.body, fontWeight: "700", color: colors.textPrimary },
-  typeRow: { flexDirection: "row", alignItems: "center", gap: 5 },
-  dot: { width: 6, height: 6, borderRadius: 3 },
-  type: { ...typography.tiny, color: colors.textSecondary },
+  name: { ...typography.body, fontWeight: "700" },
+  type: { ...typography.tiny },
   balanceBlock: { gap: 1 },
-  balanceLabel: { ...typography.tiny, color: colors.textSecondary },
-  balance: { ...typography.title, color: colors.textPrimary },
+  balanceLabel: { ...typography.tiny },
+  balance: { ...typography.title, fontWeight: "800", letterSpacing: 0.2 },
 }));

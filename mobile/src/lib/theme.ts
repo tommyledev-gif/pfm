@@ -134,6 +134,14 @@ export const walletAccentPalette = [
   "#E86BD8", // magenta
 ] as const;
 
+// Text on a wallet card. The card face is its accent at full strength in every
+// theme, so its text cannot follow the theme's textPrimary; WalletStackCard
+// picks whichever of these two contrasts more with the accent.
+export const walletCardInk = {
+  dark: "#0B1220",
+  light: "#FFFFFF",
+} as const;
+
 export const radii = {
   hero: 24,
   card: 20,

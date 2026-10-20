@@ -6,7 +6,7 @@ import { formatCurrency, formatCurrencyCompact } from "@/lib/currency";
 import { formatPercent } from "@/lib/percent";
 import { useEntryAnimation } from "@/lib/use-entry-animation";
 import { typography, createStyles } from "@/lib/theme";
-import { arcPath, layoutArcLengths, polarToPoint, segmentGap } from "@/components/shared/donut-geometry";
+import { arcPath, layoutArcLengths, polarToPoint, segmentGaps } from "@/components/shared/donut-geometry";
 
 export interface DonutSegment {
   key: string;
@@ -100,21 +100,21 @@ export function DonutChart({
   const circumference = 2 * Math.PI * radius;
   const total = segments.reduce((sum, s) => sum + s.amount, 0);
 
-  // `full` is the segment's share of the ring (layoutArcLengths: proportional,
-  // with tiny ones floored so they stay visible) and drives layout (where the
-  // next one starts, where the tooltip points). `length` is what actually gets
-  // stroked — `full` minus the separator gap. Keeping them apart matters: if
-  // the gap were subtracted from the layout too, every segment after the first
-  // would creep backwards and the ring would no longer close.
+  // `full` is the segment's exact share of the ring (layoutArcLengths) and
+  // drives layout (where the next one starts, where the tooltip points).
+  // `length` is what actually gets stroked — `full` minus the separator gap.
+  // Keeping them apart matters: if the gap were subtracted from the layout
+  // too, every segment after the first would creep backwards and the ring
+  // would no longer close.
   //
-  // A floored segment gets only a hairline gap (segmentGap): with the full gap
-  // a run of "~1%" categories showed mostly gaps and hardly any colour.
+  // Segments under 5% get no gap on either side (segmentGaps): with gaps, a
+  // run of small categories showed mostly gaps and hardly any colour.
   const layout = layoutArcLengths(segments.map((s) => s.amount), circumference);
+  const gaps = segmentGaps(layout);
   let offset = 0;
   const arcs = segments.map((seg, index) => {
     const full = layout[index].full;
-    const gap = segmentGap(layout[index], segments.length);
-    const arc = { ...seg, full, length: Math.max(full - gap, 0), offset };
+    const arc = { ...seg, full, length: Math.max(full - gaps[index], 0), offset };
     offset += full;
     return arc;
   });

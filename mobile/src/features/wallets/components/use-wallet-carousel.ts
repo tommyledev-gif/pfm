@@ -7,7 +7,7 @@ import { useLatestCallback } from "@/lib/use-latest-callback";
 
 import { useReduceMotion } from "@/lib/use-reduce-motion";
 import { Wallet } from "@/features/wallets/types";
-import { CARD_OVERLAP, CARD_WIDTH } from "@/features/wallets/components/WalletStackCard";
+import { CARD_OVERLAP, CARD_WIDTH } from "@/features/wallets/components/wallet-card-geometry";
 
 // Each card steps less than its own width, so every card overlaps its
 // neighbour — the layout itself is a stack, not a row with gaps.
