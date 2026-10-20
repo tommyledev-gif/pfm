@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Linking, Modal, Text, View } from "react-native";
 
 import { PillButton } from "@/components/ui/PillButton";
@@ -39,9 +40,10 @@ const openInBrowser = () => void Linking.openURL(APK_URL);
  * change again, so carrying on in it only hides the problem. Mounted once,
  * in the root layout, above every screen.
  *
- * The APK downloads inside the app and opens in Android's installer, a
- * sheet over the app; the User only taps Cài đặt there (Android never lets
- * an app install itself without that tap). Installing restarts the app on
+ * The APK starts downloading inside the app the moment the dialog appears,
+ * with no tap, and opens in Android's installer, a sheet over the app, once
+ * it is in; the User only taps Cài đặt there (Android never lets a sideloaded
+ * app install itself without that tap). Installing restarts the app on
  * the new APK, which no longer asks. A build without the intent launcher, or
  * an installer that will not open, falls back to the browser download.
  */
@@ -56,6 +58,13 @@ function NativeUpdateCard() {
   const { state, download, install } = useApkUpdate(APK_URL);
   const inApp = canInstallInApp();
   const installBroken = state.phase === "failed" && state.step === "install";
+
+  // No tap to start: the app is blocked until the new APK is in, so there is
+  // nothing to ask. Once per dialog (download is stable); after a failure
+  // it waits for Tải lại instead of retrying on its own.
+  useEffect(() => {
+    if (inApp) void download();
+  }, [inApp, download]);
 
   let hint: string = COPY.hint;
   if (!inApp || installBroken) hint = COPY.browserHint;
