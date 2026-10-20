@@ -15,8 +15,9 @@ android {
 }
 
 dependencies {
-  // The version react-native-passkey already brings in (through
+  // The versions react-native-passkey already brings in (through
   // androidx.credentials:credentials-play-services-auth 1.6.0), so Gradle
-  // resolves one copy.
+  // resolves one copy of each.
   implementation "com.google.android.gms:play-services-fido:21.0.0"
+  implementation "com.google.android.gms:play-services-auth:21.1.1"
 }
