@@ -129,3 +129,18 @@ export function ImageIcon({ size, color = colors.textPrimary, strokeWidth = 1.8 
     </Svg>
   );
 }
+
+/** An arrow pointing right: on to the next step (the login form's Tiếp tục). */
+export function ArrowRightIcon({ size, color = colors.textPrimary, strokeWidth = 2 }: IconProps) {
+  return (
+    <Svg {...base(size)} fill="none">
+      <Path
+        d="M4.5 12h15M13.5 6l6 6-6 6"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}

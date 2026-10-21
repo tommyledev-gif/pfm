@@ -30,7 +30,7 @@ export function ImageThumbnail({ capture, messageId }: ImageThumbnailProps) {
   if (!uri || !captureExists(uri)) {
     return (
       <View style={styles.placeholder} testID={`img-chat-thumbnail-placeholder-${messageId}`}>
-        <ImageIcon size={PLACEHOLDER_ICON_SIZE} color={colors.textMuted} />
+        <ImageIcon size={PLACEHOLDER_ICON_SIZE} color={colors.onGreen} />
         <Text style={styles.placeholderLabel}>Ảnh</Text>
       </View>
     );
@@ -49,5 +49,8 @@ export function ImageThumbnail({ capture, messageId }: ImageThumbnailProps) {
 const useStyles = createStyles((colors) => ({
   thumbnail: { width: THUMBNAIL_SIZE, height: THUMBNAIL_SIZE, borderRadius: radii.listCard, marginTop: spacing.xs },
   placeholder: { flexDirection: "row", alignItems: "center", gap: spacing.xs, marginTop: spacing.xs },
-  placeholderLabel: { ...typography.caption, color: colors.textMuted },
+  // The bubble's own text colour (UserBubble): white on the light theme's deep
+  // green, near-black on the dark theme's neon. textMuted is the page's grey
+  // and all but vanished on the gradient.
+  placeholderLabel: { ...typography.caption, color: colors.onGreen },
 }));

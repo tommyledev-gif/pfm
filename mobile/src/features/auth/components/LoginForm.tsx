@@ -1,15 +1,16 @@
 import { useRef, useState } from "react";
-import { Keyboard, Pressable, Text, TextInput, View } from "react-native";
+import { Keyboard, LayoutAnimation, Pressable, Text, TextInput, View } from "react-native";
 
 import { PillButton } from "@/components/ui/PillButton";
-import { EyeIcon, EyeOffIcon } from "@/components/ui/Icon";
+import { ArrowRightIcon, EyeIcon, EyeOffIcon, UserIcon } from "@/components/ui/Icon";
 import { withAlpha } from "@/lib/color";
 import { DEV_LOGIN } from "@/lib/dev-login";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { useReduceMotion } from "@/lib/use-reduce-motion";
 import { useLoginMutation } from "@/features/auth/api/use-login-mutation";
 import { loginErrorMessage } from "@/features/auth/login-error";
 import { completeLogin, LoginOutcome } from "@/features/accounts/complete-login";
-import { PasskeySignInButton } from "@/features/auth/components/PasskeySignInButton";
+import { AuthField } from "@/features/auth/components/AuthField";
 
 export type LoginFormMode = "login" | "add-account";
 
@@ -30,7 +31,9 @@ interface LoginFormProps {
   onDone?: (outcome: LoginOutcome) => void;
 }
 
-type Field = "email" | "password";
+// Who first, then the password: one field and one green button at a time.
+type Step = "identifier" | "password";
+type FieldErrors = Partial<Record<"email" | "password", string>>;
 
 const SUBMIT_LABEL: Record<LoginFormMode, string> = {
   login: "Đăng nhập",
@@ -45,10 +48,15 @@ const COPY = {
   passwordPlaceholder: "Nhập mật khẩu",
   showPassword: "Hiện mật khẩu",
   hidePassword: "Ẩn mật khẩu",
+  next: "Tiếp tục",
+  emailMissing: "Nhập email hoặc tên đăng nhập.",
+  passwordMissing: "Nhập mật khẩu.",
 } as const;
 
 const FIELD_HEIGHT = 56;
 const FIELD_RADIUS = 16;
+// The password field fades in while the button under it slides down.
+const REVEAL_ANIMATION = LayoutAnimation.create(220, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity);
 
 // Dev builds start filled in with the test account (lib/dev-login.ts); its
 // password only goes with its own email, never a saved account being renewed.
@@ -61,9 +69,11 @@ function initialFields(
   return { email, password: DEV_LOGIN && email === DEV_LOGIN.email ? DEV_LOGIN.password : "" };
 }
 
-
 // Labelled fields over a full-width primary button. The field being typed in
 // carries the accent border, so it is clear where the keyboard is writing.
+//
+// The button is never dimmed for an empty field: a pale green button read as
+// broken. Pressed too early, it says what is missing under that field.
 export function LoginForm({
   mode = "login",
   initialEmail,
@@ -74,17 +84,42 @@ export function LoginForm({
 }: LoginFormProps) {
   const colors = useColors();
   const styles = useStyles();
+  const reduceMotion = useReduceMotion();
   const [initial] = useState(() => initialFields(initialEmail, initialPassword));
   const [email, setEmail] = useState(initial.email);
   const [password, setPassword] = useState(initial.password);
+  // Whoever is signing in is already known (a saved account, an expired one
+  // being renewed, a filled-in test account): straight to the password.
+  const [step, setStep] = useState<Step>(() =>
+    hideEmail || initialEmail || initial.password ? "password" : "identifier",
+  );
+  // Set by Tiếp tục, so the password field it reveals takes the keyboard.
+  const [revealed, setRevealed] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [focused, setFocused] = useState<Field | null>(null);
+  const [errors, setErrors] = useState<FieldErrors>({});
   const login = useLoginMutation();
   const passwordRef = useRef<TextInput>(null);
 
+  // Nothing is sent at this step, so it never says whether an account exists.
+  const advance = () => {
+    if (!email.trim()) {
+      setErrors({ email: COPY.emailMissing });
+      return;
+    }
+    if (!reduceMotion) LayoutAnimation.configureNext(REVEAL_ANIMATION);
+    setRevealed(true);
+    setStep("password");
+  };
+
   const submit = () => {
+    if (disabled) return;
     const identifier = email.trim();
-    if (disabled || !identifier || !password) return;
+    const missing: FieldErrors = {
+      email: identifier ? undefined : COPY.emailMissing,
+      password: password ? undefined : COPY.passwordMissing,
+    };
+    setErrors(missing);
+    if (missing.email || missing.password) return;
     login.mutate(
       { email: identifier, password },
       // The account's own email, not what was typed: a tên đăng nhập works
@@ -93,78 +128,81 @@ export function LoginForm({
     );
   };
 
-  const focusProps = (field: Field) => ({
-    onFocus: () => setFocused(field),
-    onBlur: () => setFocused((current) => (current === field ? null : current)),
-  });
+  const changeEmail = (value: string) => {
+    setEmail(value);
+    setErrors((e) => ({ ...e, email: undefined }));
+  };
+  const changePassword = (value: string) => {
+    setPassword(value);
+    setErrors((e) => ({ ...e, password: undefined }));
+  };
+
+  const atIdentifier = step === "identifier";
 
   return (
     <View style={styles.form}>
       <View style={styles.fields}>
         {hideEmail ? null : (
-          <View style={styles.field}>
-            <Text style={styles.label}>{COPY.emailLabel}</Text>
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder={COPY.emailPlaceholder}
-              placeholderTextColor={colors.textMuted}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              autoComplete="email"
-              textContentType="username"
-              // "Next" jumps straight to the password, the only field after it.
-              returnKeyType="next"
-              onSubmitEditing={() => passwordRef.current?.focus()}
-              submitBehavior="submit"
-              accessibilityLabel={COPY.emailLabel}
-              style={[styles.box, styles.input, focused === "email" && styles.boxFocused]}
-              testID="input-login-email"
-              {...focusProps("email")}
-            />
-          </View>
+          <AuthField
+            label={COPY.emailLabel}
+            value={email}
+            onChangeText={changeEmail}
+            error={errors.email}
+            placeholder={COPY.emailPlaceholder}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            autoComplete="email"
+            textContentType="username"
+            // "Next" is Tiếp tục until the password shows, then moves to it.
+            returnKeyType="next"
+            onSubmitEditing={atIdentifier ? advance : () => passwordRef.current?.focus()}
+            submitBehavior="submit"
+            trailing={
+              <View style={styles.trailing} importantForAccessibility="no-hide-descendants">
+                <UserIcon size={22} color={colors.textMuted} />
+              </View>
+            }
+            testID="input-login-email"
+          />
         )}
-        <View style={styles.field}>
-          <Text style={styles.label}>{COPY.passwordLabel}</Text>
-          <View style={[styles.box, styles.passwordRow, focused === "password" && styles.boxFocused]}>
-            <TextInput
-              ref={passwordRef}
-              value={password}
-              onChangeText={setPassword}
-              placeholder={COPY.passwordPlaceholder}
-              placeholderTextColor={colors.textMuted}
-              secureTextEntry={!showPassword}
-              autoComplete="current-password"
-              textContentType="password"
-              autoFocus={hideEmail && !disabled}
-              editable={!disabled}
-              // "Done" is the last field's submit: it closes the keyboard and logs in.
-              returnKeyType="done"
-              onSubmitEditing={() => {
-                Keyboard.dismiss();
-                submit();
-              }}
-              accessibilityLabel={COPY.passwordLabel}
-              style={[styles.input, styles.passwordInput]}
-              testID="input-login-password"
-              {...focusProps("password")}
-            />
-            <Pressable
-              onPress={() => setShowPassword((v) => !v)}
-              hitSlop={4}
-              style={styles.eyeButton}
-              accessibilityRole="button"
-              accessibilityLabel={showPassword ? COPY.hidePassword : COPY.showPassword}
-            >
-              {showPassword ? (
-                <EyeOffIcon size={22} color={colors.textSecondary} />
-              ) : (
-                <EyeIcon size={22} color={colors.textSecondary} />
-              )}
-            </Pressable>
-          </View>
-        </View>
+        {atIdentifier ? null : (
+          <AuthField
+            ref={passwordRef}
+            label={COPY.passwordLabel}
+            value={password}
+            onChangeText={changePassword}
+            error={errors.password}
+            placeholder={COPY.passwordPlaceholder}
+            secureTextEntry={!showPassword}
+            autoComplete="current-password"
+            textContentType="password"
+            autoFocus={revealed || (hideEmail && !disabled)}
+            editable={!disabled}
+            // "Done" is the last field's submit: it closes the keyboard and logs in.
+            returnKeyType="done"
+            onSubmitEditing={() => {
+              Keyboard.dismiss();
+              submit();
+            }}
+            trailing={
+              <Pressable
+                onPress={() => setShowPassword((v) => !v)}
+                hitSlop={4}
+                style={styles.trailing}
+                accessibilityRole="button"
+                accessibilityLabel={showPassword ? COPY.hidePassword : COPY.showPassword}
+              >
+                {showPassword ? (
+                  <EyeOffIcon size={22} color={colors.textSecondary} />
+                ) : (
+                  <EyeIcon size={22} color={colors.textSecondary} />
+                )}
+              </Pressable>
+            }
+            testID="input-login-password"
+          />
+        )}
       </View>
       {login.isError ? (
         <View style={styles.errorBox}>
@@ -172,16 +210,16 @@ export function LoginForm({
         </View>
       ) : null}
       <PillButton
-        label={SUBMIT_LABEL[mode]}
+        label={atIdentifier ? COPY.next : SUBMIT_LABEL[mode]}
+        icon={atIdentifier ? <ArrowRightIcon size={20} color={colors.onGreen} /> : undefined}
+        iconPosition="end"
         loading={login.isPending}
-        disabled={disabled || !email || !password}
-        onPress={submit}
+        disabled={disabled}
+        onPress={atIdentifier ? advance : submit}
         style={[styles.button, hideEmail ? styles.buttonTight : styles.buttonLoose]}
         textStyle={styles.buttonLabel}
-        testID="btn-login-submit"
+        testID={atIdentifier ? "btn-login-next" : "btn-login-submit"}
       />
-      {/* Any account whose passkey is on this phone — not tied to the email typed. */}
-      {hideEmail ? null : <PasskeySignInButton disabled={disabled} onDone={onDone} />}
     </View>
   );
 }
@@ -189,24 +227,8 @@ export function LoginForm({
 const useStyles = createStyles((colors) => ({
   form: { width: "100%", gap: spacing.lg },
   fields: { gap: 20 },
-  field: { gap: spacing.sm },
-  label: { ...typography.label, fontWeight: "500", color: colors.textSecondary },
-  box: {
-    height: FIELD_HEIGHT,
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: colors.surfaceBorder,
-    borderRadius: FIELD_RADIUS,
-  },
-  boxFocused: { borderColor: colors.green },
-  input: {
-    paddingHorizontal: spacing.lg,
-    color: colors.textPrimary,
-    fontSize: 17,
-  },
-  passwordRow: { flexDirection: "row", alignItems: "center", paddingRight: 4 },
-  passwordInput: { flex: 1, height: "100%" },
-  eyeButton: { width: 48, height: 48, alignItems: "center", justifyContent: "center" },
+  // Inside the field's box, at its right edge: the person icon or the eye.
+  trailing: { width: 48, height: 48, marginRight: 4, alignItems: "center", justifyContent: "center" },
   button: { height: FIELD_HEIGHT, borderRadius: FIELD_RADIUS },
   // A lone password field sits close to its button; a two-field form gets air.
   buttonTight: { marginTop: 0 },

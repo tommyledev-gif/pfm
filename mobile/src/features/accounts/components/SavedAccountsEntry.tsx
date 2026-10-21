@@ -6,15 +6,16 @@ import { createStyles, radii, spacing, typography, useColors } from "@/lib/theme
 import { CandidateAvatar } from "@/features/accounts/components/LoginCandidateViews";
 import { LoginCandidate } from "@/features/accounts/login-candidates";
 
-const AVATAR_SIZE = 28;
+const AVATAR_SIZE = 36;
 const MAX_AVATARS = 3;
 // Each avatar tucks under the previous one by this much (as AvatarGroup).
-const OVERLAP = 10;
+const OVERLAP = 12;
 const RING_WIDTH = 2;
 
 const COPY = {
-  title: "Tài khoản đã lưu",
-  count: (n: number) => `${n} tài khoản`,
+  // Names what the tap does: it sits under "hoặc" as one of the ways in.
+  title: "Chọn tài khoản đã lưu",
+  count: (n: number) => `${n} tài khoản trên thiết bị này`,
 } as const;
 
 interface SavedAccountsEntryProps {
@@ -63,7 +64,7 @@ const useStyles = createStyles((colors) => ({
     alignItems: "center",
     gap: spacing.md,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.lg,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
@@ -76,6 +77,6 @@ const useStyles = createStyles((colors) => ({
   ring: { borderRadius: 999, borderWidth: RING_WIDTH, borderColor: colors.surface },
   overlapped: { marginLeft: -OVERLAP },
   text: { flex: 1, gap: 2 },
-  title: { ...typography.body, fontWeight: "600", color: colors.textPrimary },
+  title: { ...typography.body, fontWeight: "700", color: colors.textPrimary },
   count: { ...typography.caption, color: colors.textSecondary },
 }));

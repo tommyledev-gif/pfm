@@ -4,6 +4,9 @@ import { ActivityIndicator, Pressable, StyleProp, Text, TextStyle, ViewStyle } f
 import { withAlpha } from "@/lib/color";
 import { radii, typography, createStyles, useColors } from "@/lib/theme";
 
+// How far a singleLine label may shrink before it is cut off instead.
+const SINGLE_LINE_MIN_SCALE = 0.8;
+
 interface PillButtonProps {
   label?: string;
   icon?: ReactNode;
@@ -16,6 +19,14 @@ interface PillButtonProps {
   onLongPress?: () => void;
   delayLongPress?: number;
   variant?: "solid" | "outline";
+  /** "end" puts the icon after the label, for an arrow that says "next". */
+  iconPosition?: "start" | "end";
+  /**
+   * Keeps the label on one line, shrinking it a little when it would not
+   * fit. For buttons sharing a row (ConfirmDialog), where a wrapped label
+   * makes one button taller than its neighbour.
+   */
+  singleLine?: boolean;
   disabled?: boolean;
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -47,6 +58,8 @@ export function PillButton({
   onLongPress,
   delayLongPress,
   variant = "solid",
+  iconPosition = "start",
+  singleLine = false,
   disabled,
   loading,
   style,
@@ -75,10 +88,18 @@ export function PillButton({
         <ActivityIndicator color={isOutline ? colors.textPrimary : colors.onGreen} />
       ) : (
         <>
-          {icon}
+          {iconPosition === "start" ? icon : null}
           {label ? (
-            <Text style={[styles.label, isOutline ? styles.outlineLabel : styles.solidLabel, textStyle]}>{label}</Text>
+            <Text
+              numberOfLines={singleLine ? 1 : undefined}
+              adjustsFontSizeToFit={singleLine}
+              minimumFontScale={singleLine ? SINGLE_LINE_MIN_SCALE : undefined}
+              style={[styles.label, isOutline ? styles.outlineLabel : styles.solidLabel, textStyle]}
+            >
+              {label}
+            </Text>
           ) : null}
+          {iconPosition === "end" ? icon : null}
         </>
       )}
     </Pressable>

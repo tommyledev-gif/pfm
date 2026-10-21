@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Text } from "react-native";
+import { StyleProp, Text, TextStyle, ViewStyle } from "react-native";
 
 import { PillButton } from "@/components/ui/PillButton";
 import { ShieldIcon } from "@/components/ui/Icon";
@@ -16,6 +16,9 @@ const LABEL = "Đăng nhập bằng passkey";
 interface PasskeySignInButtonProps {
   disabled?: boolean;
   onDone?: (outcome: LoginOutcome) => void;
+  /** The login screen sizes it like its other actions (56 tall, 16 corners). */
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
 }
 
 /**
@@ -25,7 +28,7 @@ interface PasskeySignInButtonProps {
  * so the account is remembered for switching too. Hidden where passkeys
  * cannot run (Expo Go, old Android).
  */
-export function PasskeySignInButton({ disabled, onDone }: PasskeySignInButtonProps) {
+export function PasskeySignInButton({ disabled, onDone, style, textStyle }: PasskeySignInButtonProps) {
   const colors = useColors();
   const styles = useStyles();
   const [busy, setBusy] = useState(false);
@@ -62,6 +65,8 @@ export function PasskeySignInButton({ disabled, onDone }: PasskeySignInButtonPro
         onPress={run}
         loading={busy}
         disabled={disabled}
+        style={style}
+        textStyle={textStyle}
         testID="btn-login-passkey"
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}

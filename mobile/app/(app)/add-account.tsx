@@ -4,7 +4,9 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Screen } from "@/components/shared/Screen";
 import { ChevronLeftIcon } from "@/components/ui/Icon";
 import { spacing, typography, createStyles } from "@/lib/theme";
+import { LoginOutcome } from "@/features/accounts/complete-login";
 import { LoginForm } from "@/features/auth/components/LoginForm";
+import { PasskeySignInButton } from "@/features/auth/components/PasskeySignInButton";
 
 const TITLE = "Thêm tài khoản";
 const HINT = "Đăng nhập tài khoản khác. Tài khoản hiện tại vẫn được lưu trên thiết bị này.";
@@ -16,6 +18,9 @@ export default function AddAccountScreen() {
   const styles = useStyles();
   const router = useRouter();
   const { email } = useLocalSearchParams<{ email?: string }>();
+  const handleDone = (outcome: LoginOutcome) => {
+    if (outcome === "same-user") router.back();
+  };
 
   return (
     <Screen style={styles.screen}>
@@ -30,10 +35,10 @@ export default function AddAccountScreen() {
         <LoginForm
           mode="add-account"
           initialEmail={typeof email === "string" ? email : undefined}
-          onDone={(outcome) => {
-            if (outcome === "same-user") router.back();
-          }}
+          onDone={handleDone}
         />
+        {/* Any account whose passkey is on this phone, not tied to the email typed. */}
+        <PasskeySignInButton onDone={handleDone} />
       </ScrollView>
     </Screen>
   );

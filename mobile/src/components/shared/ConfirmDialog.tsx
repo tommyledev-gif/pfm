@@ -48,11 +48,12 @@ export function ConfirmDialog({
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.message}>{message}</Text>
           <View style={styles.actions}>
-            <PillButton label={cancelLabel} variant="outline" onPress={onCancel} style={styles.flexButton} />
+            <PillButton label={cancelLabel} variant="outline" onPress={onCancel} style={styles.flexButton} singleLine />
             <PillButton
               label={confirmLabel}
               onPress={onConfirm}
               loading={loading}
+              singleLine
               style={[styles.flexButton, isDestructive && styles.destructive]}
               textStyle={isDestructive ? styles.destructiveLabel : undefined}
             />
@@ -78,7 +79,10 @@ const useStyles = createStyles((colors) => ({
   title: { ...typography.title, color: colors.textPrimary },
   message: { ...typography.body, color: colors.textSecondary },
   actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
-  flexButton: { flex: 1 },
+  // Two half-width pills: at PillButton's own 20 side padding a two-word
+  // label ("Xóa nội dung") broke onto a second line. The narrower padding
+  // fits it; singleLine shrinks anything longer rather than wrapping.
+  flexButton: { flex: 1, paddingHorizontal: spacing.md },
   destructive: { backgroundColor: colors.peach },
   destructiveLabel: { color: colors.bgApp },
 }));
