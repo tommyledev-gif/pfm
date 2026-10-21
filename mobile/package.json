@@ -58,6 +58,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "apk": "node scripts/ota/build-apk.mjs",
+    "ota:check": "node scripts/ota/check-setup.mjs",
     "ota:publish": "node scripts/ota/publish-update.mjs",
     "ota:rollback": "node scripts/ota/rollback-update.mjs"
   },

@@ -1,0 +1,17 @@
+# Line endings of the files the release fingerprint reads byte for byte.
+#
+# The runtime version (app.json "runtimeVersion": fingerprint) is a hash of
+# these files' raw bytes, CR included. Left to core.autocrlf, a Windows clone
+# gets CRLF and a macOS/Linux clone LF, each resolves to a different runtime
+# version than the APK on users' phones, and `npm run ota:publish` from that
+# machine is refused ("No APK has been built for runtime …"). Pinned here,
+# every clone on every OS gets the bytes the live APK was built from.
+# docs/mobile-release-setup.md
+.gitignore  text eol=lf
+plugins/**  text=auto eol=lf
+modules/**  text=auto eol=lf
+
+# CRLF on purpose: the APK on phones (versionCode 9, runtime d29c1ff7…) was
+# built from a CRLF copy of this file. Change it to eol=lf only together with
+# a native change, whose `npm run apk` moves the runtime version anyway.
+eas.json    text eol=crlf

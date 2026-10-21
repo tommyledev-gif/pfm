@@ -9,7 +9,7 @@ Mobile app quản lý chi tiêu cá nhân. React Native (Expo) + Go + Python AI 
 [Python AI Service :8000]
 
 
-Infra: Docker Compose (backend, ai-service, postgres, Next.js web only — `mobile/` is not containerized, see below). Không deploy App Store/Play Store. Android: APK build trên máy bằng `npm run apk` (ký bằng release key riêng, cài đè được), code JS/TS ship qua OTA tự host (`expo-updates` → backend `/api/v1/app-updates`, `npm run ota:publish`) — xem `docs/ops-runbook.md` §8.
+Infra: Docker Compose (backend, ai-service, postgres, Next.js web only — `mobile/` is not containerized, see below). Không deploy App Store/Play Store. Android: APK build trên máy bằng `npm run apk` (ký bằng release key riêng, cài đè được), code JS/TS ship qua OTA tự host (`expo-updates` → backend `/api/v1/app-updates`, `npm run ota:publish`) — xem `docs/ops-runbook.md` §8. Setup máy release mới: `docs/mobile-release-setup.md`, kiểm tra bằng `npm run ota:check`.
 
 > **Frontend priority:** `frontend/` (Next.js web) is feature-complete-first priority. `mobile/` (React Native + Expo, migrated from Flutter 2026-08-16) has only an initial project scaffold — Expo Router, TanStack Query, Zustand, Axios, and secure-store are wired, but no feature screens (auth, wallets, etc.) exist yet. Build mobile features only when explicitly requested.
 >
