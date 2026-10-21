@@ -2,7 +2,7 @@ module github.com/example/pfm/backend
 
 go 1.26.0
 
-toolchain go1.26.9
+toolchain go1.26.10
 
 require (
 	github.com/go-playground/validator/v10 v10.22.0
