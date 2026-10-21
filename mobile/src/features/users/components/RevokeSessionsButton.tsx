@@ -21,7 +21,7 @@ const CONFIRM_TITLE = "Đăng xuất mọi thiết bị?";
 const CONFIRM_LABEL = "Đăng xuất";
 const NOT_FOUND = "Không tìm thấy người dùng.";
 const OFFLINE = "Cần kết nối mạng để đăng xuất mọi thiết bị.";
-const FALLBACK_ERROR = "Không thể đăng xuất mọi thiết bị. Vui lòng thử lại.";
+const FALLBACK_ERROR = "Chưa đăng xuất được mọi thiết bị. Thử lại.";
 
 const confirmMessage = (email: string) =>
   `Đăng xuất ${email} khỏi mọi thiết bị? Người này sẽ phải đăng nhập lại bằng mật khẩu.`;

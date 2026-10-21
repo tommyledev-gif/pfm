@@ -1,9 +1,11 @@
 import { useMemo } from "react";
-import { ActivityIndicator, Pressable, SectionList, Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import { ActivityIndicator, SectionList, Text, View } from "react-native";
 
-import { ChevronLeftIcon } from "@/components/ui/Icon";
+import { useListEntrance } from "@/components/motion/MotionView";
+import { GroupedListCell, ListSectionHeader } from "@/components/ui/grouped-list";
+import { useFabBottom } from "@/components/ui/Fab";
 import { Screen } from "@/components/shared/Screen";
+import { ScreenHeader } from "@/components/shared/ScreenHeader";
 import { dayLabelVi, formatDateViShort } from "@/lib/format-date";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { AuditLogRow } from "@/features/audit-logs/components/AuditLogRow";
@@ -25,11 +27,15 @@ interface DaySection {
 // Settings → "Nhật ký giao dịch" (specs/transaction-audit-log/spec.md US-02).
 // Read-only by design: no undo/restore affordance anywhere on this screen —
 // the log is history, not a time machine (that spec's Out of Scope).
+// Each day is one rounded group; its entries are hairline-split rows.
 export default function AuditLogsScreen() {
   const colors = useColors();
   const styles = useStyles();
-  const router = useRouter();
   const auditLogs = useAuditLogsQuery();
+  // Clear of the floating BottomNav, so the oldest entry is never under it.
+  const navClearance = useFabBottom();
+  // The first page staggers in once; later pages and refetches just appear.
+  const enter = useListEntrance(auditLogs.isLoading ? "loading" : "ready");
   const categories = useCategoriesQuery();
   const wallets = useWalletsQuery();
 
@@ -70,17 +76,20 @@ export default function AuditLogsScreen() {
     return groups;
   }, [entries]);
 
+  // Each day's first entry's position in the whole log, for the stagger.
+  const sectionStart = useMemo(() => {
+    const starts = new Map<string, number>();
+    let offset = 0;
+    for (const section of sections) {
+      starts.set(section.key, offset);
+      offset += section.data.length;
+    }
+    return starts;
+  }, [sections]);
+
   return (
     <Screen style={styles.screen}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={8}>
-          <ChevronLeftIcon size={24} />
-        </Pressable>
-        <View style={styles.headerText}>
-          <Text style={styles.title}>Nhật ký giao dịch</Text>
-          <Text style={styles.subtitle}>Lịch sử tạo, sửa và xóa giao dịch của bạn</Text>
-        </View>
-      </View>
+      <ScreenHeader title="Nhật ký giao dịch" subtitle="Lịch sử tạo, sửa và xóa giao dịch" />
 
       {auditLogs.isLoading ? (
         <ActivityIndicator color={colors.green} style={styles.loader} />
@@ -89,7 +98,7 @@ export default function AuditLogsScreen() {
           testID="list-audit-logs"
           sections={sections}
           keyExtractor={(entry) => entry.id}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, { paddingBottom: navClearance }]}
           stickySectionHeadersEnabled={false}
           showsVerticalScrollIndicator={false}
           refreshControl={refreshControl}
@@ -98,18 +107,26 @@ export default function AuditLogsScreen() {
             if (auditLogs.hasNextPage && !auditLogs.isFetchingNextPage) auditLogs.fetchNextPage();
           }}
           renderSectionHeader={({ section }) => (
-            <View style={styles.dayHeader}>
-              <Text style={styles.dayHeaderTitle}>{section.dayLabel}</Text>
-              <Text style={styles.dayHeaderDate}>{section.dateLabel}</Text>
+            <View style={section.key !== sections[0]?.key && styles.laterDay}>
+              <ListSectionHeader
+                title={section.dayLabel}
+                trailing={<Text style={styles.dayHeaderDate}>{section.dateLabel}</Text>}
+              />
             </View>
           )}
-          renderItem={({ item }) => (
-            <AuditLogRow
-              entry={item}
-              currency={currency}
-              resolveCategoryName={(id) => categoryNameById.get(id) ?? "Danh mục"}
-              resolveWalletName={(id) => walletNameById.get(id) ?? "Ví"}
-            />
+          renderItem={({ item, index, section }) => (
+            <GroupedListCell
+              index={index}
+              count={section.data.length}
+              entering={enter(index + (sectionStart.get(section.key) ?? 0))}
+            >
+              <AuditLogRow
+                entry={item}
+                currency={currency}
+                resolveCategoryName={(id) => categoryNameById.get(id) ?? "Danh mục"}
+                resolveWalletName={(id) => walletNameById.get(id) ?? "Ví"}
+              />
+            </GroupedListCell>
           )}
           ListEmptyComponent={<AuditLogsEmptyState />}
           ListFooterComponent={
@@ -123,20 +140,8 @@ export default function AuditLogsScreen() {
 
 const useStyles = createStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bgApp },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
-  },
-  headerText: { flex: 1, gap: 2 },
-  title: { ...typography.title, color: colors.textPrimary },
-  subtitle: { ...typography.caption, color: colors.textSecondary },
-  list: { paddingHorizontal: spacing.xl, paddingBottom: 140, gap: spacing.sm },
-  dayHeader: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingTop: spacing.md, paddingBottom: spacing.xs },
-  dayHeaderTitle: { ...typography.label, color: colors.textPrimary },
+  list: { paddingHorizontal: spacing.xl },
+  laterDay: { paddingTop: spacing.xxl },
   dayHeaderDate: { ...typography.tiny, color: colors.textMuted },
   loader: { marginVertical: spacing.lg },
 }));

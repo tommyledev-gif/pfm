@@ -1,6 +1,6 @@
 -- name: CreateWallet :one
-INSERT INTO wallets (user_id, name, type, balance, currency, is_default, icon, icon_url)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO wallets (user_id, name, type, balance, currency, is_default, icon, icon_url, color)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING *;
 
 -- name: CountWalletsByUser :one
@@ -42,7 +42,9 @@ LIMIT 1;
 -- photo — COALESCE(sqlc.narg('icon_url'), icon_url) would silently keep the
 -- old value forever once set (specs/wallet-budget-icons/plan.md Finding #1;
 -- icon itself keeps the simpler COALESCE convention, matching categories.icon
--- — no spec requires explicit emoji-clearing).
+-- — no spec requires explicit emoji-clearing). color uses the same
+-- presence-flag CASE: null puts the card back on its automatic colour
+-- (specs/shared-wallets plan F10).
 UPDATE wallets
 SET
     name             = COALESCE(sqlc.narg('name'), name),
@@ -50,6 +52,7 @@ SET
     currency         = COALESCE(sqlc.narg('currency'), currency),
     icon             = COALESCE(sqlc.narg('icon'), icon),
     icon_url         = CASE WHEN sqlc.arg('icon_url_provided')::bool THEN sqlc.narg('icon_url') ELSE icon_url END,
+    color            = CASE WHEN sqlc.arg('color_provided')::bool THEN sqlc.narg('color') ELSE color END,
     updated_at       = NOW()
 WHERE id = $1
   AND user_id = $2

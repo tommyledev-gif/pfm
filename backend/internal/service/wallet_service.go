@@ -81,6 +81,7 @@ func (s *WalletService) createWalletTx(ctx context.Context, userID uuid.UUID, re
 		IsDefault: makeDefault,
 		Icon:      req.Icon,
 		IconURL:   req.IconURL,
+		Color:     req.Color,
 	})
 	if err != nil {
 		return nil, err
@@ -92,26 +93,74 @@ func (s *WalletService) createWalletTx(ctx context.Context, userID uuid.UUID, re
 	return wallet, nil
 }
 
-// ListWallets implements US-02 — strictly scoped to the caller (CLAUDE.md
-// user isolation rule); ordering (default wallet first) is the repository
+// ListWallets implements US-02 — the caller's own wallets (CLAUDE.md user
+// isolation rule); ordering (default wallet first) is the repository
 // query's job, not the service's.
-func (s *WalletService) ListWallets(ctx context.Context, userID uuid.UUID) ([]*model.Wallet, error) {
+//
+// includeShared (specs/shared-wallets US-03) appends the wallets other
+// people shared with the caller and fills every wallet's member count. It is
+// opt-in: web and app builds from before sharing sum this list into net
+// worth, and must keep getting only the caller's own wallets.
+func (s *WalletService) ListWallets(ctx context.Context, userID uuid.UUID, includeShared bool) ([]*model.Wallet, error) {
 	wallets, err := s.repo.ListWalletsByUser(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("service.ListWallets: %w", err)
 	}
+	if !includeShared {
+		return wallets, nil
+	}
+	shared, err := s.repo.ListSharedWalletsForUser(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("service.ListWallets: %w", err)
+	}
+	wallets = append(wallets, shared...)
+	if err := s.attachMemberCounts(ctx, wallets); err != nil {
+		return nil, err
+	}
 	return wallets, nil
 }
 
-// GetWallet implements US-03 — distinguishes "belongs to someone else"
-// (403) from "doesn't exist" (404), per spec.md S-WAL-16/S-WAL-17.
+// GetWallet implements US-03 — distinguishes "no access" (403) from "doesn't
+// exist" (404), per spec.md S-WAL-16/S-WAL-17. Members of a shared wallet may
+// read it too (specs/shared-wallets US-03).
 func (s *WalletService) GetWallet(ctx context.Context, userID, walletID uuid.UUID) (*model.Wallet, error) {
-	return s.getOwnedWallet(ctx, userID, walletID)
+	wallet, err := requireReadableWallet(ctx, s.repo, userID, walletID)
+	if err != nil {
+		return nil, err
+	}
+	if wallet.Access != model.WalletAccessOwner {
+		names, err := s.repo.ListUserDisplayNames(ctx, []uuid.UUID{wallet.UserID})
+		if err != nil {
+			return nil, fmt.Errorf("service.GetWallet: %w", err)
+		}
+		if name, ok := names[wallet.UserID]; ok {
+			wallet.OwnerName = &name
+		}
+	}
+	if err := s.attachMemberCounts(ctx, []*model.Wallet{wallet}); err != nil {
+		return nil, err
+	}
+	return wallet, nil
+}
+
+func (s *WalletService) attachMemberCounts(ctx context.Context, wallets []*model.Wallet) error {
+	ids := make([]uuid.UUID, 0, len(wallets))
+	for _, w := range wallets {
+		ids = append(ids, w.ID)
+	}
+	counts, err := s.repo.CountActiveMembersByWallets(ctx, ids)
+	if err != nil {
+		return fmt.Errorf("service.attachMemberCounts: %w", err)
+	}
+	for _, w := range wallets {
+		w.MemberCount = counts[w.ID]
+	}
+	return nil
 }
 
 // getOwnedWallet fetches a wallet by ID and enforces ownership — shared by
-// GetWallet, UpdateWallet, and SetDefaultWallet so the 403-vs-404 split is
-// decided in exactly one place.
+// UpdateWallet and SetDefaultWallet (owner-only, specs/shared-wallets BR-01)
+// so the 403-vs-404 split is decided in exactly one place.
 func (s *WalletService) getOwnedWallet(ctx context.Context, userID, walletID uuid.UUID) (*model.Wallet, error) {
 	wallet, err := s.repo.GetWalletByID(ctx, walletID)
 	if err != nil {
@@ -162,6 +211,8 @@ func (s *WalletService) UpdateWallet(ctx context.Context, userID, walletID uuid.
 		Icon:            req.Icon,
 		IconURL:         req.IconURL.Value,
 		IconURLProvided: req.IconURL.Set,
+		Color:           req.Color.Value,
+		ColorProvided:   req.Color.Set,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("service.UpdateWallet: %w", err)

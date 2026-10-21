@@ -38,15 +38,15 @@ func (s *TransactionService) resolveWalletMove(ctx context.Context, userID uuid.
 	if existing.Type == model.TransactionTypeTransfer {
 		return nil, common.ErrTransferWalletImmutable
 	}
-	// 404 for a missing or soft-deleted Wallet, 403 for someone else's —
-	// same split as a create.
-	target, err := s.getOwnedWallet(ctx, userID, *req.WalletID)
+	// 404 for a missing or soft-deleted Wallet, 403 for one the caller may
+	// not record into — same split as a create (specs/shared-wallets BR-05).
+	target, err := requireWritableWallet(ctx, s.walletRepo, userID, *req.WalletID)
 	if err != nil {
 		return nil, err
 	}
-	source, err := s.getOwnedWallet(ctx, userID, existing.WalletID)
+	source, err := requireWritableWallet(ctx, s.walletRepo, userID, existing.WalletID)
 	if err != nil {
-		return nil, fmt.Errorf("service.resolveWalletMove: %w", err)
+		return nil, err
 	}
 	if target.Currency != source.Currency {
 		return nil, common.ErrWalletCurrencyMismatch

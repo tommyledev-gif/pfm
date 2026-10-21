@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { FlatList, Pressable, Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import { FlatList, View } from "react-native";
 
-import { ChevronLeftIcon, PlusIcon } from "@/components/ui/Icon";
+import { useListEntrance } from "@/components/motion/MotionView";
+import { GroupedListCell, ListSection } from "@/components/ui/grouped-list";
+import { useFabBottom } from "@/components/ui/Fab";
 import { Screen } from "@/components/shared/Screen";
-import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { ScreenHeader, ScreenHeaderAction } from "@/components/shared/ScreenHeader";
+import { spacing, createStyles } from "@/lib/theme";
 import { useUsersQuery } from "@/features/users/api/use-users-query";
 import { UserListItem } from "@/features/users/components/UserListItem";
 import { UserListItemSkeleton } from "@/features/users/components/UserListItemSkeleton";
@@ -16,40 +18,50 @@ const LIST_SKELETON_COUNT = 4;
 // Household Members screen — backend enforces admin-only access on
 // GET/POST /admin/users* (403 for members); mobile does not add a
 // client-side gate, same precedent as frontend/src/app/app/users/page.tsx.
+//
+// One grouped list: every member a row of the same rounded group.
 export default function UsersScreen() {
-  const colors = useColors();
   const styles = useStyles();
-  const router = useRouter();
   const users = useUsersQuery();
   const [inviteOpen, setInviteOpen] = useState(false);
+  // Clear of the floating BottomNav, so the last member is never under it.
+  const navClearance = useFabBottom();
+  // Rows stagger in once, when the list first has data; refetches keep the key.
+  const enter = useListEntrance(users.isLoading ? "loading" : "ready");
+  const list = users.data?.data ?? [];
 
   return (
     <Screen>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={8}>
-          <ChevronLeftIcon size={24} />
-        </Pressable>
-        <Text style={styles.title}>Thành viên</Text>
-        <Pressable style={styles.addButton} onPress={() => setInviteOpen(true)} hitSlop={8}>
-          <PlusIcon size={16} color={colors.onGreen} />
-        </Pressable>
-      </View>
+      <ScreenHeader
+        title="Thành viên"
+        trailing={
+          <ScreenHeaderAction
+            onPress={() => setInviteOpen(true)}
+            accessibilityLabel="Mời thành viên"
+            testID="btn-users-invite"
+          />
+        }
+      />
 
       {users.isLoading ? (
         <View style={styles.list}>
-          {Array.from({ length: LIST_SKELETON_COUNT }).map((_, i) => (
-            <View key={i} style={i > 0 ? styles.skeletonSpacing : undefined}>
-              <UserListItemSkeleton />
-            </View>
-          ))}
+          <ListSection>
+            {Array.from({ length: LIST_SKELETON_COUNT }).map((_, i) => (
+              <UserListItemSkeleton key={i} />
+            ))}
+          </ListSection>
         </View>
       ) : (
         <FlatList
-          data={users.data?.data ?? []}
+          data={list}
           keyExtractor={(u) => u.id}
-          contentContainerStyle={styles.list}
-          ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
-          renderItem={({ item }) => <UserListItem user={item} />}
+          contentContainerStyle={[styles.list, { paddingBottom: navClearance }]}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item, index }) => (
+            <GroupedListCell index={index} count={list.length} entering={enter(index)}>
+              <UserListItem user={item} />
+            </GroupedListCell>
+          )}
           ListEmptyComponent={
             <UsersEmptyState
               failed={users.isError}
@@ -65,24 +77,6 @@ export default function UsersScreen() {
   );
 }
 
-const useStyles = createStyles((colors) => ({
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
-  },
-  title: { flex: 1, ...typography.title, color: colors.textPrimary },
-  addButton: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.pill,
-    backgroundColor: colors.green,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  list: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl },
-  skeletonSpacing: { marginTop: spacing.sm },
+const useStyles = createStyles(() => ({
+  list: { paddingHorizontal: spacing.xl },
 }));

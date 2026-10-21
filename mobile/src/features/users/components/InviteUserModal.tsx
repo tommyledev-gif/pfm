@@ -42,8 +42,8 @@ export function InviteUserModal({ visible, onClose }: InviteUserModalProps) {
 
   return (
     <Drawer visible={visible} onClose={onClose}>
-      <Text style={styles.title}>Invite member</Text>
-      <Text style={styles.description}>An activation email with a sign-up link is sent to this address.</Text>
+      <Text style={styles.title}>Mời thành viên</Text>
+      <Text style={styles.description}>Người được mời nhận email để kích hoạt tài khoản.</Text>
 
       <Text style={styles.label}>Email</Text>
       <TextInput
@@ -56,25 +56,25 @@ export function InviteUserModal({ visible, onClose }: InviteUserModalProps) {
         style={styles.input}
       />
 
-      <Text style={styles.label}>Role</Text>
+      <Text style={styles.label}>Vai trò</Text>
       <View style={styles.chipRow}>
         {USER_ROLES.map((r) => (
           <Pressable key={r} onPress={() => setRole(r)} style={[styles.chip, role === r && styles.chipActive]}>
             <Text style={[styles.chipLabel, role === r && styles.chipLabelActive]}>
-              {r === "admin" ? "Admin" : "Member"}
+              {r === "admin" ? "Quản trị" : "Thành viên"}
             </Text>
           </Pressable>
         ))}
       </View>
 
       {inviteUser.isError ? (
-        <Text style={styles.error}>{getErrorMessage(inviteUser.error, "Could not send the invite")}</Text>
+        <Text style={styles.error}>{getErrorMessage(inviteUser.error, "Chưa gửi được lời mời. Thử lại.")}</Text>
       ) : null}
 
       <View style={styles.actions}>
-        <PillButton label="Cancel" variant="outline" onPress={onClose} style={styles.flexButton} />
+        <PillButton label="Hủy" variant="outline" onPress={onClose} style={styles.flexButton} />
         <PillButton
-          label="Send invite"
+          label="Gửi lời mời"
           onPress={() => requireOnline(submit)}
           loading={inviteUser.isPending}
           disabled={!email.trim()}

@@ -72,12 +72,18 @@ type fakeWalletRepo struct {
 	// wallet IDs a test has staged as "has at least one non-deleted
 	// Transaction", via seedTransactionForWallet.
 	transactionWallets map[uuid.UUID]bool
+	// Shared wallets (fake_wallet_members_test.go): every membership row ever
+	// written, removed ones included, and the display names
+	// ListUserDisplayNames answers with.
+	members   []*model.WalletMember
+	userNames map[uuid.UUID]string
 }
 
 func newFakeWalletRepo() *fakeWalletRepo {
 	return &fakeWalletRepo{
 		wallets:            make(map[uuid.UUID]*model.Wallet),
 		transactionWallets: make(map[uuid.UUID]bool),
+		userNames:          make(map[uuid.UUID]string),
 	}
 }
 

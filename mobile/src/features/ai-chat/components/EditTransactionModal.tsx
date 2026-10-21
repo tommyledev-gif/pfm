@@ -72,7 +72,7 @@ export function EditTransactionModal({
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [walletId, setWalletId] = useState<string | null>(null);
   const [toWalletId, setToWalletId] = useState<string | null>(null);
-  const wallets = useWalletsQuery();
+  const wallets = useWalletsQuery("writable");
   const openWalletCreator = useOpenWalletCreator();
   const savedId = confirmed ? transactionId : null;
   // The keypad's decimals follow the chosen wallet's currency: always VND for

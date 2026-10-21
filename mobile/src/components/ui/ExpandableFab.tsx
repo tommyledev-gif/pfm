@@ -1,9 +1,11 @@
 import { ComponentType, useEffect, useRef, useState } from "react";
 import { Animated, Easing, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
+import Reanimated from "react-native-reanimated";
 
+import { PressableScale } from "@/components/motion/PressableScale";
 import { IconProps } from "@/components/ui/icons/primitives";
 import { PlusIcon } from "@/components/ui/Icon";
-import { FAB_SIZE, useFabBottom } from "@/components/ui/Fab";
+import { FAB_PRESS_SCALE, FAB_SIZE, fabEntrance, useFabBottom } from "@/components/ui/Fab";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useReduceMotion } from "@/lib/use-reduce-motion";
 
@@ -41,8 +43,9 @@ interface ExpandableFabProps {
  * turns into an × while open; tapping it again, or anywhere else in the
  * host, folds the stack back. Picking an action closes it first.
  *
- * Sits exactly where a plain Fab would (same size and bottom offset), so a
- * screen can swap one for the other without its list padding changing.
+ * Sits exactly where a plain Fab would (same size and bottom offset, same
+ * pop-in and press dip), so a screen can swap one for the other without its
+ * list padding changing.
  */
 export function ExpandableFab({ actions, accessibilityLabel, testID, style }: ExpandableFabProps) {
   const colors = useColors();
@@ -77,7 +80,7 @@ export function ExpandableFab({ actions, accessibilityLabel, testID, style }: Ex
           host's padded box would show hard edges. */}
       {open ? <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} accessible={false} /> : null}
 
-      <View style={[styles.container, { bottom }, style]} pointerEvents="box-none">
+      <Reanimated.View entering={fabEntrance()} style={[styles.container, { bottom }, style]} pointerEvents="box-none">
         <View
           style={styles.actions}
           pointerEvents={open ? "box-none" : "none"}
@@ -116,20 +119,21 @@ export function ExpandableFab({ actions, accessibilityLabel, testID, style }: Ex
           })}
         </View>
 
-        <Pressable
+        <PressableScale
           testID={testID}
           accessibilityRole="button"
           accessibilityLabel={open ? "Đóng" : accessibilityLabel}
           accessibilityState={{ expanded: open }}
           onPress={() => setOpen((prev) => !prev)}
           hitSlop={8}
-          style={({ pressed }) => [styles.fab, pressed && styles.pressed]}
+          scaleTo={FAB_PRESS_SCALE}
+          style={styles.fab}
         >
           <Animated.View style={{ transform: [{ rotate }] }}>
             <PlusIcon size={24} color={colors.onGreen} />
           </Animated.View>
-        </Pressable>
-      </View>
+        </PressableScale>
+      </Reanimated.View>
     </>
   );
 }

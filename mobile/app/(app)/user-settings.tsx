@@ -1,12 +1,15 @@
-import { useRouter } from "expo-router";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { ScrollView } from "react-native";
 
+import { MotionView } from "@/components/motion/MotionView";
+import { ListSection } from "@/components/ui/grouped-list";
 import { Screen } from "@/components/shared/Screen";
+import { ScreenHeader } from "@/components/shared/ScreenHeader";
 import { useFabBottom } from "@/components/ui/Fab";
-import { ChevronLeftIcon } from "@/components/ui/Icon";
 import { ThemePicker } from "@/features/settings/components/ThemePicker";
-import { PinLocationPreferenceRow } from "@/features/transactions/components/PinLocationPreferenceRow";
-import { spacing, typography, createStyles } from "@/lib/theme";
+import { PIN_LOCATION_FOOTER, PinLocationDefaultRow } from "@/features/settings/components/PinLocationDefaultRow";
+import { spacing, createStyles } from "@/lib/theme";
+
+const TRANSACTIONS_HEADER = "Giao dịch";
 
 // Entry point: Settings' "Cài đặt người dùng" row. How the app looks and
 // behaves for this User, kept apart from the data-management rows there.
@@ -15,21 +18,21 @@ import { spacing, typography, createStyles } from "@/lib/theme";
 // picker applies a theme the moment it is tapped, so there is no save step.
 export default function UserSettingsScreen() {
   const styles = useStyles();
-  const router = useRouter();
   // Clear of the floating BottomNav, which covers the screen's foot.
   const navClearance = useFabBottom();
 
   return (
     <Screen style={styles.screen}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={8} testID="btn-user-settings-back" accessibilityLabel="Quay lại">
-          <ChevronLeftIcon size={24} />
-        </Pressable>
-        <Text style={styles.title}>Cài đặt người dùng</Text>
-      </View>
+      <ScreenHeader title="Cài đặt người dùng" backTestID="btn-user-settings-back" />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: navClearance }]}>
-        <ThemePicker />
-        <PinLocationPreferenceRow />
+        <MotionView index={0}>
+          <ThemePicker />
+        </MotionView>
+        <MotionView index={1}>
+          <ListSection header={TRANSACTIONS_HEADER} footer={PIN_LOCATION_FOOTER}>
+            <PinLocationDefaultRow />
+          </ListSection>
+        </MotionView>
       </ScrollView>
     </Screen>
   );
@@ -37,14 +40,5 @@ export default function UserSettingsScreen() {
 
 const useStyles = createStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bgApp },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
-  },
-  title: { flex: 1, ...typography.title, color: colors.textPrimary },
-  content: { paddingHorizontal: spacing.xl, gap: spacing.md },
+  content: { paddingHorizontal: spacing.xl, gap: spacing.xxl },
 }));

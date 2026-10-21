@@ -1,26 +1,30 @@
 import { useRouter } from "expo-router";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { ScrollView } from "react-native";
 
+import { MotionView } from "@/components/motion/MotionView";
 import { Screen } from "@/components/shared/Screen";
-import { ChevronLeftIcon } from "@/components/ui/Icon";
+import { ScreenHeader } from "@/components/shared/ScreenHeader";
+import { useFabBottom } from "@/components/ui/Fab";
 import { EditProfileForm } from "@/features/profile/components/EditProfileForm";
-import { spacing, typography, createStyles } from "@/lib/theme";
+import { spacing, createStyles } from "@/lib/theme";
 
-// Entry points: Settings' avatar and its top-right edit button.
+// Entry points: Settings' profile card and the avatar on it.
 export default function EditProfileScreen() {
   const styles = useStyles();
   const router = useRouter();
+  // Clear of the floating BottomNav (it hides only while the keyboard is up).
+  const navClearance = useFabBottom();
 
   return (
     <Screen style={styles.screen}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={8} testID="btn-edit-profile-back" accessibilityLabel="Quay lại">
-          <ChevronLeftIcon size={24} />
-        </Pressable>
-        <Text style={styles.title}>Hồ sơ</Text>
-      </View>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <EditProfileForm onSaved={() => router.back()} />
+      <ScreenHeader title="Hồ sơ" backTestID="btn-edit-profile-back" />
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: navClearance }]}
+        keyboardShouldPersistTaps="handled"
+      >
+        <MotionView>
+          <EditProfileForm onSaved={() => router.back()} />
+        </MotionView>
       </ScrollView>
     </Screen>
   );
@@ -28,14 +32,5 @@ export default function EditProfileScreen() {
 
 const useStyles = createStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bgApp },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
-  },
-  title: { flex: 1, ...typography.title, color: colors.textPrimary },
-  content: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl },
+  content: { paddingHorizontal: spacing.xl },
 }));

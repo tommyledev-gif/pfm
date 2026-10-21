@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { apiClient, unwrap } from "@/lib/axios";
 import { Wallet } from "@/features/wallets/types";
+import type { WalletColorKey } from "@/lib/wallet-colors";
 import { WalletCurrency, WalletType } from "@/lib/constants";
 
 export interface CreateWalletRequest {
@@ -12,6 +13,8 @@ export interface CreateWalletRequest {
   is_default?: boolean;
   icon?: string;
   icon_url?: string;
+  // Card colour key; omitted = automatic (src/lib/wallet-colors.ts).
+  color?: WalletColorKey;
 }
 
 export function useCreateWalletMutation() {

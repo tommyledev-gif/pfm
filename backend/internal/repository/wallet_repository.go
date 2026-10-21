@@ -47,6 +47,7 @@ type CreateWalletParams struct {
 	IsDefault bool
 	Icon      *string
 	IconURL   *string
+	Color     *string
 }
 
 // CreateWallet always runs inside the caller's transaction — even the
@@ -62,6 +63,7 @@ func (r *WalletRepository) CreateWallet(ctx context.Context, tx pgx.Tx, arg Crea
 		IsDefault: arg.IsDefault,
 		Icon:      arg.Icon,
 		IconURL:   arg.IconURL,
+		Color:     arg.Color,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("repository.CreateWallet: %w", err)
@@ -122,6 +124,10 @@ type UpdateWalletParams struct {
 	// "leave it alone".
 	IconURL         *string
 	IconURLProvided bool
+	// Color follows the same presence-flag rule as IconURL: nil with
+	// ColorProvided=true puts the card back on its automatic colour.
+	Color         *string
+	ColorProvided bool
 }
 
 // UpdateWallet is a single-row UPDATE ... RETURNING * — no transaction
@@ -140,6 +146,8 @@ func (r *WalletRepository) UpdateWallet(ctx context.Context, arg UpdateWalletPar
 		Icon:            arg.Icon,
 		IconURL:         arg.IconURL,
 		IconURLProvided: arg.IconURLProvided,
+		Color:           arg.Color,
+		ColorProvided:   arg.ColorProvided,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("repository.UpdateWallet: %w", err)
@@ -182,6 +190,7 @@ func toWalletModel(row sqlc.Wallet) *model.Wallet {
 		IsDefault: row.IsDefault,
 		Icon:      row.Icon,
 		IconURL:   row.IconURL,
+		Color:     row.Color,
 		CreatedAt: row.CreatedAt,
 		UpdatedAt: row.UpdatedAt,
 		DeletedAt: row.DeletedAt,

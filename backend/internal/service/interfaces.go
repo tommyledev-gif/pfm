@@ -61,6 +61,11 @@ type WalletRepo interface {
 	UpdateWallet(ctx context.Context, arg repository.UpdateWalletParams) (*model.Wallet, error)
 	SetDefaultWallet(ctx context.Context, tx pgx.Tx, id, userID uuid.UUID) (*model.Wallet, error)
 	HasTransactionForWallet(ctx context.Context, walletID uuid.UUID) (bool, error)
+	// Shared-wallet reads (specs/shared-wallets); writes: WalletMemberRepo.
+	GetLiveWalletMember(ctx context.Context, walletID, userID uuid.UUID) (*model.WalletMember, error)
+	ListSharedWalletsForUser(ctx context.Context, userID uuid.UUID) ([]*model.Wallet, error)
+	CountActiveMembersByWallets(ctx context.Context, walletIDs []uuid.UUID) (map[uuid.UUID]int, error)
+	ListUserDisplayNames(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]string, error)
 }
 
 // CategoryRepo is the repository contract CategoryService depends on (F-04).
@@ -231,16 +236,6 @@ type ReportRepo interface {
 // (specs/ai-budget-wizard-v2 US-03). Returns 0 when the User has no plan.
 type CyclePlanRepo interface {
 	ActiveCycleStartDay(ctx context.Context, userID uuid.UUID) (int, error)
-}
-
-// AnalyticsRepo backs AnalyticsService's aggregates the report queries cannot
-// answer (specs/ai-chat-query-spending/plan.md AIQ-T14).
-type AnalyticsRepo interface {
-	ListExpensesByAmount(ctx context.Context, userID uuid.UUID, f repository.AnalyticsFilter, limit int) ([]model.AnalyticsExpense, error)
-	CountTransactions(ctx context.Context, userID uuid.UUID, f repository.AnalyticsFilter) (int64, error)
-	SumExpenseByWallet(ctx context.Context, userID uuid.UUID, f repository.AnalyticsFilter) ([]model.AnalyticsKeyedAmount, error)
-	SumExpenseByLocalDay(ctx context.Context, userID uuid.UUID, f repository.AnalyticsFilter, tz string) ([]model.AnalyticsDayAmount, error)
-	ListTopCategoriesRecent(ctx context.Context, userID uuid.UUID, since time.Time, limit int) ([]model.CategoryUsage, error)
 }
 
 // IntentParseLogRepo is the free-text question log (spec.md US-07).

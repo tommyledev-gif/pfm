@@ -3,13 +3,14 @@ import { Text, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 
 import { Avatar } from "@/components/ui/Avatar";
-import { LockIcon } from "@/components/ui/Icon";
+import { ListCell, ListSection } from "@/components/ui/grouped-list";
+import { LockGlyph } from "@/components/ui/grouped-list/list-icons";
+import { LIST_ROW_MIN_HEIGHT } from "@/components/ui/grouped-list/list-metrics";
 import { UploadButton } from "@/components/ui/UploadButton";
 import { InlineActionField } from "@/components/shared/InlineActionField";
 import { getErrorMessage } from "@/lib/axios";
 import { useRequireOnline } from "@/lib/connectivity";
-import { withAlpha } from "@/lib/color";
-import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useSessionStore } from "@/stores/session-store";
 import { useToastStore } from "@/stores/toast-store";
 import { accountDisplayName } from "@/features/accounts/account-registry-store";
@@ -29,8 +30,7 @@ const COPY = {
   usernameHint: "Đặt một lần lúc kích hoạt, không đổi được.",
   namePlaceholder: "Nguyễn Văn A",
   changePhoto: "Đổi ảnh",
-  // The bar's own label; next to "Đổi ảnh" it can only mean the photo.
-  remove: "Xóa",
+  // The upload card's trash button is icon-only: this names it for screen readers.
   removePhoto: "Xóa ảnh",
   save: "Lưu",
   saved: "Đã lưu",
@@ -118,7 +118,7 @@ export function EditProfileForm({ onSaved }: EditProfileFormProps) {
   };
 
   // Under the field it belongs to: the name's under the name, the photo's
-  // under the form.
+  // under the photo.
   const nameError = updateProfile.isError ? getErrorMessage(updateProfile.error, COPY.saveFailed) : null;
   const photoError = uploadAvatar.isError
     ? getErrorMessage(uploadAvatar.error, COPY.photoFailed)
@@ -128,46 +128,45 @@ export function EditProfileForm({ onSaved }: EditProfileFormProps) {
 
   return (
     <View style={styles.form}>
+      {/* The picture centred on top, its "Đổi ảnh" upload card under it, the
+          way a profile screen opens on iOS. The card's trash button shows
+          only once there is a picture to remove. */}
       <View style={styles.photoBlock}>
         <Avatar name={displayName} iconUrl={profile?.avatar_url} size={AVATAR_SIZE} fallback="initial" />
-        {/* "Đổi ảnh" | "Xóa" in one bar; "Xóa" only once there is a picture. */}
-        <View style={styles.photoActions}>
-          <UploadButton
-            status={uploadAvatar.status}
-            label={COPY.changePhoto}
-            doneLabel={COPY.photoChanged}
-            onPress={() => requireOnline(pickPhoto)}
-            disabled={updateProfile.isPending || removeAvatar.isPending}
-            testID="btn-profile-change-photo"
-            remove={
-              profile?.avatar_url
-                ? {
-                    label: COPY.remove,
-                    accessibilityLabel: COPY.removePhoto,
-                    onPress: () => requireOnline(removePhoto),
-                    disabled: busy,
-                    testID: "btn-profile-remove-photo",
-                  }
-                : undefined
-            }
-          />
-        </View>
+        <UploadButton
+          status={uploadAvatar.status}
+          label={COPY.changePhoto}
+          doneLabel={COPY.photoChanged}
+          onPress={() => requireOnline(pickPhoto)}
+          disabled={updateProfile.isPending || removeAvatar.isPending}
+          testID="btn-profile-change-photo"
+          remove={
+            profile?.avatar_url
+              ? {
+                  accessibilityLabel: COPY.removePhoto,
+                  onPress: () => requireOnline(removePhoto),
+                  disabled: busy,
+                  testID: "btn-profile-remove-photo",
+                }
+              : undefined
+          }
+        />
+        {photoError ? <Text style={styles.error}>{photoError}</Text> : null}
       </View>
 
       {/* Read-only: chosen once on the activation page (backend mig 030).
-          Accounts activated before it existed pick theirs here, once. */}
+          Accounts activated before it existed pick theirs here, once. A row
+          of a group with a lock, so it reads as a value, not a field. */}
       {profile?.username ? (
-        <View style={styles.usernameBlock} testID="text-profile-username">
-          <Text style={styles.label}>{COPY.usernameLabel}</Text>
-          {/* Same box as the field below, locked: it reads as a value, not a typo. */}
-          <View style={styles.lockedBox}>
+        <ListSection footer={COPY.usernameHint}>
+          <ListCell style={styles.usernameRow} testID="text-profile-username">
+            <Text style={styles.usernameLabel}>{COPY.usernameLabel}</Text>
             <Text style={styles.usernameValue} selectable numberOfLines={1}>
               {profile.username}
             </Text>
-            <LockIcon size={16} color={colors.textMuted} />
-          </View>
-          <Text style={styles.hint}>{COPY.usernameHint}</Text>
-        </View>
+            <LockGlyph size={16} weight="fill" color={colors.textMuted} />
+          </ListCell>
+        </ListSection>
       ) : profile ? (
         <UsernameClaimField />
       ) : null}
@@ -189,30 +188,15 @@ export function EditProfileForm({ onSaved }: EditProfileFormProps) {
         testID="input-profile-name"
         actionTestID="btn-profile-save"
       />
-
-      {photoError ? <Text style={styles.error}>{photoError}</Text> : null}
     </View>
   );
 }
 
 const useStyles = createStyles((colors) => ({
-  form: { gap: spacing.md },
-  photoBlock: { flexDirection: "row", alignItems: "center", gap: spacing.lg },
-  photoActions: { flexShrink: 1, alignItems: "flex-start" },
-  label: { ...typography.caption, color: colors.textSecondary },
-  usernameBlock: { gap: spacing.xs },
-  lockedBox: {
-    height: 52,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radii.pill,
-    borderWidth: 1.5,
-    borderColor: colors.surfaceBorder,
-    backgroundColor: withAlpha(colors.overlayBase, 0.03),
-  },
-  usernameValue: { flex: 1, ...typography.body, color: colors.textSecondary },
-  hint: { ...typography.tiny, color: colors.textMuted },
-  error: { color: colors.peach, ...typography.caption },
+  form: { gap: spacing.xxl },
+  photoBlock: { alignItems: "center", gap: spacing.md },
+  usernameRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: LIST_ROW_MIN_HEIGHT },
+  usernameLabel: { ...typography.body, fontWeight: "500", color: colors.textPrimary },
+  usernameValue: { flex: 1, textAlign: "right", ...typography.body, fontWeight: "400", color: colors.textSecondary },
+  error: { ...typography.caption, color: colors.peach, textAlign: "center" },
 }));

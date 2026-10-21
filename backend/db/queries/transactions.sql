@@ -81,6 +81,10 @@ LIMIT 1;
 -- field on a transaction), with literal % / _ / \ pre-escaped by the caller
 -- and matched via ESCAPE '\' so a note containing those characters can't be
 -- misread as a wildcard.
+-- wallet_scoped (specs/shared-wallets plan F1) widens the user_id filter to
+-- every entry in wallet_id, whoever recorded it — for a shared wallet's own
+-- list. TransactionService sets it only after a read-access check on that
+-- wallet, and the clause itself refuses it without a wallet_id.
 SELECT
     t.id, t.user_id, t.wallet_id, t.category_id, t.amount, t.type, t.note,
     t.occurred_at, t.created_at, t.updated_at, t.deleted_at,
@@ -91,7 +95,7 @@ FROM transactions t
 JOIN wallets w ON w.id = t.wallet_id
 JOIN categories c ON c.id = t.category_id
 LEFT JOIN wallets tw ON tw.id = t.to_wallet_id
-WHERE t.user_id = $1
+WHERE (t.user_id = $1 OR (sqlc.arg('wallet_scoped')::bool AND sqlc.narg('wallet_id')::uuid IS NOT NULL))
   AND t.deleted_at IS NULL
   AND (sqlc.narg('wallet_id')::uuid IS NULL OR t.wallet_id = sqlc.narg('wallet_id') OR t.to_wallet_id = sqlc.narg('wallet_id'))
   AND (sqlc.narg('category_id')::uuid IS NULL OR t.category_id = sqlc.narg('category_id'))
@@ -128,7 +132,7 @@ SELECT COUNT(*)::bigint
 FROM transactions t
 JOIN wallets w ON w.id = t.wallet_id
 JOIN categories c ON c.id = t.category_id
-WHERE t.user_id = $1
+WHERE (t.user_id = $1 OR (sqlc.arg('wallet_scoped')::bool AND sqlc.narg('wallet_id')::uuid IS NOT NULL))
   AND t.deleted_at IS NULL
   AND (sqlc.narg('wallet_id')::uuid IS NULL OR t.wallet_id = sqlc.narg('wallet_id') OR t.to_wallet_id = sqlc.narg('wallet_id'))
   AND (sqlc.narg('category_id')::uuid IS NULL OR t.category_id = sqlc.narg('category_id'))

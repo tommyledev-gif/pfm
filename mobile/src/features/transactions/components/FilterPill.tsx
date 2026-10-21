@@ -1,8 +1,13 @@
-import { ReactNode } from "react";
-import { Pressable, Text } from "react-native";
+import { ReactNode, useEffect } from "react";
+import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
+import { PressableScale } from "@/components/motion/PressableScale";
 import { IconProps } from "@/components/ui/Icon";
 import { radii, typography, createStyles, useColors } from "@/lib/theme";
+import { useReduceMotion } from "@/lib/use-reduce-motion";
+
+// A filter turning on (or off) cross-fades the pill rather than cutting.
+const ACTIVE_FADE_MS = 200;
 
 interface FilterPillProps {
   // Filled-green state, for a pill that reflects an applied filter. Action
@@ -25,18 +30,36 @@ interface FilterPillProps {
 export function FilterPill({ active, label, icon: Icon, onPress, children, testID }: FilterPillProps) {
   const colors = useColors();
   const styles = useStyles();
+  const reduceMotion = useReduceMotion();
+  const on = useSharedValue(active ? 1 : 0);
+
+  useEffect(() => {
+    const target = active ? 1 : 0;
+    on.value = reduceMotion ? target : withTiming(target, { duration: ACTIVE_FADE_MS });
+  }, [active, reduceMotion, on]);
+
+  // Read outside the worklets, so a theme switch hands them the new colours.
+  const { surface, surfaceBorder, green, textSecondary, onGreen } = colors;
+  const pillStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(on.value, [0, 1], [surface, green]),
+    borderColor: interpolateColor(on.value, [0, 1], [surfaceBorder, green]),
+  }));
+  const labelStyle = useAnimatedStyle(() => ({ color: interpolateColor(on.value, [0, 1], [textSecondary, onGreen]) }));
+
   return (
-    <Pressable testID={testID} style={[styles.pill, active && styles.pillActive]} onPress={onPress}>
+    <PressableScale testID={testID} style={[styles.pill, pillStyle]} onPress={onPress}>
+      {/* The icon is an SVG and switches colour at once; it is small enough
+          that the fill fading in under it carries the change. */}
       <Icon size={16} color={active ? colors.onGreen : colors.textSecondary} />
-      <Text style={[styles.label, active && styles.labelActive]} numberOfLines={1}>
+      <Animated.Text style={[styles.label, labelStyle]} numberOfLines={1}>
         {label}
-      </Text>
+      </Animated.Text>
       {children}
-    </Pressable>
+    </PressableScale>
   );
 }
 
-const useStyles = createStyles((colors) => ({
+const useStyles = createStyles(() => ({
   pill: {
     // Anchors the sort pill's absolutely-positioned count badge.
     position: "relative",
@@ -46,11 +69,7 @@ const useStyles = createStyles((colors) => ({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: radii.pill,
-    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.surfaceBorder,
   },
-  pillActive: { backgroundColor: colors.green, borderColor: colors.green },
-  label: { ...typography.tiny, color: colors.textSecondary },
-  labelActive: { color: colors.onGreen },
+  label: { ...typography.tiny },
 }));

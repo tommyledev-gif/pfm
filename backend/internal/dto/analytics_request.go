@@ -11,7 +11,7 @@ import "github.com/google/uuid"
 // compare/series need compatible periods, …) are business rules checked in
 // AnalyticsService.validate and returned together in one 400.
 type AnalyticsQueryRequest struct {
-	Metric      string      `json:"metric" validate:"required,oneof=sum breakdown compare series top_n max_tx avg_daily budget_status"`
+	Metric      string      `json:"metric" validate:"required,oneof=sum breakdown compare series top_n max_tx avg_daily budget_status anomaly"`
 	GroupBy     string      `json:"group_by,omitempty" validate:"omitempty,oneof=category wallet weekday"`
 	TxType      string      `json:"tx_type,omitempty" validate:"omitempty,oneof=income expense"`
 	Period      string      `json:"period" validate:"required,oneof=this_cycle last_cycle last_3_cycles last_6_cycles last_30_days this_week custom"`

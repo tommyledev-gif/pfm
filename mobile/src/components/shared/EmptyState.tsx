@@ -1,6 +1,9 @@
 import { ReactNode } from "react";
 import { Pressable, StyleProp, Text, View, ViewStyle } from "react-native";
+import Animated from "react-native-reanimated";
 
+import { entrance } from "@/components/motion/motion-tokens";
+import { PressableScale } from "@/components/motion/PressableScale";
 import { PillButton } from "@/components/ui/PillButton";
 import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
@@ -35,6 +38,9 @@ interface EmptyStateCardProps {
  * One action, deliberately. An empty screen is the moment a new User decides
  * whether the app is worth learning; a row of equal buttons hands that
  * decision back to them, where one clear "do this" makes it for them.
+ *
+ * Settles in with a slight zoom when it appears (a filter that just emptied
+ * a list), so it reads as the answer to that rather than as a blank screen.
  */
 export function EmptyStateCard({
   illustration,
@@ -49,7 +55,7 @@ export function EmptyStateCard({
 }: EmptyStateCardProps) {
   const styles = useStyles();
   return (
-    <View style={[styles.card, style]} testID={testID}>
+    <Animated.View entering={entrance("zoom")} style={[styles.card, style]} testID={testID}>
       {illustration}
       <View style={styles.copy}>
         {eyebrow ? (
@@ -76,7 +82,7 @@ export function EmptyStateCard({
         </Pressable>
       ) : null}
       {children}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -91,15 +97,10 @@ interface EmptyInlineCardProps {
 export function EmptyInlineCard({ icon, text, onPress, testID }: EmptyInlineCardProps) {
   const styles = useStyles();
   return (
-    <Pressable
-      onPress={onPress}
-      disabled={!onPress}
-      testID={testID}
-      style={({ pressed }) => [styles.inline, pressed && styles.inlinePressed]}
-    >
+    <PressableScale onPress={onPress} disabled={!onPress} testID={testID} style={styles.inline}>
       <View style={styles.inlineIcon}>{icon}</View>
       <Text style={styles.inlineText}>{text}</Text>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -137,7 +138,6 @@ const useStyles = createStyles((colors) => ({
     borderColor: colors.surfaceBorder,
     backgroundColor: colors.surface,
   },
-  inlinePressed: { opacity: 0.7 },
   inlineIcon: {
     width: 36,
     height: 36,

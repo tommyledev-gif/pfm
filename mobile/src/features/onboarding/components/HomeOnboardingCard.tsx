@@ -2,6 +2,7 @@ import { Pressable, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 
+import { MotionStagger } from "@/components/motion/MotionStagger";
 import { EmptyStateCard } from "@/components/shared/EmptyState";
 import { PillButton } from "@/components/ui/PillButton";
 import { CheckIcon, LockIcon, PlusIcon, TargetIcon, WalletIcon } from "@/components/ui/Icon";
@@ -18,6 +19,8 @@ const ILLUSTRATION = {
   dark: require("../../../../assets/app-img/dark-empty-home.webp"),
 };
 const ILLUSTRATION_ASPECT_RATIO = 982 / 547;
+// The steps start entering once the card above them has begun to.
+const STEPS_DELAY_MS = 120;
 
 interface HomeOnboardingCardProps {
   hasWallet: boolean;
@@ -76,10 +79,13 @@ export function HomeOnboardingCard({ hasWallet, hasTransaction, hasBudget, onAdd
         <Text style={styles.journeyTitle}>Xong {completed}/3 bước</Text>
       </View>
 
+      {/* The steps follow the card in, one after another. */}
       <View style={styles.steps}>
-        {steps.map((step, index) => (
-          <StepRow key={step.key} step={step} index={index} onPress={() => onAction(step.key)} />
-        ))}
+        <MotionStagger delay={STEPS_DELAY_MS}>
+          {steps.map((step, index) => (
+            <StepRow key={step.key} step={step} index={index} onPress={() => onAction(step.key)} />
+          ))}
+        </MotionStagger>
       </View>
 
       {active ? (

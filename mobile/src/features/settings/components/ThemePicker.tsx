@@ -1,8 +1,9 @@
 import { Pressable, Text, View } from "react-native";
 import Animated, { ZoomIn } from "react-native-reanimated";
 
-import { CheckIcon, PaletteIcon } from "@/components/ui/Icon";
-import { createStyles, radii, spacing, typography, useColors, useThemeName } from "@/lib/theme";
+import { ListCell, ListSection } from "@/components/ui/grouped-list";
+import { CheckIcon } from "@/components/ui/Icon";
+import { createStyles, radii, spacing, typography, useThemeName } from "@/lib/theme";
 import { THEME_NAMES, THEMES, ThemeName } from "@/theme/palettes";
 import { useSwitchTheme } from "@/theme/use-switch-theme";
 
@@ -13,31 +14,29 @@ const SWATCH_HEIGHT = 64;
 // miniature of that theme painted in its OWN palette (ground, a card, the
 // primary) — not the active one — so every option previews what it switches
 // to. Tiles wrap, so adding a palette needs nothing here.
+//
+// A group of the screen's grouped list: "Giao diện" is the group's header
+// (the label the old row carried), the tiles fill its one cell.
 export function ThemePicker() {
   const styles = useStyles();
-  const colors = useColors();
   const active = useThemeName();
   const switchTheme = useSwitchTheme();
 
   return (
-    <View style={styles.card} testID="section-settings-appearance">
-      {/* Same icon + label the old "Giao diện" row carried, so the section
-          reads as the row it replaced, opened. */}
-      <View style={styles.titleRow}>
-        <PaletteIcon size={20} color={colors.textSecondary} />
-        <Text style={styles.title}>Giao diện</Text>
-      </View>
-      <View style={styles.options}>
-        {THEME_NAMES.map((name) => (
-          <ThemeOption
-            key={name}
-            name={name}
-            selected={name === active}
-            onPress={() => switchTheme(name)}
-          />
-        ))}
-      </View>
-    </View>
+    <ListSection header="Giao diện" testID="section-settings-appearance">
+      <ListCell style={styles.cell}>
+        <View style={styles.options}>
+          {THEME_NAMES.map((name) => (
+            <ThemeOption
+              key={name}
+              name={name}
+              selected={name === active}
+              onPress={() => switchTheme(name)}
+            />
+          ))}
+        </View>
+      </ListCell>
+    </ListSection>
   );
 }
 
@@ -74,16 +73,7 @@ function ThemeOption({ name, selected, onPress }: { name: ThemeName; selected: b
 }
 
 const useStyles = createStyles((colors) => ({
-  card: {
-    gap: spacing.md,
-    padding: spacing.lg,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    borderRadius: 16,
-  },
-  titleRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
-  title: { flex: 1, ...typography.body, color: colors.textPrimary },
+  cell: { paddingVertical: spacing.lg },
   options: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
   option: { flexGrow: 1, flexBasis: "40%", gap: spacing.sm, alignItems: "center" },
   swatch: {

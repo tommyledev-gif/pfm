@@ -1,13 +1,14 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Text } from "react-native";
 import { isAxiosError } from "axios";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { ListCell, ListInlineButton, ListRow, ListSection } from "@/components/ui/grouped-list";
 import { SearchField } from "@/components/ui/SearchField";
 import { getErrorMessage, isNetworkError } from "@/lib/api-envelope";
 import { useRequireOnline } from "@/lib/connectivity";
 import { HTTP_STATUS } from "@/lib/constants";
-import { createStyles, radii, spacing, typography, useColors } from "@/lib/theme";
+import { createStyles, typography, useColors } from "@/lib/theme";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { useToastStore } from "@/stores/toast-store";
 import { User } from "@/features/users/types";
@@ -68,39 +69,43 @@ export function DeleteAccountsSection() {
   const results = search.data ?? [];
 
   return (
-    <View style={styles.section} testID="section-delete-accounts">
-      <Text style={styles.title}>{TITLE}</Text>
-      <SearchField
-        value={query}
-        onChangeText={setQuery}
-        placeholder={PLACEHOLDER}
-        autoCorrect={false}
-        testID="input-account-search"
-      />
+    <>
+      {/* One group: the search field as its first row, results under it. */}
+      <ListSection header={TITLE} testID="section-delete-accounts">
+        <ListCell>
+          <SearchField
+            value={query}
+            onChangeText={setQuery}
+            placeholder={PLACEHOLDER}
+            autoCorrect={false}
+            testID="input-account-search"
+          />
+        </ListCell>
 
-      {!hasQuery ? null : search.isPending ? (
-        <ActivityIndicator style={styles.status} color={colors.textSecondary} />
-      ) : search.isError && results.length === 0 ? (
-        <View style={styles.failed}>
-          <Text style={styles.statusText}>{SEARCH_FAILED}</Text>
-          <Pressable onPress={() => search.refetch()} hitSlop={8} accessibilityRole="button">
-            <Text style={styles.retry}>{RETRY}</Text>
-          </Pressable>
-        </View>
-      ) : results.length === 0 ? (
-        <Text style={[styles.status, styles.statusText]}>{NO_RESULTS}</Text>
-      ) : (
-        <View>
-          {results.map((user) => (
+        {!hasQuery ? null : search.isPending ? (
+          <ListCell>
+            <ActivityIndicator color={colors.textSecondary} />
+          </ListCell>
+        ) : search.isError && results.length === 0 ? (
+          <ListRow
+            title={SEARCH_FAILED}
+            trailing={<ListInlineButton label={RETRY} tone="default" onPress={() => search.refetch()} />}
+          />
+        ) : results.length === 0 ? (
+          <ListCell>
+            <Text style={styles.statusText}>{NO_RESULTS}</Text>
+          </ListCell>
+        ) : (
+          results.map((user) => (
             <AccountSearchRow
               key={user.id}
               user={user}
               deleting={remove.isPending && remove.variables === user.id}
               onDelete={setTarget}
             />
-          ))}
-        </View>
-      )}
+          ))
+        )}
+      </ListSection>
 
       <ConfirmDialog
         visible={target !== null}
@@ -112,22 +117,10 @@ export function DeleteAccountsSection() {
         onCancel={() => setTarget(null)}
         testID="dialog-delete-account"
       />
-    </View>
+    </>
   );
 }
 
 const useStyles = createStyles((colors) => ({
-  section: {
-    gap: spacing.sm,
-    padding: spacing.lg,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    borderRadius: radii.listCard,
-  },
-  title: { ...typography.body, color: colors.textPrimary },
-  status: { paddingVertical: spacing.sm },
-  statusText: { ...typography.caption, color: colors.textSecondary },
-  failed: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.sm },
-  retry: { ...typography.caption, fontWeight: "700", color: colors.textPrimary },
+  statusText: { ...typography.caption, fontWeight: "500", color: colors.textSecondary },
 }));

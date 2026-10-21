@@ -232,12 +232,11 @@ export function BottomNav() {
               accessibilityLabel={label}
               accessibilityState={{ selected: index === activeIndex }}
               onLayout={handleTabLayout(index)}
-              // navigate, not replace: the tabs are a real tab navigator
-              // ((tabs)/_layout.tsx), so this jumps to the already-mounted
-              // tab — and from a pushed sub-screen (Wallets, …) it pops back
-              // to the tabs first. Still a no-op on the active tab.
+              // navigate: jumps to the mounted tab, popping sub-screens first.
+              // By path, not lit index: Settings stays lit on its sub-screens,
+              // and tapping it there must go back to Settings.
               onPress={() => {
-                if (index !== activeIndex) router.navigate(href);
+                if (pathname !== href) router.navigate(href);
               }}
               style={styles.tab}
               hitSlop={8}

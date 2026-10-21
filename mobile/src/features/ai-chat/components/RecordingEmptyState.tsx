@@ -1,5 +1,6 @@
 import { Text, View, ViewProps } from "react-native";
 
+import { MotionStagger } from "@/components/motion/MotionStagger";
 import { EmptyStateCard } from "@/components/shared/EmptyState";
 import { ThemedIllustration } from "@/components/shared/ThemedIllustration";
 import { Chip } from "@/components/ui/Chip";
@@ -10,6 +11,8 @@ import { useNeedsFirstWallet, useOpenWalletCreator } from "@/features/wallets/us
 // One of each shape the parser handles: an expense with a wallet named, a
 // bare expense, and an income — tapping one fills the input, never sends.
 const EXAMPLES = ["Cà phê 50k tiền mặt", "Ăn trưa 45k", "Nhận lương 15tr"];
+// The example chips follow the card in, one after another.
+const EXAMPLES_DELAY_MS = 160;
 // The robot art is nearly square: at full card width it took most of the
 // thread's height and pushed the examples down behind the composer.
 const AI_CHAT_ART_MAX_WIDTH = 220;
@@ -58,9 +61,11 @@ export function RecordingEmptyState({ onPickExample, style, onLayout }: Recordin
           <View style={styles.examples}>
             <Text style={styles.examplesTitle}>Thử nhắn</Text>
             <View style={styles.chips}>
-              {EXAMPLES.map((example) => (
-                <Chip key={example} label={example} onPress={() => onPickExample(example)} />
-              ))}
+              <MotionStagger delay={EXAMPLES_DELAY_MS}>
+                {EXAMPLES.map((example) => (
+                  <Chip key={example} label={example} onPress={() => onPickExample(example)} />
+                ))}
+              </MotionStagger>
             </View>
           </View>
         )}

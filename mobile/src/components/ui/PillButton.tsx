@@ -1,11 +1,15 @@
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { ActivityIndicator, Pressable, StyleProp, Text, TextStyle, ViewStyle } from "react-native";
+import Animated from "react-native-reanimated";
 
+import { usePressScale } from "@/components/motion/use-press-scale";
 import { withAlpha } from "@/lib/color";
 import { radii, typography, createStyles, useColors } from "@/lib/theme";
 
 // How far a singleLine label may shrink before it is cut off instead.
 const SINGLE_LINE_MIN_SCALE = 0.8;
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 interface PillButtonProps {
   label?: string;
@@ -51,6 +55,11 @@ interface PillButtonProps {
 // The secondary (outline) variant gets a faint filled background rather than
 // full transparency for the same reason — a border-only shape on a dark
 // sheet reads as decoration, not as a tappable button.
+//
+// A press dips the pill (usePressScale) instead of dimming it: dimmed, a
+// green button looked for a moment like the disabled one. Reduce Motion keeps
+// the dim. Not PressableScale: its style writes opacity, which would undo
+// the disabled look.
 export function PillButton({
   label,
   icon,
@@ -69,19 +78,31 @@ export function PillButton({
   const colors = useColors();
   const styles = useStyles();
   const isOutline = variant === "outline";
+  const press = usePressScale();
+  // Only tracked under Reduce Motion, where the press dims instead.
+  const [dimmed, setDimmed] = useState(false);
   return (
-    <Pressable
+    <AnimatedPressable
       testID={testID}
       onPress={onPress}
       onLongPress={onLongPress}
       delayLongPress={delayLongPress}
+      onPressIn={() => {
+        press.onPressIn();
+        if (press.reduceMotion) setDimmed(true);
+      }}
+      onPressOut={() => {
+        press.onPressOut();
+        if (dimmed) setDimmed(false);
+      }}
       disabled={disabled || loading}
-      style={({ pressed }) => [
+      style={[
         styles.base,
         isOutline ? styles.outline : styles.solid,
         (disabled || loading) && styles.disabled,
-        pressed && !disabled && styles.pressed,
+        dimmed && styles.pressed,
         style,
+        press.style,
       ]}
     >
       {loading ? (
@@ -102,7 +123,7 @@ export function PillButton({
           {iconPosition === "end" ? icon : null}
         </>
       )}
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 

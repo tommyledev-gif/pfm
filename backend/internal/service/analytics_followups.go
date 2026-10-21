@@ -76,6 +76,8 @@ func (b followUpBuilder) forMetric(answer *dto.AnalyticsAnswerResponse) []dto.An
 		return []dto.AnalyticsFollowUp{b.weekday(), b.whereDidItGo()}
 	case model.AnalyticsMetricBudgetStatus:
 		return []dto.AnalyticsFollowUp{b.whereDidItGo(), b.expenseSum()}
+	case analyticsMetricAnomaly:
+		return b.forAnomaly(answer)
 	}
 	return nil
 }

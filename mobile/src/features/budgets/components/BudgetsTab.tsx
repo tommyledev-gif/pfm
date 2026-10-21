@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Pressable, ScrollView, Text, View } from "react-native";
+import Reanimated from "react-native-reanimated";
 
+import { useListEntrance } from "@/components/motion/MotionView";
 import { useFabClearance } from "@/components/ui/Fab";
 import { CalendarIcon } from "@/components/ui/Icon";
 import { CategoryPickerDrawer } from "@/components/shared/CategoryPickerDrawer";
@@ -80,6 +82,7 @@ export function BudgetsTab({ initialRange, rangeNonce, onOpenBudgetWizard }: Bud
   // each row's icon falls back to its linked category's.
   const { refreshControl } = useRefresh([budgets, wallets, categories]);
   const fabClearance = useFabClearance();
+  const rowEntrance = useListEntrance(); // rows stagger in as the tab opens, not per filter
 
   const scrollRef = useRef<ScrollView>(null);
   const rowOffsets = useRef<Record<string, number>>({});
@@ -201,9 +204,10 @@ export function BudgetsTab({ initialRange, rangeNonce, onOpenBudgetWizard }: Bud
                   {rows.length === 0 ? `Chưa có ngân sách bằng ${currency}.` : "Không có ngân sách nào trong nhóm này."}
                 </Text>
               ) : (
-                visibleRows.map(({ budget, limit, periodElapsed }) => (
-                  <View
+                visibleRows.map(({ budget, limit, periodElapsed }, index) => (
+                  <Reanimated.View
                     key={`${budget.id}-${limit.currency}`}
+                    entering={rowEntrance(index)}
                     onLayout={(e) => {
                       rowOffsets.current[budget.id] = e.nativeEvent.layout.y;
                     }}
@@ -222,7 +226,7 @@ export function BudgetsTab({ initialRange, rangeNonce, onOpenBudgetWizard }: Bud
                       onHold={() => setPickerOpen(true)}
                       onPressBar={() => setDetailRow({ budget, limit })}
                     />
-                  </View>
+                  </Reanimated.View>
                 ))
               )}
             </Animated.View>

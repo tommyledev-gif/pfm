@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
+import Animated from "react-native-reanimated";
 
+import { entrance } from "@/components/motion/motion-tokens";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { ChevronLeftIcon } from "@/components/ui/Icon";
 import { createStyles, spacing, useColors } from "@/lib/theme";
@@ -34,6 +36,10 @@ interface SavedAccountLoginProps {
  * list first, then the chosen one, with back returning to the list. Each
  * saved account or sent request can be removed from the device (after a
  * confirm); a test account cannot.
+ *
+ * Picking someone slides their way in over from the right; back slides the
+ * list in from the left. The step on screen when this view opens just shows
+ * (the login screen slides the whole view in).
  */
 export function SavedAccountLogin({ candidates, onBack, onDone }: SavedAccountLoginProps) {
   const colors = useColors();
@@ -44,6 +50,10 @@ export function SavedAccountLogin({ candidates, onBack, onDone }: SavedAccountLo
   const single = candidates.length === 1;
   // A chosen person who has just been removed falls back to the list.
   const selected = single ? candidates[0] : candidates.find((c) => c.key === selectedKey);
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+  }, []);
 
   // The last one removed: nothing left to show here.
   useEffect(() => {
@@ -84,11 +94,15 @@ export function SavedAccountLogin({ candidates, onBack, onDone }: SavedAccountLo
         <View style={styles.column}>
           <BrandMark />
           {selected ? (
-            <View style={styles.body}>
+            <Animated.View
+              key={`person-${selected.key}`}
+              entering={mounted.current ? entrance("slideLeft") : undefined}
+              style={styles.body}
+            >
               <CandidateSignIn key={selected.key} candidate={selected} onDone={onDone} onRemove={removable(selected)} />
-            </View>
+            </Animated.View>
           ) : (
-            <View style={styles.body}>
+            <Animated.View key="list" entering={mounted.current ? entrance("slideRight") : undefined} style={styles.body}>
               <Text style={styles.title} accessibilityRole="header">{COPY.pick}</Text>
               <View style={styles.list}>
                 {candidates.map((candidate) => (
@@ -100,7 +114,7 @@ export function SavedAccountLogin({ candidates, onBack, onDone }: SavedAccountLo
                   />
                 ))}
               </View>
-            </View>
+            </Animated.View>
           )}
         </View>
       </ScrollView>

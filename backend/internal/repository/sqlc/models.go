@@ -58,6 +58,8 @@ type Wallet struct {
 	DeletedAt *time.Time
 	Icon      *string
 	IconURL   *string
+	// Color is a palette key (034_wallets_color.sql); nil = automatic.
+	Color *string
 }
 
 // Category mirrors the categories table exactly (005_categories.sql).

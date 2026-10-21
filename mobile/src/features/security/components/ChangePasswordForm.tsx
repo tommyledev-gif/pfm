@@ -1,12 +1,12 @@
 import { useRef, useState } from "react";
-import { Text, TextInput, View } from "react-native";
+import { TextInput, View } from "react-native";
 
+import { ListSection, ListTextField } from "@/components/ui/grouped-list";
 import { PillButton } from "@/components/ui/PillButton";
 import { getErrorCode, isNetworkError } from "@/lib/api-envelope";
 import { MIN_PASSWORD_LENGTH } from "@/lib/constants";
-import { createStyles, spacing, typography } from "@/lib/theme";
+import { createStyles, spacing } from "@/lib/theme";
 import { useToastStore } from "@/stores/toast-store";
-import { AuthField } from "@/features/auth/components/AuthField";
 import { useChangePasswordMutation } from "@/features/security/api/use-change-password-mutation";
 
 const COPY = {
@@ -63,6 +63,10 @@ function errorsFor(error: unknown): FieldErrors {
  * a typo never costs one of the limited tries; the server checks again. On
  * success this device stays signed in and every other one needs the new
  * password.
+ *
+ * The three fields are one group (hairlines between, no box around each);
+ * the one sentence that matters (the error, or the length rule) is the
+ * group's footer, and the field it is about has a red label.
  */
 export function ChangePasswordForm({ onDone }: { onDone: () => void }) {
   const styles = useStyles();
@@ -95,27 +99,32 @@ export function ChangePasswordForm({ onDone }: { onDone: () => void }) {
     );
   };
 
+  // validate() and errorsFor() report one problem at a time.
+  const errorLine = errors.current ?? errors.next ?? errors.confirm ?? errors.form;
+
   return (
     <View style={styles.form}>
-      <AuthField
-        label={COPY.current}
-        value={current}
-        onChangeText={setCurrent}
-        error={errors.current}
-        secureTextEntry
-        autoCapitalize="none"
-        autoComplete="current-password"
-        textContentType="password"
-        returnKeyType="next"
-        onSubmitEditing={() => nextRef.current?.focus()}
-        testID="input-current-password"
-      />
-      <View style={styles.withHint}>
-        <AuthField
+      <ListSection footer={errorLine ?? COPY.nextHint} footerTone={errorLine ? "danger" : "default"}>
+        <ListTextField
+          label={COPY.current}
+          value={current}
+          onChangeText={setCurrent}
+          invalid={Boolean(errors.current)}
+          error={errors.current}
+          secureTextEntry
+          autoCapitalize="none"
+          autoComplete="current-password"
+          textContentType="password"
+          returnKeyType="next"
+          onSubmitEditing={() => nextRef.current?.focus()}
+          testID="input-current-password"
+        />
+        <ListTextField
           ref={nextRef}
           label={COPY.next}
           value={next}
           onChangeText={setNext}
+          invalid={Boolean(errors.next)}
           error={errors.next}
           secureTextEntry
           autoCapitalize="none"
@@ -125,31 +134,27 @@ export function ChangePasswordForm({ onDone }: { onDone: () => void }) {
           onSubmitEditing={() => confirmRef.current?.focus()}
           testID="input-new-password"
         />
-        {errors.next ? null : <Text style={styles.hint}>{COPY.nextHint}</Text>}
-      </View>
-      <AuthField
-        ref={confirmRef}
-        label={COPY.confirm}
-        value={confirm}
-        onChangeText={setConfirm}
-        error={errors.confirm}
-        secureTextEntry
-        autoCapitalize="none"
-        autoComplete="new-password"
-        textContentType="newPassword"
-        returnKeyType="done"
-        onSubmitEditing={submit}
-        testID="input-confirm-password"
-      />
-      {errors.form ? <Text style={styles.formError}>{errors.form}</Text> : null}
+        <ListTextField
+          ref={confirmRef}
+          label={COPY.confirm}
+          value={confirm}
+          onChangeText={setConfirm}
+          invalid={Boolean(errors.confirm)}
+          error={errors.confirm}
+          secureTextEntry
+          autoCapitalize="none"
+          autoComplete="new-password"
+          textContentType="newPassword"
+          returnKeyType="done"
+          onSubmitEditing={submit}
+          testID="input-confirm-password"
+        />
+      </ListSection>
       <PillButton label={COPY.submit} onPress={submit} loading={change.isPending} testID="btn-change-password" />
     </View>
   );
 }
 
-const useStyles = createStyles((colors) => ({
-  form: { gap: spacing.lg },
-  withHint: { gap: spacing.xs },
-  hint: { ...typography.caption, color: colors.textSecondary },
-  formError: { ...typography.caption, color: colors.peach },
+const useStyles = createStyles(() => ({
+  form: { gap: spacing.xxl },
 }));

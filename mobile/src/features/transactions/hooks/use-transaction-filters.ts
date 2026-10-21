@@ -38,6 +38,8 @@ export function useTransactionFilters() {
   // yet", not "nothing matches". `search`, not `searchInput`: what the list
   // on screen was actually fetched with.
   const hasNarrowingFilter = Boolean(dateRange.from || dateRange.to) || categoryIds.length > 0 || search !== "";
+  // Changes exactly when the fetched list would: a new result set to stagger in.
+  const filterKey = [filter, dateRange.from, dateRange.to, categoryIds.join(), search].join("|");
 
   const resetNarrowing = () => {
     setFilter(undefined);
@@ -69,6 +71,7 @@ export function useTransactionFilters() {
     setSearchInput,
     sharedFilters,
     hasNarrowingFilter,
+    filterKey,
     clearFilters,
     searchFor,
   };

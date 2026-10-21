@@ -1,19 +1,23 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable } from "react-native";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { TrashIcon } from "@/components/ui/Icon";
+import { ListRow } from "@/components/ui/grouped-list";
+import { TrashGlyph } from "@/components/ui/grouped-list/list-icons";
 import { colorForCategory } from "@/lib/category-color";
 import { useRequireOnline } from "@/lib/connectivity";
-import { radii, spacing, typography, createStyles } from "@/lib/theme";
+import { createStyles, spacing, useColors } from "@/lib/theme";
 import { Category } from "@/features/categories/types";
 import { useDeleteCategoryMutation } from "@/features/categories/api/use-delete-category-mutation";
 
-// System categories (`user_id === null`) are read-only — the design's icon
-// circle gets a "System" tag instead of a delete action, and tapping it
-// doesn't open the edit form.
+const AVATAR_SIZE = 36;
+
+// System categories (`user_id === null`) are read-only — no delete action,
+// and tapping one doesn't open the edit form. The screen lists them in a
+// group of their own ("Mặc định"), so the row no longer labels them.
 export function CategoryListItem({ category, onPress }: { category: Category; onPress: () => void }) {
+  const colors = useColors();
   const styles = useStyles();
   const requireOnline = useRequireOnline();
   const isSystem = category.user_id === null;
@@ -22,37 +26,44 @@ export function CategoryListItem({ category, onPress }: { category: Category; on
 
   return (
     <>
-      <Pressable
-        style={styles.row}
+      <ListRow
+        title={category.name}
+        titleLines={1}
+        leading={
+          <Avatar
+            name={category.name}
+            color={colorForCategory(category.id)}
+            size={AVATAR_SIZE}
+            icon={category.icon}
+            iconUrl={category.icon_url}
+          />
+        }
+        leadingWidth={AVATAR_SIZE}
         onPress={isSystem ? undefined : onPress}
         onLongPress={isSystem ? undefined : onPress}
-        disabled={isSystem}
-      >
-        <Avatar
-          name={category.name}
-          color={colorForCategory(category.id)}
-          size={40}
-          icon={category.icon}
-          iconUrl={category.icon_url}
-        />
-        <View style={styles.info}>
-          <Text style={styles.name}>{category.name}</Text>
-          <Text style={styles.sub}>
-            {category.type === "expense" ? "Chi" : "Thu"}
-            {isSystem ? " · Hệ thống" : ""}
-          </Text>
-        </View>
-        {!isSystem ? (
-          <Pressable onPress={() => requireOnline(() => setConfirmDeleteOpen(true))} hitSlop={8} style={styles.deleteButton}>
-            <TrashIcon size={18} />
-          </Pressable>
-        ) : null}
-      </Pressable>
+        // The tap opens the edit sheet over this screen, not a new screen.
+        chevron={false}
+        trailing={
+          isSystem ? null : (
+            <Pressable
+              onPress={() => requireOnline(() => setConfirmDeleteOpen(true))}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={`Xóa danh mục ${category.name}`}
+              style={({ pressed }) => [styles.deleteButton, pressed && styles.pressed]}
+            >
+              <TrashGlyph size={20} color={colors.textSecondary} />
+            </Pressable>
+          )
+        }
+      />
 
       <ConfirmDialog
         visible={confirmDeleteOpen}
         title="Xóa danh mục?"
         message={`"${category.name}" sẽ bị xóa.`}
+        confirmLabel="Xóa danh mục"
+        cancelLabel="Giữ lại"
         onCancel={() => setConfirmDeleteOpen(false)}
         onConfirm={() => {
           setConfirmDeleteOpen(false);
@@ -64,20 +75,7 @@ export function CategoryListItem({ category, onPress }: { category: Category; on
   );
 }
 
-const useStyles = createStyles((colors) => ({
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    borderRadius: radii.listCard,
-  },
-  info: { flex: 1, gap: 2 },
-  name: { ...typography.body, color: colors.textPrimary },
-  sub: { ...typography.tiny, color: colors.textSecondary },
+const useStyles = createStyles(() => ({
   deleteButton: { padding: spacing.xs },
+  pressed: { opacity: 0.6 },
 }));

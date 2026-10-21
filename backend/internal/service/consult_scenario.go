@@ -21,12 +21,7 @@ const (
 	scenarioBaselineCycles = 3
 	// scenarioMaxMonths bounds a plan to something worth showing (50 years).
 	scenarioMaxMonths = 600
-	// scenarioRoundXu is the step every VND figure of a plan lands on: 5.000đ.
-	// "để dành 1.234.567đ" is arithmetic output; 1.235.000đ is a plan.
-	scenarioRoundXu = 5_000 * common.VNDToCentsFactor
-	// scenarioRoundMinor is the step for any other currency: one whole unit.
-	scenarioRoundMinor = 100
-	viDateFmt          = "02/01/2006"
+	viDateFmt         = "02/01/2006"
 
 	msgScenarioPast    = "Mốc thời gian này đã qua. Chọn một mốc trong tương lai."
 	msgScenarioNoPlan  = "Các tháng gần đây chưa có khoản dư để ước tính thời gian. Thử nêu mốc thời gian hoặc số tiền để dành mỗi tháng."
@@ -106,10 +101,14 @@ func (s *ConsultService) scenarioBaseline(ctx context.Context, userID uuid.UUID,
 func planScenario(p *AIConsultParse, base scenarioBaseline, today time.Time, loc *time.Location, currency string) (*dto.ConsultScenario, string) {
 	goal := *p.GoalAmountVND * common.VNDToCentsFactor
 	sc := &dto.ConsultScenario{Currency: currency, Goal: goal, BaselineCycles: base.cycles}
-	// Every worked-out figure sits on the same step, and the cap and cut are
-	// built from the rounded averages, so the numbers on screen still add up.
-	step := scenarioStep(currency)
-	income, expense := roundNearest(base.income, step), roundNearest(base.expense, step)
+	// Every worked-out figure sits on its suggested step (common.SuggestedStep:
+	// 5.000đ under 1.000.000đ, 100.000đ from there), each rounded in the
+	// direction that never overstates what the User can afford: averages to
+	// nearest, a saving needed by a deadline UP, a saving taken from the
+	// surplus and the spending cap DOWN, the cut needed UP. The cap and cut
+	// are built from the rounded figures, so income − cap still covers the
+	// saving and cap + cut still covers today's spending.
+	income, expense := roundNearest(base.income, currency), roundNearest(base.expense, currency)
 
 	switch deadline, err := time.ParseInLocation(common.DateOnlyLayout, p.GoalDeadline, loc); {
 	case p.GoalDeadline != "" && err == nil:
@@ -118,13 +117,13 @@ func planScenario(p *AIConsultParse, base scenarioBaseline, today time.Time, loc
 		}
 		sc.Deadline = p.GoalDeadline
 		sc.Months = monthsUntil(today, deadline)
-		sc.MonthlySave = roundUp(divCeil(goal, int64(sc.Months)), step)
+		sc.MonthlySave = roundUp(divCeil(goal, int64(sc.Months)), currency)
 	case p.MonthlySaveVND != nil:
 		// The user's own figure: kept as stated.
 		sc.MonthlySave = *p.MonthlySaveVND * common.VNDToCentsFactor
 		sc.Months = int(divCeil(goal, sc.MonthlySave))
-	case base.cycles > 0 && income > expense:
-		sc.MonthlySave = income - expense
+	case base.cycles > 0 && roundDown(income-expense, currency) > 0:
+		sc.MonthlySave = roundDown(income-expense, currency)
 		sc.Months = int(divCeil(goal, sc.MonthlySave))
 	default:
 		return nil, msgScenarioNoPlan
@@ -134,9 +133,9 @@ func planScenario(p *AIConsultParse, base scenarioBaseline, today time.Time, loc
 	}
 
 	if base.cycles > 0 {
-		spendCap := income - sc.MonthlySave
-		cut := max(expense-spendCap, 0)
-		feasible := income-expense >= sc.MonthlySave
+		spendCap := roundDown(income-sc.MonthlySave, currency)
+		cut := roundUp(max(expense-spendCap, 0), currency)
+		feasible := expense <= spendCap
 		sc.AvgIncome, sc.AvgExpense, sc.SpendCap, sc.CutNeeded, sc.Feasible = &income, &expense, &spendCap, &cut, &feasible
 	}
 	return sc, ""
@@ -155,15 +154,33 @@ func monthsUntil(today, deadline time.Time) int {
 
 func divCeil(a, b int64) int64 { return (a + b - 1) / b }
 
-func scenarioStep(currency string) int64 {
-	if currency == common.WalletDefaultCurrency {
-		return scenarioRoundXu
+// roundUp / roundNearest / roundDown put a worked-out amount on its
+// suggested step (common.SuggestedStep), chosen by the amount itself.
+func roundUp(x int64, currency string) int64 {
+	if x <= 0 {
+		return x
 	}
-	return scenarioRoundMinor
+	step := common.SuggestedStep(x, currency)
+	return divCeil(x, step) * step
 }
 
-func roundUp(x, step int64) int64      { return divCeil(x, step) * step }
-func roundNearest(x, step int64) int64 { return (x + step/2) / step * step }
+func roundNearest(x int64, currency string) int64 {
+	if x <= 0 {
+		return x
+	}
+	step := common.SuggestedStep(x, currency)
+	return (x + step/2) / step * step
+}
+
+// roundDown leaves zero and negative amounts as they are: a cap at or below
+// zero is reported as "income does not cover the saving", not shown.
+func roundDown(x int64, currency string) int64 {
+	if x <= 0 {
+		return x
+	}
+	step := common.SuggestedStep(x, currency)
+	return x / step * step
+}
 
 func summaryScenario(sc *dto.ConsultScenario, monthly bool) string {
 	m := func(x int64) string { return common.FormatCentsVI(x, sc.Currency) }

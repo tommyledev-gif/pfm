@@ -104,7 +104,7 @@
 {"text": "thế còn ăn uống?", "group": "query_vs_evaluate", "expected": {"kind": "needs_context"}}
 {"text": "cafe 50k", "group": "query_vs_evaluate", "expected": {"kind": "transaction_like"}}
 {"text": "nên đầu tư gì", "group": "unsupported", "expected": {"kind": "unsupported"}}
-{"text": "có khoản nào bất thường không", "group": "unsupported", "expected": {"kind": "unsupported"}}
+{"text": "có khoản nào bất thường không", "group": "anomaly", "expected": {"kind": "query", "coverage": "full", "metric": "anomaly", "period": "custom", "from": "2026-10-14", "to": "2026-10-14"}}
 {"text": "đang trả subscription nào", "group": "unsupported", "expected": {"kind": "unsupported"}}
 {"text": "so với người khác tôi tiêu nhiều không", "group": "unsupported", "expected": {"kind": "unsupported"}}
 {"text": "cuối tháng còn bao nhiêu", "group": "unsupported", "expected": {"kind": "unsupported"}}
@@ -144,3 +144,18 @@
 {"text": "tiêu hnay", "group": "what_spent", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "custom", "from": "2026-10-14", "to": "2026-10-14"}}
 {"text": "tiêu hum qua", "group": "what_spent", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "custom", "from": "2026-10-13", "to": "2026-10-13"}}
 {"text": "tháng nì tiêu bao nhiêu", "group": "what_spent", "expected": {"kind": "query", "coverage": "full", "metric": "sum", "period": "this_cycle"}}
+{"text": "có j bất thường hnay", "group": "anomaly", "expected": {"kind": "query", "coverage": "full", "metric": "anomaly", "period": "custom", "from": "2026-10-14", "to": "2026-10-14"}}
+{"text": "co gi bat thuong hom nay", "group": "anomaly", "expected": {"kind": "query", "coverage": "full", "metric": "anomaly", "period": "custom", "from": "2026-10-14", "to": "2026-10-14"}}
+{"text": "hnay có gì lạ k", "group": "anomaly", "expected": {"kind": "query", "coverage": "full", "metric": "anomaly", "period": "custom", "from": "2026-10-14", "to": "2026-10-14"}}
+{"text": "hôm nay tiêu nhiều hơn bth k", "group": "anomaly", "expected": {"kind": "query", "coverage": "full", "metric": "anomaly", "period": "custom", "from": "2026-10-14", "to": "2026-10-14"}}
+{"text": "có khoản chi nào bất thường không", "group": "anomaly", "expected": {"kind": "query", "coverage": "full", "metric": "anomaly", "period": "custom", "from": "2026-10-14", "to": "2026-10-14"}}
+{"text": "hôm qua có khoản nào bất thường không", "group": "anomaly", "expected": {"kind": "query", "coverage": "full", "metric": "anomaly", "period": "custom", "from": "2026-10-13", "to": "2026-10-13"}}
+{"text": "hqua tiêu gì lạ", "group": "anomaly", "expected": {"kind": "query", "coverage": "full", "metric": "anomaly", "period": "custom", "from": "2026-10-13", "to": "2026-10-13"}}
+{"text": "hôm kia có gì bất thường ko", "group": "anomaly", "expected": {"kind": "query", "coverage": "full", "metric": "anomaly", "period": "custom", "from": "2026-10-12", "to": "2026-10-12"}}
+{"text": "tuần này có gì lạ không", "group": "anomaly", "expected": {"kind": "query", "coverage": "full", "metric": "anomaly", "period": "this_week"}}
+{"text": "tuần này chi tiêu có đột biến không", "group": "anomaly", "expected": {"kind": "query", "coverage": "full", "metric": "anomaly", "period": "this_week"}}
+{"text": "tháng này danh mục nào tăng đột biến", "group": "anomaly", "expected": {"kind": "query", "coverage": "full", "metric": "anomaly", "period": "this_cycle"}}
+{"text": "tháng này tiêu nhiều hơn bình thường không", "group": "anomaly", "expected": {"kind": "query", "coverage": "full", "metric": "anomaly", "period": "this_cycle"}}
+{"text": "tháng trước có gì khác thường", "group": "anomaly", "expected": {"kind": "query", "coverage": "full", "metric": "anomaly", "period": "last_cycle"}}
+{"text": "hôm qua ăn uống có gì lạ", "group": "anomaly", "expected": {"kind": "query", "coverage": "full", "metric": "anomaly", "period": "custom", "from": "2026-10-13", "to": "2026-10-13", "category_names": ["Ăn uống"]}}
+{"text": "dạo này có gì bất thường", "group": "anomaly", "expected": {"kind": "query", "coverage": "full", "metric": "anomaly", "period": "last_30_days"}}

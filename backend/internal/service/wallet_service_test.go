@@ -119,7 +119,7 @@ func TestWalletService_CreateWallet_ConcurrentFirstWalletRace(t *testing.T) {
 		}
 	}
 
-	settled, err := svc.ListWallets(context.Background(), userID)
+	settled, err := svc.ListWallets(context.Background(), userID, false)
 	if err != nil {
 		t.Fatalf("unexpected error listing wallets: %v", err)
 	}

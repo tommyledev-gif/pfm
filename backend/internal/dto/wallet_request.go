@@ -9,17 +9,21 @@ import (
 // "VND" and initial_balance to 0 when omitted — applied in WalletService,
 // not here (shape validation only, per CLAUDE.md's handler/service split).
 type CreateWalletRequest struct {
-	Name           string  `json:"name" validate:"required,max=100"`
-	Type           string  `json:"type" validate:"required,oneof=cash bank e_wallet other"`
-	Currency       string  `json:"currency" validate:"omitempty,oneof=VND USD"`
-	InitialBalance int64   `json:"initial_balance" validate:"omitempty,min=0"`
-	IsDefault      bool    `json:"is_default"`
+	Name           string `json:"name" validate:"required,max=100"`
+	Type           string `json:"type" validate:"required,oneof=cash bank e_wallet other"`
+	Currency       string `json:"currency" validate:"omitempty,oneof=VND USD"`
+	InitialBalance int64  `json:"initial_balance" validate:"omitempty,min=0"`
+	IsDefault      bool   `json:"is_default"`
 	// Icon is a free-text emoji/short label; IconURL is the URL returned by
 	// POST /wallets/icon (a prior upload) and takes display precedence over
 	// Icon when both are set — same convention as Category
 	// (specs/wallet-budget-icons/spec.md).
 	Icon    *string `json:"icon" validate:"omitempty,max=32"`
 	IconURL *string `json:"icon_url" validate:"omitempty,max=500"`
+	// Color is a card palette key (specs/shared-wallets plan F10); the app
+	// owns the actual colours. Keep this list in step with
+	// mobile/src/lib/wallet-colors.ts.
+	Color *string `json:"color" validate:"omitempty,oneof=blue indigo violet magenta rose orange amber lime green teal cyan slate"`
 }
 
 // UpdateWalletRequest is the body of PATCH /wallets/{id}. Deliberately has no
@@ -43,12 +47,15 @@ type UpdateWalletRequest struct {
 	Currency *string        `json:"currency" validate:"omitempty,oneof=VND USD"`
 	Icon     *string        `json:"icon" validate:"omitempty,max=32"`
 	IconURL  OptionalString `json:"icon_url" validate:"omitempty,max=500"`
+	// Color: a palette key, or an explicit null to go back to the automatic
+	// colour — an OptionalString for the same reason as IconURL.
+	Color OptionalString `json:"color" validate:"omitempty,oneof=blue indigo violet magenta rose orange amber lime green teal cyan slate"`
 }
 
 // HasUpdates reports whether at least one field was supplied — an empty
 // body is a client mistake (400), not a no-op 200 (spec.md S-WAL-24).
 func (r UpdateWalletRequest) HasUpdates() bool {
-	return r.Name != nil || r.Type != nil || r.Currency != nil || r.Icon != nil || r.IconURL.Set
+	return r.Name != nil || r.Type != nil || r.Currency != nil || r.Icon != nil || r.IconURL.Set || r.Color.Set
 }
 
 // DecodeStrict decodes raw JSON into v, rejecting any field not present on

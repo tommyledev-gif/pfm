@@ -9,6 +9,10 @@ type AppNativeStatusResponse struct {
 	UpdateRequired bool   `json:"update_required"`
 	VersionCode    int    `json:"version_code"`
 	VersionName    string `json:"version_name"`
+	// DownloadURL is the APK link to open in a browser; omitted when the
+	// server has none configured (APK_PUBLIC_URL), and the app then uses its
+	// API's /app-updates/apk.
+	DownloadURL string `json:"download_url,omitempty"`
 }
 
 // NewAppNativeStatusResponse builds the answer; latest is nil before the

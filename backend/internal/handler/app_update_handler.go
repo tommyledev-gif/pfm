@@ -30,10 +30,21 @@ var runtimeVersionPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127
 type AppUpdateHandler struct {
 	svc    *service.AppUpdateService
 	logger *zap.Logger
+	// publicAPKURL is the APK link handed to people (config.APKPublicURL);
+	// empty = the app falls back to this API's own /api/v1/app-updates/apk.
+	publicAPKURL string
 }
 
 func NewAppUpdateHandler(svc *service.AppUpdateService, logger *zap.Logger) *AppUpdateHandler {
 	return &AppUpdateHandler{svc: svc, logger: logger}
+}
+
+// WithPublicAPKURL sets the link NativeStatus hands out for opening the APK
+// in a browser, e.g. https://app.example.com/app-updates/apk, so the API's
+// own host never appears in front of a person (docs/ops-runbook.md §8).
+func (h *AppUpdateHandler) WithPublicAPKURL(url string) *AppUpdateHandler {
+	h.publicAPKURL = url
+	return h
 }
 
 // Manifest serves GET /api/v1/app-updates/manifest: the live update for the
@@ -85,11 +96,15 @@ func (h *AppUpdateHandler) NativeStatus(c *fiber.Ctx) error {
 	if err != nil {
 		return response.Error(c, h.logger, err)
 	}
-	return response.Success(c, fiber.StatusOK, "app native status", dto.NewAppNativeStatusResponse(latest, required))
+	status := dto.NewAppNativeStatusResponse(latest, required)
+	status.DownloadURL = h.publicAPKURL
+	return response.Success(c, fiber.StatusOK, "app native status", status)
 }
 
-// DownloadAPK serves GET /api/v1/app-updates/apk: the newest APK, for a
-// phone whose installed app is too old for the live OTA update.
+// DownloadAPK serves GET /api/v1/app-updates/apk, and the same file at the
+// short public path GET /app-updates/apk: the newest APK, for a phone whose
+// installed app is too old for the live OTA update, or for a link shared by
+// hand.
 func (h *AppUpdateHandler) DownloadAPK(c *fiber.Ctx) error {
 	path, release, err := h.svc.LatestAPK()
 	if errors.Is(err, service.ErrNoAppUpdate) {

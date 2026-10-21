@@ -14,7 +14,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 ParseKind = Literal["query", "evaluate", "scenario", "unsupported", "needs_context", "transaction_like"]
 Coverage = Literal["full", "partial"]
-Metric = Literal["sum", "breakdown", "compare", "series", "top_n", "max_tx", "avg_daily", "budget_status"]
+# "anomaly": "anything unusual today/this week/this month?" — the backend
+# compares the period with the User's own history (no model numbers).
+Metric = Literal["sum", "breakdown", "compare", "series", "top_n", "max_tx", "avg_daily", "budget_status", "anomaly"]
 GroupBy = Literal["category", "wallet", "weekday"]
 TxType = Literal["income", "expense"]
 Period = Literal["this_cycle", "last_cycle", "last_3_cycles", "last_6_cycles", "last_30_days", "this_week", "custom"]

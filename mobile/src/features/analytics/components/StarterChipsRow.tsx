@@ -1,5 +1,6 @@
 import { SuggestionChips } from "@/features/analytics/components/SuggestionChips";
-import { STARTER_CHIPS } from "@/features/analytics/starter-chips";
+import { STARTER_CHIPS, anomalyTodayChip } from "@/features/analytics/starter-chips";
+import { todayDateOnly } from "@/lib/date-range";
 import { AnalyticsQuery } from "@/features/analytics/types";
 import { spacing } from "@/lib/theme";
 
@@ -13,7 +14,9 @@ interface StarterChipsRowProps {
 export function StarterChipsRow({ onAsk, disabled }: StarterChipsRowProps) {
   return (
     <SuggestionChips
-      chips={STARTER_CHIPS}
+      // The anomaly question second: after the month's total, before the
+      // breakdown it often leads to.
+      chips={[STARTER_CHIPS[0], anomalyTodayChip(todayDateOnly()), ...STARTER_CHIPS.slice(1)]}
       disabled={disabled}
       testIDPrefix="chip-starter"
       bleed={spacing.xl}

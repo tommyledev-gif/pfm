@@ -13,3 +13,13 @@ export const STARTER_CHIPS: AnalyticsFollowUp[] = [
   { label: "Còn bao nhiêu ngân sách?", query: { metric: "budget_status", period: "this_cycle" } },
   { label: "Thu nhập tháng này", query: { metric: "sum", tx_type: "income", period: "this_cycle" } },
 ];
+
+/**
+ * "Anything unusual today?" — the anomaly answer for one local day
+ * (backend consult_anomaly.go's anomalyTodayChip asks the same). Built per
+ * render rather than kept in STARTER_CHIPS, so a pane left open past
+ * midnight asks about the new day.
+ */
+export function anomalyTodayChip(today: string): AnalyticsFollowUp {
+  return { label: "Hôm nay có gì bất thường?", query: { metric: "anomaly", period: "custom", from: today, to: today } };
+}

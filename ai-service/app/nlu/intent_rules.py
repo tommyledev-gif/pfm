@@ -56,6 +56,22 @@ _add(
     "liet ke", "giao dich nao", "nhung giao dich", "cac giao dich", "nhung giao dich nao",
 )
 _add("most", "nhieu nhat")
+# "Anything unusual?" (backend metric anomaly). Accentless "la" is both "lạ"
+# (odd) and "là" (is, a filler), so "lạ" counts only glued to what it
+# qualifies: "gì lạ", "khoản lạ". Longest phrase wins, so "khoản nào bất
+# thường" is read whole rather than as a list cue.
+_add(
+    "unusual",
+    "bat thuong", "khac thuong", "dot bien", "tang dot bien", "tang vot", "tang manh",
+    "nhieu bat thuong", "cao bat thuong", "lon bat thuong",
+    "hon binh thuong", "nhieu hon binh thuong", "khac binh thuong", "hon moi khi", "nhieu hon moi khi", "khac moi khi",
+    "gi la", "cai gi la", "khoan la", "khoan nao la", "khoan chi la", "giao dich la", "giao dich nao la",
+    "khoan bat thuong", "khoan chi bat thuong", "khoan chi nao bat thuong", "giao dich bat thuong",
+)
+# "có … không" turns a statement into a yes/no question. Known only so an
+# unusual-question can be read whole; anywhere else it is an evaluation
+# ("tháng này có tiêu nhiều không"), which only the model tells apart.
+_add("yes_no", "co", "khong", "co khong", "hay khong", "chua")
 _add("filler", "da", "roi", "het", "duoc", "trong", "vay", "nhi", "a", "ha", "oi", "cua", "la", "xem", "coi", "cho xem", "muon biet", "biet")
 _add("period:today", "hom nay", "ngay hom nay")
 _add("period:yesterday", "hom qua")
@@ -68,6 +84,13 @@ _add("period:last_30_days", "30 ngay qua")
 _MAX_PHRASE = max(len(p) for p in _PHRASES)
 _DAYS_BACK = {"today": 0, "yesterday": 1, "day_before": 2}
 _ANCHORS = {"spend", "money", "income", "category"}
+# What an unusual-question may also contain. Not income, budget, a count or
+# "most": "thu nhập có gì lạ", "tiêu gì là nhiều nhất" go to the model.
+_ANOMALY_ROLES = {"unusual", "spend", "money", "what_on", "category", "list", "filler", "yes_no"}
+# The backend compares a day with days, a week with weeks, a cycle with
+# cycles; "dạo này" (last 30 days) has nothing to compare with. No period
+# stated means today.
+_ANOMALY_PERIODS = {None, "today", "yesterday", "day_before", "this_week", "this_cycle", "last_cycle"}
 
 
 def read_simple_question(normalized: str, today: str) -> ConsultQuery | None:
@@ -83,6 +106,10 @@ def read_simple_question(normalized: str, today: str) -> ConsultQuery | None:
         return None
     has = {r for r in roles if not r.startswith("period:")}
     period = periods[0] if periods else None
+    if "unusual" in has:
+        return _anomaly(has, period, today)
+    if "yes_no" in has:
+        return None
     if "budget" in has:
         return _budget(has, period)
     metric = _metric(has, period)
@@ -105,6 +132,13 @@ def _roles(words: list[str]) -> list[str] | None:
         else:
             return None
     return roles
+
+
+def _anomaly(has: set[str], period: str | None, today: str) -> ConsultQuery | None:
+    """"có j bất thường hnay", "tuần này có khoản nào lạ không"."""
+    if has - _ANOMALY_ROLES or period not in _ANOMALY_PERIODS:
+        return None
+    return _query("anomaly", has, period or "today", today)
 
 
 def _budget(has: set[str], period: str | None) -> ConsultQuery | None:

@@ -1,14 +1,15 @@
 import { useState } from "react";
-import { Text, View } from "react-native";
 
-import { Toggle } from "@/components/ui/Toggle";
-import { createStyles, radii, spacing, typography } from "@/lib/theme";
+import { ListToggleRow } from "@/components/ui/grouped-list";
+import { LockGlyph } from "@/components/ui/grouped-list/list-icons";
+import { useColors } from "@/lib/theme";
 import { useSecurityPrefsStore } from "@/stores/security-prefs-store";
 import { useToastStore } from "@/stores/toast-store";
 import { CHANGE_SETTING_PROMPT, confirmOwner } from "@/features/security/identity-check";
 
 const TITLE = "Khóa ứng dụng";
-const HINT = "Hỏi vân tay, khuôn mặt hoặc mã khóa màn hình khi mở ứng dụng.";
+/** The group footer under this row on the Security screen. */
+export const APP_LOCK_FOOTER = "Hỏi vân tay, khuôn mặt hoặc mã khóa màn hình khi mở ứng dụng.";
 const NO_LOCK = "Máy chưa cài khóa màn hình nên chưa bật được khóa ứng dụng.";
 const FAILED = "Không xác minh được.";
 
@@ -20,7 +21,7 @@ const FAILED = "Không xác minh được.";
  * it off.
  */
 export function AppLockToggleRow() {
-  const styles = useStyles();
+  const colors = useColors();
   const enabled = useSecurityPrefsStore((s) => s.appLockEnabled);
   const setEnabled = useSecurityPrefsStore((s) => s.setAppLockEnabled);
   const [checking, setChecking] = useState(false);
@@ -40,35 +41,14 @@ export function AppLockToggleRow() {
   };
 
   return (
-    <View style={styles.row}>
-      <View style={styles.text}>
-        <Text style={styles.title}>{TITLE}</Text>
-        <Text style={styles.hint}>{HINT}</Text>
-      </View>
-      <Toggle
-        value={enabled}
-        onValueChange={onChange}
-        disabled={checking}
-        accessibilityLabel={TITLE}
-        testID="switch-app-lock"
-      />
-    </View>
+    <ListToggleRow
+      title={TITLE}
+      icon={LockGlyph}
+      tone={colors.info}
+      value={enabled}
+      onValueChange={onChange}
+      disabled={checking}
+      testID="switch-app-lock"
+    />
   );
 }
-
-const useStyles = createStyles((colors) => ({
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    borderRadius: radii.listCard,
-  },
-  text: { flex: 1, gap: spacing.xs },
-  title: { ...typography.body, color: colors.textPrimary },
-  hint: { ...typography.caption, color: colors.textSecondary },
-}));

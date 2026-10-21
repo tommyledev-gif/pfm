@@ -21,4 +21,10 @@ func registerAppUpdateRoutes(app *fiber.App, h *handler.AppUpdateHandler, filesD
 	updates.Get("/apk", h.DownloadAPK)
 	updates.Get("/apk/status", h.NativeStatus)
 	updates.Static("/files", filesDir, fiber.Static{ByteRange: true, MaxAge: appUpdateFileMaxAge})
+
+	// The APK at a short path outside /api/v1, for the link people share:
+	// https://app.example.com/app-updates/apk (APK_PUBLIC_URL). Same
+	// handler, same file; that host routes here through the Cloudflare tunnel
+	// and its path rule must let /app-updates/apk through (ops-runbook §4, §8).
+	app.Get("/app-updates/apk", h.DownloadAPK)
 }

@@ -59,6 +59,13 @@ export default function NotificationsScreen() {
       return;
     }
 
+    // Shared wallets (specs/shared-wallets US-02): the invitation card, or
+    // the wallet someone just joined, are both on the Wallets screen.
+    if (item.type === "wallet_invite" || item.type === "wallet_member_joined") {
+      router.push("/wallets");
+      return;
+    }
+
     const categoryId = item.related_budget_id ? categoryIdByBudgetId.get(item.related_budget_id) : undefined;
     if (!categoryId) return;
 

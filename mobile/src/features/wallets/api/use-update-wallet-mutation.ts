@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { apiClient, unwrap } from "@/lib/axios";
 import { Wallet } from "@/features/wallets/types";
+import type { WalletColorKey } from "@/lib/wallet-colors";
 import { WalletCurrency, WalletType } from "@/lib/constants";
 
 // No `balance` field here — backend's UpdateWalletRequest is strict-decoded
@@ -13,6 +14,8 @@ export interface UpdateWalletRequest {
   icon?: string;
   // null clears an uploaded photo (backend OptionalString); omitted leaves it.
   icon_url?: string | null;
+  // Same three states: a key, null for the automatic colour, omitted = keep.
+  color?: WalletColorKey | null;
 }
 
 export function useUpdateWalletMutation() {

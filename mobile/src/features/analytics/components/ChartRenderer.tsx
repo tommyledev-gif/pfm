@@ -1,6 +1,7 @@
 import { Text, View } from "react-native";
 
 import { AmountText } from "@/components/ui/AmountText";
+import { AnomalyAnswer } from "@/features/analytics/components/AnomalyAnswer";
 import { BarList } from "@/features/analytics/components/BarList";
 import { BudgetStatusList } from "@/features/analytics/components/BudgetStatusList";
 import { ColumnBars, fitsColumns } from "@/features/analytics/components/ColumnBars";
@@ -70,6 +71,13 @@ export function ChartRenderer({ chart, currency, elapsed }: ChartRendererProps) 
         ) : null;
       case "progress":
         return chart.budgets ? <BudgetStatusList budgets={chart.budgets} currency={currency} elapsed={elapsed} /> : null;
+      case "anomaly":
+        // A malformed one still shows its figures rather than nothing.
+        return chart.anomaly ? (
+          <AnomalyAnswer chart={chart} anomaly={chart.anomaly} currency={currency} />
+        ) : (
+          <FallbackList chart={chart} currency={currency} elapsed={elapsed} />
+        );
       default:
         return <FallbackList chart={chart} currency={currency} elapsed={elapsed} />;
     }
@@ -80,7 +88,9 @@ export function ChartRenderer({ chart, currency, elapsed }: ChartRendererProps) 
   // ground, only the data gets a raised tone — no border, no card in a card.
   // A list's rows already carry their own vertical padding; a chart with a
   // few expenses listed under it (donut, number) keeps the chart's padding.
-  const listOnly = chart.type !== "donut" && chart.type !== "number" && Boolean(chart.rows || chart.budgets);
+  // An anomaly answer draws bars above its lists, so it keeps the padding too.
+  const padded = chart.type === "donut" || chart.type === "number" || chart.type === "anomaly";
+  const listOnly = !padded && Boolean(chart.rows || chart.budgets);
   return (
     <View testID={`chart-analytics-${chart.type}`} style={[styles.surface, listOnly && styles.surfaceList]}>
       {body}

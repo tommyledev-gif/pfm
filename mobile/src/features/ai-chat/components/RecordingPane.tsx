@@ -38,6 +38,12 @@ const FOCUS_RETRY_DELAY_MS = 100;
 
 const messageKey = (m: ChatMessage) => m.id;
 
+// What the assistant is reading: the newest user message, sent or re-sent.
+const READING_PHOTO = "Đang đọc ảnh…";
+const READING_MESSAGE = "Đang đọc tin nhắn…";
+const readingLabel = (messages: ChatMessage[]) =>
+  messages.find((m) => m.role === "user")?.imageCapture ? READING_PHOTO : READING_MESSAGE;
+
 interface RecordingPaneProps {
   listRef: RefObject<FlatList<ChatMessage> | null>;
   /** Recording messages, newest first (the list is inverted). */
@@ -111,7 +117,7 @@ export function RecordingPane({
   // Proposals are read as VND (proposal-wallet.ts), so without a VND Wallet a
   // card can never be saved — it offers to create one instead. Only once the
   // list has loaded, so it never flashes for an account that has one.
-  const wallets = useWalletsQuery();
+  const wallets = useWalletsQuery("writable");
   const noVndWallet = wallets.isSuccess && !wallets.data.some((w) => w.currency === PROPOSAL_CURRENCY);
   const openWalletCreator = useOpenWalletCreator();
   const handleCreateWallet = noVndWallet ? openWalletCreator : undefined;
@@ -230,11 +236,11 @@ export function RecordingPane({
           // inversion onto the header/empty slots.
           ListEmptyComponent={<RecordingEmptyState onPickExample={onChangeInput} />}
           // Header, not footer: on an inverted list the header renders at the
-          // visual bottom, which is where the typing dots belong.
+          // visual bottom, which is where the typing bubble belongs.
           ListHeaderComponent={
             chat.sending ? (
               <View style={chatThreadStyles.typingRow}>
-                <TypingIndicator />
+                <TypingIndicator label={readingLabel(messages)} testID="typing-recording" />
               </View>
             ) : null
           }

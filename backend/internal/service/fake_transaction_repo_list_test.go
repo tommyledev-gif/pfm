@@ -24,10 +24,13 @@ func (f *fakeTransactionRepo) ListTransactionsByUser(_ context.Context, userID u
 
 	var out []*model.Transaction
 	for _, t := range f.transactions {
-		if t.DeletedAt != nil || t.UserID != userID {
+		// Mirrors the SQL: WalletScoped lifts the user filter, but only
+		// together with a wallet filter (specs/shared-wallets plan F1).
+		walletScoped := filter.WalletScoped && filter.WalletID != nil
+		if t.DeletedAt != nil || (t.UserID != userID && !walletScoped) {
 			continue
 		}
-		if filter.WalletID != nil && t.WalletID != *filter.WalletID {
+		if filter.WalletID != nil && t.WalletID != *filter.WalletID && (t.ToWalletID == nil || *t.ToWalletID != *filter.WalletID) {
 			continue
 		}
 		if filter.CategoryID != nil && t.CategoryID != *filter.CategoryID {

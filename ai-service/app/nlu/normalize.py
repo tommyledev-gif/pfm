@@ -46,6 +46,8 @@ _TEENCODE = {
     "nhiu": "nhieu",
     "bnhiu": "bao nhieu",
     "r": "roi",
+    # "nhiều hơn bth" — "bình thường" (usual), for "anything unusual" questions.
+    "bth": "binh thuong",
 }
 
 # Informal "recently" phrasings all mean the last 30 days (brief §II.5.2

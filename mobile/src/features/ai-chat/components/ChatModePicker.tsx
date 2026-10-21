@@ -1,9 +1,20 @@
+import { useEffect } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from "react-native-reanimated";
 
+import { SPRING } from "@/components/motion/motion-tokens";
 import { CheckCircleIcon } from "@/components/ui/Icon";
 import { CHAT_MODE_META, CHAT_MODE_ORDER, ChatMode } from "@/features/ai-chat/chat-mode";
 import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { useReduceMotion } from "@/lib/use-reduce-motion";
+
+// The sheet grows from just under its size as the Modal fades in
+// (animate-ui's Dialog: zoom + fade, short travel).
+const OPEN_SCALE = 0.94;
+const OPEN_RISE = 8;
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 interface ChatModePickerProps {
   visible: boolean;
@@ -23,6 +34,9 @@ interface ChatModePickerProps {
  * Deliberately flat: plain rows on the sheet, and only the selected one gets
  * a faint tint of its own colour plus the check.
  *
+ * Opens like animate-ui's Dialog: the Modal fades and the sheet zooms up to
+ * size with it. Reduce Motion: the fade alone.
+ *
  * ⚠️ No shadows / elevation on the rows. On Android an elevation shadow is
  * drawn BEHIND the view, and through a translucent tinted background it
  * shows up as a dark rectangle inside the row — which is exactly what the
@@ -31,11 +45,28 @@ interface ChatModePickerProps {
 export function ChatModePicker({ visible, mode, onClose, onSelect }: ChatModePickerProps) {
   const colors = useColors();
   const styles = useStyles();
+  const reduceMotion = useReduceMotion();
+  // 0 = just opened (small, low), 1 = at rest.
+  const open = useSharedValue(1);
+
+  useEffect(() => {
+    if (!visible || reduceMotion) return;
+    // From 0 every time it opens: a sequence, so the reset is never skipped.
+    open.value = withSequence(withTiming(0, { duration: 0 }), withSpring(1, SPRING));
+  }, [visible, reduceMotion, open]);
+
+  const sheetMotion = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: (1 - open.value) * OPEN_RISE },
+      { scale: OPEN_SCALE + (1 - OPEN_SCALE) * open.value },
+    ],
+  }));
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         {/* Swallows the press so a tap inside the card does not close it. */}
-        <Pressable onPress={() => {}} style={styles.sheet}>
+        <AnimatedPressable onPress={() => {}} style={[styles.sheet, sheetMotion]}>
           <Text style={styles.title}>Chế độ trò chuyện</Text>
 
           <View style={styles.list}>
@@ -76,7 +107,7 @@ export function ChatModePicker({ visible, mode, onClose, onSelect }: ChatModePic
               );
             })}
           </View>
-        </Pressable>
+        </AnimatedPressable>
       </Pressable>
     </Modal>
   );

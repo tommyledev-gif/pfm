@@ -43,6 +43,15 @@ type TransactionResponse struct {
 	ItemCount   int                              `json:"item_count"`
 	Items       *[]TransactionItemResponse       `json:"items,omitempty"`
 	Adjustments *[]TransactionAdjustmentResponse `json:"adjustments,omitempty"`
+	// RecordedBy is who recorded the entry, only on a shared wallet's list
+	// and only when that is someone other than the caller
+	// (specs/shared-wallets BR-13); omitted otherwise.
+	RecordedBy *TransactionRecorderResponse `json:"recorded_by,omitempty"`
+}
+
+type TransactionRecorderResponse struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
 }
 
 // TransactionLocationResponse is TransactionResponse.location. PlaceName and
@@ -86,7 +95,15 @@ func NewTransactionResponse(t *model.Transaction) TransactionResponse {
 		ItemCount:    t.ItemCount,
 		Items:        items,
 		Adjustments:  adjustments,
+		RecordedBy:   newRecorderResponse(t),
 	}
+}
+
+func newRecorderResponse(t *model.Transaction) *TransactionRecorderResponse {
+	if t.RecordedByName == nil {
+		return nil
+	}
+	return &TransactionRecorderResponse{ID: t.UserID, Name: *t.RecordedByName}
 }
 
 // NewTransactionResponseWithBalance attaches the Wallet's new balance —

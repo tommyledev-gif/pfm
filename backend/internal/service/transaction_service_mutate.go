@@ -38,6 +38,9 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, userID, tran
 	if err != nil {
 		return nil, nil, err
 	}
+	if err := s.requireWritableEntry(ctx, userID, existing); err != nil {
+		return nil, nil, err
+	}
 
 	var categoryName string
 	// A transfer is always filed under the system transfer Category.
@@ -185,6 +188,9 @@ func (s *TransactionService) updateTransactionTx(ctx context.Context, userID, tr
 func (s *TransactionService) DeleteTransaction(ctx context.Context, userID, transactionID uuid.UUID) (*model.Wallet, error) {
 	existing, err := s.getOwnedTransaction(ctx, userID, transactionID)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.requireWritableEntry(ctx, userID, existing); err != nil {
 		return nil, err
 	}
 

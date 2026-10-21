@@ -1,5 +1,8 @@
+import { useEffect, useRef } from "react";
 import { Image, Pressable, Text, View } from "react-native";
+import Animated from "react-native-reanimated";
 
+import { entrance } from "@/components/motion/motion-tokens";
 import { ChevronDownIcon } from "@/components/ui/Icon";
 import { CHAT_MODE_META, ChatMode } from "@/features/ai-chat/chat-mode";
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
@@ -20,11 +23,18 @@ interface ChatModeHeaderProps {
  * screen, and an unlabelled glyph left the user guessing both what mode they
  * were in and that it was tappable at all. A soft ring in the mode's colour
  * gives it the "glow" that marks it as the screen's key control.
+ *
+ * Switching mode fades the pill's new icon and name in (keyed by mode), in
+ * step with ChatModeBackdrop's wash; the first render just shows it.
  */
 export function ChatModeHeader({ mode, onPressMode }: ChatModeHeaderProps) {
   const styles = useStyles();
   const meta = CHAT_MODE_META[mode];
   const ModeIcon = meta.icon;
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+  }, []);
 
   return (
     <View style={styles.header}>
@@ -53,11 +63,17 @@ export function ChatModeHeader({ mode, onPressMode }: ChatModeHeaderProps) {
           onPress={onPressMode}
           hitSlop={6}
         >
-          <ModeIcon size={18} color={meta.tint} toColor={meta.iconToColor} />
-          <Text style={[styles.modeLabel, { color: meta.tint }]} numberOfLines={1}>
-            {meta.shortLabel}
-          </Text>
-          <ChevronDownIcon size={14} color={meta.tint} />
+          <Animated.View
+            key={mode}
+            entering={mounted.current ? entrance("fade") : undefined}
+            style={styles.modeContent}
+          >
+            <ModeIcon size={18} color={meta.tint} toColor={meta.iconToColor} />
+            <Text style={[styles.modeLabel, { color: meta.tint }]} numberOfLines={1}>
+              {meta.shortLabel}
+            </Text>
+            <ChevronDownIcon size={14} color={meta.tint} />
+          </Animated.View>
         </Pressable>
       </View>
     </View>
@@ -102,15 +118,13 @@ const useStyles = createStyles((colors) => ({
     shadowOffset: { width: 0, height: 0 },
   },
   modePill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
     paddingVertical: 7,
     paddingLeft: 10,
     paddingRight: 12,
     borderRadius: radii.pill,
     borderWidth: 1,
   },
+  modeContent: { flexDirection: "row", alignItems: "center", gap: 6 },
   modePillPressed: { opacity: 0.7 },
   modeLabel: { ...typography.caption, fontWeight: "700" },
 }));

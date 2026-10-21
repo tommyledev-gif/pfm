@@ -1,5 +1,7 @@
 import { memo } from "react";
+import Animated from "react-native-reanimated";
 
+import { useFreshEntrance } from "@/components/motion/use-fresh-entrance";
 import { ActionPopover } from "@/components/shared/ActionPopover";
 import { AI_CONFIDENCE_THRESHOLD, FALLBACK_CURRENCY, TRANSFER_CATEGORY_ICON } from "@/lib/constants";
 import { BudgetWizardCard } from "@/features/ai-chat/components/BudgetWizardCard";
@@ -20,6 +22,15 @@ import { ManualEntryButton } from "@/features/ai-chat/components/ManualEntryButt
 import { CreateWalletButton } from "@/features/ai-chat/components/CreateWalletButton";
 import { ImageThumbnail } from "@/features/ai-chat/components/ImageThumbnail";
 import { RetryImageButton } from "@/features/ai-chat/components/RetryImageButton";
+
+// Message ids carry their creation time (message-id.ts: `msg_<ms>_<n>`).
+const ID_TIME = /^msg_(\d+)_/;
+
+/** When a message was created, read from its id; undefined if it has none. */
+export function messageCreatedAt(id: string): number | undefined {
+  const match = ID_TIME.exec(id);
+  return match ? Number(match[1]) : undefined;
+}
 
 interface ChatMessageRowProps {
   message: ChatMessage;
@@ -54,6 +65,9 @@ interface ChatMessageRowProps {
  *
  * Memoized (export below): callers pass stable callbacks, so a row re-renders
  * only when its own message or flags change.
+ *
+ * A message that has just been sent or received rises in (useFreshEntrance);
+ * the history already in the thread, restored or remounted, never animates.
  */
 function ChatMessageRowView({
   message,
@@ -99,6 +113,7 @@ function ChatMessageRowView({
   const onEdit = isEditLocked(message) ? undefined : () => onTriggerEdit(message);
   const onDelete = isRemovable(message) ? () => onTriggerDelete(message) : undefined;
 
+  const entering = useFreshEntrance(messageCreatedAt(message.id));
   const menu = useHoldMenu();
   const menuActions = useMessageActions({
     message,
@@ -109,7 +124,7 @@ function ChatMessageRowView({
     phraseActions: message.role === "user",
   });
 
-  return (
+  const row = (
     <SwipeableMessageRow
       // User bubbles are right-aligned, assistant bubbles left-aligned, so
       // each is dragged away from the edge it already sits on.
@@ -185,6 +200,8 @@ function ChatMessageRowView({
       />
     </SwipeableMessageRow>
   );
+  // Decided once at mount, so the wrapper never comes or goes under a row.
+  return entering ? <Animated.View entering={entering}>{row}</Animated.View> : row;
 }
 
 export const ChatMessageRow = memo(ChatMessageRowView);

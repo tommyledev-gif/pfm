@@ -7,6 +7,7 @@ import { formatCurrency } from "@/lib/currency";
 import { readableInk, withAlpha } from "@/lib/color";
 import { radii, spacing, typography, walletCardInk, createStyles } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
+import { isOwnWallet } from "@/features/wallets/wallet-access";
 import { PendingBalanceHint, usePendingWalletCount } from "@/features/wallets/components/PendingBalanceHint";
 import { WalletCardArt } from "@/features/wallets/components/WalletCardArt";
 import { WalletCardSheen } from "@/features/wallets/components/WalletCardSheen";
@@ -40,12 +41,21 @@ const BALANCE_LABEL: Record<Wallet["type"], string> = {
 };
 
 // Secondary text on the card (type, balance label): the ink, pulled back.
-const SECONDARY_INK_ALPHA = 0.72;
+// 0.8, not lower: with the card's lightest corner it keeps every picked
+// colour above 3:1 (src/lib/wallet-colors.ts).
+const SECONDARY_INK_ALPHA = 0.8;
+
+// The small line under the name: the wallet's type, or who shares it
+// (specs/shared-wallets US-06).
+function identityLine(wallet: Wallet): string {
+  if (!isOwnWallet(wallet)) return wallet.owner_name ? `Ví chung của ${wallet.owner_name}` : "Ví chung";
+  return (wallet.member_count ?? 0) > 0 ? `${TYPE_LABEL[wallet.type]} · Ví chung` : TYPE_LABEL[wallet.type];
+}
 
 interface WalletStackCardProps {
   wallet: Wallet;
-  /** This wallet's own color from walletAccentPalette — picked per wallet by
-   *  the carousel, not per type, so two bank wallets never look alike. */
+  /** This wallet's face colour (walletFace): the owner's pick, else one from
+   *  its position, never from its type, so two bank wallets never look alike. */
   accentColor: string;
   /** The carousel's motion for this card (wallet-carousel-motion): position,
    *  lean, scale, fade and paint order, the rim's fade and the light streak. */
@@ -127,7 +137,7 @@ export function WalletStackCard({
                 {wallet.name}
               </Text>
               <Text style={[styles.type, { color: secondaryInk }]} numberOfLines={1}>
-                {TYPE_LABEL[wallet.type]}
+                {identityLine(wallet)}
               </Text>
             </View>
           </View>

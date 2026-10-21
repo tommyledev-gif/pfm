@@ -1,8 +1,8 @@
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { ScrollView, Text } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { Screen } from "@/components/shared/Screen";
-import { ChevronLeftIcon } from "@/components/ui/Icon";
+import { ScreenHeader } from "@/components/shared/ScreenHeader";
 import { spacing, typography, createStyles } from "@/lib/theme";
 import { LoginOutcome } from "@/features/accounts/complete-login";
 import { LoginForm } from "@/features/auth/components/LoginForm";
@@ -24,12 +24,7 @@ export default function AddAccountScreen() {
 
   return (
     <Screen style={styles.screen}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={8} accessibilityLabel="Quay lại" testID="btn-add-account-back">
-          <ChevronLeftIcon size={24} />
-        </Pressable>
-        <Text style={styles.title}>{TITLE}</Text>
-      </View>
+      <ScreenHeader title={TITLE} backTestID="btn-add-account-back" />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" testID="screen-add-account">
         <Text style={styles.hint}>{HINT}</Text>
         <LoginForm
@@ -46,15 +41,6 @@ export default function AddAccountScreen() {
 
 const useStyles = createStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bgApp },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
-  },
-  title: { flex: 1, ...typography.title, color: colors.textPrimary },
   content: { paddingHorizontal: spacing.xl, gap: spacing.lg },
   hint: { ...typography.label, color: colors.textSecondary },
 }));

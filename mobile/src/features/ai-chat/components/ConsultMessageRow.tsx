@@ -1,7 +1,10 @@
-import { Pressable, Text, View } from "react-native";
+import { Pressable, Text } from "react-native";
+import Animated from "react-native-reanimated";
 
+import { useFreshEntrance } from "@/components/motion/use-fresh-entrance";
 import { ActionPopover } from "@/components/shared/ActionPopover";
 import { UserBubble } from "@/features/ai-chat/components/UserBubble";
+import { messageCreatedAt } from "@/features/ai-chat/components/ChatMessageRow";
 import { useHoldMenu } from "@/features/ai-chat/hooks/use-hold-menu";
 import { useMessageActions } from "@/features/ai-chat/hooks/use-message-actions";
 import { ChatMessage } from "@/features/ai-chat/types";
@@ -32,10 +35,13 @@ const IN_TURN_GAP = spacing.sm;
  * the conversation are told apart at a glance. The recording pane keeps
  * ChatBubble around it: its proposals are cards the User acts on, which is
  * a different job.
+ *
+ * Like ChatMessageRow, only a message that has just arrived rises in.
  */
 export function ConsultMessageRow({ message, startsTurn, handlers }: ConsultMessageRowProps) {
   const styles = useStyles();
   const gap = { marginTop: startsTurn ? TURN_GAP : IN_TURN_GAP };
+  const entering = useFreshEntrance(messageCreatedAt(message.id));
   const menu = useHoldMenu();
   // Analysis messages are never swiped, so Copy is all a hold offers.
   const menuActions = useMessageActions({ message });
@@ -54,15 +60,15 @@ export function ConsultMessageRow({ message, startsTurn, handlers }: ConsultMess
 
   if (message.role === "user") {
     return (
-      <View style={[styles.userRow, gap]}>
+      <Animated.View entering={entering} style={[styles.userRow, gap]}>
         <UserBubble text={message.text} onLongPress={onLongPress} testID={`msg-consult-${message.id}`} />
         {popup}
-      </View>
+      </Animated.View>
     );
   }
 
   return (
-    <View style={gap}>
+    <Animated.View entering={entering} style={gap}>
       {/* Only the text is the hold target — the chart and chips below it
           have taps of their own. */}
       {message.text ? (
@@ -80,7 +86,7 @@ export function ConsultMessageRow({ message, startsTurn, handlers }: ConsultMess
         <ConsultReplyCard data={message.consult} handlers={handlers} sourceText={message.sourceText} />
       ) : null}
       {popup}
-    </View>
+    </Animated.View>
   );
 }
 

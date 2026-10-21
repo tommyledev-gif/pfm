@@ -63,6 +63,12 @@ type Config struct {
 	// (service.AppUpdateService, docs/ops-runbook.md §8). Missing or empty is
 	// fine: every client is told "no update" and the APK link answers 404.
 	AppUpdatesDir string
+
+	// APKPublicURL is the APK link people see (APK_PUBLIC_URL), e.g.
+	// https://app.example.com/app-updates/apk; empty = the app keeps using
+	// the API's /api/v1/app-updates/apk. Set it only once that host routes
+	// to this server (docs/ops-runbook.md §8).
+	APKPublicURL string
 }
 
 // MinJWTSecretBytes is the shortest JWT_SECRET accepted. The same key signs
@@ -98,6 +104,7 @@ func Load() (*Config, error) {
 		R2PublicBaseURL:   os.Getenv("R2_PUBLIC_BASE_URL"),
 
 		AppUpdatesDir: getEnvOrDefault("APP_UPDATES_DIR", "/data/app-updates"),
+		APKPublicURL:  os.Getenv("APK_PUBLIC_URL"),
 	}
 	if cfg.DatabaseURL == "" {
 		return nil, fmt.Errorf("config.Load: DATABASE_URL is required")

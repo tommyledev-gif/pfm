@@ -1,38 +1,57 @@
-import { useEffect, useRef } from "react";
-import { Animated, View } from "react-native";
+import Animated from "react-native-reanimated";
 
-import { radii, createStyles } from "@/lib/theme";
+import { entrance, exit } from "@/components/motion/motion-tokens";
+import { TextShimmerWave } from "@/components/shared/TextShimmerWave";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
-// AI Chat's typing indicator — "3 pulsing dots" (README).
-export function TypingIndicator() {
+interface TypingIndicatorProps {
+  /** What the assistant is doing, as a loading line ("Đang xem số liệu…"). */
+  label: string;
+  testID?: string;
+}
+
+// Spoken without the trailing "…", which screen readers read out as a word.
+const spokenLabel = (label: string) => label.replace(/(…|\.\.\.)$/, "");
+
+/**
+ * AI Chat's "the assistant is answering" row: an assistant bubble (the same
+ * box ChatBubble draws for a reply) holding a short status line with a wave
+ * running through it. Rises in as it appears and fades out when the answer
+ * takes its place.
+ */
+export function TypingIndicator({ label, testID }: TypingIndicatorProps) {
+  const colors = useColors();
   const styles = useStyles();
-  const values = useRef([0, 1, 2].map(() => new Animated.Value(0.3))).current;
-
-  useEffect(() => {
-    const animations = values.map((value, i) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(i * 150),
-          Animated.timing(value, { toValue: 1, duration: 350, useNativeDriver: true }),
-          Animated.timing(value, { toValue: 0.3, duration: 350, useNativeDriver: true }),
-          Animated.delay((2 - i) * 150),
-        ]),
-      ),
-    );
-    animations.forEach((a) => a.start());
-    return () => animations.forEach((a) => a.stop());
-  }, [values]);
-
   return (
-    <View style={styles.row}>
-      {values.map((value, i) => (
-        <Animated.View key={i} style={[styles.dot, { opacity: value }]} />
-      ))}
-    </View>
+    <Animated.View
+      testID={testID}
+      entering={entrance("fadeUp")}
+      exiting={exit("fade")}
+      style={styles.bubble}
+      accessibilityLiveRegion="polite"
+    >
+      <TextShimmerWave
+        text={label}
+        style={styles.text}
+        baseColor={colors.textMuted}
+        highlightColor={colors.textPrimary}
+        accessibilityLabel={spokenLabel(label)}
+      />
+    </Animated.View>
   );
 }
 
+// Mirrors ChatBubble's assistant bubble; only the line height is set, so the
+// lifted letters and Vietnamese marks have room inside it.
 const useStyles = createStyles((colors) => ({
-  row: { flexDirection: "row", gap: 5, paddingVertical: 4 },
-  dot: { width: 7, height: 7, borderRadius: radii.pill, backgroundColor: colors.textSecondary },
+  bubble: {
+    maxWidth: "82%",
+    borderRadius: radii.listCard,
+    borderBottomLeftRadius: 4,
+    padding: spacing.lg,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+  },
+  text: { ...typography.body, lineHeight: 22 },
 }));

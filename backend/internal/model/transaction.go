@@ -53,6 +53,10 @@ type Transaction struct {
 	Items       []TransactionItem
 	Adjustments []TransactionAdjustment
 	ItemCount   int
+	// RecordedByName is who recorded the entry, set only on a shared
+	// wallet's list and only when that is not the caller
+	// (specs/shared-wallets BR-13). Not a column of transactions.
+	RecordedByName *string
 }
 
 // TransactionLocation is a map pin plus its optional descriptions. A pin is

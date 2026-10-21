@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, SectionList, Text, View } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { ActivityIndicator, ScrollView, SectionList, View } from "react-native";
+import { useLocalSearchParams } from "expo-router";
 
-import { ChevronLeftIcon, PlusIcon } from "@/components/ui/Icon";
+import { MotionView, useListEntrance } from "@/components/motion/MotionView";
+import { GroupedListCell, ListSectionHeader } from "@/components/ui/grouped-list";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { Screen } from "@/components/shared/Screen";
+import { ScreenHeader, ScreenHeaderAction } from "@/components/shared/ScreenHeader";
 import { WALLET_TYPES, WalletType } from "@/lib/constants";
-import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { spacing, createStyles, useColors } from "@/lib/theme";
+import { walletFace } from "@/lib/wallet-colors";
 import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
 import { useRequireOnline } from "@/lib/connectivity";
 import { isWaitingForNetwork } from "@/lib/query-status";
@@ -14,11 +17,14 @@ import { useHighlightFade } from "@/lib/use-highlight-fade";
 import { useUiPrefsStore, WalletsViewMode } from "@/stores/ui-prefs-store";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { Wallet } from "@/features/wallets/types";
+import { isOwnWallet } from "@/features/wallets/wallet-access";
 import { WalletActiveActions } from "@/features/wallets/components/WalletActiveActions";
 import { WalletCardSkeleton } from "@/features/wallets/components/WalletCardSkeleton";
 import { WalletCarousel } from "@/features/wallets/components/WalletCarousel";
 import { WalletFormModal } from "@/features/wallets/components/WalletFormModal";
+import { WalletInvitationCards } from "@/features/wallets/components/WalletInvitationCards";
 import { WalletListItem } from "@/features/wallets/components/WalletListItem";
+import { WalletMembersSheet } from "@/features/wallets/components/WalletMembersSheet";
 import { WalletRecentTransactions } from "@/features/wallets/components/WalletRecentTransactions";
 import { WalletsEmptyState } from "@/features/wallets/components/WalletsEmptyState";
 
@@ -42,7 +48,7 @@ const MAX_SCROLL_RETRIES = 3;
 const BOTTOM_NAV_CLEARANCE = 140;
 
 interface WalletSection {
-  type: WalletType;
+  key: string;
   title: string;
   data: Wallet[];
 }
@@ -50,7 +56,6 @@ interface WalletSection {
 export default function WalletsScreen() {
   const colors = useColors();
   const styles = useStyles();
-  const router = useRouter();
   // Set by Home when one of its wallet cards is tapped: open on that wallet
   // and flash a border on it. `focusedAt` is a nonce, so tapping the same
   // card twice in a row still replays the highlight.
@@ -66,6 +71,8 @@ export default function WalletsScreen() {
   const setViewMode = useUiPrefsStore((s) => s.setWalletsViewMode);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingWallet, setEditingWallet] = useState<Wallet | null>(null);
+  // The wallet whose members sheet is open (specs/shared-wallets US-05).
+  const [membersWallet, setMembersWallet] = useState<Wallet | null>(null);
   // The wallet the card view is centred on — kept here rather than in the
   // carousel so switching to the list and back lands on the same one.
   const [activeWalletId, setActiveWalletId] = useState<string | null>(focusWalletId ?? null);
@@ -75,38 +82,46 @@ export default function WalletsScreen() {
   const highlightWalletId = focusWalletId && wallets.data?.some((w) => w.id === focusWalletId) ? focusWalletId : null;
   const highlightOpacity = useHighlightFade(highlightWalletId ? `${highlightWalletId}:${focusedAt ?? ""}` : null);
 
+  // A card's colour comes from the wallet's place in the server order (the
+  // order Home's carousel shows), so a wallet keeps one colour on every
+  // screen and in both views here.
+  const faceById = useMemo(() => {
+    const list = wallets.data ?? [];
+    return new Map(list.map((w, i) => [w.id, walletFace(w.color, i, list.length)]));
+  }, [wallets.data]);
+
   // GET /wallets orders `is_default DESC, created_at ASC` (backend/db/queries
   // /wallets.sql) — fine for a flat list, but it means every wallet visibly
   // jumps to the top the moment it becomes the new default. Re-sorted here by
   // created_at only (is_default never enters the comparison), then grouped by
-  // type, so changing the default flips just the "Mặc định" badge and nothing
-  // about position or grouping.
-  //
-  // The card view keeps the server order instead: it is the order Home's
-  // carousel shows, and a card's accent color comes from its position — the
-  // same wallet must not change color between the two screens.
+  // type, so changing the default flips just the "Mặc định" label and nothing
+  // about position or grouping. Wallets other people shared come last, as
+  // their own group.
   const sections = useMemo<WalletSection[]>(() => {
     const byType = new Map<WalletType, Wallet[]>();
     const stableOrder = [...(wallets.data ?? [])].sort((a, b) => a.created_at.localeCompare(b.created_at));
-    for (const wallet of stableOrder) {
+    for (const wallet of stableOrder.filter(isOwnWallet)) {
       const group = byType.get(wallet.type) ?? [];
       group.push(wallet);
       byType.set(wallet.type, group);
     }
-    return WALLET_TYPES.map((type) => ({ type, title: TYPE_LABEL[type], data: byType.get(type) ?? [] })).filter(
-      (section) => section.data.length > 0,
-    );
+    const own = WALLET_TYPES.map((type) => ({ key: type, title: TYPE_LABEL[type], data: byType.get(type) ?? [] }));
+    const shared = { key: "shared", title: "Ví chung của người khác", data: stableOrder.filter((w) => !isOwnWallet(w)) };
+    return [...own, shared].filter((section) => section.data.length > 0);
   }, [wallets.data]);
 
   const activeWallet = wallets.data?.find((w) => w.id === activeWalletId) ?? wallets.data?.[0] ?? null;
   // Only once loaded — never while loading or waiting offline, which keep
   // their own skeleton / placeholder.
   const isEmpty = wallets.isSuccess && wallets.data.length === 0;
+  const enter = useListEntrance(`${viewMode}:${wallets.isSuccess}`);
 
   const openEditor = (wallet: Wallet | null) => {
     setEditingWallet(wallet);
     setModalOpen(true);
   };
+  // Someone else's wallet is not ours to edit: its card opens who shares it.
+  const openWallet = (wallet: Wallet) => (isOwnWallet(wallet) ? openEditor(wallet) : setMembersWallet(wallet));
   // A new wallet can only be saved online — say so at the tap, not at save.
   const requireOnline = useRequireOnline();
   const openCreator = () => requireOnline(() => openEditor(null));
@@ -142,19 +157,18 @@ export default function WalletsScreen() {
 
   return (
     <Screen>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={8}>
-          <ChevronLeftIcon size={24} />
-        </Pressable>
-        <Text style={styles.title}>Ví tiền</Text>
-        <Pressable style={styles.addButton} onPress={openCreator} hitSlop={8}>
-          <PlusIcon size={16} color={colors.onGreen} />
-        </Pressable>
-      </View>
+      <ScreenHeader
+        title="Ví"
+        trailing={<ScreenHeaderAction onPress={openCreator} accessibilityLabel="Tạo ví" testID="btn-wallets-add" />}
+      />
+
+      <WalletInvitationCards />
 
       {/* Two ways of looking at nothing is not a choice worth offering. */}
       {isEmpty ? null : (
-        <SegmentedTabs style={styles.modeTabs} options={VIEW_MODES} value={viewMode} onChange={setViewMode} />
+        <MotionView preset="fade" style={styles.modeTabs}>
+          <SegmentedTabs options={VIEW_MODES} value={viewMode} onChange={setViewMode} />
+        </MotionView>
       )}
 
       {isEmpty ? (
@@ -176,15 +190,19 @@ export default function WalletsScreen() {
                 wallets={wallets.data ?? []}
                 initialWalletId={activeWalletId}
                 onActiveWalletChange={setActiveWalletId}
-                onPressWallet={openEditor}
+                onPressWallet={openWallet}
                 highlightWalletId={highlightWalletId}
                 highlightOpacity={highlightOpacity}
               />
             )}
             {activeWallet ? (
-              <>
-                <WalletActiveActions wallet={activeWallet} onEdit={() => openEditor(activeWallet)} />
-              </>
+              <MotionView preset="fadeUp" delay={120}>
+                <WalletActiveActions
+                  wallet={activeWallet}
+                  onEdit={() => openEditor(activeWallet)}
+                  onOpenMembers={() => setMembersWallet(activeWallet)}
+                />
+              </MotionView>
             ) : null}
           </View>
           {activeWallet ? (
@@ -193,7 +211,10 @@ export default function WalletsScreen() {
               contentContainerStyle={styles.recentBody}
               showsVerticalScrollIndicator={false}
             >
-              <WalletRecentTransactions wallet={activeWallet} />
+              {/* Keyed by wallet: swiping to another card cross-fades its list. */}
+              <MotionView key={activeWallet.id} preset="fade">
+                <WalletRecentTransactions wallet={activeWallet} />
+              </MotionView>
             </ScrollView>
           ) : null}
         </View>
@@ -213,50 +234,33 @@ export default function WalletsScreen() {
             scrollRetries.current += 1;
             setTimeout(scrollToFocusedRow, SCROLL_RETRY_MS);
           }}
-          ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
-          SectionSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
-          renderSectionHeader={({ section }) => (
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionHeaderLabel}>{section.title}</Text>
-              <Text style={styles.sectionHeaderCount}>{section.data.length}</Text>
-            </View>
-          )}
-          renderItem={({ item }) => (
-            <WalletListItem
-              wallet={item}
-              onPress={() => {
-                setActiveWalletId(item.id);
-                openEditor(item);
-              }}
-              highlightOpacity={item.id === highlightWalletId ? highlightOpacity : undefined}
-            />
+          renderSectionHeader={({ section }) => <ListSectionHeader title={`${section.title} · ${section.data.length}`} />}
+          SectionSeparatorComponent={() => <View style={styles.sectionGap} />}
+          renderItem={({ item, index, section }) => (
+            <GroupedListCell index={index} count={section.data.length} entering={enter(index)}>
+              <WalletListItem
+                wallet={item}
+                faceColor={faceById.get(item.id) ?? colors.green}
+                onPress={() => {
+                  setActiveWalletId(item.id);
+                  openWallet(item);
+                }}
+                highlightOpacity={item.id === highlightWalletId ? highlightOpacity : undefined}
+              />
+            </GroupedListCell>
           )}
         />
       )}
 
       <WalletFormModal visible={modalOpen} onClose={() => setModalOpen(false)} editingWallet={editingWallet} />
+      {membersWallet ? (
+        <WalletMembersSheet wallet={membersWallet} visible onClose={() => setMembersWallet(null)} />
+      ) : null}
     </Screen>
   );
 }
 
-const useStyles = createStyles((colors) => ({
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
-  },
-  title: { flex: 1, ...typography.title, color: colors.textPrimary },
-  addButton: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.pill,
-    backgroundColor: colors.green,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+const useStyles = createStyles(() => ({
   modeTabs: { marginHorizontal: spacing.xl, marginBottom: spacing.md },
   cardsView: { flex: 1 },
   // Same horizontal padding Home gives the carousel's section, which the
@@ -264,21 +268,7 @@ const useStyles = createStyles((colors) => ({
   cardsPinned: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm, gap: spacing.lg },
   recentScroll: { flex: 1 },
   recentBody: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: BOTTOM_NAV_CLEARANCE },
-  hint: { ...typography.tiny, color: colors.textMuted, textAlign: "center" },
   list: { paddingHorizontal: spacing.xl, paddingBottom: BOTTOM_NAV_CLEARANCE },
+  sectionGap: { height: spacing.sm },
   loader: { marginTop: spacing.xxl },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xs,
-  },
-  sectionHeaderLabel: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
-  sectionHeaderCount: { ...typography.tiny, color: colors.textMuted },
 }));

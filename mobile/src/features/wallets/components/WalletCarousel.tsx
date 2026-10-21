@@ -2,7 +2,8 @@ import { memo } from "react";
 import { Animated as RNAnimated, Text, View } from "react-native";
 import Animated, { SharedValue } from "react-native-reanimated";
 
-import { spacing, typography, walletAccentPalette, createStyles } from "@/lib/theme";
+import { spacing, typography, createStyles } from "@/lib/theme";
+import { walletFace } from "@/lib/wallet-colors";
 import { Wallet } from "@/features/wallets/types";
 import {
   CARD_HEIGHT,
@@ -15,17 +16,10 @@ import { SNAP_INTERVAL, useWalletCarousel } from "@/features/wallets/components/
 import { useCardMotion, useCardPress, useCarouselIntro } from "@/features/wallets/components/wallet-carousel-motion";
 import { WalletCarouselPager } from "@/features/wallets/components/WalletCarouselPager";
 
-// Each wallet's accent by its position in the list. Colors are assigned by
-// position, not by wallet type, so every card is visibly its own. The one
-// wrap-around case that could put the same color on two neighbours — the last
-// wallet landing on the first wallet's slot across the loop seam — is nudged
-// to the palette's opposite end.
-function accentForIndex(index: number, count: number): string {
-  const size = walletAccentPalette.length;
-  let slot = index % size;
-  if (count > 1 && index === count - 1 && slot === 0) slot = Math.floor(size / 2);
-  return walletAccentPalette[slot];
-}
+// Each card's colour: the one its owner picked, else one from its position
+// in the list (walletFace, src/lib/wallet-colors.ts).
+const accentFor = (wallets: Wallet[], index: number) =>
+  walletFace(wallets[index]?.color, index, wallets.length);
 
 interface WalletCarouselProps {
   wallets: Wallet[];
@@ -153,7 +147,7 @@ function WalletCarouselView({
                   wallet={wallet}
                   index={index}
                   isLast={index === rendered.length - 1}
-                  accentColor={accentForIndex(index % wallets.length, wallets.length)}
+                  accentColor={accentFor(wallets, index % wallets.length)}
                   scrollX={scrollX}
                   intro={intro}
                   // A side card is a shortcut for the swipe that would bring it
@@ -170,7 +164,7 @@ function WalletCarouselView({
       <WalletCarouselPager
         dotCount={wallets.length}
         // The active dot wears its wallet's card colour, tying the bar to the card above it.
-        dotColors={wallets.map((_, i) => accentForIndex(i, wallets.length))}
+        dotColors={wallets.map((_, i) => accentFor(wallets, i))}
         positionCount={rendered.length}
         scrollX={scrollX}
         canGoBack={looping || centreIndex > 0}

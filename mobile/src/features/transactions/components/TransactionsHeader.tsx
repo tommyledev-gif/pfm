@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import Animated, { ZoomIn, ZoomOut } from "react-native-reanimated";
 
 import { CalendarIcon, DownloadIcon, SearchIcon, SortIcon, TagIcon, UploadIcon } from "@/components/ui/Icon";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
@@ -195,9 +196,9 @@ export function TransactionsHeader({
         />
         <FilterPill active={hasCustomSort} label="Sắp xếp" icon={SortIcon} onPress={onOpenSort}>
           {hasCustomSort ? (
-            <View style={styles.sortBadge}>
+            <Animated.View entering={ZoomIn.duration(180)} exiting={ZoomOut.duration(140)} style={styles.sortBadge}>
               <Text style={styles.sortBadgeText}>{sortCount}</Text>
-            </View>
+            </Animated.View>
           ) : null}
         </FilterPill>
         {/* Never "active" — unlike the three pills above these are actions,

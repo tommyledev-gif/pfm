@@ -1,72 +1,49 @@
-import { Pressable, Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import { ScrollView } from "react-native";
 
-import { ChevronLeftIcon } from "@/components/ui/Icon";
-import { Toggle } from "@/components/ui/Toggle";
+import { MotionView } from "@/components/motion/MotionView";
+import { ListSection, ListToggleRow } from "@/components/ui/grouped-list";
+import { BugGlyph } from "@/components/ui/grouped-list/list-icons";
 import { Screen } from "@/components/shared/Screen";
-import { spacing, typography, createStyles } from "@/lib/theme";
+import { ScreenHeader } from "@/components/shared/ScreenHeader";
+import { useFabBottom } from "@/components/ui/Fab";
+import { spacing, createStyles } from "@/lib/theme";
 import { useUiPrefsStore } from "@/stores/ui-prefs-store";
 
-// Entry point: profile.tsx's "Developer" row. Only toggles DebugBubble's own
+const BUBBLE_LABEL = "Hiển thị Debug Bubble";
+const BUBBLE_FOOTER = "Khi ẩn, log API và điều hướng vẫn được ghi.";
+
+// Entry point: Settings' "Nhà phát triển" row. Only toggles DebugBubble's own
 // visible UI — the underlying logging (axios.ts interceptors, global-error-
 // logger.ts, NavigationLogger) runs unconditionally regardless of this
 // toggle, see ui-prefs-store.ts's debugBubbleVisible field comment.
 export default function DeveloperScreen() {
   const styles = useStyles();
-  const router = useRouter();
   const bubbleVisible = useUiPrefsStore((s) => s.debugBubbleVisible);
   const setBubbleVisible = useUiPrefsStore((s) => s.setDebugBubbleVisible);
+  // Clear of the floating BottomNav, which covers the screen's foot.
+  const navClearance = useFabBottom();
 
   return (
     <Screen style={styles.screen}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={8}>
-          <ChevronLeftIcon size={24} />
-        </Pressable>
-        <Text style={styles.title}>Nhà phát triển</Text>
-      </View>
-
-      <View style={styles.row}>
-        <View style={styles.rowText}>
-          <Text style={styles.rowLabel}>Hiển thị Debug Bubble</Text>
-          <Text style={styles.rowHint}>
-            Vẫn ghi log API/điều hướng ngay cả khi ẩn — nút chỉ ẩn giao diện nổi.
-          </Text>
-        </View>
-        <Toggle
-          testID="toggle-debug-bubble"
-          value={bubbleVisible}
-          onValueChange={setBubbleVisible}
-          accessibilityLabel="Hiển thị Debug Bubble"
-        />
-      </View>
+      <ScreenHeader title="Nhà phát triển" />
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: navClearance }]}>
+        <MotionView>
+          <ListSection footer={BUBBLE_FOOTER}>
+            <ListToggleRow
+              title={BUBBLE_LABEL}
+              icon={BugGlyph}
+              value={bubbleVisible}
+              onValueChange={setBubbleVisible}
+              testID="toggle-debug-bubble"
+            />
+          </ListSection>
+        </MotionView>
+      </ScrollView>
     </Screen>
   );
 }
 
 const useStyles = createStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bgApp },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
-  },
-  title: { flex: 1, ...typography.title, color: colors.textPrimary },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    marginHorizontal: spacing.xl,
-    padding: spacing.lg,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    borderRadius: 16,
-  },
-  rowText: { flex: 1, gap: spacing.xs },
-  rowLabel: { ...typography.body, color: colors.textPrimary },
-  rowHint: { ...typography.caption, color: colors.textSecondary },
+  content: { paddingHorizontal: spacing.xl },
 }));

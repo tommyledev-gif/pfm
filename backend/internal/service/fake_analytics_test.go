@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"sort"
 	"sync"
 	"time"
 
@@ -51,6 +52,9 @@ type fakeAnalyticsRepo struct {
 	topUsage  []model.CategoryUsage
 	lastLimit int
 	filters   []repository.AnalyticsFilter
+	// txByType backs ListTransactionsInWindow: rows per type, filtered by
+	// the window like the SQL, returned newest first.
+	txByType map[string][]model.AnalyticsExpense
 }
 
 func (f *fakeAnalyticsRepo) record(filter repository.AnalyticsFilter) {
@@ -81,6 +85,21 @@ func (f *fakeAnalyticsRepo) SumExpenseByWallet(_ context.Context, _ uuid.UUID, f
 func (f *fakeAnalyticsRepo) SumExpenseByLocalDay(_ context.Context, _ uuid.UUID, filter repository.AnalyticsFilter, _ string) ([]model.AnalyticsDayAmount, error) {
 	f.record(filter)
 	return append([]model.AnalyticsDayAmount(nil), f.byDay...), nil
+}
+
+func (f *fakeAnalyticsRepo) ListTransactionsInWindow(_ context.Context, _ uuid.UUID, filter repository.AnalyticsFilter, limit int) ([]model.AnalyticsExpense, error) {
+	f.record(filter)
+	var out []model.AnalyticsExpense
+	for _, r := range f.txByType[*filter.TxType] {
+		if !r.OccurredAt.Before(filter.Start) && r.OccurredAt.Before(filter.End) {
+			out = append(out, r)
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].OccurredAt.After(out[j].OccurredAt) })
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
 }
 
 func (f *fakeAnalyticsRepo) ListTopCategoriesRecent(_ context.Context, _ uuid.UUID, _ time.Time, _ int) ([]model.CategoryUsage, error) {

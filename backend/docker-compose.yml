@@ -126,6 +126,10 @@ services:
       ANDROID_CERT_SHA256: ${ANDROID_CERT_SHA256:-}
       # Mobile OTA updates and APKs, mounted below (docs/ops-runbook.md §8).
       APP_UPDATES_DIR: /data/app-updates
+      # The APK link people see (docs/ops-runbook.md §8): set it to
+      # https://app.example.com/app-updates/apk once that host routes to
+      # this server. Blank keeps the API's own /api/v1/app-updates/apk.
+      APK_PUBLIC_URL: ${APK_PUBLIC_URL:-}
       # Read only by ./seed (see deploy.sh), not by the server process. Blank
       # means "skip admin bootstrap" — set these in .env.prod only for the
       # very first deploy of a fresh environment (invite-only auth has no one

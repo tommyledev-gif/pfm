@@ -1,4 +1,5 @@
 import { WalletCurrency, WalletType } from "@/lib/constants";
+import type { WalletColorKey } from "@/lib/wallet-colors";
 
 // Mirrors backend/internal/dto/wallet_response.go /
 // frontend/src/features/wallets/types.ts exactly. icon/icon_url added by
@@ -14,6 +15,40 @@ export interface Wallet {
   is_default: boolean;
   icon: string | null;
   icon_url: string | null;
+  // Card colour key (src/lib/wallet-colors.ts); null = automatic. Optional
+  // because a backend from before card colours does not send it.
+  color?: WalletColorKey | null;
   created_at: string;
   updated_at: string;
+  // Shared wallets (specs/shared-wallets US-03). Optional for the same
+  // reason: absent means the caller's own wallet with no members.
+  access?: WalletAccess;
+  owner_name?: string | null;
+  member_count?: number;
+}
+
+/** What the signed-in User may do with a wallet. */
+export type WalletAccess = "owner" | "editor" | "viewer";
+export type WalletMemberRole = "editor" | "viewer";
+
+/** One row of GET /wallets/{id}/members; the owner comes first with role "owner". */
+export interface WalletMember {
+  user_id: string;
+  name: string;
+  username: string | null;
+  role: WalletAccess;
+  status: "pending" | "active";
+  invited_at: string | null;
+  accepted_at: string | null;
+}
+
+/** A pending invitation to someone else's wallet (GET /wallets/invitations). */
+export interface WalletInvitation {
+  wallet_id: string;
+  wallet_name: string;
+  wallet_currency: WalletCurrency;
+  wallet_color: WalletColorKey | null;
+  role: WalletMemberRole;
+  owner_name: string;
+  invited_at: string;
 }

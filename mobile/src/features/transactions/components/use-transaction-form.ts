@@ -44,7 +44,7 @@ interface UseTransactionFormOptions {
  */
 export function useTransactionForm({ visible, onClose, editingTransaction, editingQueued, draft }: UseTransactionFormOptions) {
   const isEditing = Boolean(editingTransaction);
-  const wallets = useWalletsQuery();
+  const wallets = useWalletsQuery("writable"); // no view-only shared wallets
   const [walletId, setWalletId] = useState<string | null>(null);
   const [type, setType] = useState<TransactionKind>("expense");
   const isTransfer = type === "transfer";

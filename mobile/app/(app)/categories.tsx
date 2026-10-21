@@ -1,11 +1,14 @@
 import { useMemo, useState } from "react";
-import { FlatList, Pressable, Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import { SectionList, Text, View } from "react-native";
 
-import { ChevronLeftIcon, PlusIcon } from "@/components/ui/Icon";
-import { Chip } from "@/components/ui/Chip";
+import { useListEntrance } from "@/components/motion/MotionView";
+import { GroupedListCell, ListSection, ListSectionHeader } from "@/components/ui/grouped-list";
+import { PillButton } from "@/components/ui/PillButton";
+import { SegmentedTabs, SegmentedTabOption } from "@/components/ui/SegmentedTabs";
+import { useFabBottom } from "@/components/ui/Fab";
 import { Screen } from "@/components/shared/Screen";
-import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { ScreenHeader, ScreenHeaderAction } from "@/components/shared/ScreenHeader";
+import { spacing, typography, createStyles } from "@/lib/theme";
 import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
 import { isWaitingForNetwork } from "@/lib/query-status";
 import { CategoryType } from "@/lib/constants";
@@ -17,78 +20,121 @@ import { CategoryListItemSkeleton } from "@/features/categories/components/Categ
 
 const LIST_SKELETON_COUNT = 6;
 
+const TYPE_OPTIONS: SegmentedTabOption<CategoryType>[] = [
+  { value: "expense", label: "Chi tiêu" },
+  { value: "income", label: "Thu nhập" },
+];
+
+const EMPTY_LABEL: Record<CategoryType, string> = {
+  expense: "Chưa có danh mục chi tiêu.",
+  income: "Chưa có danh mục thu nhập.",
+};
+
+interface CategorySection {
+  key: string;
+  title: string;
+  data: Category[];
+}
+
 export default function CategoriesScreen() {
-  const colors = useColors();
   const styles = useStyles();
-  const router = useRouter();
   const [type, setType] = useState<CategoryType>("expense");
   const categories = useCategoriesQuery(type);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  // Clear of the floating BottomNav, so the last row can scroll out from under it.
+  const navClearance = useFabBottom();
+  // Rows stagger in when the list first has data and again on each type
+  // switch; a refetch keeps the same key, so it never replays.
+  const enter = useListEntrance(categories.isLoading ? "loading" : type);
 
-  // The user's own categories first, the system defaults under them.
+  // The user's own categories first, the system defaults under them, each
+  // in a group of its own.
   //
   // GET /categories returns them interleaved (the system set was seeded first,
   // so a user's own category lands wherever its name happens to sort), which
   // buries the handful of rows they actually made among two dozen they did not.
   // Only the user's own are editable in any meaningful sense, and they are the
-  // ones being looked for. Array.prototype.sort is stable, so within each group
-  // the server's own ordering is left exactly as it came.
-  const ordered = useMemo(
-    () => [...(categories.data ?? [])].sort((a, b) => Number(a.user_id === null) - Number(b.user_id === null)),
-    [categories.data],
-  );
+  // ones being looked for. Filtering keeps the server's own ordering within
+  // each group exactly as it came.
+  const sections = useMemo<CategorySection[]>(() => {
+    const all = categories.data ?? [];
+    return [
+      { key: "own", title: "Của bạn", data: all.filter((c) => c.user_id !== null) },
+      { key: "system", title: "Mặc định", data: all.filter((c) => c.user_id === null) },
+    ].filter((section) => section.data.length > 0);
+  }, [categories.data]);
+
+  // Each section's first row's position in the whole list, for the stagger.
+  const sectionStart = useMemo(() => {
+    const starts = new Map<string, number>();
+    let offset = 0;
+    for (const section of sections) {
+      starts.set(section.key, offset);
+      offset += section.data.length;
+    }
+    return starts;
+  }, [sections]);
+
+  const openForm = (category: Category | null) => {
+    setEditingCategory(category);
+    setModalOpen(true);
+  };
 
   return (
     <Screen>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={8}>
-          <ChevronLeftIcon size={24} />
-        </Pressable>
-        <Text style={styles.title}>Danh mục</Text>
-        <Pressable
-          style={styles.addButton}
-          onPress={() => {
-            setEditingCategory(null);
-            setModalOpen(true);
-          }}
-          hitSlop={8}
-        >
-          <PlusIcon size={16} color={colors.onGreen} />
-        </Pressable>
-      </View>
+      <ScreenHeader
+        title="Danh mục"
+        trailing={
+          <ScreenHeaderAction onPress={() => openForm(null)} accessibilityLabel="Tạo danh mục" testID="btn-categories-add" />
+        }
+      />
 
-      <View style={styles.chipRow}>
-        <Chip label="Expense" active={type === "expense"} onPress={() => setType("expense")} />
-        <Chip label="Income" active={type === "income"} onPress={() => setType("income")} />
-      </View>
+      <SegmentedTabs
+        options={TYPE_OPTIONS}
+        value={type}
+        onChange={setType}
+        style={styles.tabs}
+        testID="tabs-categories-type"
+      />
 
       {isWaitingForNetwork(categories) ? (
         <OfflinePlaceholder />
       ) : categories.isLoading ? (
         <View style={styles.list}>
-          {Array.from({ length: LIST_SKELETON_COUNT }).map((_, i) => (
-            <View key={i} style={i > 0 ? styles.skeletonSpacing : undefined}>
-              <CategoryListItemSkeleton />
-            </View>
-          ))}
+          <ListSection>
+            {Array.from({ length: LIST_SKELETON_COUNT }).map((_, i) => (
+              <CategoryListItemSkeleton key={i} />
+            ))}
+          </ListSection>
         </View>
       ) : (
-        <FlatList
-          data={ordered}
+        <SectionList
+          sections={sections}
           keyExtractor={(c) => c.id}
-          contentContainerStyle={styles.list}
-          ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
-          renderItem={({ item }) => (
-            <CategoryListItem
-              category={item}
-              onPress={() => {
-                setEditingCategory(item);
-                setModalOpen(true);
-              }}
-            />
+          contentContainerStyle={[styles.list, { paddingBottom: navClearance }]}
+          stickySectionHeadersEnabled={false}
+          showsVerticalScrollIndicator={false}
+          renderSectionHeader={({ section }) => (
+            <View style={section.key !== sections[0]?.key && styles.laterSection}>
+              <ListSectionHeader title={section.title} />
+            </View>
           )}
-          ListEmptyComponent={<Text style={styles.empty}>No categories yet — tap + to create one.</Text>}
+          renderItem={({ item, index, section }) => (
+            <GroupedListCell
+              index={index}
+              count={section.data.length}
+              entering={enter(index + (sectionStart.get(section.key) ?? 0))}
+            >
+              <CategoryListItem category={item} onPress={() => openForm(item)} />
+            </GroupedListCell>
+          )}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Text style={styles.emptyLabel}>{EMPTY_LABEL[type]}</Text>
+              <PillButton label="Tạo danh mục" variant="outline" onPress={() => openForm(null)} />
+            </View>
+          }
         />
       )}
 
@@ -98,25 +144,9 @@ export default function CategoriesScreen() {
 }
 
 const useStyles = createStyles((colors) => ({
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
-  },
-  title: { flex: 1, ...typography.title, color: colors.textPrimary },
-  addButton: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.pill,
-    backgroundColor: colors.green,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  chipRow: { flexDirection: "row", gap: spacing.sm, paddingHorizontal: spacing.xl, paddingBottom: spacing.md },
-  list: { paddingHorizontal: spacing.xl, paddingBottom: 140 },
-  skeletonSpacing: { marginTop: spacing.sm },
-  empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
+  tabs: { marginHorizontal: spacing.xl, marginBottom: spacing.xl },
+  list: { paddingHorizontal: spacing.xl },
+  laterSection: { paddingTop: spacing.xxl },
+  empty: { alignItems: "center", gap: spacing.md, marginTop: spacing.xl },
+  emptyLabel: { ...typography.label, color: colors.textSecondary, textAlign: "center" },
 }));

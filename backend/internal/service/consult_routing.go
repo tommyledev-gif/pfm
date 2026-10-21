@@ -71,6 +71,10 @@ func (s *ConsultService) route(ctx context.Context, userID uuid.UUID, p *AIConsu
 		out.reply = reply
 		return out, nil
 	}
+	if reply := consultAnomalyGuard(p, today, currency); reply != nil {
+		out.reply = reply
+		return out, nil
+	}
 
 	query := queryFromParse(p)
 	if len(p.CategoryIDs) > 0 && confidence(p) < common.AnalyticsCategoryConfidenceMedium {

@@ -40,7 +40,7 @@ export function UsersEmptyState({ failed, onInvite, onRetry }: UsersEmptyStatePr
         </EmptyIllustration>
       }
       title="Chưa có thành viên nào"
-      description="Mời người thân cùng dùng PFM — họ sẽ nhận email để kích hoạt tài khoản của riêng mình."
+      description="Người được mời nhận email để kích hoạt tài khoản riêng."
       action={{
         label: "Mời thành viên",
         icon: <PlusIcon size={18} color={colors.onGreen} />,

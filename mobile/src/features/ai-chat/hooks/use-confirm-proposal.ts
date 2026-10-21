@@ -21,7 +21,7 @@ export function useConfirmProposal() {
   const updateMessage = useChatStore((s) => s.updateMessage);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [confirmingAll, setConfirmingAll] = useState(false);
-  const wallets = useWalletsQuery();
+  const wallets = useWalletsQuery("writable");
   const createTransaction = useCreateTransactionMutation();
 
   const walletById = useMemo(() => new Map(wallets.data?.map((w) => [w.id, w])), [wallets.data]);

@@ -1,7 +1,9 @@
 import { memo } from "react";
 import { Pressable, Text, View } from "react-native";
+import Animated, { ZoomIn, ZoomOut } from "react-native-reanimated";
 import { useRouter } from "expo-router";
 
+import { SPRING } from "@/components/motion/motion-tokens";
 import { Avatar } from "@/components/ui/Avatar";
 import { BellIcon } from "@/components/ui/Icon";
 import { useNotificationsQuery } from "@/features/notifications/api/use-notifications-query";
@@ -26,7 +28,14 @@ export const TopBar = memo(function TopBar() {
       <View style={styles.actions}>
         <Pressable onPress={() => router.push("/notifications")} style={styles.bellButton} hitSlop={8}>
           <BellIcon size={22} color={colors.textPrimary} />
-          {hasUnread ? <View style={styles.dot} /> : null}
+          {/* Pops in when something new arrives, and out once it is read. */}
+          {hasUnread ? (
+            <Animated.View
+              entering={ZoomIn.springify().damping(SPRING.damping).stiffness(SPRING.stiffness)}
+              exiting={ZoomOut.duration(160)}
+              style={styles.dot}
+            />
+          ) : null}
         </Pressable>
         <Pressable
           onPress={() => router.push("/settings")}

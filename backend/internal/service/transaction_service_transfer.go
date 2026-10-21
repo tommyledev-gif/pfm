@@ -39,7 +39,9 @@ func (s *TransactionService) resolveTransfer(ctx context.Context, userID uuid.UU
 	if *toWalletID == source.ID {
 		return nil, nil, common.ErrTransferSameWallet
 	}
-	destination, err := s.getOwnedWallet(ctx, userID, *toWalletID)
+	// Any wallet the caller may record into, e.g. a personal wallet into a
+	// shared one (specs/shared-wallets BR-12).
+	destination, err := requireWritableWallet(ctx, s.walletRepo, userID, *toWalletID)
 	if err != nil {
 		return nil, nil, err
 	}

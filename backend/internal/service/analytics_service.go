@@ -122,6 +122,8 @@ func (s *AnalyticsService) compute(ctx context.Context, run *analyticsRun) error
 		return s.computeAvgDaily(ctx, run)
 	case model.AnalyticsMetricBudgetStatus:
 		return s.computeBudgetStatus(ctx, run)
+	case analyticsMetricAnomaly:
+		return s.computeAnomaly(ctx, run)
 	}
 	return common.NewInvalidInputError("unsupported metric")
 }

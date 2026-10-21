@@ -230,7 +230,7 @@ Read-only. The same question over unchanged data always returns the same figures
 | S-AIQ-25 | "Change" tapped | User picks other Categories | The answer is recomputed with the chosen Categories<br>and no usage limit is consumed | Behaves like a follow-up chip |
 | S-AIQ-26 | Category match has low confidence | Question sent | No figures are shown<br>and the System asks "Which Category do you mean?" with the User's Categories as choices | Never guess |
 | S-AIQ-27 | Question is "tháng này tiêu bao nhiêu cho ăn uống" | Interpreted | The answer is **never** the unfiltered total | ⚠️ Partial-understanding guard |
-| S-AIQ-28 | Question is out of scope, e.g. "what should I invest in", "any unusual spending", "which subscriptions am I paying", "compared with other people", "how much will I have left at the end of the month" | Question sent | A short message says this cannot be answered yet<br>and two alternative chips are offered<br>and no figures are shown | Not supported in this release |
+| S-AIQ-28 | Question is out of scope, e.g. "what should I invest in", "which subscriptions am I paying", "compared with other people", "how much will I have left at the end of the month" | Question sent | A short message says this cannot be answered yet<br>and two alternative chips are offered<br>and no figures are shown | Not supported in this release |
 | S-AIQ-29 | Question depends on earlier context, e.g. "còn tháng trước?" | Question sent | A message asks for the full question<br>and offers follow-up chips from the previous answer if there is one | A-04 |
 | S-AIQ-30 | Question is an evaluation or what-if ("tháng này tiêu nhiều không", "cắt cafe 50% thì sao") | Question sent | A message says evaluations and what-if scenarios are coming later<br>and offers the closest supported question as a chip | Covered by later US-04 / US-05 of Feature-12 |
 | S-AIQ-31 | Question is a Transaction description ("cafe 50k") while in analysis mode | Question sent | Treated as a question that cannot be answered<br>and a chip offers switching to record-Transaction mode | No Transaction is ever created from analysis mode |
@@ -444,10 +444,20 @@ Append-only; one record per received free-text question.
 3. **What-if scenarios** ("if I cut coffee by 50%", "when can I afford a laptop") — new Feature-12 US-05, to be added to the SRS before its spec.
 4. **Keyword search on Transaction notes** ("how much on Grab") — notes are free text with no merchant field, so totals would be silently incomplete.
 5. **Conversation memory** — follow-ups via chips only (A-04).
-6. **Projections, anomaly detection, subscription detection, peer comparison, investment advice.**
+6. **Projections, subscription detection, peer comparison, investment advice.** *(Revision 2026-10-21: anomaly questions moved in scope; see "Revision: unusual spending" below.)*
 7. **Lunar-calendar periods.**
 8. **Applying the new text cleaning to recording Transactions via chat** — that flow is left unchanged to avoid regressions.
 9. **Choosing Category cut classes** — owned by the What-if spec.
+
+## Revision: unusual spending (2026-10-21)
+
+Owner request: questions like "có gì bất thường hôm nay" are answered, not refused.
+
+- **What it answers:** whether one local day, this week, this month or last month spent unusually against the User's own history (its usual level is the median of earlier periods with spending), which Categories rose well above their usual, single unusually large expenses or incomes, and an unusual number of expenses. Only rises are reported. With too little history the answer says so instead of judging.
+- **How:** a new analytics metric, answered by fixed rules over recorded Transactions with no AI in the figures (the same three-tier rule as every other answer). Transfers are not spending.
+- **Other periods** (several days, the last 30 days) get the out-of-scope reply with chips for today and this month.
+- **Starter chip:** "Hôm nay có gì bất thường?".
+- Rules and thresholds: `backend/internal/service/analytics_anomaly_rules.go`, values in `backend/internal/common/constants_anomaly.go`.
 
 ## Open Questions
 

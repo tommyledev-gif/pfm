@@ -18,6 +18,9 @@ import { useRequireOnline } from "@/lib/connectivity";
 import { spacing } from "@/lib/theme";
 import { useChatStore } from "@/stores/chat-store";
 
+// The assistant is pulling the figures the question asks about.
+const ANSWERING_LABEL = "Đang xem số liệu…";
+
 interface ConsultPaneProps {
   keyboardVisible: boolean;
   bottomInset: number;
@@ -79,7 +82,7 @@ export function ConsultPane({
           ListHeaderComponent={
             consult.sending ? (
               <View style={[styles.typingRow, consultStyles.typing]}>
-                <TypingIndicator />
+                <TypingIndicator label={ANSWERING_LABEL} testID="typing-consult" />
               </View>
             ) : null
           }

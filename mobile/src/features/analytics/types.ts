@@ -11,7 +11,9 @@ export type AnalyticsMetric =
   | "top_n"
   | "max_tx"
   | "avg_daily"
-  | "budget_status";
+  | "budget_status"
+  // "Anything unusual?" — the period against the User's own history.
+  | "anomaly";
 
 export type AnalyticsPeriod =
   | "this_cycle"
@@ -92,6 +94,42 @@ export interface AnalyticsChart {
   budgets?: AnalyticsBudgetItem[];
   // `rows` also rides on a "donut" or "number" answer whose period has only a
   // few expenses (backend attachInlineRows) — listed under the chart.
+  /** Type "anomaly" only. That answer also carries `value` (the period's
+   *  spending), `compare` (that against the usual) and `rows` (unusually
+   *  large expenses), so an app that does not know the type still lists them. */
+  anomaly?: AnalyticsAnomaly;
+}
+
+/** Mirrors backend dto/analytics_anomaly_response.go. Amounts are xu. */
+export interface AnalyticsAnomaly {
+  /** "found", "none" or "little_history"; kept `string` so a value a newer
+   *  backend adds still renders (as its figures). */
+  status: string;
+  /** What one baseline sample is: "day", "week" or "cycle". */
+  unit: string;
+  /** The history compared with: "8 tuần trước đó". */
+  baseline_label: string;
+  total: number;
+  count: number;
+  typical?: number;
+  typical_label?: string;
+  typical_count?: number;
+  history_samples: number;
+  history_min: number;
+  total_spike: boolean;
+  count_spike: boolean;
+  categories?: AnalyticsAnomalyCategory[];
+  /** Incomes larger than any in the baseline. */
+  income?: AnalyticsTxRow[];
+}
+
+/** A Category far above its usual; no `typical` when it had no spending in
+ *  the whole baseline. */
+export interface AnalyticsAnomalyCategory {
+  category_id: string;
+  category_name: string;
+  amount: number;
+  typical?: number;
 }
 
 export interface AnalyticsNotice {

@@ -6,11 +6,11 @@ export interface DaySection {
   key: string;
   dayLabel: string;
   dateLabel: string;
-  // Empty while the day is collapsed. ⚠️ The rows are dropped, not kept
-  // mounted at zero height: inside the SectionList every cell still takes the
-  // list's gap whatever its height, so a folded day of ten rows left ten gaps
-  // of blank space behind it. A folded day is now laid out exactly like a day
-  // with no rows. (Unfolding eases them back in — ExpandRevealRow.)
+  // Empty while the day is collapsed: a folded day is laid out exactly like a
+  // day with no rows. While it is still *folding* the rows stay, shrinking to
+  // zero height in DayFoldRow, and are dropped only once that has played
+  // (useCollapsedDays). Each row carries its own spacing inside that
+  // shrinking box, so a row at zero height leaves no gap behind.
   data: Transaction[];
   // Full row count regardless of collapse, so a collapsed day can still say
   // how much it is hiding.
@@ -28,7 +28,10 @@ export interface DaySection {
   expense: number | undefined;
   currency: string | undefined;
   otherCurrencies: string[];
+  /** Folded, or folding: what the header shows. */
   collapsed: boolean;
+  /** Folding right now: its rows are still in `data`, shrinking away. */
+  folding: boolean;
 }
 
 interface BuildDaySectionsOptions {
@@ -40,7 +43,8 @@ interface BuildDaySectionsOptions {
   // section (day header hidden) is returned in that case.
   grouped: boolean;
   walletCurrencyMap: Map<string, string>;
-  collapsedDays: Set<string>;
+  collapsedDays: ReadonlySet<string>;
+  foldingDays: ReadonlySet<string>;
 }
 
 // Splits an already-sorted transaction list into the SectionList sections the
@@ -48,7 +52,7 @@ interface BuildDaySectionsOptions {
 // as it goes. Pure — the screen wraps it in a useMemo.
 export function buildDaySections(
   items: Transaction[],
-  { grouped, walletCurrencyMap, collapsedDays }: BuildDaySectionsOptions,
+  { grouped, walletCurrencyMap, collapsedDays, foldingDays }: BuildDaySectionsOptions,
 ): DaySection[] {
   if (!grouped) {
     if (items.length === 0) return [];
@@ -64,6 +68,7 @@ export function buildDaySections(
         currency: undefined,
         otherCurrencies: [],
         collapsed: false,
+        folding: false,
       },
     ];
   }
@@ -86,7 +91,8 @@ export function buildDaySections(
         expense: undefined,
         currency: undefined,
         otherCurrencies: [],
-        collapsed: collapsedDays.has(dayKey),
+        collapsed: collapsedDays.has(dayKey) || foldingDays.has(dayKey),
+        folding: foldingDays.has(dayKey),
       };
       groups.push(group);
       sums.set(dayKey, { byCurrency: new Map(), unknown: false });
@@ -122,5 +128,5 @@ export function buildDaySections(
 
   // After the loop, not instead of the push: count and the subtotals above
   // still cover every row, so a folded day says what it is hiding.
-  return groups.map((g) => (g.collapsed ? { ...g, data: [] } : g));
+  return groups.map((g) => (g.collapsed && !g.folding ? { ...g, data: [] } : g));
 }

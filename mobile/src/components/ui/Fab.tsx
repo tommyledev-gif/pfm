@@ -1,7 +1,10 @@
 import { ComponentType } from "react";
-import { Pressable, StyleProp, ViewStyle } from "react-native";
+import { StyleProp, ViewStyle } from "react-native";
+import Animated, { ZoomIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { SPRING } from "@/components/motion/motion-tokens";
+import { PressableScale } from "@/components/motion/PressableScale";
 import { IconProps } from "@/components/ui/icons/primitives";
 import { PlusIcon } from "@/components/ui/Icon";
 import { radii, spacing, createStyles, useColors } from "@/lib/theme";
@@ -11,6 +14,13 @@ import { radii, spacing, createStyles, useColors } from "@/lib/theme";
 // nav instead of sitting on top of it.
 const NAV_HEIGHT = 64;
 export const FAB_SIZE = 56;
+// A press dips it further than a row: it is the screen's one big target.
+export const FAB_PRESS_SCALE = 0.92;
+// Pops in a beat after its screen, so it reads as arriving rather than as
+// part of the layout. Built per mount: Reanimated's builders are mutable.
+const FAB_ENTER_DELAY_MS = 150;
+export const fabEntrance = () =>
+  ZoomIn.springify().damping(SPRING.damping).stiffness(SPRING.stiffness).delay(FAB_ENTER_DELAY_MS);
 
 interface FabProps {
   onPress: () => void;
@@ -37,6 +47,8 @@ export function useFabBottom(): number {
 
 /**
  * Bottom-right floating action button for a screen's primary "create" action.
+ * Pops in when its screen mounts and dips while pressed; Reduce Motion skips
+ * both (Reanimated's entrance follows the OS setting, PressableScale its own).
  *
  * Render it BEFORE the screen's Drawer sheets in the tree, so an open sheet's
  * overlay paints over it rather than under it.
@@ -46,28 +58,26 @@ export function Fab({ onPress, Icon = PlusIcon, accessibilityLabel, testID, styl
   const styles = useStyles();
   const bottom = useFabBottom();
   return (
-    <Pressable
-      testID={testID}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      onPress={onPress}
-      hitSlop={8}
-      style={({ pressed }) => [
-        styles.fab,
-        { bottom },
-        style,
-        pressed && styles.pressed,
-      ]}
-    >
-      <Icon size={24} color={colors.onGreen} />
-    </Pressable>
+    <Animated.View entering={fabEntrance()} style={[styles.host, { bottom }, style]} pointerEvents="box-none">
+      <PressableScale
+        testID={testID}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        onPress={onPress}
+        hitSlop={8}
+        scaleTo={FAB_PRESS_SCALE}
+        style={styles.fab}
+      >
+        <Icon size={24} color={colors.onGreen} />
+      </PressableScale>
+    </Animated.View>
   );
 }
 
 const useStyles = createStyles((colors) => ({
+  // Placement lives on the host, so a caller's `style` still moves the button.
+  host: { position: "absolute", right: spacing.xl },
   fab: {
-    position: "absolute",
-    right: spacing.xl,
     width: FAB_SIZE,
     height: FAB_SIZE,
     borderRadius: radii.pill,
@@ -80,5 +90,4 @@ const useStyles = createStyles((colors) => ({
     shadowOffset: { width: 0, height: 4 },
     elevation: 6,
   },
-  pressed: { opacity: 0.85, transform: [{ scale: 0.95 }] },
 }));

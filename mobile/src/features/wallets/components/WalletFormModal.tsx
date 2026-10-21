@@ -18,6 +18,8 @@ import { useCreateWalletMutation } from "@/features/wallets/api/use-create-walle
 import { useUpdateWalletMutation } from "@/features/wallets/api/use-update-wallet-mutation";
 import { useUploadWalletIconMutation } from "@/features/wallets/api/use-upload-wallet-icon-mutation";
 import { Wallet } from "@/features/wallets/types";
+import { WalletColorPicker } from "@/features/wallets/components/WalletColorPicker";
+import type { WalletColorKey } from "@/lib/wallet-colors";
 
 const TYPE_LABEL: Record<WalletType, string> = {
   cash: "Tiền mặt",
@@ -53,6 +55,8 @@ export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormM
   const [icon, setIcon] = useState("");
   // undefined = none, null = an existing photo the user chose to drop.
   const [iconUrl, setIconUrl] = useState<string | null | undefined>(undefined);
+  // null = automatic (from the wallet's position), SRS Feature-03 US-07.
+  const [color, setColor] = useState<WalletColorKey | null>(null);
   const [submitAttempted, setSubmitAttempted] = useState(false);
 
   useEffect(() => {
@@ -63,6 +67,7 @@ export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormM
       setCurrency(editingWallet.currency);
       setIcon(editingWallet.icon ?? "");
       setIconUrl(editingWallet.icon_url ?? undefined);
+      setColor(editingWallet.color ?? null);
     } else {
       setName("");
       setType("cash");
@@ -70,6 +75,7 @@ export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormM
       setInitialBalance("");
       setIcon("");
       setIconUrl(undefined);
+      setColor(null);
     }
     setSubmitAttempted(false);
   }, [visible, editingWallet]);
@@ -111,7 +117,7 @@ export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormM
   });
 
   const errors = {
-    name: !name.trim() ? "Vui lòng nhập tên ví" : undefined,
+    name: !name.trim() ? "Nhập tên ví." : undefined,
   };
 
   const submit = () => {
@@ -119,7 +125,7 @@ export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormM
     if (errors.name) return;
     if (isEditing && editingWallet) {
       updateWallet.mutate(
-        { id: editingWallet.id, body: { name, type, icon: icon || undefined, icon_url: iconUrl } },
+        { id: editingWallet.id, body: { name, type, icon: icon || undefined, icon_url: iconUrl, color } },
         { onSuccess: onClose },
       );
     } else {
@@ -131,6 +137,7 @@ export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormM
           initial_balance: initialBalance ? toCents(Number(initialBalance)) : undefined,
           icon: icon || undefined,
           icon_url: iconUrl ?? undefined,
+          color: color ?? undefined,
         },
         { onSuccess: onClose },
       );
@@ -158,6 +165,9 @@ export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormM
       {submitAttempted ? <FieldError message={errors.name} /> : null}
 
 
+      <Text style={styles.label}>Màu thẻ</Text>
+      <WalletColorPicker value={color} onChange={setColor} />
+
       <Text style={styles.label}>Loại</Text>
       <View style={styles.chipRow}>
         {WALLET_TYPES.map((t) => (
@@ -167,7 +177,7 @@ export function WalletFormModal({ visible, onClose, editingWallet }: WalletFormM
         ))}
       </View>
 
-      <Text style={styles.label}>Đơn vị tiền tệ{isEditing ? " (khóa sau khi tạo)" : ""}</Text>
+      <Text style={styles.label}>Loại tiền{isEditing ? " (không đổi được sau khi tạo)" : ""}</Text>
       <View style={styles.chipRow}>
         {WALLET_CURRENCIES.map((c) => (
           <Pressable

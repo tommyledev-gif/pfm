@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
+import Animated from "react-native-reanimated";
 
+import { useListEntrance } from "@/components/motion/MotionView";
 import { CalendarIcon } from "@/components/ui/Icon";
 import { Card } from "@/components/ui/Card";
 import { useFabBottom } from "@/components/ui/Fab";
@@ -56,6 +58,8 @@ export function SpendingTab({ focusCategoryId, focusNonce, onOpenBudgets }: Spen
   const [detailCategoryId, setDetailCategoryId] = useState<string | null>(null);
   const reportCurrency = useReportCurrency(summary.data);
   const navClearance = useFabBottom();
+  // The legend's rows stagger in as the tab opens, not on every refetch.
+  const legendEntrance = useListEntrance();
 
   // Both deps are plain strings, so this can't re-fire on identity alone — the
   // trap that made useCategoryPicker loop.
@@ -202,16 +206,17 @@ export function SpendingTab({ focusCategoryId, focusNonce, onOpenBudgets }: Spen
           {/* Padded past the floating nav: the list runs to the screen's
               bottom edge, so its last row sat under the bar. */}
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: navClearance }}>
-            {segments.map((seg) => (
-              <DonutLegendRow
-                key={seg.key}
-                segment={seg}
-                currency={currency}
-                percentage={totalExpense > 0 ? (seg.amount / totalExpense) * 100 : 0}
-                selected={selected === seg.key}
-                onPress={() => setSelected((prev) => (prev === seg.key ? null : seg.key))}
-                onHoldCategory={() => setCategoryPickerOpen(true)}
-              />
+            {segments.map((seg, index) => (
+              <Animated.View key={seg.key} entering={legendEntrance(index)}>
+                <DonutLegendRow
+                  segment={seg}
+                  currency={currency}
+                  percentage={totalExpense > 0 ? (seg.amount / totalExpense) * 100 : 0}
+                  selected={selected === seg.key}
+                  onPress={() => setSelected((prev) => (prev === seg.key ? null : seg.key))}
+                  onHoldCategory={() => setCategoryPickerOpen(true)}
+                />
+              </Animated.View>
             ))}
           </ScrollView>
         </>

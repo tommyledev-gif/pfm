@@ -50,7 +50,8 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, userID uuid.
 		}
 	}
 
-	wallet, err := s.getOwnedWallet(ctx, userID, req.WalletID)
+	// Owner or an editor of a shared wallet (specs/shared-wallets BR-05).
+	wallet, err := requireWritableWallet(ctx, s.walletRepo, userID, req.WalletID)
 	if err != nil {
 		return nil, nil, false, err
 	}

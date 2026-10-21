@@ -1,6 +1,8 @@
 import { Text, View } from "react-native";
 
+import { ListCell } from "@/components/ui/grouped-list";
 import { formatCurrency } from "@/lib/currency";
+import { withAlpha } from "@/lib/color";
 import { formatDateShort, formatTime } from "@/lib/format-date";
 import { colors, radii, spacing, typography, createStyles } from "@/lib/theme";
 import { AuditAction, AuditLogEntry, AuditSnapshot } from "@/features/audit-logs/types";
@@ -56,7 +58,8 @@ interface AuditLogRowProps {
 
 // One line per changed field, e.g. "Số tiền: 200.000 ₫ → 300.000 ₫". For a
 // create/delete (a full snapshot rather than a diff) it renders the snapshot
-// as a compact summary line instead of a list of arrows.
+// as a compact summary line instead of a list of arrows. A cell of its day's
+// group (GroupedListCell), so entries are split by hairlines, not boxed.
 export function AuditLogRow({ entry, resolveCategoryName, resolveWalletName, currency }: AuditLogRowProps) {
   const styles = useStyles();
   const formatValue = (field: string, value: unknown): string => {
@@ -95,9 +98,9 @@ export function AuditLogRow({ entry, resolveCategoryName, resolveWalletName, cur
   const snapshot = entry.action === "delete" ? entry.before : entry.after;
 
   return (
-    <View style={styles.row}>
+    <ListCell style={styles.row}>
       <View style={styles.headerRow}>
-        <View style={[styles.actionBadge, { borderColor: `${ACTION_COLOR[entry.action]}55` }]}>
+        <View style={[styles.actionBadge, { backgroundColor: withAlpha(ACTION_COLOR[entry.action], 0.14) }]}>
           <Text style={[styles.actionLabel, { color: ACTION_COLOR[entry.action] }]}>
             {ACTION_LABEL[entry.action]}
           </Text>
@@ -147,26 +150,14 @@ export function AuditLogRow({ entry, resolveCategoryName, resolveWalletName, cur
           ) : null}
         </>
       )}
-    </View>
+    </ListCell>
   );
 }
 
 const useStyles = createStyles((colors) => ({
-  row: {
-    gap: spacing.sm,
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    borderRadius: radii.listCard,
-  },
+  row: { gap: spacing.sm },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  actionBadge: {
-    paddingVertical: 2,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-  },
+  actionBadge: { paddingVertical: 2, paddingHorizontal: spacing.sm, borderRadius: radii.pill },
   actionLabel: { ...typography.tiny, fontWeight: "700" },
   time: { ...typography.tiny, color: colors.textMuted },
   changeList: { gap: 2 },

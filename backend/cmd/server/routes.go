@@ -22,7 +22,7 @@ type dbPinger interface {
 // (/api/v1). Auth/rate-limit middleware ordering matters: JWTAuth must run
 // before RequireRole (role comes from the token) and before
 // InviteRateLimiter (keyed by the caller's user ID from that same token).
-func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, transactionExportHandler *handler.TransactionExportHandler, transactionImportHandler *handler.TransactionImportHandler, auditLogHandler *handler.AuditLogHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, chatHandler *handler.ChatHandler, chatImageHandler *handler.ChatImageHandler, budgetWizardHandler *handler.BudgetWizardHandler, analyticsHandler *handler.AnalyticsHandler, accountSwitchHandler *handler.AccountSwitchHandler, sessionRevocationHandler *handler.SessionRevocationHandler, profileHandler *handler.ProfileHandler, accessRequestHandler *handler.AccessRequestHandler, accountDeletionHandler *handler.AccountDeletionHandler, passkeyHandler *handler.PasskeyHandler, assetLinks fiber.Handler, tokens *service.TokenService, sessions *service.SessionService, db dbPinger, logger *zap.Logger) {
+func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, walletHandler *handler.WalletHandler, walletMemberHandler *handler.WalletMemberHandler, categoryHandler *handler.CategoryHandler, budgetHandler *handler.BudgetHandler, transactionHandler *handler.TransactionHandler, transactionExportHandler *handler.TransactionExportHandler, transactionImportHandler *handler.TransactionImportHandler, auditLogHandler *handler.AuditLogHandler, reportHandler *handler.ReportHandler, notificationHandler *handler.NotificationHandler, chatHandler *handler.ChatHandler, chatImageHandler *handler.ChatImageHandler, budgetWizardHandler *handler.BudgetWizardHandler, analyticsHandler *handler.AnalyticsHandler, accountSwitchHandler *handler.AccountSwitchHandler, sessionRevocationHandler *handler.SessionRevocationHandler, profileHandler *handler.ProfileHandler, accessRequestHandler *handler.AccessRequestHandler, accountDeletionHandler *handler.AccountDeletionHandler, passkeyHandler *handler.PasskeyHandler, assetLinks fiber.Handler, tokens *service.TokenService, sessions *service.SessionService, db dbPinger, logger *zap.Logger) {
 	// One instance for every protected route: validates the access token and
 	// its session (see middleware.JWTAuth).
 	jwtAuth := middleware.JWTAuth(tokens, sessions, logger)
@@ -145,9 +145,18 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	wallets.Post("/icon", uploadLimit, walletHandler.UploadIcon)
 	wallets.Post("/", walletHandler.CreateWallet)
 	wallets.Get("/", walletHandler.ListWallets)
+	// Shared wallets (specs/shared-wallets). The literal path goes before
+	// "/:id", or "invitations" would be parsed as a wallet id.
+	wallets.Get("/invitations", walletMemberHandler.ListInvitations)
 	wallets.Get("/:id", walletHandler.GetWallet)
 	wallets.Patch("/:id", walletHandler.UpdateWallet)
 	wallets.Post("/:id/set-default", walletHandler.SetDefaultWallet)
+	wallets.Get("/:id/members", walletMemberHandler.ListMembers)
+	wallets.Post("/:id/members", walletMemberHandler.Invite)
+	wallets.Patch("/:id/members/:user_id", walletMemberHandler.UpdateRole)
+	wallets.Delete("/:id/members/:user_id", walletMemberHandler.Remove)
+	wallets.Post("/:id/invitation/accept", walletMemberHandler.AcceptInvitation)
+	wallets.Post("/:id/invitation/decline", walletMemberHandler.DeclineInvitation)
 
 	// F-04 Category Management — no RequireRole gate: every active user
 	// manages only their own categories and reads system ones identically

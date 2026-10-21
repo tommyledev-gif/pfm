@@ -43,18 +43,23 @@ type AnalyticsPeriodResponse struct {
 // round-trips through the client's opaque thread payload without a custom
 // decoder.
 type AnalyticsChart struct {
-	Type         string                `json:"type"`
-	Value        *int64                `json:"value,omitempty"`
-	Days         *int                  `json:"days,omitempty"`
-	Items        []AnalyticsChartItem  `json:"items,omitempty"`
-	Compare      *AnalyticsCompare     `json:"compare,omitempty"`
-	Rows         []AnalyticsTxRow      `json:"rows,omitempty"`
+	Type    string               `json:"type"`
+	Value   *int64               `json:"value,omitempty"`
+	Days    *int                 `json:"days,omitempty"`
+	Items   []AnalyticsChartItem `json:"items,omitempty"`
+	Compare *AnalyticsCompare    `json:"compare,omitempty"`
+	Rows    []AnalyticsTxRow     `json:"rows,omitempty"`
 	// MoreRows continues Rows in the same order — what the client reveals
 	// when the User expands "và N khoản khác". Rows alone is still the answer
 	// (the summary describes only Rows); an older client just ignores this.
 	MoreRows     []AnalyticsTxRow      `json:"more_rows,omitempty"`
 	TotalMatched *int64                `json:"total_matched,omitempty"`
 	Budgets      []AnalyticsBudgetItem `json:"budgets,omitempty"`
+	// Anomaly is set only on type "anomaly" (analytics_anomaly_response.go).
+	// That answer also fills Value (the period's spending), Compare (that
+	// against the usual) and Rows (unusually large expenses), so a client
+	// that does not know the type still lists real figures (S-AIQ-43).
+	Anomaly *AnalyticsAnomaly `json:"anomaly,omitempty"`
 }
 
 // AnalyticsChartItem is one slice, bar, line point or weekday.
@@ -77,9 +82,9 @@ type AnalyticsCompare struct {
 // AnalyticsTxRow is one Transaction in a ranked list — no note, by design
 // (plan.md BR-22).
 type AnalyticsTxRow struct {
-	ID           uuid.UUID `json:"id"`
-	OccurredAt   time.Time `json:"occurred_at"`
-	Amount       int64     `json:"amount"`
+	ID         uuid.UUID `json:"id"`
+	OccurredAt time.Time `json:"occurred_at"`
+	Amount     int64     `json:"amount"`
 	// CategoryID lets the client draw the Category's own icon and colour —
 	// the same tile this row has everywhere else in the app.
 	CategoryID   uuid.UUID `json:"category_id"`
@@ -95,12 +100,12 @@ type AnalyticsBudgetItem struct {
 	CategoryName string    `json:"category_name"`
 	// The Budget's own icon, which wins over its Category's — the same
 	// precedence as the Budgets screen (specs/wallet-budget-icons/spec.md).
-	Icon    *string `json:"icon,omitempty"`
-	IconURL *string `json:"icon_url,omitempty"`
-	Limit        int64     `json:"limit"`
-	Spent        int64     `json:"spent"`
-	Remaining    int64     `json:"remaining"`
-	Exceeded     bool      `json:"exceeded"`
+	Icon      *string `json:"icon,omitempty"`
+	IconURL   *string `json:"icon_url,omitempty"`
+	Limit     int64   `json:"limit"`
+	Spent     int64   `json:"spent"`
+	Remaining int64   `json:"remaining"`
+	Exceeded  bool    `json:"exceeded"`
 }
 
 // AnalyticsNotice is a caveat shown under the summary.
@@ -135,8 +140,8 @@ type ConsultResponse struct {
 // averages come from the last completed cycles; they are nil when there is
 // no history to compare against, and so is Feasible.
 type ConsultScenario struct {
-	Currency       string `json:"currency"`
-	Goal           int64  `json:"goal"`
+	Currency string `json:"currency"`
+	Goal     int64  `json:"goal"`
 	// Deadline is the local YYYY-MM-DD the money is needed by, if one was said.
 	Deadline       string `json:"deadline,omitempty"`
 	Months         int    `json:"months"`
@@ -146,10 +151,10 @@ type ConsultScenario struct {
 	AvgExpense     *int64 `json:"avg_expense,omitempty"`
 	// SpendCap is the most the User can spend a month and still save
 	// MonthlySave: average income minus MonthlySave.
-	SpendCap       *int64 `json:"spend_cap,omitempty"`
+	SpendCap *int64 `json:"spend_cap,omitempty"`
 	// CutNeeded is how much below the current average spending SpendCap is.
-	CutNeeded      *int64 `json:"cut_needed,omitempty"`
-	Feasible       *bool  `json:"feasible,omitempty"`
+	CutNeeded *int64 `json:"cut_needed,omitempty"`
+	Feasible  *bool  `json:"feasible,omitempty"`
 }
 
 // ConsultCategoryRef names a Category in a banner or a choice list.

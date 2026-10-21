@@ -58,11 +58,12 @@ Bạn nhận câu gốc và một dạng đã chuẩn hoá (bỏ dấu, số ti�
 Câu có từ hỏi (đâu, gì, nào, bao nhiêu, mấy) KHÔNG BAO GIỜ là transaction_like, kể cả khi không dấu: \
 "tien di dau hom nay" = query. transaction_like luôn có số tiền hoặc tên món cụ thể; câu chỉ có động từ chi tiêu \
 và một kỳ ("tiêu hnay", "chi tiêu tuần này", "danh mục tiêu hôm nay") là query.
-- "unsupported": mọi thứ khác — đầu tư, so với người khác, dự đoán cuối tháng, khoản bất thường, subscription, \
+- "unsupported": mọi thứ khác — đầu tư, so với người khác, dự đoán cuối tháng, subscription, \
 hỏi theo tên cửa hàng/người/địa điểm/ghi chú (ví dụ "tốn bao nhiêu cho Grab" khi không có danh mục tên Grab), \
 mốc âm lịch ("từ Tết tới giờ").
 Ví dụ ranh giới: "tháng này tiêu bao nhiêu" = query; "tháng này tiêu nhiều không" = evaluate; \
-"ăn uống tháng này so tháng trước" = query; "ăn uống tháng này so tháng trước có tăng nhiều không" = evaluate.
+"ăn uống tháng này so tháng trước" = query; "ăn uống tháng này so tháng trước có tăng nhiều không" = evaluate; \
+"hôm nay có gì bất thường" = query.
 
 2. Khi kind = "query", chọn metric:
 - sum: tổng chi (tx_type=expense) hoặc tổng thu nhập (tx_type=income) trong một kỳ. Câu chỉ có động từ chi tiêu \
@@ -79,9 +80,12 @@ và kỳ ("tiêu hôm nay", "tháng này chi tiêu") cũng là sum.
 - max_tx: MỘT khoản chi lớn nhất.
 - avg_daily: trung bình mỗi ngày chi bao nhiêu.
 - budget_status: còn bao nhiêu ngân sách (period luôn = this_cycle).
+- anomaly: có gì bất thường/lạ/đột biến/tăng vọt, chi nhiều hơn bình thường không. Không đặt group_by, tx_type, limit. \
+Ví dụ: "tuần này có khoản nào lạ không" → this_week; "hôm qua ăn uống có gì lạ" → hôm qua, category Ăn uống.
 
 3. period: "tháng này" = this_cycle; "tháng trước" = last_cycle; "3 tháng qua" = last_3_cycles; "6 tháng qua" = \
-last_6_cycles; "30 ngày qua"/"dạo này"/"gần đây" = last_30_days; "tuần này" = this_week. Không nói kỳ nào → this_cycle. \
+last_6_cycles; "30 ngày qua"/"dạo này"/"gần đây" = last_30_days; "tuần này" = this_week. Không nói kỳ nào → this_cycle \
+(riêng anomaly: hôm nay). \
 Khoảng ngày cụ thể → custom với from_date, to_date dạng YYYY-MM-DD.
 Một ngày ("hôm nay", "hôm qua", "hôm kia", "ngày 15/9", "ngày mai") → custom với from_date = to_date = đúng ngày đó, \
 chép ngày từ dòng "Hôm nay/Hôm qua/Hôm kia" ở trên. Ngày không ghi năm → lần gần nhất không sau hôm nay. \

@@ -32,9 +32,10 @@ const COPY = {
 const ACTION_HEIGHT = 52;
 
 // Served by the backend (AppUpdateHandler.DownloadAPK): always the newest APK.
+// The in-app download uses the API address, which nobody sees; a browser is
+// handed the public link when the server has one (download_url), so the API's
+// host never shows in front of a person.
 const APK_URL = `${Config.apiBaseUrl}/app-updates/apk`;
-
-const openInBrowser = () => void Linking.openURL(APK_URL);
 
 // What the card body shows. In-app, idle lasts only until the effect below
 // starts the download, so it already reads as progress: no "Tải bản mới"
@@ -64,10 +65,11 @@ function stageOf(state: ApkUpdateState, inApp: boolean): Stage {
 export function NativeUpdateDialog() {
   const status = useNativeUpdateQuery();
   if (!status.data?.update_required) return null;
-  return <NativeUpdateCard versionName={status.data.version_name} />;
+  return <NativeUpdateCard versionName={status.data.version_name} browserUrl={status.data.download_url || APK_URL} />;
 }
 
-function NativeUpdateCard({ versionName }: { versionName: string }) {
+function NativeUpdateCard({ versionName, browserUrl }: { versionName: string; browserUrl: string }) {
+  const openInBrowser = () => void Linking.openURL(browserUrl);
   const colors = useColors();
   const styles = useStyles();
   const { state, download, install } = useApkUpdate(APK_URL);

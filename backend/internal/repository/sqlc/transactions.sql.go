@@ -188,7 +188,7 @@ FROM transactions t
 JOIN wallets w ON w.id = t.wallet_id
 JOIN categories c ON c.id = t.category_id
 LEFT JOIN wallets tw ON tw.id = t.to_wallet_id
-WHERE t.user_id = $1
+WHERE (t.user_id = $1 OR ($13::bool AND $3::uuid IS NOT NULL))
   AND t.deleted_at IS NULL
   AND ($3::uuid IS NULL OR t.wallet_id = $3 OR t.to_wallet_id = $3)
   AND ($4::uuid IS NULL OR t.category_id = $4)
@@ -220,6 +220,10 @@ type ListTransactionsByUserParams struct {
 	CursorOccurredAt *time.Time
 	CursorCreatedAt  *time.Time
 	CursorID         *uuid.UUID
+	// WalletScoped lifts the user_id filter to "every entry in WalletID" —
+	// set only after the service proved the caller may read that wallet
+	// (specs/shared-wallets plan F1). The SQL ignores it without a WalletID.
+	WalletScoped bool
 }
 
 type ListTransactionsByUserRow struct {
@@ -252,6 +256,7 @@ func (q *Queries) ListTransactionsByUser(ctx context.Context, arg ListTransactio
 	rows, err := q.db.Query(ctx, listTransactionsByUser,
 		arg.UserID, arg.Limit, arg.WalletID, arg.CategoryID, arg.CategoryIDs, arg.Type,
 		arg.FromTs, arg.ToTs, arg.Search, arg.CursorOccurredAt, arg.CursorCreatedAt, arg.CursorID,
+		arg.WalletScoped,
 	)
 	if err != nil {
 		return nil, err
@@ -282,7 +287,7 @@ SELECT COUNT(*)::bigint
 FROM transactions t
 JOIN wallets w ON w.id = t.wallet_id
 JOIN categories c ON c.id = t.category_id
-WHERE t.user_id = $1
+WHERE (t.user_id = $1 OR ($9::bool AND $2::uuid IS NOT NULL))
   AND t.deleted_at IS NULL
   AND ($2::uuid IS NULL OR t.wallet_id = $2 OR t.to_wallet_id = $2)
   AND ($3::uuid IS NULL OR t.category_id = $3)
@@ -302,6 +307,8 @@ type CountTransactionsByUserParams struct {
 	FromTs      *time.Time
 	ToTs        *time.Time
 	Search      *string
+	// WalletScoped: see ListTransactionsByUserParams.WalletScoped.
+	WalletScoped bool
 }
 
 // CountTransactionsByUser is ListTransactionsByUser's WHERE clause without the
@@ -310,7 +317,7 @@ type CountTransactionsByUserParams struct {
 func (q *Queries) CountTransactionsByUser(ctx context.Context, arg CountTransactionsByUserParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countTransactionsByUser,
 		arg.UserID, arg.WalletID, arg.CategoryID, arg.CategoryIDs, arg.Type,
-		arg.FromTs, arg.ToTs, arg.Search,
+		arg.FromTs, arg.ToTs, arg.Search, arg.WalletScoped,
 	)
 	var total int64
 	err := row.Scan(&total)

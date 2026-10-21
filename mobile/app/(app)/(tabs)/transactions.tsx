@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { SectionList } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 
 import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
@@ -24,8 +23,7 @@ import { ManualDraftEditor } from "@/features/transactions/components/ManualDraf
 import { TransactionsListEmpty, TransactionsListFooter } from "@/features/transactions/components/TransactionsListStates";
 import { PendingSyncSection } from "@/features/transactions/components/PendingSyncSection";
 import { PendingSyncEditor } from "@/features/transactions/components/PendingSyncEditor";
-import { TransactionDayHeader } from "@/features/transactions/components/TransactionDayHeader";
-import { ExpandRevealRow } from "@/features/transactions/components/ExpandRevealRow";
+import { DaySectionList } from "@/features/transactions/components/DaySectionList";
 import { useCollapsedDays } from "@/features/transactions/hooks/use-collapsed-days";
 import { useFocusTransaction } from "@/features/transactions/hooks/use-focus-transaction";
 import { useTransactionFilters } from "@/features/transactions/hooks/use-transaction-filters";
@@ -50,7 +48,8 @@ export default function TransactionsScreen() {
   // deliberately not persisted — collapsing is a "get this out of my way
   // while I look at something else" gesture, not a setting. Keys that stop
   // matching after a filter change are simply never looked up again.
-  const { collapsedDays, toggleDay, isRevealing } = useCollapsedDays();
+  const days = useCollapsedDays();
+  const { collapsedDays, foldingDays } = days;
   // Set by "Xem trong Giao dịch" (Insights' category drill-down): scroll to
   // that row and flash a border on it. `focusedAt` is a nonce, so the same
   // row can be jumped to twice in a row.
@@ -112,9 +111,12 @@ export default function TransactionsScreen() {
   }, [sortedItems, dateRange.to]);
 
   const sections = useMemo(
-    () => buildDaySections(upToToday, { grouped: !hasAmountSort, walletCurrencyMap, collapsedDays }),
-    [upToToday, hasAmountSort, walletCurrencyMap, collapsedDays],
+    () => buildDaySections(upToToday, { grouped: !hasAmountSort, walletCurrencyMap, collapsedDays, foldingDays }),
+    [upToToday, hasAmountSort, walletCurrencyMap, collapsedDays, foldingDays],
   );
+  // A new result set staggers in: new filters, and again once their first page
+  // lands. A refetch or the next page changes none of it.
+  const listReplayKey = `${filters.filterKey}|${sortKeys.join()}|${transactions.isPending}`;
 
   const focus = useFocusTransaction({
     focusId: focusTransactionId,
@@ -127,8 +129,8 @@ export default function TransactionsScreen() {
       filters.clearFilters();
       setSortKeys([]);
     },
-    collapsedDays,
-    toggleDay,
+    closedDays: days.closedDays,
+    toggleDay: days.toggleDay,
     onFoundInFuture: () => setFutureOpen(true),
   });
 
@@ -171,13 +173,14 @@ export default function TransactionsScreen() {
 
   return (
     <Screen>
-      <SectionList
-        ref={focus.listRef}
+      <DaySectionList
+        listRef={focus.listRef}
         onScrollToIndexFailed={focus.onScrollToIndexFailed}
         style={styles.screen}
         contentContainerStyle={styles.content}
         sections={sections}
-        keyExtractor={(t) => t.id}
+        days={days}
+        replayKey={listReplayKey}
         stickySectionHeadersEnabled={false}
         refreshControl={refreshControl}
         onEndReachedThreshold={0.4}
@@ -211,24 +214,19 @@ export default function TransactionsScreen() {
             <FutureTransactionsCard transactions={future} onPress={() => setFutureOpen(true)} />
           </TransactionsHeader>
         }
-        renderSectionHeader={({ section }) =>
-          section.dayLabel ? <TransactionDayHeader section={section} onToggle={() => toggleDay(section.key)} /> : null
-        }
-        renderItem={({ item, section }) => (
-          <ExpandRevealRow revealing={isRevealing(section.key)}>
-            <TransactionRow
-              transaction={item}
-              currency={walletCurrencyMap.get(item.wallet_id)}
-              category={categoryById.get(item.category_id)}
-              onPress={() => {
-                setEditingTransaction(item);
-                setFormOpen(true);
-              }}
-              highlightOpacity={item.id === focus.highlightId ? focus.highlightOpacity : undefined}
-            />
-          </ExpandRevealRow>
+        renderRow={(item) => (
+          <TransactionRow
+            transaction={item}
+            currency={walletCurrencyMap.get(item.wallet_id)}
+            category={categoryById.get(item.category_id)}
+            onPress={() => {
+              setEditingTransaction(item);
+              setFormOpen(true);
+            }}
+            highlightOpacity={item.id === focus.highlightId ? focus.highlightOpacity : undefined}
+          />
         )}
-        ListEmptyComponent={
+        empty={
           <TransactionsListEmpty
             query={transactions}
             filtered={filters.hasNarrowingFilter}
@@ -239,7 +237,7 @@ export default function TransactionsScreen() {
             onSearch={filters.searchFor}
           />
         }
-        ListFooterComponent={<TransactionsListFooter query={transactions} />}
+        footer={<TransactionsListFooter query={transactions} />}
       />
 
       <Fab accessibilityLabel="Thêm giao dịch" testID="btn-add-transaction" onPress={openCreateForm} />
@@ -295,5 +293,6 @@ export default function TransactionsScreen() {
 
 const useStyles = createStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bgApp },
-  content: { paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: 140, gap: spacing.md },
+  // No gap: each cell spaces itself — see DaySectionList.
+  content: { paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: 140 },
 }));

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import Animated from "react-native-reanimated";
 
+import { entrance } from "@/components/motion/motion-tokens";
 import { AmountRevealPopup } from "@/components/ui/AmountRevealPopup";
 import { Avatar } from "@/components/ui/Avatar";
 import { CalendarIcon, CheckIcon, EditIcon, WalletIcon } from "@/components/ui/Icon";
@@ -127,6 +129,9 @@ export function TransactionActionCard({
         })()
       : null;
   const [revealVisible, setRevealVisible] = useState(false);
+  // Saved while on screen: the compact row settles in, so the save reads as
+  // the result of the tap. A card already saved when it mounts just shows it.
+  const [savedAtMount] = useState(confirmed);
   const label = payload.note || categoryName;
 
   const amountText = (
@@ -153,13 +158,13 @@ export function TransactionActionCard({
       ) : null}
 
       {confirmed ? (
-        <View style={styles.compactRow}>
+        <Animated.View entering={savedAtMount ? undefined : entrance("zoom")} style={styles.compactRow}>
           <CheckIcon size={16} color={colors.green} />
           <Text style={styles.compactLabel} numberOfLines={1}>
             {label}
           </Text>
           {amountText}
-        </View>
+        </Animated.View>
       ) : (
         <>
           <View style={styles.topRow}>

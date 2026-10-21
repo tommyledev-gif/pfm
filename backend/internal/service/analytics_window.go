@@ -26,6 +26,10 @@ type analyticsWindows struct {
 	// (specs/ai-chat-query-spending/plan.md BR-29).
 	singleDay bool
 	isToday   bool
+	// cycleDay is the plan's cycle start day the windows were resolved
+	// with, so a cycle baseline (analytics_anomaly_scope.go) needs no
+	// second plan read.
+	cycleDay int
 }
 
 func (s *AnalyticsService) resolveWindows(ctx context.Context, userID uuid.UUID, q model.AnalyticsQuery) (analyticsWindows, error) {
@@ -41,7 +45,7 @@ func (s *AnalyticsService) resolveWindows(ctx context.Context, userID uuid.UUID,
 		w := ResolveCycleWindow(now, day, offset, loc)
 		return model.AnalyticsWindow{Start: w.Start, End: w.End, Partial: now.Before(w.End)}
 	}
-	out := analyticsWindows{monthly: cycle(0).Start.In(loc).Day() == budgetCycleMinDay}
+	out := analyticsWindows{monthly: cycle(0).Start.In(loc).Day() == budgetCycleMinDay, cycleDay: day}
 
 	switch q.Period {
 	case model.AnalyticsPeriodThisCycle, model.AnalyticsPeriodLastCycle:

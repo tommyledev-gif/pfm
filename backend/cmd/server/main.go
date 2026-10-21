@@ -72,6 +72,7 @@ func main() {
 	openLegacyRefreshWindow(context.Background(), queries, authService, logger)
 	enableUnboundSessionCleanup(context.Background(), queries, sessionService, logger)
 	walletService := service.NewWalletService(walletRepo, logger)
+	walletMemberService := service.NewWalletMemberService(walletRepo, walletRepo, userRepo, logger)
 	categoryService := service.NewCategoryService(categoryRepo, logger)
 	budgetService := service.NewBudgetService(budgetRepo, cycleResolver, logger)
 	transactionService := service.NewTransactionService(transactionRepo, walletRepo, categoryRepo, logger)
@@ -110,6 +111,7 @@ func main() {
 	accessRequestHandler := handler.NewAccessRequestHandler(service.NewAccessRequestService(userRepo, notificationRepo, emailSender, logger), logger)
 	accountDeletionHandler := handler.NewAccountDeletionHandler(service.NewAccountDeletionService(userRepo, sessionService, logger), logger)
 	walletHandler := handler.NewWalletHandler(walletService, iconUploader, logger)
+	walletMemberHandler := handler.NewWalletMemberHandler(walletMemberService, logger)
 	categoryHandler := handler.NewCategoryHandler(categoryService, iconUploader, logger)
 	budgetHandler := handler.NewBudgetHandler(budgetService, iconUploader, logger)
 	transactionHandler := handler.NewTransactionHandler(transactionService, logger)
@@ -140,8 +142,9 @@ func main() {
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization, " + common.HeaderDeviceID + ", " + common.HeaderDeviceName,
 		AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 	}))
-	registerRoutes(app, userHandler, authHandler, walletHandler, categoryHandler, budgetHandler, transactionHandler, transactionExportHandler, transactionImportHandler, auditLogHandler, reportHandler, notificationHandler, chatHandler, chatImageHandler, budgetWizardHandler, analyticsHandler, accountSwitchHandler, sessionRevocationHandler, profileHandler, accessRequestHandler, accountDeletionHandler, passkeyHandler, assetLinks, tokenService, sessionService, pool, logger)
-	registerAppUpdateRoutes(app, handler.NewAppUpdateHandler(service.NewAppUpdateService(cfg.AppUpdatesDir), logger), cfg.AppUpdatesDir)
+	registerRoutes(app, userHandler, authHandler, walletHandler, walletMemberHandler, categoryHandler, budgetHandler, transactionHandler, transactionExportHandler, transactionImportHandler, auditLogHandler, reportHandler, notificationHandler, chatHandler, chatImageHandler, budgetWizardHandler, analyticsHandler, accountSwitchHandler, sessionRevocationHandler, profileHandler, accessRequestHandler, accountDeletionHandler, passkeyHandler, assetLinks, tokenService, sessionService, pool, logger)
+	appUpdateHandler := handler.NewAppUpdateHandler(service.NewAppUpdateService(cfg.AppUpdatesDir), logger).WithPublicAPKURL(cfg.APKPublicURL)
+	registerAppUpdateRoutes(app, appUpdateHandler, cfg.AppUpdatesDir)
 
 	go func() {
 		if err := app.Listen(":" + cfg.Port); err != nil {

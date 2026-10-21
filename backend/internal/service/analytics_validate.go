@@ -36,6 +36,11 @@ var (
 		model.AnalyticsPeriodThisCycle: true, model.AnalyticsPeriodLastCycle: true,
 		model.AnalyticsPeriodThisWeek: true, model.AnalyticsPeriodLast30Days: true,
 	}
+	// Anomaly: one day (custom, from = to), this week, or one cycle.
+	analyticsAnomalyPeriods = map[model.AnalyticsPeriod]bool{
+		model.AnalyticsPeriodCustom: true, model.AnalyticsPeriodThisWeek: true,
+		model.AnalyticsPeriodThisCycle: true, model.AnalyticsPeriodLastCycle: true,
+	}
 	// Metrics whose SQL is expense-only; income makes sense only on the
 	// report-backed ones.
 	analyticsIncomeMetrics = map[model.AnalyticsMetric]bool{
@@ -86,6 +91,15 @@ func toAnalyticsQuery(req dto.AnalyticsQueryRequest) (model.AnalyticsQuery, erro
 		if q.WalletID != nil {
 			add("wallet_id", analyticsRuleIncompatible)
 		}
+	case analyticsMetricAnomaly:
+		// A day is compared with days, a week with weeks, a cycle with
+		// cycles; a range of some other length has no samples to compare.
+		if !analyticsAnomalyPeriods[q.Period] {
+			add("period", analyticsRuleIncompatible)
+		}
+		if q.From != nil && q.To != nil && !q.From.Equal(*q.To) {
+			add("to", analyticsRuleIncompatible)
+		}
 	}
 	if q.Metric != model.AnalyticsMetricBreakdown && q.GroupBy != "" {
 		add("group_by", analyticsRuleIncompatible)
@@ -98,7 +112,9 @@ func toAnalyticsQuery(req dto.AnalyticsQueryRequest) (model.AnalyticsQuery, erro
 			add("limit", analyticsRuleIncompatible)
 		}
 	}
-	incomeOK := analyticsIncomeMetrics[q.Metric] ||
+	// An anomaly answer always looks at spending and income both, so an
+	// income-worded question is answered, not refused.
+	incomeOK := analyticsIncomeMetrics[q.Metric] || q.Metric == analyticsMetricAnomaly ||
 		(q.Metric == model.AnalyticsMetricBreakdown && q.GroupBy == model.AnalyticsGroupByCategory)
 	if q.TxType == string(model.TransactionTypeIncome) && !incomeOK {
 		add("tx_type", analyticsRuleIncompatible)

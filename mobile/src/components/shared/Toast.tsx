@@ -1,158 +1,160 @@
-import { useEffect, useRef } from "react";
-import { Animated, Dimensions, PanResponder, Pressable, Text, View } from "react-native";
+import { useEffect } from "react";
+import { AccessibilityInfo, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ToastGlyph, toastAccent } from "@/components/shared/toast-glyphs";
+import { useToastMotion } from "@/components/shared/use-toast-motion";
 import { CloseIcon } from "@/components/ui/Icon";
+import { ProgressRing } from "@/components/ui/ProgressRing";
 import { withAlpha } from "@/lib/color";
-import { colors, radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
-import { useToastStore, type ToastVariant } from "@/stores/toast-store";
+import { radii, spacing, createStyles, useColors } from "@/lib/theme";
+import { useReduceMotion } from "@/lib/use-reduce-motion";
+import { useToastStore } from "@/stores/toast-store";
 
-const AUTO_DISMISS_MS = 5000;
+const CLOSE_LABEL = "Đóng thông báo";
 const CARD_MARGIN = spacing.xl;
-const SCREEN_WIDTH = Dimensions.get("window").width;
-const CARD_WIDTH = SCREEN_WIDTH - CARD_MARGIN * 2;
-// "swipe it more than 80% of its width and continue a bit more" — the
-// release threshold sits a little past 80% so a drag that merely touches
-// 80% and stalls still springs back; only a drag that keeps going past it
-// commits to the dismiss.
-const HORIZONTAL_DISMISS_RATIO = 0.85;
-const VERTICAL_DISMISS_PX = 24;
-const OFFSCREEN_Y = -160;
+// A phone-width card; on a tablet it stops growing instead of spanning the screen.
+const MAX_CARD_WIDTH = 480;
+const WELL_SIZE = 44;
+const BADGE_SIZE = 22;
+const GLYPH_SIZE = 14;
+const CARD_PAD = 10;
+// Concentric with the icon well, so a one-line toast is a full capsule; a
+// taller one keeps the same corners instead of turning into a lozenge.
+const CARD_RADIUS = WELL_SIZE / 2 + CARD_PAD;
+const CLOSE_SIZE = 28;
+const RING_STROKE = 2;
+const WELL_ALPHA = 0.14;
 
-// Getters, not values: read at render time so they follow a theme switch
-// (see src/theme/active-palette.ts).
-const VARIANT_ACCENT: Record<ToastVariant, string> = {
-  get error() { return colors.error; },
-  get warning() { return colors.warning; },
-  get info() { return colors.info; },
-};
-
-// Slides down from above the screen to rest just under the safe area,
-// auto-dismisses after 5s, and can be swiped away — up (any distance past a
-// small threshold) or sideways (past ~85% of its own width) — mirroring an
-// iOS-style notification banner's swipe-to-dismiss. Mounted once in
-// app/_layout.tsx, driven globally via useToastStore (see that file's doc
-// comment) — no react-native-gesture-handler/reanimated dependency, plain
-// core PanResponder + Animated, same as SwipeableMessageRow/DebugBubble.
+/**
+ * The app's one toast: a capsule card under the status bar, a tinted circle
+ * holding the variant's badge (error and warning "!", info "i", success a
+ * check), the message (up to 3 lines), an optional coloured action line, and
+ * a close button ringed by the time left before it closes on its own.
+ *
+ * Mounted once in app/_layout.tsx and driven globally via useToastStore (see
+ * that file's doc comment). Motion lives in use-toast-motion: a spring in from
+ * just above, swipe up or aside to dismiss, and a show() while one is up
+ * replaces it in place.
+ */
 export function Toast() {
   const colors = useColors();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const reduceMotion = useReduceMotion();
   const visible = useToastStore((s) => s.visible);
   const message = useToastStore((s) => s.message);
   const variant = useToastStore((s) => s.variant);
+  const title = useToastStore((s) => s.title);
+  const action = useToastStore((s) => s.action);
   const token = useToastStore((s) => s.token);
   const hide = useToastStore((s) => s.hide);
 
-  const translateY = useRef(new Animated.Value(OFFSCREEN_Y)).current;
-  const translateX = useRef(new Animated.Value(0)).current;
-  const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const mounted = useRef(false);
+  const cardWidth = Math.min(windowWidth - CARD_MARGIN * 2, MAX_CARD_WIDTH);
+  const motion = useToastMotion({ token, visible, cardWidth, reduceMotion, onHidden: hide });
+  const accent = toastAccent(variant, colors);
+  const spoken = title ? `${title}. ${message}` : message;
 
-  const clearDismissTimer = () => {
-    if (dismissTimer.current) {
-      clearTimeout(dismissTimer.current);
-      dismissTimer.current = null;
-    }
-  };
-
-  const dismiss = (direction: "up" | "left" | "right" | "none") => {
-    clearDismissTimer();
-    const target =
-      direction === "up"
-        ? { x: 0, y: OFFSCREEN_Y }
-        : direction === "left"
-          ? { x: -SCREEN_WIDTH, y: 0 }
-          : direction === "right"
-            ? { x: SCREEN_WIDTH, y: 0 }
-            : { x: 0, y: OFFSCREEN_Y };
-    Animated.parallel([
-      Animated.timing(translateY, { toValue: target.y, duration: 200, useNativeDriver: true }),
-      Animated.timing(translateX, { toValue: target.x, duration: 200, useNativeDriver: true }),
-    ]).start(() => hide());
-  };
-
-  // Re-triggers on every show() (token changes even if a toast was already
-  // visible) — resets the swipe offset, slides in fresh, and restarts the
-  // 5s auto-dismiss clock.
+  // Android reads the live region below; iOS has none, so it is told.
   useEffect(() => {
-    if (!visible || token === 0) return;
-    mounted.current = true;
-    clearDismissTimer();
-    translateX.setValue(0);
-    translateY.setValue(OFFSCREEN_Y);
-    Animated.spring(translateY, { toValue: 0, useNativeDriver: true, bounciness: 6 }).start();
-    dismissTimer.current = setTimeout(() => dismiss("up"), AUTO_DISMISS_MS);
-    return clearDismissTimer;
+    if (visible && token > 0 && Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(spoken);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  useEffect(() => clearDismissTimer, []);
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > 6 || Math.abs(gesture.dy) > 6,
-      onPanResponderGrant: () => {
-        clearDismissTimer();
-      },
-      onPanResponderMove: (_, gesture) => {
-        if (Math.abs(gesture.dy) > Math.abs(gesture.dx)) {
-          // Vertical drag only ever follows upward — dragging down further
-          // than the docked position isn't a gesture this banner supports.
-          translateY.setValue(Math.min(0, gesture.dy));
-          translateX.setValue(0);
-        } else {
-          translateX.setValue(gesture.dx);
-          translateY.setValue(0);
-        }
-      },
-      onPanResponderRelease: (_, gesture) => {
-        const verticalDominant = Math.abs(gesture.dy) > Math.abs(gesture.dx);
-        if (verticalDominant && gesture.dy <= -VERTICAL_DISMISS_PX) {
-          dismiss("up");
-          return;
-        }
-        if (!verticalDominant && Math.abs(gesture.dx) >= CARD_WIDTH * HORIZONTAL_DISMISS_RATIO) {
-          dismiss(gesture.dx < 0 ? "left" : "right");
-          return;
-        }
-        // Snap back — didn't cross a dismiss threshold.
-        Animated.parallel([
-          Animated.spring(translateY, { toValue: 0, useNativeDriver: true, bounciness: 6 }),
-          Animated.spring(translateX, { toValue: 0, useNativeDriver: true, bounciness: 6 }),
-        ]).start();
-        dismissTimer.current = setTimeout(() => dismiss("up"), AUTO_DISMISS_MS);
-      },
-    }),
-  ).current;
-
-  if (!mounted.current && !visible) return null;
+  const runAction = () => {
+    // Closed first: an action that shows a toast of its own ("Đã hoàn tác")
+    // replaces this one instead of being closed with it.
+    motion.dismiss("up");
+    action?.onPress();
+  };
 
   return (
-    <View pointerEvents="box-none" style={[styles.container, { top: insets.top + spacing.sm }]}>
-      <Animated.View
-        style={[
-          styles.card,
-          { borderColor: withAlpha(VARIANT_ACCENT[variant], 0.45), transform: [{ translateX }, { translateY }] },
-        ]}
-        {...panResponder.panHandlers}
-      >
-        <Text style={styles.message} numberOfLines={3}>
-          {message}
-        </Text>
-        <Pressable onPress={() => dismiss("up")} hitSlop={8}>
-          <CloseIcon size={14} color={colors.textPrimary} />
-        </Pressable>
-      </Animated.View>
+    <View
+      pointerEvents="box-none"
+      accessibilityLiveRegion="polite"
+      style={[styles.container, { top: insets.top + spacing.sm }]}
+    >
+      {visible ? (
+        <Animated.View
+          style={[styles.card, { width: cardWidth, shadowColor: accent }, motion.cardStyle]}
+          {...motion.panHandlers}
+        >
+          <View
+            style={[styles.well, { backgroundColor: withAlpha(accent, WELL_ALPHA) }]}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            <Animated.View style={[styles.badge, { backgroundColor: accent }, motion.badgeStyle]}>
+              {/* The card's own surface, punched through the badge: dark on the
+                  dark theme's light accents, white on the light theme's deep ones. */}
+              <ToastGlyph variant={variant} size={GLYPH_SIZE} color={colors.surface} />
+            </Animated.View>
+          </View>
+
+          <View style={styles.body}>
+            <View accessible accessibilityRole="alert" accessibilityLabel={spoken}>
+              {title ? (
+                <Text style={styles.title} numberOfLines={1}>
+                  {title}
+                </Text>
+              ) : null}
+              <Text style={title ? styles.detail : styles.message} numberOfLines={3}>
+                {message}
+              </Text>
+            </View>
+            {action ? (
+              <Pressable
+                onPress={runAction}
+                hitSlop={{ top: 6, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel={action.label}
+                style={({ pressed }) => [styles.actionHit, pressed && styles.pressed]}
+              >
+                <Text style={[styles.action, { color: accent }]} numberOfLines={1}>
+                  {action.label}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          <Pressable
+            onPress={() => motion.dismiss("up")}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={CLOSE_LABEL}
+            style={({ pressed }) => [styles.close, pressed && styles.closePressed]}
+          >
+            {/* The time left before it closes itself, as a ring that empties.
+                It stops while the card is dragged. */}
+            {reduceMotion ? null : (
+              <ProgressRing
+                progress={motion.countdown}
+                size={CLOSE_SIZE}
+                strokeWidth={RING_STROKE}
+                color={withAlpha(accent, 0.6)}
+                trackColor={withAlpha(colors.overlayBase, 0.06)}
+              />
+            )}
+            <View style={styles.closeGlyph}>
+              <CloseIcon size={12} color={colors.textMuted} strokeWidth={2.4} />
+            </View>
+          </Pressable>
+        </Animated.View>
+      ) : null}
     </View>
   );
 }
 
 const useStyles = createStyles((colors) => ({
+  // Always mounted, empty while hidden: TalkBack announces a toast appearing
+  // inside a live region, not a live region appearing.
   container: {
     position: "absolute",
-    left: CARD_MARGIN,
-    right: CARD_MARGIN,
+    left: 0,
+    right: 0,
+    alignItems: "center",
     zIndex: 10000,
     elevation: 10000,
   },
@@ -160,14 +162,48 @@ const useStyles = createStyles((colors) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
+    minHeight: WELL_SIZE + CARD_PAD * 2,
+    paddingVertical: CARD_PAD,
+    paddingLeft: CARD_PAD,
+    // Centres the close button on the right-hand curve, as the well is on the left.
+    paddingRight: CARD_RADIUS - CLOSE_SIZE / 2,
+    borderRadius: CARD_RADIUS,
     backgroundColor: colors.surface,
-    // The variant is carried by one even border all the way round, softened —
-    // not a thick accent stripe down the left edge, which is the stock
-    // "alert" look and read as decoration rather than as part of the card.
-    borderWidth: 1,
-    borderRadius: radii.listCard,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.surfaceBorder,
+    // Tinted by the variant (shadowColor, inline): a soft coloured lift reads
+    // on the dark ground too, where a black shadow disappears.
+    shadowOpacity: 0.2,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
   },
-  message: { flex: 1, ...typography.label, color: colors.textPrimary },
+  well: {
+    width: WELL_SIZE,
+    height: WELL_SIZE,
+    borderRadius: radii.pill,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badge: {
+    width: BADGE_SIZE,
+    height: BADGE_SIZE,
+    borderRadius: 7,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  body: { flex: 1, justifyContent: "center", gap: 2 },
+  message: { fontSize: 14, fontWeight: "500", lineHeight: 19, color: colors.textPrimary },
+  title: { fontSize: 14, fontWeight: "700", lineHeight: 19, color: colors.textPrimary },
+  detail: { fontSize: 13, fontWeight: "500", lineHeight: 18, color: colors.textSecondary },
+  actionHit: { alignSelf: "flex-start" },
+  action: { fontSize: 14, fontWeight: "700", lineHeight: 19 },
+  pressed: { opacity: 0.6 },
+  close: {
+    width: CLOSE_SIZE,
+    height: CLOSE_SIZE,
+    borderRadius: radii.pill,
+  },
+  closePressed: { backgroundColor: withAlpha(colors.overlayBase, 0.08) },
+  closeGlyph: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
 }));

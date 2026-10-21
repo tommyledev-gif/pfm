@@ -56,7 +56,8 @@ export function disposableXu(incomeXu: number, fixedXu: number, savingsXu: numbe
   return incomeXu - fixedXu - savingsXu;
 }
 
-// A suggestion, so a 5.000đ step: 10% of 15.432.100đ is 1.540.000đ, not
+// A suggestion, so a round step (5.000đ under 1.000.000đ, 100.000đ from
+// there, lib/currency.ts): 10% of 15.432.100đ is 1.500.000đ, not
 // 1.543.210đ. Down, so it never asks for more than the share chosen.
 export function savingsForPct(incomeXu: number, pct: number): number {
   return floorToSuggestedStep(Math.floor((incomeXu * pct) / 100));

@@ -153,20 +153,32 @@ export function formatCurrencyTruncated(amountCents: number, currency: string = 
 }
 
 // Amounts the app works out for the user — a per-day allowance, a suggested
-// savings share — move in 5.000đ steps (500.000 xu): 15k, 255k, 30k, never an
-// odd figure. "còn 12.347đ" is arithmetic output; "còn 10.000đ" is something
-// you can decide against while standing at a counter. Amounts the user typed
-// are never rounded. (The budget engine's own ladder, budgetproposal
-// .roundStep, only ever lands on multiples of this step too.)
+// savings share, a consult plan — move in steps a person would pick: under
+// 1.000.000đ by 5.000đ (500.000 xu: 15k, 255k, 30k), from 1.000.000đ by
+// 100.000đ (10.000.000 xu: 1.500.000đ, never 1.545.000đ). "còn 12.347đ" is
+// arithmetic output; "còn 10.000đ" is something you can decide against while
+// standing at a counter. Amounts the user typed are never rounded.
+// Mirrors the backend's common.SuggestedStep (consult plans): the two must
+// agree. (The budget engine has its own finer ladder, budgetproposal
+// .roundStep; its figures are proposals the user edits, not this rule.)
 export const SUGGESTED_AMOUNT_STEP_XU = 500_000;
+export const SUGGESTED_AMOUNT_LARGE_STEP_XU = 10_000_000;
+/** From this amount (1.000.000đ) the step is SUGGESTED_AMOUNT_LARGE_STEP_XU. */
+export const SUGGESTED_AMOUNT_LARGE_FROM_XU = 100_000_000;
 // Any other currency steps by one whole unit (100 cents): 5.000 of a dollar
 // would floor every daily figure to nothing.
 const SUGGESTED_AMOUNT_STEP_MINOR = 100;
 
-/** A worked-out amount, rounded DOWN onto its currency's step (5.000đ for VND). */
+/** The step a worked-out amount lands on, chosen by the amount itself. */
+export function suggestedStep(amountCents: number, currency = "VND"): number {
+  if (currency !== "VND") return SUGGESTED_AMOUNT_STEP_MINOR;
+  return Math.abs(amountCents) < SUGGESTED_AMOUNT_LARGE_FROM_XU ? SUGGESTED_AMOUNT_STEP_XU : SUGGESTED_AMOUNT_LARGE_STEP_XU;
+}
+
+/** A worked-out amount, rounded DOWN onto its step (5.000đ under 1.000.000đ, 100.000đ from there, for VND). */
 export function floorToSuggestedStep(amountCents: number, currency = "VND"): number {
   if (amountCents <= 0) return 0;
-  const step = currency === "VND" ? SUGGESTED_AMOUNT_STEP_XU : SUGGESTED_AMOUNT_STEP_MINOR;
+  const step = suggestedStep(amountCents, currency);
   return Math.floor(amountCents / step) * step;
 }
 

@@ -21,7 +21,7 @@ export function AuditLogsEmptyState() {
         </EmptyIllustration>
       }
       title="Chưa có thay đổi nào"
-      description="Mỗi lần bạn tạo, sửa hoặc xoá một giao dịch, thay đổi đó sẽ được ghi lại tại đây."
+      description="Mỗi lần tạo, sửa hoặc xóa giao dịch đều được ghi ở đây."
       action={{
         label: "Đến trang Giao dịch",
         icon: <ReceiptIcon size={18} color={colors.onGreen} />,

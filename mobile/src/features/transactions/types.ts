@@ -30,6 +30,9 @@ export interface Transaction {
   item_count?: number;
   items?: TransactionItem[];
   adjustments?: TransactionAdjustment[];
+  // Who recorded it, only on a shared wallet's list and only when that was
+  // someone else (specs/shared-wallets BR-13).
+  recorded_by?: { id: string; name: string } | null;
 }
 
 // --- Items of a Transaction (specs/transaction-line-items) ----------------

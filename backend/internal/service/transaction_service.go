@@ -55,22 +55,20 @@ func (s *TransactionService) getOwnedTransaction(ctx context.Context, userID, tr
 	return transaction, nil
 }
 
-// getOwnedWallet mirrors WalletService's own helper — duplicated here rather
-// than shared because it belongs to a different service's dependency
-// (WalletRepo), same reasoning as CategoryService/BudgetService each having
-// their own small ownership helpers instead of a shared cross-service one.
-func (s *TransactionService) getOwnedWallet(ctx context.Context, userID, walletID uuid.UUID) (*model.Wallet, error) {
-	wallet, err := s.walletRepo.GetWalletByID(ctx, walletID)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, common.ErrWalletNotFound
+// requireWritableEntry is the wallet half of editing or deleting an entry:
+// the recorder (getOwnedTransaction) must still be able to record into every
+// wallet the entry moves, or a member removed from a shared wallet could
+// still change its balance (specs/shared-wallets BR-07, S-SHW-34).
+func (s *TransactionService) requireWritableEntry(ctx context.Context, userID uuid.UUID, t *model.Transaction) error {
+	if _, err := requireWritableWallet(ctx, s.walletRepo, userID, t.WalletID); err != nil {
+		return err
+	}
+	if t.ToWalletID != nil {
+		if _, err := requireWritableWallet(ctx, s.walletRepo, userID, *t.ToWalletID); err != nil {
+			return err
 		}
-		return nil, fmt.Errorf("service.getOwnedWallet: %w", err)
 	}
-	if wallet.UserID != userID {
-		return nil, common.ErrWalletAccessDenied
-	}
-	return wallet, nil
+	return nil
 }
 
 // getVisibleCategory mirrors CategoryService's own visibility check — system

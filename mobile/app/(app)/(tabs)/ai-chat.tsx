@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Keyboard, StyleSheet, View } from "react-native";
+import Animated from "react-native-reanimated";
 import { useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { entrance } from "@/components/motion/motion-tokens";
 import { Screen } from "@/components/shared/Screen";
 import { ChatModeBackdrop } from "@/features/ai-chat/components/ChatModeBackdrop";
 import { ChatModeHeader } from "@/features/ai-chat/components/ChatModeHeader";
@@ -56,6 +58,12 @@ export default function AiChatScreen() {
   const mode = useChatModeStore((s) => s.mode);
   const setMode = useChatModeStore((s) => s.setMode);
   const [modePickerOpen, setModePickerOpen] = useState(false);
+  // Switching between the two panes fades the new one in, in step with the
+  // backdrop's wash; the pane on screen when the tab first mounts just shows.
+  const firstRender = useRef(true);
+  useEffect(() => {
+    firstRender.current = false;
+  }, []);
 
   const [input, setInput] = useState("");
   // Set when "Switch to recording" carries a question over, so the recording
@@ -164,36 +172,43 @@ export default function AiChatScreen() {
       <View style={styles.screen}>
         <ChatModeHeader mode={mode} onPressMode={dismissKeyboardThen(() => setModePickerOpen(true))} />
 
-        {mode === "consult" ? (
-          <ConsultPane
-            keyboardVisible={keyboardVisible}
-            bottomInset={insets.bottom}
-            onSwitchToRecording={handleSwitchToRecording}
-          />
-        ) : (
-          <RecordingPane
-            listRef={listRef}
-            messages={invertedThread}
-            walletById={walletById}
-            categoryById={categoryById}
-            chat={chat}
-            closeSignal={closeSignal}
-            onScrollBeginDrag={() => setCloseSignal((n) => n + 1)}
-            input={input}
-            onChangeInput={setInput}
-            autoFocusInput={focusRecordingInput}
-            onInputFocused={() => setFocusRecordingInput(false)}
-            keyboardVisible={keyboardVisible}
-            keyboardHeight={keyboardHeight}
-            bottomInset={insets.bottom}
-            mode={mode}
-            onTriggerEdit={overlays.triggerEdit}
-            onTriggerDelete={removal.request}
-            onPressHistory={dismissKeyboardThen(overlays.openHistory)}
-            onOpenBudgetWizard={dismissKeyboardThen(overlays.openBudgetWizard)}
-            onOpenManualEntry={dismissKeyboardThen(() => overlays.setManualEntryOpen(true))}
-          />
-        )}
+        {/* Keyed by pane, not mode: recording and the budget wizard share one. */}
+        <Animated.View
+          key={mode === "consult" ? "consult" : "recording"}
+          entering={firstRender.current ? undefined : entrance("fade")}
+          style={styles.pane}
+        >
+          {mode === "consult" ? (
+            <ConsultPane
+              keyboardVisible={keyboardVisible}
+              bottomInset={insets.bottom}
+              onSwitchToRecording={handleSwitchToRecording}
+            />
+          ) : (
+            <RecordingPane
+              listRef={listRef}
+              messages={invertedThread}
+              walletById={walletById}
+              categoryById={categoryById}
+              chat={chat}
+              closeSignal={closeSignal}
+              onScrollBeginDrag={() => setCloseSignal((n) => n + 1)}
+              input={input}
+              onChangeInput={setInput}
+              autoFocusInput={focusRecordingInput}
+              onInputFocused={() => setFocusRecordingInput(false)}
+              keyboardVisible={keyboardVisible}
+              keyboardHeight={keyboardHeight}
+              bottomInset={insets.bottom}
+              mode={mode}
+              onTriggerEdit={overlays.triggerEdit}
+              onTriggerDelete={removal.request}
+              onPressHistory={dismissKeyboardThen(overlays.openHistory)}
+              onOpenBudgetWizard={dismissKeyboardThen(overlays.openBudgetWizard)}
+              onOpenManualEntry={dismissKeyboardThen(() => overlays.setManualEntryOpen(true))}
+            />
+          )}
+        </Animated.View>
       </View>
 
       <ChatModePicker
@@ -246,4 +261,5 @@ const styles = StyleSheet.create({
   // No background of its own — Screen paints bgApp, and ChatModeBackdrop
   // has to show through.
   screen: { flex: 1 },
+  pane: { flex: 1 },
 });

@@ -45,6 +45,17 @@ Một khái niệm = một từ, ở cả VI và EN. Cột "Nguồn": `app` = đ
 | Phrase (câu mẫu) | câu mẫu | saved phrase | app | Câu từng nhắn để ghi giao dịch, gợi ý lại trên ô chat. Ô tìm: "Tìm trong {{count}} câu mẫu"; nút: "Lưu câu mẫu" / "Bỏ lưu câu mẫu" / "Xóa câu mẫu" |
 | Needs-review mark (một món/dòng AI đọc từ ảnh chưa chắc) | cần kiểm tra | check this | đề xuất | Nhãn cạnh từng món trong "Chi tiết món" của thẻ đọc từ ảnh. Khác "Độ tin cậy thấp" (nhãn cho cả thẻ). Không chặn lưu |
 | Possible duplicate (thẻ đọc từ ảnh trùng giao dịch đã lưu) | giống giao dịch | looks like a saved transaction | đề xuất | Dòng trên thẻ: "Giống giao dịch {{amount}} ngày {{date}}"; nút lưu đổi thành "Vẫn lưu". Không chặn lưu |
+| Shared wallet | ví chung | shared wallet | app | Ví chủ ví mời người khác vào để cùng ghi thu chi (specs/shared-wallets). Không gọi "sổ", "sổ chung", "ví nhóm". Trên thẻ: "Ví chung của {{owner}}" hoặc "{{type}} · Ví chung" |
+| Wallet owner | chủ ví | owner | app | Người tạo ví. Một ví một chủ ví |
+| Recorder role (ví chung) | ghi chép | can record | app | Vai trò thêm được giao dịch vào ví chung. Khác "người ghi" (ai đã ghi một giao dịch: "{{name}} ghi") |
+| Viewer role (ví chung) | chỉ xem | view only | app | Vai trò chỉ xem số dư và giao dịch |
+| Invitation (ví chung) | lời mời | invitation | app | Nút: "Tham gia" / "Từ chối"; chủ ví rút lại: "Thu hồi lời mời". Trạng thái chưa trả lời: "Chờ trả lời" |
+| Leave (ví chung) | rời ví | leave | app | Nút và tiêu đề hộp xác nhận: "Rời ví" / "Rời ví {{wallet}}?", nhánh an toàn "Giữ lại" |
+| Card colour (ví) | màu thẻ | card colour | app | Nhãn trong form ví; lựa chọn mặc định: "Màu tự động" |
+| Admin role (tài khoản) | quản trị | admin | app | Nhãn vai trò tài khoản: "Quản trị" / "Thành viên"; tiêu đề chọn: "Vai trò" |
+| System category | mặc định | default | app | Nhóm danh mục có sẵn trong Danh mục ("Mặc định"), đối lập "Của bạn" |
+| Unusual (phân tích) | bất thường | unusual | app | Câu hỏi/trả lời phân tích chi tiêu khác hẳn mức thường ("Hôm nay có gì bất thường?") |
+| Usual level (phân tích) | mức thường | usual | app | Trung vị của các kỳ trước có chi tiêu: "gấp 3 lần mức thường ngày (100.000 ₫)" |
 
 ## Từ tránh dùng trong UI
 

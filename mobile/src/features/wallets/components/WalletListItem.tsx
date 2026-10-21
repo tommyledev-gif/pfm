@@ -1,16 +1,18 @@
 import { useState } from "react";
-import { Animated, Pressable, Text, View } from "react-native";
+import { Animated, StyleSheet } from "react-native";
 
 import { Avatar } from "@/components/ui/Avatar";
-import { ChevronRightIcon } from "@/components/ui/Icon";
+import { ListInlineButton, ListRow } from "@/components/ui/grouped-list";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { colorForCategory } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
 import { useRequireOnline } from "@/lib/connectivity";
-import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { radii, createStyles } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
+import { isOwnWallet } from "@/features/wallets/wallet-access";
 import { useSetDefaultWalletMutation } from "@/features/wallets/api/use-set-default-wallet-mutation";
-import { PendingBalanceHint, usePendingWalletCount } from "@/features/wallets/components/PendingBalanceHint";
+import { usePendingWalletCount } from "@/features/wallets/components/PendingBalanceHint";
+
+const AVATAR_SIZE = 40;
 
 const TYPE_LABEL: Record<Wallet["type"], string> = {
   cash: "Tiền mặt",
@@ -21,13 +23,21 @@ const TYPE_LABEL: Record<Wallet["type"], string> = {
 
 interface WalletListItemProps {
   wallet: Wallet;
+  /** The wallet's card colour (walletFace), so the row matches its card. */
+  faceColor: string;
   onPress: () => void;
   /** 1 → 0 from useHighlightFade — the "you picked this one" border. */
   highlightOpacity?: Animated.Value;
 }
 
-export function WalletListItem({ wallet, onPress, highlightOpacity }: WalletListItemProps) {
-  const colors = useColors();
+/**
+ * One wallet in the Wallets screen's grouped list: its icon on its card
+ * colour, name, type (or whose shared wallet it is) and balance. Set as
+ * default sits on the row of the User's own wallets only — a shared wallet
+ * is someone else's to set (specs/shared-wallets BR-01). Lives inside a
+ * GroupedListCell, which draws the group around it.
+ */
+export function WalletListItem({ wallet, faceColor, onPress, highlightOpacity }: WalletListItemProps) {
   const styles = useStyles();
   const requireOnline = useRequireOnline();
   const setDefault = useSetDefaultWalletMutation();
@@ -36,39 +46,38 @@ export function WalletListItem({ wallet, onPress, highlightOpacity }: WalletList
   // back out of an accidental tap — a confirm step first, same convention as
   // CategoryListItem's delete prompt, just non-destructive (tone="default").
   const [confirmDefaultOpen, setConfirmDefaultOpen] = useState(false);
+  const own = isOwnWallet(wallet);
+
+  const kind = own ? TYPE_LABEL[wallet.type] : `Ví chung của ${wallet.owner_name ?? "người khác"}`;
+  const shared = own && (wallet.member_count ?? 0) > 0 ? " · Ví chung" : "";
+  const pending = pendingCount > 0 ? ` · ${pendingCount} chưa đồng bộ` : "";
 
   return (
     <>
-      <Pressable style={styles.row} onPress={onPress}>
-        {highlightOpacity ? (
-          <Animated.View pointerEvents="none" style={[styles.highlightBorder, { opacity: highlightOpacity }]} />
-        ) : null}
-        <Avatar name={wallet.name} color={colorForCategory(wallet.id)} size={40} icon={wallet.icon} iconUrl={wallet.icon_url} />
-        <View style={styles.info}>
-          <View style={styles.titleRow}>
-            <Text style={styles.name}>{wallet.name}</Text>
-            {wallet.is_default ? (
-              <View style={styles.badge}>
-                <Text style={styles.badgeLabel}>Mặc định</Text>
-              </View>
-            ) : null}
-          </View>
-          <Text style={styles.sub}>
-            {TYPE_LABEL[wallet.type]} · {formatCurrency(wallet.balance, wallet.currency)}
-          </Text>
-          <PendingBalanceHint count={pendingCount} style={styles.sub} />
-        </View>
-        {!wallet.is_default ? (
-          <Pressable
-            onPress={() => requireOnline(() => setConfirmDefaultOpen(true))}
-            disabled={setDefault.isPending}
-            style={styles.defaultButton}
-          >
-            <Text style={styles.defaultButtonLabel}>Đặt mặc định</Text>
-          </Pressable>
-        ) : null}
-        <ChevronRightIcon size={18} color={colors.textMuted} />
-      </Pressable>
+      <ListRow
+        title={wallet.name}
+        subtitle={`${kind}${shared} · ${formatCurrency(wallet.balance, wallet.currency)}${pending}`}
+        value={wallet.is_default && own ? "Mặc định" : undefined}
+        leading={
+          <Avatar name={wallet.name} color={faceColor} size={AVATAR_SIZE} icon={wallet.icon} iconUrl={wallet.icon_url} />
+        }
+        leadingWidth={AVATAR_SIZE}
+        trailing={
+          own && !wallet.is_default ? (
+            <ListInlineButton
+              label="Đặt mặc định"
+              tone="default"
+              onPress={() => requireOnline(() => setConfirmDefaultOpen(true))}
+              disabled={setDefault.isPending}
+            />
+          ) : undefined
+        }
+        onPress={onPress}
+        testID={`row-wallet-${wallet.id}`}
+      />
+      {highlightOpacity ? (
+        <Animated.View pointerEvents="none" style={[styles.highlightBorder, { opacity: highlightOpacity }]} />
+      ) : null}
 
       <ConfirmDialog
         visible={confirmDefaultOpen}
@@ -88,41 +97,11 @@ export function WalletListItem({ wallet, onPress, highlightOpacity }: WalletList
 }
 
 const useStyles = createStyles((colors) => ({
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    borderRadius: radii.listCard,
-  },
-  // Sits exactly over the row's own 1px border, so it replaces it rather than
-  // drawing a second ring inside it.
+  // Over the whole cell; the cell clips it to the group's rounded corners.
   highlightBorder: {
-    position: "absolute",
-    top: -1,
-    left: -1,
-    right: -1,
-    bottom: -1,
+    ...StyleSheet.absoluteFillObject,
     borderRadius: radii.listCard,
     borderWidth: 2,
     borderColor: colors.green,
   },
-  info: { flex: 1, gap: 4 },
-  titleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  name: { ...typography.body, color: colors.textPrimary },
-  sub: { ...typography.tiny, color: colors.textSecondary },
-  badge: { backgroundColor: colors.green, borderRadius: radii.pill, paddingVertical: 2, paddingHorizontal: 8 },
-  badgeLabel: { ...typography.tiny, color: colors.onGreen },
-  defaultButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-  },
-  defaultButtonLabel: { ...typography.tiny, color: colors.textSecondary },
 }));

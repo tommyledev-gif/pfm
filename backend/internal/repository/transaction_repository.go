@@ -150,6 +150,10 @@ type ListTransactionsFilter struct {
 	CursorCreatedAt  *time.Time
 	CursorID         *uuid.UUID
 	Limit            int32
+	// WalletScoped: every entry in WalletID, whoever recorded it (a shared
+	// wallet's list). Only TransactionService sets it, after a read-access
+	// check on WalletID (specs/shared-wallets plan F1).
+	WalletScoped bool
 }
 
 // ListTransactionsByUser is cursor-paginated on (occurred_at, created_at, id)
@@ -170,6 +174,7 @@ func (r *TransactionRepository) ListTransactionsByUser(ctx context.Context, user
 		CursorOccurredAt: filter.CursorOccurredAt,
 		CursorCreatedAt:  filter.CursorCreatedAt,
 		CursorID:         filter.CursorID,
+		WalletScoped:     filter.WalletScoped,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("repository.ListTransactionsByUser: %w", err)
@@ -187,14 +192,15 @@ func (r *TransactionRepository) ListTransactionsByUser(ctx context.Context, user
 // TransactionService.ListTransactions).
 func (r *TransactionRepository) CountTransactionsByUser(ctx context.Context, userID uuid.UUID, filter ListTransactionsFilter) (int64, error) {
 	total, err := r.q.CountTransactionsByUser(ctx, sqlc.CountTransactionsByUserParams{
-		UserID:      userID,
-		WalletID:    filter.WalletID,
-		CategoryID:  filter.CategoryID,
-		CategoryIDs: filter.CategoryIDs,
-		Type:        filter.Type,
-		FromTs:      filter.From,
-		ToTs:        filter.To,
-		Search:      filter.Search,
+		UserID:       userID,
+		WalletID:     filter.WalletID,
+		CategoryID:   filter.CategoryID,
+		CategoryIDs:  filter.CategoryIDs,
+		Type:         filter.Type,
+		FromTs:       filter.From,
+		ToTs:         filter.To,
+		Search:       filter.Search,
+		WalletScoped: filter.WalletScoped,
 	})
 	if err != nil {
 		return 0, fmt.Errorf("repository.CountTransactionsByUser: %w", err)

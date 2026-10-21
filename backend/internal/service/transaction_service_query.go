@@ -41,10 +41,14 @@ func (s *TransactionService) ListTransactions(ctx context.Context, userID uuid.U
 		if err != nil {
 			return ListTransactionsResult{}, common.NewInvalidInputError("wallet_id must be a valid UUID")
 		}
-		if _, err := s.getOwnedWallet(ctx, userID, walletID); err != nil {
+		// Owner or any member: a wallet's own list shows every entry in it,
+		// whoever recorded it (specs/shared-wallets US-04). Without a wallet
+		// filter the list stays the caller's own entries (BR-09).
+		if _, err := requireReadableWallet(ctx, s.walletRepo, userID, walletID); err != nil {
 			return ListTransactionsResult{}, err
 		}
 		filter.WalletID = &walletID
+		filter.WalletScoped = true
 	}
 	if q.CategoryID != "" {
 		categoryID, err := uuid.Parse(q.CategoryID)
@@ -157,23 +161,68 @@ func (s *TransactionService) ListTransactions(ctx context.Context, userID uuid.U
 	if err := s.attachItemCounts(ctx, userID, transactions); err != nil {
 		return ListTransactionsResult{}, err
 	}
+	if filter.WalletScoped {
+		if err := s.attachRecorderNames(ctx, userID, transactions); err != nil {
+			return ListTransactionsResult{}, err
+		}
+	}
 
 	return ListTransactionsResult{Transactions: transactions, NextCursor: nextCursor, Total: total}, nil
 }
 
 // attachItemCounts sets ItemCount on a page of rows with one batched query
-// (specs/transaction-line-items plan F4) — never one query per row.
+// per recorder (specs/transaction-line-items plan F4) — never one per row.
+// The count query is scoped by recorder; a shared wallet's page holds
+// several (specs/shared-wallets), usually one to three. The ids all come
+// from a page the caller was allowed to read.
 func (s *TransactionService) attachItemCounts(ctx context.Context, userID uuid.UUID, transactions []*model.Transaction) error {
-	ids := make([]uuid.UUID, 0, len(transactions))
+	idsByRecorder := map[uuid.UUID][]uuid.UUID{userID: nil}
 	for _, t := range transactions {
-		ids = append(ids, t.ID)
+		idsByRecorder[t.UserID] = append(idsByRecorder[t.UserID], t.ID)
 	}
-	counts, err := s.repo.CountActiveItems(ctx, userID, ids)
+	counts := make(map[uuid.UUID]int, len(transactions))
+	for recorder, ids := range idsByRecorder {
+		if len(ids) == 0 {
+			continue
+		}
+		recorderCounts, err := s.repo.CountActiveItems(ctx, recorder, ids)
+		if err != nil {
+			return fmt.Errorf("service.ListTransactions: %w", err)
+		}
+		for id, n := range recorderCounts {
+			counts[id] = n
+		}
+	}
+	for _, t := range transactions {
+		t.ItemCount = counts[t.ID]
+	}
+	return nil
+}
+
+// attachRecorderNames names whoever recorded each entry on a shared wallet's
+// page, when that is not the caller (specs/shared-wallets BR-13): one batched
+// lookup per page.
+func (s *TransactionService) attachRecorderNames(ctx context.Context, userID uuid.UUID, transactions []*model.Transaction) error {
+	seen := make(map[uuid.UUID]bool)
+	ids := make([]uuid.UUID, 0)
+	for _, t := range transactions {
+		if t.UserID != userID && !seen[t.UserID] {
+			seen[t.UserID] = true
+			ids = append(ids, t.UserID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	names, err := s.walletRepo.ListUserDisplayNames(ctx, ids)
 	if err != nil {
 		return fmt.Errorf("service.ListTransactions: %w", err)
 	}
 	for _, t := range transactions {
-		t.ItemCount = counts[t.ID]
+		if name, ok := names[t.UserID]; ok && t.UserID != userID {
+			recorded := name
+			t.RecordedByName = &recorded
+		}
 	}
 	return nil
 }

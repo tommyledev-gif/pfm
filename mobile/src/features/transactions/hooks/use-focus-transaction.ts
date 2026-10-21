@@ -35,8 +35,10 @@ interface UseFocusTransactionOptions {
   transactions: TransactionsPager;
   /** Clears whatever filter or sort could be hiding the row. */
   resetView: () => void;
-  collapsedDays: Set<string>;
-  toggleDay: (dayKey: string) => void;
+  /** Days folded or folding (useCollapsedDays) — a row there is not in view. */
+  closedDays: ReadonlySet<string>;
+  /** `animate: false` opens a day at full height at once, ready to scroll in. */
+  toggleDay: (dayKey: string, animate?: boolean) => void;
   /** The row is a future one: open the card that lists those instead. */
   onFoundInFuture: () => void;
 }
@@ -56,7 +58,7 @@ export function useFocusTransaction({
   future,
   transactions,
   resetView,
-  collapsedDays,
+  closedDays,
   toggleDay,
   onFoundInFuture,
 }: UseFocusTransactionOptions) {
@@ -106,9 +108,10 @@ export function useFocusTransaction({
       return;
     }
 
-    // A folded day hands the list no rows: open the row's own day, and only it.
-    if (focusDay && collapsedDays.has(focusDay)) {
-      toggleDay(focusDay);
+    // A folded day hands the list no rows (and a folding one is about to):
+    // open the row's own day, and only it.
+    if (focusDay && closedDays.has(focusDay)) {
+      toggleDay(focusDay, false);
       return;
     }
 

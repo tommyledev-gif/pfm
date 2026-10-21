@@ -219,6 +219,10 @@ Wallets are used as the main source or destination for all financial transaction
 
 Each Wallet shall optionally support a visual icon (an emoji/short label, or an uploaded photo) for quick recognition in lists, consistent with the icon support already provided by Category Management (FR-03). *(Not yet implemented — see SDS §12.1 Known Issues Log, Item 3.)*
 
+Each Wallet shall support a card colour chosen by its owner from a fixed palette, with text that stays readable on it.
+
+The owner of a Wallet shall be able to **share it with other Users** (shared wallet): invited Users who accept see its balance and every Transaction in it, and Users given the recording role add Transactions to it, so several Users keep one book of income and spending together. Sharing never moves or deletes anyone's Transactions. *(specs/shared-wallets/spec.md)*
+
 ## FR-02: Transaction Management {#fr-02-transaction-management}
 
 The System shall allow Users to **record financial Transactions**, including **both income and expense Transactions**.
@@ -762,6 +766,39 @@ The User Stories of this feature are described below.
 ### US-04: Update a Wallet {#us-04-update-a-wallet}
 
 ### US-05: Set a Wallet as default {#us-05-set-a-wallet-as-default}
+
+### US-06: Share a Wallet with other Users [Release 1] {#us-06-share-a-wallet-release-1}
+
+*As a User who owns a Wallet,*
+*I want to invite other Users to it as recorders or viewers,*
+*so that we keep one book of income and spending together.*
+
+  **Scenario: Invite and accept**
+    **Given** I own a Wallet and another active User exists
+    **When** I invite them as a recorder and they accept
+    **Then** the Wallet appears in their list with its balance
+    **And** Transactions they record in it change its balance for both of us
+
+  **Scenario: Viewer cannot record**
+    **Given** a User is a viewer of my Wallet
+    **When** they try to record a Transaction in it
+    **Then** the System refuses and the balance does not change
+
+  **Scenario: Removing a member keeps their Transactions**
+    **Given** a member recorded Transactions in my Wallet
+    **When** I remove them
+    **Then** they lose access and their Transactions stay in the Wallet
+
+### US-07: Choose a Wallet card colour [Release 1] {#us-07-choose-a-wallet-card-colour-release-1}
+
+*As a User,*
+*I want to pick a colour for each Wallet's card,*
+*so that I recognise my Wallets at a glance.*
+
+  **Scenario: Readable text on every colour**
+    **Given** I pick any colour from the palette
+    **When** the card is shown in either theme
+    **Then** the card's text stays readable on it
 
 ## Feature-04: Category Management {#feature-04-category-management}
 

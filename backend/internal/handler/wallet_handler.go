@@ -52,14 +52,17 @@ func (h *WalletHandler) CreateWallet(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusCreated, "wallet created successfully", dto.NewWalletResponse(wallet))
 }
 
-// ListWallets handles GET /wallets.
+// ListWallets handles GET /wallets. ?include_shared=true adds the wallets
+// shared with the caller (specs/shared-wallets US-03); without it the list
+// is exactly what it was before sharing existed.
 func (h *WalletHandler) ListWallets(c *fiber.Ctx) error {
 	userID, err := callerUUID(c)
 	if err != nil {
 		return response.Error(c, h.logger, common.ErrUnauthenticated)
 	}
 
-	wallets, err := h.walletService.ListWallets(c.Context(), userID)
+	includeShared := c.QueryBool("include_shared", false)
+	wallets, err := h.walletService.ListWallets(c.Context(), userID, includeShared)
 	if err != nil {
 		return response.Error(c, h.logger, err)
 	}

@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { onlineManager } from "@tanstack/react-query";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { PillButton } from "@/components/ui/PillButton";
-import { PlusIcon, ShieldIcon, TrashIcon } from "@/components/ui/Icon";
+import { ListCell, ListRow, ListSection } from "@/components/ui/grouped-list";
+import { PasskeyGlyph, PlusGlyph, TrashGlyph } from "@/components/ui/grouped-list/list-icons";
 import { getErrorMessage } from "@/lib/api-envelope";
 import { formatDateDMY } from "@/lib/format-date";
-import { createStyles, radii, spacing, typography, useColors } from "@/lib/theme";
+import { createStyles, spacing, typography, useColors } from "@/lib/theme";
 import { useToastStore } from "@/stores/toast-store";
 import { useDeletePasskeyMutation, usePasskeysQuery, useRegisterPasskeyMutation } from "@/features/security/api/use-passkeys-query";
 import { PasskeyNativeError, passkeysAvailable } from "@/features/security/passkeys/native-passkey";
@@ -44,6 +44,7 @@ function usedLine(p: PasskeyItem): string {
  * The account's passkeys on the Security screen: what is registered (any
  * phone), adding one on this phone, removing one. Removing works anywhere;
  * adding needs a build with the passkey module (passkeysAvailable).
+ * One group: a row per passkey, then "Thêm passkey" as the group's last row.
  */
 export function PasskeysSection() {
   const colors = useColors();
@@ -101,43 +102,66 @@ export function PasskeysSection() {
     });
   };
 
-  return (
-    <View style={styles.card} testID="section-passkeys">
-      <View style={styles.header}>
-        <ShieldIcon size={20} color={colors.green} />
-        <View style={styles.text}>
-          <Text style={styles.title}>{COPY.title}</Text>
-          <Text style={styles.hint}>{COPY.hint}</Text>
-        </View>
-      </View>
+  const list = passkeys.data ?? [];
 
-      {passkeys.isLoading ? (
-        <ActivityIndicator color={colors.green} />
-      ) : passkeys.isError ? (
-        <Text style={styles.note}>{COPY.loadFailed}</Text>
-      ) : (passkeys.data ?? []).length === 0 ? (
-        <Text style={styles.note}>{COPY.empty}</Text>
-      ) : (
-        (passkeys.data ?? []).map((p, index) => (
-          <View key={p.id} style={[styles.row, index > 0 && styles.divider]}>
-            <View style={styles.text}>
-              <Text style={styles.name} numberOfLines={1}>
-                {p.name}
-              </Text>
-              <Text style={styles.note}>{usedLine(p)}</Text>
-            </View>
-            <Pressable
-              onPress={() => setConfirming(p)}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel={`${COPY.confirmLabel} ${p.name}`}
-              testID="btn-passkey-delete"
-            >
-              <TrashIcon size={18} color={colors.textSecondary} />
-            </Pressable>
-          </View>
-        ))
-      )}
+  return (
+    <View style={styles.block}>
+      <ListSection header={COPY.title} footer={COPY.hint} testID="section-passkeys">
+        {passkeys.isLoading ? (
+          <ListCell>
+            <ActivityIndicator color={colors.green} />
+          </ListCell>
+        ) : passkeys.isError ? (
+          <ListCell>
+            <Text style={styles.note}>{COPY.loadFailed}</Text>
+          </ListCell>
+        ) : list.length === 0 ? (
+          <ListCell>
+            <Text style={styles.note}>{COPY.empty}</Text>
+          </ListCell>
+        ) : (
+          list.map((p) => (
+            <ListRow
+              key={p.id}
+              title={p.name}
+              titleLines={1}
+              subtitle={usedLine(p)}
+              icon={PasskeyGlyph}
+              tone={colors.lavender}
+              trailing={
+                <Pressable
+                  onPress={() => setConfirming(p)}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${COPY.confirmLabel} ${p.name}`}
+                  style={({ pressed }) => pressed && styles.pressed}
+                  testID="btn-passkey-delete"
+                >
+                  <TrashGlyph size={20} color={colors.textSecondary} />
+                </Pressable>
+              }
+            />
+          ))
+        )}
+        {/* While the guide below is up, it carries the retry; no second add. */}
+        {available && !needsProvider ? (
+          <ListRow
+            title={COPY.add}
+            icon={PlusGlyph}
+            tone={colors.green}
+            variant="accent"
+            chevron={false}
+            onPress={add}
+            loading={register.isPending}
+            testID="btn-passkey-add"
+          />
+        ) : null}
+        {available ? null : (
+          <ListCell>
+            <Text style={styles.note}>{COPY.unsupported}</Text>
+          </ListCell>
+        )}
+      </ListSection>
 
       {available && needsProvider ? (
         <PasskeyProviderHelp
@@ -146,18 +170,7 @@ export function PasskeysSection() {
           onDismiss={closeProviderHelp}
           stillMissing={providerStillMissing}
         />
-      ) : available ? (
-        <PillButton
-          label={COPY.add}
-          variant="outline"
-          icon={<PlusIcon size={16} color={colors.textPrimary} />}
-          onPress={add}
-          loading={register.isPending}
-          testID="btn-passkey-add"
-        />
-      ) : (
-        <Text style={styles.note}>{COPY.unsupported}</Text>
-      )}
+      ) : null}
 
       <ConfirmDialog
         visible={confirming !== null}
@@ -175,21 +188,7 @@ export function PasskeysSection() {
 }
 
 const useStyles = createStyles((colors) => ({
-  card: {
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    borderRadius: radii.listCard,
-  },
-  header: { flexDirection: "row", gap: spacing.md },
-  text: { flex: 1, gap: spacing.xs },
-  title: { ...typography.body, color: colors.textPrimary },
-  hint: { ...typography.caption, color: colors.textSecondary },
-  row: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingTop: spacing.sm },
-  divider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.surfaceBorder },
-  name: { ...typography.body, color: colors.textPrimary },
-  note: { ...typography.caption, color: colors.textSecondary },
+  block: { gap: spacing.md },
+  note: { ...typography.caption, fontWeight: "500", color: colors.textSecondary },
+  pressed: { opacity: 0.6 },
 }));

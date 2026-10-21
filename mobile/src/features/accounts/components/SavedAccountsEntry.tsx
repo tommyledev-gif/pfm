@@ -1,5 +1,6 @@
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
+import { PressableScale } from "@/components/motion/PressableScale";
 import { ChevronRightIcon } from "@/components/ui/Icon";
 import { withAlpha } from "@/lib/color";
 import { createStyles, radii, spacing, typography, useColors } from "@/lib/theme";
@@ -34,10 +35,10 @@ export function SavedAccountsEntry({ candidates, onPress }: SavedAccountsEntryPr
   const count = COPY.count(candidates.length);
 
   return (
-    <Pressable
+    <PressableScale
       onPress={onPress}
       android_ripple={{ color: withAlpha(colors.overlayBase, 0.08) }}
-      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+      style={styles.row}
       accessibilityRole="button"
       accessibilityLabel={`${COPY.title}, ${count}`}
       testID="btn-login-saved-accounts"
@@ -54,7 +55,7 @@ export function SavedAccountsEntry({ candidates, onPress }: SavedAccountsEntryPr
         <Text style={styles.count} numberOfLines={1}>{count}</Text>
       </View>
       <ChevronRightIcon size={20} color={colors.textSecondary} />
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -71,7 +72,6 @@ const useStyles = createStyles((colors) => ({
     borderRadius: radii.listCard,
     overflow: "hidden",
   },
-  pressed: { opacity: 0.85 },
   faces: { flexDirection: "row" },
   // The ring in the page colour is what separates two overlapping circles.
   ring: { borderRadius: 999, borderWidth: RING_WIDTH, borderColor: colors.surface },
