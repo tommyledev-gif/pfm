@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
-import { Animated, BackHandler, Dimensions, Keyboard, Pressable, ScrollView, View } from "react-native";
+import { Animated, BackHandler, Dimensions, Easing, Keyboard, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { DrawerChildPanel } from "@/components/shared/DrawerChildPanel";
@@ -55,6 +55,10 @@ interface DrawerProps {
 //
 // Slide distance only has to clear the screen, so it is the window height.
 const OFFSCREEN_Y = Dimensions.get("window").height;
+// Closing glides down on a decelerating curve over a dim that fades with it,
+// so a tap outside reads as the sheet sliding away, not vanishing.
+const CLOSE_MS = 280;
+const CLOSE_EASING = Easing.out(Easing.cubic);
 // How long after opening the overlay keeps re-checking where its host sits —
 // past a screen push (native-stack fade) and the safe-area padding landing.
 const ANCHOR_SETTLE_MS = 800;
@@ -95,22 +99,18 @@ function DrawerSheet({ visible, onClose, children, footer, child, startOpen, onE
   // The sheet runs to the screen's bottom edge (edge-to-edge), so its last
   // row would sit under the gesture bar / nav buttons without this. With the
   // keyboard up the keyboard covers that strip and lifts the sheet anyway.
-  const { bottom: bottomInset } = useSafeAreaInsets();
+  const { bottom: bottomInset, top: topInset } = useSafeAreaInsets();
   const navPad = keyboardHeight > 0 ? 0 : bottomInset;
   const translateY = useRef(new Animated.Value(startOpen ? 0 : OFFSCREEN_Y)).current;
   const backdropOpacity = useRef(new Animated.Value(startOpen ? 1 : 0)).current;
   // Grab-handle drag: down past half the height closes, up expands to max.
   const drag = useSheetDrag({ translateY, onClose });
 
-  // Rendering in-tree (rather than through <Modal>, see the note above) has
-  // one consequence the original version missed: an absolutely-positioned
-  // child fills its parent's *padding box*, not the window. Mounted from a
-  // screen that pads its own root — Insights does (`paddingHorizontal:
-  // spacing.xl` on the Screen, `paddingBottom: 140` on the tab body) — the
-  // "full-screen" overlay was inset on all four sides, so the sheet floated
-  // as a rounded card in the middle of the screen and read as a dialog
-  // rather than a bottom sheet. Transactions, which mounts its Drawer as a
-  // direct child of an unpadded Screen, looked correct by luck.
+  // Rendering in-tree (rather than through <Modal>, see the note above) means
+  // an absolutely-positioned child fills its parent's *padding box*, not the
+  // window. Mounted from a screen that pads its own root (Insights), the
+  // "full-screen" overlay was inset on all four sides and the sheet floated
+  // as a rounded card mid-screen, reading as a dialog, not a bottom sheet.
   //
   // Fix: measure a zero-size anchor pinned at the parent's content origin,
   // then offset the overlay by the negative of those window coordinates and
@@ -136,8 +136,8 @@ function DrawerSheet({ visible, onClose, children, footer, child, startOpen, onE
       ]).start();
     } else {
       Animated.parallel([
-        Animated.timing(backdropOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
-        Animated.timing(translateY, { toValue: OFFSCREEN_Y, duration: 220, useNativeDriver: true }),
+        Animated.timing(backdropOpacity, { toValue: 0, duration: CLOSE_MS, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: OFFSCREEN_Y, duration: CLOSE_MS, easing: CLOSE_EASING, useNativeDriver: true }),
       ]).start(({ finished }) => {
         // Unmounting resets the drag too: every open starts at resting height.
         if (finished) onExited();
@@ -194,14 +194,19 @@ function DrawerSheet({ visible, onClose, children, footer, child, startOpen, onE
       {/* Zero-size, never-moved probe at the host's content origin — the
           overlay below is positioned relative to what this measures. */}
       <View ref={anchorRef} onLayout={measureAnchor} pointerEvents="none" style={styles.anchor} />
-      <Animated.View
-        style={[
-          styles.overlay,
-          { left: -origin.x, top: -origin.y, width: windowSize.width, height: windowSize.height },
-          { opacity: backdropOpacity },
-        ]}
+      <View
+        style={[styles.overlay, { left: -origin.x, top: -origin.y, width: windowSize.width, height: windowSize.height }]}
       >
-        <Pressable style={[styles.backdrop, { paddingBottom: keyboardHeight }]} onPress={onClose}>
+        {/* ⚠️ Only the dim fades. The opacity used to sit on this whole
+            overlay, sheet included, so closing faded the sheet out in 180ms
+            while it was meant to be sliding down: a tap outside read as the
+            sheet vanishing on the spot. */}
+        <Animated.View pointerEvents="none" style={[styles.dim, { opacity: backdropOpacity }]} />
+        <Pressable
+          style={[styles.backdrop, { paddingTop: topInset, paddingBottom: keyboardHeight }]}
+          onPress={onClose}
+          accessibilityLabel="Đóng"
+        >
           <Animated.View
             style={[
               styles.sheetTouchArea,
@@ -209,12 +214,16 @@ function DrawerSheet({ visible, onClose, children, footer, child, startOpen, onE
               { transform: [{ translateY }] },
             ]}
           >
+            {/* Under the sheet, in its colour: pulling the sheet up lifts it
+                off the bottom edge for a moment (use-sheet-drag's rubber
+                band), and this keeps that gap filled. */}
+            <View pointerEvents="none" style={styles.skirt} />
             <Pressable
               onPress={() => {}}
               onLayout={drag.onSheetLayout}
               style={[styles.sheetSurface, drag.expanded && styles.sheetSurfaceExpanded]}
             >
-              <SheetHandle panHandlers={drag.panHandlers} />
+              <SheetHandle panHandlers={drag.panHandlers} progress={drag.progress} expanded={drag.expanded} />
               <ScrollView
                 // flexShrink so a pinned footer can claim its space out of the
                 // scroll area once the sheet hits its 90% cap, rather than
@@ -240,8 +249,12 @@ function DrawerSheet({ visible, onClose, children, footer, child, startOpen, onE
             </Pressable>
           </Animated.View>
         </Pressable>
-        {child ? <DrawerChildPanel {...child} width={windowSize.width} bottomInset={keyboardHeight} /> : null}
-      </Animated.View>
+        {child ? (
+          <Animated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { opacity: backdropOpacity }]}>
+            <DrawerChildPanel {...child} width={windowSize.width} bottomInset={keyboardHeight} />
+          </Animated.View>
+        ) : null}
+      </View>
     </>
   );
 }
@@ -249,12 +262,15 @@ function DrawerSheet({ visible, onClose, children, footer, child, startOpen, onE
 const useStyles = createStyles((colors) => ({
   anchor: { position: "absolute", left: 0, top: 0, width: 0, height: 0 },
   overlay: { position: "absolute", zIndex: 1000, elevation: 1000 },
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
-  sheetTouchArea: { maxHeight: "90%" },
-  // Dragged up via the handle: fills to the max height regardless of how
-  // short the content is, with the scroll area taking the extra room so a
-  // pinned footer stays at the bottom.
-  sheetTouchAreaExpanded: { height: "94%", maxHeight: "94%" },
+  dim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.6)" },
+  // Padded by the status bar, so "full screen" stops just under it.
+  backdrop: { flex: 1, justifyContent: "flex-end" },
+  sheetTouchArea: { maxHeight: "92%" },
+  // Dragged up via the handle: fills the whole screen under the status bar
+  // regardless of how short the content is, with the scroll area taking the
+  // extra room so a pinned footer stays at the bottom.
+  sheetTouchAreaExpanded: { height: "100%", maxHeight: "100%" },
+  skirt: { position: "absolute", left: 0, right: 0, top: "50%", height: OFFSCREEN_Y / 2, backgroundColor: colors.surface },
   sheetSurfaceExpanded: { flex: 1 },
   sheetScrollExpanded: { flex: 1 },
   // The surface (background + rounded top) moved off the ScrollView's content

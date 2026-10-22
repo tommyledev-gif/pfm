@@ -10,6 +10,8 @@ interface MotionStaggerProps {
   startIndex?: number;
   /** Extra wait before the first child, ms. */
   delay?: number;
+  /** Each child slides to its new place when something above it appears or leaves. */
+  animateLayout?: boolean;
 }
 
 /**
@@ -25,11 +27,23 @@ interface MotionStaggerProps {
  *
  * Plays on mount only, like MotionView: re-renders change nothing.
  */
-export function MotionStagger({ children, preset = "fadeUp", startIndex = 0, delay = 0 }: MotionStaggerProps) {
+export function MotionStagger({
+  children,
+  preset = "fadeUp",
+  startIndex = 0,
+  delay = 0,
+  animateLayout = false,
+}: MotionStaggerProps) {
   return (
     <>
       {Children.toArray(children).map((child, i) => (
-        <MotionView key={isValidElement(child) ? child.key : i} preset={preset} index={startIndex + i} delay={delay}>
+        <MotionView
+          key={isValidElement(child) ? child.key : i}
+          preset={preset}
+          index={startIndex + i}
+          delay={delay}
+          animateLayout={animateLayout}
+        >
           {child}
         </MotionView>
       ))}

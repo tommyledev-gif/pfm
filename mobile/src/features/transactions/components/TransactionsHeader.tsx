@@ -18,7 +18,7 @@ export type TypeFilterValue = "all" | TransactionKind;
 
 // Transfers carry no total of their own — they change no net worth, so the
 // tab only narrows the list.
-const TYPE_OPTIONS: { value: TypeFilterValue; label: string }[] = [
+export const TYPE_OPTIONS: { value: TypeFilterValue; label: string }[] = [
   { value: "all", label: "Tất cả" },
   { value: "expense", label: "Chi tiêu" },
   { value: "income", label: "Thu nhập" },

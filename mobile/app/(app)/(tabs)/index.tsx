@@ -1,10 +1,11 @@
 import { memo, useCallback, useMemo, useState } from "react";
-import { FlatList, ListRenderItemInfo, Pressable, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useRouter } from "expo-router";
 
 import { MotionStagger } from "@/components/motion/MotionStagger";
 import { useListEntrance } from "@/components/motion/MotionView";
+import { layoutSpring } from "@/components/motion/motion-tokens";
 import { BankIcon, PlusIcon } from "@/components/ui/Icon";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { EmptyInlineCard } from "@/components/shared/EmptyState";
@@ -42,7 +43,6 @@ const RECENT_TRANSACTION_COUNT = 4;
 // asking for exactly four would leave the list short by however many there are.
 const RECENT_FETCH_LIMIT = 10;
 const NO_WALLETS: Wallet[] = [];
-const transactionKey = (t: Transaction) => t.id;
 // The header's staggered blocks (MotionStagger): the recent rows continue
 // the same top-to-bottom sequence after them.
 const HEADER_BLOCKS = 5;
@@ -75,6 +75,10 @@ const RecentRow = memo(function RecentRow({ transaction, currency, category, onP
  * native animation graph included — and that work landed on the same JS
  * thread that had to answer the tap back to Home, which is what made the
  * switch take half a second or more to happen.
+ *
+ * One column, not a FlatList: blocks land at different times (pending
+ * proposals after the wallets), and each carries a layout spring, so a late
+ * one fades in while everything under it slides down instead of jumping.
  */
 export default function HomeScreen() {
   const colors = useColors();
@@ -145,116 +149,117 @@ export default function HomeScreen() {
 
   // The header's blocks enter first (MotionStagger below), the rows after them.
   const rowEntrance = useListEntrance();
-  // The entrance wrapper sits outside RecentRow, so its memo still holds.
-  const renderRecent = useCallback(
-    ({ item, index }: ListRenderItemInfo<Transaction>) => (
-      <Animated.View entering={rowEntrance(index + HEADER_BLOCKS)}>
-        <RecentRow
-          transaction={item}
-          currency={walletCurrencyMap.get(item.wallet_id)}
-          category={categoryById.get(item.category_id)}
-          onPress={setEditingTransaction}
-        />
-      </Animated.View>
-    ),
-    [walletCurrencyMap, categoryById, rowEntrance],
-  );
 
   return (
     <Screen>
-      <FlatList
+      <ScrollView
         style={styles.screen}
         contentContainerStyle={styles.content}
-        data={recentTransactions}
-        keyExtractor={transactionKey}
         refreshControl={refreshControl}
-        ListHeaderComponent={
-          <View style={styles.header}>
-            {/* Blocks enter top to bottom on Home's first mount; Home then
-                stays mounted, so this never replays on a tab switch. */}
-            <MotionStagger>
-              <TopBar />
-              {isFresh ? (
-                <HomeOnboardingCard
-                  hasWallet={(wallets.data?.length ?? 0) > 0}
-                  hasTransaction={false}
-                  hasBudget={(budgets.data?.length ?? 0) > 0}
-                  onAddTransaction={startTransaction}
-                />
-              ) : (
-                <SegmentedTabs style={styles.periodRow} options={PERIODS} value={homePeriod} onChange={setHomePeriod} />
-              )}
-              {isFresh ? null : (
-                <HomeSnapshotCard
-                  loading={snapshot.loading || deciding}
-                  periodIndex={PERIODS.findIndex((p) => p.value === homePeriod)}
-                  isDay={homePeriod === "day"}
-                  currency={snapshot.currency}
-                  currencies={snapshot.currencies}
-                  onChangeCurrency={snapshot.setCurrency}
-                  periodSpent={snapshot.periodSpent}
-                  spentDelta={snapshot.spentDelta}
-                  previousPeriodLabel={previousPeriodLabel(homePeriod)}
-                  budgetSnapshot={snapshot.budgetSnapshot}
-                  remainingToday={snapshot.remainingToday}
-                  todayAllowance={snapshot.todayAllowance}
-                  daysLeft={snapshot.daysLeft}
-                  atRiskBudgets={snapshot.atRiskBudgets}
-                  topCategories={snapshot.topCategories}
-                  topCategoriesExpenseTotal={snapshot.topCategoriesExpenseTotal}
-                  categoryById={categoryById}
-                  onOpenBudgets={openBudgetsForPeriod}
-                  onOpenInsights={openInsights}
-                />
-              )}
-            </MotionStagger>
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          {/* Blocks enter top to bottom on Home's first mount (Home then
+              stays mounted), and slide when a block above them lands. */}
+          <MotionStagger animateLayout>
+            <TopBar />
+            {isFresh ? (
+              <HomeOnboardingCard
+                hasWallet={(wallets.data?.length ?? 0) > 0}
+                hasTransaction={false}
+                hasBudget={(budgets.data?.length ?? 0) > 0}
+                onAddTransaction={startTransaction}
+              />
+            ) : (
+              <SegmentedTabs style={styles.periodRow} options={PERIODS} value={homePeriod} onChange={setHomePeriod} />
+            )}
+            {isFresh ? null : (
+              <HomeSnapshotCard
+                loading={snapshot.loading || deciding}
+                periodIndex={PERIODS.findIndex((p) => p.value === homePeriod)}
+                isDay={homePeriod === "day"}
+                currency={snapshot.currency}
+                currencies={snapshot.currencies}
+                onChangeCurrency={snapshot.setCurrency}
+                periodSpent={snapshot.periodSpent}
+                spentDelta={snapshot.spentDelta}
+                previousPeriodLabel={previousPeriodLabel(homePeriod)}
+                budgetSnapshot={snapshot.budgetSnapshot}
+                remainingToday={snapshot.remainingToday}
+                todayAllowance={snapshot.todayAllowance}
+                daysLeft={snapshot.daysLeft}
+                atRiskBudgets={snapshot.atRiskBudgets}
+                topCategories={snapshot.topCategories}
+                topCategoriesExpenseTotal={snapshot.topCategoriesExpenseTotal}
+                categoryById={categoryById}
+                onOpenBudgets={openBudgetsForPeriod}
+                onOpenInsights={openInsights}
+              />
+            )}
+          </MotionStagger>
 
-            {/* Outside the stagger: either may render nothing, and an empty
-                wrapper would still take a gap. */}
-            <HomePendingProposals categoryById={categoryById} walletCurrencyById={walletCurrencyMap} />
+          {/* Outside the stagger: either may render nothing (no empty gap). */}
+          <HomePendingProposals categoryById={categoryById} walletCurrencyById={walletCurrencyMap} />
 
-            <HomePendingSyncSection />
+          <HomePendingSyncSection />
 
-            <MotionStagger startIndex={3}>
-              <View style={styles.section}>
-                <View style={styles.sectionHeaderRow}>
-                  <View style={styles.sectionTitleRow}>
-                    <Text style={styles.sectionTitle}>Ví</Text>
-                    {wallets.data ? <Text style={styles.sectionCountHint}>{wallets.data.length} ví</Text> : null}
-                  </View>
-                  <Pressable onPress={openWallets} hitSlop={8} style={styles.addWalletAction}>
-                    <PlusIcon size={12} color={colors.green} />
-                    <Text style={styles.sectionAction}>Thêm ví</Text>
-                  </Pressable>
-                </View>
-                {isAwaitingFirstData(wallets) ? (
-                  <WalletCardSkeleton />
-                ) : isWaitingForNetwork(wallets) ? (
-                  <OfflinePlaceholder />
-                ) : wallets.data?.length === 0 ? (
-                  <EmptyInlineCard
-                    icon={<BankIcon size={18} color={colors.textSecondary} />}
-                    text="Chưa có ví. Tạo ví để ghi giao dịch."
-                    onPress={openWalletCreator}
-                    testID="empty-home-wallets"
-                  />
-                ) : (
-                  <WalletCarousel wallets={wallets.data ?? NO_WALLETS} onPressWallet={openWallet} />
-                )}
-              </View>
-
+          <MotionStagger startIndex={3} animateLayout>
+            <View style={styles.section}>
               <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionTitle}>Giao dịch gần đây</Text>
-                <Pressable onPress={openTransactions} hitSlop={8}>
-                  <Text style={styles.sectionAction}>Xem tất cả →</Text>
+                <View style={styles.sectionTitleRow}>
+                  <Text style={styles.sectionTitle}>Ví</Text>
+                  {wallets.data ? <Text style={styles.sectionCountHint}>{wallets.data.length} ví</Text> : null}
+                </View>
+                <Pressable onPress={openWallets} hitSlop={8} style={styles.addWalletAction}>
+                  <PlusIcon size={12} color={colors.green} />
+                  <Text style={styles.sectionAction}>Thêm ví</Text>
                 </Pressable>
               </View>
-            </MotionStagger>
-          </View>
-        }
-        renderItem={renderRecent}
-        ListEmptyComponent={<HomeRecentEmpty query={recent} />}
-      />
+              {isAwaitingFirstData(wallets) ? (
+                <WalletCardSkeleton />
+              ) : isWaitingForNetwork(wallets) ? (
+                <OfflinePlaceholder />
+              ) : wallets.data?.length === 0 ? (
+                <EmptyInlineCard
+                  icon={<BankIcon size={18} color={colors.textSecondary} />}
+                  text="Chưa có ví. Tạo ví để ghi giao dịch."
+                  onPress={openWalletCreator}
+                  testID="empty-home-wallets"
+                />
+              ) : (
+                <WalletCarousel wallets={wallets.data ?? NO_WALLETS} onPressWallet={openWallet} />
+              )}
+            </View>
+
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>Giao dịch gần đây</Text>
+              <Pressable onPress={openTransactions} hitSlop={8}>
+                <Text style={styles.sectionAction}>Xem tất cả →</Text>
+              </Pressable>
+            </View>
+          </MotionStagger>
+        </View>
+
+        <View style={styles.recent}>
+          {recentTransactions.length === 0 ? (
+            <Animated.View layout={layoutSpring()}>
+              <HomeRecentEmpty query={recent} />
+            </Animated.View>
+          ) : (
+            recentTransactions.map((item, index) => (
+              // The entrance wrapper sits outside RecentRow, so its memo still holds.
+              <Animated.View key={item.id} entering={rowEntrance(index + HEADER_BLOCKS)} layout={layoutSpring()}>
+                <RecentRow
+                  transaction={item}
+                  currency={walletCurrencyMap.get(item.wallet_id)}
+                  category={categoryById.get(item.category_id)}
+                  onPress={setEditingTransaction}
+                />
+              </Animated.View>
+            ))
+          )}
+        </View>
+      </ScrollView>
 
       <TransactionFormModal
         visible={Boolean(editingTransaction) || creatingTransaction}
@@ -269,6 +274,7 @@ const useStyles = createStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bgApp },
   content: { paddingBottom: 140, paddingHorizontal: spacing.xl, gap: spacing.md },
   header: { gap: spacing.xl },
+  recent: { gap: spacing.md },
   section: { gap: spacing.md },
   periodRow: { flexDirection: "row", gap: spacing.sm },
   // No bottom margin: the section's own gap owns the space under a header,

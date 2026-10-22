@@ -5,6 +5,7 @@ import { useListEntrance } from "@/components/motion/MotionView";
 import { GroupedListCell, ListSectionHeader } from "@/components/ui/grouped-list";
 import { useFabBottom } from "@/components/ui/Fab";
 import { Screen } from "@/components/shared/Screen";
+import { ScreenLoader } from "@/components/shared/ScreenLoader";
 import { ScreenHeader } from "@/components/shared/ScreenHeader";
 import { dayLabelVi, formatDateViShort } from "@/lib/format-date";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
@@ -92,7 +93,7 @@ export default function AuditLogsScreen() {
       <ScreenHeader title="Nhật ký giao dịch" subtitle="Lịch sử tạo, sửa và xóa giao dịch" />
 
       {auditLogs.isLoading ? (
-        <ActivityIndicator color={colors.green} style={styles.loader} />
+        <ScreenLoader />
       ) : (
         <SectionList
           testID="list-audit-logs"

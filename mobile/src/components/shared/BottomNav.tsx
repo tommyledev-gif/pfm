@@ -1,5 +1,5 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, LayoutChangeEvent, Pressable, View } from "react-native";
+import { memo, useEffect, useRef, useState } from "react";
+import { Animated, LayoutChangeEvent, Pressable, View } from "react-native";
 import { useRouter, usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
@@ -12,16 +12,12 @@ import {
   TransactionsTabIcon,
 } from "@/components/shared/nav-icons";
 import { NavBallLight } from "@/components/shared/NavBallLight";
+import { useNavBallMotion } from "@/components/shared/use-nav-ball-motion";
 import { useColors } from "@/lib/theme";
 import {
   BALL_SIZE,
   BAND_CUTOUT_PATH,
-  BOB_DISTANCE,
-  BOB_DURATION,
-  BOB_INPUT,
-  BOB_OUTPUT,
   HAIRLINE,
-  ICON_BOUNCE_SCALE,
   LINE_LEFT_END,
   LINE_RIGHT_START,
   PILL_HEIGHT,
@@ -48,6 +44,7 @@ export const TABS = [
 const SETTINGS_SUB_ROUTES = [
   "/user-settings",
   "/wallets",
+  "/shared-wallets",
   "/categories",
   "/users",
   "/audit-logs",
@@ -56,6 +53,10 @@ const SETTINGS_SUB_ROUTES = [
   "/change-password",
   "/edit-profile",
 ];
+
+// How long a tapped tab is held as the target while the router gets there.
+// Only a ceiling: the hold ends as soon as the pathname arrives.
+const PENDING_TAB_MS = 1000;
 
 interface BottomNavProps {
   /** Hidden but kept mounted: a sheet or the keyboard is up, or the route has no nav. */
@@ -82,97 +83,45 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
 
-  const activeIndex = SETTINGS_SUB_ROUTES.includes(pathname)
+  const routeIndex = SETTINGS_SUB_ROUTES.includes(pathname)
     ? TABS.findIndex((t) => t.href === "/settings")
     : TABS.findIndex((t) => t.href === pathname);
-  const [displayIndex, setDisplayIndex] = useState(Math.max(activeIndex, 0));
+  // ⚠️ The tab just tapped, held until the router lands on it. Navigating
+  // from a pushed screen (Wallets opened from Home, say) goes through the tab
+  // underneath first — the pathname read "/" for a moment before the tapped
+  // tab's — and the ball followed it there and back. Leading with the tap
+  // also starts the ball the moment the finger lifts, not a render later.
+  const [pendingIndex, setPendingIndex] = useState<number | null>(null);
+  const activeIndex = pendingIndex ?? routeIndex;
+  useEffect(() => {
+    if (pendingIndex === null) return;
+    if (routeIndex === pendingIndex) {
+      setPendingIndex(null);
+      return;
+    }
+    const timer = setTimeout(() => setPendingIndex(null), PENDING_TAB_MS);
+    return () => clearTimeout(timer);
+  }, [pendingIndex, routeIndex]);
 
   const tabRects = useRef<{ x: number; width: number }[]>([]);
   const positioned = useRef(false);
   const lastAnimatedIndex = useRef(activeIndex);
-  // ⚠️ The ball is hidden until the tab row has been measured: a fresh
-  // Animated.Value(0) paints it under Home for a frame before onLayout moves
-  // it, which read as the nav jumping to Home. Fading in on the first
-  // measurement costs nothing and removes that flash.
-  const [positionedReady, setPositionedReady] = useState(false);
-  const ballOpacity = useRef(new Animated.Value(0)).current;
-
-  const ballX = useRef(new Animated.Value(0)).current;
-  const squish = useRef(new Animated.Value(0)).current;
-  const iconOpacity = useRef(new Animated.Value(1)).current;
-  const iconScale = useRef(new Animated.Value(1)).current;
-  const bobPhase = useRef(new Animated.Value(0)).current;
-  const bob = useMemo(() => bobPhase.interpolate({ inputRange: BOB_INPUT, outputRange: BOB_OUTPUT }), [bobPhase]);
-  const rowOpacities = useRef(TABS.map((_, i) => new Animated.Value(i === Math.max(activeIndex, 0) ? 0 : 1))).current;
-
-  // Idle up/down float, independent of every other animation on the ball:
-  // it drives translateY only, while ballX/squish own translateX and scale,
-  // so a tab switch mid-float neither interrupts nor is interrupted by it.
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.timing(bobPhase, {
-        toValue: 1,
-        duration: BOB_DURATION * 2,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [bobPhase]);
-
-  const fadeRowIcons = (prevIndex: number, nextIndex: number) => {
-    if (prevIndex !== -1 && prevIndex !== nextIndex) {
-      Animated.timing(rowOpacities[prevIndex], { toValue: 1, duration: 220, useNativeDriver: true }).start();
-    }
-    Animated.timing(rowOpacities[nextIndex], { toValue: 0, duration: 160, useNativeDriver: true }).start();
-  };
-
-  const moveBallTo = (index: number, instant: boolean) => {
+  const ball = useNavBallMotion(TABS.length, Math.max(activeIndex, 0));
+  const { ballOpacity, ballX, iconScale, ballIconOpacities, rowOpacities, bob } = ball;
+  const { ballScaleX, ballScaleY, ballBobY, bandCoverOpacity, followBall } = ball;
+  const ballTarget = (index: number) => {
     const rect = tabRects.current[index];
-    if (!rect) return;
-    const target = rect.x + rect.width / 2 - BALL_SIZE / 2;
-
-    if (instant) {
-      ballX.setValue(target);
-      return;
-    }
-
-    Animated.spring(ballX, { toValue: target, tension: 210, friction: 14, useNativeDriver: true }).start();
-    squish.setValue(0);
-    Animated.sequence([
-      Animated.timing(squish, { toValue: 1, duration: 90, useNativeDriver: true }),
-      Animated.spring(squish, { toValue: 0, tension: 180, friction: 10, useNativeDriver: true }),
-    ]).start();
-  };
-
-  const morphIconTo = (index: number) => {
-    Animated.timing(iconOpacity, { toValue: 0, duration: 120, useNativeDriver: true }).start(() => {
-      setDisplayIndex(index);
-      Animated.timing(iconOpacity, { toValue: 1, duration: 180, useNativeDriver: true }).start();
-      // The new icon arrives with a small pop (1 → 1.15 → 1) so the switch
-      // registers as a response to the tap, not just a swap.
-      iconScale.setValue(1);
-      Animated.sequence([
-        Animated.timing(iconScale, {
-          toValue: ICON_BOUNCE_SCALE,
-          duration: 120,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.spring(iconScale, { toValue: 1, tension: 220, friction: 7, useNativeDriver: true }),
-      ]).start();
-    });
+    return rect ? rect.x + rect.width / 2 - BALL_SIZE / 2 : null;
   };
 
   useEffect(() => {
     if (activeIndex === -1 || !positioned.current) return;
     if (lastAnimatedIndex.current === activeIndex) return;
-    const prevIndex = lastAnimatedIndex.current;
+    const x = ballTarget(activeIndex);
+    if (x === null) return;
     lastAnimatedIndex.current = activeIndex;
-    moveBallTo(activeIndex, false);
-    morphIconTo(activeIndex);
-    fadeRowIcons(prevIndex, activeIndex);
+    ball.switchTo(activeIndex, x);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeIndex]);
 
   const handleTabLayout = (index: number) => (e: LayoutChangeEvent) => {
@@ -181,30 +130,9 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
     positioned.current = true;
     const startIndex = Math.max(activeIndex, 0);
     lastAnimatedIndex.current = startIndex;
-    moveBallTo(startIndex, true);
-    setDisplayIndex(startIndex);
-    setPositionedReady(true);
+    ball.place(startIndex, ballTarget(startIndex) ?? 0);
+    ball.reveal();
   };
-
-  useEffect(() => {
-    if (!positionedReady) return;
-    Animated.timing(ballOpacity, { toValue: 1, duration: 120, useNativeDriver: true }).start();
-  }, [positionedReady, ballOpacity]);
-
-  const DisplayIcon = TABS[displayIndex].Icon;
-
-  // Built once: a new node per render would rebuild the native animation graph.
-  const motion = useMemo(
-    () => ({
-      ballScaleX: squish.interpolate({ inputRange: [0, 1], outputRange: [1, 1.22] }),
-      ballScaleY: squish.interpolate({ inputRange: [0, 1], outputRange: [1, 0.85] }),
-      ballBobY: bob.interpolate({ inputRange: [0, 1], outputRange: [0, -BOB_DISTANCE] }),
-      bandCoverOpacity: ballOpacity.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
-      followBall: { transform: [{ translateX: ballX }] },
-    }),
-    [squish, bob, ballOpacity, ballX],
-  );
-  const { ballScaleX, ballScaleY, ballBobY, bandCoverOpacity, followBall } = motion;
 
   return (
     <View
@@ -235,7 +163,9 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
               // By path, not lit index: Settings stays lit on its sub-screens,
               // and tapping it there must go back to Settings.
               onPress={() => {
-                if (pathname !== href) router.navigate(href);
+                if (pathname === href) return;
+                setPendingIndex(index);
+                router.navigate(href);
               }}
               style={styles.tab}
               hitSlop={8}
@@ -290,9 +220,14 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
           },
         ]}
       >
-        <Animated.View style={{ opacity: iconOpacity, transform: [{ scale: iconScale }] }}>
-          <DisplayIcon size={22} color={colors.onGreen} weight="fill" />
-        </Animated.View>
+        {TABS.map(({ href, Icon }, index) => (
+          <Animated.View
+            key={href}
+            style={[styles.ballIcon, { opacity: ballIconOpacities[index], transform: [{ scale: iconScale }] }]}
+          >
+            <Icon size={22} color={colors.onGreen} weight="fill" />
+          </Animated.View>
+        ))}
       </Animated.View>
     </View>
   );

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import Animated from "react-native-reanimated";
 
+import { entrance, exit, layoutSpring } from "@/components/motion/motion-tokens";
 import { ChevronRightIcon } from "@/components/ui/Icon";
 import { FALLBACK_CURRENCY } from "@/lib/constants";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
@@ -58,8 +60,11 @@ export function PendingConfirmationsSection({
 
   if (messages.length === 0) return null;
 
+  // Usually lands after the rest of Home (the chat thread restores late), so
+  // it fades in and the blocks under it slide down to make room (Home's
+  // layout springs) rather than jumping. Rows coming and going slide too.
   return (
-    <View style={styles.section}>
+    <Animated.View style={styles.section} entering={entrance("fadeDown")} exiting={exit("fade")} layout={layoutSpring()}>
       <View style={styles.headerRow}>
         <View style={styles.titleRow}>
           <Text style={styles.sectionTitle}>Chờ xác nhận</Text>
@@ -75,17 +80,18 @@ export function PendingConfirmationsSection({
       {visible.map((message) => {
         const payload = message.action?.payload;
         return (
-          <PendingRow
-            key={message.id}
-            message={message}
-            label={
-              payload?.note || (payload && proposalCategoryName(payload, (id) => categoryById.get(id)?.name)) || "Giao dịch"
-            }
-            currency={walletCurrencyById.get(payload?.wallet_id ?? "") ?? FALLBACK_CURRENCY}
-            closeSignal={closeSignal}
-            onOpen={(openEdit) => onOpenMessage(message.id, openEdit)}
-            onRequestRemove={() => onRequestRemove(message)}
-          />
+          <Animated.View key={message.id} entering={entrance("fade")} exiting={exit("fade")} layout={layoutSpring()}>
+            <PendingRow
+              message={message}
+              label={
+                payload?.note || (payload && proposalCategoryName(payload, (id) => categoryById.get(id)?.name)) || "Giao dịch"
+              }
+              currency={walletCurrencyById.get(payload?.wallet_id ?? "") ?? FALLBACK_CURRENCY}
+              closeSignal={closeSignal}
+              onOpen={(openEdit) => onOpenMessage(message.id, openEdit)}
+              onRequestRemove={() => onRequestRemove(message)}
+            />
+          </Animated.View>
         );
       })}
 
@@ -101,7 +107,7 @@ export function PendingConfirmationsSection({
           <ChevronRightIcon size={16} color={colors.textMuted} />
         </Pressable>
       ) : null}
-    </View>
+    </Animated.View>
   );
 }
 

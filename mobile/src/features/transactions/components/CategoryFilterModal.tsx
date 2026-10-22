@@ -3,11 +3,17 @@ import { Pressable, Text, View } from "react-native";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { CheckIcon } from "@/components/ui/Icon";
+import { SearchField } from "@/components/ui/SearchField";
 import { Drawer } from "@/components/shared/Drawer";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
 import { colorForCategory } from "@/lib/category-color";
+import { matchesSearch } from "@/lib/search-text";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
 import { Category } from "@/features/categories/types";
+
+// The list is filtered after a pause in typing, not on every keystroke.
+const SEARCH_DEBOUNCE_MS = 250;
 
 interface CategoryFilterModalProps {
   visible: boolean;
@@ -26,10 +32,13 @@ interface CategoryFilterModalProps {
 export const CategoryFilterModal = memo(function CategoryFilterModal({ visible, onClose, categories, selectedIds, onApply }: CategoryFilterModalProps) {
   const styles = useStyles();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
+  const needle = useDebouncedValue(search, SEARCH_DEBOUNCE_MS).trim();
 
   useEffect(() => {
     if (!visible) return;
     setSelected(new Set(selectedIds));
+    setSearch("");
   }, [visible, selectedIds]);
 
   const toggle = (id: string) => {
@@ -48,8 +57,11 @@ export const CategoryFilterModal = memo(function CategoryFilterModal({ visible, 
     onClose();
   };
 
-  const expenseCategories = categories.filter((c) => c.type === "expense");
-  const incomeCategories = categories.filter((c) => c.type === "income");
+  // Filtering only hides rows: a ticked category stays ticked while hidden.
+  // Case and accents ignored: "an uong" finds "Ăn uống".
+  const shown = needle ? categories.filter((c) => matchesSearch(c.name, needle)) : categories;
+  const expenseCategories = shown.filter((c) => c.type === "expense");
+  const incomeCategories = shown.filter((c) => c.type === "income");
 
   return (
     <Drawer visible={visible} onClose={onClose}>
@@ -60,6 +72,10 @@ export const CategoryFilterModal = memo(function CategoryFilterModal({ visible, 
           { label: "Áp dụng", onPress: apply },
         ]}
       />
+
+      <SearchField value={search} onChangeText={setSearch} placeholder="Tìm danh mục" testID="input-category-filter-search" />
+
+      {needle && shown.length === 0 ? <Text style={styles.noMatch}>Không có danh mục khớp.</Text> : null}
 
       {expenseCategories.length > 0 ? (
         <View style={styles.section}>
@@ -105,6 +121,7 @@ function CategoryRow({ category, active, onPress }: { category: Category; active
 
 const useStyles = createStyles((colors) => ({
   section: { gap: spacing.xs },
+  noMatch: { ...typography.body, color: colors.textSecondary, textAlign: "center", paddingVertical: spacing.lg },
   sectionLabel: { ...typography.caption, color: colors.textSecondary },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.xs },
   rowLabel: { flex: 1, ...typography.body, color: colors.textPrimary },

@@ -1,10 +1,11 @@
 import { Animated, ScrollView, Text, View } from "react-native";
+import { useRouter } from "expo-router";
 
 import { MotionView } from "@/components/motion/MotionView";
 import { PressableScale } from "@/components/motion/PressableScale";
 import { EmptyIllustration } from "@/components/shared/EmptyIllustration";
 import { EmptyStateCard } from "@/components/shared/EmptyState";
-import { PlusIcon, UsersIcon } from "@/components/ui/Icon";
+import { ChevronRightIcon, PlusIcon, SearchIcon, UsersIcon } from "@/components/ui/Icon";
 import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useWalletInvitationsQuery } from "@/features/wallets/api/use-wallet-members-query";
@@ -13,8 +14,8 @@ import { isOwnWallet } from "@/features/wallets/wallet-access";
 import { SharedWalletCard } from "@/features/wallets/components/SharedWalletCard";
 import { WalletInvitationCards } from "@/features/wallets/components/WalletInvitationCards";
 
-// Clears the floating bottom nav — same clearance as the screen's other views.
-const BOTTOM_NAV_CLEARANCE = 140;
+// Clears the floating bottom nav and the Fab — same as the screen's other views.
+const BOTTOM_NAV_CLEARANCE = 200;
 
 interface SharedWalletsViewProps {
   wallets: Wallet[];
@@ -43,6 +44,7 @@ export function SharedWalletsView({
 }: SharedWalletsViewProps) {
   const colors = useColors();
   const styles = useStyles();
+  const router = useRouter();
   const invitations = useWalletInvitationsQuery();
   const withMe = wallets.filter((w) => !isOwnWallet(w));
   const byMe = wallets.filter((w) => isOwnWallet(w) && (w.member_count ?? 0) > 0);
@@ -94,6 +96,23 @@ export function SharedWalletsView({
         />
       ) : (
         <>
+          {/* Everyone's entries, searchable and filterable — the Transactions
+              tab only ever lists the User's own (BR-09). */}
+          <PressableScale
+            onPress={() => router.push("/shared-wallets")}
+            style={styles.activityRow}
+            accessibilityRole="button"
+            testID="btn-shared-open-activity"
+          >
+            <View style={styles.activityIcon}>
+              <SearchIcon size={18} color={colors.onGreen} />
+            </View>
+            <View style={styles.activityTexts}>
+              <Text style={styles.activityTitle}>Giao dịch ví chung</Text>
+              <Text style={styles.activityHint}>Tìm và lọc giao dịch của mọi người trong ví</Text>
+            </View>
+            <ChevronRightIcon size={16} color={colors.textMuted} />
+          </PressableScale>
           {renderGroup("Được chia sẻ với bạn", withMe, 0)}
           {renderGroup("Bạn đang chia sẻ", byMe, withMe.length)}
           <PressableScale
@@ -137,4 +156,25 @@ const useStyles = createStyles((colors) => ({
     backgroundColor: withAlpha(colors.green, 0.12),
   },
   shareLabel: { ...typography.body, color: colors.green },
+  activityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    borderColor: withAlpha(colors.green, 0.3),
+    backgroundColor: withAlpha(colors.green, 0.06),
+  },
+  activityIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.green,
+  },
+  activityTexts: { flex: 1, gap: 2 },
+  activityTitle: { ...typography.body, color: colors.textPrimary },
+  activityHint: { ...typography.caption, color: colors.textSecondary },
 }));

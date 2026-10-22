@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, SectionList, Text, TextInput, View } from "react-native";
+import { Pressable, SectionList, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { ChevronLeftIcon, SearchIcon } from "@/components/ui/Icon";
 import { Screen } from "@/components/shared/Screen";
+import { ScreenLoader } from "@/components/shared/ScreenLoader";
 import { NotificationRow } from "@/features/notifications/components/NotificationRow";
 import { dayLabel } from "@/lib/format-date";
 import { useRequireOnline } from "@/lib/connectivity";
@@ -138,7 +139,7 @@ export default function NotificationsScreen() {
       </View>
 
       {notifications.isLoading ? (
-        <ActivityIndicator color={colors.green} style={styles.loader} />
+        <ScreenLoader />
       ) : (
         <SectionList
           sections={sections}
@@ -205,6 +206,5 @@ const useStyles = createStyles((colors) => ({
   clearSearch: { ...typography.body, color: colors.textSecondary },
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
   sectionHeader: { ...typography.caption, color: colors.textMuted, paddingHorizontal: spacing.sm, paddingVertical: spacing.sm },
-  loader: { marginTop: spacing.xxl },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
 }));

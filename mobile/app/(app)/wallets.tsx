@@ -1,17 +1,21 @@
-import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, ScrollView, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ScrollView, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 
 import { MotionView } from "@/components/motion/MotionView";
+import { Fab } from "@/components/ui/Fab";
+import { UsersIcon } from "@/components/ui/Icon";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { Screen } from "@/components/shared/Screen";
-import { ScreenHeader, ScreenHeaderAction } from "@/components/shared/ScreenHeader";
+import { ScreenLoader } from "@/components/shared/ScreenLoader";
+import { ScreenHeader } from "@/components/shared/ScreenHeader";
 import { spacing, createStyles, useColors } from "@/lib/theme";
 import { walletFace } from "@/lib/wallet-colors";
 import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
 import { useRequireOnline } from "@/lib/connectivity";
 import { isWaitingForNetwork } from "@/lib/query-status";
 import { useHighlightFade } from "@/lib/use-highlight-fade";
+import { useLatestCallback } from "@/lib/use-latest-callback";
 import { useUiPrefsStore, WalletsViewMode } from "@/stores/ui-prefs-store";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useWalletInvitationsQuery } from "@/features/wallets/api/use-wallet-members-query";
@@ -36,8 +40,8 @@ const VIEW_MODES: { label: string; value: WalletsViewMode }[] = [
 ];
 const NO_WALLETS: Wallet[] = [];
 
-// Clears the floating bottom nav, so the last row is never hidden under it.
-const BOTTOM_NAV_CLEARANCE = 140;
+// Clears the floating bottom nav and the Fab, so the last row is never under them.
+const BOTTOM_NAV_CLEARANCE = 200;
 
 export default function WalletsScreen() {
   const colors = useColors();
@@ -58,12 +62,24 @@ export default function WalletsScreen() {
   const setViewMode = useUiPrefsStore((s) => s.setWalletsViewMode);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingWallet, setEditingWallet] = useState<Wallet | null>(null);
-  // The wallet whose sharing sheet is open (specs/shared-wallets US-05).
+  // The wallet whose sharing sheet is open (specs/shared-wallets US-05). The
+  // wallet outlives the open flag, so closing keeps the sheet mounted long
+  // enough to slide down instead of vanishing with it.
   const [membersWallet, setMembersWallet] = useState<Wallet | null>(null);
+  const [membersOpen, setMembersOpen] = useState(false);
+  const openMembers = (wallet: Wallet) => {
+    setMembersWallet(wallet);
+    setMembersOpen(true);
+  };
   const [sharePickerOpen, setSharePickerOpen] = useState(false);
   // The wallet the card view is centred on — kept here rather than in the
   // carousel so switching to the list and back lands on the same one.
   const [activeWalletId, setActiveWalletId] = useState<string | null>(focusWalletId ?? null);
+  // Which way the carousel last moved: the recent list under it follows —
+  // the next wallet's list rises from below, the previous one's drops in.
+  const [listDirection, setListDirection] = useState<1 | -1>(1);
+  const activeWalletIdRef = useRef(activeWalletId);
+  activeWalletIdRef.current = activeWalletId;
 
   // Only once the wallet is actually on screen to be highlighted — fading a
   // border over a loading skeleton would spend the whole fade on nothing.
@@ -83,6 +99,23 @@ export default function WalletsScreen() {
   const ownWallets = useMemo(() => wallets.data?.filter(isOwnWallet) ?? NO_WALLETS, [wallets.data]);
 
   const activeWallet = ownWallets.find((w) => w.id === activeWalletId) ?? ownWallets[0] ?? null;
+  // Stable for the memoized carousel. The shorter way round the loop is the
+  // direction the cards moved.
+  const changeActiveWallet = useLatestCallback((walletId: string) => {
+    const count = ownWallets.length;
+    const from = ownWallets.findIndex((w) => w.id === activeWalletIdRef.current);
+    const to = ownWallets.findIndex((w) => w.id === walletId);
+    const direction = (to - from + count) % count <= count / 2 ? 1 : -1;
+    if (from < 0 || to < 0 || from === to || direction === listDirection) {
+      setActiveWalletId(walletId);
+      return;
+    }
+    // A turn of direction lands a frame before the switch: the outgoing list
+    // leaves with the props of its last render, so it must have rendered
+    // with the new direction first or it would exit the old way.
+    setListDirection(direction);
+    requestAnimationFrame(() => setActiveWalletId(walletId));
+  });
   // Only once loaded — never while loading or waiting offline, which keep
   // their own skeleton / placeholder. No wallet of the User's own: the card
   // and list tabs show the create prompt, while the Ví chung tab may still
@@ -114,10 +147,7 @@ export default function WalletsScreen() {
 
   return (
     <Screen>
-      <ScreenHeader
-        title="Ví"
-        trailing={<ScreenHeaderAction onPress={openCreator} accessibilityLabel="Tạo ví" testID="btn-wallets-add" />}
-      />
+      <ScreenHeader title="Ví" />
 
       {/* Three ways of looking at nothing is not a choice worth offering. */}
       {hasAnything ? (
@@ -132,7 +162,7 @@ export default function WalletsScreen() {
         <SharedWalletsView
           wallets={wallets.data}
           faceById={faceById}
-          onOpenWallet={setMembersWallet}
+          onOpenWallet={openMembers}
           onShare={() => setSharePickerOpen(true)}
           highlightWalletId={highlightWalletId}
           highlightOpacity={highlightOpacity}
@@ -155,7 +185,7 @@ export default function WalletsScreen() {
               <WalletCarousel
                 wallets={ownWallets}
                 initialWalletId={activeWalletId}
-                onActiveWalletChange={setActiveWalletId}
+                onActiveWalletChange={changeActiveWallet}
                 onPressWallet={openEditor}
                 highlightWalletId={highlightWalletId}
                 highlightOpacity={highlightOpacity}
@@ -166,7 +196,7 @@ export default function WalletsScreen() {
                 <WalletActiveActions
                   wallet={activeWallet}
                   onEdit={() => openEditor(activeWallet)}
-                  onOpenMembers={() => setMembersWallet(activeWallet)}
+                  onOpenMembers={() => openMembers(activeWallet)}
                 />
               </MotionView>
             ) : null}
@@ -177,15 +207,21 @@ export default function WalletsScreen() {
               contentContainerStyle={styles.recentBody}
               showsVerticalScrollIndicator={false}
             >
-              {/* Keyed by wallet: swiping to another card cross-fades its list. */}
-              <MotionView key={activeWallet.id} preset="fade">
+              {/* Keyed by wallet: swiping to another card swaps its list, the
+                  new one rising from below (next) or dropping in from above
+                  (previous) while the old one leaves the other way. */}
+              <MotionView
+                key={activeWallet.id}
+                preset={listDirection > 0 ? "fadeUp" : "fadeDown"}
+                exitPreset={listDirection > 0 ? "fadeUp" : "fadeDown"}
+              >
                 <WalletRecentTransactions wallet={activeWallet} />
               </MotionView>
             </ScrollView>
           ) : null}
         </View>
       ) : wallets.isLoading ? (
-        <ActivityIndicator color={colors.green} style={styles.loader} />
+        <ScreenLoader />
       ) : isWaitingForNetwork(wallets) ? (
         <OfflinePlaceholder />
       ) : (
@@ -196,9 +232,24 @@ export default function WalletsScreen() {
             setActiveWalletId(wallet.id);
             openEditor(wallet);
           }}
+          bottomClearance={BOTTOM_NAV_CLEARANCE}
           highlightWalletId={highlightWalletId}
           highlightOpacity={highlightOpacity}
         />
+      )}
+
+      {/* The screen's one primary action, at the thumb: create a wallet, or
+          on the Ví chung tab share one. Before the sheets, so they cover it. */}
+      {viewMode === "shared" ? (
+        <Fab
+          key="share"
+          Icon={UsersIcon}
+          onPress={() => setSharePickerOpen(true)}
+          accessibilityLabel="Chia sẻ một ví"
+          testID="btn-wallets-share"
+        />
+      ) : (
+        <Fab key="create" onPress={openCreator} accessibilityLabel="Tạo ví" testID="btn-wallets-add" />
       )}
 
       <WalletFormModal visible={modalOpen} onClose={() => setModalOpen(false)} editingWallet={editingWallet} />
@@ -206,8 +257,8 @@ export default function WalletsScreen() {
         <WalletMembersSheet
           wallet={membersWallet}
           faceColor={faceById.get(membersWallet.id) ?? colors.green}
-          visible
-          onClose={() => setMembersWallet(null)}
+          visible={membersOpen}
+          onClose={() => setMembersOpen(false)}
         />
       ) : null}
       <ShareWalletPicker
@@ -217,7 +268,7 @@ export default function WalletsScreen() {
         faceById={faceById}
         onPick={(wallet) => {
           setSharePickerOpen(false);
-          setMembersWallet(wallet);
+          openMembers(wallet);
         }}
       />
     </Screen>
@@ -232,5 +283,4 @@ const useStyles = createStyles(() => ({
   cardsPinned: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm, gap: spacing.lg },
   recentScroll: { flex: 1 },
   recentBody: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: BOTTOM_NAV_CLEARANCE },
-  loader: { marginTop: spacing.xxl },
 }));

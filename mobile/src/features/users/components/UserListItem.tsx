@@ -1,27 +1,29 @@
-import { Text, View } from "react-native";
+import { View } from "react-native";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { ListRow } from "@/components/ui/grouped-list";
 import { PillTag } from "@/components/ui/PillTag";
-import { colors, spacing, typography, createStyles } from "@/lib/theme";
+import { colorForCategory } from "@/lib/category-color";
+import { colors, createStyles } from "@/lib/theme";
 import { User } from "@/features/users/types";
 import { AccessRequestActions } from "@/features/users/components/AccessRequestActions";
 import { ResendInviteButton } from "@/features/users/components/ResendInviteButton";
 import { RevokeSessionsButton } from "@/features/users/components/RevokeSessionsButton";
 import { useCurrentUserId } from "@/stores/use-current-user-id";
 
-const AVATAR_SIZE = 36;
+const AVATAR_SIZE = 44;
+const STATUS_DOT = 12;
 
 // Getters, not values: read at render time so they follow a theme switch
 // (see src/theme/active-palette.ts).
-const STATUS_COLOR: Record<User["status"], string> = {
+export const STATUS_COLOR: Record<User["status"], string> = {
   get requested() { return colors.lavender; },
   get active() { return colors.green; },
   get pending() { return colors.mustard; },
   get disabled() { return colors.peach; },
 };
 
-const STATUS_LABEL: Record<User["status"], string> = {
+export const STATUS_LABEL: Record<User["status"], string> = {
   requested: "Chờ duyệt",
   pending: "Chờ kích hoạt",
   active: "Đang dùng",
@@ -32,27 +34,41 @@ const STATUS_LABEL: Record<User["status"], string> = {
 // and a tag on every row says nothing.
 const ADMIN_LABEL = "Quản trị";
 
-/** One member as a row of the screen's grouped list; actions sit under the email. */
+/**
+ * One member as a row of the screen's grouped list: their photo (or initial
+ * on their own colour) with a status dot, name, @tên đăng nhập and email,
+ * and the actions their status calls for under it. The status itself is the
+ * section the row sits in (users.tsx); the dot repeats it at a glance.
+ */
 export function UserListItem({ user }: { user: User }) {
   const styles = useStyles();
   const currentUserId = useCurrentUserId();
   const displayName = user.full_name ?? user.email.split("@")[0];
+  const isSelf = user.id === currentUserId;
 
   return (
     <ListRow
-      title={displayName}
+      title={isSelf ? `${displayName} (bạn)` : displayName}
       titleLines={1}
-      subtitle={user.email}
+      subtitle={user.username ? `@${user.username} · ${user.email}` : user.email}
       subtitleLines={1}
       subtitleEllipsizeMode="middle"
-      leading={<Avatar name={displayName} size={AVATAR_SIZE} fallback="initial" />}
-      leadingWidth={AVATAR_SIZE}
-      trailing={
-        <View style={styles.tags}>
-          {user.role === "admin" ? <PillTag color="success" label={ADMIN_LABEL} /> : null}
-          <Text style={[styles.status, { color: STATUS_COLOR[user.status] }]}>{STATUS_LABEL[user.status]}</Text>
+      leading={
+        <View>
+          <Avatar
+            name={displayName}
+            color={colorForCategory(user.id)}
+            iconUrl={user.avatar_url}
+            size={AVATAR_SIZE}
+            fallback="initial"
+          />
+          <View style={[styles.dot, { backgroundColor: STATUS_COLOR[user.status] }]} />
         </View>
       }
+      leadingWidth={AVATAR_SIZE}
+      trailing={user.role === "admin" ? <PillTag color="success" label={ADMIN_LABEL} /> : undefined}
+      accessibilityLabel={`${displayName}, ${STATUS_LABEL[user.status]}${user.role === "admin" ? `, ${ADMIN_LABEL}` : ""}`}
+      testID={`row-user-${user.id}`}
     >
       {/* A request from the login screen: approving sends the activation
           email, rejecting removes the request. */}
@@ -62,14 +78,22 @@ export function UserListItem({ user }: { user: User }) {
       ) : null}
       {/* Active Users other than yourself only (spec AC-42); you sign
           yourself out from the Security screen. */}
-      {user.status === "active" && user.id !== currentUserId ? (
-        <RevokeSessionsButton userId={user.id} email={user.email} />
-      ) : null}
+      {user.status === "active" && !isSelf ? <RevokeSessionsButton userId={user.id} email={user.email} /> : null}
     </ListRow>
   );
 }
 
-const useStyles = createStyles(() => ({
-  tags: { alignItems: "flex-end", gap: spacing.xs },
-  status: { ...typography.tiny },
+const useStyles = createStyles((c) => ({
+  // On the avatar's lower-right edge, ringed in the row's own colour so it
+  // reads as a separate mark over a photo.
+  dot: {
+    position: "absolute",
+    right: -1,
+    bottom: -1,
+    width: STATUS_DOT,
+    height: STATUS_DOT,
+    borderRadius: STATUS_DOT / 2,
+    borderWidth: 2,
+    borderColor: c.surface,
+  },
 }));

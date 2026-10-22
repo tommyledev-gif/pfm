@@ -1,6 +1,9 @@
 import { memo, useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
+import Animated from "react-native-reanimated";
 import { useRouter } from "expo-router";
+
+import { entrance, exit, layoutSpring } from "@/components/motion/motion-tokens";
 
 import { ChevronRightIcon, HistoryIcon } from "@/components/ui/Icon";
 import { formatCurrency } from "@/lib/currency";
@@ -41,8 +44,15 @@ export const HomePendingSyncSection = memo(function HomePendingSyncSection() {
 
   if (items.length === 0) return null;
 
+  // Fades in, and Home's blocks below slide down to make room (layout springs).
   return (
-    <View style={styles.section} testID="section-home-pending-sync">
+    <Animated.View
+      style={styles.section}
+      entering={entrance("fadeDown")}
+      exiting={exit("fade")}
+      layout={layoutSpring()}
+      testID="section-home-pending-sync"
+    >
       <View style={styles.headerRow}>
         <View style={styles.titleRow}>
           <Text style={styles.sectionTitle}>{SECTION_TITLE}</Text>
@@ -75,7 +85,7 @@ export const HomePendingSyncSection = memo(function HomePendingSyncSection() {
           </Pressable>
         ) : null}
       </View>
-    </View>
+    </Animated.View>
   );
 });
 

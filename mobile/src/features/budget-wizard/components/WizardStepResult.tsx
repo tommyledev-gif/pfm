@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 
 import { SegmentedBar } from "@/components/shared/SegmentedBar";
+import { ScreenLoader } from "@/components/shared/ScreenLoader";
 import { EditAmountModal } from "@/features/budget-wizard/components/EditAmountModal";
 import { AddBudgetRowModal, AddBudgetRowResult } from "@/features/budget-wizard/components/AddBudgetRowModal";
 import { ConfidencePopup } from "@/features/budget-wizard/components/ConfidencePopup";
@@ -93,9 +94,8 @@ export function WizardStepResult({
   const colors = useColors();
   const styles = useStyles();
   const [editing, setEditing] = useState<ProposalEntry | null>(null);
-  // Which block of the allocation bar the user is asking about, and which
-  // row's figure they are asking the provenance of. Both are transient
-  // presentation state, so neither belongs anywhere but here.
+  // Which bar block the user is asking about, and which row's figure they are
+  // asking the provenance of: transient presentation state, so kept here.
   const [activeSegment, setActiveSegment] = useState<string | null>(null);
   const [confidence, setConfidence] = useState<{ name: string; badge: ConfidenceBadge } | null>(null);
 
@@ -132,7 +132,7 @@ export function WizardStepResult({
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color={colors.green} />
+        <ScreenLoader />
       </View>
     );
   }

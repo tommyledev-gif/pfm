@@ -2,6 +2,7 @@ import { ReactNode, useState } from "react";
 import { ActivityIndicator, Pressable, StyleProp, Text, TextStyle, ViewStyle } from "react-native";
 import Animated from "react-native-reanimated";
 
+import { RippleLayer, useRipple } from "@/components/motion/Ripple";
 import { usePressScale } from "@/components/motion/use-press-scale";
 import { withAlpha } from "@/lib/color";
 import { radii, typography, createStyles, useColors } from "@/lib/theme";
@@ -79,6 +80,8 @@ export function PillButton({
   const styles = useStyles();
   const isOutline = variant === "outline";
   const press = usePressScale();
+  // A disc spreads from where the finger lands (animate-ui's ripple button).
+  const ripple = useRipple();
   // Only tracked under Reduce Motion, where the press dims instead.
   const [dimmed, setDimmed] = useState(false);
   return (
@@ -87,8 +90,10 @@ export function PillButton({
       onPress={onPress}
       onLongPress={onLongPress}
       delayLongPress={delayLongPress}
-      onPressIn={() => {
+      onLayout={ripple.onLayout}
+      onPressIn={(event) => {
         press.onPressIn();
+        ripple.spawn(event);
         if (press.reduceMotion) setDimmed(true);
       }}
       onPressOut={() => {
@@ -105,6 +110,8 @@ export function PillButton({
         press.style,
       ]}
     >
+      {/* First, so the label paints over it; the pill clips it to its shape. */}
+      <RippleLayer {...ripple} color={isOutline ? colors.overlayBase : colors.onGreen} />
       {loading ? (
         <ActivityIndicator color={isOutline ? colors.textPrimary : colors.onGreen} />
       ) : (
@@ -136,6 +143,8 @@ const useStyles = createStyles((colors) => ({
     borderRadius: radii.pill,
     paddingVertical: 14,
     paddingHorizontal: 20,
+    // Keeps the press ripple inside the pill.
+    overflow: "hidden",
   },
   solid: { backgroundColor: colors.green },
   outline: {

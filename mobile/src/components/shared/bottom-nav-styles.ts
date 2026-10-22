@@ -153,6 +153,8 @@ export const useStyles = createStyles((colors) => ({
   rim: { position: "absolute", top: 0, left: RIM_LEFT_OFFSET, width: RIM_WIDTH, height: RIM_HEIGHT },
   tabRow: { flexDirection: "row", width: "100%", height: PILL_HEIGHT },
   tab: { flex: 1, alignItems: "center", justifyContent: "center" },
+  // Every tab's filled icon sits stacked in the ball; only the active one is opaque.
+  ballIcon: { position: "absolute" },
   ball: {
     position: "absolute",
     left: 0,

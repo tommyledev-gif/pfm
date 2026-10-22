@@ -19,8 +19,6 @@ const TYPE_LABEL: Record<WalletType, string> = {
 // can fail once or twice before its layout lands.
 const SCROLL_RETRY_MS = 120;
 const MAX_SCROLL_RETRIES = 3;
-// Clears the floating bottom nav, so the last row is never hidden under it.
-const BOTTOM_NAV_CLEARANCE = 140;
 
 interface WalletSection {
   key: string;
@@ -35,6 +33,8 @@ interface WalletsGroupedListProps {
   onPressWallet: (wallet: Wallet) => void;
   highlightWalletId: string | null;
   highlightOpacity: Animated.Value;
+  /** Room under the last row for the floating nav and Fab. */
+  bottomClearance: number;
 }
 
 /**
@@ -54,6 +54,7 @@ export function WalletsGroupedList({
   onPressWallet,
   highlightWalletId,
   highlightOpacity,
+  bottomClearance,
 }: WalletsGroupedListProps) {
   const colors = useColors();
   const styles = useStyles();
@@ -101,7 +102,7 @@ export function WalletsGroupedList({
       ref={listRef}
       sections={sections}
       keyExtractor={(w) => w.id}
-      contentContainerStyle={styles.list}
+      contentContainerStyle={[styles.list, { paddingBottom: bottomClearance }]}
       stickySectionHeadersEnabled={false}
       onScrollToIndexFailed={() => {
         if (scrollRetries.current >= MAX_SCROLL_RETRIES) return;
@@ -125,6 +126,6 @@ export function WalletsGroupedList({
 }
 
 const useStyles = createStyles(() => ({
-  list: { paddingHorizontal: spacing.xl, paddingBottom: BOTTOM_NAV_CLEARANCE },
+  list: { paddingHorizontal: spacing.xl },
   sectionGap: { height: spacing.sm },
 }));

@@ -75,8 +75,15 @@ export function SwipeableRow({
     },
   });
 
+  // ⚠️ The gesture lives on this wrapper, which never moves; only the content
+  // inside it slides. With the pan handlers on the sliding view itself, the
+  // view under the finger moved on every move event while it was measuring
+  // that same touch, and on Android the coordinates of a transformed
+  // responder fed back into its own position: a finger held still mid-swipe
+  // made the row shake from side to side. Here a drag that starts on a
+  // revealed button can also close the row.
   return (
-    <View style={styles.wrapper}>
+    <View style={styles.wrapper} {...swipe.panHandlers}>
       {leftAction ? (
         <SwipeActionButton
           action={wrap(leftAction)}
@@ -95,7 +102,7 @@ export function SwipeableRow({
           positionStyle={styles.right}
         />
       ) : null}
-      <Animated.View style={{ transform: [{ translateX: swipe.translateX }] }} {...swipe.panHandlers}>
+      <Animated.View style={{ transform: [{ translateX: swipe.translateX }] }}>
         {children}
         {/* After the content, so they paint over the card they sit on. */}
         {showHandles && leftAction ? (

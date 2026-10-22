@@ -4,7 +4,6 @@ import Animated from "react-native-reanimated";
 
 import { useListEntrance } from "@/components/motion/MotionView";
 import { CalendarIcon } from "@/components/ui/Icon";
-import { Card } from "@/components/ui/Card";
 import { useFabBottom } from "@/components/ui/Fab";
 import { CategoryPickerDrawer } from "@/components/shared/CategoryPickerDrawer";
 import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
@@ -66,7 +65,7 @@ export const SpendingTab = memo(function SpendingTab({ focusCategoryId, focusNon
     () => segments.map((s) => ({ id: s.key, name: s.label, icon: s.icon, iconUrl: s.iconUrl, color: s.color })),
     [segments],
   );
-  const legendStyle = useMemo(() => ({ paddingBottom: navClearance }), [navClearance]);
+  const scrollStyle = useMemo(() => [styles.scroll, { paddingBottom: navClearance }], [styles.scroll, navClearance]);
 
   useEffect(() => {
     if (focusCategoryId) setSelected(focusCategoryId);
@@ -109,85 +108,93 @@ export const SpendingTab = memo(function SpendingTab({ focusCategoryId, focusNon
       : formatDateRange(range.from, range.to);
   const detailSegment = detailCategoryId ? segments.find((s) => s.key === detailCategoryId) : undefined;
 
+  // ⚠️ One scroll for the whole tab. Only the legend used to scroll, in what
+  // was left under the range row, two stat cards and the boxed donut — on a
+  // phone a strip a few rows tall. Now everything moves together and the
+  // legend gets the whole screen once scrolled to.
   return (
     <View style={styles.container}>
-      <View style={styles.filterRow}>
-        <Pressable style={styles.rangeButton} onPress={openRangePicker}>
-          {switchingRange ? (
-            <ActivityIndicator size={14} color={colors.textSecondary} />
-          ) : (
-            <CalendarIcon size={14} color={colors.textSecondary} />
-          )}
-          <Text style={styles.range}>{rangeLabel}</Text>
-        </Pressable>
-        <CurrencySwitch
-          currencies={currencies}
-          value={currency}
-          onChange={changeCurrency}
-          style={styles.currencyTabs}
-          testID="tabs-spending-currency"
-        />
-      </View>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={scrollStyle}>
+        <View style={styles.filterRow}>
+          <Pressable style={styles.rangeButton} onPress={openRangePicker}>
+            {switchingRange ? (
+              <ActivityIndicator size={14} color={colors.textSecondary} />
+            ) : (
+              <CalendarIcon size={14} color={colors.textSecondary} />
+            )}
+            <Text style={styles.range}>{rangeLabel}</Text>
+          </Pressable>
+          <CurrencySwitch
+            currencies={currencies}
+            value={currency}
+            onChange={changeCurrency}
+            style={styles.currencyTabs}
+            testID="tabs-spending-currency"
+          />
+        </View>
 
-      <View style={styles.statRow}>
-        <RevealableAmount
-          label="Thu nhập"
-          amountCents={primaryTotal?.total_income ?? 0}
-          currency={currency}
-          containerStyle={styles.statCard}
-          labelStyle={styles.statLabel}
-          style={styles.statIncome}
-          testID="text-spending-income"
-        />
-        <RevealableAmount
-          label="Chi tiêu"
-          amountCents={primaryTotal?.total_expense ?? 0}
-          currency={currency}
-          containerStyle={styles.statCard}
-          labelStyle={styles.statLabel}
-          style={styles.statExpense}
-          testID="text-spending-expense"
-        />
-      </View>
+        {/* One surface split down the middle, not two boxes side by side. */}
+        <View style={styles.statRow}>
+          <RevealableAmount
+            label="Thu nhập"
+            amountCents={primaryTotal?.total_income ?? 0}
+            currency={currency}
+            containerStyle={styles.statCard}
+            labelStyle={styles.statLabel}
+            style={styles.statIncome}
+            testID="text-spending-income"
+          />
+          <View style={styles.statDivider} />
+          <RevealableAmount
+            label="Chi tiêu"
+            amountCents={primaryTotal?.total_expense ?? 0}
+            currency={currency}
+            containerStyle={styles.statCard}
+            labelStyle={styles.statLabel}
+            style={styles.statExpense}
+            testID="text-spending-expense"
+          />
+        </View>
 
-      {segments.length === 0 ? (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.emptyScroll}>
+        {segments.length === 0 ? (
           <SpendingEmptyState onOpenBudgets={onOpenBudgets} />
-        </ScrollView>
-      ) : (
-        <>
-          <Card style={styles.donutCard}>
-            <DonutChart
-              segments={segments}
-              currency={currency}
-              selected={selected}
-              onToggle={toggleSegment}
-              budgetTotal={budgetTotal}
-              onPressDetails={setDetailCategoryId}
-            />
-            {budgetTotal !== null && prorated ? (
-              <Text style={styles.budgetHint}>
-                Hạn mức tháng đã chia theo {rangeDayCount === 1 ? "ngày" : `${rangeDayCount} ngày`} bạn chọn.
-              </Text>
-            ) : null}
-          </Card>
+        ) : (
+          <>
+            {/* Open on the page, not in a card: the ring is its own shape. */}
+            <View style={styles.donut}>
+              <DonutChart
+                segments={segments}
+                currency={currency}
+                selected={selected}
+                onToggle={toggleSegment}
+                budgetTotal={budgetTotal}
+                onPressDetails={setDetailCategoryId}
+              />
+              {budgetTotal !== null && prorated ? (
+                <Text style={styles.budgetHint}>
+                  Hạn mức tháng đã chia theo {rangeDayCount === 1 ? "ngày" : `${rangeDayCount} ngày`} bạn chọn.
+                </Text>
+              ) : null}
+            </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={legendStyle}>
-            {segments.map((seg, index) => (
-              <Animated.View key={seg.key} entering={legendEntrance(index)}>
-                <DonutLegendRow
-                  segment={seg}
-                  currency={currency}
-                  percentage={totalExpense > 0 ? (seg.amount / totalExpense) * 100 : 0}
-                  selected={selected === seg.key}
-                  onPress={toggleSegment}
-                  onHoldCategory={openCategoryPicker}
-                />
-              </Animated.View>
-            ))}
-          </ScrollView>
-        </>
-      )}
+            <View>
+              <Text style={styles.legendTitle}>Theo danh mục</Text>
+              {segments.map((seg, index) => (
+                <Animated.View key={seg.key} entering={legendEntrance(index)}>
+                  <DonutLegendRow
+                    segment={seg}
+                    currency={currency}
+                    percentage={totalExpense > 0 ? (seg.amount / totalExpense) * 100 : 0}
+                    selected={selected === seg.key}
+                    onPress={toggleSegment}
+                    onHoldCategory={openCategoryPicker}
+                  />
+                </Animated.View>
+              ))}
+            </View>
+          </>
+        )}
+      </ScrollView>
 
       <DateRangePickerModal
         visible={pickerOpen}
@@ -224,7 +231,8 @@ export const SpendingTab = memo(function SpendingTab({ focusCategoryId, focusNon
 });
 
 const useStyles = createStyles((colors) => ({
-  container: { gap: spacing.md, flex: 1 },
+  container: { flex: 1 },
+  scroll: { gap: spacing.lg },
   filterRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
   currencyTabs: { marginLeft: "auto" },
   rangeButton: {
@@ -240,24 +248,23 @@ const useStyles = createStyles((colors) => ({
     borderColor: colors.surfaceBorder,
   },
   range: { ...typography.caption, color: colors.textSecondary },
-  statRow: { flexDirection: "row", gap: spacing.md },
-  // The whole card is RevealableAmount's hold target, so it carries Card's look.
-  statCard: {
-    flex: 1,
-    gap: spacing.xs,
-    padding: 16,
+  statRow: {
+    flexDirection: "row",
     borderRadius: radii.card,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     backgroundColor: colors.surface,
   },
+  // Each half is RevealableAmount's hold target.
+  statCard: { flex: 1, gap: spacing.xs, padding: spacing.lg },
+  statDivider: { width: 1, marginVertical: spacing.md, backgroundColor: colors.surfaceBorder },
   statLabel: { ...typography.caption, color: colors.textSecondary },
   statIncome: { ...typography.cardTitle, color: colors.green },
   statExpense: { ...typography.cardTitle, color: colors.peach },
-  donutCard: { alignItems: "center", paddingVertical: spacing.xl, gap: spacing.sm },
+  donut: { alignItems: "center", paddingVertical: spacing.sm, gap: spacing.sm },
+  legendTitle: { ...typography.caption, color: colors.textSecondary, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: spacing.xs },
   budgetHint: { ...typography.tiny, color: colors.textMuted, textAlign: "center" },
   loadError: { alignItems: "center", gap: spacing.sm, marginTop: spacing.xl },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center" },
   retry: { ...typography.label, color: colors.green },
-  emptyScroll: { paddingBottom: 140 },
 }));

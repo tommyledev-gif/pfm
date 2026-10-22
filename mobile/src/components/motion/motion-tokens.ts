@@ -5,6 +5,7 @@ import {
   FadeInRight,
   FadeInUp,
   FadeOut,
+  FadeOutDown,
   FadeOutUp,
   LinearTransition,
   ZoomIn,
@@ -84,7 +85,7 @@ export function entrance(preset: EntrancePreset = "fadeUp", delay = 0) {
   }
 }
 
-export type ExitPreset = "fade" | "fadeUp" | "zoom";
+export type ExitPreset = "fade" | "fadeUp" | "fadeDown" | "zoom";
 
 export function exit(preset: ExitPreset = "fade") {
   switch (preset) {
@@ -92,6 +93,8 @@ export function exit(preset: ExitPreset = "fade") {
       return ZoomOut.duration(160);
     case "fadeUp":
       return FadeOutUp.duration(180);
+    case "fadeDown":
+      return FadeOutDown.duration(180);
     case "fade":
     default:
       return FadeOut.duration(160);

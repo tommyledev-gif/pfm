@@ -11,9 +11,9 @@ import {
 } from "@/components/ui/grouped-list/list-metrics";
 import { radii, createStyles } from "@/lib/theme";
 
-const AVATAR_SIZE = 36;
+const AVATAR_SIZE = 44;
 
-// Mirrors UserListItem as a row of a grouped list (36px avatar circle,
+// Mirrors UserListItem as a row of a grouped list (44px avatar circle,
 // ListRow's padding and hairline). Goes inside a ListSection.
 export function UserListItemSkeleton() {
   const styles = useStyles();

@@ -12,6 +12,7 @@ import {
 
 import { SNAP_INTERVAL } from "@/features/wallets/components/use-wallet-carousel";
 import {
+  CARD_WIDTH,
   SHEEN_ANGLE,
   SHEEN_X_FROM_LEFT,
   SHEEN_X_FROM_RIGHT,
@@ -62,12 +63,13 @@ const KEYFRAMES: [offset: number, x: number][] = [
   [1, NEIGHBOUR_X],
   [2, FAR_X],
 ];
-// Mirrored for the left side. Each output is the target position minus where
-// the scroll alone puts the card (that many snap intervals from the centre).
+// Mirrored for the left side. Each output is the card's centre-to-centre
+// offset from the middle of the carousel — the whole position, because the
+// cards no longer sit inside the scrolling content (see WalletCarousel).
 const SHUFFLE_INPUT = [...KEYFRAMES.slice(1).reverse().map(([o]) => -o), ...KEYFRAMES.map(([o]) => o)];
 const SHUFFLE_OUTPUT = SHUFFLE_INPUT.map((offset) => {
   const x = KEYFRAMES.find(([o]) => o === Math.abs(offset))![1];
-  return Math.sign(offset) * x - offset * SNAP_INTERVAL;
+  return Math.sign(offset) * x;
 });
 
 const NEAR = [-1, 0, 1];
@@ -121,16 +123,23 @@ export function useCarouselIntro(ready: boolean): SharedValue<number> {
   return intro;
 }
 
-/** The 0 → 1 press depth for one card, and the handlers that drive it. */
-export function useCardPress() {
-  const pressed = useSharedValue(0);
+/**
+ * The carousel's press: which card (rendered index, -1 for none) the finger
+ * is on and how far it is pressed in, 0 → 1. One pair for the whole carousel,
+ * since a single tap layer over the deck takes every touch (WalletCarousel).
+ */
+export function useCarouselPress() {
+  const target = useSharedValue(-1);
+  const depth = useSharedValue(0);
   return {
-    pressed,
-    onPressIn: () => {
-      pressed.value = withTiming(1, { duration: 110 });
+    target,
+    depth,
+    pressIn: (index: number) => {
+      target.value = index;
+      depth.value = withTiming(1, { duration: 110 });
     },
-    onPressOut: () => {
-      pressed.value = withSpring(0, { damping: 12, stiffness: 260 });
+    pressOut: () => {
+      depth.value = withSpring(0, { damping: 12, stiffness: 260 });
     },
   };
 }
@@ -139,13 +148,18 @@ export function useCardPress() {
  * One card's motion: position, tilt, scale, fade and paint order, all from
  * the carousel's scroll offset on the UI thread, plus the deal-in, the press,
  * the rim's fade-in for whichever card is centred, and the light streak.
+ *
+ * Every card is laid out dead centre and placed by translateX alone: it is
+ * not scrolled by the native ScrollView, so nothing here has to cancel the
+ * scroll out (see WalletCarousel for why that shook).
  */
 export function useCardMotion(
   index: number,
   scrollX: SharedValue<number>,
   centre: SharedValue<number>,
   intro: SharedValue<number>,
-  pressed: SharedValue<number>,
+  pressTarget: SharedValue<number>,
+  pressDepth: SharedValue<number>,
 ) {
   const card = useAnimatedStyle(() => {
     // -1 is one card left of centre, 0 is centred.
@@ -154,10 +168,9 @@ export function useCardMotion(
     const fromCentre = Math.abs(index - centre.value);
     const layer = fromCentre === 0 ? 3 : fromCentre === 1 ? 2 : 1;
     const settledX = interpolate(offset, SHUFFLE_INPUT, SHUFFLE_OUTPUT, Extrapolation.CLAMP);
-    // Where the scroll alone would have to be undone to put this card dead
-    // centre, under the centred card.
-    const stackedX = -offset * SNAP_INTERVAL;
+    // Dealing in: stacked dead centre (x 0) under the centred card.
     const stacked = distance <= INTRO_REACH ? 1 - intro.value : 0;
+    const pressed = pressTarget.value === index ? pressDepth.value : 0;
     return {
       zIndex: layer,
       elevation: LAYER_ELEVATION[layer],
@@ -166,11 +179,11 @@ export function useCardMotion(
         interpolate(intro.value, [0, 0.35], [0, 1], Extrapolation.CLAMP),
       transform: [
         { perspective: CARD_PERSPECTIVE },
-        { translateX: settledX + (stackedX - settledX) * stacked },
+        { translateX: settledX * (1 - stacked) },
         { translateY: (1 - intro.value) * INTRO_RISE },
         // A right-hand card turns its right edge away, a left-hand one its left.
         { rotateY: `${interpolate(offset, NEAR, TILT, Extrapolation.CLAMP)}deg` },
-        { scale: interpolate(offset, FAR, SCALE, Extrapolation.CLAMP) * (1 - PRESS_SHRINK * pressed.value) },
+        { scale: interpolate(offset, FAR, SCALE, Extrapolation.CLAMP) * (1 - PRESS_SHRINK * pressed) },
       ],
     };
   });
@@ -194,3 +207,20 @@ export function useCardMotion(
 }
 
 export type CardMotion = ReturnType<typeof useCardMotion>;
+
+// The neighbour's outer edge, from the carousel's middle: its centre plus
+// half its scaled width (the tilt only pulls the edge in, so this is generous).
+const NEIGHBOUR_REACH = NEIGHBOUR_X + (CARD_WIDTH * NEIGHBOUR_SCALE) / 2;
+
+/**
+ * Which card a touch `dx` px from the carousel's middle lands on, relative to
+ * the centred one: 0 for the centred card, ±1 for the neighbour showing on
+ * that side, null for empty space. The tap layer (WalletCarousel) uses it,
+ * since the cards themselves sit under it and take no touches.
+ */
+export function cardAtOffset(dx: number): -1 | 0 | 1 | null {
+  const reach = Math.abs(dx);
+  if (reach <= CARD_WIDTH / 2) return 0;
+  if (reach <= NEIGHBOUR_REACH) return dx > 0 ? 1 : -1;
+  return null;
+}

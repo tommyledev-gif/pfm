@@ -1,9 +1,10 @@
 import { ComponentType } from "react";
-import { StyleProp, ViewStyle } from "react-native";
+import { StyleProp, View, ViewStyle } from "react-native";
 import Animated, { ZoomIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SPRING } from "@/components/motion/motion-tokens";
+import { RippleLayer, useRipple } from "@/components/motion/Ripple";
 import { PressableScale } from "@/components/motion/PressableScale";
 import { IconProps } from "@/components/ui/icons/primitives";
 import { PlusIcon } from "@/components/ui/Icon";
@@ -57,6 +58,7 @@ export function Fab({ onPress, Icon = PlusIcon, accessibilityLabel, testID, styl
   const colors = useColors();
   const styles = useStyles();
   const bottom = useFabBottom();
+  const ripple = useRipple();
   return (
     <Animated.View entering={fabEntrance()} style={[styles.host, { bottom }, style]} pointerEvents="box-none">
       <PressableScale
@@ -64,10 +66,17 @@ export function Fab({ onPress, Icon = PlusIcon, accessibilityLabel, testID, styl
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         onPress={onPress}
+        onPressIn={ripple.spawn}
+        onLayout={ripple.onLayout}
         hitSlop={8}
         scaleTo={FAB_PRESS_SCALE}
         style={styles.fab}
       >
+        {/* Clipped by its own layer: clipping the button itself would drop
+            its shadow on iOS. */}
+        <View pointerEvents="none" style={styles.rippleClip}>
+          <RippleLayer {...ripple} color={colors.onGreen} />
+        </View>
         <Icon size={24} color={colors.onGreen} />
       </PressableScale>
     </Animated.View>
@@ -90,4 +99,5 @@ const useStyles = createStyles((colors) => ({
     shadowOffset: { width: 0, height: 4 },
     elevation: 6,
   },
+  rippleClip: { position: "absolute", left: 0, top: 0, right: 0, bottom: 0, borderRadius: radii.pill, overflow: "hidden" },
 }));

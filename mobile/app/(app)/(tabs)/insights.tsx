@@ -153,7 +153,9 @@ function SubTabLabel({ label, active, reduceMotion }: { label: string; active: b
 }
 
 const useStyles = createStyles((colors) => ({
-  screen: { flex: 1, backgroundColor: colors.bgApp, paddingHorizontal: spacing.xl, paddingTop: spacing.md, gap: spacing.lg },
+  // Tight on purpose: the title and tabs stay put above both panes, so every
+  // pixel here is one the lists below do not get.
+  screen: { flex: 1, backgroundColor: colors.bgApp, paddingHorizontal: spacing.xl, paddingTop: spacing.sm, gap: spacing.md },
   title: { ...typography.title, color: colors.textPrimary },
   tabRow: { flexDirection: "row", gap: spacing.xl, borderBottomWidth: 1, borderBottomColor: colors.surfaceBorder },
   tabButton: { paddingBottom: spacing.sm, alignItems: "center", gap: spacing.sm },

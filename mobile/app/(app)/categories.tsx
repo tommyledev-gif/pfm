@@ -5,9 +5,9 @@ import { useListEntrance } from "@/components/motion/MotionView";
 import { GroupedListCell, ListSection, ListSectionHeader } from "@/components/ui/grouped-list";
 import { PillButton } from "@/components/ui/PillButton";
 import { SegmentedTabs, SegmentedTabOption } from "@/components/ui/SegmentedTabs";
-import { useFabBottom } from "@/components/ui/Fab";
+import { Fab, useFabClearance } from "@/components/ui/Fab";
 import { Screen } from "@/components/shared/Screen";
-import { ScreenHeader, ScreenHeaderAction } from "@/components/shared/ScreenHeader";
+import { ScreenHeader } from "@/components/shared/ScreenHeader";
 import { spacing, typography, createStyles } from "@/lib/theme";
 import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
 import { isWaitingForNetwork } from "@/lib/query-status";
@@ -42,8 +42,8 @@ export default function CategoriesScreen() {
   const categories = useCategoriesQuery(type);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  // Clear of the floating BottomNav, so the last row can scroll out from under it.
-  const navClearance = useFabBottom();
+  // Clear of the floating BottomNav and the Fab, so the last row can scroll out from under them.
+  const navClearance = useFabClearance();
   // Rows stagger in when the list first has data and again on each type
   // switch; a refetch keeps the same key, so it never replays.
   const enter = useListEntrance(categories.isLoading ? "loading" : type);
@@ -83,12 +83,7 @@ export default function CategoriesScreen() {
 
   return (
     <Screen>
-      <ScreenHeader
-        title="Danh mục"
-        trailing={
-          <ScreenHeaderAction onPress={() => openForm(null)} accessibilityLabel="Tạo danh mục" testID="btn-categories-add" />
-        }
-      />
+      <ScreenHeader title="Danh mục" />
 
       <SegmentedTabs
         options={TYPE_OPTIONS}
@@ -137,6 +132,9 @@ export default function CategoriesScreen() {
           }
         />
       )}
+
+      {/* Before the sheet, so its overlay covers the button. */}
+      <Fab onPress={() => openForm(null)} accessibilityLabel="Tạo danh mục" testID="btn-categories-add" />
 
       <CategoryFormModal visible={modalOpen} onClose={() => setModalOpen(false)} editingCategory={editingCategory} />
     </Screen>

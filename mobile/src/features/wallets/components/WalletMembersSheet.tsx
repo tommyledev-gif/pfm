@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { useRouter } from "expo-router";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Drawer } from "@/components/shared/Drawer";
-import { LogOutIcon } from "@/components/ui/Icon";
+import { ChevronRightIcon, LogOutIcon } from "@/components/ui/Icon";
 import { SkeletonBlock } from "@/components/ui/SkeletonBlock";
 import { useRequireOnline } from "@/lib/connectivity";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
@@ -14,7 +15,7 @@ import {
   useRemoveWalletMemberMutation,
 } from "@/features/wallets/api/use-wallet-member-mutations";
 import { Wallet, WalletMember } from "@/features/wallets/types";
-import { isOwnWallet } from "@/features/wallets/wallet-access";
+import { isOwnWallet, isSharedWallet } from "@/features/wallets/wallet-access";
 import { WalletInviteForm } from "@/features/wallets/components/WalletInviteForm";
 import { WalletMemberRow } from "@/features/wallets/components/WalletMemberRow";
 import { WalletRecentTransactions } from "@/features/wallets/components/WalletRecentTransactions";
@@ -51,6 +52,7 @@ export function WalletMembersSheet({ wallet, faceColor, visible, onClose }: Wall
   const colors = useColors();
   const styles = useStyles();
   const requireOnline = useRequireOnline();
+  const router = useRouter();
   const userId = useCurrentUserId();
   const owner = isOwnWallet(wallet);
   const members = useWalletMembersQuery(visible ? wallet.id : null);
@@ -123,7 +125,24 @@ export function WalletMembersSheet({ wallet, faceColor, visible, onClose }: Wall
 
         {owner ? <WalletInviteForm walletId={wallet.id} memberCount={others.length} /> : null}
 
-        <WalletRecentTransactions wallet={wallet} />
+        <View style={styles.section}>
+          <WalletRecentTransactions wallet={wallet} />
+          {/* The full list, with search and filters (shared-wallets.tsx). */}
+          {isSharedWallet(wallet) ? (
+            <Pressable
+              onPress={() => {
+                onClose();
+                router.push({ pathname: "/shared-wallets", params: { walletId: wallet.id } });
+              }}
+              style={({ pressed }) => [styles.allEntries, pressed && styles.leavePressed]}
+              accessibilityRole="link"
+              testID="btn-wallet-sheet-all-entries"
+            >
+              <Text style={styles.allEntriesLabel}>Tìm và lọc mọi giao dịch</Text>
+              <ChevronRightIcon size={16} color={colors.green} />
+            </Pressable>
+          ) : null}
+        </View>
 
         {!owner && self ? (
           <Pressable
@@ -183,4 +202,13 @@ const useStyles = createStyles((colors) => ({
   },
   leavePressed: { backgroundColor: colors.surface },
   leaveLabel: { ...typography.body, color: colors.peach },
+  allEntries: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    paddingVertical: spacing.md,
+    borderRadius: radii.pill,
+  },
+  allEntriesLabel: { ...typography.label, color: colors.green },
 }));
