@@ -18,10 +18,15 @@ interface ChatThreadMessageWire {
 // outside any React component, so they call these directly (same precedent
 // as features/auth/api/use-refresh-mutation.ts's refreshTokenRequest).
 
-// Bulk-upserts the caller's entire current thread, keyed by each message's
-// own client-generated id — cheap enough to resend in full given a chat
-// thread's size, and it sidesteps ever tracking a separate "dirty since last
-// sync" set client-side.
+// How many messages a restore reads: one screenful and then some, not a
+// year of history. Older ones load as the User scrolls back (loadOlder in
+// chat-store.ts), a page of the same size at a time.
+export const CHAT_THREAD_PAGE_SIZE = 100;
+
+// Upserts the given messages, keyed by each message's own client-generated
+// id. chat-store.ts sends only the ones changed since its last successful
+// sync — it used to resend the whole thread after every message, which grew
+// with every conversation the User ever had.
 export async function syncChatThreadRequest(messages: ChatMessage[]): Promise<void> {
   const body = {
     messages: messages.map((m): ChatThreadMessageWire => ({ client_message_id: m.id, payload: withoutDevicePath(m) })),
@@ -29,9 +34,6 @@ export async function syncChatThreadRequest(messages: ChatMessage[]): Promise<vo
   await apiClient.post("/ai/chat/thread/sync", body);
 }
 
-// Restores a device's synced thread — used once, on ai-chat.tsx mount, only
-// when the local (AsyncStorage-persisted) thread is empty, i.e. after a
-// logout/reinstall/new device wiped it.
 // ⚠️ A photo never leaves the device: its message syncs as the caption only,
 // without the file path (specs/ai-chat-image-capture AC-23). Another device
 // shows a placeholder (AC-24).
@@ -40,15 +42,36 @@ function withoutDevicePath(message: ChatMessage): ChatMessage {
   return { ...message, imageCapture: { caption: message.imageCapture.caption } };
 }
 
-export async function fetchChatThreadRequest(): Promise<ChatMessage[]> {
-  const res = await apiClient.get<{ success: boolean; message: string; data?: { messages: ChatThreadMessageWire[] } }>(
-    "/ai/chat/thread",
-  );
+export interface ChatThreadPage {
+  /** Oldest first. */
+  messages: ChatMessage[];
+  /** Older messages are left on the server. */
+  hasMore: boolean;
+}
+
+// GET /ai/chat/thread?limit=…[&before=…]: the latest page, or the page just
+// older than `before` (the client id of the oldest message the device holds).
+// `has_more` is missing from a backend from before paging, which returned
+// the whole thread — so nothing older is left there either.
+export async function fetchChatThreadPage(before?: string): Promise<ChatThreadPage> {
+  const res = await apiClient.get<{
+    success: boolean;
+    message: string;
+    data?: { messages: ChatThreadMessageWire[]; has_more?: boolean };
+  }>("/ai/chat/thread", { params: { limit: CHAT_THREAD_PAGE_SIZE, ...(before ? { before } : {}) } });
   const data = unwrap(res.data);
-  return data.messages.map((m) => m.payload);
+  return { messages: data.messages.map((m) => m.payload), hasMore: data.has_more ?? false };
+}
+
+async function fetchChatThreadRequest(): Promise<ChatMessage[]> {
+  return (await fetchChatThreadPage()).messages;
 }
 
 /**
+ * Restores a device's synced thread — used once, on ai-chat.tsx mount, only
+ * when the local (AsyncStorage-persisted) thread is empty, i.e. after a
+ * logout/reinstall/new device wiped it. Reads the latest page only.
+ *
  * ⚠️ The cached result of this outlives the chat screen. The screen unmounts on
  * every bottom-nav tab change while the QueryClient does not, so `data` is
  * still sitting here — a snapshot of the thread as the SERVER had it at fetch

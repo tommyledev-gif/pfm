@@ -195,6 +195,7 @@ type ChatRepo interface {
 type ChatThreadRepo interface {
 	UpsertMessage(ctx context.Context, arg repository.UpsertChatThreadMessageParams) error
 	ListByUser(ctx context.Context, userID uuid.UUID) ([]repository.ChatThreadRow, error)
+	ListPageByUser(ctx context.Context, userID uuid.UUID, before *string, limit int) ([]repository.ChatThreadRow, error)
 }
 
 // AIServiceClient is the contract ChatService depends on for talking to the

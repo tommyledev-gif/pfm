@@ -6,7 +6,7 @@ import { useRouter } from "expo-router";
 import { SPRING } from "@/components/motion/motion-tokens";
 import { Avatar } from "@/components/ui/Avatar";
 import { BellIcon } from "@/components/ui/Icon";
-import { useNotificationsQuery } from "@/features/notifications/api/use-notifications-query";
+import { useHasUnreadNotifications } from "@/features/notifications/api/use-notifications-query";
 import { useProfileIdentity } from "@/features/profile/use-profile-identity";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 
@@ -19,8 +19,7 @@ export const TopBar = memo(function TopBar() {
   const styles = useStyles();
   const router = useRouter();
   const { name, avatarUrl } = useProfileIdentity();
-  const unread = useNotificationsQuery(true);
-  const hasUnread = (unread.data?.data.length ?? 0) > 0;
+  const hasUnread = useHasUnreadNotifications();
 
   return (
     <View style={styles.row}>

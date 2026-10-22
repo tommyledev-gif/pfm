@@ -42,11 +42,40 @@ func (s *ChatThreadService) Sync(ctx context.Context, userID uuid.UUID, messages
 	return nil
 }
 
-func (s *ChatThreadService) GetThread(ctx context.Context, userID uuid.UUID) (*dto.GetChatThreadResponse, error) {
-	rows, err := s.repo.ListByUser(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("service.ChatThreadGet: %w", err)
+// GetThread returns the caller's thread oldest first. Without a limit it is
+// the whole thread (app builds from before paging send none). With one, it is
+// the latest `limit` messages — or the `limit` just older than q.Before — so a
+// restore on a fresh device reads one screenful, not years of history.
+func (s *ChatThreadService) GetThread(ctx context.Context, userID uuid.UUID, q dto.GetChatThreadQuery) (*dto.GetChatThreadResponse, error) {
+	if q.Limit == 0 {
+		rows, err := s.repo.ListByUser(ctx, userID)
+		if err != nil {
+			return nil, fmt.Errorf("service.ChatThreadGet: %w", err)
+		}
+		return &dto.GetChatThreadResponse{Messages: toThreadMessages(rows)}, nil
 	}
+
+	var before *string
+	if q.Before != "" {
+		before = &q.Before
+	}
+	// One extra row says whether anything older is left, without a COUNT.
+	rows, err := s.repo.ListPageByUser(ctx, userID, before, q.Limit+1)
+	if err != nil {
+		return nil, fmt.Errorf("service.ChatThreadGetPage: %w", err)
+	}
+	hasMore := len(rows) > q.Limit
+	if hasMore {
+		rows = rows[:q.Limit]
+	}
+	// The page comes newest first; the client wants oldest first.
+	for i, j := 0, len(rows)-1; i < j; i, j = i+1, j-1 {
+		rows[i], rows[j] = rows[j], rows[i]
+	}
+	return &dto.GetChatThreadResponse{Messages: toThreadMessages(rows), HasMore: hasMore}, nil
+}
+
+func toThreadMessages(rows []repository.ChatThreadRow) []dto.ChatThreadMessageResponse {
 	messages := make([]dto.ChatThreadMessageResponse, 0, len(rows))
 	for _, row := range rows {
 		messages = append(messages, dto.ChatThreadMessageResponse{
@@ -54,5 +83,5 @@ func (s *ChatThreadService) GetThread(ctx context.Context, userID uuid.UUID) (*d
 			Payload:         json.RawMessage(row.Payload),
 		})
 	}
-	return &dto.GetChatThreadResponse{Messages: messages}, nil
+	return messages
 }

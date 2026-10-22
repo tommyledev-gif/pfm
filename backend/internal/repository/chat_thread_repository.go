@@ -55,3 +55,22 @@ func (r *ChatThreadRepository) ListByUser(ctx context.Context, userID uuid.UUID)
 	}
 	return out, nil
 }
+
+// ListPageByUser returns up to `limit` messages, newest first — the latest
+// ones, or those older than the message `before` (a client message id) when
+// it is set. The service turns the page back into oldest-first order.
+func (r *ChatThreadRepository) ListPageByUser(ctx context.Context, userID uuid.UUID, before *string, limit int) ([]ChatThreadRow, error) {
+	rows, err := r.q.ListChatThreadMessagesPage(ctx, sqlc.ListChatThreadMessagesPageParams{
+		UserID:                userID,
+		Limit:                 int32(limit),
+		BeforeClientMessageID: before,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("repository.ListChatThreadMessagesPage: %w", err)
+	}
+	out := make([]ChatThreadRow, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, ChatThreadRow{ClientMessageID: row.ClientMessageID, Payload: row.Payload})
+	}
+	return out, nil
+}

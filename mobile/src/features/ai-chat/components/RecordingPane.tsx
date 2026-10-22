@@ -1,5 +1,5 @@
 import { RefObject, useCallback, useMemo, useState } from "react";
-import { FlatList, LayoutChangeEvent, ListRenderItemInfo, StyleSheet, View } from "react-native";
+import { ActivityIndicator, FlatList, LayoutChangeEvent, ListRenderItemInfo, StyleSheet, View } from "react-native";
 
 import { closeParkedSwipeRow } from "@/components/shared/use-swipe-actions";
 import { TypingIndicator } from "@/components/shared/TypingIndicator";
@@ -22,6 +22,8 @@ import { useOpenWalletCreator } from "@/features/wallets/use-open-wallet-creator
 import { useRequireOnline } from "@/lib/connectivity";
 import { PROPOSAL_CURRENCY } from "@/lib/constants";
 import { useLatestCallback } from "@/lib/use-latest-callback";
+import { useColors } from "@/lib/theme";
+import { useChatStore } from "@/stores/chat-store";
 
 // Retry delay when a deep-linked row had not been measured yet.
 const FOCUS_RETRY_DELAY_MS = 100;
@@ -79,7 +81,12 @@ export function RecordingPane({
   onOpenManualEntry,
 }: RecordingPaneProps) {
   const chatThreadStyles = useChatThreadStyles();
+  const colors = useColors();
   const requireOnline = useRequireOnline();
+  // A restore reads only the latest page; scrolling back to the top of the
+  // thread pages in older messages from the server (chat-store loadOlder).
+  const loadOlder = useChatStore((s) => s.loadOlder);
+  const loadingOlder = useChatStore((s) => s.olderStatus === "loading");
   const [composerHeight, setComposerHeight] = useState(0);
   const [paneHeight, setPaneHeight] = useState(0);
 
@@ -175,6 +182,11 @@ export function RecordingPane({
             }, FOCUS_RETRY_DELAY_MS);
           }}
           renderItem={renderItem}
+          // The end of an inverted list is its top: the oldest message.
+          onEndReached={loading ? undefined : loadOlder}
+          onEndReachedThreshold={0.4}
+          // Footer renders at the visual top of an inverted list.
+          ListFooterComponent={loadingOlder ? <ActivityIndicator color={colors.green} style={styles.olderLoader} /> : null}
           // No counter-transform: the list composes its own inversion onto these.
           ListEmptyComponent={
             loading ? <ChatThreadSkeleton /> : <RecordingEmptyState onPickExample={draftStore.getState().setText} />
@@ -208,4 +220,5 @@ export function RecordingPane({
 const styles = StyleSheet.create({
   // The composer is positioned against this box.
   pane: { flex: 1 },
+  olderLoader: { paddingVertical: 16 },
 });

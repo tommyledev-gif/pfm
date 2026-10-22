@@ -54,14 +54,23 @@ func (h *ChatHandler) Chat(c *fiber.Ctx) error {
 // GetThread handles GET /ai/chat/thread — restores the caller's synced chat
 // UI thread (registered behind JWTAuth + AIChatRateLimiter, same group as
 // every other /ai/* endpoint, even though this one never calls the AI
-// Service, for URL-namespace/rate-limit consistency).
+// Service, for URL-namespace/rate-limit consistency). Optional ?limit= and
+// ?before= page it (dto.GetChatThreadQuery).
 func (h *ChatHandler) GetThread(c *fiber.Ctx) error {
+	var q dto.GetChatThreadQuery
+	if err := c.QueryParser(&q); err != nil {
+		return response.Error(c, h.logger, common.NewInvalidInputError("malformed query parameters"))
+	}
+	if err := validate.Struct(q); err != nil {
+		return response.Error(c, h.logger, newValidationError(err))
+	}
+
 	userID, err := callerUUID(c)
 	if err != nil {
 		return response.Error(c, h.logger, common.ErrUnauthenticated)
 	}
 
-	resp, err := h.chatThreadService.GetThread(c.Context(), userID)
+	resp, err := h.chatThreadService.GetThread(c.Context(), userID, q)
 	if err != nil {
 		return response.Error(c, h.logger, err)
 	}

@@ -3,7 +3,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import { chatThreadQueryKey, syncChatThreadRequest } from "@/features/ai-chat/api/use-chat-thread-sync";
+import {
+  chatThreadQueryKey,
+  fetchChatThreadPage,
+  syncChatThreadRequest,
+} from "@/features/ai-chat/api/use-chat-thread-sync";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { userIdFromAccessToken } from "@/lib/jwt";
 import { queryClient } from "@/lib/query-client";
@@ -26,6 +30,16 @@ import { useSessionStore } from "@/stores/session-store";
 // can't let a stale timer fire against the now-cleared session.
 const SYNC_DEBOUNCE_MS = 3000;
 let syncTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Stamps each local change so a sync can tell, once it lands, whether a
+// message changed again while it was in flight (then it stays unsynced).
+// Seeded from the clock so stamps never repeat across app runs.
+let changeStamp = Date.now();
+type Unsynced = Record<string, number>;
+const markUnsynced = (unsynced: Unsynced, id: string): Unsynced => ({ ...unsynced, [id]: ++changeStamp });
+// What is still unsynced once `sent` landed: anything changed again since.
+const withoutSent = (unsynced: Unsynced, sent: Unsynced): Unsynced =>
+  Object.fromEntries(Object.entries(unsynced).filter(([id, stamp]) => sent[id] !== stamp));
 
 // Set once the saved thread has been read back, or the read failed: until
 // then an empty thread means "not loaded yet", not "no messages".
@@ -61,18 +75,29 @@ function ownedBySession(ownerId: string | null): ownerId is string {
   return ownerId !== null && ownerId === userIdFromAccessToken(useSessionStore.getState().accessToken);
 }
 
-function scheduleSync(getState: () => ChatState) {
+// Uploads only the messages changed since the last sync that landed. It
+// used to post the whole thread every time, so each new message cost an
+// upload of the entire conversation history.
+async function pushUnsynced(): Promise<void> {
+  const { thread, ownerId, unsynced, epoch } = useChatStore.getState();
+  if (!ownedBySession(ownerId)) return;
+  const sent = { ...unsynced };
+  const messages = thread.filter((m) => m.id in sent);
+  if (messages.length > 0) await syncChatThreadRequest(messages);
+  // A sync that outlived its session must not touch the next one's state.
+  if (useChatStore.getState().epoch !== epoch) return;
+  useChatStore.setState((state) => ({ unsynced: withoutSent(state.unsynced, sent) }));
+  refreshSyncedCache(useChatStore.getState().thread, ownerId);
+}
+
+function scheduleSync() {
   if (syncTimer) clearTimeout(syncTimer);
   syncTimer = setTimeout(() => {
     syncTimer = null;
-    const { thread, ownerId } = getState();
-    if (!thread.length || !ownedBySession(ownerId)) return;
-    // Best-effort — a failed sync (offline, expired session) just leaves the
-    // next mutation to reschedule it; settings.tsx's logout flush gets one
-    // more attempt before the local copy is wiped.
-    syncChatThreadRequest(thread)
-      .then(() => refreshSyncedCache(thread, ownerId))
-      .catch(() => {});
+    // Best-effort — a failed sync (offline, expired session) keeps its
+    // messages unsynced for the next one; the logout flush gets one more
+    // attempt before the local copy is wiped.
+    pushUnsynced().catch(() => {});
   }, SYNC_DEBOUNCE_MS);
 }
 
@@ -91,6 +116,16 @@ interface ChatState {
   // compares it (captureChatEpoch) to drop a reply that outlived the session
   // it was asked in.
   epoch: number;
+  // Messages changed locally and not yet on the server, each with the stamp
+  // of its latest change. Persisted, so a change made just before the app
+  // was closed still syncs on the next run.
+  unsynced: Unsynced;
+  // Paging back through the server's copy (loadOlder): "done" once it has
+  // nothing older. Not persisted: one check per app run is cheap.
+  olderStatus: "idle" | "loading" | "done";
+  // Prepends the page of server messages just older than the oldest synced
+  // one held here — the chat list calls it when scrolled back to the top.
+  loadOlder: () => Promise<void>;
   addMessage: (message: ChatMessage) => void;
   updateMessage: (id: string, patch: Partial<ChatMessage>) => void;
   removeMessage: (id: string) => void;
@@ -121,15 +156,25 @@ export const useChatStore = create<ChatState>()(
       ownerId: null,
       restoredFor: null,
       epoch: 0,
+      unsynced: {},
+      olderStatus: "idle",
       addMessage: (message) => {
-        set((state) => ({ thread: [...state.thread, message] }));
-        scheduleSync(get);
+        set((state) => ({ thread: [...state.thread, message], unsynced: markUnsynced(state.unsynced, message.id) }));
+        scheduleSync();
       },
       updateMessage: (id, patch) => {
-        set((state) => ({ thread: state.thread.map((m) => (m.id === id ? { ...m, ...patch } : m)) }));
-        scheduleSync(get);
+        set((state) => ({
+          thread: state.thread.map((m) => (m.id === id ? { ...m, ...patch } : m)),
+          unsynced: markUnsynced(state.unsynced, id),
+        }));
+        scheduleSync();
       },
-      removeMessage: (id) => set((state) => ({ thread: state.thread.filter((m) => m.id !== id) })),
+      // Not synced: the server keeps no deletions (an upsert-only cache).
+      removeMessage: (id) =>
+        set((state) => {
+          const { [id]: _removed, ...unsynced } = state.unsynced;
+          return { thread: state.thread.filter((m) => m.id !== id), unsynced };
+        }),
       // ⚠️ Guarded in the store rather than at the call site, because the call
       // site cannot see the danger: TanStack keeps the GET's result cached for
       // minutes after the chat screen unmounts, so ai-chat.tsx's mount effect
@@ -147,7 +192,7 @@ export const useChatStore = create<ChatState>()(
           clearTimeout(syncTimer);
           syncTimer = null;
         }
-        set((state) => ({ thread: [], ownerId, restoredFor: null, epoch: state.epoch + 1 }));
+        set((state) => ({ thread: [], ownerId, restoredFor: null, epoch: state.epoch + 1, unsynced: {}, olderStatus: "idle" }));
       },
       // A thread persisted before owners were recorded has none, and is
       // dropped too: it may well be the previous account's (the server copy
@@ -160,17 +205,43 @@ export const useChatStore = create<ChatState>()(
           clearTimeout(syncTimer);
           syncTimer = null;
         }
-        const { thread, ownerId } = get();
-        if (!thread.length || !ownedBySession(ownerId)) return;
-        await syncChatThreadRequest(thread);
-        refreshSyncedCache(thread, ownerId);
+        await pushUnsynced();
+      },
+      loadOlder: async () => {
+        const { thread, ownerId, olderStatus, unsynced, epoch } = get();
+        // The cursor must be a message the server has: an unsynced one is
+        // unknown there and would match nothing.
+        const oldestSynced = thread.find((m) => !(m.id in unsynced));
+        if (olderStatus !== "idle" || !oldestSynced || !ownedBySession(ownerId)) return;
+        set({ olderStatus: "loading" });
+        try {
+          const page = await fetchChatThreadPage(oldestSynced.id);
+          if (get().epoch !== epoch) return;
+          set((state) => {
+            const known = new Set(state.thread.map((m) => m.id));
+            const older = page.messages.filter((m) => !known.has(m.id));
+            return { thread: [...older, ...state.thread], olderStatus: page.hasMore && older.length > 0 ? "idle" : "done" };
+          });
+        } catch {
+          // Offline or a failed request: the next scroll to the top tries again.
+          if (get().epoch === epoch) set({ olderStatus: "idle" });
+        }
       },
     }),
     {
       name: "pfm_chat_thread",
       storage: createJSONStorage(() => AsyncStorage),
-      // restoredFor and epoch describe this app run only.
-      partialize: (state) => ({ thread: state.thread, ownerId: state.ownerId }),
+      // restoredFor, epoch and olderStatus describe this app run only.
+      partialize: (state) => ({ thread: state.thread, ownerId: state.ownerId, unsynced: state.unsynced }),
+      // v1 added `unsynced`. A thread saved before it has no record of what
+      // reached the server, so every message counts as unsynced once — the
+      // same full upload every sync used to be, one last time.
+      version: 1,
+      migrate: (persisted, version) => {
+        const state = persisted as { thread?: ChatMessage[]; ownerId?: string | null; unsynced?: Unsynced };
+        if (version < 1) state.unsynced = Object.fromEntries((state.thread ?? []).map((m) => [m.id, 0]));
+        return state as ChatState;
+      },
       // Called after a successful read and after a failed one alike.
       onRehydrateStorage: () => markThreadRestored,
     },
