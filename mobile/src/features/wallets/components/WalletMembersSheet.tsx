@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
-import { Avatar } from "@/components/ui/Avatar";
-import { ListCell, ListInlineButton, ListRow, ListSection } from "@/components/ui/grouped-list";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Drawer } from "@/components/shared/Drawer";
+import { LogOutIcon } from "@/components/ui/Icon";
+import { SkeletonBlock } from "@/components/ui/SkeletonBlock";
 import { useRequireOnline } from "@/lib/connectivity";
-import { spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useCurrentUserId } from "@/stores/use-current-user-id";
 import { useWalletMembersQuery } from "@/features/wallets/api/use-wallet-members-query";
 import {
@@ -16,28 +16,38 @@ import {
 import { Wallet, WalletMember } from "@/features/wallets/types";
 import { isOwnWallet } from "@/features/wallets/wallet-access";
 import { WalletInviteForm } from "@/features/wallets/components/WalletInviteForm";
-import { ROLE_LABEL, memberStatusLine } from "@/features/wallets/components/wallet-member-copy";
-
-const AVATAR_SIZE = 32;
-
-type PendingAction =
-  | { kind: "role"; member: WalletMember }
-  | { kind: "remove"; member: WalletMember }
-  | { kind: "leave"; member: WalletMember };
+import { WalletMemberRow } from "@/features/wallets/components/WalletMemberRow";
+import { WalletRecentTransactions } from "@/features/wallets/components/WalletRecentTransactions";
+import { WalletSheetHero } from "@/features/wallets/components/WalletSheetHero";
+import { memberCountLine } from "@/features/wallets/components/wallet-member-copy";
+import {
+  PendingMemberAction,
+  dialogConfirm,
+  dialogMessage,
+  dialogTitle,
+} from "@/features/wallets/components/wallet-member-dialogs";
 
 interface WalletMembersSheetProps {
   wallet: Wallet;
+  /** The wallet's card colour (walletFace), so the sheet's card matches it. */
+  faceColor: string;
   visible: boolean;
   onClose: () => void;
 }
 
 /**
- * Who shares a wallet (specs/shared-wallets US-05, US-06). The owner invites,
- * switches a member between "Ghi chép" and "Chỉ xem" (tap the row), removes
- * someone or takes an invitation back; a member sees who is in it and can
- * leave. Every change is online-only and confirmed first.
+ * Everything about one shared wallet (specs/shared-wallets US-04 – US-06), in
+ * the order a household needs it: which wallet and its shared balance, who is
+ * in it, inviting someone (owner only), everyone's entries, and leaving
+ * (members only). The owner switches a member between "Ghi chép" and "Chỉ
+ * xem" from the role pill and takes someone out with ×; every change is
+ * online-only and confirmed first.
+ *
+ * Entries live here as well as under the carousel: someone else's wallet is
+ * no longer in the carousel (it has the Ví chung tab instead), so this sheet
+ * is the one place its history shows.
  */
-export function WalletMembersSheet({ wallet, visible, onClose }: WalletMembersSheetProps) {
+export function WalletMembersSheet({ wallet, faceColor, visible, onClose }: WalletMembersSheetProps) {
   const colors = useColors();
   const styles = useStyles();
   const requireOnline = useRequireOnline();
@@ -46,9 +56,11 @@ export function WalletMembersSheet({ wallet, visible, onClose }: WalletMembersSh
   const members = useWalletMembersQuery(visible ? wallet.id : null);
   const changeRole = useChangeWalletMemberRoleMutation(wallet.id);
   const remove = useRemoveWalletMemberMutation(wallet.id);
-  const [pending, setPending] = useState<PendingAction | null>(null);
+  const [pending, setPending] = useState<PendingMemberAction | null>(null);
 
-  const others = (members.data ?? []).filter((m) => m.role !== "owner");
+  const list = members.data ?? [];
+  const others = list.filter((m) => m.role !== "owner");
+  const self = list.find((m) => m.user_id === userId);
 
   const confirm = () => {
     if (!pending) return;
@@ -67,67 +79,63 @@ export function WalletMembersSheet({ wallet, visible, onClose }: WalletMembersSh
     });
   };
 
-  const renderMember = (member: WalletMember) => {
-    const isSelf = member.user_id === userId;
-    const canManage = owner && member.role !== "owner";
-    return (
-      <ListRow
-        key={member.user_id}
-        title={isSelf ? `${member.name} (bạn)` : member.name}
-        subtitle={memberStatusLine(member)}
-        leading={<Avatar name={member.name} size={AVATAR_SIZE} fallback="initial" />}
-        leadingWidth={AVATAR_SIZE}
-        onPress={canManage ? () => setPending({ kind: "role", member }) : undefined}
-        chevron={false}
-        accessibilityHint={canManage ? "Đổi vai trò" : undefined}
-        trailing={
-          canManage ? (
-            <ListInlineButton
-              label={member.status === "pending" ? "Thu hồi" : "Xóa"}
-              tone="destructive"
-              onPress={() => setPending({ kind: "remove", member })}
-              testID={`btn-wallet-member-remove-${member.user_id}`}
-            />
-          ) : isSelf && member.role !== "owner" ? (
-            <ListInlineButton
-              label="Rời ví"
-              tone="destructive"
-              onPress={() => setPending({ kind: "leave", member })}
-              testID="btn-wallet-leave"
-            />
-          ) : undefined
-        }
-        testID={`row-wallet-member-${member.user_id}`}
-      />
-    );
-  };
+  const renderMember = (member: WalletMember, index: number) => (
+    <WalletMemberRow
+      key={member.user_id}
+      member={member}
+      isSelf={member.user_id === userId}
+      canManage={owner && member.role !== "owner"}
+      separated={index > 0}
+      onChangeRole={() => setPending({ kind: "role", member })}
+      onRemove={() => setPending({ kind: "remove", member })}
+    />
+  );
 
   return (
     <Drawer visible={visible} onClose={onClose}>
       <View testID="sheet-wallet-members" style={styles.body}>
-        <View>
-          <Text style={styles.title}>Ví chung</Text>
-          <Text style={styles.subtitle} numberOfLines={1}>
-            {wallet.name}
-          </Text>
+        <WalletSheetHero wallet={wallet} faceColor={faceColor} />
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Người trong ví</Text>
+            {members.data ? <Text style={styles.sectionMeta}>{memberCountLine(list)}</Text> : null}
+          </View>
+          <View style={styles.group}>
+            {members.isLoading ? (
+              [0, 1].map((i) => (
+                <View key={i} style={styles.skeletonRow}>
+                  <SkeletonBlock width={40} height={40} borderRadius={20} />
+                  <SkeletonBlock width="50%" height={14} />
+                </View>
+              ))
+            ) : members.isError ? (
+              <Pressable onPress={() => void members.refetch()} style={styles.retry} accessibilityRole="button">
+                <Text style={styles.retryText}>Chưa tải được danh sách.</Text>
+                <Text style={styles.retryAction}>Thử lại</Text>
+              </Pressable>
+            ) : (
+              list.map(renderMember)
+            )}
+          </View>
+          {owner && others.length > 0 ? <Text style={styles.hint}>Chạm vào vai trò để đổi.</Text> : null}
         </View>
 
-        {owner ? <WalletInviteForm walletId={wallet.id} /> : null}
+        {owner ? <WalletInviteForm walletId={wallet.id} memberCount={others.length} /> : null}
 
-        <ListSection
-          header={members.data ? `Trong ví · ${members.data.length} người` : "Trong ví"}
-          footer={owner && others.length > 0 ? "Chạm vào một người để đổi vai trò." : undefined}
-        >
-          {members.isLoading ? (
-            <ListCell>
-              <ActivityIndicator color={colors.textSecondary} style={styles.loader} />
-            </ListCell>
-          ) : members.isError ? (
-            <ListRow title="Chưa tải được danh sách." variant="accent" onPress={() => void members.refetch()} value="Thử lại" chevron={false} />
-          ) : (
-            (members.data ?? []).map(renderMember)
-          )}
-        </ListSection>
+        <WalletRecentTransactions wallet={wallet} />
+
+        {!owner && self ? (
+          <Pressable
+            onPress={() => setPending({ kind: "leave", member: self })}
+            style={({ pressed }) => [styles.leave, pressed && styles.leavePressed]}
+            accessibilityRole="button"
+            testID="btn-wallet-leave"
+          >
+            <LogOutIcon size={18} color={colors.peach} />
+            <Text style={styles.leaveLabel}>Rời ví</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       <ConfirmDialog
@@ -145,40 +153,34 @@ export function WalletMembersSheet({ wallet, visible, onClose }: WalletMembersSh
   );
 }
 
-function nextRole(member: WalletMember) {
-  return member.role === "editor" ? ROLE_LABEL.viewer : ROLE_LABEL.editor;
-}
-
-function dialogTitle(action: PendingAction | null, walletName: string): string {
-  if (!action) return "";
-  if (action.kind === "role") return `Đổi ${action.member.name} sang ${nextRole(action.member)}?`;
-  if (action.kind === "leave") return `Rời ví ${walletName}?`;
-  return action.member.status === "pending" ? "Thu hồi lời mời?" : `Xóa ${action.member.name} khỏi ví?`;
-}
-
-function dialogMessage(action: PendingAction | null): string {
-  if (!action) return "";
-  if (action.kind === "role") {
-    return action.member.role === "editor"
-      ? "Người này vẫn xem được ví nhưng không thêm được giao dịch."
-      : "Người này thêm được giao dịch vào ví.";
-  }
-  if (action.kind === "leave") return "Ví sẽ không còn trong danh sách của bạn. Giao dịch bạn đã ghi vẫn ở lại trong ví.";
-  return action.member.status === "pending"
-    ? `${action.member.name} sẽ không vào được ví này.`
-    : `Giao dịch ${action.member.name} đã ghi vẫn ở lại trong ví.`;
-}
-
-function dialogConfirm(action: PendingAction | null): string {
-  if (!action) return "";
-  if (action.kind === "role") return `Đổi sang ${nextRole(action.member)}`;
-  if (action.kind === "leave") return "Rời ví";
-  return action.member.status === "pending" ? "Thu hồi lời mời" : "Xóa khỏi ví";
-}
-
 const useStyles = createStyles((colors) => ({
-  body: { gap: spacing.lg },
-  title: { ...typography.title, color: colors.textPrimary },
-  subtitle: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
-  loader: { paddingVertical: spacing.md },
+  body: { gap: spacing.xl },
+  section: { gap: spacing.sm },
+  sectionHeader: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between" },
+  sectionTitle: { ...typography.label, color: colors.textSecondary },
+  sectionMeta: { ...typography.caption, color: colors.textMuted },
+  group: {
+    paddingHorizontal: spacing.lg,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    backgroundColor: colors.surface,
+  },
+  skeletonRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.md },
+  retry: { flexDirection: "row", justifyContent: "space-between", paddingVertical: spacing.lg },
+  retryText: { ...typography.body, color: colors.textSecondary },
+  retryAction: { ...typography.body, color: colors.green },
+  hint: { ...typography.caption, color: colors.textMuted, paddingHorizontal: spacing.xs },
+  leave: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+  },
+  leavePressed: { backgroundColor: colors.surface },
+  leaveLabel: { ...typography.body, color: colors.peach },
 }));

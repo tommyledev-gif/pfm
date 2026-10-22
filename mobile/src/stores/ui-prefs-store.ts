@@ -3,9 +3,11 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 export type HomePeriod = "day" | "month" | "year";
-// The Wallets screen's two layouts: the card carousel Home also shows (the
-// default), or the vertical list grouped by wallet type.
-export type WalletsViewMode = "carousel" | "list";
+// The Wallets screen's tabs: the card carousel Home also shows (the
+// default), the vertical list grouped by wallet type, or "shared" — the Ví
+// chung tab, invitations and every shared wallet, kept out of the card stack
+// of the User's own wallets.
+export type WalletsViewMode = "carousel" | "list" | "shared";
 
 // Small persisted UI-preferences store — currently just the Home screen's
 // selected Day/Month/Year snapshot period, so it survives navigation and

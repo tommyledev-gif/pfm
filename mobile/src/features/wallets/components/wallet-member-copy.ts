@@ -36,3 +36,19 @@ export function inviteErrorMessage(error: unknown): string {
   if (code && INVITE_ERRORS[code]) return INVITE_ERRORS[code];
   return getErrorMessage(error, "Chưa gửi được lời mời. Thử lại.");
 }
+
+/** BR-02: live memberships (pending + active) a wallet may hold, owner excluded. */
+export const WALLET_MEMBER_LIMIT = 10;
+
+/** What each role lets a member do — under the role options of the invite form. */
+export const ROLE_DESCRIPTION: Record<"editor" | "viewer", string> = {
+  editor: "Thêm được giao dịch. Chỉ sửa được giao dịch mình ghi.",
+  viewer: "Xem số dư và giao dịch, không thêm được.",
+};
+
+/** "3 người · 1 chờ trả lời" — the owner counts as one of the people. */
+export function memberCountLine(members: WalletMember[]): string {
+  const pending = members.filter((m) => m.status === "pending").length;
+  const people = `${members.length - pending} người`;
+  return pending > 0 ? `${people} · ${pending} chờ trả lời` : people;
+}
