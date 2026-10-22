@@ -91,8 +91,12 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
           have been — lifting it roughly two keyboard heights and leaving the
           dead gap under it. Drawer.tsx legitimately needs that padding because
           its sheet is bottom-anchored with no scroll-into-view of its own; this
-          full-screen flow does not. */
-      <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
+          full-screen flow does not.
+          ⚠️ Bottom edge only. Both mount sites (Insights, AI chat) render this
+          overlay inside <Screen>, whose SafeAreaView already pads the status
+          bar; adding the top inset here again pushed the progress header a
+          whole status bar's height too low. */
+      <SafeAreaView edges={["bottom"]} style={styles.safeArea}>
         <WizardProgressHeader
           step={step}
           totalSteps={BUDGET_WIZARD_TOTAL_STEPS}
@@ -185,5 +189,5 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
 const useStyles = createStyles((colors) => ({
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.bgApp, zIndex: 40 },
   safeArea: { flex: 1 },
-  body: { flex: 1, paddingTop: spacing.sm },
+  body: { flex: 1, paddingTop: spacing.xs },
 }));

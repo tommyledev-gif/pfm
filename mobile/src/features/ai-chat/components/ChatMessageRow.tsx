@@ -48,6 +48,8 @@ interface ChatMessageRowProps {
   onOpenManualEntry: () => void;
   /** Re-sends the photo of a failed image reading. */
   onRetryImage: (message: ChatMessage) => void;
+  /** Re-sends the text of a failed reply. */
+  onRetryText: (message: ChatMessage) => void;
   /** Present only while the User owns no VND Wallet — see TransactionActionCard. */
   onCreateWallet?: () => void;
   /** Opens the new-wallet form — for a reply flagged `offerCreateWallet`. */
@@ -80,6 +82,7 @@ function ChatMessageRowView({
   onOpenBudgetWizard,
   onOpenManualEntry,
   onRetryImage,
+  onRetryText,
   onCreateWallet,
   onOpenWalletCreator,
 }: ChatMessageRowProps) {
@@ -178,9 +181,12 @@ function ChatMessageRowView({
           />
         ) : message.imageCapture ? (
           <ImageThumbnail capture={message.imageCapture} messageId={message.id} />
-        ) : message.retryImageMessageId || message.offerManualEntry ? (
+        ) : message.retryImageMessageId || message.retryText || message.offerManualEntry ? (
           <>
             {message.retryImageMessageId ? <RetryImageButton messageId={message.id} onPress={() => onRetryImage(message)} /> : null}
+            {message.retryText ? (
+              <RetryImageButton kind="text" messageId={message.id} onPress={() => onRetryText(message)} />
+            ) : null}
             {message.offerManualEntry ? <ManualEntryButton onPress={onOpenManualEntry} /> : null}
           </>
         ) : message.offerCreateWallet ? (

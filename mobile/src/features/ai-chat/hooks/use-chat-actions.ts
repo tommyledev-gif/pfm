@@ -17,6 +17,10 @@ import { useToastStore } from "@/stores/toast-store";
 
 // A saved proposal's PATCH failed for a reason without its own copy.
 const SAVE_EDIT_FAILED = "Chưa lưu được thay đổi. Số dư chưa thay đổi.";
+// A text reply that failed. The bubble carries a Thử lại button (retryText),
+// so the copy names the failure only.
+const REPLY_FAILED = "Chưa xử lý được tin nhắn này.";
+const REPLY_BUSY = "Hệ thống đang bận. Thử lại sau ít phút.";
 
 // The typing indicator is meant to be felt, not just technically present —
 // even a fast reply holds the dots for a beat before the answer appears.
@@ -70,8 +74,9 @@ export function useChatActions({ onSent }: UseChatActionsOptions) {
         {
           id: nextMessageId(),
           role: "assistant",
-          text: isBusy ? "Hệ thống đang bận. Thử lại sau ít phút." : "Chưa xử lý được tin nhắn này. Thử lại.",
+          text: isBusy ? REPLY_BUSY : REPLY_FAILED,
           offerManualEntry: isBusy,
+          retryText: message,
           edited,
         },
       ];
@@ -88,6 +93,21 @@ export function useChatActions({ onSent }: UseChatActionsOptions) {
     const replies = await requestAssistantReply(trimmed);
     // A reply that outlived a logout or account switch belongs to the
     // previous session's thread, which is gone.
+    if (stillCurrent()) replies.forEach(addMessage);
+    setSending(false);
+  };
+
+  // Sends the message of a failed reply again, the same way a photo retry
+  // does: the failed bubble stays in the thread (its button gone) and the new
+  // reply lands under it — no second copy of the user's message.
+  const retryReply = async (failedReply: ChatMessage) => {
+    const text = failedReply.retryText;
+    if (!text || sending) return;
+    updateMessage(failedReply.id, { retryText: undefined });
+    onSent();
+    setSending(true);
+    const stillCurrent = captureChatEpoch();
+    const replies = await requestAssistantReply(text);
     if (stillCurrent()) replies.forEach(addMessage);
     setSending(false);
   };
@@ -174,5 +194,5 @@ export function useChatActions({ onSent }: UseChatActionsOptions) {
     });
   };
 
-  return { sending, confirmingId, send, editUserMessage, editAction, confirmAction, sendImage, retryImage };
+  return { sending, confirmingId, send, retryReply, editUserMessage, editAction, confirmAction, sendImage, retryImage };
 }

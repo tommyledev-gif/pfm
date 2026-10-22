@@ -1,33 +1,38 @@
-import { ReactNode, useEffect } from "react";
+import { useEffect } from "react";
+import { Pressable } from "react-native";
 import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
 import { PressableScale } from "@/components/motion/PressableScale";
-import { IconProps } from "@/components/ui/Icon";
+import { ChevronDownIcon, CloseIcon } from "@/components/ui/Icon";
+import { withAlpha } from "@/lib/color";
 import { radii, typography, createStyles, useColors } from "@/lib/theme";
 import { useReduceMotion } from "@/lib/use-reduce-motion";
 
 // A filter turning on (or off) cross-fades the pill rather than cutting.
 const ACTIVE_FADE_MS = 200;
+const MAX_LABEL_WIDTH = 140;
 
 interface FilterPillProps {
-  // Filled-green state, for a pill that reflects an applied filter. Action
-  // pills (Export/Import) pass false always — a filled action button would
-  // read as "this filter is on".
+  /** A filter is applied: the pill is tinted and shows its value. */
   active: boolean;
+  /** The dimension's name when inactive ("Ví"), the applied value when active. */
   label: string;
-  icon: (props: IconProps) => ReactNode;
   onPress: () => void;
-  // An optional badge rendered after the label, e.g. the sort pill's count.
-  children?: ReactNode;
+  /** Clears just this filter — the × that replaces the chevron while active. */
+  onClear?: () => void;
+  clearLabel?: string;
   testID?: string;
 }
 
-// One pill in the Transactions header's horizontal filter row. Extracted from
-// TransactionsHeader when that file crossed CLAUDE.md's 300-line cap; the
-// five pills there differ only in icon, label and the badge one of them
-// carries, so they share this one shape rather than five near-identical
-// Pressables.
-export function FilterPill({ active, label, icon: Icon, onPress, children, testID }: FilterPillProps) {
+// One dropdown chip in the Transactions filter row (TransactionsFilterBar):
+// the filter's name and a chevron while off; its value and an × to drop it
+// while on. Filters only — sort and export are actions and live as icon
+// buttons in the title row, so a chip that is lit always means "the list is
+// narrowed by this".
+//
+// Tinted rather than filled when active: with several filters on, a row of
+// solid neon pills shouted over the list they were narrowing.
+export function FilterPill({ active, label, onPress, onClear, clearLabel, testID }: FilterPillProps) {
   const colors = useColors();
   const styles = useStyles();
   const reduceMotion = useReduceMotion();
@@ -39,37 +44,61 @@ export function FilterPill({ active, label, icon: Icon, onPress, children, testI
   }, [active, reduceMotion, on]);
 
   // Read outside the worklets, so a theme switch hands them the new colours.
-  const { surface, surfaceBorder, green, textSecondary, onGreen } = colors;
+  const { surface, surfaceBorder, green, textSecondary } = colors;
+  const tint = withAlpha(green, 0.12);
   const pillStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(on.value, [0, 1], [surface, green]),
+    backgroundColor: interpolateColor(on.value, [0, 1], [surface, tint]),
     borderColor: interpolateColor(on.value, [0, 1], [surfaceBorder, green]),
   }));
-  const labelStyle = useAnimatedStyle(() => ({ color: interpolateColor(on.value, [0, 1], [textSecondary, onGreen]) }));
+  const labelStyle = useAnimatedStyle(() => ({ color: interpolateColor(on.value, [0, 1], [textSecondary, green]) }));
 
   return (
-    <PressableScale testID={testID} style={[styles.pill, pillStyle]} onPress={onPress}>
-      {/* The icon is an SVG and switches colour at once; it is small enough
-          that the fill fading in under it carries the change. */}
-      <Icon size={16} color={active ? colors.onGreen : colors.textSecondary} />
+    <PressableScale
+      testID={testID}
+      style={[styles.pill, pillStyle]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+    >
       <Animated.Text style={[styles.label, labelStyle]} numberOfLines={1}>
         {label}
       </Animated.Text>
-      {children}
+      {active && onClear ? (
+        <Pressable
+          onPress={onClear}
+          hitSlop={10}
+          style={styles.clear}
+          accessibilityRole="button"
+          accessibilityLabel={clearLabel}
+          testID={testID ? `${testID}-clear` : undefined}
+        >
+          <CloseIcon size={10} color={colors.onGreen} strokeWidth={3} />
+        </Pressable>
+      ) : (
+        <ChevronDownIcon size={14} color={active ? colors.green : colors.textMuted} />
+      )}
     </PressableScale>
   );
 }
 
-const useStyles = createStyles(() => ({
+const useStyles = createStyles((colors) => ({
   pill: {
-    // Anchors the sort pill's absolutely-positioned count badge.
-    position: "relative",
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    height: 34,
+    paddingLeft: 14,
+    paddingRight: 10,
     borderRadius: radii.pill,
     borderWidth: 1,
   },
-  label: { ...typography.tiny },
+  label: { ...typography.caption, maxWidth: MAX_LABEL_WIDTH },
+  clear: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.green,
+  },
 }));

@@ -89,8 +89,10 @@ export function WizardStepSuccess({ createdCount, dailyAllowance, onDone }: Wiza
   // only claimed when there genuinely is one.
   const hasCount = typeof createdCount === "number" && createdCount > 0;
 
+  // No top inset: the wizard overlay already sits below the status bar
+  // (see BudgetWizardModal's SafeAreaView note).
   return (
-    <View style={[styles.root, { paddingTop: insets.top + spacing.xxl, paddingBottom: insets.bottom + spacing.lg }]}>
+    <View style={[styles.root, { paddingTop: spacing.xxl, paddingBottom: insets.bottom + spacing.lg }]}>
       <View style={styles.center}>
         <View style={styles.badge}>
           <Animated.View style={[styles.halo, haloStyle]} pointerEvents="none" />

@@ -101,10 +101,15 @@ Nếu **reset App Secret** trên Lark console thì phải sửa `lark-credential
 - Bảng **Daily Tasks** `tblDAILYTASKS`
   - Task Name `fldK5vDHGu` (primary, text)
   - Date `fldL1q45Ln` (date, auto_fill = ngày tạo)
-  - Status `fldAIEE7xE` (select: To Do / In Progress / Done / Overdue)
-  - Category `fldclCe9qD` (select: PFM App / Học tập / Sức khỏe / Cá nhân)
+  - Status `fldAIEE7xE` (select: To Do / In Progress / Done / Overdue / On Hold / Cancelled)
+  - Category `fldclCe9qD` (select: PFM App / Học tập / Sức khỏe / Cá nhân / Công việc / Tổng kết)
   - AI Note/Feedback `fld8FeSZiu` (text)
   - Link to PFM Worklog `fldVJXyo0V` (duplex link → Roadmap)
+  - Khung giờ `fld1lUNjGZ` (text "HH:MM–HH:MM"), Ưu tiên `fld2lHIvcR` (select: Phải làm / Nên làm)
+  - Priority `fldNHDmv80` (number, hệ số phạt): luôn là 1, chỉ để 2 khi user nói
+  - Punishment `fld7VQitHY` (formula): dòng task = Priority nếu chưa Done (Cancelled / On Hold = 0); dòng tổng kết = tổng phạt cả ngày
+  - Tổng kết `fldkwGO7gZ` (formula text, chỉ có trên dòng tổng kết): "Done x/y · Sắp xong (In Progress) z · Phạt p"
+- Mỗi ngày có 1 dòng tổng kết: Task Name "Tổng kết DD/MM", Category "Tổng kết", cùng Date, Khung giờ "23:59", không có Status/Priority. Tạo cùng lúc với task của ngày.
 - Bảng **PFM App Worklog & Roadmap** `tblROADMAP`
   - Feature/Module `fldU4OWOp5` (primary, text)
   - Target Version `fldHDdN4HN` (select: v0.1-MVP / v0.2-Beta / v1.0-Release)

@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
 
-import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
 import { Screen } from "@/components/shared/Screen";
 import { Fab } from "@/components/ui/Fab";
 import { monthRange } from "@/lib/date-range";
@@ -29,22 +28,24 @@ import { useCollapsedDays } from "@/features/transactions/hooks/use-collapsed-da
 import { useFocusTransaction } from "@/features/transactions/hooks/use-focus-transaction";
 import { useTransactionFilters } from "@/features/transactions/hooks/use-transaction-filters";
 import { TransactionsHeader, TypeFilterValue } from "@/features/transactions/components/TransactionsHeader";
-import { CategoryFilterModal } from "@/features/transactions/components/CategoryFilterModal";
-import { SortDrawerModal } from "@/features/transactions/components/SortDrawerModal";
+import { TransactionsFilterBar } from "@/features/transactions/components/TransactionsFilterBar";
+import { TransactionsFilterSheets } from "@/features/transactions/components/TransactionsFilterSheets";
+import { useTransactionsSheets } from "@/features/transactions/hooks/use-transactions-sheets";
 import { isDefaultSort, sortTransactions, SORT_OPTIONS, SortKey } from "@/features/transactions/sort";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { Category } from "@/features/categories/types";
+import { Wallet } from "@/features/wallets/types";
 
 const NO_CATEGORIES: Category[] = [];
+const NO_WALLETS: Wallet[] = [];
 
 export default function TransactionsScreen() {
   const styles = useStyles();
   const filters = useTransactionFilters();
-  const { filter, setFilter, dateRange, setDateRange, categoryIds, setCategoryIds, sharedFilters } = filters;
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [categoryFilterOpen, setCategoryFilterOpen] = useState(false);
+  const { filter, setFilter, walletId, setWalletId, dateRange, setDateRange, categoryIds, setCategoryIds, sharedFilters } =
+    filters;
+  const sheets = useTransactionsSheets();
   const [sortKeys, setSortKeys] = useState<SortKey[]>([]);
-  const [sortDrawerOpen, setSortDrawerOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [futureOpen, setFutureOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -129,7 +130,11 @@ export default function TransactionsScreen() {
   const dateRangeLabel =
     hasDateFilter && dateRange.from ? formatDateRange(dateRange.from, dateRange.to ?? dateRange.from) : null;
   const headerRange = hasDateFilter ? { from: dateRange.from, to: dateRange.to } : monthRange(0);
-  const { total: headerTotal, otherCurrencies, refetch: refetchHeaderTotal } = useFilteredReportTotal(headerRange, categoryIds);
+  const { total: headerTotal, otherCurrencies, refetch: refetchHeaderTotal } = useFilteredReportTotal(
+    headerRange,
+    categoryIds,
+    walletId,
+  );
 
   // Export and import act on the period on screen: the date filter, else the
   // current month the header summarises. Both bounds are required by the API.
@@ -140,6 +145,7 @@ export default function TransactionsScreen() {
   };
   const transactionIO = useTransactionIO({
     range: exportRange,
+    walletId,
     currency: headerTotal?.currency ?? "VND",
   });
 
@@ -152,12 +158,6 @@ export default function TransactionsScreen() {
     setFormOpen(true);
   }, []);
   const closeForm = useCallback(() => setFormOpen(false), []);
-  const openDatePicker = useCallback(() => setPickerOpen(true), []);
-  const closeDatePicker = useCallback(() => setPickerOpen(false), []);
-  const openCategoryFilter = useCallback(() => setCategoryFilterOpen(true), []);
-  const closeCategoryFilter = useCallback(() => setCategoryFilterOpen(false), []);
-  const openSort = useCallback(() => setSortDrawerOpen(true), []);
-  const closeSort = useCallback(() => setSortDrawerOpen(false), []);
   const openFuture = useCallback(() => setFutureOpen(true), []);
   const closeFuture = useCallback(() => setFutureOpen(false), []);
   const selectFuture = useCallback((transaction: Transaction) => {
@@ -217,13 +217,18 @@ export default function TransactionsScreen() {
             onChangeTypeFilter={changeTypeFilter}
             searchSeed={filters.searchSeed}
             onSearch={filters.setSearch}
-            dateRangeLabel={dateRangeLabel}
-            onOpenDatePicker={openDatePicker}
-            categoryCount={categoryIds.length}
-            onOpenCategoryFilter={openCategoryFilter}
+            filterBar={
+              <TransactionsFilterBar
+                filters={filters}
+                wallets={wallets.data}
+                categoryById={categoryById}
+                dateLabel={dateRangeLabel}
+                openers={sheets.openers}
+              />
+            }
             sortCount={sortKeys.length}
             hasCustomSort={hasCustomSort}
-            onOpenSort={openSort}
+            onOpenSort={sheets.openers.sort}
             onExport={transactionIO.onExport}
             onImport={transactionIO.onImport}
             exporting={transactionIO.exporting}
@@ -250,23 +255,20 @@ export default function TransactionsScreen() {
 
       <Fab accessibilityLabel="Thêm giao dịch" testID="btn-add-transaction" onPress={openCreateForm} />
 
-      <DateRangePickerModal
-        visible={pickerOpen}
-        onClose={closeDatePicker}
-        from={dateRange.from}
-        to={dateRange.to}
-        onApply={setDateRange}
-      />
-
-      <CategoryFilterModal
-        visible={categoryFilterOpen}
-        onClose={closeCategoryFilter}
+      <TransactionsFilterSheets
+        open={sheets.open}
+        onClose={sheets.close}
+        wallets={wallets.data ?? NO_WALLETS}
+        walletId={walletId}
+        onSelectWallet={setWalletId}
+        dateRange={dateRange}
+        onApplyDateRange={setDateRange}
         categories={categories.data ?? NO_CATEGORIES}
-        selectedIds={categoryIds}
-        onApply={setCategoryIds}
+        categoryIds={categoryIds}
+        onApplyCategories={setCategoryIds}
+        sortKeys={sortKeys}
+        onApplySort={setSortKeys}
       />
-
-      <SortDrawerModal visible={sortDrawerOpen} onClose={closeSort} selected={sortKeys} onApply={setSortKeys} />
 
       <TransactionFormModal visible={formOpen} onClose={closeForm} editingTransaction={editingTransaction} />
 

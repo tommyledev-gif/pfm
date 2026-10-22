@@ -4,7 +4,8 @@ import { ReportTotal } from "@/features/reports/types";
 import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary-query";
 import { mainCurrency } from "@/features/transactions/other-currencies";
 
-// The income/expense totals for a window, narrowed to a set of categories.
+// The income/expense totals for a window, narrowed to a set of categories and,
+// optionally, one wallet (GET /reports/summary takes `wallet_id` as is).
 //
 // GET /reports/summary takes a single `category_id`, not the multi-select the
 // Transactions screen filters by, so a category selection is folded in
@@ -21,8 +22,11 @@ import { mainCurrency } from "@/features/transactions/other-currencies";
 export function useFilteredReportTotal(
   range: { from?: string; to?: string },
   categoryIds: string[],
+  walletId?: string,
 ): { total: ReportTotal | null; otherCurrencies: string[]; refetch: () => Promise<unknown> } {
-  const summary = useReportSummaryQuery(range);
+  // No wallet_id key at all when unfiltered, so the query key (and its cache)
+  // stays the one every other caller of the period summary shares.
+  const summary = useReportSummaryQuery(walletId ? { ...range, wallet_id: walletId } : range);
   const data = summary.data;
   const { refetch } = summary;
   // Joined so a caller passing a fresh array literal every render (which every

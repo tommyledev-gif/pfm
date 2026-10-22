@@ -1,11 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { LayoutChangeEvent } from "react-native";
-import Animated, { useAnimatedRef, useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated";
-import { scheduleOnRN } from "react-native-worklets";
+import Animated, {
+  cancelAnimation,
+  scrollTo,
+  useAnimatedReaction,
+  useAnimatedRef,
+  useAnimatedScrollHandler,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated";
+import { scheduleOnRN, scheduleOnUI } from "react-native-worklets";
 
 import { useLatestCallback } from "@/lib/use-latest-callback";
-
-import { useReduceMotion } from "@/lib/use-reduce-motion";
 import { Wallet } from "@/features/wallets/types";
 import { CARD_OVERLAP, CARD_WIDTH } from "@/features/wallets/components/wallet-card-geometry";
 
@@ -17,10 +23,16 @@ export const SNAP_INTERVAL = CARD_WIDTH - CARD_OVERLAP;
 // three distinct wallets is the floor; below it this is a plain bounded list.
 const MIN_WALLETS_TO_LOOP = 3;
 const LOOP_COPIES = 3;
-// Longest a tap-started slide may hold the paint order before it is released
-// anyway — RN's own smooth scroll runs 250ms; momentum-end normally releases
-// it sooner. Only a safety net for a platform that never reports the end.
-const TAP_SCROLL_SETTLE_MS = 700;
+// How far past the halfway mark (in cards) the centred card changes. Without
+// it a finger resting at the halfway mark flipped the centred card — so both
+// cards' paint order and shadow, and the host's active wallet — on every
+// pixel of jitter: the two cards shook. Inside the swap's clear window
+// (0.3–0.7, wallet-carousel-motion), so the late flip is never visible.
+const CENTRE_HYSTERESIS = 0.08;
+// The pager arrows' and side-card taps' slide. Critically damped (damping =
+// 2·√stiffness): no overshoot past the card, and a re-aim mid-slide keeps the
+// current velocity instead of stopping and starting again.
+const DRIVE_SPRING = { stiffness: 260, damping: 32, mass: 1 };
 
 interface UseWalletCarouselOptions {
   wallets: Wallet[];
@@ -30,40 +42,37 @@ interface UseWalletCarouselOptions {
 }
 
 /**
- * Scroll state for WalletCarousel — split out of the component to keep it
- * under the 300-line cap. Owns the loop: three copies of the list laid end
- * to end, the user always re-anchored into the middle one once motion stops.
+ * Scroll state for WalletCarousel (split out for the 300-line cap). Owns the
+ * loop: three copies of the list end to end, re-anchored into the middle one.
+ *
+ * ⚠️ Everything that moves the scroll runs on the UI thread and sets
+ * `scrollX` in the same frame as the native offset:
+ *   - The loop re-anchor was a JS scrollTo: for a frame the offset had jumped
+ *     a whole copy while the cards still read the old `scrollX`, so the
+ *     transparent far copies were drawn in place: the flash on a quick switch.
+ *   - Arrows and side-card taps used RN's fixed 250ms scrollTo, presses
+ *     mid-slide queued one after another (stop, start, stop). They now drive
+ *     one spring a further press re-aims, wrapping as it goes.
  */
 export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChange }: UseWalletCarouselOptions) {
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   // The scroll offset on the UI thread: every card and pager dot reads it.
   const scrollX = useSharedValue(0);
-  // The nearest card as last reported to JS, so the handler only calls over on a change.
-  const lastIndex = useSharedValue(-1);
+  // The centred card in `rendered` indices, with hysteresis — the cards' paint
+  // order reads it too (wallet-carousel-motion).
+  const centre = useSharedValue(0);
+  // A programmatic slide in flight: its unwrapped position, and where it ends.
+  const driving = useSharedValue(false);
+  const driveX = useSharedValue(0);
+  const driveGoal = useSharedValue(0);
   const [containerWidth, setContainerWidth] = useState(0);
-  // Which card is currently centred, in `rendered` indices. Orders the
-  // overlapping cards — the centred one has to paint ON TOP of both its
-  // neighbours, and paint order in React Native is render order, which would
-  // otherwise put every card to the right over the active one.
+  // The same centred index on the JS side, for the pager arrows and taps.
   const [centreIndex, setCentreIndex] = useState(0);
   const didInitialScroll = useRef(false);
-  const reduceMotion = useReduceMotion();
-  // Set while a tap-started slide is in flight — see scrollToCard.
-  const tapTarget = useRef<number | null>(null);
-  const tapSettleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Arrow presses that arrived during a slide, as a signed count (+1 next,
-  // -1 previous) — see step.
-  const pendingSteps = useRef(0);
-
-  const releaseTapTarget = () => {
-    tapTarget.current = null;
-    if (tapSettleTimer.current) clearTimeout(tapSettleTimer.current);
-    tapSettleTimer.current = null;
-  };
-  useEffect(() => releaseTapTarget, []);
-  // Read once: the landing target is where the carousel opens, and a host
-  // that feeds the reported active wallet straight back in here must not
-  // re-aim a landing that is still pending.
+  // JS mirror of `driving`: while a slide runs, a tap never "opens" a card.
+  const isDriving = useRef(false);
+  // Read once: a host feeding the reported active wallet straight back in
+  // here must not re-aim a landing that is still pending.
   const initialWalletIdRef = useRef(initialWalletId);
 
   const looping = wallets.length >= MIN_WALLETS_TO_LOOP;
@@ -71,6 +80,9 @@ export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChan
   // runway in either direction before a jump is owed.
   const rendered = looping ? Array.from({ length: LOOP_COPIES }, () => wallets).flat() : wallets;
   const loopWidth = wallets.length * SNAP_INTERVAL;
+  const maxX = Math.max(0, rendered.length - 1) * SNAP_INTERVAL;
+  // Farthest an arrow-driven slide may run ahead of the cards on screen.
+  const driveReach = Math.max(1, wallets.length - 1) * SNAP_INTERVAL;
 
   // Side padding is what actually centres a card: the first and last items
   // need half a viewport of empty space beside them to reach the middle.
@@ -79,8 +91,90 @@ export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChan
   // The rendered index showing wallets[walletIndex] — in the middle copy when looping.
   const renderedIndexOf = (walletIndex: number) => (looping ? wallets.length : 0) + walletIndex;
 
+  const onCentreChange = useLatestCallback((next: number) => setCentreIndex(next));
+  const onDriveEnd = useLatestCallback(() => {
+    isDriving.current = false;
+  });
+  const onBeginDrag = useLatestCallback(() => {
+    isDriving.current = false;
+  });
+
+  // Folds an offset into the middle copy (half a copy of runway each side).
+  // The copies are identical, so the jump cannot be seen — as long as the
+  // cards move with it in the same frame, which `place` makes sure of.
+  const wrap = (x: number) => {
+    "worklet";
+    if (!looping) return Math.min(maxX, Math.max(0, x));
+    const half = loopWidth / 2;
+    return ((((x - half) % loopWidth) + loopWidth) % loopWidth) + half;
+  };
+
+  const track = (x: number) => {
+    "worklet";
+    scrollX.value = x;
+    const position = x / SNAP_INTERVAL;
+    if (Math.abs(position - centre.value) < 0.5 + CENTRE_HYSTERESIS) return;
+    const next = Math.round(position);
+    if (next === centre.value) return;
+    centre.value = next;
+    scheduleOnRN(onCentreChange, next);
+  };
+
+  const place = (x: number) => {
+    "worklet";
+    scrollTo(scrollRef, x, 0, false);
+    track(x);
+  };
+
+  const startDrive = (goal: number) => {
+    "worklet";
+    if (!driving.value) {
+      driveX.value = scrollX.value;
+      driving.value = true;
+    }
+    driveGoal.value = goal;
+    driveX.value = withSpring(goal, DRIVE_SPRING, (finished) => {
+      // A re-aim or a drag cut it short: whoever did that owns the scroll now.
+      if (!finished) return;
+      place(wrap(goal));
+      driving.value = false;
+      scheduleOnRN(onDriveEnd);
+    });
+  };
+
+  // One card along (the arrows). Pressed again mid-slide, it extends the
+  // running slide's goal rather than queueing a new one.
+  const driveBy = (delta: number) => {
+    "worklet";
+    const current = driving.value ? driveX.value : scrollX.value;
+    const base = driving.value ? driveGoal.value : Math.round(scrollX.value / SNAP_INTERVAL) * SNAP_INTERVAL;
+    const goal = looping ? base + delta * SNAP_INTERVAL : Math.min(maxX, Math.max(0, base + delta * SNAP_INTERVAL));
+    if (Math.abs(goal - current) <= driveReach) startDrive(goal);
+    // No slide started: release the JS-side hold `step` took for it.
+    else if (!driving.value) scheduleOnRN(onDriveEnd);
+  };
+
+  // Straight to the card at rendered `index`, from wherever the slide is.
+  const driveToCard = (index: number) => {
+    "worklet";
+    const current = driving.value ? driveX.value : scrollX.value;
+    startDrive(current + (index * SNAP_INTERVAL - scrollX.value));
+  };
+
+  // A slide moves the scroll view itself, one frame at a time.
+  useAnimatedReaction(
+    () => (driving.value ? driveX.value : null),
+    (x) => {
+      if (x !== null) place(wrap(x));
+    },
+    [looping, loopWidth, maxX],
+  );
+
   const jumpTo = (index: number) => {
-    scrollRef.current?.scrollTo({ x: index * SNAP_INTERVAL, animated: false });
+    const x = index * SNAP_INTERVAL;
+    scrollRef.current?.scrollTo({ x, animated: false });
+    scrollX.value = x;
+    centre.value = index;
     setCentreIndex(index);
   };
 
@@ -99,119 +193,33 @@ export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChan
     onActiveWalletChange?.(wallets[initial].id);
   };
 
-  // Called from the UI-thread scroll handler only when the nearest card
-  // changes, once per swipe, not once per frame. The cards' own motion and
-  // paint order never wait on this (wallet-carousel-motion); it only keeps
-  // the pager arrows, taps and the reported active wallet in step.
-  const onScrollIndex = (next: number) => {
-    if (tapTarget.current !== null) return;
-    setCentreIndex((prev) => (prev === next ? prev : next));
-  };
-
-  // ⚠️ The wrap happens only once motion has stopped. Re-anchoring mid-fling
-  // would cancel the user's own momentum and read as the carousel snatching
-  // the card back.
-  const onMomentumEnd = (x: number) => {
-    let landed = false;
-    if (tapTarget.current !== null) {
-      // ⚠️ A tap is itself a touch on the scroll view, and Android's
-      // ScrollView reports a momentum end for every touch once it settles —
-      // often before the tap's own slide has even started. Wrapping on that
-      // one re-anchored the carousel under a slide that was about to start,
-      // which then set off from a different copy and ran backwards through
-      // several cards. Only the slide's own end, at the target, releases the
-      // hold and may wrap.
-      if (Math.abs(x - tapTarget.current * SNAP_INTERVAL) > 1) return;
-      releaseTapTarget();
-      landed = true;
-    }
-    let settled = x;
-    if (looping && (x < loopWidth / 2 || x > loopWidth * 1.5)) {
-      settled = x < loopWidth / 2 ? x + loopWidth : x - loopWidth;
-      scrollRef.current?.scrollTo({ x: settled, animated: false });
-      setCentreIndex(Math.round(settled / SNAP_INTERVAL));
-    }
-    if (landed) runPendingStep(Math.round(settled / SNAP_INTERVAL));
-  };
-
-  // The middle-copy index showing the same wallet as rendered `index`.
-  const anchored = (index: number) => (looping ? wallets.length + (index % wallets.length) : index);
-
-  /**
-   * Brings the card at rendered `index` to the centre — what tapping a card
-   * peeking at the side does, the same result as swiping it over. The card
-   * slides straight to the middle from where it sits: it was tapped, so it is
-   * on screen and inside the rendered copies, and onMomentumEnd re-anchors
-   * into the middle copy once the slide lands, exactly as after a fling.
-   *
-   * ⚠️ The tapped card counts as centred at once, and that is then held,
-   * onScrollIndex ignored, until the slide lands: a second tap on it mid-slide
-   * must not "open" it (see pressCard). Paint order is not part of this; it
-   * follows the scroll on the UI thread (wallet-carousel-motion).
-   */
-  const scrollToCard = (index: number) => {
-    if (index === centreIndex) return;
-    releaseTapTarget();
-    // No slide means no momentum end to wrap on, so land in the middle copy
-    // directly — otherwise repeated arrow presses walk off the end of the copies.
-    if (reduceMotion) {
-      jumpTo(anchored(index));
-      return;
-    }
-    tapTarget.current = index;
-    tapSettleTimer.current = setTimeout(() => {
-      pendingSteps.current = 0;
-      releaseTapTarget();
-    }, TAP_SCROLL_SETTLE_MS);
-    setCentreIndex(index);
-    scrollRef.current?.scrollTo({ x: index * SNAP_INTERVAL, animated: true });
-  };
-
-  /**
-   * One card left (-1) or right (+1) — the pager's arrows.
-   *
-   * ⚠️ A press while a slide is running is queued and run when that slide
-   * lands, one card at a time. Re-aiming the running slide two cards out
-   * would put the far card on top straight away, and it would pass, half
-   * transparent, over the card crossing the centre.
-   */
+  /** One card left (-1) or right (+1) — the pager's arrows. */
   const step = (delta: 1 | -1) => {
-    if (tapTarget.current !== null) {
-      const limit = Math.max(1, wallets.length - 1);
-      pendingSteps.current = Math.max(-limit, Math.min(limit, pendingSteps.current + delta));
-      return;
+    if (!looping && !isDriving.current) {
+      const target = centreIndex + delta;
+      if (target < 0 || target >= rendered.length) return;
     }
-    const target = centreIndex + delta;
-    if (target >= 0 && target < rendered.length) scrollToCard(target);
-  };
-
-  const runPendingStep = (from: number) => {
-    const queued = pendingSteps.current;
-    if (queued === 0) return;
-    const delta = Math.sign(queued);
-    pendingSteps.current = queued - delta;
-    if (from + delta >= 0 && from + delta < rendered.length) scrollToCard(from + delta);
-    else pendingSteps.current = 0;
+    isDriving.current = true;
+    scheduleOnUI(driveBy, delta);
   };
 
   /**
    * A tap on the card at rendered `index`: the centred card opens, a side
-   * card slides to the centre.
+   * card slides to the centre — the same result as swiping it over.
    *
-   * ⚠️ While a tap-started slide is still running, the card sliding in
-   * already counts as centred — so a quick second tap on it (one tap to bring
-   * it over, the next landing before it arrived) "opened" it, which on Home
-   * navigates away. Mid-slide, a tap on that same card is the same request
-   * again and is ignored; a tap on another card re-aims the slide.
+   * ⚠️ While a slide is running, a tap never opens anything: a quick second
+   * tap on the card sliding in (one tap to bring it over, the next landing
+   * before it arrived) used to "open" it, which on Home navigates away.
+   * Mid-slide, a tap re-aims the slide at the tapped card instead — a no-op
+   * when it is the card already on its way.
    */
   const pressCard = (index: number, open?: () => void) => {
-    if (tapTarget.current !== null) {
-      pendingSteps.current = 0;
-      if (index !== tapTarget.current) scrollToCard(index);
+    if (!isDriving.current && index === centreIndex) {
+      open?.();
       return;
     }
-    if (index === centreIndex) open?.();
-    else scrollToCard(index);
+    isDriving.current = true;
+    scheduleOnUI(driveToCard, index);
   };
 
   const centredId = rendered[centreIndex]?.id;
@@ -241,40 +249,43 @@ export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChan
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [centredId]);
 
-  // A drag takes over from any tap-started slide still in flight, and drops
-  // arrow presses still queued behind it.
-  const onBeginDrag = () => {
-    pendingSteps.current = 0;
-    releaseTapTarget();
-  };
+  useEffect(() => () => cancelAnimation(driveX), [driveX]);
 
-  // Stable identities for the worklet below, always running the latest code.
-  const reportIndex = useLatestCallback(onScrollIndex);
-  const reportMomentumEnd = useLatestCallback(onMomentumEnd);
-  const reportBeginDrag = useLatestCallback(onBeginDrag);
   const scrollHandler = useAnimatedScrollHandler(
     {
       onScroll: (event) => {
-        scrollX.value = event.contentOffset.x;
-        const index = Math.round(event.contentOffset.x / SNAP_INTERVAL);
-        if (index !== lastIndex.value) {
-          lastIndex.value = index;
-          scheduleOnRN(reportIndex, index);
-        }
+        // A slide sets the offset itself, frame by frame; the events its
+        // scrollTo calls echo back arrive a frame late and would drag the
+        // cards back to where they were.
+        if (driving.value) return;
+        track(event.contentOffset.x);
       },
+      // A drag takes over from any slide still in flight.
       onBeginDrag: () => {
-        scheduleOnRN(reportBeginDrag);
+        if (driving.value) {
+          cancelAnimation(driveX);
+          driving.value = false;
+        }
+        scheduleOnRN(onBeginDrag);
       },
+      // ⚠️ The wrap happens only once motion has stopped. Re-anchoring
+      // mid-fling would cancel the user's own momentum. Ignored during a
+      // slide: Android reports a momentum end for every touch once it
+      // settles, and the slide lands (and wraps) by itself.
       onMomentumEnd: (event) => {
-        scheduleOnRN(reportMomentumEnd, event.contentOffset.x);
+        if (driving.value) return;
+        const x = event.contentOffset.x;
+        const settled = wrap(x);
+        if (Math.abs(settled - x) > 0.5) place(settled);
       },
     },
-    [reportIndex, reportMomentumEnd, reportBeginDrag],
+    [looping, loopWidth, maxX],
   );
 
   return {
     scrollRef,
     scrollX,
+    centre,
     scrollHandler,
     containerWidth,
     centreIndex,

@@ -77,16 +77,17 @@ const SCALE = [FAR_SCALE, NEIGHBOUR_SCALE, 1, NEIGHBOUR_SCALE, FAR_SCALE];
 const OPACITY = [0, NEIGHBOUR_OPACITY, 1, NEIGHBOUR_OPACITY, 0];
 
 // ── Paint order ──────────────────────────────────────────────────────────
-// Three layers by distance from the centre, stepping exactly at 0.5 (the
-// swapping pair, then clear of each other) and at 1.5 (a neighbour and the
-// card behind it). Worked out on the UI thread from the same scroll value as
-// the movement, frame by frame: it used to be React state, re-rendered once
-// the JS thread caught up, and a quick flick crossed the whole clear window
-// before that landed, so cards jumped over each other while overlapping.
-// Stepped, not continuous, because a zIndex change re-sorts the views; it now
-// happens twice per swipe instead of on every frame. Android sorts by
-// elevation before zIndex, so elevation steps with it, kept small because it
-// is also the shadow's size.
+// Three layers: the centred card on top, its two neighbours under it, the
+// rest at the bottom. "Centred" is the scroll hook's `centre`, a UI-thread
+// value that flips just past the halfway mark (0.58 of a card, inside the
+// swap's clear window) rather than exactly at it. Stepping at exactly 0.5 off
+// the raw scroll made a finger resting there flip the pair's zIndex and
+// elevation (so their shadows) on every pixel of jitter — the two cards
+// visibly shook. Still worked out on the UI thread, in the same frame as the
+// movement: as React state it landed after a quick flick had crossed the
+// whole clear window, and cards jumped over each other while overlapping.
+// Android sorts by elevation before zIndex, so elevation steps with it, kept
+// small because it is also the shadow's size.
 const LAYER_ELEVATION = [0, 6, 7, 8];
 
 // ── Dealing in ───────────────────────────────────────────────────────────
@@ -142,6 +143,7 @@ export function useCardPress() {
 export function useCardMotion(
   index: number,
   scrollX: SharedValue<number>,
+  centre: SharedValue<number>,
   intro: SharedValue<number>,
   pressed: SharedValue<number>,
 ) {
@@ -149,7 +151,8 @@ export function useCardMotion(
     // -1 is one card left of centre, 0 is centred.
     const offset = index - scrollX.value / SNAP_INTERVAL;
     const distance = Math.abs(offset);
-    const layer = distance < 0.5 ? 3 : distance < 1.5 ? 2 : 1;
+    const fromCentre = Math.abs(index - centre.value);
+    const layer = fromCentre === 0 ? 3 : fromCentre === 1 ? 2 : 1;
     const settledX = interpolate(offset, SHUFFLE_INPUT, SHUFFLE_OUTPUT, Extrapolation.CLAMP);
     // Where the scroll alone would have to be undone to put this card dead
     // centre, under the centred card.

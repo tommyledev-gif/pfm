@@ -42,6 +42,7 @@ interface CarouselCardProps {
   isLast: boolean;
   accentColor: string;
   scrollX: SharedValue<number>;
+  centre: SharedValue<number>;
   intro: SharedValue<number>;
   onPressCard: (index: number, wallet: Wallet) => void;
   highlightOpacity?: RNAnimated.Value;
@@ -60,12 +61,13 @@ const CarouselCard = memo(function CarouselCard({
   isLast,
   accentColor,
   scrollX,
+  centre,
   intro,
   onPressCard,
   highlightOpacity,
 }: CarouselCardProps) {
   const press = useCardPress();
-  const motion = useCardMotion(index, scrollX, intro, press.pressed);
+  const motion = useCardMotion(index, scrollX, centre, intro, press.pressed);
   return (
     <WalletStackCard
       wallet={wallet}
@@ -112,6 +114,7 @@ function WalletCarouselView({
   const {
     scrollRef,
     scrollX,
+    centre,
     scrollHandler,
     containerWidth,
     centreIndex,
@@ -173,6 +176,7 @@ function WalletCarouselView({
                   isLast={index === rendered.length - 1}
                   accentColor={accentFor(wallets, index % wallets.length)}
                   scrollX={scrollX}
+                  centre={centre}
                   intro={intro}
                   onPressCard={handlePressCard}
                   // Every loop copy of the wallet gets it — whichever copy is

@@ -113,6 +113,9 @@ export function RecordingPane({
   const handleOpenWizard = useLatestCallback((message: ChatMessage) => onOpenBudgetWizard(message.id));
   const handleOpenManualEntry = useLatestCallback(onOpenManualEntry);
   const handleRetryImage = useLatestCallback((message: ChatMessage) => void chat.retryImage(message));
+  // Offline, a retry would only fail the same way again: the connection
+  // toast shows instead, and the button stays for when it is back.
+  const handleRetryText = useLatestCallback((message: ChatMessage) => requireOnline(() => void chat.retryReply(message)));
   const confirmingId = chat.confirmingId;
 
   const renderItem = useCallback(
@@ -130,6 +133,7 @@ export function RecordingPane({
         onOpenBudgetWizard={handleOpenWizard}
         onOpenManualEntry={handleOpenManualEntry}
         onRetryImage={handleRetryImage}
+        onRetryText={handleRetryText}
         onCreateWallet={handleCreateWallet}
         onOpenWalletCreator={openWalletCreator}
       />
@@ -146,6 +150,7 @@ export function RecordingPane({
       handleOpenWizard,
       handleOpenManualEntry,
       handleRetryImage,
+      handleRetryText,
       handleCreateWallet,
       openWalletCreator,
     ],

@@ -29,7 +29,7 @@ export default function UserSettingsScreen() {
           <ThemePicker />
         </MotionView>
         <MotionView index={1}>
-          <ListSection header={TRANSACTIONS_HEADER} footer={PIN_LOCATION_FOOTER}>
+          <ListSection header={TRANSACTIONS_HEADER}>
             <PinLocationDefaultRow />
           </ListSection>
         </MotionView>

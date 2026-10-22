@@ -202,4 +202,7 @@ export interface ChatMessage {
   reviewLineKeys?: string[];
   // On a failed image reply: the image message to re-send on retry (EC-11, EC-20).
   retryImageMessageId?: string;
+  // On a failed text reply: the message to send again on retry, so a dropped
+  // request never has to be retyped. Cleared once the retry starts.
+  retryText?: string;
 }
