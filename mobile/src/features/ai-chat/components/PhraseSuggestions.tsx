@@ -7,7 +7,7 @@ import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme
 import { useLatestCallback } from "@/lib/use-latest-callback";
 import { useReportComposerFocus } from "@/features/ai-chat/components/KeyboardLiftView";
 import { usePhraseActions } from "@/features/ai-chat/hooks/use-phrase-actions";
-import { PhraseSuggestion, usePhraseSuggestions } from "@/features/ai-chat/hooks/use-phrase-suggestions";
+import { usePhraseSuggestions } from "@/features/ai-chat/hooks/use-phrase-suggestions";
 
 // The pin and remove buttons are small; their touch targets should not be.
 const ICON_HIT_SLOP = 12;
@@ -45,9 +45,13 @@ export function PhraseSuggestions({ input, userId, maxHeight, onSelect, onSearch
   const reportComposerFocus = useReportComposerFocus();
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
-  const [boxHeight, setBoxHeight] = useState(0);
-  const [contentHeight, setContentHeight] = useState(0);
-  const [scrollY, setScrollY] = useState(0);
+  // Measured without state: only whether more is hidden below re-renders.
+  const scrollMetrics = useRef({ box: 0, content: 0, y: 0 });
+  const [moreBelow, setMoreBelow] = useState(false);
+  const measureMoreBelow = (patch: Partial<typeof scrollMetrics.current>) => {
+    const metrics = Object.assign(scrollMetrics.current, patch);
+    setMoreBelow(metrics.content - metrics.box - metrics.y > SCROLL_EPSILON);
+  };
 
   // A focused field that unmounts sends no blur: let go of the lift ourselves.
   const searchFocusedRef = useRef(false);
@@ -64,20 +68,20 @@ export function PhraseSuggestions({ input, userId, maxHeight, onSelect, onSearch
     limit: searching ? undefined : AUTOCOMPLETE_LIMIT,
     listAllWhenEmpty: searching,
   });
+  const select = useLatestCallback((text: string) => {
+    onSelect(text, searching);
+    setSearch("");
+  });
+
   // Kept while its field has focus, even after the last phrase is removed.
   if (total === 0 && !searchFocused) return null;
 
-  const moreBelow = contentHeight - boxHeight - scrollY > SCROLL_EPSILON;
   const handleSearchFocus = (focused: boolean) => {
     searchFocusedRef.current = focused;
     setSearchFocused(focused);
     // Part of the composer: the keyboard lift holds while this has focus too.
     reportComposerFocus(focused);
     onSearchFocusChange(focused);
-  };
-  const select = (text: string) => {
-    onSelect(text, searching);
-    setSearch("");
   };
 
   return (
@@ -91,13 +95,13 @@ export function PhraseSuggestions({ input, userId, maxHeight, onSelect, onSearch
             // Android: the bar stays drawn, so a list taller than its box
             // reads as scrollable before it is touched.
             persistentScrollbar
-            onLayout={(e) => setBoxHeight(e.nativeEvent.layout.height)}
-            onContentSizeChange={(_w, h) => setContentHeight(h)}
-            onScroll={(e) => setScrollY(e.nativeEvent.contentOffset.y)}
+            onLayout={(e) => measureMoreBelow({ box: e.nativeEvent.layout.height })}
+            onContentSizeChange={(_w, h) => measureMoreBelow({ content: h })}
+            onScroll={(e) => measureMoreBelow({ y: e.nativeEvent.contentOffset.y })}
             scrollEventThrottle={32}
           >
             {suggestions.map((suggestion, index) => (
-              <SuggestionRow key={suggestion.text} suggestion={suggestion} index={index} onSelect={select} />
+              <SuggestionRow key={suggestion.text} text={suggestion.text} index={index} onSelect={select} />
             ))}
           </ScrollView>
           {moreBelow ? <EdgeFade edge="bottom" width={FADE_HEIGHT} color={colors.surface} /> : null}
@@ -130,7 +134,7 @@ export function PhraseSuggestions({ input, userId, maxHeight, onSelect, onSearch
 }
 
 interface SuggestionRowProps {
-  suggestion: PhraseSuggestion;
+  text: string;
   index: number;
   onSelect: (text: string) => void;
 }
@@ -141,20 +145,20 @@ interface SuggestionRowProps {
 // Pin and remove are trailing buttons, not a hold menu: a menu is a Modal,
 // opening it blurs the input, and a blurred input hides this whole panel —
 // the menu would vanish with it. A tap inside this list keeps focus.
-const SuggestionRow = memo(function SuggestionRow({ suggestion, index, onSelect }: SuggestionRowProps) {
+const SuggestionRow = memo(function SuggestionRow({ text, index, onSelect }: SuggestionRowProps) {
   const colors = useColors();
   const styles = useStyles();
-  const phrase = usePhraseActions(suggestion.text);
+  const phrase = usePhraseActions(text);
 
   return (
     <Pressable
       testID={`row-phrase-suggestion-${index}`}
       accessibilityRole="button"
-      onPress={() => onSelect(suggestion.text)}
+      onPress={() => onSelect(text)}
       style={({ pressed }) => [styles.row, index > 0 && styles.divider, pressed && styles.pressed]}
     >
       <Text style={styles.label} numberOfLines={1}>
-        {suggestion.text}
+        {text}
       </Text>
       {phrase.available ? (
         <>

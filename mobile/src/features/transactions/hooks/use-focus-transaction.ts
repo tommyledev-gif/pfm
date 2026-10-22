@@ -96,11 +96,15 @@ export function useFocusTransaction({
     });
   };
 
+  // Read only during a jump: reading isFetching re-renders the screen on
+  // every background refetch.
+  const reloading = seeking.current !== null && transactions.isFetching && !transactions.isFetchingNextPage;
+
   useEffect(() => {
     const target = seeking.current;
     if (!target) return;
     // The list is reloading after the filters were cleared — wait for it.
-    if (transactions.isFetching && !transactions.isFetchingNextPage) return;
+    if (reloading) return;
 
     if (future.some((t) => t.id === target.id)) {
       seeking.current = null;
@@ -137,7 +141,7 @@ export function useFocusTransaction({
     setHighlightKey(`${target.id}:${nonce ?? ""}`);
     requestAnimationFrame(scrollToTarget);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seekToken, sections, future, transactions.isFetching, transactions.isFetchingNextPage, transactions.hasNextPage]);
+  }, [seekToken, sections, future, reloading, transactions.isFetchingNextPage, transactions.hasNextPage]);
 
   // For the list's onScrollToIndexFailed: rows past the rendered window have
   // no layout yet, so jump near them by the average row height, then retry.

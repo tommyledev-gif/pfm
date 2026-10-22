@@ -1,11 +1,13 @@
 import { ReactNode } from "react";
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import Animated, { ZoomIn, ZoomOut } from "react-native-reanimated";
 
-import { CalendarIcon, DownloadIcon, SearchIcon, SortIcon, TagIcon, UploadIcon } from "@/components/ui/Icon";
+import { CalendarIcon, DownloadIcon, SortIcon, TagIcon, UploadIcon } from "@/components/ui/Icon";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { FilterPill } from "@/features/transactions/components/FilterPill";
-import { formatCurrency, formatCurrencyCompact } from "@/lib/currency";
+import { TransactionsSearchField } from "@/features/transactions/components/TransactionsSearchField";
+import { SearchFieldSeed } from "@/features/transactions/hooks/use-transaction-filters";
+import { formatCurrency } from "@/lib/currency";
 import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { TransactionKind } from "@/lib/constants";
@@ -14,11 +16,18 @@ import { otherCurrenciesLabel } from "@/features/transactions/other-currencies";
 
 export type TypeFilterValue = "all" | TransactionKind;
 
+// Transfers carry no total of their own — they change no net worth, so the
+// tab only narrows the list.
+const TYPE_OPTIONS: { value: TypeFilterValue; label: string }[] = [
+  { value: "all", label: "Tất cả" },
+  { value: "expense", label: "Chi tiêu" },
+  { value: "income", label: "Thu nhập" },
+  { value: "transfer", label: "Chuyển" },
+];
+
 interface TransactionsHeaderProps {
-  // Rows matching every active filter, and the same count ignoring the type
-  // tab (which is what the "Tất cả" tab's own trailing figure has to show).
-  matchedCount: number;
-  allTypesMatchedCount: number;
+  /** Rows matching every active filter; null while that answer is loading. */
+  matchedCount: number | null;
   periodLabel: string;
   // Already narrowed to the selected categories by the screen — null until
   // the report summary lands.
@@ -27,8 +36,8 @@ interface TransactionsHeaderProps {
   otherCurrencies?: string[];
   typeFilter: TypeFilterValue;
   onChangeTypeFilter: (value: TypeFilterValue) => void;
-  searchInput: string;
-  onChangeSearch: (value: string) => void;
+  searchSeed: SearchFieldSeed;
+  onSearch: (text: string) => void;
   dateRangeLabel: string | null;
   onOpenDatePicker: () => void;
   categoryCount: number;
@@ -57,14 +66,13 @@ interface TransactionsHeaderProps {
 // screen file on its own.
 export function TransactionsHeader({
   matchedCount,
-  allTypesMatchedCount,
   periodLabel,
   headerTotal,
   otherCurrencies = [],
   typeFilter,
   onChangeTypeFilter,
-  searchInput,
-  onChangeSearch,
+  searchSeed,
+  onSearch,
   dateRangeLabel,
   onOpenDatePicker,
   categoryCount,
@@ -100,42 +108,17 @@ export function TransactionsHeader({
     : null;
   const otherNote = otherCurrenciesLabel(otherCurrencies);
 
-  const typeOptions = [
-    {
-      value: "all" as TypeFilterValue,
-      label: "Tất cả",
-      trailing: <Text style={styles.segmentTrailing}>{allTypesMatchedCount}</Text>,
-    },
-    {
-      value: "expense" as TypeFilterValue,
-      label: "Chi tiêu",
-      trailing: headerTotal ? (
-        <Text style={[styles.segmentTrailing, { color: colors.peach }]}>
-          {formatCurrencyCompact(-headerTotal.total_expense, headerTotal.currency)}
-        </Text>
-      ) : undefined,
-    },
-    {
-      value: "income" as TypeFilterValue,
-      label: "Thu nhập",
-      trailing: headerTotal ? (
-        <Text style={[styles.segmentTrailing, { color: colors.green }]}>
-          +{formatCurrencyCompact(headerTotal.total_income, headerTotal.currency)}
-        </Text>
-      ) : undefined,
-    },
-    // Transfers carry no total of their own — they change no net worth, so
-    // the tab only narrows the list.
-    { value: "transfer" as TypeFilterValue, label: "Chuyển" },
-  ];
-
   return (
     <View style={styles.header}>
       <View style={styles.headerRow}>
         <View style={styles.titleRow}>
           <Text style={styles.title}>Giao dịch</Text>
           <View style={styles.countBadge}>
-            <Text style={styles.countBadgeLabel}>{matchedCount} giao dịch</Text>
+            {matchedCount === null ? (
+              <ActivityIndicator size={10} color={colors.green} style={styles.countBadgeLoader} />
+            ) : (
+              <Text style={styles.countBadgeLabel}>{matchedCount} giao dịch</Text>
+            )}
           </View>
         </View>
       </View>
@@ -156,23 +139,9 @@ export function TransactionsHeader({
         </Text>
       ) : null}
 
-      <View style={styles.searchRow}>
-        <SearchIcon size={16} color={colors.textSecondary} />
-        <TextInput
-          value={searchInput}
-          onChangeText={onChangeSearch}
-          placeholder="Tìm theo ghi chú..."
-          placeholderTextColor={colors.textMuted}
-          style={styles.searchInput}
-        />
-        {searchInput ? (
-          <Pressable onPress={() => onChangeSearch("")} hitSlop={8}>
-            <Text style={styles.clearSearch}>✕</Text>
-          </Pressable>
-        ) : null}
-      </View>
+      <TransactionsSearchField key={searchSeed.key} initialText={searchSeed.text} onSearch={onSearch} />
 
-      <SegmentedTabs options={typeOptions} value={typeFilter} onChange={onChangeTypeFilter} />
+      <SegmentedTabs options={TYPE_OPTIONS} value={typeFilter} onChange={onChangeTypeFilter} />
 
       {/* Bleeds through the screen's side padding so pills scroll out to the
           screen edge instead of being cut off at the margin. */}
@@ -239,24 +208,11 @@ const useStyles = createStyles((colors) => ({
     borderColor: withAlpha(colors.green, 0.3),
   },
   countBadgeLabel: { ...typography.tiny, color: colors.green, fontWeight: "700" },
+  countBadgeLoader: { marginVertical: 3, marginHorizontal: spacing.md },
   periodNote: { ...typography.tiny, color: colors.textMuted, marginTop: 2 },
   subtitle: { ...typography.caption, color: colors.textSecondary },
   subtitleAmount: { fontWeight: "700" },
   otherCurrencies: { ...typography.tiny, color: colors.textMuted, marginTop: -spacing.xs },
-  segmentTrailing: { ...typography.tiny, color: colors.textMuted, fontWeight: "700" },
-  searchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    paddingVertical: 10,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-  },
-  searchInput: { flex: 1, ...typography.body, color: colors.textPrimary, padding: 0 },
-  clearSearch: { ...typography.body, color: colors.textSecondary },
   // Matches the Transactions screen's own horizontal padding.
   filterScroll: { marginHorizontal: -spacing.xl },
   filterRow: { flexDirection: "row", gap: spacing.sm, paddingHorizontal: spacing.xl },

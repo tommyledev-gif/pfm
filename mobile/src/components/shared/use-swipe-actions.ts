@@ -42,6 +42,13 @@ const PARK_VIBRATION_MS = 25;
 // no benefit.
 let closeCurrentlyParked: (() => void) | null = null;
 
+/** Closes whichever row is parked open, if any — for a list's scroll start. */
+export function closeParkedSwipeRow() {
+  const closeParked = closeCurrentlyParked;
+  closeCurrentlyParked = null;
+  closeParked?.();
+}
+
 export interface SwipeSideConfig {
   /** Fraction of screen width this side may travel before it parks. */
   ratio: number;
@@ -124,6 +131,9 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
 
     const close = () => {
       if (closeCurrentlyParked === reset) closeCurrentlyParked = null;
+      // Already at rest: nothing to animate. Close signals reach every row
+      // in a list, and only the parked one has work to do.
+      if (offsetRef.current === 0 && activeSideRef.current === null) return;
       reset();
     };
 

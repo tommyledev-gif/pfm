@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { Text, View } from "react-native";
 
 import { CategoryOptionRow } from "@/components/shared/CategoryOptionRow";
@@ -35,7 +35,7 @@ const SEARCH_MIN_OPTIONS = 8;
 //
 // Same row, search and header as the form's category picker
 // (CategoryPickerList), so the two never read as different lists.
-export function CategoryPickerDrawer({ visible, onClose, title = "Chọn danh mục", categories, onSelect }: CategoryPickerDrawerProps) {
+export const CategoryPickerDrawer = memo(function CategoryPickerDrawer({ visible, onClose, title = "Chọn danh mục", categories, onSelect }: CategoryPickerDrawerProps) {
   const styles = useStyles();
   const [search, setSearch] = useState("");
   const shown = useMemo(() => categories.filter((c) => matchesSearch(c.name, search)), [categories, search]);
@@ -72,7 +72,7 @@ export function CategoryPickerDrawer({ visible, onClose, title = "Chọn danh m�
       </View>
     </Drawer>
   );
-}
+});
 
 const useStyles = createStyles((colors) => ({
   empty: { ...typography.body, color: colors.textSecondary, textAlign: "center", paddingVertical: spacing.xxl },

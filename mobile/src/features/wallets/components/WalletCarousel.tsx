@@ -1,8 +1,9 @@
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import { Animated as RNAnimated, Text, View } from "react-native";
 import Animated, { SharedValue } from "react-native-reanimated";
 
 import { spacing, typography, createStyles } from "@/lib/theme";
+import { useLatestCallback } from "@/lib/use-latest-callback";
 import { walletFace } from "@/lib/wallet-colors";
 import { Wallet } from "@/features/wallets/types";
 import {
@@ -42,12 +43,27 @@ interface CarouselCardProps {
   accentColor: string;
   scrollX: SharedValue<number>;
   intro: SharedValue<number>;
-  onPress: () => void;
+  onPressCard: (index: number, wallet: Wallet) => void;
   highlightOpacity?: RNAnimated.Value;
 }
 
+// The final card keeps its full width so the scrollable content is exactly
+// long enough to bring it to the middle.
+const LAYOUT_OVERLAP = { marginRight: -CARD_OVERLAP };
+const LAYOUT_LAST = { marginRight: 0 };
+
 // One card, so each gets its own motion hooks (hooks cannot run in a loop).
-function CarouselCard({ wallet, index, isLast, accentColor, scrollX, intro, onPress, highlightOpacity }: CarouselCardProps) {
+// Memoized: a swipe changes the centred index, which must not re-render every card.
+const CarouselCard = memo(function CarouselCard({
+  wallet,
+  index,
+  isLast,
+  accentColor,
+  scrollX,
+  intro,
+  onPressCard,
+  highlightOpacity,
+}: CarouselCardProps) {
   const press = useCardPress();
   const motion = useCardMotion(index, scrollX, intro, press.pressed);
   return (
@@ -55,16 +71,14 @@ function CarouselCard({ wallet, index, isLast, accentColor, scrollX, intro, onPr
       wallet={wallet}
       accentColor={accentColor}
       motion={motion}
-      // The final card keeps its full width so the scrollable content is
-      // exactly long enough to bring it to the middle.
-      layoutStyle={{ marginRight: isLast ? 0 : -CARD_OVERLAP }}
-      onPress={onPress}
+      layoutStyle={isLast ? LAYOUT_LAST : LAYOUT_OVERLAP}
+      onPress={() => onPressCard(index, wallet)}
       onPressIn={press.onPressIn}
       onPressOut={press.onPressOut}
       highlightOpacity={highlightOpacity}
     />
   );
-}
+});
 
 /**
  * The wallets section: the selected wallet centred, its neighbours tucked
@@ -112,6 +126,16 @@ function WalletCarouselView({
   // Cards are only rendered once the width is known, so that is when the deck
   // is dealt.
   const intro = useCarouselIntro(containerWidth > 0 && wallets.length > 0);
+  // A side card is a shortcut for the swipe that would bring it over; only
+  // the card already in the middle is "opened".
+  const handlePressCard = useLatestCallback((index: number, wallet: Wallet) =>
+    pressCard(index, onPressWallet ? () => onPressWallet(wallet) : undefined),
+  );
+  const contentStyle = useMemo(
+    () => ({ paddingHorizontal: sidePadding, paddingTop: CAROUSEL_SHADOW_BLEED_TOP, paddingBottom: CAROUSEL_SHADOW_BLEED_BOTTOM }),
+    [sidePadding],
+  );
+  const dotColors = useMemo(() => wallets.map((_, i) => accentFor(wallets, i)), [wallets]);
 
   if (wallets.length === 0) {
     return <Text style={styles.empty}>Chưa có ví. Tạo ví để ghi giao dịch.</Text>;
@@ -132,7 +156,7 @@ function WalletCarouselView({
           directionalLockEnabled
           // No gap: the overlap is carried by each card's negative right margin
           // below, which Yoga will not accept as a negative `gap`.
-          contentContainerStyle={{ paddingHorizontal: sidePadding, paddingTop: CAROUSEL_SHADOW_BLEED_TOP, paddingBottom: CAROUSEL_SHADOW_BLEED_BOTTOM }}
+          contentContainerStyle={contentStyle}
           scrollEventThrottle={16}
           onContentSizeChange={onContentSizeChange}
           // Scroll, drag start and momentum end, all in one UI-thread handler.
@@ -150,9 +174,7 @@ function WalletCarouselView({
                   accentColor={accentFor(wallets, index % wallets.length)}
                   scrollX={scrollX}
                   intro={intro}
-                  // A side card is a shortcut for the swipe that would bring it
-                  // over; only the card already in the middle is "opened".
-                  onPress={() => pressCard(index, onPressWallet ? () => onPressWallet(wallet) : undefined)}
+                  onPressCard={handlePressCard}
                   // Every loop copy of the wallet gets it — whichever copy is
                   // centred is the one the user sees.
                   highlightOpacity={wallet.id === highlightWalletId ? highlightOpacity : undefined}
@@ -164,7 +186,7 @@ function WalletCarouselView({
       <WalletCarouselPager
         dotCount={wallets.length}
         // The active dot wears its wallet's card colour, tying the bar to the card above it.
-        dotColors={wallets.map((_, i) => accentFor(wallets, i))}
+        dotColors={dotColors}
         positionCount={rendered.length}
         scrollX={scrollX}
         canGoBack={looping || centreIndex > 0}

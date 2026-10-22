@@ -42,6 +42,7 @@ const RECENT_TRANSACTION_COUNT = 4;
 // asking for exactly four would leave the list short by however many there are.
 const RECENT_FETCH_LIMIT = 10;
 const NO_WALLETS: Wallet[] = [];
+const transactionKey = (t: Transaction) => t.id;
 // The header's staggered blocks (MotionStagger): the recent rows continue
 // the same top-to-bottom sequence after them.
 const HEADER_BLOCKS = 5;
@@ -64,10 +65,6 @@ const RecentRow = memo(function RecentRow({ transaction, currency, category, onP
     <TransactionRow transaction={transaction} currency={currency} category={category} onPress={() => onPress(transaction)} />
   );
 });
-
-// The edit sheet runs its whole form hook on every render, even closed — kept
-// out of Home's re-renders unless its own props change.
-const EditTransactionSheet = memo(TransactionFormModal);
 
 /**
  * ⚠️ Performance, the same way the AI chat screen does it: Home stays mounted
@@ -138,6 +135,8 @@ export default function HomeScreen() {
     }),
   );
   const openInsights = useCallback(() => router.push("/insights"), [router]);
+  const openWallets = useCallback(() => router.push("/wallets"), [router]);
+  const openTransactions = useCallback(() => router.push("/transactions"), [router]);
   const closeEditor = useCallback(() => {
     setEditingTransaction(null);
     setCreatingTransaction(false);
@@ -167,7 +166,7 @@ export default function HomeScreen() {
         style={styles.screen}
         contentContainerStyle={styles.content}
         data={recentTransactions}
-        keyExtractor={(t) => t.id}
+        keyExtractor={transactionKey}
         refreshControl={refreshControl}
         ListHeaderComponent={
           <View style={styles.header}>
@@ -221,9 +220,9 @@ export default function HomeScreen() {
                 <View style={styles.sectionHeaderRow}>
                   <View style={styles.sectionTitleRow}>
                     <Text style={styles.sectionTitle}>Ví</Text>
-                    <Text style={styles.sectionCountHint}>{wallets.data?.length ?? 0} ví</Text>
+                    {wallets.data ? <Text style={styles.sectionCountHint}>{wallets.data.length} ví</Text> : null}
                   </View>
-                  <Pressable onPress={() => router.push("/wallets")} hitSlop={8} style={styles.addWalletAction}>
+                  <Pressable onPress={openWallets} hitSlop={8} style={styles.addWalletAction}>
                     <PlusIcon size={12} color={colors.green} />
                     <Text style={styles.sectionAction}>Thêm ví</Text>
                   </Pressable>
@@ -246,7 +245,7 @@ export default function HomeScreen() {
 
               <View style={styles.sectionHeaderRow}>
                 <Text style={styles.sectionTitle}>Giao dịch gần đây</Text>
-                <Pressable onPress={() => router.push("/transactions")} hitSlop={8}>
+                <Pressable onPress={openTransactions} hitSlop={8}>
                   <Text style={styles.sectionAction}>Xem tất cả →</Text>
                 </Pressable>
               </View>
@@ -257,7 +256,7 @@ export default function HomeScreen() {
         ListEmptyComponent={<HomeRecentEmpty query={recent} />}
       />
 
-      <EditTransactionSheet
+      <TransactionFormModal
         visible={Boolean(editingTransaction) || creatingTransaction}
         onClose={closeEditor}
         editingTransaction={editingTransaction}

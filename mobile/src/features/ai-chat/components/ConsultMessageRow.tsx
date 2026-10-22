@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Pressable, Text } from "react-native";
 import Animated from "react-native-reanimated";
 
@@ -38,7 +39,7 @@ const IN_TURN_GAP = spacing.sm;
  *
  * Like ChatMessageRow, only a message that has just arrived rises in.
  */
-export function ConsultMessageRow({ message, startsTurn, handlers }: ConsultMessageRowProps) {
+export const ConsultMessageRow = memo(function ConsultMessageRow({ message, startsTurn, handlers }: ConsultMessageRowProps) {
   const styles = useStyles();
   const gap = { marginTop: startsTurn ? TURN_GAP : IN_TURN_GAP };
   const entering = useFreshEntrance(messageCreatedAt(message.id));
@@ -88,7 +89,7 @@ export function ConsultMessageRow({ message, startsTurn, handlers }: ConsultMess
       {popup}
     </Animated.View>
   );
-}
+});
 
 const useStyles = createStyles((colors) => ({
   userRow: { flexDirection: "row", justifyContent: "flex-end" },

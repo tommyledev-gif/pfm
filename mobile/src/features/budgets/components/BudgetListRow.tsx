@@ -1,4 +1,6 @@
-import { Animated, Pressable, Text, View } from "react-native";
+import { memo } from "react";
+import { Pressable, Text, View } from "react-native";
+import Animated from "react-native-reanimated";
 
 import { formatCurrency } from "@/lib/currency";
 import { formatPercent } from "@/lib/percent";
@@ -19,11 +21,11 @@ interface BudgetListRowProps {
   // See budgetPeriodElapsed.
   periodElapsed: number;
   category?: Category;
-  onPress: () => void;
+  onPress: (budget: Budget) => void;
   onHold: () => void;
   /** Tapping the bar itself drills into the transactions behind it — a
    *  separate target from the row's own tap, which edits the limit. */
-  onPressBar: () => void;
+  onPressBar: (budget: Budget, limit: BudgetLimit) => void;
   highlighted?: boolean;
 }
 
@@ -40,7 +42,7 @@ interface BudgetListRowProps {
 //
 // Tap-to-edit and the 2s hold that opens the category picker are carried over
 // from the card unchanged.
-export function BudgetListRow({
+export const BudgetListRow = memo(function BudgetListRow({
   budget,
   limit,
   periodElapsed,
@@ -53,8 +55,7 @@ export function BudgetListRow({
   const colors = useColors();
   const styles = useStyles();
   const status = budgetRowStatus(limit, periodElapsed);
-  const { progress, start, cancel } = useHoldProgress();
-  const nameColor = progress.interpolate({ inputRange: [0, 1], outputRange: [colors.textPrimary, colors.green] });
+  const { start, cancel, tintStyle } = useHoldProgress(colors.textPrimary, colors.green);
 
   // Budget's own icon/icon_url takes precedence over its linked Category's
   // (specs/wallet-budget-icons/spec.md Edge Case US-04 #1).
@@ -63,7 +64,7 @@ export function BudgetListRow({
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => onPress(budget)}
       onPressIn={start}
       onPressOut={cancel}
       onLongPress={() => {
@@ -75,7 +76,7 @@ export function BudgetListRow({
     >
       <View style={styles.headRow}>
         <BudgetIconTile name={budget.category_name} icon={icon} iconUrl={iconUrl} />
-        <Animated.Text style={[styles.name, { color: nameColor }]} numberOfLines={1}>
+        <Animated.Text style={[styles.name, tintStyle]} numberOfLines={1}>
           {budget.category_name}
         </Animated.Text>
         {/* What was spent, in the header's corner. Over-budget turns it red;
@@ -89,7 +90,7 @@ export function BudgetListRow({
           bar answers "what is this number made of". Nested inside the row's
           Pressable rather than beside it so the layout is unchanged — RN gives
           the innermost responder the tap, so the two never both fire. */}
-      <Pressable onPress={onPressBar} hitSlop={6} testID="btn-budget-transactions">
+      <Pressable onPress={() => onPressBar(budget, limit)} hitSlop={6} testID="btn-budget-transactions">
         <BudgetProgressBar
           ratio={status.ratio}
           // A budget with nothing spent yet has no pace to be behind, and the
@@ -116,7 +117,7 @@ export function BudgetListRow({
       </Pressable>
     </Pressable>
   );
-}
+});
 
 const useStyles = createStyles((colors) => ({
   row: {

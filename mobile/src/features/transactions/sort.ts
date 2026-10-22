@@ -25,12 +25,12 @@ export const SORT_OPTIONS: { key: SortKey; label: string; group: SortGroup }[] =
   { key: "lowest", label: "Số tiền thấp nhất", group: "amount" },
 ];
 
-function compare(key: SortKey, a: Transaction, b: Transaction): number {
+function compare(key: SortKey, a: Transaction, b: Transaction, time: Map<string, number>): number {
   switch (key) {
     case "recent":
-      return new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime();
+      return time.get(b.id)! - time.get(a.id)!;
     case "oldest":
-      return new Date(a.occurred_at).getTime() - new Date(b.occurred_at).getTime();
+      return time.get(a.id)! - time.get(b.id)!;
     case "highest":
       return b.amount - a.amount;
     case "lowest":
@@ -40,9 +40,11 @@ function compare(key: SortKey, a: Transaction, b: Transaction): number {
 
 export function sortTransactions(items: Transaction[], activeSorts: SortKey[]): Transaction[] {
   if (activeSorts.length === 0) return items;
+  // Parsed once per row, not twice per comparison.
+  const time = new Map(items.map((t) => [t.id, Date.parse(t.occurred_at)]));
   return [...items].sort((a, b) => {
     for (const key of activeSorts) {
-      const cmp = compare(key, a, b);
+      const cmp = compare(key, a, b, time);
       if (cmp !== 0) return cmp;
     }
     return 0;

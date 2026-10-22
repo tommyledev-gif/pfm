@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
@@ -46,7 +46,7 @@ interface CategoryTransactionsDialogProps {
 // this is a Drawer (one ScrollView), so an inner infinite list would fight it
 // for the gesture. The first page is what's shown, with a footer saying so
 // when more exist.
-export function CategoryTransactionsDialog({
+export const CategoryTransactionsDialog = memo(function CategoryTransactionsDialog({
   visible,
   onClose,
   categoryId,
@@ -168,7 +168,7 @@ export function CategoryTransactionsDialog({
       ) : null}
     </Drawer>
   );
-}
+});
 
 const useStyles = createStyles((colors) => ({
   summary: { flexDirection: "row", alignItems: "center", gap: spacing.md },

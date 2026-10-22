@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Keyboard, LayoutAnimation, Platform, UIManager, useWindowDimensions } from "react-native";
+import { useSyncExternalStore } from "react";
+import { Dimensions, Keyboard, LayoutAnimation, Platform, UIManager, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Pre-Fabric Android silently no-ops LayoutAnimation without this opt-in;
@@ -17,78 +17,79 @@ const HIDE_EVENT = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide
 // again — it takes a frame or two to grow back to full size.
 const WINDOW_RESTORE_MS = 300;
 
-// Returns the live keyboard height in px (0 when hidden) instead of just a
-// boolean, so callers can push content up by exactly that amount using
-// plain flex/margin math — deliberately not KeyboardAvoidingView, whose
-// Android "height" behavior has a long-standing bug where it fails to
-// restore the original layout once the keyboard closes (facebook/react-
-// native#22884 and friends), which is exactly the "stuck pushed up after
-// closing the keyboard" symptom this replaced.
+// One set of keyboard listeners for the whole app, installed at load, so a
+// component mounted while the keyboard is already open (a sheet opened from a
+// focused field) reads the right height at once, and each event costs one
+// update instead of one per mounted component.
+let rawHeight = 0;
+let visible = false;
+// The window height with the keyboard closed. Some Android devices shrink the
+// window for the keyboard ("resize"); the shrink is subtracted so the height
+// is never counted twice. Re-captured on a timer after the keyboard hides,
+// never from a window change: the shrink can land before keyboardDidShow,
+// and capturing then would record the already-shrunk height.
+let windowBeforeKeyboard = Dimensions.get("window").height;
+let baselineTimer: ReturnType<typeof setTimeout> | null = null;
+const heightListeners = new Set<() => void>();
+const visibleListeners = new Set<() => void>();
+
+function notify() {
+  heightListeners.forEach((listener) => listener());
+  visibleListeners.forEach((listener) => listener());
+}
+
+Keyboard.addListener(SHOW_EVENT, (e) => {
+  if (baselineTimer) {
+    clearTimeout(baselineTimer);
+    baselineTimer = null;
+  }
+  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  rawHeight = e.endCoordinates.height;
+  visible = true;
+  notify();
+});
+
+Keyboard.addListener(HIDE_EVENT, () => {
+  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  rawHeight = 0;
+  visible = false;
+  notify();
+  if (baselineTimer) clearTimeout(baselineTimer);
+  baselineTimer = setTimeout(() => {
+    baselineTimer = null;
+    windowBeforeKeyboard = Dimensions.get("window").height;
+  }, WINDOW_RESTORE_MS);
+});
+
+function subscribeHeight(listener: () => void) {
+  heightListeners.add(listener);
+  return () => {
+    heightListeners.delete(listener);
+  };
+}
+
+function subscribeVisible(listener: () => void) {
+  visibleListeners.add(listener);
+  return () => {
+    visibleListeners.delete(listener);
+  };
+}
+
+/**
+ * The keyboard's height in px (0 when hidden), for pushing content up with
+ * plain margin/padding — never KeyboardAvoidingView, whose Android "height"
+ * mode fails to restore layout once the keyboard closes (RN#22884).
+ */
 export function useKeyboardHeight(): number {
-  const insets = useSafeAreaInsets();
+  const { bottom } = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
-  const [rawHeight, setRawHeight] = useState(0);
-  // Some real Android devices (softwareKeyboardLayoutMode: "resize" in
-  // app.json) DO shrink the window when the keyboard opens — RN reports the
-  // shrink through useWindowDimensions the moment it happens — despite RN
-  // 0.81's edge-to-edge default suggesting otherwise. Manually adding the
-  // full raw keyboard height on top of a window the OS already shrank
-  // double-counts it, leaving a dead gap between the input bar and the
-  // keyboard exactly one keyboard-height tall. windowBeforeKeyboard freezes
-  // the last known keyboard-hidden window height so the shrink amount can be
-  // measured and subtracted back out.
-  const windowBeforeKeyboard = useRef(windowHeight);
-  const windowHeightRef = useRef(windowHeight);
-  windowHeightRef.current = windowHeight;
-
-  // ⚠️ The baseline is re-captured on a TIMER after the keyboard hides, never
-  // straight from a windowHeight change.
-  //
-  // It used to be `if (rawHeight === 0) windowBeforeKeyboard.current = windowHeight`,
-  // which lost a race it could not win: Android shrinks the window and fires
-  // keyboardDidShow on independent schedules, and when the shrink lands FIRST
-  // that effect ran while rawHeight was still 0 and recorded the ALREADY-SHRUNK
-  // height as the baseline. `alreadyShrunk` then computed to zero, the hook
-  // returned the full keyboard height on a window that had already made room,
-  // and every caller pushed its content up by a second keyboard height — the
-  // dead gap between the chat input and the keyboard.
-  //
-  // Keying the effect on rawHeight alone means a mid-open window shrink cannot
-  // re-trigger it, and the delay lets the window grow back before the next
-  // baseline is taken.
-  useEffect(() => {
-    if (rawHeight !== 0) return;
-    const timer = setTimeout(() => {
-      windowBeforeKeyboard.current = windowHeightRef.current;
-    }, WINDOW_RESTORE_MS);
-    return () => clearTimeout(timer);
-  }, [rawHeight]);
-
-  useEffect(() => {
-    const showSub = Keyboard.addListener(SHOW_EVENT, (e) => {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      const raw = e.endCoordinates.height;
-      // RN 0.81 forces edge-to-edge on Android, so on devices where the
-      // window truly never resizes, this event's height is measured from
-      // the true physical bottom of the display — i.e. it includes the nav
-      // bar, not just the keyboard surface above it. iOS's keyboardWillShow
-      // height is already correct (it visually covers the home-indicator
-      // area).
-      setRawHeight(Platform.OS === "android" ? Math.max(raw - insets.bottom, 0) : raw);
-    });
-    const hideSub = Keyboard.addListener(HIDE_EVENT, () => {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setRawHeight(0);
-    });
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, [insets.bottom]);
-
-  if (Platform.OS !== "android" || rawHeight === 0) return rawHeight;
-  const alreadyShrunk = Math.max(windowBeforeKeyboard.current - windowHeight, 0);
-  return Math.max(rawHeight - alreadyShrunk, 0);
+  const raw = useSyncExternalStore(subscribeHeight, () => rawHeight);
+  if (raw === 0 || Platform.OS !== "android") return raw;
+  // Edge-to-edge Android measures the keyboard from the physical bottom of
+  // the display, nav bar included.
+  const keyboard = Math.max(raw - bottom, 0);
+  const alreadyShrunk = Math.max(windowBeforeKeyboard - windowHeight, 0);
+  return Math.max(keyboard - alreadyShrunk, 0);
 }
 
 /**
@@ -97,20 +98,8 @@ export function useKeyboardHeight(): number {
  * ⚠️ Use this, not `useKeyboardHeight() > 0`, for anything that hides or shows on
  * the keyboard — the bottom nav, a quick-action row. The height is an ADJUSTED
  * figure: on a device where the OS already shrinks the window it is legitimately
- * zero while the keyboard is fully open, so treating it as a visibility flag
- * would leave the nav bar on screen exactly where the resize made room for it.
+ * zero while the keyboard is fully open.
  */
 export function useKeyboardVisible(): boolean {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    const showSub = Keyboard.addListener(SHOW_EVENT, () => setVisible(true));
-    const hideSub = Keyboard.addListener(HIDE_EVENT, () => setVisible(false));
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
-
-  return visible;
+  return useSyncExternalStore(subscribeVisible, () => visible);
 }

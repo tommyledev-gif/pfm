@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { memo, useRef, useState } from "react";
 import { Animated, Easing, Pressable, StyleProp, Text, TextStyle, View, ViewStyle } from "react-native";
 
 import { AmountTooltip, AnchorRect } from "@/components/ui/AmountTooltip";
@@ -43,7 +43,7 @@ interface RevealableAmountProps {
  * fills along its bottom edge for the length of the hold, so the user can see
  * the hold registering and how long is left.
  */
-export function RevealableAmount({
+export const RevealableAmount = memo(function RevealableAmount({
   amountCents,
   currency,
   style,
@@ -123,7 +123,7 @@ export function RevealableAmount({
       ) : null}
     </>
   );
-}
+});
 
 const useStyles = createStyles((colors) => ({
   // Clips the hold bar to the container's rounded corners.

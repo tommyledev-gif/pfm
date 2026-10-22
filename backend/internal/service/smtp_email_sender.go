@@ -71,7 +71,10 @@ func (s *SMTPEmailSender) link(path, token string) string {
 // 587; net/smtp.SendMail upgrades the connection automatically when the
 // server offers it, so no manual TLS dialing is needed here.
 func (s *SMTPEmailSender) send(ctx context.Context, toEmail string, email emailContent) error {
-	msg := buildEmailMessage(s.cfg.FromEmail, s.cfg.FromName, toEmail, email)
+	msg, err := buildEmailMessage(s.cfg.FromEmail, s.cfg.FromName, toEmail, email)
+	if err != nil {
+		return err
+	}
 	addr := fmt.Sprintf("%s:%s", s.cfg.Host, s.cfg.Port)
 	auth := smtp.PlainAuth("", s.cfg.Username, s.cfg.Password, s.cfg.Host)
 

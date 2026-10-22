@@ -1,4 +1,4 @@
-import { ComponentType, useEffect, useRef, useState } from "react";
+import { ComponentType, memo, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
 import Reanimated from "react-native-reanimated";
 
@@ -47,7 +47,7 @@ interface ExpandableFabProps {
  * pop-in and press dip), so a screen can swap one for the other without its
  * list padding changing.
  */
-export function ExpandableFab({ actions, accessibilityLabel, testID, style }: ExpandableFabProps) {
+export const ExpandableFab = memo(function ExpandableFab({ actions, accessibilityLabel, testID, style }: ExpandableFabProps) {
   const colors = useColors();
   const styles = useStyles();
   const bottom = useFabBottom();
@@ -71,7 +71,24 @@ export function ExpandableFab({ actions, accessibilityLabel, testID, style }: Ex
     }).start();
   }, [open, reduceMotion, progress]);
 
-  const rotate = progress.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "45deg"] });
+  // Built once per action count: a new node per render rebuilt the native graph.
+  const actionCount = actions.length;
+  const motion = useMemo(() => {
+    const rotate = progress.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "45deg"] });
+    const slots = Array.from({ length: actionCount }, (_, index) => {
+      // 0 = the slot next to the main button.
+      const slot = actionCount - 1 - index;
+      const start = Math.min(slot * STAGGER, 0.6);
+      const local = progress.interpolate({ inputRange: [start, 1], outputRange: [0, 1], extrapolate: "clamp" });
+      return {
+        local,
+        translateY: local.interpolate({ inputRange: [0, 1], outputRange: [SLIDE_PER_SLOT * (slot + 1), 0] }),
+        scale: local.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }),
+      };
+    });
+    return { rotate, slots };
+  }, [progress, actionCount]);
+  const { rotate } = motion;
 
   return (
     <>
@@ -88,12 +105,7 @@ export function ExpandableFab({ actions, accessibilityLabel, testID, style }: Ex
           importantForAccessibility={open ? "auto" : "no-hide-descendants"}
         >
           {actions.map((action, index) => {
-            // 0 = the slot next to the main button.
-            const slot = actions.length - 1 - index;
-            const start = Math.min(slot * STAGGER, 0.6);
-            const local = progress.interpolate({ inputRange: [start, 1], outputRange: [0, 1], extrapolate: "clamp" });
-            const translateY = local.interpolate({ inputRange: [0, 1], outputRange: [SLIDE_PER_SLOT * (slot + 1), 0] });
-            const scale = local.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] });
+            const { local, translateY, scale } = motion.slots[index];
             const arcInset = ARC_STEP * index;
             return (
               <Animated.View
@@ -136,7 +148,7 @@ export function ExpandableFab({ actions, accessibilityLabel, testID, style }: Ex
       </Reanimated.View>
     </>
   );
-}
+});
 
 const useStyles = createStyles((colors) => ({
   container: {

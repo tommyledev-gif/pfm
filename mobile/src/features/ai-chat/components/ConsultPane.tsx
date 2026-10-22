@@ -1,8 +1,9 @@
-import { useMemo, useRef, useState } from "react";
-import { FlatList, StyleSheet, View } from "react-native";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { FlatList, ListRenderItemInfo, StyleSheet, View } from "react-native";
 
 import { TypingIndicator } from "@/components/shared/TypingIndicator";
 import { ChatComposer } from "@/features/ai-chat/components/ChatComposer";
+import { ChatThreadSkeleton } from "@/features/ai-chat/components/ChatThreadSkeleton";
 import { ConsultEmptyState } from "@/features/ai-chat/components/ConsultEmptyState";
 import { ChatInputBar } from "@/features/ai-chat/components/ChatInputBar";
 import { ChatThreadList } from "@/features/ai-chat/components/ChatThreadList";
@@ -21,8 +22,11 @@ import { useChatStore } from "@/stores/chat-store";
 // The assistant is pulling the figures the question asks about.
 const ANSWERING_LABEL = "Đang xem số liệu…";
 
+const messageKey = (m: ChatMessage) => m.id;
+
 interface ConsultPaneProps {
-  keyboardVisible: boolean;
+  /** The saved thread is still being read back: a skeleton, not the empty state. */
+  loading: boolean;
   bottomInset: number;
   /** `prefill` = the question to carry into the recording input. */
   onSwitchToRecording: (prefill?: string) => void;
@@ -30,25 +34,15 @@ interface ConsultPaneProps {
 
 /**
  * The "Hỏi phân tích" conversation (specs/ai-chat-query-spending): its own
- * thread, typing indicator, starter chips and input, rendered in place of
- * the recording pane. No swipe rows — answers are snapshots, never edited
- * or removed — so bubbles render directly.
+ * thread, typing indicator, starter chips and input. No swipe rows — answers
+ * are snapshots, never edited or removed.
  */
-export function ConsultPane({
-  keyboardVisible,
-  bottomInset,
-  onSwitchToRecording,
-}: ConsultPaneProps) {
+export function ConsultPane({ loading, bottomInset, onSwitchToRecording }: ConsultPaneProps) {
   const styles = useChatThreadStyles();
   const listRef = useRef<FlatList<ChatMessage>>(null);
-  const requireOnline = useRequireOnline();
-
   const thread = useChatStore((s) => s.thread);
-
-  const [input, setInput] = useState("");
   // Measured height of the floating composer, reserved inside the thread.
   const [composerHeight, setComposerHeight] = useState(0);
-
   const categories = useCategoriesQuery();
 
   const consult = useConsultActions({
@@ -57,8 +51,18 @@ export function ConsultPane({
     onSwitchToRecording,
   });
 
-  // Inverted list, same reasoning as the recording pane: offset 0 is "newest".
+  // Inverted list, same as the recording pane: offset 0 is "newest".
   const messages = useMemo(() => thread.filter(isConsultMessage).reverse(), [thread]);
+
+  const renderItem = useCallback(
+    ({ item, index }: ListRenderItemInfo<ChatMessage>) => {
+      // Newest first, so the message before this one is next in the array.
+      const previous = messages[index + 1];
+      const startsTurn = previous !== undefined && (item.role === "user" || previous.role === "assistant");
+      return <ConsultMessageRow message={item} startsTurn={startsTurn} handlers={consult.handlers} />;
+    },
+    [messages, consult.handlers],
+  );
 
   return (
     <View style={consultStyles.pane}>
@@ -66,19 +70,13 @@ export function ConsultPane({
         <ChatThreadList
           listRef={listRef}
           data={messages}
-          keyExtractor={(m) => m.id}
-          // Each row spaces itself (ConsultMessageRow) — a uniform gap is what
-          // made every message sit the same distance from every other.
+          keyExtractor={messageKey}
+          // Each row spaces itself (ConsultMessageRow).
           contentContainerStyle={[styles.thread, consultStyles.thread]}
           keyboardShouldPersistTaps="handled"
           reservedBottom={composerHeight}
-          renderItem={({ item, index }) => {
-            // Newest first (inverted), so the message before this one is next.
-            const previous = messages[index + 1];
-            const startsTurn = previous !== undefined && (item.role === "user" || previous.role === "assistant");
-            return <ConsultMessageRow message={item} startsTurn={startsTurn} handlers={consult.handlers} />;
-          }}
-          ListEmptyComponent={<ConsultEmptyState />}
+          renderItem={renderItem}
+          ListEmptyComponent={loading ? <ChatThreadSkeleton /> : <ConsultEmptyState />}
           ListHeaderComponent={
             consult.sending ? (
               <View style={[styles.typingRow, consultStyles.typing]}>
@@ -88,32 +86,52 @@ export function ConsultPane({
           }
         />
 
-        <ChatComposer onHeightChange={setComposerHeight}>
-          <ChatInputBar
-            value={input}
-            onChangeText={setInput}
-            // Online-only (AC-OFF-08): offline, the typed text stays in the box.
-            onSend={() =>
-              requireOnline(() => {
-                const text = input;
-                setInput("");
-                consult.sendConsult(text);
-              })
-            }
-            sending={consult.sending}
-            keyboardVisible={keyboardVisible}
-            bottomInset={bottomInset}
-            mode="consult"
-            quickActions={
-              <StarterChipsRow
-                onAsk={(query, label) => requireOnline(() => consult.askQuery(query, label))}
-                disabled={consult.sending}
-              />
-            }
-          />
-        </ChatComposer>
+        <ConsultComposer
+          sending={consult.sending}
+          bottomInset={bottomInset}
+          onSend={consult.sendConsult}
+          onAsk={consult.askQuery}
+          onHeightChange={setComposerHeight}
+        />
       </KeyboardLiftView>
     </View>
+  );
+}
+
+interface ConsultComposerProps {
+  sending: boolean;
+  bottomInset: number;
+  onSend: (text: string) => void;
+  onAsk: ReturnType<typeof useConsultActions>["askQuery"];
+  onHeightChange: (height: number) => void;
+}
+
+// Holds the draft, so typing re-renders the input and not the thread.
+function ConsultComposer({ sending, bottomInset, onSend, onAsk, onHeightChange }: ConsultComposerProps) {
+  const requireOnline = useRequireOnline();
+  const [input, setInput] = useState("");
+
+  return (
+    <ChatComposer onHeightChange={onHeightChange}>
+      <ChatInputBar
+        value={input}
+        onChangeText={setInput}
+        // Online-only (AC-OFF-08): offline, the typed text stays in the box.
+        onSend={() =>
+          requireOnline(() => {
+            const text = input;
+            setInput("");
+            onSend(text);
+          })
+        }
+        sending={sending}
+        bottomInset={bottomInset}
+        mode="consult"
+        quickActions={
+          <StarterChipsRow onAsk={(query, label) => requireOnline(() => onAsk(query, label))} disabled={sending} />
+        }
+      />
+    </ChatComposer>
   );
 }
 

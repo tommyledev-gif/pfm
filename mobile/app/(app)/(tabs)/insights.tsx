@@ -1,10 +1,16 @@
-import { useEffect, useRef, useState } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import Animated, {
+  interpolateColor,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import { useLocalSearchParams } from "expo-router";
 
 import { MotionHighlight, useOptionRects } from "@/components/motion/MotionHighlight";
-import { entrance } from "@/components/motion/motion-tokens";
+import { ENTER_OFFSET, SPRING } from "@/components/motion/motion-tokens";
 import { Screen } from "@/components/shared/Screen";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useReduceMotion } from "@/lib/use-reduce-motion";
@@ -12,8 +18,7 @@ import { SpendingTab } from "@/features/reports/components/SpendingTab";
 import { BudgetsTab } from "@/features/budgets/components/BudgetsTab";
 import { BudgetWizardModal } from "@/features/budget-wizard/components/BudgetWizardModal";
 
-// Keys stay English because they cross a navigation boundary — Home deep-links
-// here with `tab: "Budgets"`. Only what the user reads is translated.
+// Keys stay English: Home deep-links here with `tab: "Budgets"`.
 const SUB_TABS = [
   { key: "Spending", label: "Chi tiêu" },
   { key: "Budgets", label: "Ngân sách" },
@@ -26,27 +31,9 @@ const LABEL_FADE_MS = 180;
 export default function InsightsScreen() {
   const styles = useStyles();
   const reduceMotion = useReduceMotion();
-  const [tab, setTab] = useState<SubTab>("Spending");
-  const [wizardOpen, setWizardOpen] = useState(false);
-  // The underline slides between the tabs (MotionHighlight) instead of
-  // jumping; until both are measured it is drawn under the active one as before.
-  const { rects, onOptionLayout } = useOptionRects();
-  const activeRect = rects[tab];
-  // The new tab's content slides in from the side its tab sits on. The tab
-  // on screen when this first mounts just shows.
-  const firstRender = useRef(true);
-  useEffect(() => {
-    firstRender.current = false;
-  }, []);
-  const tabIndex = SUB_TABS.findIndex((t) => t.key === tab);
-  // Deep link from a budget notification (app/(app)/notifications.tsx): force
-  // the Spending tab and hand the category down so its donut segment opens
-  // selected. `focusedAt` is the nonce that lets the same category be focused
-  // twice in a row — see the comment at the push site.
-  //
-  // Home's "sắp vượt" list deep-links the other way: it forces the Budgets tab
-  // and hands over the exact day it was showing, so tapping a budget there lands
-  // on the same window rather than on the whole month.
+  // From a budget notification (categoryId) or Home's "sắp vượt" list (tab +
+  // from/to). Read on the first render too, so a deep link never mounts the
+  // other tab first.
   const { categoryId, focusedAt, tab: tabParam, from, to } = useLocalSearchParams<{
     categoryId?: string;
     focusedAt?: string;
@@ -54,6 +41,16 @@ export default function InsightsScreen() {
     from?: string;
     to?: string;
   }>();
+  const [tab, setTab] = useState<SubTab>(() => (tabParam === "Budgets" ? "Budgets" : "Spending"));
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const { rects, onOptionLayout } = useOptionRects();
+  const activeRect = rects[tab];
+
+  // A pane mounts on its first visit and then stays, so switching back is
+  // instant instead of refetching and redrawing the whole tab.
+  const visited = useRef(new Set<SubTab>()).current;
+  visited.add(tab);
+  const firstTab = useRef(tab).current;
 
   useEffect(() => {
     if (categoryId) setTab("Spending");
@@ -62,6 +59,11 @@ export default function InsightsScreen() {
   useEffect(() => {
     if (tabParam === "Budgets") setTab("Budgets");
   }, [tabParam, from, to]);
+
+  const openBudgets = useCallback(() => setTab("Budgets"), []);
+  const openWizard = useCallback(() => setWizardOpen(true), []);
+  const closeWizard = useCallback(() => setWizardOpen(false), []);
+  const initialRange = useMemo(() => (from || to ? { from, to } : undefined), [from, to]);
 
   return (
     <Screen style={styles.screen}>
@@ -79,36 +81,59 @@ export default function InsightsScreen() {
             accessibilityState={{ selected: tab === t.key }}
           >
             <SubTabLabel label={t.label} active={tab === t.key} reduceMotion={reduceMotion} />
-            {/* Keeps every tab the same height; the line itself is drawn
-                by the highlight once the tabs are measured. */}
+            {/* Keeps the tabs the same height; the highlight draws the line once measured. */}
             <View style={[styles.underlineSlot, tab === t.key && !activeRect && styles.underlineStatic]} />
           </Pressable>
         ))}
       </View>
 
-      <Animated.View
-        key={tab}
-        entering={firstRender.current ? undefined : entrance(tabIndex > 0 ? "slideLeft" : "slideRight")}
-        style={styles.body}
-      >
-        {tab === "Spending" ? (
-          <SpendingTab focusCategoryId={categoryId} focusNonce={focusedAt} onOpenBudgets={() => setTab("Budgets")} />
-        ) : (
+      {visited.has("Spending") ? (
+        <SubTabPane active={tab === "Spending"} fromSide={-1} animateFirst={firstTab !== "Spending"}>
+          <SpendingTab focusCategoryId={categoryId} focusNonce={focusedAt} onOpenBudgets={openBudgets} />
+        </SubTabPane>
+      ) : null}
+      {visited.has("Budgets") ? (
+        <SubTabPane active={tab === "Budgets"} fromSide={1} animateFirst={firstTab !== "Budgets"}>
           <BudgetsTab
-            initialRange={from || to ? { from, to } : undefined}
+            initialRange={initialRange}
             rangeNonce={`${from ?? ""}-${to ?? ""}`}
-            onOpenBudgetWizard={() => setWizardOpen(true)}
+            onOpenBudgetWizard={openWizard}
           />
-        )}
-      </Animated.View>
+        </SubTabPane>
+      ) : null}
 
-      {/* At the screen's root, not inside BudgetsTab: the wizard is a
-          full-screen overlay positioned against its parent, and the tab body
-          is inset by this screen's padding and title. Same placement as the
-          chat screen's ChatOverlays. */}
-      <BudgetWizardModal visible={wizardOpen} onClose={() => setWizardOpen(false)} />
+      {/* At the screen's root: the wizard is a full-screen overlay positioned
+          against its parent, and the tab body is inset. */}
+      <BudgetWizardModal visible={wizardOpen} onClose={closeWizard} />
     </Screen>
   );
+}
+
+interface SubTabPaneProps {
+  active: boolean;
+  /** -1: slides in from the left, 1: from the right. */
+  fromSide: number;
+  /** Slide in when first mounted; off for the tab the screen opens on. */
+  animateFirst: boolean;
+  children: ReactNode;
+}
+
+// Hidden panes stay mounted but take no layout; the newly active one slides
+// in on the UI thread.
+function SubTabPane({ active, fromSide, animateFirst, children }: SubTabPaneProps) {
+  const styles = useStyles();
+  const shown = useSharedValue(active && !animateFirst ? 1 : 0);
+
+  useEffect(() => {
+    shown.value = active ? withSpring(1, SPRING) : 0;
+  }, [active, shown]);
+
+  const motion = useAnimatedStyle(() => ({
+    opacity: shown.value,
+    transform: [{ translateX: (1 - shown.value) * fromSide * ENTER_OFFSET * 2 }],
+  }));
+
+  return <Animated.View style={[styles.body, !active && styles.hidden, motion]}>{children}</Animated.View>;
 }
 
 // The label's colour fades with the underline's slide rather than cutting.
@@ -138,4 +163,5 @@ const useStyles = createStyles((colors) => ({
   // Where the slot above sits: the tab's bottom padding up from the border.
   underline: { bottom: spacing.sm, height: UNDERLINE_HEIGHT, backgroundColor: colors.green, borderRadius: 1 },
   body: { flex: 1 },
+  hidden: { display: "none" },
 }));

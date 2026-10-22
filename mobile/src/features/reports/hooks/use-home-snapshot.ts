@@ -144,7 +144,8 @@ export function useHomeSnapshot(homePeriod: HomePeriod) {
     // Every input defaults to zero or empty before its own query resolves —
     // without this the first render showed a zeroed snapshot rather than a
     // loading state.
-    loading: [wallets, periodSummary, thisMonthSummary, budgets].some(isAwaitingFirstData),
+    // The previous period too: the trend badge compared against zero until it landed.
+    loading: [wallets, periodSummary, thisMonthSummary, previousPeriodSummary, budgets].some(isAwaitingFirstData),
     // Handed to the screen's pull-to-refresh: refreshing fewer than all of
     // them would leave the trend badge comparing a fresh number to a stale one.
     queries: [budgets, periodSummary, thisMonthSummary, previousPeriodSummary],

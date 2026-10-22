@@ -43,51 +43,17 @@ interface DrawerProps {
   child?: DrawerChild;
 }
 
-// Reusable bottom-sheet chrome shared by every form/picker modal (Wallet/
-// Category/Budget/Transaction forms, date pickers) — dimmed backdrop +
-// slide-up sheet, so every modal gets the same look and the same
-// tap-outside-to-dismiss behavior from one place instead of copy-pasted
-// per-component. The backdrop is itself a Pressable that closes on tap; the
-// inner Pressable is a no-op that exists only to swallow taps on the sheet
-// content so they don't bubble up and close it. The body is a ScrollView so
-// long forms (or a shown keyboard) never clip content off-screen — capped
-// at 90% of the modal height.
+// Bottom-sheet chrome for every form and picker: dimmed backdrop that closes
+// on tap, a slide-up sheet, and a ScrollView body capped at 90% height.
 //
-// Keyboard safety (SDS.md §3.2 / §12.1 Known Issues Log Item 2), take two:
-// this used to render through react-native's <Modal>, padding the
-// ScrollView's contentContainerStyle by the live keyboard height. That
-// still left the input hidden intermittently — Android hosts <Modal>'s
-// content in a separate Dialog window outside the Activity's own view tree,
-// and getting a focused input back into view there depends on RN's
-// automatic scroll-to-focused-input firing correctly, which is exactly the
-// part that's unreliable inside a Modal on Android (the "insights budget
-// tab seems fine" report was luck, not a working mechanism).
+// Rendered in-tree, not through <Modal>: Android hosts a Modal in its own
+// window, where scrolling a focused input into view was unreliable. The sheet
+// is lifted by the live keyboard height instead (useKeyboardHeight — never
+// KeyboardAvoidingView, which fails to restore layout on Android, RN#22884).
+// Losing <Modal> also loses the back button and painting above BottomNav;
+// BackHandler and useSheetStore (which hides the nav) cover both.
 //
-// Fix: render as a plain absolutely-positioned View in the normal component
-// tree instead of through <Modal> — no separate window, so there's nothing
-// unreliable left to depend on. The whole sheet (backdrop + all) is shifted
-// up by the exact live keyboard height via useKeyboardHeight(), which is
-// sourced straight from OS keyboard-visibility events, not from window
-// resize — deliberately not relying on `app.json`'s
-// `android.softwareKeyboardLayoutMode: "resize"`, since Android disregards
-// that flag once the app opts into edge-to-edge (Expo's default on modern
-// Android targetSdk levels), which this app does. Never KeyboardAvoidingView
-// either — that API's Android "height" behavior has a confirmed bug where it
-// fails to restore layout once the keyboard closes (facebook/react-
-// native#22884), which is exactly the "stuck pushed up after closing the
-// keyboard" symptom useKeyboardHeight replaced it for in the first place.
-//
-// Losing <Modal> also loses two things it gave for free, both handled here:
-// the Android hardware back button closing the sheet (BackHandler below),
-// and always painting above everything else on screen — BottomNav
-// (app/(app)/_layout.tsx) is an absolutely-positioned overlay from a
-// completely different part of the tree, so a plain in-tree zIndex can't
-// guarantee it stays under the sheet. useSheetStore's open/close instead
-// tells the layout to hide BottomNav entirely while any Drawer is visible.
-// Slide-up distance just needs to clear the screen entirely, not match the
-// sheet's actual (variable, content-dependent) height — translating by the
-// full window height guarantees the sheet starts below the visible area
-// regardless of device size or how tall `children` ends up being.
+// Slide distance only has to clear the screen, so it is the window height.
 const OFFSCREEN_Y = Dimensions.get("window").height;
 // How long after opening the overlay keeps re-checking where its host sits —
 // past a screen push (native-stack fade) and the safe-area padding landing.
@@ -95,7 +61,35 @@ const ANCHOR_SETTLE_MS = 800;
 
 const claimTouch = () => true;
 
-export function Drawer({ visible, onClose, children, footer, child }: DrawerProps) {
+/**
+ * Renders nothing while closed: the sheet and everything it subscribes to
+ * (keyboard events, insets, the drag responder) exist only while it is open
+ * or animating closed. Screens keep many closed drawers mounted.
+ */
+export function Drawer(props: DrawerProps) {
+  const [rendered, setRendered] = useState(props.visible);
+  // A drawer mounted already open shows in place, as before; later opens slide.
+  const startOpen = useRef(props.visible);
+  if (props.visible && !rendered) setRendered(true);
+  if (!rendered) return null;
+  return (
+    <DrawerSheet
+      {...props}
+      startOpen={startOpen.current}
+      onExited={() => {
+        startOpen.current = false;
+        setRendered(false);
+      }}
+    />
+  );
+}
+
+interface DrawerSheetProps extends DrawerProps {
+  startOpen: boolean;
+  onExited: () => void;
+}
+
+function DrawerSheet({ visible, onClose, children, footer, child, startOpen, onExited }: DrawerSheetProps) {
   const styles = useStyles();
   const keyboardHeight = useKeyboardHeight();
   // The sheet runs to the screen's bottom edge (edge-to-edge), so its last
@@ -103,15 +97,10 @@ export function Drawer({ visible, onClose, children, footer, child }: DrawerProp
   // keyboard up the keyboard covers that strip and lifts the sheet anyway.
   const { bottom: bottomInset } = useSafeAreaInsets();
   const navPad = keyboardHeight > 0 ? 0 : bottomInset;
-  // Kept mounted for the duration of the close animation — flipping
-  // straight to `if (!visible) return null` would unmount mid-slide-down
-  // and make the sheet vanish instantly instead of animating out.
-  const [rendered, setRendered] = useState(visible);
-  const translateY = useRef(new Animated.Value(visible ? 0 : OFFSCREEN_Y)).current;
-  const backdropOpacity = useRef(new Animated.Value(visible ? 1 : 0)).current;
+  const translateY = useRef(new Animated.Value(startOpen ? 0 : OFFSCREEN_Y)).current;
+  const backdropOpacity = useRef(new Animated.Value(startOpen ? 1 : 0)).current;
   // Grab-handle drag: down past half the height closes, up expands to max.
   const drag = useSheetDrag({ translateY, onClose });
-  const { collapse } = drag;
 
   // Rendering in-tree (rather than through <Modal>, see the note above) has
   // one consequence the original version missed: an absolutely-positioned
@@ -139,7 +128,6 @@ export function Drawer({ visible, onClose, children, footer, child }: DrawerProp
 
   useEffect(() => {
     if (visible) {
-      setRendered(true);
       // An anchor already laid out (reopening without remounting) won't fire
       // onLayout again — the settle loop below measures it instead.
       Animated.parallel([
@@ -151,10 +139,8 @@ export function Drawer({ visible, onClose, children, footer, child }: DrawerProp
         Animated.timing(backdropOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
         Animated.timing(translateY, { toValue: OFFSCREEN_Y, duration: 220, useNativeDriver: true }),
       ]).start(({ finished }) => {
-        if (!finished) return;
-        setRendered(false);
-        // Every open starts at the resting height, not wherever it was left.
-        collapse();
+        // Unmounting resets the drag too: every open starts at resting height.
+        if (finished) onExited();
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -202,8 +188,6 @@ export function Drawer({ visible, onClose, children, footer, child }: DrawerProp
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
-
-  if (!rendered) return null;
 
   return (
     <>

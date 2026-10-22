@@ -1,3 +1,4 @@
+import { memo, useMemo } from "react";
 import { Animated } from "react-native";
 import Svg, { Defs, Ellipse, Path, RadialGradient, Stop } from "react-native-svg";
 
@@ -41,7 +42,7 @@ interface NavBallLightProps {
   /** The ball's left edge — the same value that moves the ball and its hollow. */
   ballX: Animated.Value;
   /** The ball's idle float, 0 seated → 1 raised. */
-  bob: Animated.Value;
+  bob: Animated.AnimatedInterpolation<number>;
   /** Hides the light with the ball until the tab row is measured. */
   opacity: Animated.Value;
 }
@@ -56,13 +57,16 @@ interface NavBallLightProps {
  * for — and one SVG riding ballX on the native driver, like the hollow itself.
  * The light theme keeps the plain ball: on white this reads as a smudge.
  */
-export function NavBallLight({ ballX, bob, opacity }: NavBallLightProps) {
+export const NavBallLight = memo(function NavBallLight({ ballX, bob, opacity }: NavBallLightProps) {
   const colors = useColors();
   const { isDark } = useThemeDefinition();
+  const lightOpacity = useMemo(
+    () => Animated.multiply(opacity, bob.interpolate({ inputRange: [0, 1], outputRange: [1, RAISED_INTENSITY] })),
+    [opacity, bob],
+  );
   if (!isDark) return null;
 
   const glow = colors.navGlow;
-  const intensity = bob.interpolate({ inputRange: [0, 1], outputRange: [1, RAISED_INTENSITY] });
 
   return (
     <Animated.View
@@ -73,7 +77,7 @@ export function NavBallLight({ ballX, bob, opacity }: NavBallLightProps) {
         left: BALL_SIZE / 2 - HALF_WIDTH,
         width: WIDTH,
         height: PILL_HEIGHT,
-        opacity: Animated.multiply(opacity, intensity),
+        opacity: lightOpacity,
         transform: [{ translateX: ballX }],
       }}
     >
@@ -104,4 +108,4 @@ export function NavBallLight({ ballX, bob, opacity }: NavBallLightProps) {
       </Svg>
     </Animated.View>
   );
-}
+});

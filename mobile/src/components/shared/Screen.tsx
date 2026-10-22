@@ -19,7 +19,9 @@ interface ScreenProps {
 // Also the one place the offline strip lives: right under the status bar,
 // full width, pushing the screen down. That is why `style` goes on an inner
 // view — a screen's own padding must not inset the strip.
-export function Screen({ children, edges = ["top"], style }: ScreenProps) {
+const TOP_EDGE: Edge[] = ["top"];
+
+export function Screen({ children, edges = TOP_EDGE, style }: ScreenProps) {
   const colors = useColors();
   return (
     <SafeAreaView edges={edges} style={[styles.fill, { backgroundColor: colors.bgApp }]}>

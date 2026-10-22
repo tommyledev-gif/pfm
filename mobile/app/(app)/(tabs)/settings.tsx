@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 
@@ -110,20 +110,28 @@ export default function SettingsScreen() {
 
   // One push per burst of taps: a quick double tap fires twice before the
   // route has changed, and would otherwise stack the same screen twice.
-  const openRow = (href: SettingsHref) => {
-    const now = Date.now();
-    if (now - lastPushAt.current < ROW_TAP_GUARD_MS) return;
-    lastPushAt.current = now;
-    router.push(href);
-  };
+  const openRow = useCallback(
+    (href: SettingsHref) => {
+      const now = Date.now();
+      if (now - lastPushAt.current < ROW_TAP_GUARD_MS) return;
+      lastPushAt.current = now;
+      router.push(href);
+    },
+    [router],
+  );
+  const openProfile = useCallback(() => openRow(EDIT_PROFILE_HREF), [openRow]);
 
   // Unsynced Transactions first get a choice (specs/mobile-offline-support US-07).
   const requestLogout = () => (outboxItemsFor(userId).length > 0 ? setLogoutGuardOpen(true) : logout());
 
-  const groups = SETTINGS_GROUPS.map((group) => ({
-    ...group,
-    rows: group.rows.filter((row) => !row.adminOnly || role === "admin"),
-  })).filter((group) => group.rows.length > 0);
+  const groups = useMemo(
+    () =>
+      SETTINGS_GROUPS.map((group) => ({
+        ...group,
+        rows: group.rows.filter((row) => !row.adminOnly || role === "admin"),
+      })).filter((group) => group.rows.length > 0),
+    [role],
+  );
 
   const renderRow = ({ label, icon, tone, href, testID }: SettingsRow) => (
     <ListRow
@@ -145,7 +153,7 @@ export default function SettingsScreen() {
         {/* Groups stagger in top to bottom on the first visit; the tab stays
             mounted afterwards, so coming back does not replay it. */}
         <MotionView index={0}>
-          <ProfileSummaryCard onOpenProfile={() => openRow(EDIT_PROFILE_HREF)} />
+          <ProfileSummaryCard onOpenProfile={openProfile} />
         </MotionView>
 
         {groups.map((group, index) => (

@@ -6,10 +6,18 @@ import (
 	"testing"
 )
 
+// render builds a message, failing the test on a template error.
+func render(t *testing.T, toEmail string, email emailContent) string {
+	t.Helper()
+	msg, err := buildEmailMessage("no-reply@pfm.local", "PFM", toEmail, email)
+	if err != nil {
+		t.Fatalf("buildEmailMessage() error: %v", err)
+	}
+	return string(msg)
+}
+
 func TestBuildEmailMessage_Activation(t *testing.T) {
-	msg := string(buildEmailMessage(
-		"no-reply@pfm.local", "PFM", "user@example.com", activationEmail("https://app.pfm.local/activate?token=abc123"),
-	))
+	msg := render(t, "user@example.com", activationEmail("https://app.pfm.local/activate?token=abc123"))
 
 	wantSubstrings := []string{
 		"From: PFM <no-reply@pfm.local>",
@@ -35,9 +43,7 @@ func TestBuildEmailMessage_Activation(t *testing.T) {
 // let it inject a header line or markup.
 func TestBuildEmailMessage_AccessRequestEscapesRequester(t *testing.T) {
 	requester := "a<b>@example.com\r\nBcc: x@evil.test"
-	msg := string(buildEmailMessage(
-		"no-reply@pfm.local", "PFM", "admin@example.com", accessRequestEmail(requester, "https://app.pfm.local/approve-access?token=t"),
-	))
+	msg := render(t, "admin@example.com", accessRequestEmail(requester, "https://app.pfm.local/approve-access?token=t"))
 
 	headers := msg[:strings.Index(msg, "\r\n\r\n")]
 	if strings.Contains(headers, "Bcc:") {
@@ -48,5 +54,22 @@ func TestBuildEmailMessage_AccessRequestEscapesRequester(t *testing.T) {
 	}
 	if !strings.Contains(msg, "https://app.pfm.local/approve-access?token=t") {
 		t.Errorf("approval link missing:\n%s", msg)
+	}
+}
+
+// Every template renders with its heading, button and link.
+func TestBuildEmailMessage_AllTemplatesRender(t *testing.T) {
+	const link = "https://app.pfm.local/activate?token=x"
+	for name, email := range map[string]emailContent{
+		"activation":      activationEmail(link),
+		"access approved": accessApprovedEmail(link),
+		"access request":  accessRequestEmail("a@example.com", link),
+	} {
+		msg := render(t, "user@example.com", email)
+		for _, want := range []string{link, email.ButtonLabel, email.Heading} {
+			if !strings.Contains(msg, want) {
+				t.Errorf("%s: missing %q", name, want)
+			}
+		}
 	}
 }

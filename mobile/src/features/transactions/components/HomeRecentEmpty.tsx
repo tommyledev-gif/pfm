@@ -3,14 +3,14 @@ import { View } from "react-native";
 import { ReceiptIcon } from "@/components/ui/Icon";
 import { EmptyInlineCard } from "@/components/shared/EmptyState";
 import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
-import { isAwaitingFirstData, isWaitingForNetwork } from "@/lib/query-status";
+import { QueryStatusLike, isAwaitingFirstData, isWaitingForNetwork } from "@/lib/query-status";
 import { useColors } from "@/lib/theme";
 import { TransactionRowSkeleton } from "@/features/transactions/components/TransactionRowSkeleton";
 
 const SKELETON_COUNT = 4;
 
 interface HomeRecentEmptyProps {
-  query: { isPending: boolean; fetchStatus: "fetching" | "paused" | "idle" };
+  query: QueryStatusLike;
 }
 
 // Home's "Giao dịch gần đây" with no rows to show: skeleton rows while the

@@ -1,4 +1,6 @@
-import { Animated, Pressable, Text, View } from "react-native";
+import { memo } from "react";
+import { Pressable, Text, View } from "react-native";
+import Animated from "react-native-reanimated";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { ProgressBar } from "@/components/ui/ProgressBar";
@@ -8,47 +10,45 @@ import { useHoldProgress } from "@/lib/use-hold-progress";
 import { typography, createStyles, useColors } from "@/lib/theme";
 import { DonutSegment } from "@/components/shared/DonutChart";
 
-// Legend row lives in its own file so it can sit in a normal ScrollView list
-// below the chart and still drive/reflect the same selection (it takes the
-// same `selected`/`onPress` pair DonutChart does). Also
-// doubles as a 2s-hold target (onHoldCategory) that opens a category picker
-// drawer — the label eases toward the primary accent color while held so the
-// user understands the row is holdable.
-export function DonutLegendRow({
+const HOLD_MS = 2000;
+
+interface DonutLegendRowProps {
+  segment: DonutSegment;
+  percentage: number;
+  currency: string;
+  selected: boolean;
+  onPress: (key: string) => void;
+  /** A 2s hold; the name eases to the accent colour while held. */
+  onHoldCategory?: (key: string) => void;
+}
+
+export const DonutLegendRow = memo(function DonutLegendRow({
   segment,
   percentage,
   currency,
   selected,
   onPress,
   onHoldCategory,
-}: {
-  segment: DonutSegment;
-  percentage: number;
-  currency: string;
-  selected: boolean;
-  onPress: () => void;
-  onHoldCategory?: (key: string) => void;
-}) {
+}: DonutLegendRowProps) {
   const colors = useColors();
   const legendStyles = useLegendStyles();
-  const { progress, start, cancel } = useHoldProgress();
-  const nameColor = progress.interpolate({ inputRange: [0, 1], outputRange: [colors.textPrimary, colors.green] });
+  const { start, cancel, tintStyle } = useHoldProgress(colors.textPrimary, colors.green, HOLD_MS);
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => onPress(segment.key)}
       onPressIn={start}
       onPressOut={cancel}
       onLongPress={() => {
         cancel();
         onHoldCategory?.(segment.key);
       }}
-      delayLongPress={2000}
+      delayLongPress={HOLD_MS}
       style={[legendStyles.row, selected && legendStyles.rowSelected]}
     >
       <View style={legendStyles.headRow}>
         <Avatar name={segment.label} color={segment.color} size={22} icon={segment.icon} iconUrl={segment.iconUrl} />
-        <Animated.Text style={[legendStyles.name, { color: nameColor }]} numberOfLines={1}>
+        <Animated.Text style={[legendStyles.name, tintStyle]} numberOfLines={1}>
           {segment.label}
         </Animated.Text>
         <Text style={legendStyles.value}>
@@ -58,7 +58,7 @@ export function DonutLegendRow({
       <ProgressBar progress={percentage / 100} color={segment.color} height={4} />
     </Pressable>
   );
-}
+});
 
 const useLegendStyles = createStyles((colors) => ({
   row: { gap: 6, paddingVertical: 8 },

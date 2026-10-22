@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>{{.Subject}}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#EEF1F5;-webkit-text-size-adjust:100%;">
+{{if .Preheader}}<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;mso-hide:all;">{{.Preheader}}</div>{{end}}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#EEF1F5;">
+<tr>
+<td align="center" style="padding:32px 16px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+  style="max-width:560px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+
+<tr>
+<td bgcolor="#050B14" style="background-color:#050B14;background-image:linear-gradient(140deg,#050B14 0%,#0B1A0E 100%);
+  border-radius:24px 24px 0 0;padding:28px 32px 36px;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td width="32" height="32" align="center" bgcolor="#85FF33"
+  style="width:32px;height:32px;border-radius:10px;background-color:#85FF33;color:#06130A;font-size:17px;font-weight:800;line-height:32px;">B</td>
+<td style="padding-left:10px;color:#F5F6F8;font-size:17px;font-weight:700;letter-spacing:0.2px;">Budgest</td>
+</tr>
+</table>
+{{if .Eyebrow}}<div style="margin-top:32px;">
+<span style="display:inline-block;padding:5px 12px;border-radius:999px;background-color:#15270C;color:#85FF33;
+  font-size:12px;font-weight:700;letter-spacing:0.4px;">{{.Eyebrow}}</span>
+</div>{{end}}
+<h1 style="margin:14px 0 0;color:#F5F6F8;font-size:28px;line-height:36px;font-weight:800;letter-spacing:-0.3px;">{{.Heading}}</h1>
+</td>
+</tr>
+
+<tr>
+<td bgcolor="#FFFFFF" style="background-color:#FFFFFF;padding:28px 32px 8px;">
+{{range .Paragraphs}}<p style="margin:0 0 14px;color:#3A4250;font-size:16px;line-height:24px;">{{.}}</p>
+{{end}}
+{{with .Detail}}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+  style="margin:4px 0 18px;background-color:#F3F5F8;border-radius:14px;">
+<tr>
+<td style="padding:14px 18px;">
+<div style="color:#6B7383;font-size:12px;line-height:18px;">{{.Label}}</div>
+<div style="color:#050B14;font-size:16px;line-height:24px;font-weight:700;word-break:break-all;">{{.Value}}</div>
+</td>
+</tr>
+</table>{{end}}
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 24px;">
+<tr>
+<td align="center" bgcolor="#85FF33" style="border-radius:999px;background-color:#85FF33;">
+<a href="{{.ButtonURL}}" target="_blank"
+  style="display:inline-block;padding:15px 32px;border-radius:999px;color:#06130A;font-size:16px;font-weight:700;text-decoration:none;">{{.ButtonLabel}}</a>
+</td>
+</tr>
+</table>
+{{if .Steps}}<div style="margin:0 0 12px;color:#050B14;font-size:14px;font-weight:700;">{{.StepsTitle}}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;">
+{{range $i, $step := .Steps}}<tr>
+<td width="28" valign="top" style="padding:0 0 12px;">
+<div style="width:24px;height:24px;border-radius:12px;background-color:#EAF7DF;color:#2E6B12;font-size:12px;font-weight:700;
+  line-height:24px;text-align:center;">{{inc $i}}</div>
+</td>
+<td valign="top" style="padding:2px 0 12px 10px;color:#3A4250;font-size:15px;line-height:20px;">{{$step}}</td>
+</tr>
+{{end}}</table>{{end}}
+</td>
+</tr>
+
+<tr>
+<td bgcolor="#FFFFFF" style="background-color:#FFFFFF;border-radius:0 0 24px 24px;padding:0 32px 28px;">
+<div style="border-top:1px solid #E6E9EE;padding-top:18px;color:#6B7383;font-size:13px;line-height:20px;">
+<div>Nút không mở được? Dùng liên kết này:</div>
+<a href="{{.ButtonURL}}" target="_blank" style="color:#2E6B12;word-break:break-all;">{{.ButtonURL}}</a>
+{{range .Footnotes}}<div style="margin-top:10px;">{{.}}</div>
+{{end}}</div>
+</td>
+</tr>
+
+<tr>
+<td align="center" style="padding:20px 16px 0;color:#8A93A3;font-size:12px;line-height:18px;">Email tự động từ Budgest. Không cần trả lời.</td>
+</tr>
+
+</table>
+</td>
+</tr>
+</table>
+</body>
+</html>

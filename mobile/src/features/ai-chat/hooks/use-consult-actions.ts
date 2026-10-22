@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { getErrorCode, getErrorMessage } from "@/lib/axios";
 import { MIN_TYPING_MS } from "@/features/ai-chat/hooks/use-chat-actions";
@@ -16,6 +16,7 @@ import {
   ConsultResponse,
 } from "@/features/analytics/types";
 import { Category } from "@/features/categories/types";
+import { useLatestCallback } from "@/lib/use-latest-callback";
 import { captureChatEpoch, useChatStore } from "@/stores/chat-store";
 
 const RATE_LIMITED = "RATE_LIMITED";
@@ -112,13 +113,15 @@ export function useConsultActions({ onSent, categories, onSwitchToRecording }: U
     });
   };
 
-  const handlers: ConsultHandlers = {
-    onAskQuery: askQuery,
-    onPickCategory: pickCategory,
-    onChangeCategories: changeCategories,
-    onSwitchToRecording,
-    busy: sending,
-  };
+  // Stable, so memoized rows re-render only when `busy` flips.
+  const onAskQuery = useLatestCallback(askQuery);
+  const onPickCategory = useLatestCallback(pickCategory);
+  const onChangeCategories = useLatestCallback(changeCategories);
+  const onSwitch = useLatestCallback(onSwitchToRecording);
+  const handlers = useMemo<ConsultHandlers>(
+    () => ({ onAskQuery, onPickCategory, onChangeCategories, onSwitchToRecording: onSwitch, busy: sending }),
+    [onAskQuery, onPickCategory, onChangeCategories, onSwitch, sending],
+  );
 
   return { sending, sendConsult, askQuery, handlers };
 }

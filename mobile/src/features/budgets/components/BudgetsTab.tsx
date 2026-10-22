@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Pressable, ScrollView, Text, View } from "react-native";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Animated, ScrollView, Text, View } from "react-native";
 import Reanimated from "react-native-reanimated";
 
 import { useListEntrance } from "@/components/motion/MotionView";
 import { useFabClearance } from "@/components/ui/Fab";
-import { CalendarIcon } from "@/components/ui/Icon";
 import { CategoryPickerDrawer } from "@/components/shared/CategoryPickerDrawer";
 import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
 import { BudgetFormModal } from "@/features/budgets/components/BudgetFormModal";
@@ -22,9 +21,10 @@ import { currentMonthPace } from "@/features/budgets/budget-pace";
 import { useBudgetRows } from "@/features/budgets/hooks/use-budget-rows";
 import { BUDGET_FILTERS, BudgetFilterChips, BudgetFilterKey } from "@/features/budgets/components/BudgetFilterChips";
 import { BudgetsFab } from "@/features/budgets/components/BudgetsFab";
-import { BudgetCardSkeleton } from "@/features/budgets/components/BudgetCardSkeleton";
+import { BudgetListSkeleton } from "@/features/budgets/components/BudgetCardSkeleton";
 import { BudgetListRow } from "@/features/budgets/components/BudgetListRow";
 import { BudgetMonthSummary } from "@/features/budgets/components/BudgetMonthSummary";
+import { BudgetRangeRow } from "@/features/budgets/components/BudgetRangeRow";
 import { BudgetPreset, BudgetsEmptyState } from "@/features/budgets/components/BudgetsEmptyState";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { CategoryTransactionsDialog } from "@/features/reports/components/CategoryTransactionsDialog";
@@ -32,16 +32,9 @@ import { usePeriodSlide } from "@/features/reports/hooks/use-period-slide";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { primaryCurrency } from "@/features/wallets/wallet-totals";
 
-const CARD_SKELETON_COUNT = 3;
-
-
 // Insights → Budgets tab: a month-level summary on top, then one row per
 // budget ordered worst-first, with chips to jump straight to the budgets that
-// need attention.
-//
-// The previous version was a flat list of two-bar cards scaled against the
-// largest budget in the list, with no month context at all — see
-// BudgetListRow's own note for why that was the wrong question.
+// need attention (see BudgetListRow for the row itself).
 interface BudgetsTabProps {
   /** Opens straight into a date filter — used by Home's "sắp vượt" list, which
    *  hands over the exact day the user was looking at. */
@@ -53,7 +46,7 @@ interface BudgetsTabProps {
   onOpenBudgetWizard?: () => void;
 }
 
-export function BudgetsTab({ initialRange, rangeNonce, onOpenBudgetWizard }: BudgetsTabProps = {}) {
+export const BudgetsTab = memo(function BudgetsTab({ initialRange, rangeNonce, onOpenBudgetWizard }: BudgetsTabProps = {}) {
   const colors = useColors();
   const styles = useStyles();
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>(initialRange ?? {});
@@ -103,16 +96,31 @@ export function BudgetsTab({ initialRange, rangeNonce, onOpenBudgetWizard }: Bud
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialRange?.from, initialRange?.to, rangeNonce]);
 
-  const { rangeActive, resolvedRange, rangeDayCount, rangeElapsed, rows, counts, totals, visibleRows } =
+  const { rangeActive, rangeLoading, resolvedRange, rangeDayCount, rangeElapsed, rows, counts, totals, visibleRows } =
     useBudgetRows({ budgets: budgets.data, currency, dateRange, filter, paceElapsed: pace.elapsed });
-  const pickerCategories = Array.from(new Map(rows.map(({ budget }) => [budget.category_id, budget])).values()).map(
-    (budget) => ({
-      id: budget.category_id,
-      name: budget.category_name,
-      icon: budget.icon ?? categoryById.get(budget.category_id)?.icon,
-      iconUrl: budget.icon_url ?? categoryById.get(budget.category_id)?.icon_url,
-      color: colorForCategory(budget.category_id),
-    }),
+  const pickerCategories = useMemo(
+    () =>
+      Array.from(new Map(rows.map(({ budget }) => [budget.category_id, budget])).values()).map((budget) => ({
+        id: budget.category_id,
+        name: budget.category_name,
+        icon: budget.icon ?? categoryById.get(budget.category_id)?.icon,
+        iconUrl: budget.icon_url ?? categoryById.get(budget.category_id)?.icon_url,
+        color: colorForCategory(budget.category_id),
+      })),
+    [rows, categoryById],
+  );
+  const scrollContentStyle = useMemo(() => ({ paddingBottom: fabClearance }), [fabClearance]);
+
+  // Stable, so the memoized rows re-render only when their own budget does.
+  const openEditBudget = useCallback((budget: Budget) => {
+    setHighlightedBudgetId(null);
+    setEditingBudget(budget);
+    setModalOpen(true);
+  }, []);
+  const openCategoryPicker = useCallback(() => setPickerOpen(true), []);
+  const openDetail = useCallback(
+    (budget: Budget, limit: Budget["limits"][number]) => setDetailRow({ budget, limit }),
+    [],
   );
 
   const focusCategory = (categoryId: string) => {
@@ -131,112 +139,107 @@ export function BudgetsTab({ initialRange, rangeNonce, onOpenBudgetWizard }: Bud
   // over (BudgetRepo.SpentByUserCurrentPeriod).
   const detailRange = resolvedRange ?? monthRange(0);
 
-  const openNew = (withPreset: BudgetPreset | null = null) => {
+  const openNew = useCallback((withPreset: BudgetPreset | null = null) => {
     setEditingBudget(null);
     setPreset(withPreset);
     setModalOpen(true);
-  };
+  }, []);
+  const openNewManual = useCallback(() => openNew(), [openNew]);
   const hasNoBudgets = budgets.data?.length === 0;
 
   if (isWaitingForNetwork(budgets)) return <OfflinePlaceholder />;
-  if (isAwaitingFirstData(budgets)) {
-    return (
-      <View style={styles.skeletonList}>
-        {Array.from({ length: CARD_SKELETON_COUNT }).map((_, i) => (
-          <BudgetCardSkeleton key={i} />
-        ))}
-      </View>
-    );
-  }
+  if (isAwaitingFirstData(budgets)) return <BudgetListSkeleton />;
 
   return (
     <View style={styles.container}>
       <ScrollView
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: fabClearance }}
+        contentContainerStyle={scrollContentStyle}
         refreshControl={refreshControl}
       >
         {hasNoBudgets ? (
           <BudgetsEmptyState
             currency={currency}
-            onOpenWizard={onOpenBudgetWizard ?? (() => openNew())}
+            onOpenWizard={onOpenBudgetWizard ?? openNewManual}
             onCreate={openNew}
           />
         ) : (
           <>
-            <View style={styles.rangeRow}>
-              <Pressable style={styles.rangeButton} onPress={() => setRangePickerOpen(true)} testID="btn-budgets-range">
-                <CalendarIcon size={14} color={colors.textSecondary} />
-                <Text style={styles.rangeLabel}>
-                  {resolvedRange ? formatDateRange(resolvedRange.from, resolvedRange.to) : "Tháng này"}
-                </Text>
-              </Pressable>
-              {rangeActive ? (
-                <Pressable onPress={() => setDateRange({})} hitSlop={8}>
-                  <Text style={styles.rangeClear}>Xóa bộ lọc</Text>
-                </Pressable>
-              ) : null}
-            </View>
-
-            <BudgetMonthSummary
-              // Under a filter the card describes the selected window, not the
-              // month — its own totals already come from the filtered rows, so the
-              // pace and the wording have to follow or the card contradicts itself.
-              pace={
-                rangeActive && resolvedRange
-                  ? { elapsed: rangeElapsed, daysLeft: 0, label: formatDateRange(resolvedRange.from, resolvedRange.to) }
-                  : pace
+            <BudgetRangeRow
+              label={
+                rangeLoading && dateRange.from
+                  ? formatDateRange(dateRange.from, dateRange.to ?? dateRange.from)
+                  : resolvedRange
+                    ? formatDateRange(resolvedRange.from, resolvedRange.to)
+                    : "Tháng này"
               }
-              periodNoun={rangeActive ? (rangeDayCount === 1 ? "ngày" : "khoảng này") : "tháng"}
-              showDaysLeft={!rangeActive}
-              totalLimit={totals.limit}
-              totalSpent={totals.spent}
-              currency={currency}
-              overCount={counts.over}
+              filtered={rangeActive}
+              onOpenPicker={() => setRangePickerOpen(true)}
+              onClear={() => setDateRange({})}
             />
 
-            <BudgetFilterChips value={filter} onChange={setFilter} counts={counts} />
+            {/* A picked range not answered yet: every row would read as unspent. */}
+            {rangeLoading ? (
+              <BudgetListSkeleton />
+            ) : (
+              <>
+                <BudgetMonthSummary
+                  // Under a filter the card describes the selected window, not the
+                  // month — its own totals already come from the filtered rows, so the
+                  // pace and the wording have to follow or the card contradicts itself.
+                  pace={
+                    rangeActive && resolvedRange
+                      ? { elapsed: rangeElapsed, daysLeft: 0, label: formatDateRange(resolvedRange.from, resolvedRange.to) }
+                      : pace
+                  }
+                  periodNoun={rangeActive ? (rangeDayCount === 1 ? "ngày" : "khoảng này") : "tháng"}
+                  showDaysLeft={!rangeActive}
+                  totalLimit={totals.limit}
+                  totalSpent={totals.spent}
+                  currency={currency}
+                  overCount={counts.over}
+                />
 
-            <Animated.View style={filterSlide} onLayout={(e) => (rowsTop.current = e.nativeEvent.layout.y)}>
-              {visibleRows.length === 0 ? (
-                <Text style={styles.empty}>
-                  {rows.length === 0 ? `Chưa có ngân sách bằng ${currency}.` : "Không có ngân sách nào trong nhóm này."}
-                </Text>
-              ) : (
-                visibleRows.map(({ budget, limit, periodElapsed }, index) => (
-                  <Reanimated.View
-                    key={`${budget.id}-${limit.currency}`}
-                    entering={rowEntrance(index)}
-                    onLayout={(e) => {
-                      rowOffsets.current[budget.id] = e.nativeEvent.layout.y;
-                    }}
-                  >
-                    <BudgetListRow
-                      budget={budget}
-                      limit={limit}
-                      periodElapsed={periodElapsed}
-                      category={categoryById.get(budget.category_id)}
-                      highlighted={highlightedBudgetId === budget.id}
-                      onPress={() => {
-                        setHighlightedBudgetId(null);
-                        setEditingBudget(budget);
-                        setModalOpen(true);
-                      }}
-                      onHold={() => setPickerOpen(true)}
-                      onPressBar={() => setDetailRow({ budget, limit })}
-                    />
-                  </Reanimated.View>
-                ))
-              )}
-            </Animated.View>
+                <BudgetFilterChips value={filter} onChange={setFilter} counts={counts} />
+
+                <Animated.View style={filterSlide} onLayout={(e) => (rowsTop.current = e.nativeEvent.layout.y)}>
+                  {visibleRows.length === 0 ? (
+                    <Text style={styles.empty}>
+                      {rows.length === 0 ? `Chưa có ngân sách bằng ${currency}.` : "Không có ngân sách nào trong nhóm này."}
+                    </Text>
+                  ) : (
+                    visibleRows.map(({ budget, limit, periodElapsed }, index) => (
+                      <Reanimated.View
+                        key={`${budget.id}-${limit.currency}`}
+                        entering={rowEntrance(index)}
+                        onLayout={(e) => {
+                          rowOffsets.current[budget.id] = e.nativeEvent.layout.y;
+                        }}
+                      >
+                        <BudgetListRow
+                          budget={budget}
+                          limit={limit}
+                          periodElapsed={periodElapsed}
+                          category={categoryById.get(budget.category_id)}
+                          highlighted={highlightedBudgetId === budget.id}
+                          onPress={openEditBudget}
+                          onHold={openCategoryPicker}
+                          onPressBar={openDetail}
+                        />
+                      </Reanimated.View>
+                    ))
+                  )}
+                </Animated.View>
+              </>
+            )}
           </>
         )}
       </ScrollView>
 
       {/* `right: 0` because Insights already pads its sides — the same 20px
           from the edge as Transactions' Fab. */}
-      <BudgetsFab onOpenWizard={onOpenBudgetWizard} onCreate={() => openNew()} style={styles.fab} />
+      <BudgetsFab onOpenWizard={onOpenBudgetWizard} onCreate={openNewManual} style={styles.fab} />
 
       <BudgetFormModal
         visible={modalOpen}
@@ -285,16 +288,10 @@ export function BudgetsTab({ initialRange, rangeNonce, onOpenBudgetWizard }: Bud
       />
     </View>
   );
-}
+});
 
 const useStyles = createStyles((colors) => ({
   container: { flex: 1 },
-  skeletonList: { gap: spacing.md },
-  rangeRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
-  rangeButton: { flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingVertical: spacing.sm },
-  rangeLabel: { ...typography.caption, color: colors.textSecondary },
-  rangeClear: { ...typography.caption, color: colors.green },
-  rangeNote: { ...typography.tiny, color: colors.textMuted, paddingBottom: spacing.xs },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
   fab: { right: 0 },
 }));

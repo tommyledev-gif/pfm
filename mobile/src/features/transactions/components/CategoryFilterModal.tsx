@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import { Avatar } from "@/components/ui/Avatar";
@@ -23,7 +23,7 @@ interface CategoryFilterModalProps {
 // TransactionFormModal's category picker implicitly has via its type-scoped
 // useCategoriesQuery call) since a flat alphabetical list would mix the two
 // with no visual cue.
-export function CategoryFilterModal({ visible, onClose, categories, selectedIds, onApply }: CategoryFilterModalProps) {
+export const CategoryFilterModal = memo(function CategoryFilterModal({ visible, onClose, categories, selectedIds, onApply }: CategoryFilterModalProps) {
   const styles = useStyles();
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -80,7 +80,7 @@ export function CategoryFilterModal({ visible, onClose, categories, selectedIds,
       ) : null}
     </Drawer>
   );
-}
+});
 
 function CategoryRow({ category, active, onPress }: { category: Category; active: boolean; onPress: () => void }) {
   const styles = useStyles();

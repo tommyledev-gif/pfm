@@ -1,4 +1,4 @@
-import { Fragment, useMemo } from "react";
+import { memo, Fragment, useMemo } from "react";
 import { Text } from "react-native";
 
 import { Drawer } from "@/components/shared/Drawer";
@@ -24,7 +24,7 @@ interface FutureTransactionsDialogProps {
 // already fetched rather than from a query of its own: these rows were in the
 // same response as everything else, so re-asking the server for them would be
 // a second request for data already in hand.
-export function FutureTransactionsDialog({
+export const FutureTransactionsDialog = memo(function FutureTransactionsDialog({
   visible,
   onClose,
   transactions,
@@ -77,7 +77,7 @@ export function FutureTransactionsDialog({
       )}
     </Drawer>
   );
-}
+});
 
 const useStyles = createStyles((colors) => ({
   note: { ...typography.tiny, color: colors.textSecondary },

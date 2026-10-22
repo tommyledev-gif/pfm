@@ -1,22 +1,30 @@
-import { useRef } from "react";
-import { Animated } from "react-native";
+import { useCallback } from "react";
+import { interpolateColor, useAnimatedStyle, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
 
-// Shared by Insights' Spending legend rows and Budget cards: a 2s hold on a
-// progress-bar item opens a category picker drawer, with its label text
-// gradually easing toward the primary accent color while held so the user
-// understands the row is holdable — this hook owns just the 0..1 progress
-// value driving that color interpolation (color isn't supported on the
-// native driver, hence useNativeDriver: false).
-export function useHoldProgress(durationMs = 2000) {
-  const progress = useRef(new Animated.Value(0)).current;
+// The tint waits this long before moving, so a scroll that merely starts on
+// a row never flickers its label.
+const TINT_DELAY_MS = 150;
+const RELEASE_MS = 150;
 
-  const start = () => {
-    Animated.timing(progress, { toValue: 1, duration: durationMs, useNativeDriver: false }).start();
-  };
+/**
+ * For a row with a long hold (Spending's legend, budget rows): its label eases
+ * from `idleColor` to `holdColor` over the hold, so the gesture shows it is
+ * registering. Runs on the UI thread; apply `tintStyle` to a Reanimated text.
+ */
+export function useHoldProgress(idleColor: string, holdColor: string, durationMs = 2000) {
+  const progress = useSharedValue(0);
 
-  const cancel = () => {
-    Animated.timing(progress, { toValue: 0, duration: 150, useNativeDriver: false }).start();
-  };
+  const start = useCallback(() => {
+    progress.value = withDelay(TINT_DELAY_MS, withTiming(1, { duration: Math.max(durationMs - TINT_DELAY_MS, 0) }));
+  }, [durationMs, progress]);
 
-  return { progress, start, cancel };
+  const cancel = useCallback(() => {
+    progress.value = withTiming(0, { duration: RELEASE_MS });
+  }, [progress]);
+
+  const tintStyle = useAnimatedStyle(() => ({
+    color: interpolateColor(progress.value, [0, 1], [idleColor, holdColor]),
+  }));
+
+  return { start, cancel, tintStyle };
 }

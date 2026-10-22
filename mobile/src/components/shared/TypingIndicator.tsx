@@ -1,3 +1,4 @@
+import { memo, useState } from "react";
 import Animated from "react-native-reanimated";
 
 import { entrance, exit } from "@/components/motion/motion-tokens";
@@ -19,14 +20,16 @@ const spokenLabel = (label: string) => label.replace(/(…|\.\.\.)$/, "");
  * running through it. Rises in as it appears and fades out when the answer
  * takes its place.
  */
-export function TypingIndicator({ label, testID }: TypingIndicatorProps) {
+export const TypingIndicator = memo(function TypingIndicator({ label, testID }: TypingIndicatorProps) {
   const colors = useColors();
   const styles = useStyles();
+  // Built once: a new exit builder per render re-registers the animation.
+  const [motion] = useState(() => ({ entering: entrance("fadeUp"), exiting: exit("fade") }));
   return (
     <Animated.View
       testID={testID}
-      entering={entrance("fadeUp")}
-      exiting={exit("fade")}
+      entering={motion.entering}
+      exiting={motion.exiting}
       style={styles.bubble}
       accessibilityLiveRegion="polite"
     >
@@ -39,7 +42,7 @@ export function TypingIndicator({ label, testID }: TypingIndicatorProps) {
       />
     </Animated.View>
   );
-}
+});
 
 // Mirrors ChatBubble's assistant bubble; only the line height is set, so the
 // lifted letters and Vietnamese marks have room inside it.

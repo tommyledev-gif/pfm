@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Animated, Pressable, Text, View } from "react-native";
 
 import { AmountRevealPopup } from "@/components/ui/AmountRevealPopup";
@@ -41,7 +41,7 @@ interface TransactionRowProps {
 // `category` is an optional lookup result (icon/icon_url) from the caller's
 // own categories fetch — Transaction itself only carries a denormalized
 // category_name, same reasoning as the `currency` prop above.
-export function TransactionRow({
+export const TransactionRow = memo(function TransactionRow({
   transaction,
   currency,
   category,
@@ -59,6 +59,13 @@ export function TransactionRow({
   const amountColor = isTransfer ? colors.periwinkle : isIncome ? colors.green : colors.peach;
   const amountSign = isTransfer ? "" : isIncome ? "+" : "-";
   const [revealVisible, setRevealVisible] = useState(false);
+  // Mounted from the first hold on, so a list of rows never builds a closed
+  // popup each (it spells the amount out in words on every render).
+  const [revealMounted, setRevealMounted] = useState(false);
+  const reveal = () => {
+    setRevealMounted(true);
+    setRevealVisible(true);
+  };
   const itemCount = transaction.item_count ?? 0;
   const walletLabel = isTransfer ? `${transaction.wallet_name} → ${transaction.to_wallet_name ?? "?"}` : transaction.wallet_name;
 
@@ -109,14 +116,14 @@ export function TransactionRow({
           it, so the right side of a row did nothing. Hold reveals the exact
           amount + Vietnamese words (AmountRevealPopup). */}
       {revealAmountOnHold ? (
-        <Pressable style={styles.right} onPress={onPress} onLongPress={() => setRevealVisible(true)}>
+        <Pressable style={styles.right} onPress={onPress} onLongPress={reveal}>
           {amount}
         </Pressable>
       ) : (
         <View style={styles.right}>{amount}</View>
       )}
 
-      {revealAmountOnHold ? (
+      {revealAmountOnHold && revealMounted ? (
         <AmountRevealPopup
           visible={revealVisible}
           onClose={() => setRevealVisible(false)}
@@ -133,7 +140,7 @@ export function TransactionRow({
       {content}
     </Pressable>
   );
-}
+});
 
 const useStyles = createStyles((colors) => ({
   row: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm },

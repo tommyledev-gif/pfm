@@ -10,49 +10,54 @@ import { useSheetStore } from "@/stores/sheet-store";
 import { useSavedAccountSync } from "@/features/accounts/hooks/use-saved-account-sync";
 import { AppLockOverlay } from "@/features/security/components/AppLockOverlay";
 
-// Notifications is a full-screen overlay without the bottom nav (README:
-// bell opens a "full-screen Notifications overlay"). AI Chat keeps the nav
-// visible — its input bar floats just above the pill (README: "Input bar:
-// floating pill above the bottom nav").
-// Pending review has its own pinned "Duyệt tất cả" footer where the nav would sit.
-// Add-account is a focused login form (specs/mobile-account-switch AS-T23).
+// Notifications is a full-screen overlay without the bottom nav. AI Chat
+// keeps it: its input bar floats just above the pill. Pending review has its
+// own pinned footer where the nav would sit; Add-account is a focused form.
 const ROUTES_WITHOUT_NAV = ["/notifications", "/pending", "/add-account"];
 
+const STACK_OPTIONS = { headerShown: false, animation: "fade" } as const;
+
+/**
+ * The signed-in shell: the stack of pushed sub-screens, the bottom nav and
+ * the app lock. Nothing here subscribes to anything, so a route change, a
+ * keyboard event or a sheet opening never re-renders the navigator.
+ */
 export default function AppLayout() {
   const styles = useStyles();
-  const pathname = usePathname();
-  // Signed-in area only — the lists it reads need a session.
+  return (
+    <View style={styles.container}>
+      <SessionEffects />
+      {/* Tab switching (and its fade) lives in (tabs)/_layout.tsx; this stack
+          only carries the pushed sub-screens above the tabs. */}
+      <Stack screenOptions={STACK_OPTIONS} />
+      <NavHost />
+      {/* Last, so it covers the nav and every screen (US-12). */}
+      <AppLockOverlay />
+    </View>
+  );
+}
+
+// Signed-in background work; renders nothing.
+function SessionEffects() {
   usePrefetchRecordIcons();
   // So the first transaction sheet's keypad is not the one paying for them.
   useWarmUpFormatting();
   // Keeps the device's saved accounts in step (spec US-06).
   useSavedAccountSync();
-  // BottomNav is an absolutely-positioned overlay outside any screen's own
-  // keyboard handling, so it never moves out of the way on its own — a
-  // focused input (AI Chat's, but any future one too) can end up sharing the
-  // keyboard-covered strip with it. Hiding it while the keyboard is open
-  // sidesteps needing every screen to account for its exact float height.
-  // Event-driven: the adjusted height is 0 on a window the OS already
-  // resized, which would leave the nav sitting on top of the keyboard.
-  const keyboardVisible = useKeyboardVisible();
-  // Drawer (components/shared/Drawer.tsx) renders in-tree rather than
-  // through RN's <Modal>, so unlike before it no longer automatically paints
-  // above this nav for free — hide the nav instead while any Drawer-based
-  // sheet is open.
-  const sheetOpen = useSheetStore((s) => s.openCount > 0);
-  const showNav = !ROUTES_WITHOUT_NAV.includes(pathname) && !keyboardVisible && !sheetOpen;
+  return null;
+}
 
-  return (
-    <View style={styles.container}>
-      {/* Tab-to-tab switching (and its fade) lives in (tabs)/_layout.tsx;
-          this stack only carries the pushed sub-screens above the tabs. */}
-      <Stack screenOptions={{ headerShown: false, animation: "fade" }} />
-      {showNav ? <BottomNav /> : null}
-      {/* No offline banner here — it is a strip inside Screen.tsx. */}
-      {/* Last, so it covers the nav and every screen (US-12). */}
-      <AppLockOverlay />
-    </View>
-  );
+// The nav sits outside every screen's keyboard handling, so it hides while
+// the keyboard is open (event-driven: the adjusted height is 0 on a window
+// the OS already resized), and while a Drawer sheet is open, since sheets
+// render in-tree and cannot otherwise paint above it. Hidden, not unmounted:
+// a remount rebuilt its SVGs and animation graph on every sheet close.
+function NavHost() {
+  const pathname = usePathname();
+  const keyboardVisible = useKeyboardVisible();
+  const sheetOpen = useSheetStore((s) => s.openCount > 0);
+  const hidden = ROUTES_WITHOUT_NAV.includes(pathname) || keyboardVisible || sheetOpen;
+  return <BottomNav hidden={hidden} />;
 }
 
 const useStyles = createStyles((colors) => ({

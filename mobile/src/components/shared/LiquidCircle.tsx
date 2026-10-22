@@ -101,10 +101,10 @@ export function LiquidCircle({
   // level 0 → surface at the circle's bottom edge; 1 → at its top. Left on
   // the default "extend" extrapolation so the overshoot can travel past the
   // target instead of stopping dead on it.
-  const translateY = level.interpolate({
-    inputRange: [0, 1],
-    outputRange: [size - WAVE_AMPLITUDE, -WAVE_AMPLITUDE],
-  });
+  const translateY = useMemo(
+    () => level.interpolate({ inputRange: [0, 1], outputRange: [size - WAVE_AMPLITUDE, -WAVE_AMPLITUDE] }),
+    [level, size],
+  );
 
   // The wave only runs while it can be seen. Home stays mounted behind every
   // other tab, so an unconditional loop kept a native animation ticking for

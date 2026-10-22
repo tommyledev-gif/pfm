@@ -1,12 +1,12 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
 
 import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
 import { Screen } from "@/components/shared/Screen";
 import { Fab } from "@/components/ui/Fab";
-import { TransactionRow } from "@/components/shared/TransactionRow";
 import { monthRange } from "@/lib/date-range";
 import { formatDateRange } from "@/lib/format-date";
+import { useLatestCallback } from "@/lib/use-latest-callback";
 import { useRefresh } from "@/lib/use-refresh";
 import { spacing, createStyles } from "@/lib/theme";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
@@ -24,6 +24,7 @@ import { TransactionsListEmpty, TransactionsListFooter } from "@/features/transa
 import { PendingSyncSection } from "@/features/transactions/components/PendingSyncSection";
 import { PendingSyncEditor } from "@/features/transactions/components/PendingSyncEditor";
 import { DaySectionList } from "@/features/transactions/components/DaySectionList";
+import { TransactionListRow } from "@/features/transactions/components/TransactionListRow";
 import { useCollapsedDays } from "@/features/transactions/hooks/use-collapsed-days";
 import { useFocusTransaction } from "@/features/transactions/hooks/use-focus-transaction";
 import { useTransactionFilters } from "@/features/transactions/hooks/use-transaction-filters";
@@ -32,11 +33,14 @@ import { CategoryFilterModal } from "@/features/transactions/components/Category
 import { SortDrawerModal } from "@/features/transactions/components/SortDrawerModal";
 import { isDefaultSort, sortTransactions, SORT_OPTIONS, SortKey } from "@/features/transactions/sort";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
+import { Category } from "@/features/categories/types";
+
+const NO_CATEGORIES: Category[] = [];
 
 export default function TransactionsScreen() {
   const styles = useStyles();
   const filters = useTransactionFilters();
-  const { filter, setFilter, dateRange, setDateRange, categoryIds, setCategoryIds, searchInput, sharedFilters } = filters;
+  const { filter, setFilter, dateRange, setDateRange, categoryIds, setCategoryIds, sharedFilters } = filters;
   const [pickerOpen, setPickerOpen] = useState(false);
   const [categoryFilterOpen, setCategoryFilterOpen] = useState(false);
   const [sortKeys, setSortKeys] = useState<SortKey[]>([]);
@@ -44,15 +48,12 @@ export default function TransactionsScreen() {
   const [formOpen, setFormOpen] = useState(false);
   const [futureOpen, setFutureOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-  // Day keys (YYYY-MM-DD) the user has folded away. Session-local and
-  // deliberately not persisted — collapsing is a "get this out of my way
-  // while I look at something else" gesture, not a setting. Keys that stop
-  // matching after a filter change are simply never looked up again.
+  // Day keys (YYYY-MM-DD) folded away. Session-local on purpose: collapsing
+  // is "out of my way for now", not a setting.
   const days = useCollapsedDays();
   const { collapsedDays, foldingDays } = days;
-  // Set by "Xem trong Giao dịch" (Insights' category drill-down): scroll to
-  // that row and flash a border on it. `focusedAt` is a nonce, so the same
-  // row can be jumped to twice in a row.
+  // Set by "Xem trong Giao dịch": scroll to that row and flash a border on
+  // it. `focusedAt` is a nonce, so the same row can be jumped to twice.
   const { focusTransactionId, focusDay, focusedAt } = useLocalSearchParams<{
     focusTransactionId?: string;
     focusDay?: string;
@@ -61,12 +62,10 @@ export default function TransactionsScreen() {
   const wallets = useWalletsQuery();
   const categories = useCategoriesQuery();
 
-  const transactions = useTransactionsQuery({ ...sharedFilters, type: filter });
-
-  // A 1-row request fetched purely for its `total`. Only runs while a type tab
-  // is actually narrowing the list — on "Tất cả" the main query above already
-  // counts every type, so this would just be a duplicate of it.
-  const allTypesCount = useTransactionsQuery({ ...sharedFilters, limit: 1 }, { enabled: filter !== undefined });
+  // A new filter keeps the current rows on screen until its own land, rather
+  // than dropping to a skeleton on every search refinement.
+  const transactions = useTransactionsQuery({ ...sharedFilters, type: filter }, { keepPrevious: true });
+  const switchingFilters = transactions.isPlaceholderData;
 
   const walletCurrencyMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -81,30 +80,21 @@ export default function TransactionsScreen() {
     return sortTransactions(items, sortKeys);
   }, [transactions.data, sortKeys]);
 
-  // How many transactions the active filters match in total, served by the
-  // list endpoint itself (only on the first page — see ListTransactionsResult).
-  // sortedItems.length is the number of rows *loaded*, which is capped at the
-  // page size, so the header badge using it read a constant "20 mục" no matter
-  // which tab, categories or period were selected. Falls back to the loaded
-  // count only while the first page is still in flight.
-  const matchedCount = transactions.data?.pages[0]?.total ?? sortedItems.length;
-  const allTypesMatchedCount =
-    filter === undefined ? matchedCount : allTypesCount.data?.pages[0]?.total ?? matchedCount;
+  // How many transactions the filters match in total (first page only — see
+  // ListTransactionsResult), not how many rows are loaded. Unknown while the
+  // answer for these filters is still on its way.
+  const firstPageTotal = transactions.data?.pages[0]?.total;
+  const matchedCount = switchingFilters || firstPageTotal === undefined ? null : firstPageTotal;
 
   const hasDateFilter = Boolean(dateRange.from);
-  // The sort drawer opens with DEFAULT_SORT_KEY pre-selected, so applying it
-  // without changing anything hands back ["recent"] — the order the list was
-  // already in. Highlighting the pill for that would claim a filter the user
-  // never chose.
+  // Applying the drawer's pre-selected default hands back ["recent"], the
+  // order the list was already in — not a sort the user chose.
   const hasCustomSort = !isDefaultSort(sortKeys);
-  // Day grouping only makes sense while the order is chronological — see
-  // buildDaySections' `grouped` option.
+  // Day grouping only makes sense while the order is chronological.
   const hasAmountSort = sortKeys.some((key) => SORT_OPTIONS.find((o) => o.key === key)?.group === "amount");
 
-  // Rows dated ahead of today are lifted out of the list and summarised in a
-  // dashed card above it — see splitFutureTransactions for why the top of the
-  // list has to stay "what just happened". A filter that deliberately reaches
-  // into the future opts out: those rows were asked for.
+  // Rows dated ahead of today are lifted into a card above the list, unless
+  // the filter deliberately reaches into the future.
   const { future, upToToday } = useMemo(() => {
     if (rangeTargetsFuture(dateRange.to)) return { future: [], upToToday: sortedItems };
     return splitFutureTransactions(sortedItems);
@@ -114,9 +104,9 @@ export default function TransactionsScreen() {
     () => buildDaySections(upToToday, { grouped: !hasAmountSort, walletCurrencyMap, collapsedDays, foldingDays }),
     [upToToday, hasAmountSort, walletCurrencyMap, collapsedDays, foldingDays],
   );
-  // A new result set staggers in: new filters, and again once their first page
-  // lands. A refetch or the next page changes none of it.
-  const listReplayKey = `${filters.filterKey}|${sortKeys.join()}|${transactions.isPending}`;
+  // A new result set staggers in once its rows land; a refetch or the next
+  // page changes none of it.
+  const listReplayKey = `${filters.filterKey}|${sortKeys.join()}|${transactions.isPending || switchingFilters}`;
 
   const focus = useFocusTransaction({
     focusId: focusTransactionId,
@@ -141,11 +131,8 @@ export default function TransactionsScreen() {
   const headerRange = hasDateFilter ? { from: dateRange.from, to: dateRange.to } : monthRange(0);
   const { total: headerTotal, otherCurrencies, refetch: refetchHeaderTotal } = useFilteredReportTotal(headerRange, categoryIds);
 
-  // Export and import both act on the period the user is currently looking at
-  // — the explicit date filter when there is one, otherwise the same current
-  // month the header already summarises. Falls back to the current month if
-  // a partial range ever reaches here: GET /transactions/export requires both
-  // bounds, and sending an empty one would be a 400 the user can't act on.
+  // Export and import act on the period on screen: the date filter, else the
+  // current month the header summarises. Both bounds are required by the API.
   const currentMonth = monthRange(0);
   const exportRange = {
     from: headerRange.from ?? currentMonth.from,
@@ -156,20 +143,55 @@ export default function TransactionsScreen() {
     currency: headerTotal?.currency ?? "VND",
   });
 
-  const openCreateForm = () => {
+  const openCreateForm = useCallback(() => {
     setEditingTransaction(null);
     setFormOpen(true);
-  };
+  }, []);
+  const openEdit = useCallback((transaction: Transaction) => {
+    setEditingTransaction(transaction);
+    setFormOpen(true);
+  }, []);
+  const closeForm = useCallback(() => setFormOpen(false), []);
+  const openDatePicker = useCallback(() => setPickerOpen(true), []);
+  const closeDatePicker = useCallback(() => setPickerOpen(false), []);
+  const openCategoryFilter = useCallback(() => setCategoryFilterOpen(true), []);
+  const closeCategoryFilter = useCallback(() => setCategoryFilterOpen(false), []);
+  const openSort = useCallback(() => setSortDrawerOpen(true), []);
+  const closeSort = useCallback(() => setSortDrawerOpen(false), []);
+  const openFuture = useCallback(() => setFutureOpen(true), []);
+  const closeFuture = useCallback(() => setFutureOpen(false), []);
+  const selectFuture = useCallback((transaction: Transaction) => {
+    setFutureOpen(false);
+    setEditingTransaction(transaction);
+    setFormOpen(true);
+  }, []);
+  const changeTypeFilter = useCallback(
+    (value: TypeFilterValue) => setFilter(value === "all" ? undefined : value),
+    [setFilter],
+  );
+  // Not while the previous filter's rows stand in: their next page is not this filter's.
+  const loadNextPage = useLatestCallback(() => {
+    if (switchingFilters) return;
+    if (transactions.hasNextPage && !transactions.isFetchingNextPage) transactions.fetchNextPage();
+  });
 
-  // Everything the screen shows, not just the list: leaving the header total or
-  // the "Tất cả" count behind on a pull would disagree with the rows under it.
-  const { refreshControl } = useRefresh([
-    transactions,
-    allTypesCount,
-    { refetch: refetchHeaderTotal },
-    wallets,
-    categories,
-  ]);
+  const { highlightId, highlightOpacity } = focus;
+  const renderRow = useCallback(
+    (item: Transaction) => (
+      <TransactionListRow
+        item={item}
+        currency={walletCurrencyMap.get(item.wallet_id)}
+        category={categoryById.get(item.category_id)}
+        highlightOpacity={item.id === highlightId ? highlightOpacity : undefined}
+        onSelect={openEdit}
+      />
+    ),
+    [walletCurrencyMap, categoryById, highlightId, highlightOpacity, openEdit],
+  );
+
+  // Everything the screen shows, not just the list: a stale header total
+  // would disagree with the rows under it.
+  const { refreshControl } = useRefresh([transactions, { refetch: refetchHeaderTotal }, wallets, categories]);
 
   return (
     <Screen>
@@ -184,48 +206,34 @@ export default function TransactionsScreen() {
         stickySectionHeadersEnabled={false}
         refreshControl={refreshControl}
         onEndReachedThreshold={0.4}
-        onEndReached={() => {
-          if (transactions.hasNextPage && !transactions.isFetchingNextPage) transactions.fetchNextPage();
-        }}
+        onEndReached={loadNextPage}
         ListHeaderComponent={
           <TransactionsHeader
             matchedCount={matchedCount}
-            allTypesMatchedCount={allTypesMatchedCount}
             periodLabel={dateRangeLabel ?? currentMonthLabel}
             headerTotal={headerTotal}
             otherCurrencies={otherCurrencies}
             typeFilter={filter ?? "all"}
-            onChangeTypeFilter={(value: TypeFilterValue) => setFilter(value === "all" ? undefined : value)}
-            searchInput={searchInput}
-            onChangeSearch={filters.setSearchInput}
+            onChangeTypeFilter={changeTypeFilter}
+            searchSeed={filters.searchSeed}
+            onSearch={filters.setSearch}
             dateRangeLabel={dateRangeLabel}
-            onOpenDatePicker={() => setPickerOpen(true)}
+            onOpenDatePicker={openDatePicker}
             categoryCount={categoryIds.length}
-            onOpenCategoryFilter={() => setCategoryFilterOpen(true)}
+            onOpenCategoryFilter={openCategoryFilter}
             sortCount={sortKeys.length}
             hasCustomSort={hasCustomSort}
-            onOpenSort={() => setSortDrawerOpen(true)}
+            onOpenSort={openSort}
             onExport={transactionIO.onExport}
             onImport={transactionIO.onImport}
             exporting={transactionIO.exporting}
             importing={transactionIO.importing}
           >
             <PendingSyncSection />
-            <FutureTransactionsCard transactions={future} onPress={() => setFutureOpen(true)} />
+            <FutureTransactionsCard transactions={future} onPress={openFuture} />
           </TransactionsHeader>
         }
-        renderRow={(item) => (
-          <TransactionRow
-            transaction={item}
-            currency={walletCurrencyMap.get(item.wallet_id)}
-            category={categoryById.get(item.category_id)}
-            onPress={() => {
-              setEditingTransaction(item);
-              setFormOpen(true);
-            }}
-            highlightOpacity={item.id === focus.highlightId ? focus.highlightOpacity : undefined}
-          />
-        )}
+        renderRow={renderRow}
         empty={
           <TransactionsListEmpty
             query={transactions}
@@ -244,7 +252,7 @@ export default function TransactionsScreen() {
 
       <DateRangePickerModal
         visible={pickerOpen}
-        onClose={() => setPickerOpen(false)}
+        onClose={closeDatePicker}
         from={dateRange.from}
         to={dateRange.to}
         onApply={setDateRange}
@@ -252,36 +260,23 @@ export default function TransactionsScreen() {
 
       <CategoryFilterModal
         visible={categoryFilterOpen}
-        onClose={() => setCategoryFilterOpen(false)}
-        categories={categories.data ?? []}
+        onClose={closeCategoryFilter}
+        categories={categories.data ?? NO_CATEGORIES}
         selectedIds={categoryIds}
         onApply={setCategoryIds}
       />
 
-      <SortDrawerModal
-        visible={sortDrawerOpen}
-        onClose={() => setSortDrawerOpen(false)}
-        selected={sortKeys}
-        onApply={setSortKeys}
-      />
+      <SortDrawerModal visible={sortDrawerOpen} onClose={closeSort} selected={sortKeys} onApply={setSortKeys} />
 
-      <TransactionFormModal
-        visible={formOpen}
-        onClose={() => setFormOpen(false)}
-        editingTransaction={editingTransaction}
-      />
+      <TransactionFormModal visible={formOpen} onClose={closeForm} editingTransaction={editingTransaction} />
 
       <FutureTransactionsDialog
         visible={futureOpen}
-        onClose={() => setFutureOpen(false)}
+        onClose={closeFuture}
         transactions={future}
         walletCurrencyMap={walletCurrencyMap}
         categoryById={categoryById}
-        onSelect={(transaction) => {
-          setFutureOpen(false);
-          setEditingTransaction(transaction);
-          setFormOpen(true);
-        }}
+        onSelect={selectFuture}
       />
 
       <PendingSyncEditor />

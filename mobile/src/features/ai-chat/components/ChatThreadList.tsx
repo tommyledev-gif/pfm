@@ -1,4 +1,4 @@
-import { RefObject, useEffect, useRef, useState } from "react";
+import { RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, FlatList, FlatListProps, NativeScrollEvent, NativeSyntheticEvent, Pressable, View } from "react-native";
 
 import { ChevronDownIcon } from "@/components/ui/Icon";
@@ -53,7 +53,10 @@ export function ChatThreadList({ listRef, style, reservedBottom = 0, contentCont
     setAwayFromLatest((prev) => (prev === away ? prev : away));
   };
 
-  const translateY = opacity.interpolate({ inputRange: [0, 1], outputRange: [RISE_DISTANCE, 0] });
+  const translateY = useMemo(
+    () => opacity.interpolate({ inputRange: [0, 1], outputRange: [RISE_DISTANCE, 0] }),
+    [opacity],
+  );
 
   return (
     <View style={styles.wrap}>

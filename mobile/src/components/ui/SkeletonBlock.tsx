@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import { AccessibilityInfo, Animated, StyleProp, ViewStyle } from "react-native";
+import { useEffect, useMemo, useRef } from "react";
+import { Animated, Easing, StyleProp, ViewStyle } from "react-native";
 
 import { useColors } from "@/lib/theme";
+import { useReduceMotion } from "@/lib/use-reduce-motion";
 
 interface SkeletonBlockProps {
   width: number | `${number}%`;
@@ -10,52 +11,39 @@ interface SkeletonBlockProps {
   style?: StyleProp<ViewStyle>;
 }
 
-const PULSE_DURATION_MS = 800;
+const PULSE_CYCLE_MS = 1600;
 const MIN_OPACITY = 0.4;
 const MAX_OPACITY = 1;
 const STATIC_OPACITY = 0.6;
+// One eased breath per cycle (sin²), sampled so a single linear native timing
+// can loop it. A looped sequence of two timings is restarted from JS every
+// cycle, and a screen of skeletons hit the JS thread in a burst each time.
+const PULSE_INPUT = [0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1];
+const PULSE_OUTPUT = [0, 0.146, 0.5, 0.854, 1, 0.854, 0.5, 0.146, 0].map(
+  (t) => MIN_OPACITY + (MAX_OPACITY - MIN_OPACITY) * t,
+);
 
-// Shared pulsing placeholder primitive (specs/mobile-loading-skeletons/spec.md
-// decision #2) — every screen composes this into a layout shaped like its
-// eventual content. One Animated.Value per instance (plan.md Pre-flight
-// Finding #3), not shared/hoisted, so unmounting one skeleton never
-// disrupts another's animation loop.
+/** Pulsing placeholder; screens compose it into the shape of their content. */
 export function SkeletonBlock({ width, height, borderRadius = 8, style }: SkeletonBlockProps) {
   const colors = useColors();
-  const opacity = useRef(new Animated.Value(MIN_OPACITY)).current;
-  const [reduceMotion, setReduceMotion] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      if (!cancelled) setReduceMotion(enabled);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const reduceMotion = useReduceMotion();
+  const phase = useRef(new Animated.Value(0)).current;
+  const opacity = useMemo(() => phase.interpolate({ inputRange: PULSE_INPUT, outputRange: PULSE_OUTPUT }), [phase]);
 
   useEffect(() => {
     if (reduceMotion) return;
-
     const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: MAX_OPACITY, duration: PULSE_DURATION_MS, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: MIN_OPACITY, duration: PULSE_DURATION_MS, useNativeDriver: true }),
-      ]),
+      Animated.timing(phase, { toValue: 1, duration: PULSE_CYCLE_MS, easing: Easing.linear, useNativeDriver: true }),
     );
     loop.start();
-    return () => {
-      loop.stop();
-      opacity.stopAnimation();
-    };
-  }, [reduceMotion, opacity]);
+    return () => loop.stop();
+  }, [reduceMotion, phase]);
 
   return (
     <Animated.View
       style={[
         { width, height, borderRadius, backgroundColor: colors.surfaceBorder },
-        reduceMotion ? { opacity: STATIC_OPACITY } : { opacity },
+        { opacity: reduceMotion ? STATIC_OPACITY : opacity },
         style,
       ]}
     />

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Keyboard, StyleSheet, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useLocalSearchParams } from "expo-router";
@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { entrance } from "@/components/motion/motion-tokens";
 import { Screen } from "@/components/shared/Screen";
+import { closeParkedSwipeRow } from "@/components/shared/use-swipe-actions";
 import { ChatModeBackdrop } from "@/features/ai-chat/components/ChatModeBackdrop";
 import { ChatModeHeader } from "@/features/ai-chat/components/ChatModeHeader";
 import { ChatModePicker } from "@/features/ai-chat/components/ChatModePicker";
@@ -13,17 +14,19 @@ import { ChatOverlays } from "@/features/ai-chat/components/ChatOverlays";
 import { ConsultPane } from "@/features/ai-chat/components/ConsultPane";
 import { RecordingPane } from "@/features/ai-chat/components/RecordingPane";
 import { useTransactionRemoval } from "@/features/ai-chat/components/use-transaction-removal";
+import { createChatDraftStore } from "@/features/ai-chat/chat-draft";
 import { ChatMode, useChatModeStore } from "@/features/ai-chat/chat-mode";
 import { isConsultMessage } from "@/features/ai-chat/consult-message";
 import { useChatActions } from "@/features/ai-chat/hooks/use-chat-actions";
 import { useChatOverlays } from "@/features/ai-chat/hooks/use-chat-overlays";
 import { isTombstone } from "@/features/ai-chat/tombstone";
-import { useKeyboardHeight, useKeyboardVisible } from "@/lib/use-keyboard-height";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useChatThreadQuery } from "@/features/ai-chat/api/use-chat-thread-sync";
-import { ChatMessage } from "@/features/ai-chat/types";
-import { useChatStore } from "@/stores/chat-store";
+import { ChatMessage, SavedProposalPatch, TransactionActionPayload } from "@/features/ai-chat/types";
+import { isWaitingForNetwork } from "@/lib/query-status";
+import { useLatestCallback } from "@/lib/use-latest-callback";
+import { useChatStore, useChatThreadRestored } from "@/stores/chat-store";
 import { useCurrentUserId } from "@/stores/use-current-user-id";
 
 // A beat for the list to finish its mount/measure pass before scrolling to a
@@ -31,10 +34,8 @@ import { useCurrentUserId } from "@/stores/use-current-user-id";
 const FOCUS_SCROLL_DELAY_MS = 50;
 
 // For anything that opens a Modal over the composer: close the keyboard
-// first. A Modal is its own Android window; taking focus hides the keyboard
-// but leaves the input focused, and neither React Native nor Reanimated hears
-// the keyboard go — the input bar stayed lifted under the overlay. Blurring
-// the input is what KeyboardLiftView reliably comes down on.
+// first. A Modal is its own Android window; it hides the keyboard but leaves
+// the input focused, and the input bar stayed lifted under the overlay.
 const dismissKeyboardThen =
   <A extends unknown[]>(open: (...args: A) => void) =>
   (...args: A) => {
@@ -46,40 +47,28 @@ export default function AiChatScreen() {
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
-  // Thread lives in a store, not local state: it outlives this screen, and is
-  // reset per User by session-scoped-reset.ts.
+  // In a store: the thread outlives this screen and is reset per User by
+  // session-scoped-reset.ts.
   const thread = useChatStore((s) => s.thread);
   const updateMessage = useChatStore((s) => s.updateMessage);
   const hydrateThread = useChatStore((s) => s.hydrateThread);
 
-  // Which conversation is on screen — recording or analysis, each its own
-  // pane. Stored outside the screen for the same unmount-on-tab-change
-  // reason, but NOT persisted — see chat-mode.ts.
+  // Not persisted — see chat-mode.ts.
   const mode = useChatModeStore((s) => s.mode);
   const setMode = useChatModeStore((s) => s.setMode);
   const [modePickerOpen, setModePickerOpen] = useState(false);
-  // Switching between the two panes fades the new one in, in step with the
-  // backdrop's wash; the pane on screen when the tab first mounts just shows.
+  // The pane on screen when the tab first mounts just shows; a switch fades in.
   const firstRender = useRef(true);
   useEffect(() => {
     firstRender.current = false;
   }, []);
 
-  const [input, setInput] = useState("");
+  const [draftStore] = useState(createChatDraftStore);
   // Set when "Switch to recording" carries a question over, so the recording
   // input mounts focused; cleared once it has taken focus.
   const [focusRecordingInput, setFocusRecordingInput] = useState(false);
-  // Bumped on any scroll or thread change, so a parked swipe row is never left
-  // open over content that has moved underneath it.
-  const [closeSignal, setCloseSignal] = useState(0);
 
-  const keyboardHeight = useKeyboardHeight();
-  // ⚠️ From the keyboard events, not from `keyboardHeight > 0`. The height is
-  // what remains to pad AFTER the OS has resized the window, so on a device
-  // that resizes it is legitimately 0 while the keyboard is wide open.
-  const keyboardVisible = useKeyboardVisible();
-
-  const overlays = useChatOverlays(keyboardVisible);
+  const overlays = useChatOverlays();
 
   const { focusMessageId, focusedAt, openEdit } = useLocalSearchParams<{
     focusMessageId?: string;
@@ -87,16 +76,10 @@ export default function AiChatScreen() {
     openEdit?: string;
   }>();
 
-  // Restores the synced thread when the local copy is empty — after a logout,
-  // an account switch, a reinstall or a new device wiped it. At most once per
-  // User per app run (the store's restoredFor), so a cached server snapshot
-  // can never be replayed over local changes made since (a deleted
-  // transaction's tombstone reverting to a live card is how that showed up).
-  //
-  // ⚠️ Read live, not frozen at mount. Tabs stay mounted once visited, so this
-  // screen lives through logouts and account switches; a mount-time flag kept
-  // the previous account's answer and the next account's thread was never
-  // restored.
+  // Restores the synced thread when the local copy is empty (logout, account
+  // switch, reinstall, new device). At most once per User per app run (the
+  // store's restoredFor), so a cached server snapshot never replays over
+  // local changes. Read live: this screen outlives account switches.
   const userId = useCurrentUserId();
   const ownerId = useChatStore((s) => s.ownerId);
   const restoredFor = useChatStore((s) => s.restoredFor);
@@ -106,6 +89,13 @@ export default function AiChatScreen() {
     if (needsServerThread && userId && threadQuery.data) hydrateThread(threadQuery.data, userId);
   }, [needsServerThread, userId, threadQuery.data, hydrateThread]);
 
+  // Skeleton until there is an answer, so the empty state never flashes in
+  // front of a thread that is about to appear. A failed or offline restore
+  // falls through to the empty state.
+  const threadRestored = useChatThreadRestored();
+  const threadLoading =
+    !threadRestored || (needsServerThread && !threadQuery.isError && !isWaitingForNetwork(threadQuery));
+
   const wallets = useWalletsQuery();
   const categories = useCategoriesQuery();
 
@@ -114,21 +104,20 @@ export default function AiChatScreen() {
   });
   const removal = useTransactionRemoval();
 
-  // Recording pane only — analysis messages live in ConsultPane. Reversed here
-  // rather than in the store, so every other consumer keeps reading the
-  // thread in natural order.
+  // Recording messages only, newest first for the inverted list. The store
+  // keeps natural order for every other reader.
   const invertedThread = useMemo(() => thread.filter((m) => !isConsultMessage(m)).reverse(), [thread]);
   const walletById = useMemo(() => new Map(wallets.data?.map((w) => [w.id, w])), [wallets.data]);
   const categoryById = useMemo(() => new Map(categories.data?.map((c) => [c.id, c])), [categories.data]);
 
+  // A parked swipe row never stays open over a thread that moved under it.
   useEffect(() => {
-    setCloseSignal((n) => n + 1);
+    closeParkedSwipeRow();
   }, [thread.length]);
 
   useEffect(() => {
     if (!focusMessageId) return;
-    // Deep links always point at a Transaction proposal, which lives in the
-    // recording pane.
+    // Deep links always point at a Transaction proposal (recording pane).
     setMode("transaction");
     const index = invertedThread.findIndex((m) => m.id === focusMessageId);
     if (index === -1) return;
@@ -143,34 +132,61 @@ export default function AiChatScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusMessageId, focusedAt]);
 
-  // Picking "Lập ngân sách" opens the wizard straight away; the mode lasts only
-  // while it is open, and closing it returns to recording.
-  const handleSelectMode = (next: ChatMode) => {
+  // "Lập ngân sách" opens the wizard at once; the mode lasts while it is open.
+  const handleSelectMode = useLatestCallback((next: ChatMode) => {
     setMode(next);
     setModePickerOpen(false);
     if (next === "budget") overlays.openBudgetWizard(null);
-  };
-  // Never sends: the carried question lands in the input for the User to
-  // check and send themselves. A reply with no remembered question just
-  // switches, leaving the draft alone.
-  const handleSwitchToRecording = (prefill?: string) => {
+  });
+  // Never sends: the carried question lands in the input for the User to send.
+  const handleSwitchToRecording = useLatestCallback((prefill?: string) => {
     setMode("transaction");
     const text = prefill?.trim();
     if (!text) return;
-    setInput(text);
+    draftStore.getState().setText(text);
     setFocusRecordingInput(true);
-  };
-  const handleCloseBudgetWizard = () => {
+  });
+  const handleCloseBudgetWizard = useLatestCallback(() => {
     overlays.setBudgetWizardOpen(false);
     if (mode === "budget") setMode("transaction");
-  };
+  });
+
+  const openModePicker = useMemo(() => dismissKeyboardThen(() => setModePickerOpen(true)), []);
+  const closeModePicker = useCallback(() => setModePickerOpen(false), []);
+  const clearInputFocusRequest = useCallback(() => setFocusRecordingInput(false), []);
+  const openHistory = useMemo(() => dismissKeyboardThen(overlays.openHistory), [overlays.openHistory]);
+  const openBudgetWizard = useMemo(() => dismissKeyboardThen(overlays.openBudgetWizard), [overlays.openBudgetWizard]);
+  const openManualEntry = useLatestCallback(dismissKeyboardThen(() => overlays.setManualEntryOpen(true)));
+
+  const closeEditingMessage = useLatestCallback(() => overlays.setEditingMessage(null));
+  const saveEditingMessage = useLatestCallback((text: string) => {
+    const target = overlays.editingMessage;
+    overlays.setEditingMessage(null);
+    if (target) void chat.editUserMessage(target, text);
+  });
+  const closeEditingAction = useLatestCallback(() => overlays.setEditingActionMessage(null));
+  const saveEditingAction = useLatestCallback((payload: TransactionActionPayload, savedPatch: SavedProposalPatch) => {
+    const target = overlays.editingActionMessage;
+    overlays.setEditingActionMessage(null);
+    if (target) chat.editAction(target, payload, savedPatch);
+  });
+  const closeHistory = useLatestCallback(() => overlays.setHistoryMessage(null));
+  const closeTombstone = useLatestCallback(() => overlays.setTombstoneMessage(null));
+  const closeManualEntry = useLatestCallback(() => overlays.setManualEntryOpen(false));
+  const budgetWizardCompleted = useLatestCallback((createdCount: number) => {
+    if (!overlays.budgetWizardOriginMessageId) return;
+    updateMessage(overlays.budgetWizardOriginMessageId, {
+      budgetWizardSubmitted: true,
+      budgetWizardCreatedCount: createdCount,
+    });
+  });
 
   return (
     <Screen>
       {/* Outside the content View so its wash runs up under the status bar too. */}
       <ChatModeBackdrop mode={mode} />
       <View style={styles.screen}>
-        <ChatModeHeader mode={mode} onPressMode={dismissKeyboardThen(() => setModePickerOpen(true))} />
+        <ChatModeHeader mode={mode} onPressMode={openModePicker} />
 
         {/* Keyed by pane, not mode: recording and the budget wizard share one. */}
         <Animated.View
@@ -180,7 +196,7 @@ export default function AiChatScreen() {
         >
           {mode === "consult" ? (
             <ConsultPane
-              keyboardVisible={keyboardVisible}
+              loading={threadLoading}
               bottomInset={insets.bottom}
               onSwitchToRecording={handleSwitchToRecording}
             />
@@ -188,35 +204,26 @@ export default function AiChatScreen() {
             <RecordingPane
               listRef={listRef}
               messages={invertedThread}
+              loading={threadLoading}
               walletById={walletById}
               categoryById={categoryById}
               chat={chat}
-              closeSignal={closeSignal}
-              onScrollBeginDrag={() => setCloseSignal((n) => n + 1)}
-              input={input}
-              onChangeInput={setInput}
+              draftStore={draftStore}
               autoFocusInput={focusRecordingInput}
-              onInputFocused={() => setFocusRecordingInput(false)}
-              keyboardVisible={keyboardVisible}
-              keyboardHeight={keyboardHeight}
+              onInputFocused={clearInputFocusRequest}
               bottomInset={insets.bottom}
               mode={mode}
               onTriggerEdit={overlays.triggerEdit}
               onTriggerDelete={removal.request}
-              onPressHistory={dismissKeyboardThen(overlays.openHistory)}
-              onOpenBudgetWizard={dismissKeyboardThen(overlays.openBudgetWizard)}
-              onOpenManualEntry={dismissKeyboardThen(() => overlays.setManualEntryOpen(true))}
+              onPressHistory={openHistory}
+              onOpenBudgetWizard={openBudgetWizard}
+              onOpenManualEntry={openManualEntry}
             />
           )}
         </Animated.View>
       </View>
 
-      <ChatModePicker
-        visible={modePickerOpen}
-        mode={mode}
-        onClose={() => setModePickerOpen(false)}
-        onSelect={handleSelectMode}
-      />
+      <ChatModePicker visible={modePickerOpen} mode={mode} onClose={closeModePicker} onSelect={handleSelectMode} />
 
       <ChatOverlays
         walletById={walletById}
@@ -228,30 +235,15 @@ export default function AiChatScreen() {
         tombstoneMessage={overlays.tombstoneMessage}
         manualEntryOpen={overlays.manualEntryOpen}
         budgetWizardOpen={overlays.budgetWizardOpen}
-        onCloseEditingMessage={() => overlays.setEditingMessage(null)}
-        onSaveEditingMessage={(text) => {
-          const target = overlays.editingMessage;
-          overlays.setEditingMessage(null);
-          if (target) void chat.editUserMessage(target, text);
-        }}
-        onCloseEditingAction={() => overlays.setEditingActionMessage(null)}
-        onSaveEditingAction={(payload, savedPatch) => {
-          const target = overlays.editingActionMessage;
-          overlays.setEditingActionMessage(null);
-          if (target) chat.editAction(target, payload, savedPatch);
-        }}
-        onCloseHistory={() => overlays.setHistoryMessage(null)}
-        onCloseTombstone={() => overlays.setTombstoneMessage(null)}
-        onCloseManualEntry={() => overlays.setManualEntryOpen(false)}
+        onCloseEditingMessage={closeEditingMessage}
+        onSaveEditingMessage={saveEditingMessage}
+        onCloseEditingAction={closeEditingAction}
+        onSaveEditingAction={saveEditingAction}
+        onCloseHistory={closeHistory}
+        onCloseTombstone={closeTombstone}
+        onCloseManualEntry={closeManualEntry}
         onCloseBudgetWizard={handleCloseBudgetWizard}
-        onBudgetWizardCompleted={(createdCount) => {
-          if (overlays.budgetWizardOriginMessageId) {
-            updateMessage(overlays.budgetWizardOriginMessageId, {
-              budgetWizardSubmitted: true,
-              budgetWizardCreatedCount: createdCount,
-            });
-          }
-        }}
+        onBudgetWizardCompleted={budgetWizardCompleted}
       />
     </Screen>
   );

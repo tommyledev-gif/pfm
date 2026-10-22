@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { memo, useEffect } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from "react-native-reanimated";
 
@@ -42,7 +42,7 @@ interface ChatModePickerProps {
  * shows up as a dark rectangle inside the row — which is exactly what the
  * previous "elevated card" version looked like on device.
  */
-export function ChatModePicker({ visible, mode, onClose, onSelect }: ChatModePickerProps) {
+export const ChatModePicker = memo(function ChatModePicker({ visible, mode, onClose, onSelect }: ChatModePickerProps) {
   const colors = useColors();
   const styles = useStyles();
   const reduceMotion = useReduceMotion();
@@ -111,7 +111,7 @@ export function ChatModePicker({ visible, mode, onClose, onSelect }: ChatModePic
       </Pressable>
     </Modal>
   );
-}
+});
 
 const useStyles = createStyles((colors) => ({
   backdrop: {

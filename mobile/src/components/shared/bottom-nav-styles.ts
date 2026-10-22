@@ -85,6 +85,10 @@ export const ICON_BOUNCE_SCALE = 1.15;
 // forever. Kept tiny (and slow) so it reads as "alive", not as motion.
 export const BOB_DISTANCE = 4;
 export const BOB_DURATION = 1600;
+// One breath (0 → 1 → 0) per cycle, sampled from a cosine so a single linear
+// native timing can loop it; a looped sequence is restarted from JS each cycle.
+export const BOB_INPUT = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((k) => k / 12);
+export const BOB_OUTPUT = BOB_INPUT.map((t) => (1 - Math.cos(2 * Math.PI * t)) / 2);
 
 export const useStyles = createStyles((colors) => ({
   wrapper: {
@@ -93,6 +97,7 @@ export const useStyles = createStyles((colors) => ({
     right: 0,
     bottom: 0,
   },
+  hidden: { display: "none" },
   // Flush against the screen's bottom/left/right edges now, not a floating
   // margined pill — only the top corners stay rounded. paddingBottom (set
   // inline to insets.bottom) extends the bar's own background into the

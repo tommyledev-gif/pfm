@@ -40,8 +40,6 @@ interface ChatMessageRowProps {
    *  measured against a budget limit in another. */
   budgetByCategoryCurrency: Map<string, { amount_limit: number; spent: number }>;
   confirming: boolean;
-  /** Bumped by the thread on scroll or content change — closes a parked row. */
-  closeSignal: number;
   onConfirm: (message: ChatMessage) => void;
   onTriggerEdit: (message: ChatMessage) => void;
   onTriggerDelete: (message: ChatMessage) => void;
@@ -75,7 +73,6 @@ function ChatMessageRowView({
   categoryById,
   budgetByCategoryCurrency,
   confirming,
-  closeSignal,
   onConfirm,
   onTriggerEdit,
   onTriggerDelete,
@@ -132,7 +129,6 @@ function ChatMessageRowView({
       disabled={isEditLocked(message)}
       onTriggerEdit={() => onTriggerEdit(message)}
       onTriggerDelete={onDelete}
-      closeSignal={closeSignal}
       locked={menu.visible}
     >
       {/* A tombstone speaks for itself — see ChatBubble on the empty text. */}

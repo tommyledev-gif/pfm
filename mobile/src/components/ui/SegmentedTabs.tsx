@@ -1,4 +1,4 @@
-import { ReactNode, useEffect } from "react";
+import { memo, ReactNode, useEffect } from "react";
 import { StyleProp, View, ViewStyle } from "react-native";
 import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
@@ -41,7 +41,7 @@ interface SegmentedTabsProps<T extends string> {
 // The green fill is one view that slides to the tab picked (MotionHighlight)
 // rather than each tab filling itself. Until the tabs are measured (the first
 // frame) the active tab fills itself as before, so it is never unmarked.
-export function SegmentedTabs<T extends string>({ options, value, onChange, style, disabled, testID }: SegmentedTabsProps<T>) {
+function SegmentedTabsView<T extends string>({ options, value, onChange, style, disabled, testID }: SegmentedTabsProps<T>) {
   const styles = useStyles();
   const reduceMotion = useReduceMotion();
   const { rects, onOptionLayout } = useOptionRects();
@@ -72,6 +72,10 @@ export function SegmentedTabs<T extends string>({ options, value, onChange, styl
     </View>
   );
 }
+
+// Memoized: its props are stable on every caller, and it carries a Reanimated
+// component per option.
+export const SegmentedTabs = memo(SegmentedTabsView) as typeof SegmentedTabsView;
 
 function TabLabel({ label, active, reduceMotion }: { label: string; active: boolean; reduceMotion: boolean }) {
   const colors = useColors();

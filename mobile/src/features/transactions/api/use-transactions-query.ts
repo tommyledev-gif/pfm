@@ -1,4 +1,4 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 
 import { apiClient, unwrap } from "@/lib/axios";
 import { ListTransactionsFilters, ListTransactionsResult } from "@/features/transactions/types";
@@ -7,7 +7,13 @@ import { ListTransactionsFilters, ListTransactionsResult } from "@/features/tran
 // allowed to run — a closed drill-down sheet, say. Without it, an unopened
 // sheet's "no filters yet" call would fetch the user's entire transaction
 // history the moment its host screen mounts.
-export function useTransactionsQuery(filters: ListTransactionsFilters = {}, options: { enabled?: boolean } = {}) {
+//
+// `keepPrevious` keeps the previous filter's rows on screen until the new
+// ones land, instead of a skeleton between every search refinement.
+export function useTransactionsQuery(
+  filters: ListTransactionsFilters = {},
+  options: { enabled?: boolean; keepPrevious?: boolean } = {},
+) {
   return useInfiniteQuery({
     queryKey: ["transactions", filters],
     enabled: options.enabled ?? true,
@@ -20,5 +26,6 @@ export function useTransactionsQuery(filters: ListTransactionsFilters = {}, opti
       return unwrap(res.data);
     },
     getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
+    placeholderData: options.keepPrevious ? keepPreviousData : undefined,
   });
 }

@@ -61,6 +61,46 @@ export function segmentGaps(layout: ArcLayout[]): number[] {
   return gaps;
 }
 
+export interface RingArc<T> {
+  segment: T;
+  /** Where the arc starts along the ring, px. */
+  offset: number;
+  full: number;
+  /** What is stroked: `full` minus the separator gap. */
+  length: number;
+  /** The slice of the 0 → 1 entry sweep during which this arc draws. */
+  start: number;
+  end: number;
+  d: string;
+}
+
+/** Every arc of a ring of `size` px, ready to draw. Pure, so callers memoize it. */
+export function layoutRing<T extends { amount: number }>(segments: T[], size: number, strokeWidth: number) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const layout = layoutArcLengths(segments.map((s) => s.amount), circumference);
+  const gaps = segmentGaps(layout);
+  const center = size / 2;
+  let offset = 0;
+  const arcs: RingArc<T>[] = segments.map((segment, index) => {
+    const full = layout[index].full;
+    const length = Math.max(full - gaps[index], 0);
+    const start = offset / circumference;
+    const arc = {
+      segment,
+      offset,
+      full,
+      length,
+      start,
+      end: Math.max((offset + length) / circumference, start + 0.0001),
+      d: length > 0 ? arcPath(center, center, radius, start * 360, (length / circumference) * 360) : "",
+    };
+    offset += full;
+    return arc;
+  });
+  return { radius, circumference, arcs };
+}
+
 // One segment as its own open arc path, clockwise from 12 o'clock-based
 // angles. Its own path (rather than a dash on a full circle) is what lets
 // the entry animation reveal it with the standard "draw a line" trick: a

@@ -1,21 +1,16 @@
 import { RefObject, useCallback, useMemo, useState } from "react";
-import { FlatList, Keyboard, LayoutChangeEvent, ListRenderItemInfo, StyleSheet, View } from "react-native";
-import { useRouter } from "expo-router";
-import { onlineManager } from "@tanstack/react-query";
+import { FlatList, LayoutChangeEvent, ListRenderItemInfo, StyleSheet, View } from "react-native";
 
+import { closeParkedSwipeRow } from "@/components/shared/use-swipe-actions";
 import { TypingIndicator } from "@/components/shared/TypingIndicator";
-import { ChatComposer } from "@/features/ai-chat/components/ChatComposer";
-import { ChatInputBar } from "@/features/ai-chat/components/ChatInputBar";
-import { ImageAttachButton } from "@/features/ai-chat/components/ImageAttachButton";
 import { ChatMessageRow } from "@/features/ai-chat/components/ChatMessageRow";
 import { ChatThreadList } from "@/features/ai-chat/components/ChatThreadList";
+import { ChatThreadSkeleton } from "@/features/ai-chat/components/ChatThreadSkeleton";
 import { KeyboardLiftView } from "@/features/ai-chat/components/KeyboardLiftView";
-import { OfflineManualEntryDialog } from "@/features/ai-chat/components/OfflineManualEntryDialog";
-import { draftFromText } from "@/features/transactions/draft-from-text";
-import { useManualDraftStore } from "@/features/transactions/manual-draft-store";
-import { PhraseSuggestions } from "@/features/ai-chat/components/PhraseSuggestions";
+import { RecordingComposer } from "@/features/ai-chat/components/RecordingComposer";
 import { RecordingEmptyState } from "@/features/ai-chat/components/RecordingEmptyState";
 import { useChatThreadStyles } from "@/features/ai-chat/components/chat-thread-styles";
+import { ChatDraftStore } from "@/features/ai-chat/chat-draft";
 import { ChatMode } from "@/features/ai-chat/chat-mode";
 import { useChatActions } from "@/features/ai-chat/hooks/use-chat-actions";
 import { ChatMessage } from "@/features/ai-chat/types";
@@ -27,12 +22,7 @@ import { useOpenWalletCreator } from "@/features/wallets/use-open-wallet-creator
 import { useRequireOnline } from "@/lib/connectivity";
 import { PROPOSAL_CURRENCY } from "@/lib/constants";
 import { useLatestCallback } from "@/lib/use-latest-callback";
-import { useLinger } from "@/lib/use-linger";
-import { useCurrentUserId } from "@/stores/use-current-user-id";
 
-// The suggestion area may take at most this share of the pane's height.
-const SUGGESTION_MAX_HEIGHT_RATIO = 0.2;
-const PHRASE_PANEL_LINGER_MS = 150;
 // Retry delay when a deep-linked row had not been measured yet.
 const FOCUS_RETRY_DELAY_MS = 100;
 
@@ -48,18 +38,15 @@ interface RecordingPaneProps {
   listRef: RefObject<FlatList<ChatMessage> | null>;
   /** Recording messages, newest first (the list is inverted). */
   messages: ChatMessage[];
+  /** The saved thread is still being read back: a skeleton, not the empty state. */
+  loading: boolean;
   walletById: Map<string, Wallet>;
   categoryById: Map<string, Category>;
   chat: ReturnType<typeof useChatActions>;
-  closeSignal: number;
-  onScrollBeginDrag: () => void;
-  input: string;
-  onChangeInput: (text: string) => void;
+  draftStore: ChatDraftStore;
   /** Focus the input on mount — set when arriving from analysis mode. */
   autoFocusInput: boolean;
   onInputFocused: () => void;
-  keyboardVisible: boolean;
-  keyboardHeight: number;
   bottomInset: number;
   mode: ChatMode;
   onTriggerEdit: (message: ChatMessage) => void;
@@ -70,24 +57,19 @@ interface RecordingPaneProps {
 }
 
 /**
- * The "Ghi giao dịch" conversation: thread, typing indicator, and a floating
- * composer (phrase suggestions, quick chip, input). Split out of the screen,
- * mirroring ConsultPane, so each pane owns its own layout.
+ * The "Ghi giao dịch" conversation: the thread, the typing indicator and the
+ * floating composer (RecordingComposer, which owns the input).
  */
 export function RecordingPane({
   listRef,
   messages,
+  loading,
   walletById,
   categoryById,
   chat,
-  closeSignal,
-  onScrollBeginDrag,
-  input,
-  onChangeInput,
+  draftStore,
   autoFocusInput,
   onInputFocused,
-  keyboardVisible,
-  keyboardHeight,
   bottomInset,
   mode,
   onTriggerEdit,
@@ -97,33 +79,21 @@ export function RecordingPane({
   onOpenManualEntry,
 }: RecordingPaneProps) {
   const chatThreadStyles = useChatThreadStyles();
-  const userId = useCurrentUserId();
   const requireOnline = useRequireOnline();
-  const router = useRouter();
-  const openDraft = useManualDraftStore((s) => s.openDraft);
   const [composerHeight, setComposerHeight] = useState(0);
-  const [offlineDialogOpen, setOfflineDialogOpen] = useState(false);
   const [paneHeight, setPaneHeight] = useState(0);
-  const [inputFocused, setInputFocused] = useState(false);
-  const [phraseSearchFocused, setPhraseSearchFocused] = useState(false);
-  const [inputFocusNonce, setInputFocusNonce] = useState(0);
-  // Focus moving from the message to the phrase search blurs one before the
-  // other gains it; the panel holding the search must not unmount in between.
-  const phrasePanelOpen = useLinger(inputFocused || phraseSearchFocused, PHRASE_PANEL_LINGER_MS);
 
   // Read only, so an unconfirmed proposal can say what saving it would do to
-  // the category's budget. The card never writes budgets.
+  // the category's budget.
   const budgets = useBudgetsQuery();
-  // Proposals are read as VND (proposal-wallet.ts), so without a VND Wallet a
-  // card can never be saved — it offers to create one instead. Only once the
-  // list has loaded, so it never flashes for an account that has one.
+  // Without a VND Wallet a proposal can never be saved, so its card offers to
+  // create one. Only once the list has loaded, so it never flashes.
   const wallets = useWalletsQuery("writable");
   const noVndWallet = wallets.isSuccess && !wallets.data.some((w) => w.currency === PROPOSAL_CURRENCY);
   const openWalletCreator = useOpenWalletCreator();
   const handleCreateWallet = noVndWallet ? openWalletCreator : undefined;
 
-  // Keyed "categoryId|currency": a budget carries a separate limit per
-  // currency, and a proposal in one must never be measured against another.
+  // Keyed "categoryId|currency": a budget carries a separate limit per currency.
   const budgetByCategoryCurrency = useMemo(() => {
     const map = new Map<string, { amount_limit: number; spent: number }>();
     for (const budget of budgets.data ?? []) {
@@ -134,38 +104,8 @@ export function RecordingPane({
     return map;
   }, [budgets.data]);
 
-  const handleFocusChange = (focused: boolean) => {
-    setInputFocused(focused);
-    if (focused) onInputFocused();
-  };
-
-  // Offline the AI cannot read the message, but the manual form can still
-  // record it (into the offline queue) — offered instead of a dead-end toast.
-  // Connectivity is read at press time, like useRequireOnline does.
-  const handleSend = () => {
-    if (!onlineManager.isOnline()) {
-      // The dialog is a Modal: closing the keyboard first is what brings the
-      // input bar down under it (see KeyboardLiftView).
-      Keyboard.dismiss();
-      setOfflineDialogOpen(true);
-      return;
-    }
-    const text = input;
-    onChangeInput("");
-    void chat.send(text);
-  };
-  const handleManualEntry = () => {
-    setOfflineDialogOpen(false);
-    openDraft(draftFromText(input));
-    onChangeInput("");
-    Keyboard.dismiss();
-    router.navigate("/transactions");
-  };
-
-  // Stable identities, so a memoized ChatMessageRow re-renders only when its
-  // own message (or its confirming flag) changes — not on every keystroke in
-  // the input, nor for every row when one card is confirmed. That re-render
-  // storm is what held the JS thread and made a tapped Confirm look dead.
+  // Stable identities, so a memoized row re-renders only when its own message
+  // (or its confirming flag) changes.
   const handleConfirm = useLatestCallback((message: ChatMessage) => requireOnline(() => chat.confirmAction(message)));
   const handleTriggerEdit = useLatestCallback(onTriggerEdit);
   const handleTriggerDelete = useLatestCallback(onTriggerDelete);
@@ -183,7 +123,6 @@ export function RecordingPane({
         categoryById={categoryById}
         budgetByCategoryCurrency={budgetByCategoryCurrency}
         confirming={confirmingId === item.id}
-        closeSignal={closeSignal}
         onConfirm={handleConfirm}
         onTriggerEdit={handleTriggerEdit}
         onTriggerDelete={handleTriggerDelete}
@@ -200,7 +139,6 @@ export function RecordingPane({
       categoryById,
       budgetByCategoryCurrency,
       confirmingId,
-      closeSignal,
       handleConfirm,
       handleTriggerEdit,
       handleTriggerDelete,
@@ -222,21 +160,21 @@ export function RecordingPane({
           keyExtractor={messageKey}
           contentContainerStyle={chatThreadStyles.thread}
           reservedBottom={composerHeight}
-          // The default eats the first touch on any row below a focused
-          // input, so a swipe silently did nothing while the keyboard was open.
+          // The default eats the first touch on any row below a focused input.
           keyboardShouldPersistTaps="handled"
-          onScrollBeginDrag={onScrollBeginDrag}
+          // A parked swipe row is never left open over content moving under it.
+          onScrollBeginDrag={closeParkedSwipeRow}
           onScrollToIndexFailed={(info) => {
             setTimeout(() => {
               listRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.5 });
             }, FOCUS_RETRY_DELAY_MS);
           }}
           renderItem={renderItem}
-          // No counter-transform on these: the list already composes its own
-          // inversion onto the header/empty slots.
-          ListEmptyComponent={<RecordingEmptyState onPickExample={onChangeInput} />}
-          // Header, not footer: on an inverted list the header renders at the
-          // visual bottom, which is where the typing bubble belongs.
+          // No counter-transform: the list composes its own inversion onto these.
+          ListEmptyComponent={
+            loading ? <ChatThreadSkeleton /> : <RecordingEmptyState onPickExample={draftStore.getState().setText} />
+          }
+          // Header renders at the visual bottom of an inverted list.
           ListHeaderComponent={
             chat.sending ? (
               <View style={chatThreadStyles.typingRow}>
@@ -246,48 +184,18 @@ export function RecordingPane({
           }
         />
 
-        <ChatComposer onHeightChange={setComposerHeight}>
-          <ChatInputBar
-            value={input}
-            onChangeText={onChangeInput}
-            // Offline, the typed text stays in the box until the User picks
-            // manual entry (AC-OFF-08).
-            onSend={handleSend}
-            sending={chat.sending}
-            keyboardVisible={keyboardVisible}
-            bottomInset={bottomInset}
-            onOpenBudgetWizard={() => onOpenBudgetWizard(null)}
-            // The real mode, not "transaction": while the budget wizard is
-            // open the screen behind it takes the wizard's colour too.
-            mode={mode}
-            autoFocus={autoFocusInput}
-            onFocusChange={handleFocusChange}
-            focusNonce={inputFocusNonce}
-            leading={<ImageAttachButton disabled={chat.sending} onSend={(uri, caption) => void chat.sendImage(uri, caption)} />}
-            aboveInput={
-              phrasePanelOpen ? (
-                <PhraseSuggestions
-                  input={input}
-                  userId={userId}
-                  // Of the part of the pane the keyboard does not cover.
-                  maxHeight={Math.max(0, paneHeight - keyboardHeight) * SUGGESTION_MAX_HEIGHT_RATIO}
-                  onSelect={(text, fromSearch) => {
-                    onChangeInput(text);
-                    // Picked from the search: the cursor goes back to the message.
-                    if (fromSearch) setInputFocusNonce((n) => n + 1);
-                  }}
-                  onSearchFocusChange={setPhraseSearchFocused}
-                />
-              ) : null
-            }
-          />
-        </ChatComposer>
+        <RecordingComposer
+          draftStore={draftStore}
+          chat={chat}
+          mode={mode}
+          bottomInset={bottomInset}
+          paneHeight={paneHeight}
+          autoFocusInput={autoFocusInput}
+          onInputFocused={onInputFocused}
+          onOpenBudgetWizard={onOpenBudgetWizard}
+          onHeightChange={setComposerHeight}
+        />
       </KeyboardLiftView>
-      <OfflineManualEntryDialog
-        visible={offlineDialogOpen}
-        onConfirm={handleManualEntry}
-        onCancel={() => setOfflineDialogOpen(false)}
-      />
     </View>
   );
 }

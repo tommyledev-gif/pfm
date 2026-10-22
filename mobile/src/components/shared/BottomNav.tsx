@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, LayoutChangeEvent, Pressable, View } from "react-native";
 import { useRouter, usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -18,6 +18,8 @@ import {
   BAND_CUTOUT_PATH,
   BOB_DISTANCE,
   BOB_DURATION,
+  BOB_INPUT,
+  BOB_OUTPUT,
   HAIRLINE,
   ICON_BOUNCE_SCALE,
   LINE_LEFT_END,
@@ -55,6 +57,11 @@ const SETTINGS_SUB_ROUTES = [
   "/edit-profile",
 ];
 
+interface BottomNavProps {
+  /** Hidden but kept mounted: a sheet or the keyboard is up, or the route has no nav. */
+  hidden?: boolean;
+}
+
 // Bottom nav — mobile/design_handoff_pfm_app/README.md "Design tokens" (nav)
 // + "Interactions summary". The bar itself sits flush against the screen's
 // bottom/left/right edges; only the active tab's green ball (plus its dark
@@ -68,7 +75,7 @@ const SETTINGS_SUB_ROUTES = [
 // ballX is the single source of truth for both the ball and the hollow cut
 // out of the bar behind it — they read the same Animated.Value, offset by a
 // static left, so they can never drift out of sync with each other.
-export function BottomNav() {
+export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavProps) {
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
@@ -83,21 +90,10 @@ export function BottomNav() {
   const tabRects = useRef<{ x: number; width: number }[]>([]);
   const positioned = useRef(false);
   const lastAnimatedIndex = useRef(activeIndex);
-  // ⚠️ The ball is HIDDEN until the tab row has been measured, and that is a
-  // correctness fix, not a polish pass.
-  //
-  // app/(app)/_layout.tsx unmounts this whole component while any Drawer sheet
-  // is open (the sheet renders in-tree and cannot otherwise paint above it), so
-  // every form modal — invite member, new category, new wallet — tears the nav
-  // down and rebuilds it on close. On a fresh mount `ballX` is a brand new
-  // Animated.Value(0) and `styles.ball` pins left: 0, so the ball paints under
-  // the FIRST tab (Home) and only jumps to the real one once onLayout has fired
-  // and moveBallTo(…, instant) has run. That one-frame flash is what read as
-  // "opening the form resets the nav to Home" on Wallets/Categories/Members,
-  // which are Settings sub-routes and never stopped being so.
-  //
-  // Fading in on the first measurement costs nothing on a cold app start (the
-  // measurement happens in the same commit) and removes the flash entirely.
+  // ⚠️ The ball is hidden until the tab row has been measured: a fresh
+  // Animated.Value(0) paints it under Home for a frame before onLayout moves
+  // it, which read as the nav jumping to Home. Fading in on the first
+  // measurement costs nothing and removes that flash.
   const [positionedReady, setPositionedReady] = useState(false);
   const ballOpacity = useRef(new Animated.Value(0)).current;
 
@@ -105,7 +101,8 @@ export function BottomNav() {
   const squish = useRef(new Animated.Value(0)).current;
   const iconOpacity = useRef(new Animated.Value(1)).current;
   const iconScale = useRef(new Animated.Value(1)).current;
-  const bob = useRef(new Animated.Value(0)).current;
+  const bobPhase = useRef(new Animated.Value(0)).current;
+  const bob = useMemo(() => bobPhase.interpolate({ inputRange: BOB_INPUT, outputRange: BOB_OUTPUT }), [bobPhase]);
   const rowOpacities = useRef(TABS.map((_, i) => new Animated.Value(i === Math.max(activeIndex, 0) ? 0 : 1))).current;
 
   // Idle up/down float, independent of every other animation on the ball:
@@ -113,24 +110,16 @@ export function BottomNav() {
   // so a tab switch mid-float neither interrupts nor is interrupted by it.
   useEffect(() => {
     const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(bob, {
-          toValue: 1,
-          duration: BOB_DURATION,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(bob, {
-          toValue: 0,
-          duration: BOB_DURATION,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ])
+      Animated.timing(bobPhase, {
+        toValue: 1,
+        duration: BOB_DURATION * 2,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
     );
     loop.start();
     return () => loop.stop();
-  }, []);
+  }, [bobPhase]);
 
   const fadeRowIcons = (prevIndex: number, nextIndex: number) => {
     if (prevIndex !== -1 && prevIndex !== nextIndex) {
@@ -204,14 +193,24 @@ export function BottomNav() {
 
   const DisplayIcon = TABS[displayIndex].Icon;
 
-  const ballScaleX = squish.interpolate({ inputRange: [0, 1], outputRange: [1, 1.22] });
-  const ballScaleY = squish.interpolate({ inputRange: [0, 1], outputRange: [1, 0.85] });
-  const ballBobY = bob.interpolate({ inputRange: [0, 1], outputRange: [0, -BOB_DISTANCE] });
-  const bandCoverOpacity = ballOpacity.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
-  const followBall = { transform: [{ translateX: ballX }] };
+  // Built once: a new node per render would rebuild the native animation graph.
+  const motion = useMemo(
+    () => ({
+      ballScaleX: squish.interpolate({ inputRange: [0, 1], outputRange: [1, 1.22] }),
+      ballScaleY: squish.interpolate({ inputRange: [0, 1], outputRange: [1, 0.85] }),
+      ballBobY: bob.interpolate({ inputRange: [0, 1], outputRange: [0, -BOB_DISTANCE] }),
+      bandCoverOpacity: ballOpacity.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
+      followBall: { transform: [{ translateX: ballX }] },
+    }),
+    [squish, bob, ballOpacity, ballX],
+  );
+  const { ballScaleX, ballScaleY, ballBobY, bandCoverOpacity, followBall } = motion;
 
   return (
-    <View style={[styles.wrapper, { height: PILL_HEIGHT + insets.bottom }]} pointerEvents="box-none">
+    <View
+      style={[styles.wrapper, { height: PILL_HEIGHT + insets.bottom }, hidden && styles.hidden]}
+      pointerEvents="box-none"
+    >
       {/* The bar's surface, with the hollow cut out of its top band so the
           screen behind shows through it — see BAND_CUTOUT_PATH. */}
       <View pointerEvents="none" style={styles.barBase} />
@@ -297,4 +296,4 @@ export function BottomNav() {
       </Animated.View>
     </View>
   );
-}
+});

@@ -3,6 +3,20 @@ import { View } from "react-native";
 import { SkeletonBlock } from "@/components/ui/SkeletonBlock";
 import { spacing, createStyles } from "@/lib/theme";
 
+const LIST_SKELETON_COUNT = 3;
+
+/** The Budgets list while loading: a few rows shaped like BudgetListRow. */
+export function BudgetListSkeleton() {
+  const styles = useStyles();
+  return (
+    <View style={styles.list}>
+      {Array.from({ length: LIST_SKELETON_COUNT }).map((_, i) => (
+        <BudgetCardSkeleton key={i} />
+      ))}
+    </View>
+  );
+}
+
 // Mirrors BudgetListRow's own StyleSheet (36px icon tile, name + headline
 // figure, one full-width bar, then the caption/amounts pair).
 export function BudgetCardSkeleton() {
@@ -25,6 +39,7 @@ export function BudgetCardSkeleton() {
 }
 
 const useStyles = createStyles((colors) => ({
+  list: { gap: spacing.md },
   row: {
     gap: spacing.sm,
     paddingVertical: spacing.lg,

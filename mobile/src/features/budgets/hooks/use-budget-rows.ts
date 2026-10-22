@@ -2,6 +2,7 @@ import { useMemo } from "react";
 
 import { useThemeName } from "@/lib/theme";
 import { WalletCurrency } from "@/lib/constants";
+import { isAwaitingFirstData } from "@/lib/query-status";
 import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary-query";
 import { Budget } from "@/features/budgets/types";
 import {
@@ -50,7 +51,11 @@ export function useBudgetRows({
   // reports endpoint instead, compared against a prorated slice of the limit.
   const rangeActive = Boolean(dateRange.from || dateRange.to);
   const rangeSummary = useReportSummaryQuery(rangeActive ? dateRange : {});
-
+  // A range picked but not answered yet: every row would read as unspent.
+  const rangeLoading = rangeActive && isAwaitingFirstData(rangeSummary);
+  // Only a filtered view reads these, so a refetch of the month summary does
+  // not rebuild every row.
+  const rangeData = rangeActive ? rangeSummary.data : undefined;
 
   // The backend resolves an open-ended range for us, so read the window back
   // from the response rather than guessing what a missing `from` meant.
@@ -62,18 +67,18 @@ export function useBudgetRows({
 
   const spentByCategory = useMemo(() => {
     const map = new Map<string, number>();
-    for (const entry of rangeSummary.data?.by_category ?? []) {
+    for (const entry of rangeData?.by_category ?? []) {
       if (entry.type !== "expense" || entry.currency !== currency) continue;
       map.set(entry.category_id, (map.get(entry.category_id) ?? 0) + entry.amount);
     }
     return map;
-  }, [rangeSummary.data, currency]);
+  }, [rangeData, currency]);
 
   // How far through the selected window we are. A window that has already
   // finished is fully elapsed; one containing right now is however far into it
   // the clock has got — which for a single day is a fraction of today.
   const rangeElapsed = useMemo(() => {
-    if (!resolvedRange) return 0;
+    if (!rangeActive || !resolvedRange) return 0;
     const [fy, fm, fd] = resolvedRange.from.slice(0, 10).split("-").map(Number);
     const [ty, tm, td] = resolvedRange.to.slice(0, 10).split("-").map(Number);
     const start = new Date(fy, fm - 1, fd).getTime();
@@ -82,8 +87,7 @@ export function useBudgetRows({
     if (now >= end) return 1;
     if (now <= start) return 0;
     return (now - start) / (end - start);
-  }, [resolvedRange]);
-
+  }, [rangeActive, resolvedRange]);
 
   // A dependency of the memo below: each row's status carries a resolved color.
   const themeName = useThemeName();
@@ -159,6 +163,7 @@ export function useBudgetRows({
 
   return {
     rangeActive,
+    rangeLoading,
     rangeSummary,
     resolvedRange,
     rangeDayCount,

@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 
 import { useListEntrance } from "@/components/motion/MotionView";
@@ -12,64 +12,83 @@ import { DonutChart } from "@/components/shared/DonutChart";
 import { DonutLegendRow } from "@/components/shared/DonutLegendRow";
 import { RevealableAmount } from "@/components/shared/RevealableAmount";
 import { CategoryTransactionsDialog } from "@/features/reports/components/CategoryTransactionsDialog";
-import { buildCategoryColorMap } from "@/lib/category-color";
-import { monthRange } from "@/lib/date-range";
-import { calendarDay, formatDateRange } from "@/lib/format-date";
+import { formatDateRange } from "@/lib/format-date";
 import { CurrencySwitch } from "@/components/shared/CurrencySwitch";
 import { useReportCurrency } from "@/features/reports/hooks/use-report-currency";
+import { useSpendingBreakdown } from "@/features/reports/hooks/use-spending-breakdown";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
 import { isAwaitingFirstData, isWaitingForNetwork } from "@/lib/query-status";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
-import { daysInRange, proratedLimit } from "@/features/budgets/budget-pace";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary-query";
 import { SpendingEmptyState } from "@/features/reports/components/SpendingEmptyState";
 import { SpendingTabSkeleton } from "@/features/reports/components/SpendingTabSkeleton";
 
-// Insights → Spending tab — README: date-range label, Income/Expense stat
-// cards, donut ("By Category" default), legend list with progress bars.
-// The date-range label is now a pressable filter (matching Transactions'
-// picker) rather than a static echo of the backend's default window.
 interface SpendingTabProps {
-  // Set when the screen was opened from a budget notification — selects that
-  // category's donut segment on arrival, which is what shows its tooltip.
+  /** Opens with this category's segment selected (budget notification). */
   focusCategoryId?: string;
-  // Changes on every navigation so re-focusing the same category works even
-  // after the user has deselected it. See notifications.tsx's push site.
+  /** Changes per navigation, so the same category can be focused twice. */
   focusNonce?: string;
   /** Switches Insights to its Budgets tab — offered by the empty state. */
   onOpenBudgets?: () => void;
 }
 
-export function SpendingTab({ focusCategoryId, focusNonce, onOpenBudgets }: SpendingTabProps = {}) {
+type DateRange = { from?: string; to?: string };
+
+export const SpendingTab = memo(function SpendingTab({ focusCategoryId, focusNonce, onOpenBudgets }: SpendingTabProps) {
   const colors = useColors();
   const styles = useStyles();
-  const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
+  const [dateRange, setDateRange] = useState<DateRange>({});
   const [pickerOpen, setPickerOpen] = useState(false);
-  const summary = useReportSummaryQuery(dateRange);
+  // A new range keeps the current report on screen until its own lands.
+  const summary = useReportSummaryQuery(dateRange, { keepPrevious: true });
   const categories = useCategoriesQuery();
   const budgets = useBudgetsQuery();
   const [selected, setSelected] = useState<string | null>(null);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
-  // Which segment the tooltip's "Xem giao dịch" link drilled into. Held
-  // separately from `selected` so closing the dialog leaves the chart's own
-  // highlight exactly where the user left it.
+  // Separate from `selected`, so closing the drill-down keeps the highlight.
   const [detailCategoryId, setDetailCategoryId] = useState<string | null>(null);
-  const reportCurrency = useReportCurrency(summary.data);
+  const { currency, currencies, setCurrency } = useReportCurrency(summary.data);
   const navClearance = useFabBottom();
-  // The legend's rows stagger in as the tab opens, not on every refetch.
   const legendEntrance = useListEntrance();
 
-  // Both deps are plain strings, so this can't re-fire on identity alone — the
-  // trap that made useCategoryPicker loop.
+  const { segments, totalExpense, primaryTotal, budgetTotal, prorated, rangeDayCount } = useSpendingBreakdown({
+    summary: summary.data,
+    currency,
+    categories: categories.data,
+    budgets: budgets.data,
+    hasRangeFilter: Boolean(dateRange.from || dateRange.to),
+    fallbackColor: colors.lavender,
+  });
+
+  const pickerCategories = useMemo(
+    () => segments.map((s) => ({ id: s.key, name: s.label, icon: s.icon, iconUrl: s.iconUrl, color: s.color })),
+    [segments],
+  );
+  const legendStyle = useMemo(() => ({ paddingBottom: navClearance }), [navClearance]);
+
   useEffect(() => {
     if (focusCategoryId) setSelected(focusCategoryId);
   }, [focusCategoryId, focusNonce]);
 
+  const toggleSegment = useCallback((key: string) => setSelected((prev) => (prev === key ? null : key)), []);
+  const changeCurrency = useCallback(
+    (next: string) => {
+      setCurrency(next);
+      setSelected(null);
+    },
+    [setCurrency],
+  );
+  const openRangePicker = useCallback(() => setPickerOpen(true), []);
+  const closeRangePicker = useCallback(() => setPickerOpen(false), []);
+  const openCategoryPicker = useCallback(() => setCategoryPickerOpen(true), []);
+  const closeCategoryPicker = useCallback(() => setCategoryPickerOpen(false), []);
+  const closeDetail = useCallback(() => setDetailCategoryId(null), []);
+
   if (isWaitingForNetwork(summary)) return <OfflinePlaceholder />;
-  // Not isLoading: while the saved cache is read back the query is pending
-  // without fetching, and this used to fall through to "Chưa tải được báo cáo".
+  // Not isLoading: a query still being restored from the saved cache is
+  // pending without fetching.
   if (isAwaitingFirstData(summary)) return <SpendingTabSkeleton />;
   if (!summary.data) {
     return (
@@ -82,84 +101,34 @@ export function SpendingTab({ focusCategoryId, focusNonce, onOpenBudgets }: Spen
     );
   }
 
-  const { range, totals, by_category } = summary.data;
-  const { currency, currencies, setCurrency } = reportCurrency;
-  const primaryTotal = totals.find((t) => t.currency === currency);
-
-  const categoryById = new Map(categories.data?.map((c) => [c.id, c]));
-  const expenseCategories = by_category.filter((c) => c.type === "expense" && c.currency === currency);
-  // Collision-free within this chart: two categories side by side in the
-  // donut/legend must never be painted the same color (a plain per-id hash
-  // could, and did — Shopping and Food landed on the same slot).
-  const segmentColors = buildCategoryColorMap(expenseCategories.map((c) => c.category_id));
-  const segments = expenseCategories.map((c) => ({
-    key: c.category_id,
-    label: c.category_name,
-    amount: c.amount,
-    color: segmentColors.get(c.category_id) ?? colors.lavender,
-    icon: categoryById.get(c.category_id)?.icon,
-    iconUrl: categoryById.get(c.category_id)?.icon_url,
-  }));
-
-  const totalExpense = segments.reduce((sum, s) => sum + s.amount, 0);
-  const detailSegment = segments.find((s) => s.key === detailCategoryId);
-
-  // Budgets are monthly-only, so a custom window has no budget period of its
-  // own. The old behaviour was to drop the "/budget" half of the donut's centre
-  // label entirely and print a fixed line saying budgets only apply to the
-  // current month — which was keyed on "has the user touched the filter", not
-  // on what the filter actually selected: picking this very month by hand still
-  // showed the note, and the note itself never changed no matter which range
-  // was chosen, so it read as a stuck label rather than an explanation.
-  //
-  // Now the monthly total is PRORATED to the window on screen, the same way
-  // BudgetsTab.tsx already prorates each row's limit, and the note says which
-  // window it was divided by. Comparing a single day's spend against a whole
-  // month's limit was the thing worth avoiding, and prorating avoids it without
-  // going silent.
-  //
-  // No filter at all is the backend's default window — the current budget
-  // cycle so far — so it is measured against the whole monthly total, never
-  // prorated: that note says "bạn chọn", and nothing was chosen.
-  const thisMonth = monthRange(0);
-  const fromDay = calendarDay(range.from);
-  const toDay = calendarDay(range.to);
-  const isDefaultWindow = !dateRange.from && !dateRange.to;
-  const isCurrentMonthRange = isDefaultWindow || (fromDay === thisMonth.from && toDay === thisMonth.to);
-  const monthlyBudgetTotal = (budgets.data ?? []).reduce(
-    (sum, b) => sum + (b.limits.find((l) => l.currency === currency)?.amount_limit ?? 0),
-    0,
-  );
-  const rangeDayCount = daysInRange(fromDay, toDay);
-  const budgetTotal =
-    monthlyBudgetTotal === 0
-      ? null
-      : isCurrentMonthRange
-        ? monthlyBudgetTotal
-        : proratedLimit(monthlyBudgetTotal, rangeDayCount);
+  const { range } = summary.data;
+  const switchingRange = summary.isPlaceholderData;
+  const rangeLabel =
+    switchingRange && dateRange.from
+      ? formatDateRange(dateRange.from, dateRange.to ?? dateRange.from)
+      : formatDateRange(range.from, range.to);
+  const detailSegment = detailCategoryId ? segments.find((s) => s.key === detailCategoryId) : undefined;
 
   return (
     <View style={styles.container}>
       <View style={styles.filterRow}>
-        <Pressable style={styles.rangeButton} onPress={() => setPickerOpen(true)}>
-          <CalendarIcon size={14} color={colors.textSecondary} />
-          <Text style={styles.range}>{formatDateRange(range.from, range.to)}</Text>
+        <Pressable style={styles.rangeButton} onPress={openRangePicker}>
+          {switchingRange ? (
+            <ActivityIndicator size={14} color={colors.textSecondary} />
+          ) : (
+            <CalendarIcon size={14} color={colors.textSecondary} />
+          )}
+          <Text style={styles.range}>{rangeLabel}</Text>
         </Pressable>
         <CurrencySwitch
           currencies={currencies}
           value={currency}
-          onChange={(next) => {
-            setCurrency(next);
-            setSelected(null);
-          }}
+          onChange={changeCurrency}
           style={styles.currencyTabs}
           testID="tabs-spending-currency"
         />
       </View>
 
-      {/* The compact "~7tr100k" figures give up the exact amount on a hold,
-          with the same fill-from-the-middle bar and pointing tooltip as the
-          Settings stat cards — RevealableAmount owns both. */}
       <View style={styles.statRow}>
         <RevealableAmount
           label="Thu nhập"
@@ -167,7 +136,7 @@ export function SpendingTab({ focusCategoryId, focusNonce, onOpenBudgets }: Spen
           currency={currency}
           containerStyle={styles.statCard}
           labelStyle={styles.statLabel}
-          style={[styles.statValue, { color: colors.green }]}
+          style={styles.statIncome}
           testID="text-spending-income"
         />
         <RevealableAmount
@@ -176,7 +145,7 @@ export function SpendingTab({ focusCategoryId, focusNonce, onOpenBudgets }: Spen
           currency={currency}
           containerStyle={styles.statCard}
           labelStyle={styles.statLabel}
-          style={[styles.statValue, { color: colors.peach }]}
+          style={styles.statExpense}
           testID="text-spending-expense"
         />
       </View>
@@ -192,20 +161,18 @@ export function SpendingTab({ focusCategoryId, focusNonce, onOpenBudgets }: Spen
               segments={segments}
               currency={currency}
               selected={selected}
-              onToggle={(key) => setSelected((prev) => (prev === key ? null : key))}
+              onToggle={toggleSegment}
               budgetTotal={budgetTotal}
               onPressDetails={setDetailCategoryId}
             />
-            {budgetTotal !== null && !isCurrentMonthRange ? (
+            {budgetTotal !== null && prorated ? (
               <Text style={styles.budgetHint}>
                 Hạn mức tháng đã chia theo {rangeDayCount === 1 ? "ngày" : `${rangeDayCount} ngày`} bạn chọn.
               </Text>
             ) : null}
           </Card>
 
-          {/* Padded past the floating nav: the list runs to the screen's
-              bottom edge, so its last row sat under the bar. */}
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: navClearance }}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={legendStyle}>
             {segments.map((seg, index) => (
               <Animated.View key={seg.key} entering={legendEntrance(index)}>
                 <DonutLegendRow
@@ -213,8 +180,8 @@ export function SpendingTab({ focusCategoryId, focusNonce, onOpenBudgets }: Spen
                   currency={currency}
                   percentage={totalExpense > 0 ? (seg.amount / totalExpense) * 100 : 0}
                   selected={selected === seg.key}
-                  onPress={() => setSelected((prev) => (prev === seg.key ? null : seg.key))}
-                  onHoldCategory={() => setCategoryPickerOpen(true)}
+                  onPress={toggleSegment}
+                  onHoldCategory={openCategoryPicker}
                 />
               </Animated.View>
             ))}
@@ -224,23 +191,22 @@ export function SpendingTab({ focusCategoryId, focusNonce, onOpenBudgets }: Spen
 
       <DateRangePickerModal
         visible={pickerOpen}
-        onClose={() => setPickerOpen(false)}
+        onClose={closeRangePicker}
         from={dateRange.from}
         to={dateRange.to}
         onApply={setDateRange}
       />
 
       <CategoryTransactionsDialog
-        visible={Boolean(detailCategoryId)}
-        onClose={() => setDetailCategoryId(null)}
+        visible={detailCategoryId !== null}
+        onClose={closeDetail}
         categoryId={detailCategoryId}
         categoryName={detailSegment?.label ?? ""}
         color={detailSegment?.color ?? colors.lavender}
         icon={detailSegment?.icon}
         iconUrl={detailSegment?.iconUrl}
-        // `range`, not `dateRange` — the backend's resolved window, so the
-        // rows cover exactly the period the donut was drawn from even when
-        // the user has applied no filter of their own.
+        // The backend's resolved window, so the rows match the donut even
+        // when no filter is applied.
         from={range.from}
         to={range.to}
         currency={currency}
@@ -249,13 +215,13 @@ export function SpendingTab({ focusCategoryId, focusNonce, onOpenBudgets }: Spen
 
       <CategoryPickerDrawer
         visible={categoryPickerOpen}
-        onClose={() => setCategoryPickerOpen(false)}
-        categories={segments.map((s) => ({ id: s.key, name: s.label, icon: s.icon, iconUrl: s.iconUrl, color: s.color }))}
-        onSelect={(id) => setSelected((prev) => (prev === id ? null : id))}
+        onClose={closeCategoryPicker}
+        categories={pickerCategories}
+        onSelect={toggleSegment}
       />
     </View>
   );
-}
+});
 
 const useStyles = createStyles((colors) => ({
   container: { gap: spacing.md, flex: 1 },
@@ -275,8 +241,7 @@ const useStyles = createStyles((colors) => ({
   },
   range: { ...typography.caption, color: colors.textSecondary },
   statRow: { flexDirection: "row", gap: spacing.md },
-  // The whole card is RevealableAmount's hold target, so it carries Card's
-  // look itself rather than wrapping one.
+  // The whole card is RevealableAmount's hold target, so it carries Card's look.
   statCard: {
     flex: 1,
     gap: spacing.xs,
@@ -287,7 +252,8 @@ const useStyles = createStyles((colors) => ({
     backgroundColor: colors.surface,
   },
   statLabel: { ...typography.caption, color: colors.textSecondary },
-  statValue: { ...typography.cardTitle },
+  statIncome: { ...typography.cardTitle, color: colors.green },
+  statExpense: { ...typography.cardTitle, color: colors.peach },
   donutCard: { alignItems: "center", paddingVertical: spacing.xl, gap: spacing.sm },
   budgetHint: { ...typography.tiny, color: colors.textMuted, textAlign: "center" },
   loadError: { alignItems: "center", gap: spacing.sm, marginTop: spacing.xl },

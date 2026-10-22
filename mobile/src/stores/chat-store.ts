@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
@@ -25,6 +26,19 @@ import { useSessionStore } from "@/stores/session-store";
 // can't let a stale timer fire against the now-cleared session.
 const SYNC_DEBOUNCE_MS = 3000;
 let syncTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Set once the saved thread has been read back, or the read failed: until
+// then an empty thread means "not loaded yet", not "no messages".
+let threadRestored = false;
+const restoreListeners = new Set<() => void>();
+function markThreadRestored() {
+  threadRestored = true;
+  restoreListeners.forEach((listener) => listener());
+}
+function subscribeThreadRestored(listener: () => void) {
+  restoreListeners.add(listener);
+  return () => restoreListeners.delete(listener);
+}
 
 // What we just pushed IS what the server now holds, so the GET's cache entry
 // is stale the moment a sync lands. It outlives the chat screen (the
@@ -157,9 +171,15 @@ export const useChatStore = create<ChatState>()(
       storage: createJSONStorage(() => AsyncStorage),
       // restoredFor and epoch describe this app run only.
       partialize: (state) => ({ thread: state.thread, ownerId: state.ownerId }),
+      // Called after a successful read and after a failed one alike.
+      onRehydrateStorage: () => markThreadRestored,
     },
   ),
 );
+
+export function useChatThreadRestored(): boolean {
+  return useSyncExternalStore(subscribeThreadRestored, () => threadRestored);
+}
 
 /**
  * For work that writes to the thread after an await (an AI reply, a consult

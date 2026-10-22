@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Text } from "react-native";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -44,7 +45,7 @@ interface TransactionFormModalProps {
 // wallets) scroll in the body, while the amount — typed on a calculator
 // keypad instead of the OS keyboard — sits in the pinned footer with the
 // category chip, the note, the date key and the ✓ key that saves.
-export function TransactionFormModal({ visible, onClose, editingTransaction, editingQueued, draft }: TransactionFormModalProps) {
+export const TransactionFormModal = memo(function TransactionFormModal({ visible, onClose, editingTransaction, editingQueued, draft }: TransactionFormModalProps) {
   const colors = useColors();
   const styles = useStyles();
   const {
@@ -260,7 +261,7 @@ export function TransactionFormModal({ visible, onClose, editingTransaction, edi
       />
     </>
   );
-}
+});
 
 const useStyles = createStyles((colors) => ({
   label: { ...typography.caption, color: colors.textSecondary },

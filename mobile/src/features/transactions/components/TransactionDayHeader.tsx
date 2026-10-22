@@ -35,7 +35,11 @@ export function TransactionDayHeader({
 
   // A spring retargets from wherever the chevron is, so a quick double tap
   // turns it back instead of snapping.
+  // Only on a change: a header mounting (scrolled into view) is already in place.
+  const shownCollapsed = useRef(section.collapsed);
   useEffect(() => {
+    if (shownCollapsed.current === section.collapsed) return;
+    shownCollapsed.current = section.collapsed;
     const target = section.collapsed ? 0 : 1;
     openness.value = reduceMotion ? target : withSpring(target, SPRING);
   }, [section.collapsed, reduceMotion, openness]);

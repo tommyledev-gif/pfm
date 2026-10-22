@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { EditHistoryDialog } from "@/features/ai-chat/components/EditHistoryDialog";
 import { EditMessageModal } from "@/features/ai-chat/components/EditMessageModal";
@@ -42,7 +43,7 @@ interface ChatOverlaysProps {
  * is a flat list of overlays with no logic of its own beyond resolving the
  * currency each one should display in.
  */
-export function ChatOverlays({
+export const ChatOverlays = memo(function ChatOverlays({
   walletById,
   categoryById,
   removal,
@@ -124,4 +125,4 @@ export function ChatOverlays({
       />
     </>
   );
-}
+});

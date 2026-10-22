@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { AccessibilityInfo, Pressable, Text } from "react-native";
 import { useIsFocused } from "@react-navigation/native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
@@ -38,7 +38,7 @@ type VisibleState = Exclude<ConnectionStripState, "hidden">;
  * away by animating its height. Timing (and flapping, EC-OFF-04) is
  * lib/connection-strip.ts.
  */
-export function OfflineBanner() {
+export const OfflineBanner = memo(function OfflineBanner() {
   const colors = useColors();
   const styles = useStyles();
   const status = useConnectionStrip();
@@ -64,9 +64,10 @@ export function OfflineBanner() {
   const height = useSharedValue(visible ? STRIP_HEIGHT : 0);
   useEffect(() => {
     const target = visible ? STRIP_HEIGHT : 0;
-    height.value = reduceMotion
-      ? target
-      : withTiming(target, { duration: RESIZE_MS, easing: Easing.out(Easing.cubic) });
+    // Only the screen in view animates; every other mounted tab just settles.
+    height.value =
+      reduceMotion || !focused ? target : withTiming(target, { duration: RESIZE_MS, easing: Easing.out(Easing.cubic) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, reduceMotion, height]);
   const heightStyle = useAnimatedStyle(() => ({ height: height.value }));
 
@@ -122,7 +123,7 @@ export function OfflineBanner() {
       <OfflineInfoSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} queuedCount={queuedCount} />
     </>
   );
-}
+});
 
 const useStyles = createStyles((colors) => ({
   // Clips the content while the height animates, so the band folds shut

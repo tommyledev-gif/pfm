@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Modal, Pressable, Text } from "react-native";
 
 import { formatCurrency } from "@/lib/currency";
@@ -20,7 +21,7 @@ interface AmountRevealPopupProps {
 // bubble wouldn't.
 export function AmountRevealPopup({ visible, onClose, amountCents, currency }: AmountRevealPopupProps) {
   const styles = useStyles();
-  const words = amountInWordsVi(amountCents, currency);
+  const words = useMemo(() => amountInWordsVi(amountCents, currency), [amountCents, currency]);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>

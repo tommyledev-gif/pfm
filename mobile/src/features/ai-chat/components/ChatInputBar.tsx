@@ -21,7 +21,6 @@ interface ChatInputBarProps {
   onChangeText: (text: string) => void;
   onSend: () => void;
   sending: boolean;
-  keyboardVisible: boolean;
   bottomInset: number;
   /** The recording pane's "Lập ngân sách" chip; omitted in analysis mode. */
   onOpenBudgetWizard?: () => void;
@@ -46,7 +45,6 @@ export function ChatInputBar({
   onChangeText,
   onSend,
   sending,
-  keyboardVisible,
   bottomInset,
   onOpenBudgetWizard,
   mode,

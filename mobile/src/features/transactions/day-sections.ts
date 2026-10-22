@@ -74,12 +74,13 @@ export function buildDaySections(
   }
 
   const groups: DaySection[] = [];
+  const groupByDay = new Map<string, DaySection>();
   // Per day: each currency's own income/expense, and whether any row's
   // currency is unknown (its wallet not loaded yet).
   const sums = new Map<string, { byCurrency: Map<string, { income: number; expense: number }>; unknown: boolean }>();
   for (const item of items) {
     const dayKey = item.occurred_at.slice(0, 10);
-    let group = groups.find((g) => g.key === dayKey);
+    let group = groupByDay.get(dayKey);
     if (!group) {
       group = {
         key: dayKey,
@@ -95,6 +96,7 @@ export function buildDaySections(
         folding: foldingDays.has(dayKey),
       };
       groups.push(group);
+      groupByDay.set(dayKey, group);
       sums.set(dayKey, { byCurrency: new Map(), unknown: false });
     }
 

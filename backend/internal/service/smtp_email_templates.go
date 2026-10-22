@@ -1,45 +1,85 @@
 package service
 
 import (
+	"bytes"
+	_ "embed"
 	"fmt"
-	"html"
+	"html/template"
 	"mime"
-	"strings"
 )
 
-// emailContent is one rendered email: the subject line, a heading, the body
-// paragraphs, one button, and a small footnote. Pure data, so every template
-// is unit-testable without an SMTP connection.
+// emailContent is one rendered email. Pure data, so every template is
+// unit-testable without an SMTP connection; the layout (email_layout.html)
+// escapes every field for the context it lands in.
 type emailContent struct {
-	Subject     string
-	Heading     string
-	Paragraphs  []string
+	Subject string
+	// Inbox preview line, hidden in the body.
+	Preheader string
+	// Small label above the heading.
+	Eyebrow    string
+	Heading    string
+	Paragraphs []string
+	// A highlighted label/value pair, e.g. the requester's email.
+	Detail      *emailDetail
 	ButtonLabel string
 	ButtonURL   string
-	Footnote    string
+	StepsTitle  string
+	Steps       []string
+	Footnotes   []string
 }
 
-const activationSubject = "Kích hoạt tài khoản Budgest"
+type emailDetail struct {
+	Label string
+	Value string
+}
+
+//go:embed email_layout.html
+var emailLayoutHTML string
+
+// Parsed once at startup: a broken layout fails the process, not a send.
+var emailLayout = template.Must(template.New("email").
+	Funcs(template.FuncMap{"inc": func(i int) int { return i + 1 }}).
+	Parse(emailLayoutHTML))
+
+const (
+	activationSubject  = "Kích hoạt tài khoản Budgest"
+	activateButton     = "Kích hoạt tài khoản"
+	activationLinkLife = "Liên kết kích hoạt dùng được trong 72 giờ."
+)
+
+var activationSteps = []string{
+	"Bấm " + activateButton,
+	"Đặt tên đăng nhập và mật khẩu",
+	"Đăng nhập trên ứng dụng Budgest",
+}
 
 func activationEmail(link string) emailContent {
 	return emailContent{
 		Subject:     activationSubject,
-		Heading:     "Lời mời dùng Budgest",
-		Paragraphs:  []string{"Admin đã mời bạn dùng Budgest.", "Kích hoạt tài khoản để đặt tên đăng nhập và mật khẩu."},
-		ButtonLabel: "Kích hoạt tài khoản",
+		Preheader:   activationLinkLife,
+		Eyebrow:     "Lời mời",
+		Heading:     "Bạn được mời dùng Budgest",
+		Paragraphs:  []string{activationLinkLife},
+		ButtonLabel: activateButton,
 		ButtonURL:   link,
-		Footnote:    "Liên kết hết hạn sau 72 giờ. Nếu không nhận ra lời mời này, bỏ qua email.",
+		StepsTitle:  "Cách kích hoạt",
+		Steps:       activationSteps,
+		Footnotes:   []string{"Không nhận ra lời mời này thì bỏ qua email."},
 	}
 }
 
 func accessApprovedEmail(link string) emailContent {
 	return emailContent{
 		Subject:     "Yêu cầu tạo tài khoản Budgest đã được duyệt",
-		Heading:     "Yêu cầu đã được duyệt",
-		Paragraphs:  []string{"Yêu cầu tạo tài khoản Budgest của bạn đã được duyệt.", "Kích hoạt tài khoản để đặt tên đăng nhập và mật khẩu."},
-		ButtonLabel: "Kích hoạt tài khoản",
+		Preheader:   activationLinkLife,
+		Eyebrow:     "Đã duyệt",
+		Heading:     "Yêu cầu tạo tài khoản đã được duyệt",
+		Paragraphs:  []string{activationLinkLife},
+		ButtonLabel: activateButton,
 		ButtonURL:   link,
-		Footnote:    "Liên kết hết hạn sau 72 giờ.",
+		StepsTitle:  "Cách kích hoạt",
+		Steps:       activationSteps,
+		Footnotes:   []string{"Không gửi yêu cầu này thì bỏ qua email."},
 	}
 }
 
@@ -48,37 +88,32 @@ func accessApprovedEmail(link string) emailContent {
 func accessRequestEmail(requesterEmail, link string) emailContent {
 	return emailContent{
 		Subject:     "Yêu cầu tạo tài khoản từ " + requesterEmail,
-		Heading:     "Yêu cầu tạo tài khoản",
-		Paragraphs:  []string{requesterEmail + " đã gửi yêu cầu tạo tài khoản Budgest.", "Sau khi duyệt, người gửi sẽ nhận email kích hoạt tài khoản."},
-		ButtonLabel: "Xem và duyệt",
+		Preheader:   "Một yêu cầu tạo tài khoản đang chờ duyệt.",
+		Eyebrow:     "Chờ duyệt",
+		Heading:     "Yêu cầu tạo tài khoản mới",
+		Detail:      &emailDetail{Label: "Email người gửi", Value: requesterEmail},
+		Paragraphs:  []string{"Sau khi duyệt, người gửi nhận email kích hoạt."},
+		ButtonLabel: "Xem yêu cầu",
 		ButtonURL:   link,
-		Footnote:    "Nếu không nhận ra người gửi, bỏ qua email này. Yêu cầu cũng có trong mục Thông báo của ứng dụng.",
+		Footnotes: []string{
+			"Yêu cầu cũng có trong mục Thông báo của ứng dụng.",
+			"Không nhận ra người gửi thì bỏ qua email.",
+		},
 	}
 }
 
 // buildEmailMessage renders headers + HTML. The subject goes through MIME
 // B-encoding: it is Vietnamese (non-ASCII), and the encoding also keeps any
 // user-supplied part of it from breaking out of the header line.
-func buildEmailMessage(fromEmail, fromName, toEmail string, email emailContent) []byte {
-	headers := fmt.Sprintf(
-		"From: %s <%s>\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=\"UTF-8\"\r\n\r\n",
+func buildEmailMessage(fromEmail, fromName, toEmail string, email emailContent) ([]byte, error) {
+	var msg bytes.Buffer
+	fmt.Fprintf(&msg,
+		"From: %s <%s>\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\n"+
+			"Content-Type: text/html; charset=\"UTF-8\"\r\nContent-Transfer-Encoding: 8bit\r\n\r\n",
 		mime.BEncoding.Encode("UTF-8", fromName), fromEmail, toEmail, mime.BEncoding.Encode("UTF-8", email.Subject),
 	)
-
-	var paragraphs strings.Builder
-	for _, p := range email.Paragraphs {
-		fmt.Fprintf(&paragraphs, "<p>%s</p>\n", html.EscapeString(p))
+	if err := emailLayout.Execute(&msg, email); err != nil {
+		return nil, fmt.Errorf("service.buildEmailMessage: %w", err)
 	}
-	link := html.EscapeString(email.ButtonURL)
-
-	body := fmt.Sprintf(`<html><body style="font-family:sans-serif">
-<h2>%s</h2>
-%s<p><a href="%s" style="display:inline-block;padding:10px 20px;background:#85FF33;color:#06130A;text-decoration:none;border-radius:999px;font-weight:700">%s</a></p>
-<p>Hoặc mở liên kết này:<br><a href="%s">%s</a></p>
-<p style="color:#666;font-size:12px">%s</p>
-</body></html>`,
-		html.EscapeString(email.Heading), paragraphs.String(), link, html.EscapeString(email.ButtonLabel),
-		link, link, html.EscapeString(email.Footnote))
-
-	return []byte(headers + body)
+	return msg.Bytes(), nil
 }

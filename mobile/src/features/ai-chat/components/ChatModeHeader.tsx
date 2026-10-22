@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import { Image, Pressable, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 
@@ -27,7 +27,7 @@ interface ChatModeHeaderProps {
  * Switching mode fades the pill's new icon and name in (keyed by mode), in
  * step with ChatModeBackdrop's wash; the first render just shows it.
  */
-export function ChatModeHeader({ mode, onPressMode }: ChatModeHeaderProps) {
+export const ChatModeHeader = memo(function ChatModeHeader({ mode, onPressMode }: ChatModeHeaderProps) {
   const styles = useStyles();
   const meta = CHAT_MODE_META[mode];
   const ModeIcon = meta.icon;
@@ -78,7 +78,7 @@ export function ChatModeHeader({ mode, onPressMode }: ChatModeHeaderProps) {
       </View>
     </View>
   );
-}
+});
 
 const useStyles = createStyles((colors) => ({
   // A banner strip: its own edge at the bottom, and clear space before the

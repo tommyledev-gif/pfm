@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { StyleProp, ViewStyle } from "react-native";
 
 import { ExpandableFab, FabAction } from "@/components/ui/ExpandableFab";
@@ -19,11 +20,14 @@ interface BudgetsFabProps {
  * BottomNav and the safe-area inset the same way the plain Fab is.
  */
 export function BudgetsFab({ onOpenWizard, onCreate, style }: BudgetsFabProps) {
-  const actions: FabAction[] = [
-    ...(onOpenWizard
-      ? [{ key: "wizard", label: "AI gợi ý", Icon: SparkleIcon, onPress: onOpenWizard, testID: "btn-new-budget-wizard" }]
-      : []),
-    { key: "manual", label: "Thủ công", Icon: EditIcon, onPress: onCreate, testID: "btn-new-budget-manual" },
-  ];
+  const actions = useMemo<FabAction[]>(
+    () => [
+      ...(onOpenWizard
+        ? [{ key: "wizard", label: "AI gợi ý", Icon: SparkleIcon, onPress: onOpenWizard, testID: "btn-new-budget-wizard" }]
+        : []),
+      { key: "manual", label: "Thủ công", Icon: EditIcon, onPress: onCreate, testID: "btn-new-budget-manual" },
+    ],
+    [onOpenWizard, onCreate],
+  );
   return <ExpandableFab actions={actions} accessibilityLabel="Thêm ngân sách" testID="btn-new-budget" style={style} />;
 }

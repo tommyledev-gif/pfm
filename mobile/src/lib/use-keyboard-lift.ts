@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { AppState, Keyboard, Platform } from "react-native";
 import {
   Easing,
@@ -82,11 +82,16 @@ export function useKeyboardLiftStyle(restingOffset: number, gap: number, inputFo
   const showCount = useSharedValue(0);
   const showCountRef = useRef(0);
 
-  const liftFor = (height: number) => {
-    "worklet";
-    const keyboardTop = Math.max(height - navBarInset, 0);
-    return keyboardTop > 0 ? Math.max(keyboardTop + gap - restingOffset, 0) : 0;
-  };
+  // Stable: a new worklet per render would restart the reactions and the
+  // animated style below on every render of the composer.
+  const liftFor = useCallback(
+    (height: number) => {
+      "worklet";
+      const keyboardTop = Math.max(height - navBarInset, 0);
+      return keyboardTop > 0 ? Math.max(keyboardTop + gap - restingOffset, 0) : 0;
+    },
+    [navBarInset, gap, restingOffset],
+  );
 
   // A rising height is a keyboard opening right now — never a stale reading.
   // Not the first report this hook receives, though: that can be the stale

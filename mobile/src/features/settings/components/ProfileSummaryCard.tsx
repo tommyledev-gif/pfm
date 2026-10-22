@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Avatar } from "@/components/ui/Avatar";
@@ -24,7 +25,7 @@ interface ProfileSummaryCardProps {
  * profile), then this month's three figures across the foot of the same
  * card, split by hairlines instead of three boxes of their own.
  */
-export function ProfileSummaryCard({ onOpenProfile }: ProfileSummaryCardProps) {
+export const ProfileSummaryCard = memo(function ProfileSummaryCard({ onOpenProfile }: ProfileSummaryCardProps) {
   const colors = useColors();
   const styles = useStyles();
   const email = useSessionStore((s) => s.email);
@@ -105,7 +106,7 @@ export function ProfileSummaryCard({ onOpenProfile }: ProfileSummaryCardProps) {
       </View>
     </View>
   );
-}
+});
 
 const useStyles = createStyles((colors) => ({
   card: { backgroundColor: colors.surface, borderRadius: radii.card, overflow: "hidden" },

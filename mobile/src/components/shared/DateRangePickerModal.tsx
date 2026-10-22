@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { Text, View } from "react-native";
 import { DateData } from "react-native-calendars";
 import { MarkingProps } from "react-native-calendars/src/calendar/day/marking";
@@ -67,7 +67,7 @@ function addDaysIso(iso: string, days: number): string {
 // The month/year title above the grid jumps to any month and year inline
 // (MonthYearCalendar) — react-native-calendars' own header only has
 // prev/next arrows.
-export function DateRangePickerModal({ visible, onClose, from, to, onApply }: DateRangePickerModalProps) {
+export const DateRangePickerModal = memo(function DateRangePickerModal({ visible, onClose, from, to, onApply }: DateRangePickerModalProps) {
   const styles = useStyles();
   const [start, setStart] = useState<string | null>(from ?? null);
   const [end, setEnd] = useState<string | null>(to ?? null);
@@ -145,7 +145,7 @@ export function DateRangePickerModal({ visible, onClose, from, to, onApply }: Da
       </View>
     </Drawer>
   );
-}
+});
 
 const useStyles = createStyles((colors) => ({
   title: { ...typography.title, color: colors.textPrimary },

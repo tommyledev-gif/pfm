@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { memo, useEffect, useId, useRef, useState } from "react";
 import { Animated, StyleSheet } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 
@@ -18,7 +18,7 @@ const CROSSFADE_MS = 280;
  * everything, filling the whole screen including the status-bar strip
  * (a wash that started under it would leave a hard edge there).
  */
-export function ChatModeBackdrop({ mode }: { mode: ChatMode }) {
+export const ChatModeBackdrop = memo(function ChatModeBackdrop({ mode }: { mode: ChatMode }) {
   const opacities = useRef(
     Object.fromEntries(CHAT_MODE_ORDER.map((m) => [m, new Animated.Value(m === mode ? 1 : 0)])) as Record<
       ChatMode,
@@ -53,7 +53,7 @@ export function ChatModeBackdrop({ mode }: { mode: ChatMode }) {
       ))}
     </>
   );
-}
+});
 
 function ModeWash({ mode }: { mode: ChatMode }) {
   const { tint, accentTo } = CHAT_MODE_META[mode];

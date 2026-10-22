@@ -11,7 +11,9 @@ import { TransactionKind } from "@/lib/constants";
 
 interface ListQueryState {
   isPending: boolean;
-  fetchStatus: "fetching" | "paused" | "idle";
+  isPaused: boolean;
+  /** Showing the previous filter's rows while this one loads. */
+  isPlaceholderData: boolean;
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
 }
@@ -49,7 +51,8 @@ export function TransactionsListEmpty({
 }: TransactionsListEmptyProps) {
   const styles = useStyles();
   if (isWaitingForNetwork(query)) return <OfflinePlaceholder />;
-  if (isAwaitingFirstData(query)) {
+  // Still loading a new filter: "nothing matches" would be a guess.
+  if (isAwaitingFirstData(query) || query.isPlaceholderData) {
     return (
       <View>
         {Array.from({ length: LIST_SKELETON_COUNT }).map((_, i) => (

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import { Drawer } from "@/components/shared/Drawer";
@@ -17,7 +17,7 @@ interface SortDrawerModalProps {
 // but priority-ordered multi-select instead of a plain checklist: tapping
 // options in sequence stamps each with a priority number, so amount + date
 // can combine (e.g. highest amount first, most recent as the tiebreaker).
-export function SortDrawerModal({ visible, onClose, selected, onApply }: SortDrawerModalProps) {
+export const SortDrawerModal = memo(function SortDrawerModal({ visible, onClose, selected, onApply }: SortDrawerModalProps) {
   const styles = useStyles();
   const [order, setOrder] = useState<SortKey[]>([]);
 
@@ -78,7 +78,7 @@ export function SortDrawerModal({ visible, onClose, selected, onApply }: SortDra
       </View>
     </Drawer>
   );
-}
+});
 
 const useStyles = createStyles((colors) => ({
   section: { gap: spacing.xs },

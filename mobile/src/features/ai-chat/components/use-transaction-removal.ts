@@ -1,7 +1,8 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { getErrorCode, getErrorMessage } from "@/lib/axios";
 import { useRequireOnline } from "@/lib/connectivity";
+import { useLatestCallback } from "@/lib/use-latest-callback";
 import { useDeleteTransactionMutation } from "@/features/transactions/api/use-delete-transaction-mutation";
 import { hasPersistedTransaction } from "@/features/ai-chat/tombstone";
 import { ChatMessage } from "@/features/ai-chat/types";
@@ -50,7 +51,7 @@ export function useTransactionRemoval(): TransactionRemoval {
     [updateMessage],
   );
 
-  const confirm = useCallback(() => {
+  const confirm = useLatestCallback(() => {
     const message = target;
     if (!message) return;
 
@@ -77,24 +78,32 @@ export function useTransactionRemoval(): TransactionRemoval {
         setTarget(null);
       },
     });
-  }, [target, deleteTransaction, markRemoved]);
+  });
 
-  return {
-    target,
-    targetIsPersisted: target ? hasPersistedTransaction(target) : false,
-    deleting: deleteTransaction.isPending,
-    // Deleting a saved Transaction needs the server (AC-OFF-08) — refused
-    // before the confirmation opens. Discarding an unconfirmed proposal is
-    // local only and stays available offline.
-    request: (message: ChatMessage) => {
-      if (hasPersistedTransaction(message)) requireOnline(() => setTarget(message));
-      else setTarget(message);
-    },
-    // Guarded so tapping the backdrop mid-request cannot leave a second
-    // confirmation able to fire the same delete again.
-    cancel: () => {
-      if (!deleteTransaction.isPending) setTarget(null);
-    },
-    confirm,
-  };
+  // Deleting a saved Transaction needs the server (AC-OFF-08) — refused
+  // before the confirmation opens. Discarding an unconfirmed proposal is
+  // local only and stays available offline.
+  const request = useLatestCallback((message: ChatMessage) => {
+    if (hasPersistedTransaction(message)) requireOnline(() => setTarget(message));
+    else setTarget(message);
+  });
+  // Guarded so tapping the backdrop mid-request cannot leave a second
+  // confirmation able to fire the same delete again.
+  const cancel = useLatestCallback(() => {
+    if (!deleteTransaction.isPending) setTarget(null);
+  });
+  const deleting = deleteTransaction.isPending;
+
+  // One object per change, so the overlays that take it can skip renders.
+  return useMemo(
+    () => ({
+      target,
+      targetIsPersisted: target ? hasPersistedTransaction(target) : false,
+      deleting,
+      request,
+      cancel,
+      confirm,
+    }),
+    [target, deleting, request, cancel, confirm],
+  );
 }

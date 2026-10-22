@@ -18,7 +18,7 @@ const KEYBOARD_DISMISS_SETTLE_MS = 280;
  * pieces of modal bookkeeping were the largest thing in it that the screen
  * itself did not need to read.
  */
-export function useChatOverlays(keyboardVisible: boolean) {
+export function useChatOverlays() {
   // A plain bubble opens a text editor; any transaction proposal opens the
   // structured form (editAction decides whether that patches a real
   // transaction or only the unconfirmed proposal).
@@ -46,16 +46,17 @@ export function useChatOverlays(keyboardVisible: boolean) {
   // If the keyboard is open while the user swipes a bubble above it, dismiss
   // it first and let the input bar settle before the modal opens on top —
   // otherwise the sheet visibly jumps as the keyboard closes underneath it.
+  // Read at tap time, so the screen does not re-render on every keyboard event.
   const triggerEdit = useCallback(
     (item: ChatMessage) => {
-      if (keyboardVisible) {
+      if (Keyboard.isVisible()) {
         Keyboard.dismiss();
         setTimeout(() => openEditTarget(item), KEYBOARD_DISMISS_SETTLE_MS);
       } else {
         openEditTarget(item);
       }
     },
-    [keyboardVisible, openEditTarget],
+    [openEditTarget],
   );
 
   const openBudgetWizard = useCallback((originMessageId: string | null) => {

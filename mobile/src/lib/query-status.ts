@@ -1,8 +1,12 @@
 // The only part of a TanStack Query result this needs — structural, so plain
 // and infinite queries both fit without casting.
-interface QueryStatusLike {
+//
+// isPaused, not fetchStatus: TanStack re-renders a component for every result
+// field it has read, and fetchStatus flips on every refetch, so reading it
+// re-rendered the whole screen twice per background refresh.
+export interface QueryStatusLike {
   isPending: boolean;
-  fetchStatus: "fetching" | "paused" | "idle";
+  isPaused: boolean;
 }
 
 /**
@@ -12,7 +16,7 @@ interface QueryStatusLike {
  * there is no data. Screens show OfflinePlaceholder instead.
  */
 export function isWaitingForNetwork(query: QueryStatusLike): boolean {
-  return query.isPending && query.fetchStatus === "paused";
+  return query.isPending && query.isPaused;
 }
 
 /**
@@ -26,5 +30,5 @@ export function isWaitingForNetwork(query: QueryStatusLike): boolean {
  * waiting for a network that may not come.
  */
 export function isAwaitingFirstData(query: QueryStatusLike): boolean {
-  return query.isPending && query.fetchStatus !== "paused";
+  return query.isPending && !query.isPaused;
 }
