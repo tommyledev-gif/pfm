@@ -1,6 +1,5 @@
-import { useMemo } from "react";
 import { Pressable, View } from "react-native";
-import Animated, { Extrapolation, SharedValue, interpolate, useAnimatedStyle } from "react-native-reanimated";
+import Animated, { SharedValue, interpolateColor, useAnimatedStyle } from "react-native-reanimated";
 
 import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/Icon";
 import { withAlpha } from "@/lib/color";
@@ -9,15 +8,15 @@ import { SNAP_INTERVAL } from "@/features/wallets/components/use-wallet-carousel
 import { CAROUSEL_SHADOW_BLEED_BOTTOM } from "@/features/wallets/components/WalletStackCard";
 
 const DOT = 6;
-// The active dot stretches into a pill this wide, pushing the dots after it
-// along by the difference.
+const DOT_GAP = 8;
+const STEP = DOT + DOT_GAP;
+// The capsule marking the centred card, and how much longer it draws out
+// halfway between two dots, so a swipe reads as it travelling, not blinking.
 const PILL = 18;
-const STRETCH = PILL - DOT;
-const DOT_GAP = 6;
+const PILL_STRETCH = 8;
+// Room past the outer dots for the capsule, which is wider than a dot.
+const EDGE = (PILL - DOT) / 2;
 const BUTTON = 28;
-// A zero scale is a singular transform; the collapsed middle is kept at a
-// sliver too thin to show instead.
-const COLLAPSED = 0.001;
 
 // Fixed height whatever the wallet count, including one wallet (no pager
 // drawn), so the content below never moves. WalletCardSkeleton reserves it.
@@ -26,91 +25,52 @@ export const PAGER_HEIGHT = 36;
 // card by its shadow bleed, so the pager is pulled back up into that bleed.
 export const PAGER_OFFSET_TOP = 14 - CAROUSEL_SHADOW_BLEED_BOTTOM;
 
-/**
- * One dot's motion, on the UI thread and keyed off the carousel's own scroll
- * position (the same Reanimated value the cards read), so the dots track the
- * finger frame by frame.
- *
- * Width is layout, so each dot is drawn as two half-caps and a middle piece:
- * the middle scales out from the left cap and the right cap rides its end.
- * The row's re-flow is a translate: every dot after the active one shifts
- * right by STRETCH.
- *
- * Keyed on every rendered position (the loop copies too), not on the wallet
- * index: across the loop seam the last dot shrinks while the first grows,
- * and linear interpolation between neighbouring positions gives exactly the
- * in-between widths and shifts.
- */
-function useDotMotion(dot: number, dotCount: number, positionCount: number, scrollX: SharedValue<number>) {
-  const ranges = useMemo(() => {
-    const input = Array.from({ length: positionCount }, (_, i) => i);
-    const active = input.map((i) => (i % dotCount === dot ? 1 : 0));
-    return {
-      input,
-      active,
-      shift: input.map((i) => (i % dotCount < dot ? STRETCH : 0)),
-      // Scales around its own centre, so it is moved back by the half it lost.
-      middleShift: active.map((v) => -(1 - v) * (STRETCH / 2)),
-      middleScale: active.map((v) => Math.max(COLLAPSED, v)),
-      capShift: active.map((v) => v * STRETCH),
-    };
-  }, [dot, dotCount, positionCount]);
-
-  const along = (values: number[]) => {
-    "worklet";
-    return interpolate(scrollX.value / SNAP_INTERVAL, ranges.input, values, Extrapolation.CLAMP);
-  };
-  const dotStyle = useAnimatedStyle(() => ({ transform: [{ translateX: along(ranges.shift) }] }));
-  const middleStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: along(ranges.middleShift) }, { scaleX: along(ranges.middleScale) }],
-  }));
-  const capStyle = useAnimatedStyle(() => ({ transform: [{ translateX: along(ranges.capShift) }] }));
-  const activeStyle = useAnimatedStyle(() => ({ opacity: along(ranges.active) }));
-  return { dotStyle, middleStyle, capStyle, activeStyle };
-}
-
-type DotMotion = ReturnType<typeof useDotMotion>;
-
-function Capsule({ motion, color }: { motion: DotMotion; color: string }) {
-  const styles = useStyles();
-  return (
-    <>
-      <View style={[styles.capLeft, { backgroundColor: color }]} />
-      <Animated.View style={[styles.middle, { backgroundColor: color }, motion.middleStyle]} />
-      <Animated.View style={[styles.capRight, { backgroundColor: color }, motion.capStyle]} />
-    </>
-  );
-}
-
-interface PagerDotProps {
-  dot: number;
+interface ActiveCapsuleProps {
   dotCount: number;
-  positionCount: number;
+  looping: boolean;
   scrollX: SharedValue<number>;
-  activeColor?: string;
+  /** The active colour of each dot, by wallet index. */
+  colors: string[];
+  /** The twin that slides in from the far side across the loop's seam. */
+  twin?: boolean;
 }
 
-function PagerDot({ dot, dotCount, positionCount, scrollX, activeColor }: PagerDotProps) {
+/**
+ * The one capsule that marks the centred card, sliding along the dots with
+ * the scroll frame by frame (the carousel's own Reanimated value), drawing
+ * out a little mid-way and blending from one wallet's colour into the next.
+ *
+ * Across the loop's seam (last wallet → first) it keeps going: it slides out
+ * past the last dot while its twin slides in before the first, the row
+ * clipping both, so it never jumps back across the whole bar.
+ */
+function ActiveCapsule({ dotCount, looping, scrollX, colors, twin = false }: ActiveCapsuleProps) {
   const styles = useStyles();
-  const colors = useColors();
-  const motion = useDotMotion(dot, dotCount, positionCount, scrollX);
-  return (
-    <Animated.View style={[styles.dot, { left: dot * (DOT + DOT_GAP) }, motion.dotStyle]}>
-      <Capsule motion={motion} color={colors.trackMuted} />
-      <Animated.View style={[styles.dotActive, motion.activeStyle]}>
-        <Capsule motion={motion} color={activeColor ?? colors.textPrimary} />
-      </Animated.View>
-    </Animated.View>
-  );
+  const style = useAnimatedStyle(() => {
+    const raw = scrollX.value / SNAP_INTERVAL;
+    const position = looping ? ((raw % dotCount) + dotCount) % dotCount : Math.min(Math.max(raw, 0), dotCount - 1);
+    const index = Math.floor(position);
+    const frac = position - index;
+    const shift = twin ? position - dotCount : position;
+    const width = PILL + PILL_STRETCH * Math.sin(Math.PI * frac);
+    return {
+      width,
+      transform: [{ translateX: EDGE + shift * STEP + DOT / 2 - width / 2 }],
+      backgroundColor: interpolateColor(frac, [0, 1], [colors[index] ?? colors[0], colors[(index + 1) % dotCount] ?? colors[0]]),
+    };
+  });
+  return <Animated.View style={[styles.capsule, style]} />;
 }
 
 interface WalletCarouselPagerProps {
   /** Distinct wallets — one dot each. */
   dotCount: number;
-  /** Each dot's colour while active, by wallet index; textPrimary otherwise. */
+  /** Each dot's colour while active, by wallet index. */
   dotColors?: string[];
   /** Rendered cards, loop copies included. */
   positionCount: number;
+  /** The carousel wraps around: the capsule slides across the seam. */
+  looping: boolean;
   scrollX: SharedValue<number>;
   canGoBack: boolean;
   canGoForward: boolean;
@@ -123,6 +83,7 @@ export function WalletCarouselPager({
   dotCount,
   dotColors,
   positionCount,
+  looping,
   scrollX,
   canGoBack,
   canGoForward,
@@ -132,6 +93,7 @@ export function WalletCarouselPager({
   const styles = useStyles();
   const colors = useColors();
   const hasDots = dotCount >= 2 && positionCount >= 2;
+  const activeColors = dotColors && dotColors.length === dotCount ? dotColors : Array(dotCount).fill(colors.textPrimary);
 
   return (
     // box-none: the slot overlaps the cards' bottom shadow bleed and must not
@@ -151,22 +113,20 @@ export function WalletCarouselPager({
             <ChevronLeftIcon size={16} color={colors.textPrimary} />
           </Pressable>
 
-          {/* Position is already announced by each card's own label. */}
+          {/* Position is already announced by the carousel's own label. The
+              dots stay put; only the capsule over them moves. */}
           <View
-            style={[styles.dots, { width: dotCount * DOT + (dotCount - 1) * DOT_GAP + STRETCH }]}
+            style={[styles.dots, { width: dotCount * DOT + (dotCount - 1) * DOT_GAP + EDGE * 2 }]}
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"
           >
             {Array.from({ length: dotCount }, (_, dot) => (
-              <PagerDot
-                key={dot}
-                dot={dot}
-                dotCount={dotCount}
-                positionCount={positionCount}
-                scrollX={scrollX}
-                activeColor={dotColors?.[dot]}
-              />
+              <View key={dot} style={[styles.dot, { left: EDGE + dot * STEP }]} />
             ))}
+            <ActiveCapsule dotCount={dotCount} looping={looping} scrollX={scrollX} colors={activeColors} />
+            {looping ? (
+              <ActiveCapsule dotCount={dotCount} looping scrollX={scrollX} colors={activeColors} twin />
+            ) : null}
           </View>
 
           <Pressable
@@ -193,16 +153,15 @@ const useStyles = createStyles((colors) => ({
     alignItems: "center",
     justifyContent: "center",
   },
+  // A soft fill, no outline: it is a control, not another card.
   bar: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
+    gap: spacing.xs,
     height: PAGER_HEIGHT,
     paddingHorizontal: 3,
     borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    backgroundColor: colors.surface,
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
   },
   button: {
     width: BUTTON,
@@ -213,26 +172,8 @@ const useStyles = createStyles((colors) => ({
   },
   buttonPressed: { backgroundColor: withAlpha(colors.overlayBase, 0.08) },
   buttonDisabled: { opacity: 0.3 },
-  dots: { height: DOT },
-  dot: { position: "absolute", top: 0, width: PILL, height: DOT },
-  dotActive: { position: "absolute", top: 0, left: 0, width: PILL, height: DOT },
-  // Half-circles, so no two pieces overlap: the colors are translucent, and
-  // an overlap would show as a brighter seam.
-  capLeft: {
-    position: "absolute",
-    left: 0,
-    width: DOT / 2,
-    height: DOT,
-    borderTopLeftRadius: DOT / 2,
-    borderBottomLeftRadius: DOT / 2,
-  },
-  middle: { position: "absolute", left: DOT / 2, width: STRETCH, height: DOT },
-  capRight: {
-    position: "absolute",
-    left: DOT / 2,
-    width: DOT / 2,
-    height: DOT,
-    borderTopRightRadius: DOT / 2,
-    borderBottomRightRadius: DOT / 2,
-  },
+  // Clips the capsule and its twin as they cross the loop's seam.
+  dots: { height: DOT, overflow: "hidden" },
+  dot: { position: "absolute", top: 0, width: DOT, height: DOT, borderRadius: DOT / 2, backgroundColor: colors.trackMuted },
+  capsule: { position: "absolute", top: 0, left: 0, height: DOT, borderRadius: DOT / 2 },
 }));

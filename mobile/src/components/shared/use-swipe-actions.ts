@@ -34,6 +34,10 @@ const ACTIVATION_DISTANCE = 10;
 // tick when the indicator arms, a longer one when the row parks.
 const ARM_VIBRATION_MS = 10;
 const PARK_VIBRATION_MS = 25;
+// The peek that shows a row can be swiped (nudge).
+const NUDGE_DISTANCE = 36;
+const NUDGE_OUT_MS = 260;
+const NUDGE_BACK_MS = 320;
 
 // Only one row anywhere may be parked at a time. Module-level rather than
 // per-list, because the two surfaces that use this (the chat thread and
@@ -63,6 +67,8 @@ interface UseSwipeActionsOptions {
 
 export interface SwipeActionsState {
   translateX: Animated.Value;
+  /** A one-off peek toward this side and back, to show the row swipes. */
+  nudge: (side: SwipeSide) => void;
   /** Per-side 0..1 travel fraction, for driving the indicator. */
   leftProgress: Animated.Value;
   rightProgress: Animated.Value;
@@ -157,6 +163,24 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
       setParkedSide(side);
     };
 
+    // Shows a row can be swiped without anyone having to guess: it slides a
+    // little toward the side, letting that action's indicator show, then
+    // settles back. A finger landing mid-peek takes over (grant stops it).
+    const nudge = (side: SwipeSide) => {
+      if (offsetRef.current !== 0 || activeSideRef.current !== null || !maxFor(side)) return;
+      const distance = Math.min(NUDGE_DISTANCE, maxFor(side) * 0.4);
+      const target = side === "left" ? distance : -distance;
+      const progress = side === "left" ? leftProgress : rightProgress;
+      Animated.sequence([
+        Animated.timing(translateX, { toValue: target, duration: NUDGE_OUT_MS, useNativeDriver: true }),
+        Animated.spring(translateX, { toValue: 0, useNativeDriver: true, damping: 14, stiffness: 180 }),
+      ]).start();
+      Animated.sequence([
+        Animated.timing(progress, { toValue: distance / maxFor(side), duration: NUDGE_OUT_MS, useNativeDriver: false }),
+        Animated.timing(progress, { toValue: 0, duration: NUDGE_BACK_MS, useNativeDriver: false }),
+      ]).start();
+    };
+
     const release = () => {
       // Re-checked here and not only at grant time: a row that becomes
       // disabled mid-drag must release into nothing.
@@ -190,6 +214,12 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
       onPanResponderTerminationRequest: () => false,
       onShouldBlockNativeResponder: () => true,
       onPanResponderGrant: () => {
+        // ⚠️ Whatever spring is still running (the row settling from the last
+        // release, a peek) stops here. Left running, it kept writing the row's
+        // position while the finger did too, and the row shook between the two.
+        translateX.stopAnimation();
+        leftProgress.stopAnimation();
+        rightProgress.stopAnimation();
         baseRef.current = offsetRef.current;
         // Picking a parked row back up turns its button back into the
         // drag indicator, so it fades with the travel as the row closes.
@@ -226,11 +256,14 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
         pastThresholdRef.current = cap > 0 && fraction >= PARK_THRESHOLD_RATIO;
       },
       onPanResponderRelease: release,
-      // A stolen gesture is not a deliberate release, so it never parks.
-      onPanResponderTerminate: () => close(),
+      // ⚠️ A stolen gesture settles exactly like a release. It used to snap
+      // the row home, and when a parent scroll took the touch for a moment
+      // and gave it back, the row snapped home and jumped back under the
+      // finger over and over: the back-and-forth shake.
+      onPanResponderTerminate: release,
     });
 
-    return { close, panHandlers: panResponder.panHandlers };
+    return { close, nudge, panHandlers: panResponder.panHandlers };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -240,6 +273,7 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
 
   return {
     translateX,
+    nudge: state.nudge,
     leftProgress,
     rightProgress,
     parkedSide,

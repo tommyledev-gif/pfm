@@ -252,6 +252,7 @@ function WalletCarouselView({
         // The active dot wears its wallet's card colour, tying the bar to the card above it.
         dotColors={dotColors}
         positionCount={rendered.length}
+        looping={looping}
         scrollX={scrollX}
         canGoBack={looping || centreIndex > 0}
         canGoForward={looping || centreIndex < rendered.length - 1}

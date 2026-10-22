@@ -110,10 +110,10 @@ export function SwipeableMessageRow({
   const sideRatio = (side: SwipeDirection): number =>
     side === editSide ? EDIT_SWIPE_RATIO : DELETE_SWIPE_RATIO;
 
-  // The gesture sits on the wrapper, which never moves — see SwipeableRow for
-  // why handlers on the sliding view made a held finger shake the row.
+  // The gesture sits on the wrapper, which never moves, and is never
+  // flattened — see SwipeableRow for both.
   return (
-    <View style={styles.wrapper} {...swipe.panHandlers}>
+    <View style={styles.wrapper} collapsable={false} {...swipe.panHandlers}>
       {(["left", "right"] as const).map((side) => {
         const action = sideAction(side);
         if (!action) return null;

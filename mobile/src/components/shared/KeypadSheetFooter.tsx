@@ -74,31 +74,35 @@ export function KeypadSheetFooter({
 
   return (
     <View style={styles.container}>
-      <View style={styles.summaryRow}>
-        <View style={styles.leading}>{leading}</View>
-        <Pressable
-          style={styles.amountWrap}
-          onPress={onPressAmount}
-          disabled={!onPressAmount}
-          accessibilityLabel={amountAccessibilityLabel}
-        >
-          <Animated.Text
-            testID={amountTestID}
-            style={[styles.amount, { color: amountColor, transform: [{ translateX: shake }] }]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.4}
-            // A long expression keeps its END in view — the part being typed.
-            ellipsizeMode="head"
+      {/* The amount and its preview are one block: the preview tucks under
+          the figure on a compact line instead of a full row between gaps,
+          which left a wide empty band above the note. */}
+      <View>
+        <View style={styles.summaryRow}>
+          <View style={styles.leading}>{leading}</View>
+          <Pressable
+            style={styles.amountWrap}
+            onPress={onPressAmount}
+            disabled={!onPressAmount}
+            accessibilityLabel={amountAccessibilityLabel}
           >
-            {caret !== undefined && onPressChar ? (
-              <AmountCaretText text={amount} caret={caret} caretColor={caretColor} onPressChar={onPressChar} />
-            ) : (
-              amount
-            )}
-          </Animated.Text>
-          {amountSuffix ? <Text style={styles.suffix}>{amountSuffix}</Text> : null}
-        </Pressable>
+            <Animated.Text
+              testID={amountTestID}
+              style={[styles.amount, { color: amountColor, transform: [{ translateX: shake }] }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.4}
+              // A long expression keeps its END in view — the part being typed.
+              ellipsizeMode="head"
+            >
+              {caret !== undefined && onPressChar ? (
+                <AmountCaretText text={amount} caret={caret} caretColor={caretColor} onPressChar={onPressChar} />
+              ) : (
+                amount
+              )}
+            </Animated.Text>
+            {amountSuffix ? <Text style={styles.suffix}>{amountSuffix}</Text> : null}
+          </Pressable>
       </View>
       {preview !== undefined ? (
         <Text
@@ -110,6 +114,7 @@ export function KeypadSheetFooter({
           {preview?.text ?? " "}
         </Text>
       ) : null}
+      </View>
       {errors.map((message, index) =>
         message ? (
           <Text key={index} style={styles.error}>
@@ -131,7 +136,14 @@ const useStyles = createStyles((colors) => ({
   amountWrap: { flexShrink: 1, flexDirection: "row", alignItems: "baseline", gap: spacing.xs, minWidth: 96 },
   amount: { ...typography.hero, flexShrink: 1, textAlign: "right", fontVariant: ["tabular-nums"] },
   suffix: { ...typography.caption, color: colors.textSecondary },
-  preview: { ...typography.label, color: colors.textSecondary, textAlign: "right", fontVariant: ["tabular-nums"] },
+  preview: {
+    ...typography.caption,
+    lineHeight: 15,
+    marginTop: -2,
+    color: colors.textSecondary,
+    textAlign: "right",
+    fontVariant: ["tabular-nums"],
+  },
   previewError: { color: colors.peach },
   error: { ...typography.caption, color: colors.peach },
 }));

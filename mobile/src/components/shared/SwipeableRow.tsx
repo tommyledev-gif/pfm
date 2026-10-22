@@ -28,7 +28,16 @@ interface SwipeableRowProps {
    * default — only lists that need the cue turn it on.
    */
   showHandles?: boolean;
+  /**
+   * Opt-in: one peek toward the right-hand action (else the left) shortly
+   * after mounting, so the row says it swipes without grips on its edges.
+   */
+  peek?: boolean;
 }
+
+// After the row has settled into view, so the peek reads as a hint, not as
+// part of the screen arriving.
+const PEEK_DELAY_MS = 700;
 
 /**
  * A row with up to two swipe-revealed actions.
@@ -44,6 +53,7 @@ export function SwipeableRow({
   disabled,
   closeSignal,
   showHandles = false,
+  peek = false,
 }: SwipeableRowProps) {
   // A destructive side gets the wider cap so its parked button has room for a
   // label; a plain one keeps the narrower, long-standing feel.
@@ -65,6 +75,14 @@ export function SwipeableRow({
     close();
   }, [closeSignal, close]);
 
+  const { nudge } = swipe;
+  const peekSide = rightAction ? "right" : leftAction ? "left" : null;
+  useEffect(() => {
+    if (!peek || !peekSide || disabled) return;
+    const timer = setTimeout(() => nudge(peekSide), PEEK_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [peek, peekSide, disabled, nudge]);
+
   const wrap = (action: SwipeAction): SwipeAction => ({
     ...action,
     onPress: () => {
@@ -82,8 +100,13 @@ export function SwipeableRow({
   // responder fed back into its own position: a finger held still mid-swipe
   // made the row shake from side to side. Here a drag that starts on a
   // revealed button can also close the row.
+  //
+  // ⚠️ collapsable={false}: a View with nothing but layout is flattened away
+  // on Fabric, and the responder then had no native view to stop the parent
+  // ScrollView intercepting from — the list stole the touch on any vertical
+  // drift and the swipe kept restarting.
   return (
-    <View style={styles.wrapper} {...swipe.panHandlers}>
+    <View style={styles.wrapper} collapsable={false} {...swipe.panHandlers}>
       {leftAction ? (
         <SwipeActionButton
           action={wrap(leftAction)}

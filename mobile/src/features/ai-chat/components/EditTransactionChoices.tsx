@@ -1,5 +1,7 @@
 import { Pressable, Text, View } from "react-native";
 
+import { ListRow, ListSection } from "@/components/ui/grouped-list";
+import { ArrowRightGlyph } from "@/components/ui/grouped-list/list-icons";
 import { spacing, typography, createStyles } from "@/lib/theme";
 import { TransactionKind } from "@/lib/constants";
 import { TransactionTypeChips } from "@/features/transactions/components/TransactionTypeChips";
@@ -36,8 +38,8 @@ interface EditTransactionChoicesProps {
 /**
  * The type and wallet pickers of EditTransactionModal, split out for its
  * 300-line limit: the type as the manual form's segmented control, the wallet
- * as one row opening the wallet list, or "Từ ví" | "Đến ví" side by side for a
- * transfer (the same as the manual form). A saved income/expense's wallet can
+ * as a row of an inset group opening the wallet list, "Từ ví" over "Đến ví"
+ * for a transfer (the same as the manual form). A saved income/expense's wallet can
  * change (the caller asks first, see useWalletChangeGuard); its type cannot,
  * and a saved transfer's wallets cannot either.
  */
@@ -61,18 +63,6 @@ export function EditTransactionChoices({
   const styles = useStyles();
   const isTransfer = type === "transfer";
 
-  const source = (
-    <WalletSelectTile
-      label={isTransfer ? "Từ ví" : "Ví"}
-      wallet={wallet}
-      placeholder="Chọn ví"
-      onPress={onOpenWallets}
-      locked={walletLocked}
-      compact={isTransfer}
-      testID="field-edit-wallet"
-    />
-  );
-
   return (
     <>
       <View style={styles.fieldGroup}>
@@ -87,42 +77,49 @@ export function EditTransactionChoices({
         {typeLocked ? <Text style={styles.hint}>Không đổi được loại của giao dịch đã lưu</Text> : null}
       </View>
 
-      <View style={styles.fieldGroup}>
-        {isTransfer ? (
-          <View style={styles.row}>
-            {source}
-            {destinationCount > 0 || destination ? (
-              <WalletSelectTile
-                label="Đến ví"
-                wallet={destination}
-                placeholder="Chọn ví nhận"
-                onPress={onOpenDestinations}
-                locked={destinationLocked}
-                compact
-                testID="field-edit-to-wallet"
-              />
-            ) : (
-              <View style={styles.half}>
-                <Text style={styles.label}>Đến ví</Text>
-                <Text style={styles.hint}>Cần thêm một ví VND khác để chuyển khoản.</Text>
-              </View>
-            )}
-          </View>
+      {/* One inset group, as the manual form: "Ví", or "Từ ví" over "Đến ví". */}
+      <ListSection
+        onSheet
+        footer={
+          noVndWallet || otherCurrenciesHidden ? (
+            <View style={styles.fieldGroup}>
+              {noVndWallet ? (
+                <>
+                  <Text testID="txt-edit-no-vnd-wallet" style={styles.hint}>
+                    {NO_VND_WALLET_HINT}
+                  </Text>
+                  <Pressable onPress={onCreateVndWallet} hitSlop={8} testID="btn-edit-create-vnd-wallet">
+                    <Text style={styles.createWalletLink}>Tạo ví VND</Text>
+                  </Pressable>
+                </>
+              ) : null}
+              {otherCurrenciesHidden ? <Text style={styles.hint}>Chỉ hiện ví cùng loại tiền</Text> : null}
+            </View>
+          ) : undefined
+        }
+      >
+        <WalletSelectTile
+          label={isTransfer ? "Từ ví" : "Ví"}
+          wallet={wallet}
+          placeholder="Chọn"
+          onPress={onOpenWallets}
+          locked={walletLocked}
+          testID="field-edit-wallet"
+        />
+        {!isTransfer ? null : destinationCount > 0 || destination ? (
+          <WalletSelectTile
+            label="Đến ví"
+            wallet={destination}
+            placeholder="Chọn"
+            onPress={onOpenDestinations}
+            locked={destinationLocked}
+            destination
+            testID="field-edit-to-wallet"
+          />
         ) : (
-          source
+          <ListRow title="Đến ví" subtitle="Cần thêm một ví VND khác để chuyển khoản." icon={ArrowRightGlyph} disabled />
         )}
-        {noVndWallet ? (
-          <>
-            <Text testID="txt-edit-no-vnd-wallet" style={styles.hint}>
-              {NO_VND_WALLET_HINT}
-            </Text>
-            <Pressable onPress={onCreateVndWallet} hitSlop={8} testID="btn-edit-create-vnd-wallet">
-              <Text style={styles.createWalletLink}>Tạo ví VND →</Text>
-            </Pressable>
-          </>
-        ) : null}
-        {otherCurrenciesHidden ? <Text style={styles.hint}>Chỉ hiện ví cùng loại tiền</Text> : null}
-      </View>
+      </ListSection>
     </>
   );
 }

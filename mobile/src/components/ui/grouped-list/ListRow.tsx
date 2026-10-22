@@ -23,6 +23,8 @@ export interface ListRowProps {
   subtitle?: string;
   /** Grey text on the right: the current value of a setting. */
   value?: string;
+  /** The value in another colour — e.g. green for an empty "Thêm" that invites a tap. */
+  valueColor?: string;
   /** A glyph in a tinted rounded-square tile at the start. */
   icon?: ListGlyph;
   /** The tile's colour, a palette token's value. Left out: a grey tile. */
@@ -67,6 +69,7 @@ export function ListRow({
   title,
   subtitle,
   value,
+  valueColor,
   icon,
   tone,
   leading,
@@ -113,7 +116,7 @@ export function ListRow({
         {children}
       </View>
       {value ? (
-        <Text style={styles.value} numberOfLines={1}>
+        <Text style={[styles.value, valueColor !== undefined && { color: valueColor }]} numberOfLines={1}>
           {value}
         </Text>
       ) : null}

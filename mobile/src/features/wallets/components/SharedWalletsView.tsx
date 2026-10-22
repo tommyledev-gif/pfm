@@ -1,8 +1,7 @@
-import { Animated, ScrollView, Text, View } from "react-native";
+import { Animated, Pressable, ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { MotionView } from "@/components/motion/MotionView";
-import { PressableScale } from "@/components/motion/PressableScale";
 import { EmptyIllustration } from "@/components/shared/EmptyIllustration";
 import { EmptyStateCard } from "@/components/shared/EmptyState";
 import { ChevronRightIcon, PlusIcon, SearchIcon, UsersIcon } from "@/components/ui/Icon";
@@ -51,20 +50,25 @@ export function SharedWalletsView({
   const hasInvitations = (invitations.data?.length ?? 0) > 0;
   const nothingShared = withMe.length === 0 && byMe.length === 0;
 
+  // One surface per group with the wallets as rows inside it, the way iOS
+  // groups a list — not a stack of separately bordered cards.
   const renderGroup = (title: string, items: Wallet[], offset: number) =>
     items.length === 0 ? null : (
       <View style={styles.group}>
-        <Text style={styles.groupTitle}>{`${title} · ${items.length}`}</Text>
-        {items.map((wallet, index) => (
-          <MotionView key={wallet.id} index={offset + index} animateLayout>
-            <SharedWalletCard
-              wallet={wallet}
-              faceColor={faceById.get(wallet.id) ?? colors.green}
-              onPress={() => onOpenWallet(wallet)}
-              highlightOpacity={wallet.id === highlightWalletId ? highlightOpacity : undefined}
-            />
-          </MotionView>
-        ))}
+        <Text style={styles.groupTitle}>{title}</Text>
+        <View style={styles.surface}>
+          {items.map((wallet, index) => (
+            <MotionView key={wallet.id} index={offset + index} animateLayout>
+              <SharedWalletCard
+                wallet={wallet}
+                faceColor={faceById.get(wallet.id) ?? colors.green}
+                onPress={() => onOpenWallet(wallet)}
+                separated={index > 0}
+                highlightOpacity={wallet.id === highlightWalletId ? highlightOpacity : undefined}
+              />
+            </MotionView>
+          ))}
+        </View>
       </View>
     );
 
@@ -97,35 +101,34 @@ export function SharedWalletsView({
       ) : (
         <>
           {/* Everyone's entries, searchable and filterable — the Transactions
-              tab only ever lists the User's own (BR-09). */}
-          <PressableScale
+              tab only ever lists the User's own (BR-09). A plain row. */}
+          <Pressable
             onPress={() => router.push("/shared-wallets")}
-            style={styles.activityRow}
+            style={({ pressed }) => [styles.surface, styles.activityRow, pressed && styles.pressed]}
             accessibilityRole="button"
             testID="btn-shared-open-activity"
           >
             <View style={styles.activityIcon}>
-              <SearchIcon size={18} color={colors.onGreen} />
+              <SearchIcon size={18} color={colors.green} />
             </View>
             <View style={styles.activityTexts}>
               <Text style={styles.activityTitle}>Giao dịch ví chung</Text>
               <Text style={styles.activityHint}>Tìm và lọc giao dịch của mọi người trong ví</Text>
             </View>
             <ChevronRightIcon size={16} color={colors.textMuted} />
-          </PressableScale>
+          </Pressable>
           {renderGroup("Được chia sẻ với bạn", withMe, 0)}
           {renderGroup("Bạn đang chia sẻ", byMe, withMe.length)}
-          <PressableScale
+          <Pressable
             onPress={onShare}
-            style={styles.shareRow}
+            style={({ pressed }) => [styles.shareLink, pressed && styles.shareLinkPressed]}
+            hitSlop={8}
             accessibilityRole="button"
             testID="btn-shared-share-another"
           >
-            <View style={styles.shareIcon}>
-              <PlusIcon size={16} color={colors.green} strokeWidth={2.6} />
-            </View>
+            <PlusIcon size={16} color={colors.green} strokeWidth={2.6} />
             <Text style={styles.shareLabel}>Chia sẻ một ví khác</Text>
-          </PressableScale>
+          </Pressable>
         </>
       )}
     </ScrollView>
@@ -134,47 +137,25 @@ export function SharedWalletsView({
 
 const useStyles = createStyles((colors) => ({
   body: { gap: spacing.xl, paddingHorizontal: spacing.xl, paddingTop: spacing.xs, paddingBottom: BOTTOM_NAV_CLEARANCE },
-  group: { gap: spacing.md },
-  groupTitle: { ...typography.label, color: colors.textSecondary },
-  shareRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.sm,
-    paddingVertical: spacing.lg,
-    borderRadius: radii.card,
-    borderWidth: 1.5,
-    borderStyle: "dashed",
-    borderColor: withAlpha(colors.green, 0.4),
-  },
-  shareIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: withAlpha(colors.green, 0.12),
-  },
-  shareLabel: { ...typography.body, color: colors.green },
-  activityRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    padding: spacing.lg,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    borderColor: withAlpha(colors.green, 0.3),
-    backgroundColor: withAlpha(colors.green, 0.06),
-  },
+  group: { gap: spacing.sm },
+  groupTitle: { ...typography.label, color: colors.textSecondary, paddingHorizontal: spacing.xs },
+  // No border: the surface against the page is the edge, as in an iOS group.
+  surface: { backgroundColor: colors.surface, borderRadius: radii.card, overflow: "hidden" },
+  // A dim, not a wash: a background here would replace the surface colour.
+  pressed: { opacity: 0.7 },
+  activityRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.lg },
   activityIcon: {
     width: 36,
     height: 36,
-    borderRadius: 12,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.green,
+    backgroundColor: withAlpha(colors.green, 0.14),
   },
   activityTexts: { flex: 1, gap: 2 },
   activityTitle: { ...typography.body, color: colors.textPrimary },
-  activityHint: { ...typography.caption, color: colors.textSecondary },
+  activityHint: { ...typography.caption, fontWeight: "500", color: colors.textSecondary },
+  shareLink: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.xs, paddingVertical: spacing.sm },
+  shareLinkPressed: { opacity: 0.6 },
+  shareLabel: { ...typography.body, color: colors.green },
 }));

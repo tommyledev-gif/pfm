@@ -1,15 +1,19 @@
 import { useMemo, useState } from "react";
-import { Pressable, SectionList, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, SectionList, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
-import { ChevronLeftIcon, SearchIcon } from "@/components/ui/Icon";
+import { BellIcon } from "@/components/ui/Icon";
+import { SearchField } from "@/components/ui/SearchField";
+import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { Screen } from "@/components/shared/Screen";
+import { ScreenHeader } from "@/components/shared/ScreenHeader";
 import { ScreenLoader } from "@/components/shared/ScreenLoader";
 import { NotificationRow } from "@/features/notifications/components/NotificationRow";
 import { dayLabel } from "@/lib/format-date";
 import { useRequireOnline } from "@/lib/connectivity";
-import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
-import { useNotificationsQuery } from "@/features/notifications/api/use-notifications-query";
+import { matchesSearch } from "@/lib/search-text";
+import { spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { useNotificationsInfiniteQuery } from "@/features/notifications/api/use-notifications-query";
 import { useMarkNotificationReadMutation } from "@/features/notifications/api/use-mark-notification-read-mutation";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { Notification } from "@/features/notifications/types";
@@ -17,14 +21,32 @@ import { useUsersQuery } from "@/features/users/api/use-users-query";
 import { AccessRequestActions } from "@/features/users/components/AccessRequestActions";
 import { useSessionStore } from "@/stores/session-store";
 
+type Filter = "all" | "unread";
+
+const FILTERS: { value: Filter; label: string }[] = [
+  { value: "all", label: "Tất cả" },
+  { value: "unread", label: "Chưa đọc" },
+];
+
+interface DaySection {
+  title: string;
+  data: Notification[];
+}
+
+// A plain list grouped by day, as Mail does it: large title, a two-way
+// filter and a search field over the rows, quiet day headers, and rows on the
+// page itself (NotificationRow) rather than a stack of tinted cards.
 export default function NotificationsScreen() {
   const colors = useColors();
   const styles = useStyles();
   const requireOnline = useRequireOnline();
   const router = useRouter();
-  const [unreadOnly, setUnreadOnly] = useState(false);
-  const [searchInput, setSearchInput] = useState("");
-  const notifications = useNotificationsQuery(unreadOnly);
+  const [filter, setFilter] = useState<Filter>("all");
+  const [search, setSearch] = useState("");
+  // Paged as the list scrolls: the server sends 20 at a time, and reading
+  // only the first page left anything older out of reach.
+  const notifications = useNotificationsInfiniteQuery(filter === "unread");
+  const items = useMemo(() => notifications.data?.pages.flatMap((page) => page.data) ?? [], [notifications.data]);
   const markRead = useMarkNotificationReadMutation();
   // A notification names the Budget it was raised for, but Insights selects by
   // category — this is the hop between the two. Budgets are already cached by
@@ -73,69 +95,55 @@ export default function NotificationsScreen() {
     router.push({ pathname: "/insights", params: { categoryId, focusedAt: String(Date.now()) } });
   };
 
-  // No server-side search endpoint for notifications (unlike Transactions'
-  // own `search` query param) — filtered client-side over the page already
-  // fetched, matching either the title or the body text.
-  const filteredNotifications = useMemo(() => {
-    const query = searchInput.trim().toLowerCase();
-    const all = notifications.data?.data ?? [];
-    if (!query) return all;
-    return all.filter(
-      (n) => n.title.toLowerCase().includes(query) || n.body.toLowerCase().includes(query),
-    );
-  }, [notifications.data, searchInput]);
-
   const approveActionFor = (item: Notification) => {
     const requesterEmail = item.related_user_id ? waitingRequestEmailById.get(item.related_user_id) : undefined;
     if (item.type !== "access_request" || !item.related_user_id || !requesterEmail) return undefined;
     return <AccessRequestActions userId={item.related_user_id} email={requesterEmail} />;
   };
 
-  const sections = useMemo(() => {
-    const grouped: { title: string; data: NonNullable<typeof notifications.data>["data"] }[] = [];
-    filteredNotifications.forEach((n) => {
+  // No server-side search endpoint for notifications (unlike Transactions'
+  // own `search` query param) — filtered client-side over the pages already
+  // fetched, title or body, ignoring case and accents.
+  const sections = useMemo<DaySection[]>(() => {
+    const grouped: DaySection[] = [];
+    for (const n of items) {
+      if (search.trim() && !matchesSearch(`${n.title} ${n.body}`, search)) continue;
       const label = dayLabel(n.created_at);
       const section = grouped.find((g) => g.title === label);
       if (section) section.data.push(n);
       else grouped.push({ title: label, data: [n] });
-    });
+    }
     return grouped;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredNotifications]);
+  }, [items, search]);
+
+  const empty = notifications.isError ? (
+    <View style={styles.empty}>
+      <Text style={styles.emptyTitle}>Chưa tải được thông báo.</Text>
+      <Pressable onPress={() => void notifications.refetch()} hitSlop={8} accessibilityRole="button">
+        <Text style={styles.retry}>Thử lại</Text>
+      </Pressable>
+    </View>
+  ) : search.trim() ? (
+    <View style={styles.empty}>
+      <Text style={styles.emptyTitle}>Không tìm thấy thông báo</Text>
+      <Text style={styles.emptyHint}>Thử từ khóa khác.</Text>
+    </View>
+  ) : (
+    <View style={styles.empty}>
+      <BellIcon size={28} color={colors.textMuted} />
+      <Text style={styles.emptyTitle}>
+        {filter === "unread" ? "Không có thông báo chưa đọc." : "Chưa có thông báo."}
+      </Text>
+    </View>
+  );
 
   return (
     <Screen style={styles.screen}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={8}>
-          <ChevronLeftIcon size={24} />
-        </Pressable>
-        <Text style={styles.title}>Thông báo</Text>
-        <Pressable
-          onPress={() => setUnreadOnly((v) => !v)}
-          style={[styles.toggle, unreadOnly && styles.toggleActive]}
-        >
-          <Text style={[styles.toggleLabel, unreadOnly && styles.toggleLabelActive]}>Chưa đọc</Text>
-        </Pressable>
-      </View>
+      <ScreenHeader title="Thông báo" />
 
-      <View style={styles.searchRow}>
-        <SearchIcon size={16} color={colors.textSecondary} />
-        {/* multiline (not a fixed single-line TextInput) so a search term long
-            enough to wrap grows the box downward instead of scrolling
-            sideways inside a one-row field. */}
-        <TextInput
-          value={searchInput}
-          onChangeText={setSearchInput}
-          placeholder="Tìm thông báo..."
-          placeholderTextColor={colors.textMuted}
-          style={styles.searchInput}
-          multiline
-        />
-        {searchInput ? (
-          <Pressable onPress={() => setSearchInput("")} hitSlop={8}>
-            <Text style={styles.clearSearch}>✕</Text>
-          </Pressable>
-        ) : null}
+      <View style={styles.controls}>
+        <SegmentedTabs options={FILTERS} value={filter} onChange={setFilter} testID="tabs-notifications-filter" />
+        <SearchField value={search} onChangeText={setSearch} placeholder="Tìm thông báo" testID="input-notifications-search" />
       </View>
 
       {notifications.isLoading ? (
@@ -145,16 +153,24 @@ export default function NotificationsScreen() {
           sections={sections}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
+          stickySectionHeadersEnabled={false}
+          keyboardShouldPersistTaps="handled"
           renderSectionHeader={({ section }) => <Text style={styles.sectionHeader}>{section.title}</Text>}
-          renderItem={({ item }) => (
-            <Pressable onPress={() => openNotification(item)}>
-              <NotificationRow notification={item} action={approveActionFor(item)} />
-            </Pressable>
+          renderItem={({ item, index }) => (
+            <NotificationRow
+              notification={item}
+              onPress={() => openNotification(item)}
+              action={approveActionFor(item)}
+              separated={index > 0}
+            />
           )}
-          ListEmptyComponent={
-            <Text style={styles.empty}>
-              {searchInput ? "Không tìm thấy thông báo nào." : "Không có thông báo nào."}
-            </Text>
+          ListEmptyComponent={empty}
+          onEndReachedThreshold={0.4}
+          onEndReached={() => {
+            if (notifications.hasNextPage && !notifications.isFetchingNextPage) void notifications.fetchNextPage();
+          }}
+          ListFooterComponent={
+            notifications.isFetchingNextPage ? <ActivityIndicator color={colors.textMuted} style={styles.more} /> : null
           }
         />
       )}
@@ -164,47 +180,18 @@ export default function NotificationsScreen() {
 
 const useStyles = createStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bgApp },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
+  controls: { gap: spacing.md, paddingHorizontal: spacing.xl, paddingBottom: spacing.sm },
+  list: { paddingBottom: spacing.xxl * 2 },
+  sectionHeader: {
+    ...typography.label,
+    color: colors.textSecondary,
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xs,
   },
-  title: { flex: 1, ...typography.title, color: colors.textPrimary },
-  toggle: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-  },
-  toggleActive: { backgroundColor: colors.green, borderColor: colors.green },
-  toggleLabel: { ...typography.tiny, color: colors.textSecondary },
-  toggleLabelActive: { color: colors.onGreen },
-  searchRow: {
-    flexDirection: "row",
-    // flex-start (not center) — once the input grows past one line for a
-    // long search phrase, centering would keep re-centering the icon/clear
-    // button against a taller box instead of pinning them to its first line.
-    alignItems: "flex-start",
-    gap: spacing.sm,
-    marginHorizontal: spacing.xl,
-    marginBottom: spacing.md,
-    paddingVertical: 10,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radii.listCard,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-  },
-  // maxHeight caps growth at ~4 lines — long enough for any realistic search
-  // phrase without a runaway box swallowing the screen.
-  searchInput: { flex: 1, maxHeight: 96, ...typography.body, color: colors.textPrimary, padding: 0 },
-  clearSearch: { ...typography.body, color: colors.textSecondary },
-  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
-  sectionHeader: { ...typography.caption, color: colors.textMuted, paddingHorizontal: spacing.sm, paddingVertical: spacing.sm },
-  empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
+  empty: { alignItems: "center", gap: spacing.sm, paddingTop: spacing.xxl * 2, paddingHorizontal: spacing.xl },
+  emptyTitle: { ...typography.body, color: colors.textSecondary, textAlign: "center" },
+  emptyHint: { ...typography.caption, color: colors.textMuted, textAlign: "center" },
+  retry: { ...typography.body, color: colors.green },
+  more: { paddingVertical: spacing.lg },
 }));

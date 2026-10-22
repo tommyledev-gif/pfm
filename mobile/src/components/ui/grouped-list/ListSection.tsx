@@ -1,6 +1,7 @@
 import { Children, ReactNode, isValidElement } from "react";
 import { StyleProp, Text, View, ViewStyle } from "react-native";
 
+import { withAlpha } from "@/lib/color";
 import { createStyles, radii, spacing, typography } from "@/lib/theme";
 import { LIST_ROW_PADDING_X, ListPositionContext } from "@/components/ui/grouped-list/list-metrics";
 
@@ -13,6 +14,11 @@ interface ListSectionProps {
   footerTone?: "default" | "danger";
   /** ListRow, ListToggleRow, ListCell. null / false children are skipped. */
   children: ReactNode;
+  /**
+   * The group sits on a sheet (a Drawer), not the page: the sheet is the same
+   * surface colour, so the group takes a faint wash of its own to show.
+   */
+  onSheet?: boolean;
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }
@@ -24,14 +30,22 @@ interface ListSectionProps {
  * the hairline above themselves; a list rendered with .map() as a direct
  * child counts row by row.
  */
-export function ListSection({ header, footer, footerTone = "default", children, style, testID }: ListSectionProps) {
+export function ListSection({
+  header,
+  footer,
+  footerTone = "default",
+  children,
+  onSheet = false,
+  style,
+  testID,
+}: ListSectionProps) {
   const styles = useStyles();
   const rows = Children.toArray(children);
 
   return (
     <View style={style} testID={testID}>
       {header ? <ListSectionHeader title={header} /> : null}
-      <View style={styles.container}>
+      <View style={[styles.container, onSheet && styles.containerOnSheet]}>
         {rows.map((row, index) => (
           <ListPositionContext.Provider key={isValidElement(row) && row.key !== null ? row.key : index} value={index}>
             {row}
@@ -74,6 +88,7 @@ const useStyles = createStyles((colors) => ({
   // No border: the surface against the page ground is the edge, as on iOS.
   // Clipping keeps a pressed row's wash inside the rounded corners.
   container: { backgroundColor: colors.surface, borderRadius: radii.card, overflow: "hidden" },
+  containerOnSheet: { backgroundColor: withAlpha(colors.overlayBase, 0.05) },
   header: {
     flexDirection: "row",
     alignItems: "center",

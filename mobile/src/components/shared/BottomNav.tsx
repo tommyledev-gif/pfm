@@ -55,8 +55,10 @@ const SETTINGS_SUB_ROUTES = [
 ];
 
 // How long a tapped tab is held as the target while the router gets there.
-// Only a ceiling: the hold ends as soon as the pathname arrives.
-const PENDING_TAB_MS = 1000;
+// Only a ceiling for a navigation that never lands: the hold ends as soon as
+// the pathname arrives. Generous, because a heavy first mount can take a
+// second, and letting go early showed the in-between tab for a moment.
+const PENDING_TAB_MS = 4000;
 
 interface BottomNavProps {
   /** Hidden but kept mounted: a sheet or the keyboard is up, or the route has no nav. */
@@ -164,8 +166,18 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
               // and tapping it there must go back to Settings.
               onPress={() => {
                 if (pathname === href) return;
+                // ⚠️ The ball moves first, the router a frame later. Set in
+                // the same batch, the navigation's render — a whole screen on
+                // a first visit — ran before the effect that starts the ball,
+                // so the ball sat still and then caught up late. Started here
+                // it runs on the native driver while JS mounts the screen.
+                const x = ballTarget(index);
+                if (x !== null && lastAnimatedIndex.current !== index) {
+                  lastAnimatedIndex.current = index;
+                  ball.switchTo(index, x);
+                }
                 setPendingIndex(index);
-                router.navigate(href);
+                requestAnimationFrame(() => router.navigate(href));
               }}
               style={styles.tab}
               hitSlop={8}

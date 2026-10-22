@@ -189,6 +189,8 @@ export function TransactionKeypadFooter({
 }
 
 const useStyles = createStyles((colors) => ({
+  // Tonal fills, no outlines: the chip and the note read as controls by
+  // their fill alone, without another box line on the sheet.
   chip: {
     flexDirection: "row",
     alignItems: "center",
@@ -196,18 +198,14 @@ const useStyles = createStyles((colors) => ({
     height: 36,
     paddingHorizontal: spacing.md,
     borderRadius: radii.pill,
-    backgroundColor: withAlpha(colors.overlayBase, 0.06),
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
+    backgroundColor: withAlpha(colors.overlayBase, 0.07),
     alignSelf: "flex-start",
     maxWidth: "100%",
   },
   chipLabel: { ...typography.caption, color: colors.textPrimary, flexShrink: 1 },
   chipPlaceholder: { color: colors.textMuted },
   noteInput: {
-    backgroundColor: withAlpha(colors.overlayBase, 0.06),
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
+    backgroundColor: withAlpha(colors.overlayBase, 0.07),
     borderRadius: radii.listCard,
     paddingHorizontal: spacing.lg,
     paddingVertical: 10,

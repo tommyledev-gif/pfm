@@ -1,4 +1,4 @@
-import { ReceiptIcon } from "@/components/ui/Icon";
+import { ReceiptGlyph } from "@/components/ui/grouped-list/list-icons";
 import { formatCurrency } from "@/lib/currency";
 import { useColors } from "@/lib/theme";
 import { ItemsEditor } from "@/features/transactions/items/use-items-editor";
@@ -13,38 +13,30 @@ interface ItemsEntryRowProps {
   loading: boolean;
   onPress: () => void;
   error?: string;
-  // Half-width tile next to the location tile (AI chat's edit sheet): the
-  // count on the first line, the total under it.
-  compact?: boolean;
 }
 
-const ICON_SIZE = 16;
-
-// The form's door to the Items editor (AC-01: hidden for transfers by the caller).
-export function ItemsEntryRow({ lines, currency, pendingCount, loading, onPress, error, compact }: ItemsEntryRowProps) {
+/**
+ * The form's door to the Items editor (AC-01: hidden for transfers by the
+ * caller), as a row of the extras group: receipt tile, "Các món", and on the
+ * right either the total or a green "Thêm" that says the row is where to add
+ * them — with the line count under the label once there are lines.
+ */
+export function ItemsEntryRow({ lines, currency, pendingCount, loading, onPress, error }: ItemsEntryRowProps) {
   const colors = useColors();
   const count = lines.items.length || pendingCount;
   const total = lines.items.length > 0 ? formatCurrency(lines.total, currency) : undefined;
-  const summary = loading
-    ? "Đang tải các món..."
-    : lines.items.length > 0
-      ? compact
-        ? `${lines.items.length} món`
-        : `${lines.items.length} món · ${total}`
-      : count > 0
-        ? `${count} món`
-        : "Thêm món";
+  const summary = loading ? "Đang tải" : (total ?? (count > 0 ? `${count} món` : "Thêm"));
 
   return (
     <EntryTile
       label="Các món"
       summary={summary}
-      detail={compact && !loading ? total : undefined}
-      muted={count === 0}
-      icon={compact ? <ReceiptIcon size={ICON_SIZE} color={count > 0 ? colors.green : colors.textMuted} /> : undefined}
+      detail={total ? `${lines.items.length} món` : undefined}
+      muted={!loading && count === 0}
+      glyph={ReceiptGlyph}
+      tone={colors.mint}
       onPress={onPress}
       disabled={loading}
-      compact={compact}
       error={error}
       testID="btn-transaction-items"
       accessibilityLabel={total ? `Các món: ${lines.items.length} món, tổng ${total}` : `Các món: ${summary}`}

@@ -106,16 +106,7 @@ export function TransactionsHeader({
   return (
     <View style={styles.header}>
       <View style={styles.headerRow}>
-        <View style={styles.titleRow}>
-          <Text style={styles.title}>Giao dịch</Text>
-          <View style={styles.countBadge}>
-            {matchedCount === null ? (
-              <ActivityIndicator size={10} color={colors.green} style={styles.countBadgeLoader} />
-            ) : (
-              <Text style={styles.countBadgeLabel}>{matchedCount} giao dịch</Text>
-            )}
-          </View>
-        </View>
+        <Text style={styles.title}>Giao dịch</Text>
         <View style={styles.actions}>
           <HeaderAction icon={SortIcon} label="Sắp xếp" active={hasCustomSort} onPress={onOpenSort} testID="btn-sort-transactions">
             {hasCustomSort ? (
@@ -141,15 +132,26 @@ export function TransactionsHeader({
         </View>
       </View>
 
-      <Text style={styles.subtitle} numberOfLines={1}>
-        {periodLabel}
-        {headerAmount ? (
-          <Text>
-            {` • ${headerAmount.label}: `}
-            <Text style={[styles.subtitleAmount, { color: headerAmount.color }]}>{headerAmount.text}</Text>
+      {/* The period's total, stated plainly: what period, then the figure,
+          with how many rows match on the right. It used to be a green pill
+          beside the title and a subtitle strung together with a dot. */}
+      <View style={styles.summary}>
+        <View style={styles.summaryText}>
+          <Text style={styles.period} numberOfLines={1}>
+            {headerAmount ? `${headerAmount.label} ${periodLabel.toLowerCase()}` : periodLabel}
           </Text>
-        ) : null}
-      </Text>
+          {headerAmount ? (
+            <Text style={[styles.total, { color: headerAmount.color }]} numberOfLines={1} adjustsFontSizeToFit>
+              {headerAmount.text}
+            </Text>
+          ) : null}
+        </View>
+        {matchedCount === null ? (
+          <ActivityIndicator size="small" color={colors.textMuted} />
+        ) : (
+          <Text style={styles.count}>{matchedCount} giao dịch</Text>
+        )}
+      </View>
       {/* The total is one currency; the period's others are named, not added in. */}
       {otherNote ? (
         <Text style={styles.otherCurrencies} testID="text-transactions-other-currencies">
@@ -180,8 +182,8 @@ interface HeaderActionProps {
   testID?: string;
 }
 
-// A round icon button in the title row. The label is spoken, not shown: the
-// two glyphs (sort arrows, a download tray) are the standard ones for these.
+// A round icon button in the title row, a soft fill and no outline. The label
+// is spoken, not shown: sort arrows and a download tray are standard glyphs.
 function HeaderAction({ icon: Icon, label, onPress, active = false, busy = false, children, testID }: HeaderActionProps) {
   const colors = useColors();
   const styles = useStyles();
@@ -217,28 +219,17 @@ const useStyles = createStyles((colors) => ({
     borderRadius: ACTION_SIZE / 2,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
   },
-  actionActive: { borderColor: colors.green, backgroundColor: withAlpha(colors.green, 0.12) },
+  actionActive: { backgroundColor: withAlpha(colors.green, 0.14) },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  titleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   title: { ...typography.title, color: colors.textPrimary },
-  countBadge: {
-    paddingVertical: 2,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: withAlpha(colors.green, 0.3),
-  },
-  countBadgeLabel: { ...typography.tiny, color: colors.green, fontWeight: "700" },
-  countBadgeLoader: { marginVertical: 3, marginHorizontal: spacing.md },
-  periodNote: { ...typography.tiny, color: colors.textMuted, marginTop: 2 },
-  subtitle: { ...typography.caption, color: colors.textSecondary },
-  subtitleAmount: { fontWeight: "700" },
-  otherCurrencies: { ...typography.tiny, color: colors.textMuted, marginTop: -spacing.xs },
+  summary: { flexDirection: "row", alignItems: "flex-end", gap: spacing.md },
+  summaryText: { flex: 1, minWidth: 0, gap: 2 },
+  period: { ...typography.caption, fontWeight: "500", color: colors.textSecondary },
+  total: { ...typography.hero, fontSize: 26 },
+  count: { ...typography.caption, fontWeight: "500", color: colors.textMuted, paddingBottom: 4 },
+  otherCurrencies: { ...typography.caption, fontWeight: "500", color: colors.textMuted, marginTop: -spacing.xs },
   sortBadge: {
     position: "absolute",
     top: -4,

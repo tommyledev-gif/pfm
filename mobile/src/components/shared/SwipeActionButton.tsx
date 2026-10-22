@@ -3,6 +3,7 @@ import { Animated, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } fro
 
 import { IconProps } from "@/components/ui/icons/primitives";
 import { ARMED_TRANSITION_SPAN, PARK_THRESHOLD_RATIO } from "@/components/shared/use-swipe-actions";
+import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 export interface SwipeAction {
@@ -56,14 +57,10 @@ export function SwipeActionButton({ action, progress, width, parked, positionSty
     outputRange: [0, 1],
     extrapolate: "clamp",
   });
+  // A soft disc that fills with the action's colour once armed — no ring.
   const backgroundColor = progress.interpolate({
     inputRange: ARMED_RANGE,
-    outputRange: [colors.surface, action.color],
-    extrapolate: "clamp",
-  });
-  const borderColor = progress.interpolate({
-    inputRange: ARMED_RANGE,
-    outputRange: [colors.surfaceBorder, action.color],
+    outputRange: [withAlpha(colors.overlayBase, 0.1), action.color],
     extrapolate: "clamp",
   });
   const scale = progress.interpolate({
@@ -94,7 +91,7 @@ export function SwipeActionButton({ action, progress, width, parked, positionSty
   return (
     <View pointerEvents="none" style={[styles.strip, { width }, positionStyle]}>
       <Animated.View
-        style={[styles.indicator, { opacity: indicatorOpacity, backgroundColor, borderColor, transform: [{ scale }] }]}
+        style={[styles.indicator, { opacity: indicatorOpacity, backgroundColor, transform: [{ scale }] }]}
       >
         <Icon size={16} color={colors.textPrimary} />
         <Animated.View style={[StyleSheet.absoluteFill, styles.glyphOverlay, { opacity: armedGlyphOpacity }]}>
@@ -108,10 +105,9 @@ export function SwipeActionButton({ action, progress, width, parked, positionSty
 const useStyles = createStyles((colors) => ({
   strip: { position: "absolute", top: 0, bottom: 0, alignItems: "center", justifyContent: "center" },
   indicator: {
-    width: 32,
-    height: 32,
+    width: 34,
+    height: 34,
     borderRadius: radii.pill,
-    borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
   },

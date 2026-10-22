@@ -1,12 +1,14 @@
-import { Pressable, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { SwipeableRow } from "@/components/shared/SwipeableRow";
-import { CheckIcon, EditIcon, HistoryIcon, TrashIcon } from "@/components/ui/Icon";
+import { ChevronRightIcon, EditIcon, HistoryIcon, TrashIcon } from "@/components/ui/Icon";
 import { formatCurrency } from "@/lib/currency";
 import { withAlpha } from "@/lib/color";
-import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { proposalAmountSign } from "@/features/ai-chat/proposal-kind";
 import { ChatMessage } from "@/features/ai-chat/types";
+
+const ICON_SIZE = 34;
 
 interface PendingRowProps {
   message: ChatMessage;
@@ -14,17 +16,33 @@ interface PendingRowProps {
   /** The proposal's own Wallet currency — never a screen-wide one. */
   currency: string;
   closeSignal: number;
+  /** Draws the hairline above this row (every row but the first). */
+  separated: boolean;
+  /** One peek on mount, to show the row swipes (the section's first row, once). */
+  peek: boolean;
   onOpen: (openEdit?: boolean) => void;
   onRequestRemove: () => void;
 }
 
 /**
- * One proposal in Home's "awaiting confirmation" list.
+ * One proposal in Home's "awaiting confirmation" list: a plain row of the
+ * section's group — amber clock, what it is, the amount, a chevron because
+ * the row opens it. Swipe right to edit, left to discard; the first row of a
+ * session peeks once to say so, instead of grips drawn on every edge.
  *
  * ⚠️ Swiping reveals a button; it never acts on release. Discarding goes
  * through the caller's confirmation and never deletes the message itself.
  */
-export function PendingRow({ message, label, currency, closeSignal, onOpen, onRequestRemove }: PendingRowProps) {
+export function PendingRow({
+  message,
+  label,
+  currency,
+  closeSignal,
+  separated,
+  peek,
+  onOpen,
+  onRequestRemove,
+}: PendingRowProps) {
   const colors = useColors();
   const styles = useStyles();
   const type = message.action?.payload.type ?? "expense";
@@ -34,9 +52,7 @@ export function PendingRow({ message, label, currency, closeSignal, onOpen, onRe
   return (
     <SwipeableRow
       closeSignal={closeSignal}
-      // Edge grips on both sides: the row says it can be swiped before
-      // anyone has to guess.
-      showHandles
+      peek={peek}
       leftAction={{
         Icon: EditIcon,
         color: colors.green,
@@ -53,28 +69,33 @@ export function PendingRow({ message, label, currency, closeSignal, onOpen, onRe
         onPress: onRequestRemove,
       }}
     >
-      <Pressable style={styles.row} onPress={() => onOpen()}>
-        <View style={styles.iconTile}>
-          <HistoryIcon size={18} color={colors.mustard} />
+      <Pressable
+        style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+        onPress={() => onOpen()}
+        accessibilityRole="button"
+        accessibilityHint="Vuốt sang phải để sửa, sang trái để bỏ"
+      >
+        <View style={styles.icon}>
+          <HistoryIcon size={17} color={colors.mustard} />
         </View>
-        <View style={styles.textCol}>
-          <Text style={styles.label} numberOfLines={1}>
-            {label}
+        <View style={[styles.body, separated && styles.separated]}>
+          <View style={styles.textCol}>
+            <Text style={styles.label} numberOfLines={1}>
+              {label}
+            </Text>
+            <Text style={styles.hint} numberOfLines={1}>
+              Chạm để duyệt mục {isTransfer ? "chuyển khoản" : isIncome ? "thu" : "chi"}
+            </Text>
+          </View>
+          <Text
+            testID={`text-pending-amount-${message.id}`}
+            style={[styles.amount, { color: isTransfer ? colors.periwinkle : isIncome ? colors.green : colors.textPrimary }]}
+            numberOfLines={1}
+          >
+            {proposalAmountSign(type)}
+            {formatCurrency(message.action?.payload.amount ?? 0, currency)}
           </Text>
-          <Text style={styles.hint} numberOfLines={1}>
-            Chạm để duyệt mục {isTransfer ? "chuyển khoản" : isIncome ? "thu" : "chi"}
-          </Text>
-        </View>
-        <Text
-          testID={`text-pending-amount-${message.id}`}
-          style={[styles.amount, { color: isTransfer ? colors.periwinkle : isIncome ? colors.green : colors.peach }]}
-          numberOfLines={1}
-        >
-          {proposalAmountSign(type)}
-          {formatCurrency(message.action?.payload.amount ?? 0, currency)}
-        </Text>
-        <View style={styles.checkButton}>
-          <CheckIcon size={16} color={colors.onGreen} />
+          <ChevronRightIcon size={15} color={colors.textMuted} />
         </View>
       </Pressable>
     </SwipeableRow>
@@ -82,38 +103,35 @@ export function PendingRow({ message, label, currency, closeSignal, onOpen, onRe
 }
 
 const useStyles = createStyles((colors) => ({
+  // Opaque: the swipe actions wait underneath it.
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
-    padding: spacing.md,
+    gap: spacing.md,
+    paddingLeft: spacing.lg,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    // A gold outline rather than the neutral border every other card uses —
-    // this row's own cue that it is awaiting action.
-    borderColor: withAlpha(colors.mustard, 0.4),
-    borderRadius: radii.listCard,
   },
-  iconTile: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.listCard - 2,
-    backgroundColor: withAlpha(colors.mustard, 0.12),
-    borderWidth: 1,
-    borderColor: withAlpha(colors.mustard, 0.3),
+  rowPressed: { backgroundColor: withAlpha(colors.overlayBase, 0.05) },
+  icon: {
+    width: ICON_SIZE,
+    height: ICON_SIZE,
+    borderRadius: ICON_SIZE / 2,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: withAlpha(colors.mustard, 0.14),
   },
+  // The hairline starts after the icon, as an iOS list's does.
+  body: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingRight: spacing.md,
+  },
+  separated: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.surfaceBorder },
   textCol: { flex: 1, minWidth: 0, gap: 2 },
   label: { ...typography.body, color: colors.textPrimary },
-  hint: { ...typography.tiny, color: colors.textSecondary },
+  hint: { ...typography.caption, color: colors.textSecondary },
   amount: { ...typography.body, fontWeight: "700" },
-  checkButton: {
-    width: 28,
-    height: 28,
-    borderRadius: radii.pill,
-    backgroundColor: colors.green,
-    alignItems: "center",
-    justifyContent: "center",
-  },
 }));
