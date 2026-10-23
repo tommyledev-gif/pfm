@@ -108,8 +108,13 @@ func (s *AccountSwitchService) Switch(ctx context.Context, switchToken string, d
 // Revoke invalidates a switch token. Idempotent and session-free (logout,
 // remove-from-device, replaced token); an already expired token succeeds.
 func (s *AccountSwitchService) Revoke(ctx context.Context, switchToken string) error {
-	claims, err := s.tokens.ParseSwitchTokenUnverified(switchToken)
+	claims, err := s.tokens.ParseSwitchToken(switchToken)
 	if err != nil {
+		// A forged or expired switch token can never be used: nothing to
+		// revoke, and nothing unverified is written (isUntrustedToken).
+		if isUntrustedToken(err) {
+			return nil
+		}
 		return common.NewInvalidInputError("switch token is malformed")
 	}
 	if err := s.revokedRepo.Revoke(ctx, claims.JTI, &claims.UserID, claims.ExpiresAt); err != nil {

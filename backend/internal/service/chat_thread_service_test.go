@@ -18,9 +18,11 @@ type fakeChatThreadRepo struct {
 	lastBefore *string
 	lastLimit  int
 	fullCalls  int
+	upserts    [][]repository.ChatThreadUpsert
 }
 
-func (f *fakeChatThreadRepo) UpsertMessage(context.Context, repository.UpsertChatThreadMessageParams) error {
+func (f *fakeChatThreadRepo) UpsertMessages(_ context.Context, _ uuid.UUID, messages []repository.ChatThreadUpsert) error {
+	f.upserts = append(f.upserts, messages)
 	return nil
 }
 
@@ -101,5 +103,22 @@ func TestChatThreadService_GetThread_OlderPageEndsTheThread(t *testing.T) {
 	}
 	if repo.lastBefore == nil || *repo.lastBefore != "m2" {
 		t.Fatalf("expected cursor m2 passed through, got %v", repo.lastBefore)
+	}
+}
+
+// S-HRD-44: one sync is one repository write, whatever its size, so the
+// repository can send it as one atomic batch.
+func TestChatThreadSync_IsOneBatch(t *testing.T) {
+	repo := &fakeChatThreadRepo{}
+	svc := NewChatThreadService(repo)
+	messages := []dto.ChatThreadMessageSync{
+		{ClientMessageID: "msg_1", Payload: []byte(`{"a":1}`)},
+		{ClientMessageID: "msg_2", Payload: []byte(`{"b":2}`)},
+	}
+	if err := svc.Sync(context.Background(), uuid.New(), messages); err != nil {
+		t.Fatal(err)
+	}
+	if len(repo.upserts) != 1 || len(repo.upserts[0]) != 2 || repo.upserts[0][1].Payload != `{"b":2}` {
+		t.Fatalf("upserts = %+v", repo.upserts)
 	}
 }

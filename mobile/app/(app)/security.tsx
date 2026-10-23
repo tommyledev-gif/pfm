@@ -6,8 +6,7 @@ import { Screen } from "@/components/shared/Screen";
 import { ScreenHeader } from "@/components/shared/ScreenHeader";
 import { useFabBottom } from "@/components/ui/Fab";
 import { spacing, createStyles } from "@/lib/theme";
-import { useSessionStore } from "@/stores/session-store";
-import { isAccountDeletionOperator } from "@/features/security/account-deletion";
+import { useProfileQuery } from "@/features/profile/api/use-profile-query";
 import { APP_LOCK_FOOTER, AppLockToggleRow } from "@/features/security/components/AppLockToggleRow";
 import { CHANGE_PASSWORD_FOOTER, ChangePasswordRow } from "@/features/security/components/ChangePasswordRow";
 import { DeleteAccountsSection } from "@/features/security/components/DeleteAccountsSection";
@@ -30,7 +29,10 @@ const PROTECTIONS_HEADER = "Khóa và xác minh";
 // with what it does said once in the group's footer, not in a box per row.
 export default function SecurityScreen() {
   const styles = useStyles();
-  const canDeleteAccounts = useSessionStore((s) => isAccountDeletionOperator(s.email));
+  // The server says who may use the account deletion tool (GET /users/me);
+  // the app no longer carries the operator's email.
+  const { data: me } = useProfileQuery();
+  const canDeleteAccounts = me?.can_delete_accounts === true;
   // The floating BottomNav covers the screen's foot, and the account-wide
   // sign-out at the end of the list sat under it.
   const navClearance = useFabBottom();

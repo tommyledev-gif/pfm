@@ -1,15 +1,12 @@
 package service
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/xuri/excelize/v2"
 	"go.uber.org/zap"
 
 	"github.com/example/pfm/backend/internal/common"
@@ -63,14 +60,14 @@ func NewTransactionImportService(
 }
 
 // PreviewImport is a dry run in the literal sense — the only database access
-// is read-only (the caller's wallets/categories, and one existence check per
-// candidate row's derived idempotency key).
+// is read-only: the caller's wallets/categories, and one existence check for
+// every candidate row's derived idempotency key at once (one query, not one
+// per row: 10,000 rows took ~5 s that way).
 func (s *TransactionImportService) PreviewImport(ctx context.Context, userID uuid.UUID, file []byte) (*dto.ImportPreviewResponse, error) {
-	rows, err := readWorksheetRows(file)
+	header, dataRows, err := readWorksheetRows(file, defaultImportReadLimits)
 	if err != nil {
 		return nil, err
 	}
-	header, dataRows := rows[0], rows[1:]
 	columns, err := indexColumns(header)
 	if err != nil {
 		return nil, err
@@ -92,37 +89,43 @@ func (s *TransactionImportService) PreviewImport(ctx context.Context, userID uui
 		Errors:     []dto.ImportRowIssue{},
 	}
 
-	for i, raw := range dataRows {
-		rowNumber := i + 2 // 1-based, and row 1 is the header
-		if isBlankRow(raw) {
-			continue
-		}
-
-		row, reason := resolveRow(rowNumber, cellsFor(raw, columns), lookups)
+	candidates := make([]dto.ImportRow, 0, len(dataRows))
+	keys := make([]uuid.UUID, 0, len(dataRows))
+	// How many times each content key has appeared so far in this file.
+	seen := make(map[uuid.UUID]int, len(dataRows))
+	for _, raw := range dataRows {
+		row, reason := resolveRow(raw.number, cellsFor(raw.cells, columns), lookups)
 		if reason != "" {
-			result.Errors = append(result.Errors, dto.ImportRowIssue{Row: rowNumber, Reason: reason})
+			result.Errors = append(result.Errors, dto.ImportRowIssue{Row: raw.number, Reason: reason})
 			continue
 		}
-		row.IdempotencyKey = deriveIdempotencyKey(userID, row)
+		contentKey := deriveIdempotencyKey(userID, row)
+		row.IdempotencyKey = occurrenceKey(contentKey, seen[contentKey])
+		seen[contentKey]++
+		candidates = append(candidates, row)
+		keys = append(keys, row.IdempotencyKey)
+	}
 
-		// A UX nicety, not the enforcement mechanism (plan.md Finding #2):
-		// telling the user upfront which rows are already imported. What
-		// actually guarantees a duplicate can't be written is
-		// CreateTransaction's own replay path at commit time, which catches
-		// anything that raced in between.
-		found, deleted, err := s.isAlreadyImported(ctx, userID, row.IdempotencyKey)
-		if err != nil {
-			return nil, err
-		}
-		if found {
-			reason := importReasonAlreadyImported
-			if deleted {
-				reason = importReasonImportedThenDeleted
-			}
-			result.Duplicates = append(result.Duplicates, dto.ImportRowIssue{Row: rowNumber, Reason: reason})
+	// A UX nicety, not the enforcement mechanism (plan.md Finding #2):
+	// telling the user upfront which rows are already imported. What
+	// actually guarantees a duplicate can't be written is
+	// CreateTransaction's own replay path at commit time, which catches
+	// anything that raced in between.
+	imported, err := s.repo.ImportedKeyStates(ctx, userID, keys)
+	if err != nil {
+		return nil, fmt.Errorf("service.PreviewImport: %w", err)
+	}
+	for _, row := range candidates {
+		deleted, found := imported[row.IdempotencyKey]
+		if !found {
+			result.Valid = append(result.Valid, row)
 			continue
 		}
-		result.Valid = append(result.Valid, row)
+		reason := importReasonAlreadyImported
+		if deleted {
+			reason = importReasonImportedThenDeleted
+		}
+		result.Duplicates = append(result.Duplicates, dto.ImportRowIssue{Row: row.Row, Reason: reason})
 	}
 
 	token, err := s.tokens.IssueImportToken(userID, result.Valid)
@@ -183,20 +186,6 @@ func (s *TransactionImportService) CommitImport(ctx context.Context, userID uuid
 	return result, nil
 }
 
-// isAlreadyImported reports whether this derived key has already produced a
-// Transaction for this user (found) and whether that Transaction has since
-// been soft-deleted (deleted) — the lookup matches deleted rows on purpose.
-func (s *TransactionImportService) isAlreadyImported(ctx context.Context, userID, key uuid.UUID) (found, deleted bool, err error) {
-	existing, err := s.repo.GetTransactionByIdempotencyKey(ctx, userID, key)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return false, false, nil
-		}
-		return false, false, fmt.Errorf("service.isAlreadyImported: %w", err)
-	}
-	return true, existing.DeletedAt != nil, nil
-}
-
 // commitFailureReason surfaces a domain error's own user-facing message
 // (every common.AppError already carries a Vietnamese one) and hides anything
 // else behind a generic string — an unexpected internal error's text is not
@@ -207,34 +196,6 @@ func commitFailureReason(err error) string {
 		return appErr.Message
 	}
 	return "không thể tạo giao dịch cho dòng này"
-}
-
-// readWorksheetRows opens the uploaded bytes as a workbook and returns the
-// first sheet's rows, header included.
-//
-// excelize's own parse failure IS the content validation (spec.md Edge Cases
-// US-02 #3): a renamed .csv or any other non-OOXML payload fails to open as a
-// zip+XML package here, before a single row is looked at. There is
-// deliberately no separate magic-byte check reimplemented by hand.
-func readWorksheetRows(file []byte) ([][]string, error) {
-	workbook, err := excelize.OpenReader(bytes.NewReader(file))
-	if err != nil {
-		return nil, common.NewInvalidInputError("tệp không phải là tệp .xlsx hợp lệ")
-	}
-	defer workbook.Close() //nolint:errcheck // read-only, in-memory
-
-	sheets := workbook.GetSheetList()
-	if len(sheets) == 0 {
-		return nil, common.NewInvalidInputError("tệp không có trang tính nào")
-	}
-	rows, err := workbook.GetRows(sheets[0])
-	if err != nil {
-		return nil, common.NewInvalidInputError("không đọc được trang tính đầu tiên")
-	}
-	if len(rows) == 0 {
-		return nil, common.NewInvalidInputError("tệp không có dòng tiêu đề")
-	}
-	return rows, nil
 }
 
 // indexColumns maps each required/optional column name to its position in the
@@ -270,15 +231,4 @@ func cellsFor(raw []string, columns map[string]int) map[string]string {
 		}
 	}
 	return cells
-}
-
-// isBlankRow skips the trailing empty rows spreadsheets routinely carry —
-// reporting them as validation errors would bury the real ones.
-func isBlankRow(raw []string) bool {
-	for _, cell := range raw {
-		if strings.TrimSpace(cell) != "" {
-			return false
-		}
-	}
-	return true
 }

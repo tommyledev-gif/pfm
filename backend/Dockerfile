@@ -16,7 +16,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/seed ./
 # server binary expects — no volume mount, no synced host directory.
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/migrate ./cmd/migrate
 
-FROM alpine:3.20
+# 3.20 left upstream support on 2026-04-01 (no more security fixes for musl
+# or ca-certificates); 3.22 is supported until 2027-05.
+FROM alpine:3.22
 RUN apk add --no-cache ca-certificates
 # Opt-in local trust store: certs/local-dev-ca/*.crt is gitignored, so this is
 # empty for everyone except a developer who dropped a cert in there (e.g. a

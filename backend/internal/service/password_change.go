@@ -35,6 +35,9 @@ func (s *SessionRevocationService) ChangePassword(ctx context.Context, callerID 
 	if len(newPassword) < common.MinPasswordLength {
 		return nil, common.NewWeakPasswordError(fmt.Sprintf("Mật khẩu mới cần ít nhất %d ký tự.", common.MinPasswordLength))
 	}
+	if common.PasswordTooLong(newPassword) {
+		return nil, common.ErrPasswordTooLong
+	}
 	if newPassword == currentPassword {
 		return nil, common.ErrSamePassword
 	}

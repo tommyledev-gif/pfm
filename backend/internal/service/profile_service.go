@@ -20,11 +20,25 @@ import (
 type ProfileService struct {
 	users    UserRepo
 	uploader IconUploader
+	deletion AccountDeletionPolicy
 	logger   *zap.Logger
 }
 
 func NewProfileService(users UserRepo, uploader IconUploader, logger *zap.Logger) *ProfileService {
 	return &ProfileService{users: users, uploader: uploader, logger: logger}
+}
+
+// WithAccountDeletionPolicy sets who CanDeleteAccounts reports true for;
+// without it, nobody.
+func (s *ProfileService) WithAccountDeletionPolicy(p AccountDeletionPolicy) *ProfileService {
+	s.deletion = p
+	return s
+}
+
+// CanDeleteAccounts tells the app whether to show the account deletion tool:
+// the same two gates the tool's routes apply (admin role, configured operator).
+func (s *ProfileService) CanDeleteAccounts(user *model.User) bool {
+	return user.Role == model.UserRoleAdmin && s.deletion.IsOperator(user.Email)
 }
 
 func (s *ProfileService) Get(ctx context.Context, userID uuid.UUID) (*model.User, error) {

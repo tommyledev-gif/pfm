@@ -158,3 +158,28 @@ There is no need to judge which case applies: `ota:publish` refuses when native 
 - **Nothing is pruned yet.** R2's free tier holds 10 GB (then about $0.015 per GB a month, downloads free): roughly 190 APKs or 1,500 publishes. When pruning comes: keep every runtime's `apk.json` (the "Cần cài bản Budgest mới" check needs it to recognise an old APK), never delete a blob a kept manifest lists (blobs are shared between updates), and keep the original of any rollback copy. An R2 lifecycle rule by age is not safe here: an unchanged image uploaded months ago is still in use.
 - **iOS is not set up.** The server accepts `expo-platform: ios`, but no script builds or publishes for it.
 - **`r2.dev` URLs.** The bucket is reached through its `r2.dev` address (`R2_PUBLIC_BASE_URL`), which Cloudflare rate-limits and calls unsuitable for heavy production traffic. Fine for this user count; a custom domain on the bucket lifts it, and only `R2_PUBLIC_BASE_URL` changes (updates already published keep their old URLs). The APK now goes R2 → VPS → Cloudflare → phone, so each download also counts against the VPS's own traffic. OTA bundles and images still go straight from `r2.dev` to the phone: their URLs are inside the signed manifest, so serving them through the API means changing `publish-update.mjs` to write API URLs and adding a route for them.
+
+## 9. Security hardening (2026-10, `specs/security-hardening-2026-10/`)
+
+**Backend ↔ AI Service token (`AI_SERVICE_TOKEN`).** The backend sends it as `X-Internal-Token` on every AI Service call; once the AI Service has it, every route but `/health` answers 401 without it. Both containers read the same variable from `.env.prod`.
+
+1. Deploy both images that contain the change (backend and ai-service workflows) with the variable still unset. Everything works as before; both log a warning that the token is not set.
+2. Add `AI_SERVICE_TOKEN=<openssl rand -hex 32>` to `VPS_ENV_PROD` (≥ 32 bytes, or the backend refuses to start), then re-run **one** deploy: `deploy.sh` recreates both containers from the same env file.
+3. Check: `docker exec pfm-ai-service-container python -c "import urllib.request; urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8000/extract', data=b'{}', headers={'Content-Type':'application/json'}))"` must fail with HTTP 401, and a chat message in the app must still be read.
+4. Rotate the same way: change the value and redeploy. Set on only one side, AI features answer 502 `AI_SERVICE_UNAVAILABLE` (nothing is written; AI calls never move money) until both match.
+
+**Hardened containers.** `pfm-backend` and `ai-service` run with a read-only root filesystem, an in-memory `/tmp` (64 MB), no Linux capabilities and `no-new-privileges`. Debugging with `docker exec … sh` still works; writing anywhere but `/tmp` does not. If a future feature needs to write files, give it a named volume or a `tmpfs` entry, never `read_only: false`.
+
+**Request log.** Every request is one `"request"` log line with `request_id` (also returned as the `X-Request-ID` header; a client may send its own UUID), `method`, `path` (never the query string), `status`, `latency_ms`, `ip`, `bytes`, `user_id`. 401/403/429 are `warn`, 5xx `error`. To trace a user's report, ask for the time and grep the id: `docker logs pfm-backend-container | grep <request_id>`.
+
+**New limits.** `/auth/refresh`, `/auth/logout`, `/auth/activate` and `/auth/switch-token/revoke` share 60 requests/minute per client IP. A transaction import takes at most 10,000 data rows and 64 MiB decompressed. A thread sync takes at most 500 messages of 64 KiB each. Passwords are at most 72 bytes (bcrypt's limit). `/ai/chat` and `/ai/suggest-category-name` share 30 requests/hour per user; the other `/ai` routes (thread, wizard prefill/proposals) 600/hour.
+
+**Account deletion tool.** Open only to `ACCOUNT_DELETION_OPERATOR_EMAIL` (an admin); blank closes it for everyone. The app shows it when `GET /users/me` returns `can_delete_accounts: true`. Set it in `VPS_ENV_PROD` to keep using the tool.
+
+**Test-account passwords.** Until 2026-10-23, release bundles (public OTA and APK files) carried the debug console's test accounts with their passwords (`mobile/src/lib/dev-login.ts`). Bundles already published stay downloadable, so every account listed there must get a new password in production, and its sessions ended (Cài đặt → Bảo mật → Đổi mật khẩu, or admin "sign out everywhere").
+
+**Deploy secrets.** The deploy workflows pass `VPS_ENV_PROD` and the Docker Hub token to the VPS as environment variables (`envs:`), so `.env.prod` is byte-for-byte the secret. Before this, the secret was pasted into the remote script, and `$`, backticks and `\` in a value were expanded by the shell; a value that only worked because of that expansion (unlikely) needs fixing in the secret.
+
+**Image scan.** Images are built, scanned with Trivy (blocking on HIGH/CRITICAL that have a fix), and pushed only if clean. A blocked deploy leaves production untouched; fix by bumping the base image or the dependency named in the job log.
+
+**CI.** Third-party actions are pinned to commit SHAs (the version is in the trailing comment). To bump one: `git ls-remote https://github.com/<owner>/<repo> refs/tags/<tag> refs/tags/<tag>^{}`, take the `^{}` line's SHA when there is one, and update the SHA and the comment together.

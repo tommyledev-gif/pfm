@@ -64,3 +64,27 @@ func TestLoadDBMaxConns(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadAIServiceToken(t *testing.T) {
+	setRequired(t)
+	t.Setenv("AI_SERVICE_TOKEN", "")
+	if cfg, err := Load(); err != nil || cfg.AIServiceToken != "" {
+		t.Fatalf("unset token must be allowed: %v", err)
+	}
+
+	short := strings.Repeat("t", MinAIServiceTokenBytes-1)
+	t.Setenv("AI_SERVICE_TOKEN", short)
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "AI_SERVICE_TOKEN must be at least 32 bytes") {
+		t.Fatalf("short token: err = %v", err)
+	}
+	if strings.Contains(err.Error(), short) {
+		t.Fatalf("error leaks the token: %v", err)
+	}
+
+	long := strings.Repeat("t", MinAIServiceTokenBytes)
+	t.Setenv("AI_SERVICE_TOKEN", long)
+	if cfg, err := Load(); err != nil || cfg.AIServiceToken != long {
+		t.Fatalf("32-byte token: %v", err)
+	}
+}

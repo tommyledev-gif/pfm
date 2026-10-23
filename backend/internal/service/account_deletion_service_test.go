@@ -77,8 +77,8 @@ func newDeletionFixture() *deletionFixture {
 		repo:     &fakeDeletionRepo{users: map[uuid.UUID]*model.User{}},
 		sessions: &fakeSessionEnder{ended: map[uuid.UUID]string{}},
 	}
-	f.svc = NewAccountDeletionService(f.repo, f.sessions, zap.NewNop())
-	f.operator = f.add(common.AccountDeletionOperatorEmail)
+	f.svc = NewAccountDeletionService(f.repo, f.sessions, NewAccountDeletionPolicy(testDeletionOperatorEmail), zap.NewNop())
+	f.operator = f.add(testDeletionOperatorEmail)
 	return f
 }
 
@@ -183,4 +183,24 @@ func TestAccountDeletionService_SearchUsers(t *testing.T) {
 		_, err := f.svc.SearchUsers(ctx, member.ID, "m")
 		wantAppCode(t, err, common.ErrCodeForbidden)
 	})
+}
+
+const testDeletionOperatorEmail = "operator@example.com"
+
+// F-18: the operator comes from configuration; unset opens the tool to nobody,
+// and the email matches case-insensitively.
+func TestAccountDeletionPolicy(t *testing.T) {
+	if (AccountDeletionPolicy{}).IsOperator("") || NewAccountDeletionPolicy("").IsOperator("anyone@example.com") {
+		t.Fatal("an unset operator must match nobody")
+	}
+	p := NewAccountDeletionPolicy("  Operator@Example.com ")
+	if !p.IsOperator("operator@example.COM") || p.IsOperator("other@example.com") {
+		t.Fatal("operator match must be exact and case-insensitive")
+	}
+
+	ctx := context.Background()
+	f := newDeletionFixture()
+	f.svc = NewAccountDeletionService(f.repo, f.sessions, AccountDeletionPolicy{}, zap.NewNop())
+	target := f.add("target@example.com")
+	wantAppCode(t, f.svc.DeleteUser(ctx, f.operator.ID, target.ID), common.ErrCodeForbidden)
 }

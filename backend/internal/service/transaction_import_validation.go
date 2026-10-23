@@ -43,6 +43,21 @@ func deriveIdempotencyKey(userID uuid.UUID, row dto.ImportRow) uuid.UUID {
 	return uuid.NewSHA1(importIdempotencyNamespace, sum[:])
 }
 
+// occurrenceKey keeps identical rows of one file apart. Two real purchases can
+// share every field (two 35.000đ coffees on one day, same note); keyed by
+// content alone, the second collapsed into the first and was reported as
+// "skipped", silently losing money from the import
+// (specs/security-hardening-2026-10 F-16). The n-th repeat (n >= 1) of a
+// content key gets its own key derived from it, while the first copy keeps the
+// plain content key, so files imported before this rule still match their
+// earlier import and re-importing the same file stays a no-op.
+func occurrenceKey(contentKey uuid.UUID, occurrence int) uuid.UUID {
+	if occurrence == 0 {
+		return contentKey
+	}
+	return uuid.NewSHA1(importIdempotencyNamespace, []byte(fmt.Sprintf("%s#%d", contentKey, occurrence)))
+}
+
 // importLookups holds the caller's own wallets and visible categories,
 // indexed for name resolution. Built once per Preview, never per row.
 type importLookups struct {

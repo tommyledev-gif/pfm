@@ -17,6 +17,14 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
 from app.schemas.extract_schema import CategoryContext, WalletContext
+from app.schemas.limits import (
+    CAPTION_MAX_CHARS,
+    CATEGORIES_MAX,
+    IMAGE_BASE64_MAX_CHARS,
+    IMAGE_MAX_ITEMS,
+    SHORT_FIELD_MAX_CHARS,
+    WALLETS_MAX,
+)
 
 # A longer note is cut by image_reading.parse_image_reading before validation,
 # so it never costs the User the whole entry.
@@ -26,13 +34,14 @@ NOTE_MAX_LENGTH = 200
 class ExtractImageRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    image_base64: str = Field(min_length=1)
+    image_base64: str = Field(min_length=1, max_length=IMAGE_BASE64_MAX_CHARS)
     mime_type: Literal["image/jpeg", "image/png", "image/webp"]
-    caption: str | None = None
-    wallets: list[WalletContext]
-    categories: list[CategoryContext]
-    now: str  # RFC3339, UTC — the Go Backend's server time, never client-supplied
-    max_items: int = Field(ge=1)
+    caption: str | None = Field(default=None, max_length=CAPTION_MAX_CHARS)
+    wallets: list[WalletContext] = Field(max_length=WALLETS_MAX)
+    categories: list[CategoryContext] = Field(max_length=CATEGORIES_MAX)
+    # RFC3339, UTC — the Go Backend's server time, never client-supplied
+    now: str = Field(max_length=SHORT_FIELD_MAX_CHARS)
+    max_items: int = Field(ge=1, le=IMAGE_MAX_ITEMS)
     # False when Phase 0 failed the receipt-line criteria (plan §2.4,
     # AIImageReadReceiptLines): the prompt then never asks for lines.
     read_lines: bool = True

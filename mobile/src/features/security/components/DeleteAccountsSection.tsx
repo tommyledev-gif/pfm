@@ -35,8 +35,8 @@ const successMessage = (email: string) => `Đã xóa tài khoản ${email}`;
 
 /**
  * Test-phase tool on the Security screen: find any account by email or tên
- * đăng nhập and soft-delete it. Rendered only for
- * ACCOUNT_DELETION_OPERATOR_EMAIL; the server enforces the same.
+ * đăng nhập and soft-delete it. Rendered only when GET /users/me says
+ * can_delete_accounts; the server enforces the same on every call.
  */
 export function DeleteAccountsSection() {
   const colors = useColors();

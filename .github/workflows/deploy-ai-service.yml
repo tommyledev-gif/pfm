@@ -29,40 +29,50 @@ jobs:
       contents: read
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       # Only ai-service/ is sent to the Docker build context, same isolation
-      # principle as deploy-backend.yml's backend-only build.
-      - name: Build and push ai-service image
-        uses: docker/build-push-action@v6
+      # principle as deploy-backend.yml's backend-only build. Built locally,
+      # scanned, then pushed: same order and reasoning as deploy-backend.yml.
+      - name: Build ai-service image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: ./ai-service
           file: ./ai-service/Dockerfile
-          push: true
+          push: false
           load: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/pfm-ai-service:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/pfm-ai-service:${{ github.sha }}
 
-      # Non-blocking for now, same as deploy-backend.yml's Trivy step —
-      # flip exit-code to '1' once baseline findings are triaged.
+      # Blocking, like deploy-backend.yml's. Baseline on 2026-10-23:
+      # python:3.12-slim and the full resolved pip set had no fixable
+      # HIGH/CRITICAL CVE.
       - name: Scan image for vulnerabilities (Trivy)
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/pfm-ai-service:${{ github.sha }}
           format: table
           severity: CRITICAL,HIGH
           ignore-unfixed: true
-          exit-code: "0"
+          exit-code: "1"
+
+      - name: Push ai-service image
+        env:
+          IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/pfm-ai-service
+          TAG: ${{ github.sha }}
+        run: |
+          docker push "$IMAGE:$TAG"
+          docker push "$IMAGE:latest"
 
   deploy:
     runs-on: ubuntu-latest
@@ -71,13 +81,13 @@ jobs:
       contents: read
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       # docker-compose.yml/deploy.sh live under backend/ but now also define
       # ai-service — keep the VPS copy in sync regardless of which workflow
       # last touched them.
       - name: Sync deployment files to VPS
-        uses: appleboy/scp-action@v0.1.7
+        uses: appleboy/scp-action@917f8b81dfc1ccd331fef9e2d61bdc6c8be94634 # v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
@@ -89,25 +99,39 @@ jobs:
       # ai-service has no health-check/rollback dance like deploy-backend.yml
       # — it's a secondary service the backend already degrades gracefully
       # around (502 AI_SERVICE_UNAVAILABLE), so a plain pull+up is enough.
+      # Secrets travel as environment variables, never as ${{ }} text inside
+      # the script (same reasoning as deploy-backend.yml's deploy step).
       - name: Deploy to VPS over SSH
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
+        env:
+          VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
+          VPS_ENV_PROD: ${{ secrets.VPS_ENV_PROD }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          NEW_TAG: ${{ github.sha }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
+          envs: VPS_APP_DIR,VPS_ENV_PROD,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,NEW_TAG
           script_stop: true
           script: |
             set -euo pipefail
-            cd "${{ secrets.VPS_APP_DIR }}/backend"
+            cd "$VPS_APP_DIR/backend"
 
-            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+            printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            unset DOCKERHUB_TOKEN
 
             # umask: created owner-only, never readable even for a moment
-            # (deploy.sh also chmods it 600 on every run).
-            if [ -n "${{ secrets.VPS_ENV_PROD }}" ]; then
-              (umask 077; printf '%s\n' "${{ secrets.VPS_ENV_PROD }}" | sed -e 's/\r$//' > .env.prod)
+            # (deploy.sh also chmods it 600 on every run). Written beside the
+            # live file and then moved, so a failed write never leaves a
+            # truncated .env.prod behind.
+            if [ -n "${VPS_ENV_PROD:-}" ]; then
+              (umask 077; printf '%s\n' "$VPS_ENV_PROD" | sed -e 's/\r$//' > .env.prod.new)
+              mv .env.prod.new .env.prod
             fi
+            unset VPS_ENV_PROD
 
             chmod +x deploy.sh
 
@@ -117,9 +141,9 @@ jobs:
               PFM_BACKEND_IMAGE_TAG="$(cat "$LAST_GOOD_TAG_FILE")"
             fi
 
-            DOCKER_REGISTRY_USER="${{ secrets.DOCKERHUB_USERNAME }}" \
+            DOCKER_REGISTRY_USER="$DOCKERHUB_USERNAME" \
               PFM_BACKEND_IMAGE_TAG="$PFM_BACKEND_IMAGE_TAG" \
-              PFM_AI_SERVICE_IMAGE_TAG="${{ github.sha }}" \
+              PFM_AI_SERVICE_IMAGE_TAG="$NEW_TAG" \
               ./deploy.sh
 
             for i in $(seq 1 10); do

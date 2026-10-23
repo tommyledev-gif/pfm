@@ -1,7 +1,6 @@
 package service
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -76,12 +75,11 @@ type AIImageBusyError struct {
 func (e *AIImageBusyError) Error() string { return "ai image reading busy" }
 
 type httpAIImageClient struct {
-	baseURL string
-	client  *http.Client
+	http aiHTTP
 }
 
-func NewHTTPAIImageClient(baseURL string) *httpAIImageClient {
-	return &httpAIImageClient{baseURL: baseURL, client: &http.Client{Timeout: common.AIImageRequestTimeout}}
+func NewHTTPAIImageClient(endpoint AIServiceEndpoint) *httpAIImageClient {
+	return &httpAIImageClient{http: newAIHTTP(endpoint, common.AIImageRequestTimeout)}
 }
 
 var _ AIImageClient = (*httpAIImageClient)(nil)
@@ -142,22 +140,10 @@ type aiImageWireBusy struct {
 // non-200 body except the bounded 429 wait time: error bodies can echo the
 // request (plan F12).
 func (c *httpAIImageClient) ExtractImage(ctx context.Context, req AIExtractImageRequest) (*AIExtractImageResponse, error) {
-	if c.baseURL == "" {
-		return nil, fmt.Errorf("ai_image_client.ExtractImage: AI_SERVICE_URL not configured")
-	}
-	body, err := json.Marshal(toImageWireRequest(req))
+	const op = "ai_image_client.ExtractImage"
+	resp, err := c.http.post(ctx, op, "/extract-image", toImageWireRequest(req))
 	if err != nil {
-		return nil, fmt.Errorf("ai_image_client.ExtractImage: %w", err)
-	}
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/extract-image", bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("ai_image_client.ExtractImage: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.client.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("ai_image_client.ExtractImage: %w", err)
+		return nil, err
 	}
 	defer resp.Body.Close() //nolint:errcheck // best-effort close, response already read
 
@@ -170,12 +156,12 @@ func (c *httpAIImageClient) ExtractImage(ctx context.Context, req AIExtractImage
 		}
 		return nil, &AIImageBusyError{RetryAfterSeconds: busy.RetryAfterSeconds}
 	default:
-		return nil, fmt.Errorf("ai_image_client.ExtractImage: unexpected status %d", resp.StatusCode)
+		return nil, fmt.Errorf("%s: unexpected status %d", op, resp.StatusCode)
 	}
 
 	var wire aiImageWireResponse
-	if err := json.NewDecoder(resp.Body).Decode(&wire); err != nil {
-		return nil, fmt.Errorf("ai_image_client.ExtractImage: %w", err)
+	if err := decodeAIResponse(op, resp.Body, &wire); err != nil {
+		return nil, err
 	}
 	return fromImageWireResponse(wire), nil
 }

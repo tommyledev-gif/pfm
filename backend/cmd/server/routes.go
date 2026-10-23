@@ -13,6 +13,14 @@ import (
 	"github.com/example/pfm/backend/internal/service"
 )
 
+// The health probes. Named here and passed to the request logger in main.go,
+// which leaves their successful calls (Docker polls every few seconds) out of
+// the log.
+const (
+	healthPath      = "/api/v1/health"
+	healthReadyPath = healthPath + "/ready"
+)
+
 // dbPinger is the part of *pgxpool.Pool the readiness probe uses.
 type dbPinger interface {
 	Ping(ctx context.Context) error
@@ -44,7 +52,7 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 
 	// Deploy-verification probe (CI/CD health check after a VPS deploy) — no
 	// auth, no DB call, just proves the process is up and serving.
-	v1.Get("/health", func(c *fiber.Ctx) error {
+	app.Get(healthPath, func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
 	})
 	// Readiness: the same, plus a database ping. The deploy gate uses this one,
@@ -52,7 +60,7 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	// in the env file, a failed migration left behind) is rolled back instead
 	// of answering /health while every real request fails. Container liveness
 	// stays on /health: a database blip must not restart the API.
-	v1.Get("/health/ready", func(c *fiber.Ctx) error {
+	app.Get(healthReadyPath, func(c *fiber.Ctx) error {
 		ctx, cancel := context.WithTimeout(c.Context(), common.HealthDBPingTimeout)
 		defer cancel()
 		if err := db.Ping(ctx); err != nil {
@@ -62,15 +70,19 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 		return c.JSON(fiber.Map{"status": "ok"})
 	})
 
+	// One generous per-IP counter shared by the unauthenticated routes whose
+	// credential is a token (specs/security-hardening-2026-10 US-04): nothing
+	// to guess there, but each call is a database round trip.
+	publicTokenLimit := middleware.PublicTokenRateLimiter(logger)
+
 	auth := v1.Group("/auth")
-	auth.Post("/activate", authHandler.Activate)
+	auth.Post("/activate", publicTokenLimit, authHandler.Activate)
 	auth.Post("/login", middleware.LoginRateLimiter(logger), middleware.LoginAccountRateLimiter(logger), authHandler.Login)
-	auth.Post("/logout", authHandler.Logout)
-	// /auth/refresh is unauthenticated like /auth/logout — no rate limiter
-	// (specs/mobile-session-refresh/plan.md Pre-flight Finding #2): the
-	// refresh token itself is the credential, so there is no
-	// password-guessing surface like /auth/login has.
-	auth.Post("/refresh", authHandler.Refresh)
+	auth.Post("/logout", publicTokenLimit, authHandler.Logout)
+	// /auth/refresh is unauthenticated like /auth/logout: the refresh token
+	// itself is the credential, so there is no password-guessing surface like
+	// /auth/login has — only the shared per-IP load limit.
+	auth.Post("/refresh", publicTokenLimit, authHandler.Refresh)
 	// Account switching (specs/mobile-account-switch). Issuing needs a
 	// session; switching and revoking do not (the switch token is the
 	// credential). Only /switch is rate-limited (S-ASW-20).
@@ -78,7 +90,7 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	// device-bound session and switch with /auth/refresh. Kept for older
 	// builds, and for the one-time trade of their stored switch tokens.
 	auth.Post("/switch-token", jwtAuth, accountSwitchHandler.IssueSwitchToken)
-	auth.Post("/switch-token/revoke", accountSwitchHandler.RevokeSwitchToken)
+	auth.Post("/switch-token/revoke", publicTokenLimit, accountSwitchHandler.RevokeSwitchToken)
 	auth.Post("/switch", middleware.SwitchRateLimiter(logger), accountSwitchHandler.Switch)
 	// Sign out everywhere, self (US-08) — the device gets a fresh pair.
 	auth.Post("/sessions/revoke-all", jwtAuth, sessionRevocationHandler.RevokeAllSelf)
@@ -113,8 +125,8 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	admin.Post("/users/:id/approve", accessRequestHandler.Approve)
 	admin.Post("/users/:id/reject", accessRequestHandler.Reject)
 	// Test-phase account deletion tool (mobile Security screen). The service
-	// lets through only common.AccountDeletionOperatorEmail, on top of the
-	// group's role gate.
+	// lets through only ACCOUNT_DELETION_OPERATOR_EMAIL (AccountDeletionPolicy),
+	// on top of the group's role gate.
 	admin.Get("/users/search", accountDeletionHandler.SearchUsers)
 	admin.Delete("/users/:id", accountDeletionHandler.DeleteUser)
 
@@ -232,28 +244,33 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 
 	// Feature-12 AI Chat Assistant (US-01 only) — no RequireRole gate: every
 	// active user chats only with their own context (plan.md Security &
-	// Actor Resolution). AIChatRateLimiter runs after JWTAuth so
-	// common.LocalsUserID is already populated (same ordering rule as
-	// InviteRateLimiter). The confirm step reuses POST /transactions above —
+	// Actor Resolution). The confirm step reuses POST /transactions above —
 	// no separate route.
-	ai := v1.Group("/ai", jwtAuth, middleware.AIChatRateLimiter(logger))
-	ai.Post("/chat", chatHandler.Chat)
+	//
+	// Limiters are per route, not on the group (specs/security-hardening-
+	// 2026-10 F-17): group middleware covers every path under /ai, so the
+	// thread sync that follows each message also spent the 30-per-hour model
+	// budget, and about 15 messages locked a user out of chat. aiModelLimit
+	// is ONE instance shared by the two routes that call the AI Service;
+	// aiLocalLimit is a looser cap for the /ai routes that never do. Both run
+	// after JWTAuth, which sets the user id they are keyed by.
+	aiModelLimit := middleware.AIChatRateLimiter(logger)
+	aiLocalLimit := middleware.AILocalRateLimiter(logger)
+	ai := v1.Group("/ai", jwtAuth)
+	ai.Post("/chat", aiModelLimit, chatHandler.Chat)
 	// Client-rendered chat thread cache (mobile chat-store.ts) — restores the
 	// full chat UI (action cards, confirmed state, edit history) after local
 	// AsyncStorage is cleared (logout, reinstall, new device). Neither
-	// endpoint calls the AI Service; grouped here anyway for URL-namespace
-	// consistency with every other /ai/* route (same reasoning as the budget
-	// wizard's Prefill/Proposals below).
-	ai.Get("/chat/thread", chatHandler.GetThread)
-	ai.Post("/chat/thread/sync", chatHandler.SyncThread)
+	// endpoint calls the AI Service.
+	ai.Get("/chat/thread", aiLocalLimit, chatHandler.GetThread)
+	ai.Post("/chat/thread/sync", aiLocalLimit, chatHandler.SyncThread)
 
-	// F-13 AI Budget Setup Wizard (specs/ai-budget-wizard/plan.md Finding #4)
-	// — share the /ai group's rate limiter for URL-namespace consistency,
-	// even though Prefill/Proposals never actually call the AI Service;
-	// only SuggestCategoryName does (Finding #6/#11).
-	ai.Get("/budget-wizard/prefill", budgetWizardHandler.Prefill)
-	ai.Post("/budget-proposals", budgetWizardHandler.Proposals)
-	ai.Post("/suggest-category-name", budgetWizardHandler.SuggestCategoryName)
+	// F-13 AI Budget Setup Wizard (specs/ai-budget-wizard/plan.md Finding #4).
+	// Prefill/Proposals never call the AI Service; only SuggestCategoryName
+	// does (Finding #6/#11), so only it spends the model budget.
+	ai.Get("/budget-wizard/prefill", aiLocalLimit, budgetWizardHandler.Prefill)
+	ai.Post("/budget-proposals", aiLocalLimit, budgetWizardHandler.Proposals)
+	ai.Post("/suggest-category-name", aiModelLimit, budgetWizardHandler.SuggestCategoryName)
 
 	// Feature-12 US-03 Query Spending via Chat (specs/ai-chat-query-spending/
 	// plan.md F3). Deliberately NOT under /ai: Fiber group middleware applies

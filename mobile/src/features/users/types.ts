@@ -22,6 +22,13 @@ export interface User {
   invite_resend_available_at: string | null;
 }
 
+// GET /users/me (backend dto.MeResponse): the caller's own User plus what the
+// app should offer them. can_delete_accounts is missing from a backend older
+// than the field, which reads as false.
+export interface Me extends User {
+  can_delete_accounts?: boolean;
+}
+
 export interface PaginationInfo {
   next_cursor: string | null;
   total: number;

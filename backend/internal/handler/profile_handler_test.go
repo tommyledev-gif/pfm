@@ -154,3 +154,40 @@ func TestGetMeReturnsTheProfileWithAnAvatarField(t *testing.T) {
 		t.Fatalf("unexpected profile: %v", data)
 	}
 }
+
+// specs/security-hardening-2026-10 F-18: GET /users/me tells the app whether
+// to show the account deletion tool; only the configured operator who is an
+// admin gets true.
+func TestGetMe_CanDeleteAccounts(t *testing.T) {
+	callerID := uuid.New()
+	logger := zap.NewNop()
+	cases := []struct {
+		name  string
+		email string
+		role  model.UserRole
+		want  bool
+	}{
+		{"operator admin", "Operator@Example.com", model.UserRoleAdmin, true},
+		{"operator but member", "operator@example.com", model.UserRoleMember, false},
+		{"another admin", "admin@example.com", model.UserRoleAdmin, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			users := &profileUsers{user: model.User{ID: callerID, Email: tc.email, Role: tc.role, Status: model.UserStatusActive}}
+			svc := service.NewProfileService(users, service.UnconfiguredIconUploader{}, logger).
+				WithAccountDeletionPolicy(service.NewAccountDeletionPolicy("operator@example.com"))
+			app := fiber.New()
+			app.Use(func(c *fiber.Ctx) error {
+				c.Locals(common.LocalsUserID, callerID.String())
+				return c.Next()
+			})
+			app.Get("/users/me", NewProfileHandler(svc, logger).GetMe)
+
+			status, body := do(t, app, http.MethodGet, "/users/me", "")
+			data, _ := body["data"].(map[string]any)
+			if status != http.StatusOK || data["can_delete_accounts"] != tc.want || data["email"] != tc.email {
+				t.Fatalf("status %d, data %v", status, data)
+			}
+		})
+	}
+}

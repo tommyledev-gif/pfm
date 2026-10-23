@@ -35,6 +35,12 @@ type Config struct {
 	// degrades to 502 AI_SERVICE_UNAVAILABLE rather than failing startup.
 	AIServiceURL string
 
+	// AIServiceToken is the shared secret sent as X-Internal-Token on every AI
+	// Service call (specs/security-hardening-2026-10 US-07). The AI Service
+	// refuses requests without it once the same AI_SERVICE_TOKEN is set there.
+	// Empty sends none, which keeps an AI Service without a token working.
+	AIServiceToken string
+
 	// AIImageEnabled is the operator switch for image reading
 	// (specs/ai-chat-image-capture BR-18, plan F35). Off unless AI_IMAGE_ENABLED
 	// is "true"; flipping it needs a restart, not a release.
@@ -64,6 +70,11 @@ type Config struct {
 	// fine: every client is told "no update" and the APK link answers 404.
 	AppUpdatesDir string
 
+	// AccountDeletionOperatorEmail is the one account the test-phase account
+	// deletion tool is open to (ACCOUNT_DELETION_OPERATOR_EMAIL); empty = the
+	// tool is closed to everyone.
+	AccountDeletionOperatorEmail string
+
 	// APKPublicURL is the APK link people see (APK_PUBLIC_URL), e.g.
 	// https://app.example.com/app-updates/apk; empty = the app keeps using
 	// the API's /api/v1/app-updates/apk. Set it only once that host routes
@@ -76,6 +87,10 @@ type Config struct {
 // as that key: a short one is guessable offline from any token, after which
 // anyone can mint a token for any user or role.
 const MinJWTSecretBytes = 32
+
+// MinAIServiceTokenBytes is the shortest AI_SERVICE_TOKEN accepted: the same
+// stance as JWT_SECRET, a short shared secret is guessable.
+const MinAIServiceTokenBytes = 32
 
 const defaultDBMaxConns = 10
 
@@ -95,6 +110,7 @@ func Load() (*Config, error) {
 		AppBaseURL:    getEnvOrDefault("APP_BASE_URL", "http://localhost:8082"),
 
 		AIServiceURL:   getEnvOrDefault("AI_SERVICE_URL", "http://ai-service:8000"),
+		AIServiceToken: os.Getenv("AI_SERVICE_TOKEN"),
 		AIImageEnabled: os.Getenv("AI_IMAGE_ENABLED") == "true",
 
 		R2AccountID:       os.Getenv("R2_ACCOUNT_ID"),
@@ -105,6 +121,8 @@ func Load() (*Config, error) {
 
 		AppUpdatesDir: getEnvOrDefault("APP_UPDATES_DIR", "/data/app-updates"),
 		APKPublicURL:  os.Getenv("APK_PUBLIC_URL"),
+
+		AccountDeletionOperatorEmail: os.Getenv("ACCOUNT_DELETION_OPERATOR_EMAIL"),
 	}
 	if cfg.DatabaseURL == "" {
 		return nil, fmt.Errorf("config.Load: DATABASE_URL is required")
@@ -114,6 +132,9 @@ func Load() (*Config, error) {
 	}
 	if len(cfg.JWTSecret) < MinJWTSecretBytes {
 		return nil, fmt.Errorf("config.Load: JWT_SECRET must be at least %d bytes (got %d) — generate one with `openssl rand -hex 32`", MinJWTSecretBytes, len(cfg.JWTSecret))
+	}
+	if cfg.AIServiceToken != "" && len(cfg.AIServiceToken) < MinAIServiceTokenBytes {
+		return nil, fmt.Errorf("config.Load: AI_SERVICE_TOKEN must be at least %d bytes when set (got %d) — generate one with `openssl rand -hex 32`", MinAIServiceTokenBytes, len(cfg.AIServiceToken))
 	}
 
 	maxConns, err := getEnvInt("DB_MAX_CONNS", defaultDBMaxConns)

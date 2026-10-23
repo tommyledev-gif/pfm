@@ -51,6 +51,14 @@ type UserResponse struct {
 	InviteResendAvailableAt *time.Time `json:"invite_resend_available_at"`
 }
 
+// MeResponse is GET /users/me: the caller's own user plus what the app should
+// offer them. CanDeleteAccounts replaces an operator email the app used to
+// carry in its bundle (specs/security-hardening-2026-10 F-18).
+type MeResponse struct {
+	UserResponse
+	CanDeleteAccounts bool `json:"can_delete_accounts"`
+}
+
 func NewUserResponse(u *model.User) UserResponse {
 	return UserResponse{
 		ID:          u.ID,

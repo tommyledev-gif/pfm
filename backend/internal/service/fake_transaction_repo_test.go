@@ -149,6 +149,25 @@ func (f *fakeTransactionRepo) GetTransactionByIdempotencyKey(_ context.Context, 
 	return &cp, nil
 }
 
+// ImportedKeyStates mirrors ListIdempotencyKeyStates: present keys only,
+// soft-deleted ones included and marked.
+func (f *fakeTransactionRepo) ImportedKeyStates(_ context.Context, userID uuid.UUID, keys []uuid.UUID) (map[uuid.UUID]bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	states := make(map[uuid.UUID]bool, len(keys))
+	for _, key := range keys {
+		id, ok := f.idempotencyIndex[idempotencyIndexKey(userID, key)]
+		if !ok {
+			continue
+		}
+		if t, ok := f.transactions[id]; ok {
+			states[key] = t.DeletedAt != nil
+		}
+	}
+	return states, nil
+}
+
 func idempotencyIndexKey(userID, idempotencyKey uuid.UUID) string {
 	return userID.String() + "|" + idempotencyKey.String()
 }

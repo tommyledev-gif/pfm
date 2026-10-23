@@ -83,6 +83,12 @@ func FormatCentsVI(amountCents int64, currency string) string {
 	return grouped + " " + currency
 }
 
+// FormatCountVI groups a count the Vietnamese way for user-facing sentences:
+// 10000 -> "10.000".
+func FormatCountVI(n int64) string {
+	return strings.ReplaceAll(groupThousands(n), ",", ".")
+}
+
 const (
 	vndCurrencyCode = "VND"
 	vndSymbol       = "đ"

@@ -25,19 +25,16 @@ func NewChatThreadService(repo ChatThreadRepo) *ChatThreadService {
 	return &ChatThreadService{repo: repo}
 }
 
-// Sync upserts every message in the caller's current thread — a debounced
-// bulk resend of the whole thread rather than a diff, since a chat thread is
-// small enough that resending it is cheap and it sidesteps ever tracking a
-// separate "dirty since last sync" set client-side.
+// Sync upserts the messages the client changed since its last sync (older
+// builds resend the whole thread), all or nothing in one batch. Sizes are
+// bounded by dto.SyncChatThreadRequest.
 func (s *ChatThreadService) Sync(ctx context.Context, userID uuid.UUID, messages []dto.ChatThreadMessageSync) error {
-	for _, m := range messages {
-		if err := s.repo.UpsertMessage(ctx, repository.UpsertChatThreadMessageParams{
-			UserID:          userID,
-			ClientMessageID: m.ClientMessageID,
-			Payload:         string(m.Payload),
-		}); err != nil {
-			return fmt.Errorf("service.ChatThreadSync: %w", err)
-		}
+	upserts := make([]repository.ChatThreadUpsert, len(messages))
+	for i, m := range messages {
+		upserts[i] = repository.ChatThreadUpsert{ClientMessageID: m.ClientMessageID, Payload: string(m.Payload)}
+	}
+	if err := s.repo.UpsertMessages(ctx, userID, upserts); err != nil {
+		return fmt.Errorf("service.ChatThreadSync: %w", err)
 	}
 	return nil
 }

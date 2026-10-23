@@ -9,9 +9,10 @@ import "github.com/gofiber/fiber/v2"
 // /api/v1/auth/access-requests/approve. Same self-contained approach as
 // ActivatePageHandler.
 func ApproveAccessPageHandler(c *fiber.Ctx) error {
-	c.Set("Content-Type", "text/html; charset=utf-8")
-	return c.SendString(approveAccessPageHTML)
+	return approveAccessPage.send(c)
 }
+
+var approveAccessPage = newHTMLPage(approveAccessPageHTML)
 
 const approveAccessPageHTML = pageHead + `<title>Duyệt yêu cầu tạo tài khoản</title>
 </head>

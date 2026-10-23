@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
@@ -66,7 +67,9 @@ func (s *liveStack) newUser(t *testing.T, role model.UserRole) *model.User {
 
 func (s *liveStack) get(t *testing.T, access string) (int, string) {
 	t.Helper()
-	req, _ := http.NewRequest(http.MethodGet, "/protected", nil)
+	// httptest.NewRequest sets a Host header: fasthttp ≥ 1.70 refuses an
+	// HTTP/1.1 request without one, as RFC 9112 §3.2 requires.
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
 	req.Header.Set("Authorization", "Bearer "+access)
 	resp, err := s.app.Test(req, -1)
 	if err != nil {

@@ -16,8 +16,9 @@ import groq
 
 from app.core.config import settings
 from app.core.groq_client import get_groq_vision_client
+from app.core.llm_errors import provider_error_code
 from app.schemas.extract_image_schema import ImageReading, require_every_field
-from app.services.extract_service import _dereference_schema
+from app.services.llm_tools import dereference_schema
 from app.services.image_prompt_builder import TOOL_DESCRIPTION, TOOL_NAME
 
 _TOOL_USE_FAILED = "tool_use_failed"
@@ -73,7 +74,7 @@ def read_image(system_prompt: str, caption: str | None, image_data_url: str, max
     except groq.RateLimitError as exc:
         raise VisionBusyError(_retry_after_seconds(exc)) from exc
     except groq.BadRequestError as exc:
-        if _provider_error_code(exc) == _TOOL_USE_FAILED:
+        if provider_error_code(exc) == _TOOL_USE_FAILED:
             raise VisionTruncatedError from exc
         raise VisionUnavailableError from exc
     except Exception as exc:  # noqa: BLE001 - every other provider failure is "unavailable", never raw
@@ -99,7 +100,7 @@ def read_image(system_prompt: str, caption: str | None, image_data_url: str, max
 
 
 def _tool_schema() -> dict:
-    return require_every_field(_dereference_schema(ImageReading.model_json_schema()))
+    return require_every_field(dereference_schema(ImageReading.model_json_schema()))
 
 
 def _caption_text(caption: str | None) -> str:
@@ -114,14 +115,3 @@ def _retry_after_seconds(exc: groq.RateLimitError) -> int | None:
         return max(0, math.ceil(float(value))) if value is not None else None
     except ValueError:
         return None
-
-
-def _provider_error_code(exc: Exception) -> str | None:
-    """Only Groq's error code — the body's failed_generation echoes the model's
-    reading of the image and must never reach a log."""
-    body = getattr(exc, "body", None)
-    if isinstance(body, dict):
-        error = body.get("error", body)
-        if isinstance(error, dict):
-            return error.get("code")
-    return None

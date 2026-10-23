@@ -18,7 +18,7 @@ const auditActionDeleteUser = "users.delete"
 
 // AccountDeletionHandler serves the account deletion tool on the mobile
 // Security screen. Both routes sit in the /admin group; the service then
-// lets through only common.AccountDeletionOperatorEmail.
+// lets through only the configured operator (service.AccountDeletionPolicy).
 type AccountDeletionHandler struct {
 	service *service.AccountDeletionService
 	logger  *zap.Logger

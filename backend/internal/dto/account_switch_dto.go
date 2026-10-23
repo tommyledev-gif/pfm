@@ -6,12 +6,12 @@ import "time"
 // here; malformed / expired / used / wrong-purpose tokens are told apart in
 // AccountSwitchService.Switch (same split as RefreshRequest).
 type SwitchRequest struct {
-	SwitchToken string `json:"switch_token" validate:"required"`
+	SwitchToken string `json:"switch_token" validate:"required,max=4096"`
 }
 
 // RevokeSwitchTokenRequest is the body of POST /auth/switch-token/revoke.
 type RevokeSwitchTokenRequest struct {
-	SwitchToken string `json:"switch_token" validate:"required"`
+	SwitchToken string `json:"switch_token" validate:"required,max=4096"`
 }
 
 // SwitchTokenResponse is the 200 body of POST /auth/switch-token.

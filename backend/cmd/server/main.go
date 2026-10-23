@@ -51,7 +51,7 @@ func main() {
 	reportRepo := repository.NewReportRepository(queries)
 	notificationRepo := repository.NewNotificationRepository(queries)
 	chatRepo := repository.NewChatRepository(queries)
-	chatThreadRepo := repository.NewChatThreadRepository(queries)
+	chatThreadRepo := repository.NewChatThreadRepository(queries, pool)
 	budgetPlanRepo := repository.NewBudgetPlanRepository(queries)
 	analyticsRepo := repository.NewAnalyticsRepository(queries)
 	intentLogRepo := repository.NewIntentParseLogRepository(queries)
@@ -84,18 +84,22 @@ func main() {
 	transactionImportService := service.NewTransactionImportService(transactionService, transactionRepo, walletRepo, categoryRepo, tokenService, logger)
 	reportService := service.NewReportService(reportRepo, walletRepo, categoryRepo, cycleResolver, logger)
 	notificationService := service.NewNotificationService(notificationRepo, budgetRepo, cycleResolver, logger)
-	aiServiceClient := service.NewHTTPAIServiceClient(cfg.AIServiceURL)
+	aiEndpoint := service.AIServiceEndpoint{BaseURL: cfg.AIServiceURL, Token: cfg.AIServiceToken}
+	if cfg.AIServiceToken == "" {
+		logger.Warn("AI_SERVICE_TOKEN not set — AI Service calls carry no credential (docs/ops-runbook.md §9)")
+	}
+	aiServiceClient := service.NewHTTPAIServiceClient(aiEndpoint)
 	chatService := service.NewChatService(chatRepo, walletRepo, categoryRepo, aiServiceClient, logger)
-	chatImageService := service.NewChatImageService(walletRepo, categoryRepo, transactionRepo, service.NewHTTPAIImageClient(cfg.AIServiceURL), logger)
+	chatImageService := service.NewChatImageService(walletRepo, categoryRepo, transactionRepo, service.NewHTTPAIImageClient(aiEndpoint), logger)
 	chatThreadService := service.NewChatThreadService(chatThreadRepo)
-	aiBudgetClient := service.NewHTTPAIBudgetClient(cfg.AIServiceURL)
+	aiBudgetClient := service.NewHTTPAIBudgetClient(aiEndpoint)
 	budgetWizardService := service.NewBudgetWizardService(budgetRepo, categoryRepo, walletRepo, aiBudgetClient, logger)
 	// Feature-12 US-03 (specs/ai-chat-query-spending/): figures reuse the
 	// report queries and BudgetService itself; free text gets its own
 	// interpreter client, token guard and log.
 	analyticsService := service.NewAnalyticsService(reportRepo, analyticsRepo, walletRepo, categoryRepo, budgetService, cycleResolver, logger)
 	consultTokens := service.NewConsultTokenBudget(common.ConsultTokenBudgetPerMinute, common.ConsultTokenBudgetWindow)
-	aiConsultClient := service.NewHTTPAIConsultClient(cfg.AIServiceURL)
+	aiConsultClient := service.NewHTTPAIConsultClient(aiEndpoint)
 	consultService := service.NewConsultService(analyticsService, analyticsRepo, walletRepo, categoryRepo, aiConsultClient, consultTokens, intentLogRepo, cycleResolver, logger)
 	intentLogRetention := service.NewIntentLogRetention(intentLogRepo, logger)
 	passkeyService, err := service.NewPasskeyService(newPasskeyRelyingParty(cfg.Passkey, logger), passkeyRepo, userRepo, sessionService, logger)
@@ -107,9 +111,10 @@ func main() {
 	authHandler := handler.NewAuthHandler(authService, logger)
 	accountSwitchHandler := handler.NewAccountSwitchHandler(accountSwitchService, logger)
 	sessionRevocationHandler := handler.NewSessionRevocationHandler(sessionRevocationService, logger)
-	profileHandler := handler.NewProfileHandler(service.NewProfileService(userRepo, iconUploader, logger), logger)
+	deletionPolicy := service.NewAccountDeletionPolicy(cfg.AccountDeletionOperatorEmail)
+	profileHandler := handler.NewProfileHandler(service.NewProfileService(userRepo, iconUploader, logger).WithAccountDeletionPolicy(deletionPolicy), logger)
 	accessRequestHandler := handler.NewAccessRequestHandler(service.NewAccessRequestService(userRepo, notificationRepo, emailSender, logger), logger)
-	accountDeletionHandler := handler.NewAccountDeletionHandler(service.NewAccountDeletionService(userRepo, sessionService, logger), logger)
+	accountDeletionHandler := handler.NewAccountDeletionHandler(service.NewAccountDeletionService(userRepo, sessionService, deletionPolicy, logger), logger)
 	walletHandler := handler.NewWalletHandler(walletService, iconUploader, logger)
 	walletMemberHandler := handler.NewWalletMemberHandler(walletMemberService, logger)
 	categoryHandler := handler.NewCategoryHandler(categoryService, iconUploader, logger)
@@ -136,11 +141,17 @@ func main() {
 			return response.Error(c, logger, err)
 		},
 	})
+	// Order matters: the request logger is outermost so it sees (and logs) the
+	// 500 that Recover makes of a panic; security headers go on every response,
+	// errors and CORS preflights included.
+	app.Use(middleware.RequestLogger(logger, healthPath, healthReadyPath))
 	app.Use(middleware.Recover(logger))
+	app.Use(middleware.SecurityHeaders())
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: cfg.CORSAllowedOrigins,
-		AllowHeaders: "Origin, Content-Type, Accept, Authorization, " + common.HeaderDeviceID + ", " + common.HeaderDeviceName,
-		AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+		AllowOrigins:  cfg.CORSAllowedOrigins,
+		AllowHeaders:  "Origin, Content-Type, Accept, Authorization, " + fiber.HeaderXRequestID + ", " + common.HeaderDeviceID + ", " + common.HeaderDeviceName,
+		AllowMethods:  "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+		ExposeHeaders: fiber.HeaderXRequestID,
 	}))
 	registerRoutes(app, userHandler, authHandler, walletHandler, walletMemberHandler, categoryHandler, budgetHandler, transactionHandler, transactionExportHandler, transactionImportHandler, auditLogHandler, reportHandler, notificationHandler, chatHandler, chatImageHandler, budgetWizardHandler, analyticsHandler, accountSwitchHandler, sessionRevocationHandler, profileHandler, accessRequestHandler, accountDeletionHandler, passkeyHandler, assetLinks, tokenService, sessionService, pool, logger)
 	appUpdateHandler := handler.NewAppUpdateHandler(service.NewAppUpdateService(cfg.AppUpdatesDir), logger).WithPublicAPKURL(cfg.APKPublicURL)

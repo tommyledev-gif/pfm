@@ -70,21 +70,6 @@ func (s *TokenService) ParseSwitchToken(tokenString string) (*SwitchTokenClaims,
 	return switchClaimsFrom(claims, "service.ParseSwitchToken")
 }
 
-// ParseSwitchTokenUnverified reads a switch token WITHOUT verifying its
-// signature — revoke only (same reasoning as ParseRefreshTokenUnverified:
-// revoking a jti that was never genuinely issued is harmless). The purpose
-// check still applies so a refresh/access token is never accepted here.
-func (s *TokenService) ParseSwitchTokenUnverified(tokenString string) (*SwitchTokenClaims, error) {
-	claims := &switchTokenClaims{}
-	if _, _, err := jwt.NewParser().ParseUnverified(tokenString, claims); err != nil {
-		return nil, fmt.Errorf("service.ParseSwitchTokenUnverified: %w", err)
-	}
-	if claims.ExpiresAt == nil {
-		return nil, fmt.Errorf("service.ParseSwitchTokenUnverified: missing exp claim")
-	}
-	return switchClaimsFrom(claims, "service.ParseSwitchTokenUnverified")
-}
-
 func switchClaimsFrom(claims *switchTokenClaims, op string) (*SwitchTokenClaims, error) {
 	if claims.Purpose != common.AccountSwitchTokenPurpose {
 		return nil, fmt.Errorf("%s: unexpected purpose %q", op, claims.Purpose)

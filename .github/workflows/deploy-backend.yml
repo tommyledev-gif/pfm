@@ -28,13 +28,13 @@ jobs:
       contents: read
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -42,32 +42,40 @@ jobs:
       # Only backend/ is sent to the Docker build context — the image never
       # contains frontend/mobile/ai-service source, keeping it small and the
       # blast radius of a backend deploy limited to the backend.
-      # load: true keeps a copy in the runner's local Docker daemon (alongside
-      # the registry push) so Trivy below can scan the exact image being
-      # shipped without a second build.
-      - name: Build and push backend image
-        uses: docker/build-push-action@v6
+      # Built into the runner's Docker daemon only (load, no push): Trivy
+      # scans the exact image below, and it reaches the registry only if the
+      # scan passes. Pushing first left a failed image (and :latest) published.
+      - name: Build backend image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: ./backend
           file: ./backend/Dockerfile
-          push: true
+          push: false
           load: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/pfm-backend:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/pfm-backend:${{ github.sha }}
 
-      # Non-blocking for now (exit-code 0): reports HIGH/CRITICAL CVEs in the
-      # job log without failing the deploy. Once the team has triaged the
-      # baseline findings on alpine/ca-certificates etc., flip exit-code to
-      # '1' to make new criticals actually gate the deploy.
+      # Blocking: a HIGH or CRITICAL CVE with a released fix stops the
+      # release. Baseline on 2026-10-23 (specs/security-hardening-2026-10):
+      # alpine 3.22 and the three Go binaries had none. Unfixed ones are
+      # ignored: nothing to upgrade to yet.
       - name: Scan image for vulnerabilities (Trivy)
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/pfm-backend:${{ github.sha }}
           format: table
           severity: CRITICAL,HIGH
           ignore-unfixed: true
-          exit-code: "0"
+          exit-code: "1"
+
+      - name: Push backend image
+        env:
+          IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/pfm-backend
+          TAG: ${{ github.sha }}
+        run: |
+          docker push "$IMAGE:$TAG"
+          docker push "$IMAGE:latest"
 
   deploy:
     runs-on: ubuntu-latest
@@ -76,12 +84,12 @@ jobs:
       contents: read
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       # Only the backend's deploy files land on the VPS — no frontend/
       # mobile/ai-service source ever leaves the CI runner.
       - name: Sync deployment files to VPS
-        uses: appleboy/scp-action@v0.1.7
+        uses: appleboy/scp-action@917f8b81dfc1ccd331fef9e2d61bdc6c8be94634 # v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
@@ -90,25 +98,42 @@ jobs:
           source: "backend/deploy.sh,backend/docker-compose.yml,backend/db/migrations,backend/ops"
           target: "${{ secrets.VPS_APP_DIR }}"
 
+      # Secrets reach the remote script as environment variables (`envs`),
+      # never as ${{ }} text inside it: GitHub pastes that text into the script
+      # before the shell runs, so a `$`, backtick or quote in a value was
+      # expanded or executed on the VPS. drone-ssh exports each one
+      # single-quoted, so .env.prod is now byte-for-byte the secret.
       - name: Deploy to VPS over SSH
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
+        env:
+          VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
+          VPS_ENV_PROD: ${{ secrets.VPS_ENV_PROD }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          NEW_TAG: ${{ github.sha }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
+          envs: VPS_APP_DIR,VPS_ENV_PROD,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,NEW_TAG
           script_stop: true
           script: |
             set -euo pipefail
-            cd "${{ secrets.VPS_APP_DIR }}/backend"
+            cd "$VPS_APP_DIR/backend"
 
-            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+            printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            unset DOCKERHUB_TOKEN
 
             # umask: created owner-only, never readable even for a moment
-            # (deploy.sh also chmods it 600 on every run).
-            if [ -n "${{ secrets.VPS_ENV_PROD }}" ]; then
-              (umask 077; printf '%s\n' "${{ secrets.VPS_ENV_PROD }}" | sed -e 's/\r$//' > .env.prod)
+            # (deploy.sh also chmods it 600 on every run). Written beside the
+            # live file and then moved, so a failed write never leaves a
+            # truncated .env.prod behind.
+            if [ -n "${VPS_ENV_PROD:-}" ]; then
+              (umask 077; printf '%s\n' "$VPS_ENV_PROD" | sed -e 's/\r$//' > .env.prod.new)
+              mv .env.prod.new .env.prod
             fi
+            unset VPS_ENV_PROD
 
             chmod +x deploy.sh
 
@@ -117,14 +142,13 @@ jobs:
             # never deletes other files here) — it's how a failed health
             # check below knows which image tag to roll back to.
             LAST_GOOD_TAG_FILE=".last_good_tag"
-            NEW_TAG="${{ github.sha }}"
             PREV_TAG=""
             if [ -f "$LAST_GOOD_TAG_FILE" ]; then
               PREV_TAG="$(cat "$LAST_GOOD_TAG_FILE")"
             fi
 
             deploy_tag() {
-              DOCKER_REGISTRY_USER="${{ secrets.DOCKERHUB_USERNAME }}" \
+              DOCKER_REGISTRY_USER="$DOCKERHUB_USERNAME" \
                 PFM_BACKEND_IMAGE_TAG="$1" \
                 ./deploy.sh
             }

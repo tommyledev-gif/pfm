@@ -5,12 +5,14 @@ except a parsed threshold.
 
 ConsultToolOutput is the forced tool's schema and is deliberately FLAT — no
 nested models, so no $defs/$ref — because gpt-oss models mishandle nested
-schemas under forced tool_choice (see extract_service._dereference_schema).
+schemas under forced tool_choice (see llm_tools.dereference_schema).
 """
 
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.schemas.limits import CATEGORIES_MAX, ID_MAX_CHARS, NAME_MAX_CHARS, SHORT_FIELD_MAX_CHARS, WALLETS_MAX
 
 ParseKind = Literal["query", "evaluate", "scenario", "unsupported", "needs_context", "transaction_like"]
 Coverage = Literal["full", "partial"]
@@ -28,17 +30,17 @@ LIST_MAX_ROWS = 10
 class ConsultCategory(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    id: str
-    name: str
-    type: str
+    id: str = Field(max_length=ID_MAX_CHARS)
+    name: str = Field(max_length=NAME_MAX_CHARS)
+    type: str = Field(max_length=SHORT_FIELD_MAX_CHARS)
 
 
 class ConsultWallet(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    id: str
-    name: str
-    currency: str
+    id: str = Field(max_length=ID_MAX_CHARS)
+    name: str = Field(max_length=NAME_MAX_CHARS)
+    currency: str = Field(max_length=SHORT_FIELD_MAX_CHARS)
     is_default: bool
 
 
@@ -46,10 +48,10 @@ class ConsultRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     message: str = Field(min_length=1, max_length=MESSAGE_MAX_LENGTH)
-    categories: list[ConsultCategory]
-    wallets: list[ConsultWallet]
-    today: str
-    timezone: str
+    categories: list[ConsultCategory] = Field(max_length=CATEGORIES_MAX)
+    wallets: list[ConsultWallet] = Field(max_length=WALLETS_MAX)
+    today: str = Field(max_length=SHORT_FIELD_MAX_CHARS)
+    timezone: str = Field(max_length=SHORT_FIELD_MAX_CHARS)
 
 
 class ConsultToolOutput(BaseModel):

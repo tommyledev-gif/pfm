@@ -11,27 +11,23 @@ conform by construction, and keeps the schema itself as the single source of
 truth (dev.md LLM Rules).
 
 dev.md LLM Rules: max_tokens always explicit, log only prompt length/token
-counts and the failure type/message (never prompt content — may contain
-arbitrary user text), wrap every SDK call in try/except with a typed
-fallback, never let a raw LLM error propagate as a 500 to the Go Backend.
+counts and the failure type/code (never prompt content or provider error
+text — both may contain arbitrary user text), and never let a raw LLM error
+propagate as a 500 to the Go Backend. The provider calls and the fallback
+order live in llm_tools.py and llm_fallback.py.
 """
-
-import json
-import logging
-from copy import deepcopy
-
-from fastapi.concurrency import run_in_threadpool
 
 from app.core.config import settings
 from app.core.groq_client import get_anthropic_client, get_groq_client
 from app.schemas.extract_schema import ChatTurn, ExtractRequest, ExtractResponse
 from app.services.item_names import clean_item_names
+from app.services.llm_fallback import LLMUnavailableError, run_with_fallback
+from app.services.llm_tools import ToolSpec, anthropic_tool_arguments, dereference_schema, groq_tool_arguments
 from app.services.prompt_builder import build_system_prompt
-
-logger = logging.getLogger(__name__)
 
 _TOOL_NAME = "extract_transactions"
 _TOOL_DESCRIPTION = "Extract structured transaction proposals from a Vietnamese natural-language message."
+_LOG_LABEL = "extraction"
 
 
 class ExtractionUnavailableError(Exception):
@@ -42,68 +38,29 @@ class ExtractionUnavailableError(Exception):
 
 async def extract_transactions(req: ExtractRequest) -> ExtractResponse:
     system_prompt = build_system_prompt(req.wallets, req.categories, req.now)
+    try:
+        response = await run_with_fallback(
+            lambda: _call_groq(system_prompt, req.history, req.message),
+            lambda: _call_anthropic(system_prompt, req.history, req.message),
+            operation=_LOG_LABEL,
+            prompt_chars=len(req.message),
+        )
+    except LLMUnavailableError as exc:
+        raise ExtractionUnavailableError from exc
     # The prompt and the tool schema ask for item names without prices, but
     # neither is a guarantee: whatever either provider leaves in is stripped
     # here (item_names.py).
-    return clean_item_names(await _extract_with_fallback(system_prompt, req))
-
-
-async def _extract_with_fallback(system_prompt: str, req: ExtractRequest) -> ExtractResponse:
-    # The SDK clients are synchronous: called directly from this coroutine they
-    # would freeze the event loop (every other request and /health with it)
-    # for the whole provider round trip.
-    try:
-        return await run_in_threadpool(_call_groq, system_prompt, req.history, req.message)
-    except Exception as exc:  # noqa: BLE001 - any Groq failure falls back, never propagates raw
-        logger.warning(
-            "groq extraction failed, falling back to anthropic",
-            extra={"prompt_chars": len(req.message), "error_type": type(exc).__name__, "error": str(exc)},
-        )
-        try:
-            return await run_in_threadpool(_call_anthropic, system_prompt, req.history, req.message)
-        except Exception as fallback_exc:  # noqa: BLE001
-            logger.error(
-                "anthropic fallback also failed",
-                extra={
-                    "prompt_chars": len(req.message),
-                    "error_type": type(fallback_exc).__name__,
-                    "error": str(fallback_exc),
-                },
-            )
-            raise ExtractionUnavailableError from fallback_exc
-
-
-def _dereference_schema(schema: dict) -> dict:
-    """Inlines Pydantic's `$defs`/`$ref` indirection (used here for
-    ExtractResponse.transactions: list[ProposedTransaction]).
-
-    Live-tested against the real Groq API (2026-08-17, migrating off the
-    decommissioned llama-3.3-70b-versatile): both openai/gpt-oss-120b and
-    -20b mishandle a $ref-nested schema under forced tool_choice — silently
-    dropping a required field (`confidence`) or, on gpt-oss-120b, emitting a
-    stray `json`/`functions.<name>` tool call instead of the requested one.
-    A fully flattened schema fixed both providers to a 0/10 failure rate
-    across a Vietnamese-input regression set, without touching any actual
-    field definition — ExtractResponse stays the single source of truth,
-    this only removes the indirection Groq's schema validator can't follow.
-    """
-    defs = schema.get("$defs", {})
-
-    def resolve(node):
-        if isinstance(node, dict):
-            if "$ref" in node:
-                key = node["$ref"].rsplit("/", 1)[-1]
-                return resolve(deepcopy(defs[key]))
-            return {k: resolve(v) for k, v in node.items() if k != "$defs"}
-        if isinstance(node, list):
-            return [resolve(item) for item in node]
-        return node
-
-    return resolve(schema)
+    return clean_item_names(response)
 
 
 def _extract_tool_schema() -> dict:
-    return _dereference_schema(ExtractResponse.model_json_schema())
+    """ExtractResponse's schema with its $ref nesting (transactions → items)
+    inlined, which Groq's forced tool_choice needs (llm_tools.dereference_schema)."""
+    return dereference_schema(ExtractResponse.model_json_schema())
+
+
+def _tool() -> ToolSpec:
+    return ToolSpec(name=_TOOL_NAME, description=_TOOL_DESCRIPTION, schema=_extract_tool_schema())
 
 
 def _history_messages(history: list[ChatTurn]) -> list[dict]:
@@ -124,49 +81,34 @@ def _history_messages(history: list[ChatTurn]) -> list[dict]:
     return [{"role": turn.role, "content": turn.content} for turn in turns]
 
 
+def _conversation(history: list[ChatTurn], message: str) -> list[dict]:
+    return [*_history_messages(history), {"role": "user", "content": message}]
+
+
 def _call_groq(system_prompt: str, history: list[ChatTurn], message: str) -> ExtractResponse:
-    client = get_groq_client()
-    tool = {
-        "type": "function",
-        "function": {"name": _TOOL_NAME, "description": _TOOL_DESCRIPTION, "parameters": _extract_tool_schema()},
-    }
-    completion = client.chat.completions.create(
+    arguments = groq_tool_arguments(
+        get_groq_client(),
         model=settings.groq_model,
+        tool=_tool(),
+        system_prompt=system_prompt,
+        messages=_conversation(history, message),
         max_tokens=settings.extract_max_tokens,
         temperature=settings.temperature,
-        tools=[tool],
-        tool_choice={"type": "function", "function": {"name": _TOOL_NAME}},
-        messages=[
-            {"role": "system", "content": system_prompt},
-            *_history_messages(history),
-            {"role": "user", "content": message},
-        ],
+        log_label=_LOG_LABEL,
+        prompt_chars=len(message),
     )
-    tool_calls = completion.choices[0].message.tool_calls
-    if not tool_calls:
-        raise ValueError("groq response contained no tool call")
-    completion_tokens = completion.usage.completion_tokens if completion.usage else None
-    logger.info("groq extraction completed", extra={"prompt_chars": len(message), "completion_tokens": completion_tokens})
-    return ExtractResponse.model_validate(json.loads(tool_calls[0].function.arguments))
+    return ExtractResponse.model_validate(arguments)
 
 
 def _call_anthropic(system_prompt: str, history: list[ChatTurn], message: str) -> ExtractResponse:
-    client = get_anthropic_client()
-    tool = {"name": _TOOL_NAME, "description": _TOOL_DESCRIPTION, "input_schema": _extract_tool_schema()}
-    response = client.messages.create(
+    arguments = anthropic_tool_arguments(
+        get_anthropic_client(),
         model=settings.anthropic_model,
+        tool=_tool(),
+        system_prompt=system_prompt,
+        messages=_conversation(history, message),
         max_tokens=settings.extract_max_tokens,
-        temperature=settings.temperature,
-        system=system_prompt,
-        tools=[tool],
-        tool_choice={"type": "tool", "name": _TOOL_NAME},
-        messages=[
-            *_history_messages(history),
-            {"role": "user", "content": message},
-        ],
+        log_label=_LOG_LABEL,
+        prompt_chars=len(message),
     )
-    tool_use_blocks = [block for block in response.content if block.type == "tool_use"]
-    if not tool_use_blocks:
-        raise ValueError("anthropic response contained no tool_use block")
-    logger.info("anthropic fallback completed", extra={"prompt_chars": len(message)})
-    return ExtractResponse.model_validate(tool_use_blocks[0].input)
+    return ExtractResponse.model_validate(arguments)

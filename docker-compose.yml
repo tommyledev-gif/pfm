@@ -8,7 +8,10 @@ services:
       ADMIN_SEED_EMAIL: ${ADMIN_SEED_EMAIL}
       ADMIN_SEED_PASSWORD_HASH: ${ADMIN_SEED_PASSWORD_HASH}
     ports:
-      - "${POSTGRES_PORT}:5432"
+      # Loopback only by default: published on every interface, the dev
+      # database (with its dev password) was reachable from the whole Wi-Fi.
+      # Set POSTGRES_BIND_ADDRESS=0.0.0.0 only if another machine needs it.
+      - "${POSTGRES_BIND_ADDRESS:-127.0.0.1}:${POSTGRES_PORT}:5432"
     volumes:
       - pfm_pgdata:/var/lib/postgresql/data
       - ./backend/db/migrations/001_init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
@@ -88,7 +91,9 @@ services:
       SMTP_FROM_NAME: ${SMTP_FROM_NAME}
       APP_BASE_URL: ${APP_BASE_URL}
       AI_SERVICE_URL: http://ai-service:8000
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-}
       AI_IMAGE_ENABLED: ${AI_IMAGE_ENABLED:-false}
+      ACCOUNT_DELETION_OPERATOR_EMAIL: ${ACCOUNT_DELETION_OPERATOR_EMAIL:-}
       R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
       R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
       R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
@@ -118,6 +123,7 @@ services:
     environment:
       GROQ_API_KEY: ${GROQ_API_KEY}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-}
     networks:
       - pfm_network
 

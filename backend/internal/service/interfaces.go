@@ -142,6 +142,9 @@ type TransactionRepo interface {
 	BeginTx(ctx context.Context) (pgx.Tx, error)
 	CreateTransaction(ctx context.Context, tx pgx.Tx, arg repository.CreateTransactionParams) (*model.Transaction, error)
 	GetTransactionByIdempotencyKey(ctx context.Context, userID, idempotencyKey uuid.UUID) (*model.Transaction, error)
+	// ImportedKeyStates is GetTransactionByIdempotencyKey for a whole import
+	// preview: key -> soft-deleted, for the keys that exist.
+	ImportedKeyStates(ctx context.Context, userID uuid.UUID, keys []uuid.UUID) (map[uuid.UUID]bool, error)
 	DecrementWalletBalanceIfSufficient(ctx context.Context, tx pgx.Tx, walletID uuid.UUID, amount int64) (*model.Wallet, error)
 	AdjustWalletBalance(ctx context.Context, tx pgx.Tx, walletID uuid.UUID, delta int64) (*model.Wallet, error)
 	ListTransactionsByUser(ctx context.Context, userID uuid.UUID, filter repository.ListTransactionsFilter) ([]*model.Transaction, error)
@@ -193,7 +196,7 @@ type ChatRepo interface {
 // ChatRepo's chat_messages (raw AI-context log only, never read back by a
 // client). *repository.ChatThreadRepository satisfies this structurally.
 type ChatThreadRepo interface {
-	UpsertMessage(ctx context.Context, arg repository.UpsertChatThreadMessageParams) error
+	UpsertMessages(ctx context.Context, userID uuid.UUID, messages []repository.ChatThreadUpsert) error
 	ListByUser(ctx context.Context, userID uuid.UUID) ([]repository.ChatThreadRow, error)
 	ListPageByUser(ctx context.Context, userID uuid.UUID, before *string, limit int) ([]repository.ChatThreadRow, error)
 }

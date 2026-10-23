@@ -1,11 +1,8 @@
 package service
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
 
 	"github.com/google/uuid"
 
@@ -59,14 +56,13 @@ type AIConsultParse struct {
 }
 
 type httpAIConsultClient struct {
-	baseURL string
-	client  *http.Client
+	http aiHTTP
 }
 
 // NewHTTPAIConsultClient uses its own short timeout and never retries
 // (spec.md S-AIQ-41): a slow interpretation degrades the answer instead.
-func NewHTTPAIConsultClient(baseURL string) *httpAIConsultClient {
-	return &httpAIConsultClient{baseURL: baseURL, client: &http.Client{Timeout: common.AIConsultTimeout}}
+func NewHTTPAIConsultClient(endpoint AIServiceEndpoint) *httpAIConsultClient {
+	return &httpAIConsultClient{http: newAIHTTP(endpoint, common.AIConsultTimeout)}
 }
 
 var _ AIConsultClient = (*httpAIConsultClient)(nil)
@@ -122,31 +118,9 @@ type consultWireResponse struct {
 // non-200 status, malformed body, or an id that is not a UUID is a plain
 // error — ConsultService turns every error into a degraded reply.
 func (c *httpAIConsultClient) Parse(ctx context.Context, req AIConsultRequest) (*AIConsultParse, error) {
-	if c.baseURL == "" {
-		return nil, fmt.Errorf("ai_consult_client.Parse: AI_SERVICE_URL not configured")
-	}
-	body, err := json.Marshal(toConsultWire(req))
-	if err != nil {
-		return nil, fmt.Errorf("ai_consult_client.Parse: %w", err)
-	}
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/consult", bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("ai_consult_client.Parse: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.client.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("ai_consult_client.Parse: %w", err)
-	}
-	defer resp.Body.Close() //nolint:errcheck // best-effort close, response already read
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("ai_consult_client.Parse: unexpected status %d", resp.StatusCode)
-	}
 	var wire consultWireResponse
-	if err := json.NewDecoder(resp.Body).Decode(&wire); err != nil {
-		return nil, fmt.Errorf("ai_consult_client.Parse: %w", err)
+	if err := c.http.postJSON(ctx, "ai_consult_client.Parse", "/consult", toConsultWire(req), &wire); err != nil {
+		return nil, err
 	}
 	return fromConsultWire(wire)
 }

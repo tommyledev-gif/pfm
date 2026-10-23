@@ -27,6 +27,7 @@ from pydantic import ValidationError
 
 from app.core.config import settings
 from app.core.groq_client import get_groq_consult_client
+from app.core.llm_errors import provider_error_code
 from app.nlu.intent_rules import read_simple_question
 from app.nlu.normalize import normalize
 from app.schemas.consult_schema import (
@@ -73,7 +74,7 @@ async def consult(req: ConsultRequest) -> ConsultResponse:
     try:
         output, usage = await run_in_threadpool(_call_groq, system_prompt, user_message)
     except Exception as exc:  # noqa: BLE001 - classified below, never propagates raw
-        log_extra = {"prompt_chars": len(req.message), "error_type": type(exc).__name__, "error_code": _provider_error_code(exc)}
+        log_extra = {"prompt_chars": len(req.message), "error_type": type(exc).__name__, "error_code": provider_error_code(exc)}
         if _is_invalid_output(exc):
             # ⚠️ The provider is up; the model's reading did not fit the
             # catalog. Telling the User "temporarily unavailable" here is a
@@ -94,19 +95,7 @@ def invalid_output_response(normalized: str) -> ConsultResponse:
 def _is_invalid_output(exc: Exception) -> bool:
     if isinstance(exc, (ValidationError, json.JSONDecodeError, _NoToolCallError)):
         return True
-    return isinstance(exc, groq.BadRequestError) and _provider_error_code(exc) == _TOOL_USE_FAILED
-
-
-def _provider_error_code(exc: Exception) -> str | None:
-    """Groq's own error code ("tool_use_failed", "rate_limit_exceeded", …),
-    which error_type alone cannot tell apart. Only the code: the error body's
-    failed_generation echoes the model's reading of the question."""
-    body = getattr(exc, "body", None)
-    if isinstance(body, dict):
-        error = body.get("error", body)
-        if isinstance(error, dict):
-            return error.get("code")
-    return None
+    return isinstance(exc, groq.BadRequestError) and provider_error_code(exc) == _TOOL_USE_FAILED
 
 
 def to_response(output: ConsultToolOutput, req: ConsultRequest, normalized: str, usage: ConsultUsage) -> ConsultResponse:

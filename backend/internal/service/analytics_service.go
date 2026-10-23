@@ -152,15 +152,26 @@ func (s *AnalyticsService) ownedWallet(ctx context.Context, userID uuid.UUID, wa
 // chip was made is 404 CATEGORY_NOT_FOUND — the client shows that message,
 // which is the "explains the Category no longer exists" branch of spec.md
 // S-AIQ-36.
+//
+// One query for the whole list; the first id that fails, in request order,
+// decides the error, exactly as checking them one by one did.
 func (s *AnalyticsService) visibleCategories(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) ([]string, error) {
+	if len(ids) == 0 {
+		return []string{}, nil
+	}
+	found, err := s.categories.GetCategoriesByIDs(ctx, ids)
+	if err != nil {
+		return nil, fmt.Errorf("service.AnalyticsService.visibleCategories: %w", err)
+	}
+	byID := make(map[uuid.UUID]*model.Category, len(found))
+	for _, category := range found {
+		byID[category.ID] = category
+	}
 	names := make([]string, 0, len(ids))
 	for _, id := range ids {
-		category, err := s.categories.GetCategoryByID(ctx, id)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return nil, common.ErrCategoryNotFound
-			}
-			return nil, fmt.Errorf("service.AnalyticsService.visibleCategories: %w", err)
+		category, ok := byID[id]
+		if !ok {
+			return nil, common.ErrCategoryNotFound
 		}
 		if category.UserID != nil && *category.UserID != userID {
 			return nil, common.ErrCategoryAccessDenied

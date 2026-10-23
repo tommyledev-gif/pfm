@@ -75,8 +75,25 @@ func (s *AuthService) Activate(ctx context.Context, token, username, fullName, p
 	if len(password) < common.MinPasswordLength {
 		return nil, "", "", common.NewWeakPasswordError(fmt.Sprintf("Mật khẩu cần ít nhất %d ký tự.", common.MinPasswordLength))
 	}
+	if common.PasswordTooLong(password) {
+		return nil, "", "", common.ErrPasswordTooLong
+	}
 	if password != passwordConfirm {
 		return nil, "", "", common.ErrPasswordMismatch
+	}
+	// The display name follows the same rules as a later rename on the
+	// profile screen (normalizeFullName): it is shown to other users.
+	var fullNamePtr *string
+	if strings.TrimSpace(fullName) != "" {
+		name, err := normalizeFullName(fullName)
+		if err != nil {
+			var appErr *common.AppError
+			if errors.As(err, &appErr) {
+				return nil, "", "", common.NewInvalidFullNameError(appErr.Message)
+			}
+			return nil, "", "", fmt.Errorf("service.Activate: %w", err)
+		}
+		fullNamePtr = &name
 	}
 
 	existing, err := s.userRepo.GetUserByInviteToken(ctx, token)
@@ -93,11 +110,6 @@ func (s *AuthService) Activate(ctx context.Context, token, username, fullName, p
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), common.BcryptCost)
 	if err != nil {
 		return nil, "", "", fmt.Errorf("service.Activate: hash password: %w", err)
-	}
-
-	var fullNamePtr *string
-	if fullName != "" {
-		fullNamePtr = &fullName
 	}
 
 	// The atomic UPDATE (WHERE invite_token=$1 AND status='pending' AND

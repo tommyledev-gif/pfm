@@ -10,15 +10,19 @@ export const DEV_LOGIN: { email: string; password: string } | null = __DEV__
  * each with its password filled in, so switching between accounts while
  * testing never means typing one (components/debug/DebugLogViewer.tsx).
  *
- * These are throwaway test accounts on purpose: it does not matter that the
- * passwords ship in the bundle or that anyone can read them here. Never add a
- * real account to this list.
+ * ⚠️ Dev builds only, like DEV_LOGIN. Release bundles are served without
+ * sign-in (OTA updates, APK), so anything listed here used to be readable by
+ * anyone, and the first account is also the admin the account deletion tool
+ * was open to (specs/security-hardening-2026-10 F-19). In a release build the
+ * list is empty, and Metro drops the literal from the bundle.
  */
-export const TEST_ACCOUNTS: readonly { email: string; password: string }[] = [
-  // The same account as DEV_LOGIN. Its password has 8 zeros: the server
-  // refuses anything shorter (MinPasswordLength).
-  { email: "owner@example.com", password: "change-me-123" },
-  { email: "owner@example.com", password: "change-me-123" },
-  { email: "tester2@example.com", password: "change-me-123" },
-  { email: "tester3@example.com", password: "change-me-123" },
-];
+export const TEST_ACCOUNTS: readonly { email: string; password: string }[] = __DEV__
+  ? [
+      // The same account as DEV_LOGIN. Its password has 8 zeros: the server
+      // refuses anything shorter (MinPasswordLength).
+      { email: "owner@example.com", password: "change-me-123" },
+      { email: "owner@example.com", password: "change-me-123" },
+      { email: "tester2@example.com", password: "change-me-123" },
+      { email: "tester3@example.com", password: "change-me-123" },
+    ]
+  : [];

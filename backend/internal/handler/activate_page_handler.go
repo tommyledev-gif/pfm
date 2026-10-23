@@ -16,9 +16,10 @@ import "github.com/gofiber/fiber/v2"
 // rules the server applies (common.UsernameProblem, MinPasswordLength), and
 // a server rejection is shown under the field it is about.
 func ActivatePageHandler(c *fiber.Ctx) error {
-	c.Set("Content-Type", "text/html; charset=utf-8")
-	return c.SendString(activatePageHTML)
+	return activatePage.send(c)
 }
+
+var activatePage = newHTMLPage(activatePageHTML)
 
 const activatePageHTML = pageHead + `<title>Kích hoạt tài khoản Budgest</title>
 </head>
@@ -36,7 +37,7 @@ const activatePageHTML = pageHead + `<title>Kích hoạt tài khoản Budgest</t
 
       <div class="field" id="field-full_name">
         <label for="full_name">Tên hiển thị <span class="optional">(không bắt buộc)</span></label>
-        <input id="full_name" type="text" autocomplete="name" maxlength="100">
+        <input id="full_name" type="text" autocomplete="name" maxlength="60">
         <div class="hint">Đổi được trong app.</div>
         <div class="error" id="error-full_name"></div>
       </div>
@@ -62,6 +63,10 @@ const activatePageHTML = pageHead + `<title>Kích hoạt tài khoản Budgest</t
 <script>
 (function () {
   var MIN_PASSWORD = 8;
+  // bcrypt reads at most 72 bytes (common.MaxPasswordBytes); a letter with
+  // diacritics takes 2-3 of them, so the count is in UTF-8 bytes.
+  var MAX_PASSWORD_BYTES = 72;
+  var MAX_NAME = 60;
   var token = new URLSearchParams(window.location.search).get("token") || "";
   var form = document.getElementById("form");
   var submit = document.getElementById("submit");
@@ -81,11 +86,23 @@ const activatePageHTML = pageHead + `<title>Kích hoạt tài khoản Budgest</t
     return "";
   }
 
+  // Same rules as the server's normalizeFullName (optional here).
+  function fullNameProblem(raw) {
+    var name = raw.trim().split(/\s+/).join(" ");
+    if (!name) return "";
+    if (Array.from(name).length > MAX_NAME) return "Tên tối đa 60 ký tự.";
+    if (!/^[\p{L}\p{M}\p{N} .,'’-]+$/u.test(name)) return "Tên chỉ gồm chữ, số, dấu cách và . , ' -";
+    return "";
+  }
+
   var checks = {
     username: function () { return usernameProblem(value("username")); },
-    full_name: function () { return ""; },
+    full_name: function () { return fullNameProblem(value("full_name")); },
     password: function () {
-      return value("password").length < MIN_PASSWORD ? "Mật khẩu cần ít nhất 8 ký tự." : "";
+      var p = value("password");
+      if (p.length < MIN_PASSWORD) return "Mật khẩu cần ít nhất 8 ký tự.";
+      if (new TextEncoder().encode(p).length > MAX_PASSWORD_BYTES) return "Mật khẩu tối đa 72 ký tự không dấu.";
+      return "";
     },
     password_confirm: function () {
       if (!value("password_confirm")) return "Nhập lại mật khẩu.";
@@ -139,6 +156,7 @@ const activatePageHTML = pageHead + `<title>Kích hoạt tài khoản Budgest</t
   var FIELD_BY_CODE = {
     INVALID_USERNAME: "username",
     USERNAME_TAKEN: "username",
+    INVALID_FULL_NAME: "full_name",
     WEAK_PASSWORD: "password",
     PASSWORD_MISMATCH: "password_confirm"
   };

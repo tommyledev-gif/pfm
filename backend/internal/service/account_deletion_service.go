@@ -33,16 +33,17 @@ type sessionEnder interface {
 }
 
 // AccountDeletionService backs the account deletion tool on the mobile
-// Security screen: one operator account (common.AccountDeletionOperatorEmail)
-// searches for any other account and soft-deletes it.
+// Security screen: one operator account (AccountDeletionPolicy) searches for
+// any other account and soft-deletes it.
 type AccountDeletionService struct {
 	repo     AccountDeletionRepo
 	sessions sessionEnder
+	policy   AccountDeletionPolicy
 	logger   *zap.Logger
 }
 
-func NewAccountDeletionService(repo AccountDeletionRepo, sessions sessionEnder, logger *zap.Logger) *AccountDeletionService {
-	return &AccountDeletionService{repo: repo, sessions: sessions, logger: logger}
+func NewAccountDeletionService(repo AccountDeletionRepo, sessions sessionEnder, policy AccountDeletionPolicy, logger *zap.Logger) *AccountDeletionService {
+	return &AccountDeletionService{repo: repo, sessions: sessions, policy: policy, logger: logger}
 }
 
 // SearchUsers returns live accounts, any status, whose email or tên đăng
@@ -97,7 +98,7 @@ func (s *AccountDeletionService) DeleteUser(ctx context.Context, callerID, targe
 	return nil
 }
 
-// requireOperator lets through only common.AccountDeletionOperatorEmail.
+// requireOperator lets through only the configured operator (none when unset).
 func (s *AccountDeletionService) requireOperator(ctx context.Context, callerID uuid.UUID) error {
 	caller, err := s.repo.GetUserByID(ctx, callerID)
 	if err != nil {
@@ -106,7 +107,7 @@ func (s *AccountDeletionService) requireOperator(ctx context.Context, callerID u
 		}
 		return fmt.Errorf("service.requireOperator: %w", err)
 	}
-	if !strings.EqualFold(caller.Email, common.AccountDeletionOperatorEmail) {
+	if !s.policy.IsOperator(caller.Email) {
 		return common.ErrForbidden
 	}
 	return nil

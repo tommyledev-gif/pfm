@@ -87,9 +87,9 @@ def test_long_note_is_cut_not_dropped() -> None:
 
 def test_tool_schema_requires_every_field() -> None:
     from app.schemas.extract_image_schema import ImageReading, require_every_field
-    from app.services.extract_service import _dereference_schema
+    from app.services.llm_tools import dereference_schema
 
-    schema = require_every_field(_dereference_schema(ImageReading.model_json_schema()))
+    schema = require_every_field(dereference_schema(ImageReading.model_json_schema()))
     tx = schema["properties"]["transactions"]["items"]
     assert {"adjustments", "items", "total_visible"} <= set(tx["required"])
     assert "needs_review" in tx["properties"]["adjustments"]["items"]["required"]

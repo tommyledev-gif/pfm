@@ -20,6 +20,23 @@ const (
 	// CategoryIconMaxUploadBytes.
 	TransactionImportMaxUploadBytes = 5 * 1024 * 1024 // 5 MiB
 
+	// TransactionImportMaxDataRows caps the rows one import may carry, header
+	// and blank rows excluded. Preview hands every valid row back inside the
+	// import_token and Commit must receive that token under
+	// HTTPBodyLimitBytes: at ~340 bytes of token per row (base64 JSON), 10,000
+	// rows stay near 3.5 MB, so a file that previews can also commit.
+	TransactionImportMaxDataRows = 10_000
+
+	// TransactionImportUnzipSizeLimit caps a workbook's total decompressed size
+	// (OOXML is a zip of XML parts). excelize's own default is 16 GiB, which
+	// let a 5 MiB zip bomb expand without bound. A genuine 5 MiB workbook
+	// decompresses to well under this (text compresses 5-10x).
+	TransactionImportUnzipSizeLimit = 64 * 1024 * 1024
+
+	// TransactionImportUnzipXMLSizeLimit is the largest part excelize parses in
+	// memory; a larger worksheet is spilled to os.TempDir() first.
+	TransactionImportUnzipXMLSizeLimit = 16 * 1024 * 1024
+
 	// TransactionImportTokenTTL is how long an import_token minted by Preview
 	// stays valid (spec.md Context #6). Short on purpose: the token embeds a
 	// snapshot of resolved wallet/category IDs, and committing a stale

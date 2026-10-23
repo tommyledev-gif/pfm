@@ -9,12 +9,16 @@ package dto
 //
 // Username (tên đăng nhập) is required too, but its format rules live in
 // AuthService for the same reason: INVALID_USERNAME says which rule failed.
+//
+// The max tags are shape bounds only, far above every real value (an invite
+// token is 64 hex characters, a password is at most 72 bytes): they keep a
+// multi-megabyte field from ever reaching the services.
 type ActivateRequest struct {
-	Token           string `json:"token" validate:"required"`
+	Token           string `json:"token" validate:"required,max=128"`
 	Username        string `json:"username" validate:"max=64"`
-	FullName        string `json:"full_name" validate:"omitempty"`
-	Password        string `json:"password" validate:"required"`
-	PasswordConfirm string `json:"password_confirm" validate:"required"`
+	FullName        string `json:"full_name" validate:"max=256"`
+	Password        string `json:"password" validate:"required,max=256"`
+	PasswordConfirm string `json:"password_confirm" validate:"required,max=256"`
 }
 
 // LoginRequest is the body of POST /auth/login. Email carries an email or a
@@ -22,19 +26,16 @@ type ActivateRequest struct {
 // keep working. AuthService.Login tells the two apart by the "@".
 type LoginRequest struct {
 	Email    string `json:"email" validate:"required,max=254"`
-	Password string `json:"password" validate:"required"`
+	Password string `json:"password" validate:"required,max=256"`
 }
 
 // LogoutRequest is the body of POST /auth/logout.
 //
-// Only `required` is enforced here, not a JWT-structure tag: go-playground
-// validator/v10's built-in tag set is not confirmed to include a `jwt`
-// validator, and guessing wrong would panic at runtime on an unknown tag.
-// A malformed (non-JWT) token is instead caught by
-// AuthService.ParseRefreshTokenUnverified, which returns the same
-// 400 INVALID_INPUT either way (see auth_service.go's Logout).
+// Only presence and a size bound are enforced here, not a JWT-structure tag:
+// a malformed (non-JWT) token is caught by TokenService.ParseRefreshToken,
+// which AuthService.Logout maps to the same 400 INVALID_INPUT.
 type LogoutRequest struct {
-	RefreshToken string `json:"refresh_token" validate:"required"`
+	RefreshToken string `json:"refresh_token" validate:"required,max=4096"`
 }
 
 // RefreshRequest is the body of POST /auth/refresh — same shape as
@@ -42,5 +43,5 @@ type LogoutRequest struct {
 // same reason: only presence is validated here, malformed/expired/revoked
 // tokens are all distinguished inside AuthService.Refresh.
 type RefreshRequest struct {
-	RefreshToken string `json:"refresh_token" validate:"required"`
+	RefreshToken string `json:"refresh_token" validate:"required,max=4096"`
 }

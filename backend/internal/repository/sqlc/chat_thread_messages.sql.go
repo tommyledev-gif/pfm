@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 const upsertChatThreadMessage = `-- name: UpsertChatThreadMessage :one
@@ -25,6 +26,15 @@ func (q *Queries) UpsertChatThreadMessage(ctx context.Context, arg UpsertChatThr
 	var i ChatThreadMessage
 	err := row.Scan(&i.ID, &i.UserID, &i.ClientMessageID, &i.Payload, &i.CreatedAt, &i.UpdatedAt)
 	return i, err
+}
+
+// QueueUpsertChatThreadMessages queues one UpsertChatThreadMessage per arg on
+// b, so a whole thread sync goes to Postgres as one batch (hand-written, not
+// sqlc output: sqlc's :batchexec would need its generator, see db.go).
+func QueueUpsertChatThreadMessages(b *pgx.Batch, args []UpsertChatThreadMessageParams) {
+	for _, arg := range args {
+		b.Queue(upsertChatThreadMessage, arg.UserID, arg.ClientMessageID, arg.Payload)
+	}
 }
 
 const listChatThreadMessagesByUser = `-- name: ListChatThreadMessagesByUser :many

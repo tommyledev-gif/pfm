@@ -100,39 +100,40 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string, device *
 	return accessToken, newRefreshToken, nil
 }
 
-// Logout implements F-02 US-05. Revocation is a conflict-safe upsert, so
-// double-logout and logout-with-an-expired-token are both harmless no-op
-// successes by construction — see repository.RevokedTokenRepository.Revoke.
+// Logout implements F-02 US-05. Double-logout and logout with an expired token
+// are both harmless no-op successes.
 //
-// A refresh token that verifies and belongs to a session ends that session
-// (its access token stops working at once too). Anything else — a pre-session
-// token, an expired or unverifiable one — takes the old path: its jti goes on
-// the deny-list.
+// Only a token this server signed and that is still live is acted on: one
+// that belongs to a session ends that session (its access token stops working
+// at once too); a pre-session token's jti goes on the deny-list with its real
+// expiry. A forged or expired token is a silent success with nothing written
+// (isUntrustedToken), so the route cannot be used to fill the deny-list.
+// Something that is not a refresh token at all is 400.
 func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
-	if info, err := s.tokens.ParseRefreshToken(refreshToken); err == nil && info.SessionID != "" {
-		sessionID, sidErr := uuid.Parse(info.SessionID)
-		userID, uidErr := uuid.Parse(info.Subject)
-		if sidErr == nil && uidErr == nil {
-			if err := s.sessions.End(ctx, sessionID, userID, model.SessionRevokedLogout); err != nil {
-				return fmt.Errorf("service.Logout: %w", err)
-			}
+	info, err := s.tokens.ParseRefreshToken(refreshToken)
+	if err != nil {
+		if isUntrustedToken(err) {
 			return nil
 		}
+		return common.NewInvalidInputError("refresh token is malformed")
 	}
-
-	jti, subject, expiresAt, err := s.tokens.ParseRefreshTokenUnverified(refreshToken)
+	userID, err := uuid.Parse(info.Subject)
 	if err != nil {
 		return common.NewInvalidInputError("refresh token is malformed")
 	}
 
-	var userID *uuid.UUID
-	if parsed, parseErr := uuid.Parse(subject); parseErr == nil {
-		userID = &parsed
-	} else {
-		s.logger.Warn("logout: refresh token subject is not a valid UUID, revoking without user_id link")
+	if info.SessionID != "" {
+		sessionID, err := uuid.Parse(info.SessionID)
+		if err != nil {
+			return common.NewInvalidInputError("refresh token is malformed")
+		}
+		if err := s.sessions.End(ctx, sessionID, userID, model.SessionRevokedLogout); err != nil {
+			return fmt.Errorf("service.Logout: %w", err)
+		}
+		return nil
 	}
 
-	if err := s.revokedRepo.Revoke(ctx, jti, userID, expiresAt); err != nil {
+	if err := s.revokedRepo.Revoke(ctx, info.JTI, &userID, info.ExpiresAt); err != nil {
 		return fmt.Errorf("service.Logout: %w", err)
 	}
 	return nil

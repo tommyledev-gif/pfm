@@ -42,6 +42,16 @@ func NewInvalidUsernameError(message string) *AppError {
 	return &AppError{Code: ErrCodeInvalidUsername, Status: http.StatusBadRequest, Message: message}
 }
 
+// ErrCodeInvalidFullName: the display name chosen at activation breaks the
+// profile name rules. Its own code so the activation page can show the
+// message under the name field.
+const ErrCodeInvalidFullName = "INVALID_FULL_NAME"
+
+// NewInvalidFullNameError is 400 INVALID_FULL_NAME; the message says how to fix it.
+func NewInvalidFullNameError(message string) *AppError {
+	return &AppError{Code: ErrCodeInvalidFullName, Status: http.StatusBadRequest, Message: message}
+}
+
 const (
 	UsernameMinLength = 3
 	UsernameMaxLength = 30

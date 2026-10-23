@@ -16,6 +16,21 @@ x-logging: &default-logging
     max-size: "20m"
     max-file: "5"
 
+# Least privilege for the two stateless services (specs/security-hardening-
+# 2026-10 US-10): no Linux capability (they only listen on ports above 1024),
+# no privilege gain through setuid binaries, and a read-only root filesystem
+# with a small in-memory /tmp — a bug in a parser (uploads, model output)
+# cannot drop a file anywhere that survives, or anything executable at all.
+# Postgres keeps its defaults: its entrypoint switches user at start.
+x-hardening: &hardening
+  read_only: true
+  tmpfs:
+    - /tmp:size=64m,mode=1777
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+
 services:
   pfm-postgres:
     image: postgres:16-alpine
@@ -78,6 +93,7 @@ services:
           memory: ${MEM_LIMIT_POSTGRES:-512M}
 
   pfm-backend:
+    <<: *hardening
     image: ${DOCKER_REGISTRY_USER}/pfm-backend:${PFM_BACKEND_IMAGE_TAG:-latest}
     container_name: pfm-backend-container
     restart: unless-stopped
@@ -105,6 +121,9 @@ services:
       # ai-service is down/misconfigured, POST /ai/chat just degrades to
       # 502 AI_SERVICE_UNAVAILABLE instead of failing backend startup.
       AI_SERVICE_URL: ${AI_SERVICE_URL:-}
+      # Shared secret sent to the AI Service on every call; the ai-service
+      # block below gets the same value (docs/ops-runbook.md §9 for rollout).
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-}
       # Operator switch for reading receipt photos (specs/ai-chat-image-capture
       # BR-18). Anything but "true" keeps POST /transactions/image-proposals
       # answering 503 AI_IMAGE_DISABLED. Flip it, then `docker compose up -d backend`.
@@ -130,6 +149,9 @@ services:
       # https://app.example.com/app-updates/apk once that host routes to
       # this server. Blank keeps the API's own /api/v1/app-updates/apk.
       APK_PUBLIC_URL: ${APK_PUBLIC_URL:-}
+      # The one account the test-phase account deletion tool opens to; blank
+      # closes it for everyone (docs/ops-runbook.md §9).
+      ACCOUNT_DELETION_OPERATOR_EMAIL: ${ACCOUNT_DELETION_OPERATOR_EMAIL:-}
       # Read only by ./seed (see deploy.sh), not by the server process. Blank
       # means "skip admin bootstrap" — set these in .env.prod only for the
       # very first deploy of a fresh environment (invite-only auth has no one
@@ -168,6 +190,7 @@ services:
   # Finding #5). Image is built/pushed by deploy-ai-service.yml, not built
   # on the VPS.
   ai-service:
+    <<: *hardening
     image: ${DOCKER_REGISTRY_USER}/pfm-ai-service:${PFM_AI_SERVICE_IMAGE_TAG:-latest}
     container_name: pfm-ai-service-container
     restart: unless-stopped
@@ -176,6 +199,8 @@ services:
     environment:
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Once set, every route but /health requires it (app/core/security.py).
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-}
     healthcheck:
       # python:3.12-slim has no wget/curl; urlopen raises (exit 1) on non-2xx.
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]

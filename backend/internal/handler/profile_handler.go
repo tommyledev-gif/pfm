@@ -34,7 +34,10 @@ func (h *ProfileHandler) GetMe(c *fiber.Ctx) error {
 	if err != nil {
 		return response.Error(c, h.logger, err)
 	}
-	return response.Success(c, fiber.StatusOK, "profile fetched successfully", dto.NewUserResponse(user))
+	return response.Success(c, fiber.StatusOK, "profile fetched successfully", dto.MeResponse{
+		UserResponse:      dto.NewUserResponse(user),
+		CanDeleteAccounts: h.profileService.CanDeleteAccounts(user),
+	})
 }
 
 // UpdateMe handles PATCH /users/me (display name only).

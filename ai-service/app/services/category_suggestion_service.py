@@ -2,27 +2,22 @@
 POST /suggest-category-name (specs/ai-budget-wizard/spec.md US-03 Step 2B /
 US-05 internal-helper subsection).
 
-Same tool/function-calling approach as extract_service.py (dev.md LLM Rules:
-max_tokens always explicit, log only prompt length/token counts and the
-failure type/message, never raw prompt content, wrap every SDK call in
-try/except, never let a raw LLM error propagate as a 500 to the Go Backend).
-CategorySuggestionResponse has no nested models, so no $ref-dereference step
-is needed here (unlike ExtractResponse.transactions).
+Same tool/function-calling approach as extract_service.py, through the shared
+llm_tools.py / llm_fallback.py (max_tokens always explicit, only lengths,
+token counts and error type/code logged, never a raw LLM error as a 500 to
+the Go Backend). CategorySuggestionResponse has no nested models, so no
+$ref-dereference step is needed here.
 """
-
-import json
-import logging
-
-from fastapi.concurrency import run_in_threadpool
 
 from app.core.config import settings
 from app.core.groq_client import get_anthropic_client, get_groq_client
 from app.schemas.budget_schema import CategorySuggestionResponse
-
-logger = logging.getLogger(__name__)
+from app.services.llm_fallback import LLMUnavailableError, run_with_fallback
+from app.services.llm_tools import ToolSpec, anthropic_tool_arguments, groq_tool_arguments
 
 _TOOL_NAME = "suggest_category"
 _TOOL_DESCRIPTION = "Suggest a display name, type, and emoji icon for a personal-finance spending category described in Vietnamese free text."
+_LOG_LABEL = "category suggestion"
 
 _SYSTEM_PROMPT = """Bạn là trợ lý gợi ý tên danh mục chi tiêu cho ứng dụng quản lý tài chính cá nhân PFM.
 Người dùng sẽ mô tả một danh mục chi tiêu bằng văn bản tự do bằng tiếng Việt (ví dụ: "tiền đi chơi với người yêu").
@@ -43,71 +38,45 @@ class CategorySuggestionUnavailableError(Exception):
 
 
 async def suggest_category(description: str) -> CategorySuggestionResponse:
-    # Synchronous SDK calls run off the event loop (see extract_service.py).
     try:
-        return await run_in_threadpool(_call_groq, description)
-    except Exception as exc:  # noqa: BLE001 - any Groq failure falls back, never propagates raw
-        logger.warning(
-            "groq category suggestion failed, falling back to anthropic",
-            extra={"prompt_chars": len(description), "error_type": type(exc).__name__, "error": str(exc)},
+        return await run_with_fallback(
+            lambda: _call_groq(description),
+            lambda: _call_anthropic(description),
+            operation=_LOG_LABEL,
+            prompt_chars=len(description),
         )
-        try:
-            return await run_in_threadpool(_call_anthropic, description)
-        except Exception as fallback_exc:  # noqa: BLE001
-            logger.error(
-                "anthropic fallback also failed",
-                extra={
-                    "prompt_chars": len(description),
-                    "error_type": type(fallback_exc).__name__,
-                    "error": str(fallback_exc),
-                },
-            )
-            raise CategorySuggestionUnavailableError from fallback_exc
+    except LLMUnavailableError as exc:
+        raise CategorySuggestionUnavailableError from exc
 
 
-def _tool_schema() -> dict:
-    return CategorySuggestionResponse.model_json_schema()
+def _tool() -> ToolSpec:
+    return ToolSpec(name=_TOOL_NAME, description=_TOOL_DESCRIPTION, schema=CategorySuggestionResponse.model_json_schema())
 
 
 def _call_groq(description: str) -> CategorySuggestionResponse:
-    client = get_groq_client()
-    tool = {
-        "type": "function",
-        "function": {"name": _TOOL_NAME, "description": _TOOL_DESCRIPTION, "parameters": _tool_schema()},
-    }
-    completion = client.chat.completions.create(
+    arguments = groq_tool_arguments(
+        get_groq_client(),
         model=settings.groq_model,
+        tool=_tool(),
+        system_prompt=_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": description}],
         max_tokens=settings.max_tokens,
         temperature=settings.temperature,
-        tools=[tool],
-        tool_choice={"type": "function", "function": {"name": _TOOL_NAME}},
-        messages=[
-            {"role": "system", "content": _SYSTEM_PROMPT},
-            {"role": "user", "content": description},
-        ],
+        log_label=_LOG_LABEL,
+        prompt_chars=len(description),
     )
-    tool_calls = completion.choices[0].message.tool_calls
-    if not tool_calls:
-        raise ValueError("groq response contained no tool call")
-    completion_tokens = completion.usage.completion_tokens if completion.usage else None
-    logger.info("groq category suggestion completed", extra={"prompt_chars": len(description), "completion_tokens": completion_tokens})
-    return CategorySuggestionResponse.model_validate(json.loads(tool_calls[0].function.arguments))
+    return CategorySuggestionResponse.model_validate(arguments)
 
 
 def _call_anthropic(description: str) -> CategorySuggestionResponse:
-    client = get_anthropic_client()
-    tool = {"name": _TOOL_NAME, "description": _TOOL_DESCRIPTION, "input_schema": _tool_schema()}
-    response = client.messages.create(
+    arguments = anthropic_tool_arguments(
+        get_anthropic_client(),
         model=settings.anthropic_model,
-        max_tokens=settings.max_tokens,
-        temperature=settings.temperature,
-        system=_SYSTEM_PROMPT,
-        tools=[tool],
-        tool_choice={"type": "tool", "name": _TOOL_NAME},
+        tool=_tool(),
+        system_prompt=_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": description}],
+        max_tokens=settings.max_tokens,
+        log_label=_LOG_LABEL,
+        prompt_chars=len(description),
     )
-    tool_use_blocks = [block for block in response.content if block.type == "tool_use"]
-    if not tool_use_blocks:
-        raise ValueError("anthropic response contained no tool_use block")
-    logger.info("anthropic fallback completed", extra={"prompt_chars": len(description)})
-    return CategorySuggestionResponse.model_validate(tool_use_blocks[0].input)
+    return CategorySuggestionResponse.model_validate(arguments)

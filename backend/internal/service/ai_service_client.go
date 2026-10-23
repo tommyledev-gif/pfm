@@ -1,11 +1,7 @@
 package service
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -94,15 +90,11 @@ type AIExtractResponse struct {
 // plan.md Finding #1: POST {baseURL}/extract, reachable only on the internal
 // Docker network, never a host-mapped port).
 type httpAIServiceClient struct {
-	baseURL string
-	client  *http.Client
+	http aiHTTP
 }
 
-func NewHTTPAIServiceClient(baseURL string) *httpAIServiceClient {
-	return &httpAIServiceClient{
-		baseURL: baseURL,
-		client:  &http.Client{Timeout: aiServiceRequestTimeout},
-	}
+func NewHTTPAIServiceClient(endpoint AIServiceEndpoint) *httpAIServiceClient {
+	return &httpAIServiceClient{http: newAIHTTP(endpoint, aiServiceRequestTimeout)}
 }
 
 var _ AIServiceClient = (*httpAIServiceClient)(nil)
@@ -165,34 +157,9 @@ type aiWireResponse struct {
 // ChatService wraps it as common.ErrAIServiceUnavailable, never propagating
 // the raw error to the client (spec.md S-AI-10).
 func (c *httpAIServiceClient) Extract(ctx context.Context, req AIExtractRequest) (*AIExtractResponse, error) {
-	if c.baseURL == "" {
-		return nil, fmt.Errorf("ai_service_client.Extract: AI_SERVICE_URL not configured")
-	}
-
-	body, err := json.Marshal(toWireRequest(req))
-	if err != nil {
-		return nil, fmt.Errorf("ai_service_client.Extract: %w", err)
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/extract", bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("ai_service_client.Extract: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.client.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("ai_service_client.Extract: %w", err)
-	}
-	defer resp.Body.Close() //nolint:errcheck // best-effort close, response already read
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("ai_service_client.Extract: unexpected status %d", resp.StatusCode)
-	}
-
 	var wireResp aiWireResponse
-	if err := json.NewDecoder(resp.Body).Decode(&wireResp); err != nil {
-		return nil, fmt.Errorf("ai_service_client.Extract: %w", err)
+	if err := c.http.postJSON(ctx, "ai_service_client.Extract", "/extract", toWireRequest(req), &wireResp); err != nil {
+		return nil, err
 	}
 	return fromWireResponse(wireResp), nil
 }

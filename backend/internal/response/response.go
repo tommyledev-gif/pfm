@@ -46,6 +46,8 @@ func Error(c *fiber.Ctx, logger *zap.Logger, err error) error {
 				zap.String("method", c.Method()),
 				zap.String("path", c.Path()),
 				zap.Any("user_id", c.Locals(common.LocalsUserID)),
+				zap.Any("request_id", c.Locals(common.LocalsRequestID)),
+				zap.Any("ip", c.Locals(common.LocalsClientIP)),
 			)
 		}
 		return c.Status(appErr.Status).JSON(Body{
@@ -72,7 +74,8 @@ func Error(c *fiber.Ctx, logger *zap.Logger, err error) error {
 		})
 	}
 
-	logger.Error("unhandled error", zap.Error(err), zap.String("path", c.Path()), zap.String("method", c.Method()))
+	logger.Error("unhandled error", zap.Error(err), zap.String("path", c.Path()), zap.String("method", c.Method()),
+		zap.Any("request_id", c.Locals(common.LocalsRequestID)))
 	return c.Status(http.StatusInternalServerError).JSON(Body{
 		Success:   false,
 		ErrorCode: "INTERNAL_ERROR",

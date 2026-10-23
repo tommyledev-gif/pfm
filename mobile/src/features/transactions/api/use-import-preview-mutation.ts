@@ -3,6 +3,10 @@ import { useMutation } from "@tanstack/react-query";
 import { apiClient, unwrap } from "@/lib/axios";
 import { ImportPreview } from "@/features/transactions/types";
 
+// A 5 MiB workbook over mobile data can take longer than the client's default
+// 15 s to upload; the server's own work is under a second.
+const IMPORT_PREVIEW_TIMEOUT_MS = 60_000;
+
 export interface ImportFileAsset {
   uri: string;
   name: string;
@@ -31,7 +35,7 @@ export function useImportPreviewMutation() {
       const res = await apiClient.post<{ success: boolean; message: string; data?: ImportPreview }>(
         "/transactions/import/preview",
         form,
-        { headers: { "Content-Type": "multipart/form-data" } },
+        { headers: { "Content-Type": "multipart/form-data" }, timeout: IMPORT_PREVIEW_TIMEOUT_MS },
       );
       return unwrap(res.data);
     },

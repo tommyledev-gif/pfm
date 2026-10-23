@@ -34,7 +34,20 @@ class Settings(BaseSettings):
     # Backend. Moved to Groq's own recommended migration target for tool-use
     # workloads. Overridable via env if Groq's catalog changes again.
     groq_model: str = "openai/gpt-oss-120b"
-    anthropic_model: str = "claude-3-5-haiku-20241022"
+    # The fallback's model. claude-3-5-haiku-20241022 was retired on
+    # 2026-02-19, after which every fallback call failed and a Groq outage
+    # reached the User as 503. claude-haiku-5-5 is the current Haiku-class
+    # model (fast, low cost); it rejects non-default sampling parameters, so
+    # llm_tools.anthropic_tool_arguments sends no temperature.
+    anthropic_model: str = "claude-haiku-5-5"
+
+    # Shared secret the Go backend sends as X-Internal-Token
+    # (specs/security-hardening-2026-10 US-07; app/core/security.py). Empty =
+    # not enforced yet, which main.py logs as a warning at startup.
+    ai_service_token: str = ""
+    # /docs, /redoc and /openapi.json are off unless this is true (local work
+    # only): they map the whole internal API for whoever can reach it.
+    ai_service_expose_docs: bool = False
 
     # max_tokens must always be set explicitly on every LLM call (dev.md LLM
     # Rules) — never rely on the SDK's default.

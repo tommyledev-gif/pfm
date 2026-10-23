@@ -1,11 +1,7 @@
 package service
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
-	"net/http"
 	"time"
 )
 
@@ -29,15 +25,11 @@ type AISuggestCategoryNameResponse struct {
 // httpAIServiceClient (POST {baseURL}/suggest-category-name, never a
 // host-mapped port).
 type httpAIBudgetClient struct {
-	baseURL string
-	client  *http.Client
+	http aiHTTP
 }
 
-func NewHTTPAIBudgetClient(baseURL string) *httpAIBudgetClient {
-	return &httpAIBudgetClient{
-		baseURL: baseURL,
-		client:  &http.Client{Timeout: aiBudgetClientRequestTimeout},
-	}
+func NewHTTPAIBudgetClient(endpoint AIServiceEndpoint) *httpAIBudgetClient {
+	return &httpAIBudgetClient{http: newAIHTTP(endpoint, aiBudgetClientRequestTimeout)}
 }
 
 // Wire-level request/response shapes — field-for-field with the AI Service's
@@ -59,34 +51,9 @@ type aiBudgetWireResponse struct {
 // common.ErrAIServiceUnavailable, never propagating the raw error to the
 // client (specs/ai-budget-wizard/spec.md US-05 internal-helper subsection).
 func (c *httpAIBudgetClient) SuggestCategoryName(ctx context.Context, description string) (*AISuggestCategoryNameResponse, error) {
-	if c.baseURL == "" {
-		return nil, fmt.Errorf("ai_budget_client.SuggestCategoryName: AI_SERVICE_URL not configured")
-	}
-
-	body, err := json.Marshal(aiBudgetWireRequest{Description: description})
-	if err != nil {
-		return nil, fmt.Errorf("ai_budget_client.SuggestCategoryName: %w", err)
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/suggest-category-name", bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("ai_budget_client.SuggestCategoryName: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.client.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("ai_budget_client.SuggestCategoryName: %w", err)
-	}
-	defer resp.Body.Close() //nolint:errcheck // best-effort close, response already read
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("ai_budget_client.SuggestCategoryName: unexpected status %d", resp.StatusCode)
-	}
-
 	var wireResp aiBudgetWireResponse
-	if err := json.NewDecoder(resp.Body).Decode(&wireResp); err != nil {
-		return nil, fmt.Errorf("ai_budget_client.SuggestCategoryName: %w", err)
+	if err := c.http.postJSON(ctx, "ai_budget_client.SuggestCategoryName", "/suggest-category-name", aiBudgetWireRequest{Description: description}, &wireResp); err != nil {
+		return nil, err
 	}
 	return &AISuggestCategoryNameResponse{
 		SuggestedName: wireResp.SuggestedName,

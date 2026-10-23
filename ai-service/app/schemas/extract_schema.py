@@ -10,43 +10,54 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.limits import (
+    CATEGORIES_MAX,
+    HISTORY_MAX_TURNS,
+    ID_MAX_CHARS,
+    MESSAGE_MAX_CHARS,
+    NAME_MAX_CHARS,
+    SHORT_FIELD_MAX_CHARS,
+    WALLETS_MAX,
+)
+
 
 class WalletContext(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    id: str
-    name: str
+    id: str = Field(max_length=ID_MAX_CHARS)
+    name: str = Field(max_length=NAME_MAX_CHARS)
     is_default: bool
-    currency: str
+    currency: str = Field(max_length=SHORT_FIELD_MAX_CHARS)
 
 
 class CategoryContext(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    id: str
-    name: str
-    type: str
+    id: str = Field(max_length=ID_MAX_CHARS)
+    name: str = Field(max_length=NAME_MAX_CHARS)
+    type: str = Field(max_length=SHORT_FIELD_MAX_CHARS)
 
 
 class ChatTurn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     role: Literal["user", "assistant"]
-    content: str
+    content: str = Field(max_length=MESSAGE_MAX_CHARS)
 
 
 class ExtractRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    message: str
+    message: str = Field(max_length=MESSAGE_MAX_CHARS)
     # Prior turns in the same conversation, oldest first, never including
     # `message` itself — lets the model disambiguate a short follow-up (e.g.
     # "20k" after "mua cà phê") using what was already said instead of
     # judging it in isolation. Empty for a brand-new conversation.
-    history: list[ChatTurn] = Field(default_factory=list)
-    wallets: list[WalletContext]
-    categories: list[CategoryContext]
-    now: str  # RFC3339, UTC — the Go Backend's server time, never client-supplied
+    history: list[ChatTurn] = Field(default_factory=list, max_length=HISTORY_MAX_TURNS)
+    wallets: list[WalletContext] = Field(max_length=WALLETS_MAX)
+    categories: list[CategoryContext] = Field(max_length=CATEGORIES_MAX)
+    # RFC3339, UTC — the Go Backend's server time, never client-supplied
+    now: str = Field(max_length=SHORT_FIELD_MAX_CHARS)
 
 
 class ProposedItem(BaseModel):

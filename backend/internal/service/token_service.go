@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -189,24 +190,20 @@ type RefreshTokenInfo struct {
 	IssuedAt  *jwt.NumericDate
 }
 
-// ParseRefreshTokenUnverified extracts the jti and expiry from a refresh
-// token WITHOUT verifying its signature. Logout only — never to issue
-// credentials (see ParseRefreshToken) — plan.md's US-05 sequence diagram
-// explicitly does not require signature re-verification to revoke a token
-// (revoking a jti that never belonged to a real signed token is harmless:
-// it just occupies a row that will never be looked up by a legitimate
-// caller). Handler-level `validate:"jwt"` already rejects structurally
-// malformed input before this is ever called.
-func (s *TokenService) ParseRefreshTokenUnverified(tokenString string) (jti string, subject string, expiresAt time.Time, err error) {
-	claims := &refreshClaims{}
-	_, _, err = jwt.NewParser().ParseUnverified(tokenString, claims)
-	if err != nil {
-		return "", "", time.Time{}, fmt.Errorf("service.ParseRefreshTokenUnverified: %w", err)
-	}
-	if claims.ID == "" || claims.ExpiresAt == nil {
-		return "", "", time.Time{}, fmt.Errorf("service.ParseRefreshTokenUnverified: missing jti or exp claim")
-	}
-	return claims.ID, claims.Subject, claims.ExpiresAt.Time, nil
+// isUntrustedToken reports whether a parse failed because the token is not one
+// this server would honour (a bad signature, an algorithm it does not sign
+// with, a lapsed validity window), as opposed to not being a token at all.
+//
+// Revoking such a token is pointless, since no endpoint would ever accept it,
+// and harmful: logout and switch-token revoke are unauthenticated, so writing
+// an unverified token's claims let anyone add deny-list rows with any expiry
+// (specs/security-hardening-2026-10 US-04). Callers answer these with a
+// silent success, which keeps logout idempotent for an expired token.
+func isUntrustedToken(err error) bool {
+	return errors.Is(err, jwt.ErrTokenSignatureInvalid) ||
+		errors.Is(err, jwt.ErrTokenUnverifiable) ||
+		errors.Is(err, jwt.ErrTokenExpired) ||
+		errors.Is(err, jwt.ErrTokenNotValidYet)
 }
 
 // IssueImportToken mints the short-lived token that carries a previewed
