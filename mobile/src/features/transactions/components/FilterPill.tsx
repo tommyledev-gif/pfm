@@ -1,9 +1,9 @@
-import { useEffect } from "react";
-import { Pressable } from "react-native";
+import { ComponentType, useEffect } from "react";
+import { GestureResponderEvent, Pressable } from "react-native";
 import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
 import { PressableScale } from "@/components/motion/PressableScale";
-import { ChevronDownIcon, CloseIcon } from "@/components/ui/Icon";
+import { ChevronDownIcon, CloseIcon, IconProps } from "@/components/ui/Icon";
 import { withAlpha } from "@/lib/color";
 import { radii, typography, createStyles, useColors } from "@/lib/theme";
 import { useReduceMotion } from "@/lib/use-reduce-motion";
@@ -17,7 +17,9 @@ interface FilterPillProps {
   active: boolean;
   /** The dimension's name when inactive ("Ví"), the applied value when active. */
   label: string;
-  onPress: () => void;
+  /** Drawn instead of the inactive label (a calendar for "Thời gian"), which is then spoken only. */
+  icon?: ComponentType<IconProps>;
+  onPress: (event: GestureResponderEvent) => void;
   /** Clears just this filter — the × that replaces the chevron while active. */
   onClear?: () => void;
   clearLabel?: string;
@@ -32,7 +34,7 @@ interface FilterPillProps {
 //
 // Tinted rather than filled when active: with several filters on, a row of
 // solid neon pills shouted over the list they were narrowing.
-export function FilterPill({ active, label, onPress, onClear, clearLabel, testID }: FilterPillProps) {
+export function FilterPill({ active, label, icon: Icon, onPress, onClear, clearLabel, testID }: FilterPillProps) {
   const colors = useColors();
   const styles = useStyles();
   const reduceMotion = useReduceMotion();
@@ -58,11 +60,16 @@ export function FilterPill({ active, label, onPress, onClear, clearLabel, testID
       style={[styles.pill, pillStyle]}
       onPress={onPress}
       accessibilityRole="button"
+      accessibilityLabel={label}
       accessibilityState={{ selected: active }}
     >
-      <Animated.Text style={[styles.label, labelStyle]} numberOfLines={1}>
-        {label}
-      </Animated.Text>
+      {Icon && !active ? (
+        <Icon size={16} color={colors.textSecondary} />
+      ) : (
+        <Animated.Text style={[styles.label, labelStyle]} numberOfLines={1}>
+          {label}
+        </Animated.Text>
+      )}
       {active && onClear ? (
         <Pressable
           onPress={onClear}

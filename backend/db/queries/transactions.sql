@@ -104,6 +104,7 @@ WHERE (t.user_id = $1 OR (sqlc.arg('wallet_scoped')::bool AND sqlc.narg('wallet_
   AND (sqlc.narg('from_ts')::timestamptz IS NULL OR t.occurred_at >= sqlc.narg('from_ts'))
   AND (sqlc.narg('to_ts')::timestamptz IS NULL OR t.occurred_at <= sqlc.narg('to_ts'))
   AND (sqlc.narg('search')::text IS NULL OR t.note ILIKE '%' || sqlc.narg('search') || '%' ESCAPE '\')
+  AND (sqlc.narg('currency')::text IS NULL OR w.currency = sqlc.narg('currency'))
   AND (
     sqlc.narg('cursor_occurred_at')::timestamptz IS NULL
     OR t.occurred_at < sqlc.narg('cursor_occurred_at')
@@ -140,7 +141,8 @@ WHERE (t.user_id = $1 OR (sqlc.arg('wallet_scoped')::bool AND sqlc.narg('wallet_
   AND (sqlc.narg('type')::text IS NULL OR t.type = sqlc.narg('type'))
   AND (sqlc.narg('from_ts')::timestamptz IS NULL OR t.occurred_at >= sqlc.narg('from_ts'))
   AND (sqlc.narg('to_ts')::timestamptz IS NULL OR t.occurred_at <= sqlc.narg('to_ts'))
-  AND (sqlc.narg('search')::text IS NULL OR t.note ILIKE '%' || sqlc.narg('search') || '%' ESCAPE '\');
+  AND (sqlc.narg('search')::text IS NULL OR t.note ILIKE '%' || sqlc.narg('search') || '%' ESCAPE '\')
+  AND (sqlc.narg('currency')::text IS NULL OR w.currency = sqlc.narg('currency'));
 
 -- name: UpdateTransaction :one
 -- Partial update via COALESCE, same convention as UpdateWallet/UpdateCategory.

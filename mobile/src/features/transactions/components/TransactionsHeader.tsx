@@ -3,6 +3,7 @@ import { ActivityIndicator, Text, View } from "react-native";
 import Animated, { ZoomIn, ZoomOut } from "react-native-reanimated";
 
 import { PressableScale } from "@/components/motion/PressableScale";
+import { useHintTooltip } from "@/components/shared/use-hint-tooltip";
 import { DownloadIcon, IconProps, SortIcon } from "@/components/ui/Icon";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { TransactionsSearchField } from "@/features/transactions/components/TransactionsSearchField";
@@ -108,7 +109,14 @@ export function TransactionsHeader({
       <View style={styles.headerRow}>
         <Text style={styles.title}>Giao dịch</Text>
         <View style={styles.actions}>
-          <HeaderAction icon={SortIcon} label="Sắp xếp" active={hasCustomSort} onPress={onOpenSort} testID="btn-sort-transactions">
+          <HeaderAction
+            icon={SortIcon}
+            label="Sắp xếp"
+            hint="Sắp xếp giao dịch"
+            active={hasCustomSort}
+            onPress={onOpenSort}
+            testID="btn-sort-transactions"
+          >
             {hasCustomSort ? (
               <Animated.View entering={ZoomIn.duration(180)} exiting={ZoomOut.duration(140)} style={styles.sortBadge}>
                 <Text style={styles.sortBadgeText}>{sortCount}</Text>
@@ -118,6 +126,7 @@ export function TransactionsHeader({
           <HeaderAction
             icon={DownloadIcon}
             label="Xuất Excel"
+            hint="Xuất ra Excel"
             busy={exporting}
             onPress={onExport}
             testID="btn-export-transactions"
@@ -173,6 +182,8 @@ export function TransactionsHeader({
 interface HeaderActionProps {
   icon: (props: IconProps) => ReactNode;
   label: string;
+  /** Shown on a hold (TooltipHost): a few words on what the button does. */
+  hint: string;
   onPress: () => void;
   /** Lit while it changes what the list shows (a custom sort). */
   active?: boolean;
@@ -183,13 +194,16 @@ interface HeaderActionProps {
 }
 
 // A round icon button in the title row, a soft fill and no outline. The label
-// is spoken, not shown: sort arrows and a download tray are standard glyphs.
-function HeaderAction({ icon: Icon, label, onPress, active = false, busy = false, children, testID }: HeaderActionProps) {
+// is spoken, not shown: sort arrows and a download tray are standard glyphs,
+// and a hold says it in words.
+function HeaderAction({ icon: Icon, label, hint, onPress, active = false, busy = false, children, testID }: HeaderActionProps) {
   const colors = useColors();
   const styles = useStyles();
+  const hintTooltip = useHintTooltip(hint);
   return (
     <PressableScale
       onPress={onPress}
+      {...hintTooltip}
       disabled={busy}
       style={[styles.action, active && styles.actionActive]}
       accessibilityRole="button"

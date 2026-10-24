@@ -34,6 +34,8 @@ type User struct {
 	// Username (mig 030) is populated by GetUserByEmail, GetUserByID,
 	// GetUserByUsername, ListUsers, ActivateUser and the profile queries.
 	Username *string
+	// IsSuperAdmin (mig 037) is populated only by GetUserByID.
+	IsSuperAdmin bool
 }
 
 // RevokedToken mirrors the revoked_tokens table exactly.

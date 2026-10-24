@@ -278,6 +278,7 @@ export const BudgetsTab = memo(function BudgetsTab({ initialRange, rangeNonce, o
         to={detailRange.to}
         currency={currency}
         total={detailRow?.limit.spent ?? 0}
+        budget={detailRow ? { spent: detailRow.limit.spent, limit: detailRow.limit.amount_limit } : undefined}
       />
 
       <CategoryPickerDrawer

@@ -197,6 +197,13 @@ func TestAccountDeletionPolicy(t *testing.T) {
 	if !p.IsOperator("operator@example.COM") || p.IsOperator("other@example.com") {
 		t.Fatal("operator match must be exact and case-insensitive")
 	}
+	// mig 037: a super admin passes with no operator configured at all.
+	if !(AccountDeletionPolicy{}).Grants(&model.User{Email: "boss@example.com", IsSuperAdmin: true}) {
+		t.Fatal("a super admin must be let through")
+	}
+	if (AccountDeletionPolicy{}).Grants(&model.User{Email: "boss@example.com"}) {
+		t.Fatal("an ordinary account must not be let through")
+	}
 
 	ctx := context.Background()
 	f := newDeletionFixture()

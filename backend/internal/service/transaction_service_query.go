@@ -106,6 +106,9 @@ func (s *TransactionService) ListTransactions(ctx context.Context, userID uuid.U
 		escaped := likeEscaper.Replace(search)
 		filter.Search = &escaped
 	}
+	if q.Currency != "" {
+		filter.Currency = &q.Currency
+	}
 	if q.Cursor != "" {
 		id, occurredAt, createdAt, err := decodeTransactionCursor(q.Cursor)
 		if err != nil {

@@ -33,7 +33,7 @@ type sessionEnder interface {
 }
 
 // AccountDeletionService backs the account deletion tool on the mobile
-// Security screen: one operator account (AccountDeletionPolicy) searches for
+// Thành viên screen: a super admin or the operator (AccountDeletionPolicy) searches for
 // any other account and soft-deletes it.
 type AccountDeletionService struct {
 	repo     AccountDeletionRepo
@@ -98,7 +98,7 @@ func (s *AccountDeletionService) DeleteUser(ctx context.Context, callerID, targe
 	return nil
 }
 
-// requireOperator lets through only the configured operator (none when unset).
+// requireOperator lets through only a super admin or the configured operator.
 func (s *AccountDeletionService) requireOperator(ctx context.Context, callerID uuid.UUID) error {
 	caller, err := s.repo.GetUserByID(ctx, callerID)
 	if err != nil {
@@ -107,7 +107,7 @@ func (s *AccountDeletionService) requireOperator(ctx context.Context, callerID u
 		}
 		return fmt.Errorf("service.requireOperator: %w", err)
 	}
-	if !s.policy.IsOperator(caller.Email) {
+	if !s.policy.Grants(caller) {
 		return common.ErrForbidden
 	}
 	return nil

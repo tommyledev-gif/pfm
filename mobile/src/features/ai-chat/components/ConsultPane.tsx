@@ -3,6 +3,7 @@ import { FlatList, ListRenderItemInfo, StyleSheet, View } from "react-native";
 
 import { TypingIndicator } from "@/components/shared/TypingIndicator";
 import { ChatComposer } from "@/features/ai-chat/components/ChatComposer";
+import { ChatDayLabel, dayStartAt } from "@/features/ai-chat/components/ChatDayLabel";
 import { ChatThreadSkeleton } from "@/features/ai-chat/components/ChatThreadSkeleton";
 import { ConsultEmptyState } from "@/features/ai-chat/components/ConsultEmptyState";
 import { ChatInputBar } from "@/features/ai-chat/components/ChatInputBar";
@@ -10,6 +11,7 @@ import { ChatThreadList } from "@/features/ai-chat/components/ChatThreadList";
 import { KeyboardLiftView } from "@/features/ai-chat/components/KeyboardLiftView";
 import { ConsultMessageRow } from "@/features/ai-chat/components/ConsultMessageRow";
 import { useChatThreadStyles } from "@/features/ai-chat/components/chat-thread-styles";
+import { CHAT_MODE_META } from "@/features/ai-chat/chat-mode";
 import { isConsultMessage } from "@/features/ai-chat/consult-message";
 import { useConsultActions } from "@/features/ai-chat/hooks/use-consult-actions";
 import { ChatMessage } from "@/features/ai-chat/types";
@@ -59,7 +61,17 @@ export function ConsultPane({ loading, bottomInset, onSwitchToRecording }: Consu
       // Newest first, so the message before this one is next in the array.
       const previous = messages[index + 1];
       const startsTurn = previous !== undefined && (item.role === "user" || previous.role === "assistant");
-      return <ConsultMessageRow message={item} startsTurn={startsTurn} handlers={consult.handlers} />;
+      const row = <ConsultMessageRow message={item} startsTurn={startsTurn} handlers={consult.handlers} />;
+      // Messages grouped by day: the day's first one carries its date.
+      const dayAt = dayStartAt(messages, index);
+      return dayAt === undefined ? (
+        row
+      ) : (
+        <View>
+          <ChatDayLabel at={dayAt} tint={CHAT_MODE_META.consult.tint} />
+          {row}
+        </View>
+      );
     },
     [messages, consult.handlers],
   );

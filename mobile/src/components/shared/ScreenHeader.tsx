@@ -23,10 +23,12 @@ interface ScreenHeaderProps {
 }
 
 /**
- * A pushed screen's header, iOS large-title style: a slim bar with the round
- * back button (and an action on the right), then the title large and bold
- * on its own line, left-aligned with the content under it. Same spacing on
- * every screen, so moving between them the title never jumps.
+ * A screen's header. A pushed screen's title sits on the back button's own
+ * row, a gap after it, with an action at the far end (2026-10-24 — the title
+ * used to drop to a line of its own under the button, a whole row spent on
+ * one control). A tab's root, with no back button, keeps the large title on
+ * its own. Same spacing on every screen, so moving between them the title
+ * never jumps.
  */
 export function ScreenHeader({ title, subtitle, onBack, backTestID, trailing, style }: ScreenHeaderProps) {
   const colors = useColors();
@@ -35,29 +37,10 @@ export function ScreenHeader({ title, subtitle, onBack, backTestID, trailing, st
   const showBack = onBack !== false;
   const goBack = typeof onBack === "function" ? onBack : () => router.back();
 
-  return (
-    <View style={[styles.header, style]}>
-      {showBack || trailing ? (
-        <View style={styles.bar}>
-          {showBack ? (
-            <PressableScale
-              onPress={goBack}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Quay lại"
-              testID={backTestID}
-              style={styles.back}
-            >
-              <BackGlyph size={18} weight="bold" color={colors.textPrimary} />
-            </PressableScale>
-          ) : (
-            <View />
-          )}
-          {trailing}
-        </View>
-      ) : null}
+  const titleBlock = (
+    <View style={styles.titleBlock}>
       <Text
-        style={styles.title}
+        style={showBack ? styles.titleInline : styles.title}
         numberOfLines={1}
         adjustsFontSizeToFit
         minimumFontScale={TITLE_MIN_SCALE}
@@ -66,6 +49,27 @@ export function ScreenHeader({ title, subtitle, onBack, backTestID, trailing, st
         {title}
       </Text>
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+    </View>
+  );
+
+  return (
+    <View style={[styles.header, style]}>
+      <View style={styles.bar}>
+        {showBack ? (
+          <PressableScale
+            onPress={goBack}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Quay lại"
+            testID={backTestID}
+            style={styles.back}
+          >
+            <BackGlyph size={18} weight="bold" color={colors.textPrimary} />
+          </PressableScale>
+        ) : null}
+        {titleBlock}
+        {trailing}
+      </View>
     </View>
   );
 }
@@ -98,13 +102,8 @@ export function ScreenHeaderAction({ onPress, accessibilityLabel, icon: Icon = P
 
 const useStyles = createStyles((colors) => ({
   header: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm, paddingBottom: spacing.lg },
-  bar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    minHeight: BUTTON_SIZE,
-    marginBottom: spacing.sm,
-  },
+  bar: { flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: BUTTON_SIZE },
+  titleBlock: { flex: 1, minWidth: 0 },
   back: {
     width: BUTTON_SIZE,
     height: BUTTON_SIZE,
@@ -114,7 +113,10 @@ const useStyles = createStyles((colors) => ({
     backgroundColor: colors.surface,
   },
   title: { ...typography.hero, letterSpacing: -0.5, color: colors.textPrimary },
-  subtitle: { ...typography.caption, fontWeight: "500", color: colors.textSecondary, marginTop: spacing.xs },
+  // Beside the back button: a step down from the large title, so the row
+  // stays one button tall.
+  titleInline: { ...typography.hero, fontSize: 24, letterSpacing: -0.3, color: colors.textPrimary },
+  subtitle: { ...typography.caption, fontWeight: "500", color: colors.textSecondary, marginTop: 2 },
   action: {
     width: BUTTON_SIZE,
     height: BUTTON_SIZE,

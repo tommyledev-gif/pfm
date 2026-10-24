@@ -1,4 +1,4 @@
-import type { PanResponder } from "react-native";
+import type { GestureResponderEvent, PanResponder } from "react-native";
 import type { DerivedValue, SharedValue } from "react-native-reanimated";
 
 // The swipe rows' tuning and types (use-swipe-actions), split out for the
@@ -69,5 +69,7 @@ export interface SwipeActionsState {
   /** Which side is parked open, or null. Drives which button is rendered. */
   parkedSide: SwipeSide | null;
   close: () => void;
-  panHandlers: ReturnType<typeof PanResponder.create>["panHandlers"];
+  panHandlers: ReturnType<typeof PanResponder.create>["panHandlers"] & {
+    onTouchStart: (event: GestureResponderEvent) => void;
+  };
 }

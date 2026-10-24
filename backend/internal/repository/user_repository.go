@@ -203,5 +203,6 @@ func toModel(row sqlc.User) *model.User {
 		TokensValidAfter:  row.TokensValidAfter,
 		AvatarURL:         row.AvatarURL,
 		Username:          row.Username,
+		IsSuperAdmin:      row.IsSuperAdmin,
 	}
 }

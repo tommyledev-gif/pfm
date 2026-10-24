@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import { Avatar } from "@/components/ui/Avatar";
 import { Drawer } from "@/components/shared/Drawer";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
+import { BudgetFigures } from "@/features/budgets/components/BudgetFigures";
 import { HoldableTransactionRow } from "@/features/reports/components/HoldableTransactionRow";
 import { Transaction } from "@/features/transactions/types";
 import { TransactionRowSkeleton } from "@/features/transactions/components/TransactionRowSkeleton";
@@ -33,6 +34,8 @@ interface CategoryTransactionsDialogProps {
   to: string;
   currency: string;
   total: number;
+  /** Opened from a budget's bar: its spend and limit, spelled out over the rows. */
+  budget?: { spent: number; limit: number };
 }
 
 // Drill-down behind the donut tooltip's "Xem giao dịch" link (DonutChart) —
@@ -58,6 +61,7 @@ export const CategoryTransactionsDialog = memo(function CategoryTransactionsDial
   to,
   currency,
   total,
+  budget,
 }: CategoryTransactionsDialogProps) {
   const colors = useColors();
   const styles = useStyles();
@@ -121,10 +125,15 @@ export const CategoryTransactionsDialog = memo(function CategoryTransactionsDial
             {formatDateRange(from, to)}
           </Text>
         </View>
-        <Text style={styles.summaryAmount} numberOfLines={1}>
-          {formatCurrency(total, currency)}
-        </Text>
+        {/* With a budget the figures below say it, under their own names. */}
+        {budget ? null : (
+          <Text style={styles.summaryAmount} numberOfLines={1}>
+            {formatCurrency(total, currency)}
+          </Text>
+        )}
       </View>
+
+      {budget ? <BudgetFigures spent={budget.spent} limit={budget.limit} currency={currency} /> : null}
 
       {transactions.isLoading ? (
         <View>

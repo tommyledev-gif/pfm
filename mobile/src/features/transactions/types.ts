@@ -112,6 +112,8 @@ export interface ListTransactionsFilters {
   to?: string;
   // ILIKE substring match against a transaction's note.
   search?: string;
+  // Only entries whose wallet is in this currency (the currency pill).
+  currency?: string;
   limit?: number;
 }
 

@@ -174,7 +174,7 @@ There is no need to judge which case applies: `ota:publish` refuses when native 
 
 **New limits.** `/auth/refresh`, `/auth/logout`, `/auth/activate` and `/auth/switch-token/revoke` share 60 requests/minute per client IP. A transaction import takes at most 10,000 data rows and 64 MiB decompressed. A thread sync takes at most 500 messages of 64 KiB each. Passwords are at most 72 bytes (bcrypt's limit). `/ai/chat` and `/ai/suggest-category-name` share 30 requests/hour per user; the other `/ai` routes (thread, wizard prefill/proposals) 600/hour.
 
-**Account deletion tool.** Open only to `ACCOUNT_DELETION_OPERATOR_EMAIL` (an admin); blank closes it for everyone. The app shows it when `GET /users/me` returns `can_delete_accounts: true`. Set it in `VPS_ENV_PROD` to keep using the tool.
+**Account deletion tool.** On the app's Thành viên screen ("Tất cả tài khoản"), open to a super admin (`users.is_super_admin`, set by migration 037 for owner@example.com, who is also made an admin) and to `ACCOUNT_DELETION_OPERATOR_EMAIL` (an admin; blank adds nobody). The app shows it when `GET /users/me` returns `can_delete_accounts: true`. Another super admin: `UPDATE users SET is_super_admin = true WHERE email = '…'` (the account must be an admin).
 
 **Test-account passwords.** Until 2026-10-23, release bundles (public OTA and APK files) carried the debug console's test accounts with their passwords (`mobile/src/lib/dev-login.ts`). Bundles already published stay downloadable, so every account listed there must get a new password in production, and its sessions ended (Cài đặt → Bảo mật → Đổi mật khẩu, or admin "sign out everywhere").
 

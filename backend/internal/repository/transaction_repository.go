@@ -154,6 +154,8 @@ type ListTransactionsFilter struct {
 	// wallet's list). Only TransactionService sets it, after a read-access
 	// check on WalletID (specs/shared-wallets plan F1).
 	WalletScoped bool
+	// Currency: only entries whose wallet is in this currency.
+	Currency *string
 }
 
 // ListTransactionsByUser is cursor-paginated on (occurred_at, created_at, id)
@@ -175,6 +177,7 @@ func (r *TransactionRepository) ListTransactionsByUser(ctx context.Context, user
 		CursorCreatedAt:  filter.CursorCreatedAt,
 		CursorID:         filter.CursorID,
 		WalletScoped:     filter.WalletScoped,
+		Currency:         filter.Currency,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("repository.ListTransactionsByUser: %w", err)
@@ -201,6 +204,7 @@ func (r *TransactionRepository) CountTransactionsByUser(ctx context.Context, use
 		ToTs:         filter.To,
 		Search:       filter.Search,
 		WalletScoped: filter.WalletScoped,
+		Currency:     filter.Currency,
 	})
 	if err != nil {
 		return 0, fmt.Errorf("repository.CountTransactionsByUser: %w", err)

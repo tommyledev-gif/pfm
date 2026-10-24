@@ -1,8 +1,9 @@
 import { RefObject, useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, LayoutChangeEvent, ListRenderItemInfo, StyleSheet, View } from "react-native";
 
-import { closeParkedSwipeRow } from "@/components/shared/use-swipe-actions";
+import { closeParkedSwipeRow, closeParkedSwipeRowOnOutsideTouch } from "@/components/shared/use-swipe-actions";
 import { TypingIndicator } from "@/components/shared/TypingIndicator";
+import { ChatDayLabel, dayStartAt } from "@/features/ai-chat/components/ChatDayLabel";
 import { ChatMessageRow } from "@/features/ai-chat/components/ChatMessageRow";
 import { ChatThreadList } from "@/features/ai-chat/components/ChatThreadList";
 import { ChatThreadSkeleton } from "@/features/ai-chat/components/ChatThreadSkeleton";
@@ -11,7 +12,7 @@ import { RecordingComposer } from "@/features/ai-chat/components/RecordingCompos
 import { RecordingEmptyState } from "@/features/ai-chat/components/RecordingEmptyState";
 import { useChatThreadStyles } from "@/features/ai-chat/components/chat-thread-styles";
 import { ChatDraftStore } from "@/features/ai-chat/chat-draft";
-import { ChatMode } from "@/features/ai-chat/chat-mode";
+import { CHAT_MODE_META, ChatMode } from "@/features/ai-chat/chat-mode";
 import { pinFreshProposals, withAutoPin } from "@/features/ai-chat/proposal-auto-pin";
 import { useChatActions } from "@/features/ai-chat/hooks/use-chat-actions";
 import { ChatMessage } from "@/features/ai-chat/types";
@@ -137,28 +138,43 @@ export function RecordingPane({
   // toast shows instead, and the button stays for when it is back.
   const handleRetryText = useLatestCallback((message: ChatMessage) => requireOnline(() => void chat.retryReply(message)));
   const confirmingId = chat.confirmingId;
+  const dayTint = CHAT_MODE_META[mode].tint;
 
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<ChatMessage>) => (
-      <ChatMessageRow
-        message={item}
-        walletById={walletById}
-        categoryById={categoryById}
-        budgetByCategoryCurrency={budgetByCategoryCurrency}
-        confirming={confirmingId === item.id}
-        onConfirm={handleConfirm}
-        onTriggerEdit={handleTriggerEdit}
-        onTriggerDelete={handleTriggerDelete}
-        onPressHistory={handlePressHistory}
-        onOpenBudgetWizard={handleOpenWizard}
-        onOpenManualEntry={handleOpenManualEntry}
-        onRetryImage={handleRetryImage}
-        onRetryText={handleRetryText}
-        onCreateWallet={handleCreateWallet}
-        onOpenWalletCreator={openWalletCreator}
-      />
-    ),
+    ({ item, index }: ListRenderItemInfo<ChatMessage>) => {
+      const row = (
+        <ChatMessageRow
+          message={item}
+          walletById={walletById}
+          categoryById={categoryById}
+          budgetByCategoryCurrency={budgetByCategoryCurrency}
+          confirming={confirmingId === item.id}
+          onConfirm={handleConfirm}
+          onTriggerEdit={handleTriggerEdit}
+          onTriggerDelete={handleTriggerDelete}
+          onPressHistory={handlePressHistory}
+          onOpenBudgetWizard={handleOpenWizard}
+          onOpenManualEntry={handleOpenManualEntry}
+          onRetryImage={handleRetryImage}
+          onRetryText={handleRetryText}
+          onCreateWallet={handleCreateWallet}
+          onOpenWalletCreator={openWalletCreator}
+        />
+      );
+      // Messages grouped by day: the day's first one carries its date.
+      const dayAt = dayStartAt(messages, index);
+      return dayAt === undefined ? (
+        row
+      ) : (
+        <View>
+          <ChatDayLabel at={dayAt} tint={dayTint} />
+          {row}
+        </View>
+      );
+    },
     [
+      messages,
+      dayTint,
       walletById,
       categoryById,
       budgetByCategoryCurrency,
@@ -177,7 +193,12 @@ export function RecordingPane({
   );
 
   return (
-    <View style={styles.pane} onLayout={(e: LayoutChangeEvent) => setPaneHeight(e.nativeEvent.layout.height)}>
+    <View
+      style={styles.pane}
+      onLayout={(e: LayoutChangeEvent) => setPaneHeight(e.nativeEvent.layout.height)}
+      // A tap anywhere but an open swipe row closes it (cancels its action).
+      onTouchStart={closeParkedSwipeRowOnOutsideTouch}
+    >
       <KeyboardLiftView>
         <ChatThreadList
           listRef={listRef}

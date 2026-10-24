@@ -66,10 +66,9 @@ export function dayLabel(iso: string): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: diffDays > 300 ? "numeric" : undefined });
 }
 
-// Vietnamese counterpart of dayLabel — Transactions' date-grouped list uses
-// this one (that screen is fully translated, see project memory on the
-// Vietnamese-copy sweep), not the English dayLabel above, which notifications
-// screen still uses pending its own translation pass.
+// Vietnamese counterpart of dayLabel — Transactions' date-grouped list,
+// Notifications and the chat threads' day labels use this one, not the
+// English dayLabel above.
 // "06 Th09, 2026" — the date-group header format Transactions' day sections
 // use alongside dayLabelVi's "Hôm nay"/"Hôm qua"/full-date label.
 export function formatDateViShort(iso: string): string {

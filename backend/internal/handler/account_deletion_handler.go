@@ -17,8 +17,8 @@ import (
 const auditActionDeleteUser = "users.delete"
 
 // AccountDeletionHandler serves the account deletion tool on the mobile
-// Security screen. Both routes sit in the /admin group; the service then
-// lets through only the configured operator (service.AccountDeletionPolicy).
+// Thành viên screen. Both routes sit in the /admin group; the service then
+// lets through a super admin or the configured operator (service.AccountDeletionPolicy).
 type AccountDeletionHandler struct {
 	service *service.AccountDeletionService
 	logger  *zap.Logger

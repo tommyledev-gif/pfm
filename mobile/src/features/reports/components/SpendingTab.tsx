@@ -248,12 +248,14 @@ const useStyles = createStyles((colors) => ({
     borderColor: colors.surfaceBorder,
   },
   range: { ...typography.caption, color: colors.textSecondary },
+  // Clips each half's hold bar (RevealableAmount) to the rounded corners.
   statRow: {
     flexDirection: "row",
     borderRadius: radii.card,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     backgroundColor: colors.surface,
+    overflow: "hidden",
   },
   // Each half is RevealableAmount's hold target.
   statCard: { flex: 1, gap: spacing.xs, padding: spacing.lg },

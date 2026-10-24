@@ -1,9 +1,9 @@
-import { memo, useRef, useState } from "react";
+import { memo, useRef } from "react";
 import { Animated, Easing, Pressable, StyleProp, Text, TextStyle, View, ViewStyle } from "react-native";
 
-import { AmountTooltip, AnchorRect } from "@/components/ui/AmountTooltip";
 import { formatCurrencyCompact } from "@/lib/currency";
 import { createStyles } from "@/lib/theme";
+import { useTooltipStore } from "@/stores/tooltip-store";
 
 // Longer than RN's ~500ms default. A figure is something the eye rests on, and
 // at the default delay a slow tap on a stat card popped a modal the user never
@@ -56,7 +56,7 @@ export const RevealableAmount = memo(function RevealableAmount({
   const styles = useStyles();
   const targetRef = useRef<View>(null);
   const holdProgress = useRef(new Animated.Value(0)).current;
-  const [anchor, setAnchor] = useState<AnchorRect | null>(null);
+  const showTooltip = useTooltipStore((s) => s.show);
 
   const startHold = () => {
     holdProgress.setValue(0);
@@ -75,53 +75,42 @@ export const RevealableAmount = memo(function RevealableAmount({
 
   // ⚠️ measure()'s page coordinates, not measureInWindow: on Android
   // edge-to-edge, measureInWindow reports y below the status bar while the
-  // tooltip's Modal spans the full screen, so the bubble landed a status bar's
-  // height too high — on top of the very card it was pointing at.
+  // tooltip (TooltipHost, at the app root) spans the full screen, so the
+  // bubble landed a status bar's height too high — on top of the very card
+  // it was pointing at.
   const reveal = () => {
+    if (amountCents === null) return;
     targetRef.current?.measure((_x, _y, width, height, pageX, pageY) =>
-      setAnchor({ x: pageX, y: pageY, width, height }),
+      showTooltip({ x: pageX, y: pageY, width, height }, { kind: "amount", amountCents, currency, label }),
     );
   };
 
   const holdable = amountCents !== null;
 
   return (
-    <>
-      <Pressable
-        ref={targetRef}
-        style={[styles.target, containerStyle]}
-        onPressIn={holdable ? startHold : undefined}
-        onPressOut={holdable ? endHold : undefined}
-        onLongPress={holdable ? reveal : undefined}
-        delayLongPress={REVEAL_DELAY_MS}
-        disabled={!holdable}
-        accessibilityRole={holdable ? "button" : undefined}
-        accessibilityLabel={label}
-        accessibilityHint={holdable ? "Nhấn giữ để xem số tiền đầy đủ" : undefined}
-        testID={testID}
-      >
-        {label ? (
-          <Text style={labelStyle} numberOfLines={1}>
-            {label}
-          </Text>
-        ) : null}
-        <Text style={style} numberOfLines={1}>
-          {holdable ? formatCurrencyCompact(amountCents, currency) : emptyLabel}
+    <Pressable
+      ref={targetRef}
+      style={[styles.target, containerStyle]}
+      onPressIn={holdable ? startHold : undefined}
+      onPressOut={holdable ? endHold : undefined}
+      onLongPress={holdable ? reveal : undefined}
+      delayLongPress={REVEAL_DELAY_MS}
+      disabled={!holdable}
+      accessibilityRole={holdable ? "button" : undefined}
+      accessibilityLabel={label}
+      accessibilityHint={holdable ? "Nhấn giữ để xem số tiền đầy đủ" : undefined}
+      testID={testID}
+    >
+      {label ? (
+        <Text style={labelStyle} numberOfLines={1}>
+          {label}
         </Text>
-        <Animated.View pointerEvents="none" style={[styles.holdBar, { transform: [{ scaleX: holdProgress }] }]} />
-      </Pressable>
-
-      {holdable ? (
-        <AmountTooltip
-          visible={anchor !== null}
-          anchor={anchor}
-          amountCents={amountCents}
-          currency={currency}
-          label={label}
-          onClose={() => setAnchor(null)}
-        />
       ) : null}
-    </>
+      <Text style={style} numberOfLines={1}>
+        {holdable ? formatCurrencyCompact(amountCents, currency) : emptyLabel}
+      </Text>
+      <Animated.View pointerEvents="none" style={[styles.holdBar, { transform: [{ scaleX: holdProgress }] }]} />
+    </Pressable>
   );
 });
 

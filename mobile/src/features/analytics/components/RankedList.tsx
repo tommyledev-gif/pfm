@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AmountText } from "@/components/ui/AmountText";
+import { Collapsible } from "@/components/ui/Collapsible";
 import { ChevronDownIcon } from "@/components/ui/Icon";
 import { TintedIconTile } from "@/components/ui/TintedIconTile";
 import { AnalyticsTxRow } from "@/features/analytics/types";
@@ -45,32 +46,38 @@ export function RankedList({ rows, moreRows = [], currency, totalMatched, colorF
   const styles = useStyles();
   const categories = useCategoryLookup();
   const [expanded, setExpanded] = useState(false);
-  const visible = expanded ? [...rows, ...moreRows] : rows;
   // Matched beyond what the answer itself lists, and beyond even the
   // expanded list (past the cap, or an answer stored before more_rows).
   const hidden = totalMatched !== undefined ? Math.max(totalMatched - rows.length, 0) : 0;
   const notShown = expanded ? hidden - moreRows.length : moreRows.length > 0 ? 0 : hidden;
 
+  const renderRow = (row: AnalyticsTxRow, divided: boolean) => (
+    <View key={row.id} style={[styles.row, divided && styles.divider]}>
+      <CategoryTile
+        row={row}
+        category={row.category_id ? categories.get(row.category_id) : undefined}
+        color={row.category_id ? colorFor?.(row.category_id) : undefined}
+      />
+      <View style={styles.middle}>
+        <Text style={styles.title} numberOfLines={1}>
+          {row.category_name}
+        </Text>
+        <Text style={styles.meta} numberOfLines={1}>
+          {shortDate(row.occurred_at)} · {row.wallet_name}
+        </Text>
+      </View>
+      <AmountText amountCents={row.amount} currency={currency} style={styles.amount} />
+    </View>
+  );
+
   return (
     <View>
-      {visible.map((row, i) => (
-        <View key={row.id} style={[styles.row, i > 0 && styles.divider]}>
-          <CategoryTile
-            row={row}
-            category={row.category_id ? categories.get(row.category_id) : undefined}
-            color={row.category_id ? colorFor?.(row.category_id) : undefined}
-          />
-          <View style={styles.middle}>
-            <Text style={styles.title} numberOfLines={1}>
-              {row.category_name}
-            </Text>
-            <Text style={styles.meta} numberOfLines={1}>
-              {shortDate(row.occurred_at)} · {row.wallet_name}
-            </Text>
-          </View>
-          <AmountText amountCents={row.amount} currency={currency} style={styles.amount} />
-        </View>
-      ))}
+      {rows.map((row, i) => renderRow(row, i > 0))}
+      {/* Grows open rather than appearing: the answer, and the thread around
+          it, move with it instead of jumping. */}
+      {moreRows.length > 0 ? (
+        <Collapsible open={expanded}>{moreRows.map((row) => renderRow(row, true))}</Collapsible>
+      ) : null}
 
       {moreRows.length > 0 ? (
         <Pressable

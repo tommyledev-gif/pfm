@@ -1,6 +1,9 @@
-import { ScrollView } from "react-native";
+import { useState } from "react";
+import { GestureResponderEvent, ScrollView, View } from "react-native";
 
-import { spacing, createStyles } from "@/lib/theme";
+import { ActionPopover, PopoverAnchor } from "@/components/shared/ActionPopover";
+import { CalendarIcon, CheckIcon } from "@/components/ui/Icon";
+import { spacing, createStyles, useColors } from "@/lib/theme";
 import { Category } from "@/features/categories/types";
 import { Wallet } from "@/features/wallets/types";
 import { FilterPill } from "@/features/transactions/components/FilterPill";
@@ -13,6 +16,8 @@ interface TransactionsFilterBarProps {
   categoryById: Map<string, Category>;
   /** The applied range, formatted; null while no date filter is set. */
   dateLabel: string | null;
+  /** The currencies the User's wallets are in, the list's own first. */
+  currencies: string[];
   openers: Record<Exclude<TransactionsSheet, "sort">, () => void>;
 }
 
@@ -24,9 +29,24 @@ interface TransactionsFilterBarProps {
 //
 // Still a horizontal scroll, for the one case where applied values (a long
 // wallet name, a custom range) no longer fit side by side.
-export function TransactionsFilterBar({ filters, wallets, categoryById, dateLabel, openers }: TransactionsFilterBarProps) {
+//
+// The currency pill sits beside the wallet one: the list is always in one
+// currency (useTransactionFilters), and this says which, with a small menu to
+// change it. An unset date range is a calendar glyph, not the word "Thời gian".
+export function TransactionsFilterBar({ filters, wallets, categoryById, dateLabel, currencies, openers }: TransactionsFilterBarProps) {
   const styles = useStyles();
-  const { walletId, setWalletId, setDateRange, categoryIds, setCategoryIds } = filters;
+  const { walletId, setWalletId, setDateRange, categoryIds, setCategoryIds, currency, setCurrency } = filters;
+  const [currencyMenu, setCurrencyMenu] = useState<PopoverAnchor | null>(null);
+
+  const openCurrencyMenu = (event: GestureResponderEvent) => {
+    const target = event.currentTarget as unknown as Pick<View, "measureInWindow">;
+    target.measureInWindow((x, y, width, height) => setCurrencyMenu({ x, y, width, height }));
+  };
+  // A wallet in another currency would leave the list empty: it goes.
+  const pickCurrency = (next: string) => {
+    setCurrency(next);
+    if (walletId && wallets?.find((w) => w.id === walletId)?.currency !== next) setWalletId(undefined);
+  };
   // "Ví" still lit when the picked wallet is gone from the list (deleted
   // elsewhere): the filter is on, and its × is how to drop it.
   const walletLabel = walletId ? (wallets?.find((w) => w.id === walletId)?.name ?? "Ví") : null;
@@ -54,8 +74,15 @@ export function TransactionsFilterBar({ filters, wallets, categoryById, dateLabe
         testID="pill-filter-wallet"
       />
       <FilterPill
+        active={false}
+        label={currency ?? currencies[0]}
+        onPress={openCurrencyMenu}
+        testID="pill-filter-currency"
+      />
+      <FilterPill
         active={dateLabel !== null}
         label={dateLabel ?? "Thời gian"}
+        icon={CalendarIcon}
         onPress={openers.date}
         onClear={() => setDateRange({})}
         clearLabel="Bỏ lọc thời gian"
@@ -69,6 +96,19 @@ export function TransactionsFilterBar({ filters, wallets, categoryById, dateLabe
         clearLabel="Bỏ lọc danh mục"
         testID="pill-filter-category"
       />
+
+      <ActionPopover
+        visible={currencyMenu !== null}
+        anchor={currencyMenu}
+        align="left"
+        onClose={() => setCurrencyMenu(null)}
+        actions={currencies.map((code) => ({
+          Icon: code === currency ? CheckIconGreen : NoIcon,
+          label: code,
+          onPress: () => pickCurrency(code),
+          testID: `btn-filter-currency-${code}`,
+        }))}
+      />
     </ScrollView>
   );
 }
@@ -79,3 +119,13 @@ const useStyles = createStyles(() => ({
   scroll: { marginHorizontal: -spacing.xl },
   row: { flexDirection: "row", gap: spacing.sm, paddingHorizontal: spacing.xl },
 }));
+
+// The picked currency is ticked; the others keep the tick's width, so the
+// codes line up.
+function CheckIconGreen({ size }: { size?: number }) {
+  const colors = useColors();
+  return <CheckIcon size={size} color={colors.green} />;
+}
+function NoIcon({ size }: { size?: number }) {
+  return <View style={{ width: size, height: size }} />;
+}

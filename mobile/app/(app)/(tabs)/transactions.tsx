@@ -27,6 +27,7 @@ import { TransactionListRow } from "@/features/transactions/components/Transacti
 import { useCollapsedDays } from "@/features/transactions/hooks/use-collapsed-days";
 import { useFocusTransaction } from "@/features/transactions/hooks/use-focus-transaction";
 import { useTransactionFilters } from "@/features/transactions/hooks/use-transaction-filters";
+import { useWalletCurrencies } from "@/features/transactions/hooks/use-wallet-currencies";
 import { TransactionsHeader, TypeFilterValue } from "@/features/transactions/components/TransactionsHeader";
 import { TransactionsFilterBar } from "@/features/transactions/components/TransactionsFilterBar";
 import { TransactionsFilterSheets } from "@/features/transactions/components/TransactionsFilterSheets";
@@ -41,8 +42,10 @@ const NO_WALLETS: Wallet[] = [];
 
 export default function TransactionsScreen() {
   const styles = useStyles();
-  const filters = useTransactionFilters();
-  const { filter, setFilter, walletId, setWalletId, dateRange, setDateRange, categoryIds, setCategoryIds, sharedFilters } =
+  const wallets = useWalletsQuery();
+  const walletCurrencies = useWalletCurrencies(wallets.data);
+  const filters = useTransactionFilters(walletCurrencies.defaultCurrency);
+  const { filter, setFilter, walletId, dateRange, setDateRange, categoryIds, setCategoryIds, sharedFilters } =
     filters;
   const sheets = useTransactionsSheets();
   const [sortKeys, setSortKeys] = useState<SortKey[]>([]);
@@ -60,7 +63,6 @@ export default function TransactionsScreen() {
     focusDay?: string;
     focusedAt?: string;
   }>();
-  const wallets = useWalletsQuery();
   const categories = useCategoriesQuery();
 
   // A new filter keeps the current rows on screen until its own land, rather
@@ -134,6 +136,7 @@ export default function TransactionsScreen() {
     headerRange,
     categoryIds,
     walletId,
+    filters.currency,
   );
 
   // Export and import act on the period on screen: the date filter, else the
@@ -223,6 +226,7 @@ export default function TransactionsScreen() {
                 wallets={wallets.data}
                 categoryById={categoryById}
                 dateLabel={dateRangeLabel}
+                currencies={walletCurrencies.currencies}
                 openers={sheets.openers}
               />
             }
@@ -260,7 +264,7 @@ export default function TransactionsScreen() {
         onClose={sheets.close}
         wallets={wallets.data ?? NO_WALLETS}
         walletId={walletId}
-        onSelectWallet={setWalletId}
+        onSelectWallet={(id) => filters.selectWallet(id, wallets.data?.find((w) => w.id === id)?.currency)}
         dateRange={dateRange}
         onApplyDateRange={setDateRange}
         categories={categories.data ?? NO_CATEGORIES}

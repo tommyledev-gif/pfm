@@ -27,6 +27,7 @@ WHERE (t.user_id = $1 OR ($13::bool AND $3::uuid IS NOT NULL))
   AND ($7::timestamptz IS NULL OR t.occurred_at >= $7)
   AND ($8::timestamptz IS NULL OR t.occurred_at <= $8)
   AND ($9::text IS NULL OR t.note ILIKE '%' || $9 || '%' ESCAPE '\')
+  AND ($14::text IS NULL OR w.currency = $14)
   AND (
     $10::timestamptz IS NULL
     OR t.occurred_at < $10
@@ -54,6 +55,9 @@ type ListTransactionsByUserParams struct {
 	// set only after the service proved the caller may read that wallet
 	// (specs/shared-wallets plan F1). The SQL ignores it without a WalletID.
 	WalletScoped bool
+	// Currency keeps entries whose wallet is in this currency (the
+	// Transactions screen's currency pill).
+	Currency *string
 }
 
 type ListTransactionsByUserRow struct {
@@ -86,7 +90,7 @@ func (q *Queries) ListTransactionsByUser(ctx context.Context, arg ListTransactio
 	rows, err := q.db.Query(ctx, listTransactionsByUser,
 		arg.UserID, arg.Limit, arg.WalletID, arg.CategoryID, arg.CategoryIDs, arg.Type,
 		arg.FromTs, arg.ToTs, arg.Search, arg.CursorOccurredAt, arg.CursorCreatedAt, arg.CursorID,
-		arg.WalletScoped,
+		arg.WalletScoped, arg.Currency,
 	)
 	if err != nil {
 		return nil, err
@@ -126,6 +130,7 @@ WHERE (t.user_id = $1 OR ($9::bool AND $2::uuid IS NOT NULL))
   AND ($6::timestamptz IS NULL OR t.occurred_at >= $6)
   AND ($7::timestamptz IS NULL OR t.occurred_at <= $7)
   AND ($8::text IS NULL OR t.note ILIKE '%' || $8 || '%' ESCAPE '\')
+  AND ($10::text IS NULL OR w.currency = $10)
 `
 
 type CountTransactionsByUserParams struct {
@@ -139,6 +144,7 @@ type CountTransactionsByUserParams struct {
 	Search      *string
 	// WalletScoped: see ListTransactionsByUserParams.WalletScoped.
 	WalletScoped bool
+	Currency     *string
 }
 
 // CountTransactionsByUser is ListTransactionsByUser's WHERE clause without the
@@ -147,7 +153,7 @@ type CountTransactionsByUserParams struct {
 func (q *Queries) CountTransactionsByUser(ctx context.Context, arg CountTransactionsByUserParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countTransactionsByUser,
 		arg.UserID, arg.WalletID, arg.CategoryID, arg.CategoryIDs, arg.Type,
-		arg.FromTs, arg.ToTs, arg.Search, arg.WalletScoped,
+		arg.FromTs, arg.ToTs, arg.Search, arg.WalletScoped, arg.Currency,
 	)
 	var total int64
 	err := row.Scan(&total)

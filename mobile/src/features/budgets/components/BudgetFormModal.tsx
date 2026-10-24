@@ -22,6 +22,7 @@ import { useCreateBudgetMutation } from "@/features/budgets/api/use-create-budge
 import { useUpdateBudgetMutation } from "@/features/budgets/api/use-update-budget-mutation";
 import { useDeleteBudgetMutation } from "@/features/budgets/api/use-delete-budget-mutation";
 import { Budget } from "@/features/budgets/types";
+import { BudgetFigures } from "@/features/budgets/components/BudgetFigures";
 import { WalletCurrency } from "@/lib/constants";
 
 interface BudgetFormModalProps {
@@ -91,6 +92,8 @@ export function BudgetFormModal({ visible, onClose, currency, editingBudget, pre
   const inheritedIcon = selectedCategory?.icon ?? undefined;
   const inheritedIconUrl = selectedCategory?.icon_url ?? undefined;
 
+  // The saved limit in this currency, and this month's spend against it.
+  const savedLimit = editingBudget?.limits.find((l) => l.currency === currency);
   const amountValue = Number(amount);
   const errors = {
     category: !categoryId ? "Vui lòng chọn danh mục" : undefined,
@@ -166,6 +169,14 @@ export function BudgetFormModal({ visible, onClose, currency, editingBudget, pre
         ) : (
           <CategorySelectField categories={categoryPicker.selected} onPress={categoryPicker.open} />
         )}
+        {savedLimit ? (
+          <BudgetFigures
+            spent={savedLimit.spent}
+            limit={savedLimit.amount_limit}
+            currency={currency}
+            periodLabel="Tháng này"
+          />
+        ) : null}
         {submitAttempted ? <FieldError message={errors.category} /> : null}
         {selectedCategory ? (
           <Text style={styles.iconHint}>Ngân sách dùng luôn biểu tượng của danh mục này.</Text>

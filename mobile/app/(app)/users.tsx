@@ -9,6 +9,8 @@ import { Screen } from "@/components/shared/Screen";
 import { ScreenHeader } from "@/components/shared/ScreenHeader";
 import { matchesSearch } from "@/lib/search-text";
 import { spacing, createStyles } from "@/lib/theme";
+import { useProfileQuery } from "@/features/profile/api/use-profile-query";
+import { DeleteAccountsSection } from "@/features/security/components/DeleteAccountsSection";
 import { useUsersQuery } from "@/features/users/api/use-users-query";
 import { User } from "@/features/users/types";
 import { STATUS_LABEL, UserListItem } from "@/features/users/components/UserListItem";
@@ -34,10 +36,14 @@ interface UserSection {
 // client-side gate, same precedent as frontend/src/app/app/users/page.tsx.
 //
 // Grouped by status, so the rows asking for action sit on top; a search once
-// the household is big enough; inviting is the Fab.
+// the household is big enough; inviting is the Fab. A super admin also gets
+// "Tất cả tài khoản" on top: any account, outside the household too, found
+// and soft-deleted (DeleteAccountsSection).
 export default function UsersScreen() {
   const styles = useStyles();
   const users = useUsersQuery();
+  // The server says who is a super admin (GET /users/me); the app carries no email.
+  const isSuperAdmin = useProfileQuery().data?.can_delete_accounts === true;
   const [inviteOpen, setInviteOpen] = useState(false);
   const [query, setQuery] = useState("");
   // Clear of the floating BottomNav and the Fab, so the last member is never under them.
@@ -89,7 +95,16 @@ export default function UsersScreen() {
           contentContainerStyle={[styles.list, { paddingBottom: clearance }]}
           stickySectionHeadersEnabled={false}
           showsVerticalScrollIndicator={false}
+          // With the account search's keyboard open, the first tap on [Xóa]
+          // has to reach the row, not just close the keyboard.
           keyboardShouldPersistTaps="handled"
+          ListHeaderComponent={
+            isSuperAdmin ? (
+              <View style={styles.allAccounts}>
+                <DeleteAccountsSection />
+              </View>
+            ) : null
+          }
           renderSectionHeader={({ section }) => <ListSectionHeader title={`${section.title} · ${section.data.length}`} />}
           SectionSeparatorComponent={() => <View style={styles.sectionGap} />}
           renderItem={({ item, index, section }) => (
@@ -117,4 +132,5 @@ const useStyles = createStyles(() => ({
   search: { paddingHorizontal: spacing.xl, paddingBottom: spacing.md },
   list: { paddingHorizontal: spacing.xl },
   sectionGap: { height: spacing.sm },
+  allAccounts: { paddingBottom: spacing.xl },
 }));

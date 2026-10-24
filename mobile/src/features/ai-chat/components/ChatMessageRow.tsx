@@ -136,10 +136,12 @@ function ChatMessageRowView({
       onTriggerDelete={onDelete}
       locked={menu.visible}
     >
-      {/* A tombstone speaks for itself — see ChatBubble on the empty text. */}
+      {/* A tombstone speaks for itself — see ChatBubble on the empty text.
+          So does a saved proposal: "1 giao dịch chờ xác nhận." is no longer
+          true once it is saved, and the card already names it and its amount. */}
       <ChatBubble
         role={message.role}
-        text={kind ? "" : message.text}
+        text={kind || (message.confirmed && message.action) ? "" : message.text}
         testID={`msg-chat-${message.id}`}
         onLongPress={menuActions.length > 0 ? menu.open : undefined}
         // Only while a card is actually drawn under the text.

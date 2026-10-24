@@ -55,4 +55,7 @@ type User struct {
 	// Username is the tên đăng nhập chosen at activation (mig 030), lowercase;
 	// nil for accounts activated before it existed. Never changes afterwards.
 	Username *string
+	// IsSuperAdmin (mig 037) opens the account deletion tool, on top of the
+	// admin role. Populated only by GetUserByID.
+	IsSuperAdmin bool
 }

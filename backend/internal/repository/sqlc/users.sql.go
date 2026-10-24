@@ -145,7 +145,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at, invite_sent_at, invite_resend_count, tokens_valid_after, avatar_url, username FROM users
+SELECT id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at, invite_sent_at, invite_resend_count, tokens_valid_after, avatar_url, username, is_super_admin FROM users
 WHERE id = $1
   AND deleted_at IS NULL
 LIMIT 1
@@ -158,7 +158,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.ID, &i.Email, &i.FullName, &i.PasswordHash, &i.Status, &i.Role,
 		&i.InvitedBy, &i.InviteToken, &i.InviteExpiresAt, &i.ActivatedAt,
 		&i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.InviteSentAt, &i.InviteResendCount,
-		&i.TokensValidAfter, &i.AvatarURL, &i.Username,
+		&i.TokensValidAfter, &i.AvatarURL, &i.Username, &i.IsSuperAdmin,
 	)
 	return i, err
 }

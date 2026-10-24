@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
+import { Collapsible } from "@/components/ui/Collapsible";
 import { formatCurrency } from "@/lib/currency";
 import { createStyles, spacing, typography } from "@/lib/theme";
 import { TransactionAdjustmentInput, TransactionItemInput } from "@/features/transactions/types";
@@ -44,8 +45,11 @@ export function ProposalItemsList({ items, adjustments = [], currency, testIDSuf
       >
         <Text style={styles.toggle}>{expanded ? `Ẩn ${items.length} món` : `Xem ${items.length} món`}</Text>
       </Pressable>
-      {expanded
-        ? items.map((item, index) => (
+      {/* Grows open rather than appearing: the card, and the thread around
+          it, move with it instead of jumping. */}
+      <Collapsible open={expanded}>
+        <View style={styles.items}>
+          {items.map((item, index) => (
             <View key={`${index}-${item.name}`} style={styles.row}>
               <View style={styles.nameColumn}>
                 <Text style={styles.name} numberOfLines={2}>
@@ -59,8 +63,9 @@ export function ProposalItemsList({ items, adjustments = [], currency, testIDSuf
               </View>
               <Text style={styles.amount}>{formatCurrency(item.amount, currency)}</Text>
             </View>
-          ))
-        : null}
+          ))}
+        </View>
+      </Collapsible>
       {adjustments.map((adjustment, index) => {
         // Tax, fee and discount carry no direction on the wire (BR-06).
         const direction = adjustment.direction ?? FIXED_DIRECTIONS[adjustment.kind] ?? "add";
@@ -92,6 +97,7 @@ export function ProposalItemsList({ items, adjustments = [], currency, testIDSuf
 
 const useStyles = createStyles((colors) => ({
   container: { gap: spacing.xs },
+  items: { gap: spacing.xs },
   toggle: { ...typography.caption, color: colors.green },
   row: { flexDirection: "row", justifyContent: "space-between", gap: spacing.md },
   nameColumn: { flex: 1 },

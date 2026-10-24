@@ -53,7 +53,9 @@ export const CHAT_MODE_META: Record<ChatMode, ChatModeMeta> = {
     shortLabel: "Giao dịch",
     // No voice input exists, so the copy promises typing only.
     description: "Ghi khoản thu chi bằng một câu.",
-    placeholder: "Mô tả một giao dịch…",
+    // Three full stops, not "…": a phone font with CJK in it draws that one
+    // glyph mid-line, so the hint's dots floated level with its letters.
+    placeholder: "Mô tả một giao dịch...",
     icon: ReceiptIcon,
     get tint() { return colors.green; },
     get accentTo() { return colors.mint; },
@@ -62,7 +64,7 @@ export const CHAT_MODE_META: Record<ChatMode, ChatModeMeta> = {
     label: "Lập ngân sách",
     shortLabel: "Ngân sách",
     description: "Chia thu nhập thành hạn mức theo danh mục.",
-    placeholder: "Mô tả một giao dịch…",
+    placeholder: "Mô tả một giao dịch...",
     icon: TargetIcon,
     get tint() { return colors.lavender; },
     get accentTo() { return colors.periwinkle; },
@@ -71,7 +73,7 @@ export const CHAT_MODE_META: Record<ChatMode, ChatModeMeta> = {
     label: "Hỏi phân tích",
     shortLabel: "Phân tích",
     description: "Hỏi tháng này chi bao nhiêu, mục nào nhiều nhất.",
-    placeholder: "Hỏi về chi tiêu…",
+    placeholder: "Hỏi về chi tiêu...",
     icon: InsightIcon,
     get tint() { return colors.mint; },
     get accentTo() { return colors.info; },

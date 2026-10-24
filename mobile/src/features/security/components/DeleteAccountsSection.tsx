@@ -16,7 +16,8 @@ import { useAccountSearchQuery } from "@/features/security/api/use-account-searc
 import { useDeleteAccountMutation } from "@/features/security/api/use-delete-account-mutation";
 import { AccountSearchRow } from "@/features/security/components/AccountSearchRow";
 
-const TITLE = "Xóa tài khoản";
+const TITLE = "Tất cả tài khoản";
+const FOOTER = "Tìm và xóa bất kỳ tài khoản nào, kể cả ngoài gia đình.";
 const PLACEHOLDER = "Tìm theo email, tên đăng nhập";
 const NO_RESULTS = "Không tìm thấy tài khoản";
 const SEARCH_FAILED = "Chưa tải được kết quả.";
@@ -34,9 +35,10 @@ const confirmMessage = (email: string) =>
 const successMessage = (email: string) => `Đã xóa tài khoản ${email}`;
 
 /**
- * Test-phase tool on the Security screen: find any account by email or tên
- * đăng nhập and soft-delete it. Rendered only when GET /users/me says
- * can_delete_accounts; the server enforces the same on every call.
+ * The super admin's tool on Thành viên (it used to sit on Bảo mật): find any
+ * account by email or tên đăng nhập, in this household or not, and
+ * soft-delete it. Rendered only when GET /users/me says can_delete_accounts
+ * (a super admin, mig 037); the server enforces the same on every call.
  */
 export function DeleteAccountsSection() {
   const colors = useColors();
@@ -71,7 +73,7 @@ export function DeleteAccountsSection() {
   return (
     <>
       {/* One group: the search field as its first row, results under it. */}
-      <ListSection header={TITLE} testID="section-delete-accounts">
+      <ListSection header={TITLE} footer={FOOTER} testID="section-delete-accounts">
         <ListCell>
           <SearchField
             value={query}

@@ -124,8 +124,8 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	// Approve or reject an access request from the app (Thành viên / Thông báo).
 	admin.Post("/users/:id/approve", accessRequestHandler.Approve)
 	admin.Post("/users/:id/reject", accessRequestHandler.Reject)
-	// Test-phase account deletion tool (mobile Security screen). The service
-	// lets through only ACCOUNT_DELETION_OPERATOR_EMAIL (AccountDeletionPolicy),
+	// Account deletion tool (mobile Thành viên screen, super admins). The service
+	// lets through a super admin or ACCOUNT_DELETION_OPERATOR_EMAIL (AccountDeletionPolicy),
 	// on top of the group's role gate.
 	admin.Get("/users/search", accountDeletionHandler.SearchUsers)
 	admin.Delete("/users/:id", accountDeletionHandler.DeleteUser)

@@ -154,6 +154,9 @@ type ListTransactionsQuery struct {
 	// common.TransactionNoteMaxLength (500) purely to bound query size, not a
 	// meaningful UX limit.
 	Search string `query:"search" validate:"omitempty,max=200"`
-	Cursor string `query:"cursor"`
-	Limit  int    `query:"limit" validate:"omitempty,min=1,max=100"`
+	// Currency keeps entries whose wallet is in this currency — the
+	// Transactions screen's currency pill.
+	Currency string `query:"currency" validate:"omitempty,oneof=VND USD"`
+	Cursor   string `query:"cursor"`
+	Limit    int    `query:"limit" validate:"omitempty,min=1,max=100"`
 }

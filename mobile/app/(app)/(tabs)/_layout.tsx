@@ -1,5 +1,6 @@
+import { useEffect } from "react";
 import { Animated, Dimensions, Easing } from "react-native";
-import { Tabs } from "expo-router";
+import { Href, Tabs, useRouter } from "expo-router";
 
 import { useColors } from "@/lib/theme";
 
@@ -11,20 +12,61 @@ import { useColors } from "@/lib/theme";
 // the whole screen lurching.)
 const SWITCH_MS = 260;
 const SLIDE = Math.round(Dimensions.get("window").width * 0.2);
+// The tabs other than the one the app opens on, mounted ahead of their first
+// visit once the app has settled, a little apart, in the order they tend to
+// be opened.
+const PRELOAD_TABS: Href[] = ["/transactions", "/ai-chat", "/insights", "/settings"];
+const PRELOAD_FIRST_MS = 1500;
+const PRELOAD_GAP_MS = 700;
 
-// Driven by the tab navigator itself on a single animated value. `progress`
-// is -1/0/1 for a scene left of / at / right of the active tab, in the bar's
-// order, so its sign is the direction. (bottom-tabs doesn't export its
-// interpolator props type, so the one field used is declared here.)
-function slideInterpolator({ current }: { current: { progress: Animated.Value } }) {
+type SceneStyle = ReturnType<typeof buildSceneStyle>;
+const sceneStyles = new WeakMap<Animated.Value, SceneStyle>();
+
+// `progress` is -1/0/1 for a scene left of / at / right of the active tab, in
+// the bar's order, so its sign is the direction.
+//
+// The scene arriving is always drawn over the one leaving (bottom-tabs gives
+// the focused scene the higher zIndex). So it fades in over the first 40% of
+// its travel while the one under it stays fully opaque, and the one leaving
+// fades only in its last 40%, already covered. They used to fade through
+// each other, both half see-through at the midpoint: the screen dimmed for
+// an instant on every switch.
+function buildSceneStyle(progress: Animated.Value) {
   return {
-    sceneStyle: {
-      opacity: current.progress.interpolate({ inputRange: [-1, -0.4, 0, 0.4, 1], outputRange: [0, 0.5, 1, 0.5, 0] }),
-      transform: [
-        { translateX: current.progress.interpolate({ inputRange: [-1, 0, 1], outputRange: [-SLIDE, 0, SLIDE] }) },
-      ],
-    },
+    opacity: progress.interpolate({ inputRange: [-1, -0.6, 0.6, 1], outputRange: [0, 1, 1, 0], extrapolate: "clamp" }),
+    transform: [{ translateX: progress.interpolate({ inputRange: [-1, 0, 1], outputRange: [-SLIDE, 0, SLIDE] }) }],
   };
+}
+
+// Driven by the tab navigator itself on one animated value per scene.
+// (bottom-tabs doesn't export its interpolator props type, so the one field
+// used is declared here.)
+//
+// ⚠️ Built once per scene and reused. bottom-tabs calls this on every render,
+// and fresh interpolation nodes on a native-driven view make RN Animated drop
+// the old ones and put the view back to its defaults (opacity 1, no shift)
+// until the new ones attach: on the render that starts a switch, the arriving
+// screen showed fully for a frame before its fade began (2026-10-24).
+function slideInterpolator({ current }: { current: { progress: Animated.Value } }) {
+  let sceneStyle = sceneStyles.get(current.progress);
+  if (!sceneStyle) {
+    sceneStyle = buildSceneStyle(current.progress);
+    sceneStyles.set(current.progress, sceneStyle);
+  }
+  return { sceneStyle };
+}
+
+// Mounts each other tab ahead of its first visit (React Navigation's preload,
+// through expo-router's prefetch), so a first tap only switches, instead of
+// building a whole screen while the slide and the nav ball are running.
+function usePreloadTabs() {
+  const router = useRouter();
+  useEffect(() => {
+    const timers = PRELOAD_TABS.map((href, index) =>
+      setTimeout(() => router.prefetch(href), PRELOAD_FIRST_MS + index * PRELOAD_GAP_MS),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [router]);
 }
 
 // The five bottom-nav destinations, as a real tab navigator.
@@ -41,6 +83,7 @@ function slideInterpolator({ current }: { current: { progress: Animated.Value } 
 // built-in bar is switched off.
 export default function TabsLayout() {
   const colors = useColors();
+  usePreloadTabs();
   return (
     <Tabs
       tabBar={() => null}

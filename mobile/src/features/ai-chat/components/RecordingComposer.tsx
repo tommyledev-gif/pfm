@@ -6,6 +6,7 @@ import { onlineManager } from "@tanstack/react-query";
 import { ChatComposer } from "@/features/ai-chat/components/ChatComposer";
 import { ChatInputBar } from "@/features/ai-chat/components/ChatInputBar";
 import { ImageAttachButton } from "@/features/ai-chat/components/ImageAttachButton";
+import { LocationPinToggle } from "@/features/ai-chat/components/LocationPinToggle";
 import { OfflineManualEntryDialog } from "@/features/ai-chat/components/OfflineManualEntryDialog";
 import { PhraseSuggestions } from "@/features/ai-chat/components/PhraseSuggestions";
 import { ChatDraftStore, useChatDraftText } from "@/features/ai-chat/chat-draft";
@@ -104,7 +105,12 @@ export function RecordingComposer({
           autoFocus={autoFocusInput}
           onFocusChange={handleFocusChange}
           focusNonce={inputFocusNonce}
-          leading={<ImageAttachButton disabled={chat.sending} onSend={(uri, caption) => void chat.sendImage(uri, caption)} />}
+          leading={
+            <>
+              <ImageAttachButton disabled={chat.sending} onSend={(uri, caption) => void chat.sendImage(uri, caption)} />
+              <LocationPinToggle />
+            </>
+          }
           aboveInput={
             <PhrasePanel
               open={phrasePanelOpen}

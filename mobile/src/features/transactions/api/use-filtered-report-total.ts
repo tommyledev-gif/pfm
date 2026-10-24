@@ -23,6 +23,8 @@ export function useFilteredReportTotal(
   range: { from?: string; to?: string },
   categoryIds: string[],
   walletId?: string,
+  /** The list's own currency (its currency pill): the total speaks for it, 0 when it has none. */
+  listCurrency?: string,
 ): { total: ReportTotal | null; otherCurrencies: string[]; refetch: () => Promise<unknown> } {
   // No wallet_id key at all when unfiltered, so the query key (and its cache)
   // stays the one every other caller of the period summary shares.
@@ -44,9 +46,11 @@ export function useFilteredReportTotal(
     const filtered = selected
       ? [...new Set((data?.by_category ?? []).filter((c) => selected.has(c.category_id)).map((c) => c.currency))]
       : periodCurrencies;
-    const currency = mainCurrency(filtered.length > 0 ? filtered : periodCurrencies);
+    const currency = listCurrency ?? mainCurrency(filtered.length > 0 ? filtered : periodCurrencies);
     const others = filtered.filter((c) => c !== currency);
-    const summaryTotal = data?.totals.find((t) => t.currency === currency);
+    const summaryTotal =
+      data?.totals.find((t) => t.currency === currency) ??
+      (data && listCurrency ? { currency: listCurrency, total_income: 0, total_expense: 0, net: 0 } : undefined);
     if (!summaryTotal) return { total: null, otherCurrencies: others };
     if (!selected) return { total: summaryTotal, otherCurrencies: others };
 
@@ -66,7 +70,7 @@ export function useFilteredReportTotal(
       total: { currency: summaryTotal.currency, ...totals, net: totals.total_income - totals.total_expense },
       otherCurrencies: others,
     };
-  }, [data, categoryKey]);
+  }, [data, categoryKey, listCurrency]);
 
   return { total, otherCurrencies, refetch };
 }

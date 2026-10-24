@@ -93,6 +93,8 @@ export function ImageAttachButton({ disabled, onSend }: ImageAttachButtonProps) 
         cancelLabel="Để sau"
         onConfirm={() => void attach.acceptNotice()}
         onCancel={attach.declineNotice}
+        // Nothing is removed here: the app's own primary action, not red.
+        tone="default"
         testID="dialog-image-privacy"
       />
 
@@ -107,6 +109,7 @@ export function ImageAttachButton({ disabled, onSend }: ImageAttachButtonProps) 
           void Linking.openSettings();
         }}
         onCancel={attach.closeDenied}
+        tone="default"
         testID="dialog-image-permission"
       />
 

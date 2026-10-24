@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Dimensions, Keyboard, PanResponder, Vibration } from "react-native";
+import { Dimensions, GestureResponderEvent, Keyboard, PanResponder, Vibration } from "react-native";
 import {
   cancelAnimation,
   useDerivedValue,
@@ -24,6 +24,7 @@ import {
   SwipeSide,
   UseSwipeActionsOptions,
 } from "@/components/shared/swipe-config";
+import { markTouchOnRow, registerParkedRow, unregisterParkedRow } from "@/components/shared/swipe-registry";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
@@ -35,19 +36,7 @@ export {
   PARK_THRESHOLD_RATIO,
 } from "@/components/shared/swipe-config";
 
-// Only one row anywhere may be parked at a time. Module-level rather than
-// per-list, because the two surfaces that use this (the chat thread and
-// Home's pending list) are never on screen together but share the rule, and
-// a registry scoped per list would have to be threaded through context for
-// no benefit.
-let closeCurrentlyParked: (() => void) | null = null;
-
-/** Closes whichever row is parked open, if any — for a list's scroll start. */
-export function closeParkedSwipeRow() {
-  const closeParked = closeCurrentlyParked;
-  closeCurrentlyParked = null;
-  closeParked?.();
-}
+export { closeParkedSwipeRow, closeParkedSwipeRowOnOutsideTouch } from "@/components/shared/swipe-registry";
 
 /**
  * The park-and-confirm swipe gesture.
@@ -127,7 +116,7 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
     };
 
     const close = () => {
-      if (closeCurrentlyParked === reset) closeCurrentlyParked = null;
+      unregisterParkedRow(reset);
       // Never from under a finger: the release settles the row.
       if (draggingRef.current) return;
       clearStolenTimer();
@@ -145,8 +134,7 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
       }
       // Whatever else was parked gives way first, so there is never more than
       // one armed destructive button on screen.
-      if (closeCurrentlyParked && closeCurrentlyParked !== reset) closeCurrentlyParked();
-      closeCurrentlyParked = reset;
+      registerParkedRow(reset);
       Vibration.vibrate(PARK_VIBRATION_MS);
       const parkedAt = side === "left" ? maxFor("left") : -maxFor("right");
       // Recorded as where the row now IS, not where the finger let go — the
@@ -266,7 +254,15 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
       onPanResponderTerminate: stolen,
     });
 
-    return { close, nudge, clearStolenTimer, panHandlers: panResponder.panHandlers };
+    return {
+      close,
+      nudge,
+      clearStolenTimer,
+      panHandlers: {
+        ...panResponder.panHandlers,
+        onTouchStart: (event: GestureResponderEvent) => markTouchOnRow(reset, event),
+      },
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

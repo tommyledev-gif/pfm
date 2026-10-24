@@ -36,9 +36,10 @@ func (s *ProfileService) WithAccountDeletionPolicy(p AccountDeletionPolicy) *Pro
 }
 
 // CanDeleteAccounts tells the app whether to show the account deletion tool:
-// the same two gates the tool's routes apply (admin role, configured operator).
+// the same gates the tool's routes apply (admin role, then a super admin or
+// the configured operator).
 func (s *ProfileService) CanDeleteAccounts(user *model.User) bool {
-	return user.Role == model.UserRoleAdmin && s.deletion.IsOperator(user.Email)
+	return user.Role == model.UserRoleAdmin && s.deletion.Grants(user)
 }
 
 func (s *ProfileService) Get(ctx context.Context, userID uuid.UUID) (*model.User, error) {

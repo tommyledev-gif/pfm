@@ -10,7 +10,7 @@ import { Screen } from "@/components/shared/Screen";
 import { ScreenHeader } from "@/components/shared/ScreenHeader";
 import { ScreenLoader } from "@/components/shared/ScreenLoader";
 import { NotificationRow } from "@/features/notifications/components/NotificationRow";
-import { dayLabel } from "@/lib/format-date";
+import { dayLabelVi } from "@/lib/format-date";
 import { useRequireOnline } from "@/lib/connectivity";
 import { matchesSearch } from "@/lib/search-text";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
@@ -110,7 +110,7 @@ export default function NotificationsScreen() {
     const grouped: DaySection[] = [];
     for (const n of items) {
       if (search.trim() && !matchesSearch(`${n.title} ${n.body}`, search)) continue;
-      const label = dayLabel(n.created_at);
+      const label = dayLabelVi(n.created_at);
       const section = grouped.find((g) => g.title === label);
       if (section) section.data.push(n);
       else grouped.push({ title: label, data: [n] });

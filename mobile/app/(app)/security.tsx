@@ -6,10 +6,8 @@ import { Screen } from "@/components/shared/Screen";
 import { ScreenHeader } from "@/components/shared/ScreenHeader";
 import { useFabBottom } from "@/components/ui/Fab";
 import { spacing, createStyles } from "@/lib/theme";
-import { useProfileQuery } from "@/features/profile/api/use-profile-query";
 import { APP_LOCK_FOOTER, AppLockToggleRow } from "@/features/security/components/AppLockToggleRow";
 import { CHANGE_PASSWORD_FOOTER, ChangePasswordRow } from "@/features/security/components/ChangePasswordRow";
-import { DeleteAccountsSection } from "@/features/security/components/DeleteAccountsSection";
 import { DeviceSessionsSection } from "@/features/security/components/DeviceSessionsSection";
 import { IDENTITY_CHECK_FOOTER, IdentityCheckToggleRow } from "@/features/security/components/IdentityCheckToggleRow";
 import { PasskeysSection } from "@/features/security/components/PasskeysSection";
@@ -30,10 +28,6 @@ const PROTECTIONS_HEADER = "Khóa và xác minh";
 // with what it does said once in the group's footer, not in a box per row.
 export default function SecurityScreen() {
   const styles = useStyles();
-  // The server says who may use the account deletion tool (GET /users/me);
-  // the app no longer carries the operator's email.
-  const { data: me } = useProfileQuery();
-  const canDeleteAccounts = me?.can_delete_accounts === true;
   // The floating BottomNav covers the screen's foot, and the account-wide
   // sign-out at the end of the list sat under it.
   const navClearance = useFabBottom();
@@ -55,26 +49,17 @@ export default function SecurityScreen() {
     <ListSection key="revoke-all" footer={REVOKE_ALL_FOOTER}>
       <RevokeAllSessionsRow />
     </ListSection>,
-    canDeleteAccounts ? <DeleteAccountsSection key="delete-accounts" /> : null,
   ];
 
   return (
     <Screen style={styles.screen}>
       <ScreenHeader title={TITLE} backTestID="btn-security-back" />
-      {/* "handled": with the search keyboard open, the first tap on [Xóa] has
-          to reach the row, not just close the keyboard. */}
-      <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: navClearance }]}
-        keyboardShouldPersistTaps="handled"
-        testID="screen-security"
-      >
-        {groups.map((group, index) =>
-          group ? (
-            <MotionView key={group.key} index={index}>
-              {group}
-            </MotionView>
-          ) : null,
-        )}
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: navClearance }]} testID="screen-security">
+        {groups.map((group, index) => (
+          <MotionView key={group.key} index={index}>
+            {group}
+          </MotionView>
+        ))}
       </ScrollView>
     </Screen>
   );

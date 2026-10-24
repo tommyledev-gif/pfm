@@ -12,6 +12,7 @@ import { BrandSplash } from "@/components/shared/BrandSplash";
 import { BusyOverlay } from "@/components/shared/BusyOverlay";
 import { NavigationLogger } from "@/components/debug/NavigationLogger";
 import { ThemeTransitionHost } from "@/components/shared/ThemeTransitionHost";
+import { TooltipHost } from "@/components/shared/TooltipHost";
 import { Toast } from "@/components/shared/Toast";
 import { installConnectivity } from "@/lib/connectivity";
 import { installGlobalErrorLogger } from "@/lib/global-error-logger";
@@ -146,6 +147,8 @@ export default function RootLayout() {
           <BusyOverlay visible={switching} testID="overlay-account-switch" />
           {/* The app PIN keypad (requestPin): above every screen and the app lock. */}
           <PinPromptHost />
+          {/* Held amounts and icon-button hints, over every screen. */}
+          <TooltipHost />
           <Toast />
           {/* An APK too old for the published updates blocks every screen,
               login included, until the newest one is installed. */}
