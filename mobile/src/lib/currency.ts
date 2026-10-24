@@ -71,17 +71,18 @@ export function toMajorUnits(amountCents: number): number {
 // version ("7m1" for anything from 7.05m to 7.15m) that was too coarse to
 // tell 7.08m and 7.1m apart — the leading "~" says plainly that this is a
 // rounded display value, not the exact figure (long-press callers pair this
-// with AmountRevealPopup for the exact one).
-// Magnitude shorthand: k / m / tỷ. Named rather than inlined because
+// with AmountRevealPopup for the exact one). An amount the short form holds
+// exactly (10.000.000 → "10m") has no "~": nothing was rounded.
+// Magnitude shorthand: k / m / b. Named rather than inlined because
 // several screens render these — the Insights donut and stat cards, the
-// Transactions type tabs, Settings' three figures — and an abbreviation that
-// differs between them reads as a different unit, not a different style.
+// Budgets tab, the Transactions type tabs, Settings' three figures — and an
+// abbreviation that differs between them reads as a different unit, not a
+// different style.
 //
-// ⚠️ Thousands are "k", never "ng", and millions are "m", never "tr" — the
-// pair has to match: "7tr100k" mixes a Vietnamese syllable with a Latin
-// letter in one figure, and "7tr100ng" reads as stray syllables. "k" is what
-// a reader already sees on every price tag ("50k"); "m" is its pair.
-const MAGNITUDE_SUFFIX = { thousand: "k", million: "m", billion: "tỷ" } as const;
+// ⚠️ All three Latin, never "ng" / "tr" / "tỷ": "7tr100k" or "1tỷ200m" mixes
+// a Vietnamese syllable with Latin letters in one figure. "k" is what a
+// reader already sees on every price tag ("50k"); "m" and "b" are its pair.
+const MAGNITUDE_SUFFIX = { thousand: "k", million: "m", billion: "b" } as const;
 
 export function formatCurrencyCompact(amountCents: number, currency: string = "VND"): string {
   const amount = Math.round(amountCents / 100);
@@ -106,10 +107,11 @@ export function formatCurrencyCompact(amountCents: number, currency: string = "V
   }
 
   const digits = `${whole}${suffix}${subWhole ? `${subWhole}${subSuffix}` : ""}`;
+  const approx = whole * threshold + subWhole * subUnit === abs ? "" : "~";
   const { symbol, symbolFirst } = currencyParts(currency);
-  // The "~" stays in front of the whole thing either way — it qualifies the
+  // A "~" goes in front of the whole thing either way — it qualifies the
   // figure, so it cannot sit between the symbol and its digits.
-  return symbolFirst ? `~${sign}${symbol}${digits}` : `~${sign}${digits} ${symbol}`;
+  return symbolFirst ? `${approx}${sign}${symbol}${digits}` : `${approx}${sign}${digits} ${symbol}`;
 }
 
 // Symbol AND its placement, both taken from the same formatter the full

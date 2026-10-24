@@ -27,7 +27,7 @@ interface RevealableAmountProps {
 }
 
 /**
- * A compacted amount ("~7tr100k") that gives up the exact figure on a hold,
+ * A compacted amount ("~7m100k") that gives up the exact figure on a hold,
  * in a tooltip pointing back at it.
  *
  * The pairing is the point: compacting alone loses information, so anywhere an

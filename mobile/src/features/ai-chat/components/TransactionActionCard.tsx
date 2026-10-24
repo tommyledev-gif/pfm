@@ -29,6 +29,8 @@ interface TransactionActionCardProps {
   action: ChatAction;
   walletName: string;
   categoryName: string;
+  /** Where it will be pinned, when the location setting is on (useAutoPinLabel). */
+  locationLabel?: string;
   categoryIcon?: string | null;
   categoryIconUrl?: string | null;
   currency: string;
@@ -69,6 +71,7 @@ export function TransactionActionCard({
   action,
   walletName,
   categoryName,
+  locationLabel,
   categoryIcon,
   categoryIconUrl,
   currency,
@@ -210,6 +213,7 @@ export function TransactionActionCard({
           <View style={styles.tagRow}>
             <PillTag label={categoryName} />
             <PillTag label={walletName} />
+            {locationLabel ? <PillTag label={locationLabel} style={styles.locationTag} /> : null}
           </View>
           <ProposalNotices
             lowConfidence={lowConfidence}
@@ -283,7 +287,8 @@ const useStyles = createStyles((colors) => ({
   impactTrack: { flex: 1, minWidth: 40, maxWidth: 110 },
   impactPercent: { ...typography.tiny, minWidth: 30, textAlign: "right" },
   dateLabel: { ...typography.tiny, color: colors.textSecondary },
-  tagRow: { flexDirection: "row", gap: spacing.sm },
+  tagRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  locationTag: { flexShrink: 1 },
   walletRequired: { ...typography.caption, color: colors.mustard },
   actionRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   confirmButton: { flex: 1 },

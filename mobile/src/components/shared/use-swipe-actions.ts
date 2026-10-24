@@ -1,43 +1,39 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Dimensions, Keyboard, PanResponder, Vibration } from "react-native";
+import { Dimensions, Keyboard, PanResponder, Vibration } from "react-native";
+import {
+  cancelAnimation,
+  useDerivedValue,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 
-export type SwipeSide = "left" | "right";
+import {
+  ACTIVATION_DISTANCE,
+  ARM_VIBRATION_MS,
+  CLOSE_SPRING,
+  NUDGE_BACK_SPRING,
+  NUDGE_DISTANCE,
+  NUDGE_OUT_MS,
+  PARK_SPRING,
+  PARK_THRESHOLD_RATIO,
+  PARK_VIBRATION_MS,
+  STOLEN_SETTLE_MS,
+  SwipeActionsState,
+  SwipeSide,
+  UseSwipeActionsOptions,
+} from "@/components/shared/swipe-config";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
-// Travel caps, as a fraction of screen width rather than of the row's own
-// (variable) width, so the gesture feels identical on a short bubble and a
-// long one.
-//
-// The two sides deliberately differ. A non-destructive side only ever has to
-// show a small indicator, and 20% is the feel this app already had. A
-// destructive side has to park open wide enough for a full-size labelled
-// button, which does not fit in 20% of a phone.
-export const EDIT_SWIPE_RATIO = 0.2;
-export const DELETE_SWIPE_RATIO = 0.3;
-
-// Share of the travel past which letting go parks the row open; below it the
-// row snaps closed. The indicator fades in from the first pixel of the drag
-// and is fully visible by here, where the "armed" tick also fires — so the
-// User sees the action early and never has to drag the whole way.
-export const PARK_THRESHOLD_RATIO = 0.5;
-// Past the threshold, the indicator takes on its armed fill over this much
-// more travel, so arming reads as a change rather than a blink.
-export const ARMED_TRANSITION_SPAN = 0.15;
-// Minimum horizontal travel before this row claims the gesture away from a
-// parent list's vertical scroll and any inner Pressable. Small enough that
-// the swipe still feels immediate, large enough that an ordinary scroll or
-// button tap is never misread as a swipe.
-const ACTIVATION_DISTANCE = 10;
-// Two buzzes standing in for haptics (expo-haptics is not a dependency;
-// Vibration is the one haptic-adjacent API react-native ships with): a light
-// tick when the indicator arms, a longer one when the row parks.
-const ARM_VIBRATION_MS = 10;
-const PARK_VIBRATION_MS = 25;
-// The peek that shows a row can be swiped (nudge).
-const NUDGE_DISTANCE = 36;
-const NUDGE_OUT_MS = 260;
-const NUDGE_BACK_MS = 320;
+export type { SwipeActionsState, SwipeSide, SwipeSideConfig } from "@/components/shared/swipe-config";
+export {
+  ARMED_TRANSITION_SPAN,
+  DELETE_SWIPE_RATIO,
+  EDIT_SWIPE_RATIO,
+  PARK_THRESHOLD_RATIO,
+} from "@/components/shared/swipe-config";
 
 // Only one row anywhere may be parked at a time. Module-level rather than
 // per-list, because the two surfaces that use this (the chat thread and
@@ -53,31 +49,6 @@ export function closeParkedSwipeRow() {
   closeParked?.();
 }
 
-export interface SwipeSideConfig {
-  /** Fraction of screen width this side may travel before it parks. */
-  ratio: number;
-}
-
-interface UseSwipeActionsOptions {
-  /** Omit a side to disable dragging that way entirely. */
-  left?: SwipeSideConfig;
-  right?: SwipeSideConfig;
-  disabled?: boolean;
-}
-
-export interface SwipeActionsState {
-  translateX: Animated.Value;
-  /** A one-off peek toward this side and back, to show the row swipes. */
-  nudge: (side: SwipeSide) => void;
-  /** Per-side 0..1 travel fraction, for driving the indicator. */
-  leftProgress: Animated.Value;
-  rightProgress: Animated.Value;
-  /** Which side is parked open, or null. Drives which button is rendered. */
-  parkedSide: SwipeSide | null;
-  close: () => void;
-  panHandlers: ReturnType<typeof PanResponder.create>["panHandlers"];
-}
-
 /**
  * The park-and-confirm swipe gesture.
  *
@@ -87,16 +58,29 @@ export interface SwipeActionsState {
  * made an accidental flick destroy a record, and no amount of confirmation
  * downstream fixes a gesture that has already acted.
  *
- * Plain PanResponder + Animated: react-native-gesture-handler and reanimated
- * are not dependencies of this project (mobile/package.json).
+ * ⚠️ While the finger is down, only the finger moves the row (2026-10-24).
+ * A close signal (the list changing or scrolling, a hold menu locking the
+ * row) and a parent list taking the touch for a moment each used to spring
+ * the row home or open mid-drag, and the next move put it back under the
+ * finger: the row shook from side to side under a finger held half way.
+ * Now nothing settles the row before the finger lets go.
+ *
+ * PanResponder for the touch (react-native-gesture-handler is not a
+ * dependency), Reanimated for the motion: the row's position lives on the UI
+ * thread, so a re-render never writes a stale one back, and a grab mid-spring
+ * starts from where the row is, not from where it was headed.
  */
 export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOptions): SwipeActionsState {
-  const translateX = useRef(new Animated.Value(0)).current;
-  // Kept apart from translateX because color interpolation exists only on the
-  // JS driver, while the transform wants the native one — feeding one from the
-  // other would mix drivers on a single animated node, which RN rejects.
-  const leftProgress = useRef(new Animated.Value(0)).current;
-  const rightProgress = useRef(new Animated.Value(0)).current;
+  const translateX = useSharedValue(0);
+  const leftMax = left ? SCREEN_WIDTH * left.ratio : 0;
+  const rightMax = right ? SCREEN_WIDTH * right.ratio : 0;
+  // Read off the row's own position, so they can never disagree with it.
+  const leftProgress = useDerivedValue(() =>
+    leftMax > 0 ? Math.min(Math.max(translateX.value / leftMax, 0), 1) : 0,
+  );
+  const rightProgress = useDerivedValue(() =>
+    rightMax > 0 ? Math.min(Math.max(-translateX.value / rightMax, 0), 1) : 0,
+  );
 
   const [parkedSide, setParkedSide] = useState<SwipeSide | null>(null);
 
@@ -107,6 +91,9 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
   // from an already-parked position must be measured from where the row is.
   const baseRef = useRef(0);
   const offsetRef = useRef(0);
+  // A finger is on the row.
+  const draggingRef = useRef(false);
+  const stolenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // PanResponder.create runs once, so anything it reads has to come through a
   // ref or it freezes at its first-render value.
@@ -123,10 +110,14 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
       return config ? SCREEN_WIDTH * config.ratio : 0;
     };
 
+    const clearStolenTimer = () => {
+      if (stolenTimerRef.current === null) return;
+      clearTimeout(stolenTimerRef.current);
+      stolenTimerRef.current = null;
+    };
+
     const reset = () => {
-      Animated.spring(translateX, { toValue: 0, useNativeDriver: true, bounciness: 6 }).start();
-      Animated.timing(leftProgress, { toValue: 0, duration: 180, useNativeDriver: false }).start();
-      Animated.timing(rightProgress, { toValue: 0, duration: 180, useNativeDriver: false }).start();
+      translateX.value = withSpring(0, CLOSE_SPRING);
       armedRef.current = false;
       pastThresholdRef.current = false;
       activeSideRef.current = null;
@@ -137,6 +128,9 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
 
     const close = () => {
       if (closeCurrentlyParked === reset) closeCurrentlyParked = null;
+      // Never from under a finger: the release settles the row.
+      if (draggingRef.current) return;
+      clearStolenTimer();
       // Already at rest: nothing to animate. Close signals reach every row
       // in a list, and only the parked one has work to do.
       if (offsetRef.current === 0 && activeSideRef.current === null) return;
@@ -158,8 +152,7 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
       // Recorded as where the row now IS, not where the finger let go — the
       // next drag (e.g. swiping it closed) is measured from here.
       offsetRef.current = parkedAt;
-      (side === "left" ? leftProgress : rightProgress).setValue(1);
-      Animated.spring(translateX, { toValue: parkedAt, useNativeDriver: true, bounciness: 0 }).start();
+      translateX.value = withSpring(parkedAt, PARK_SPRING);
       setParkedSide(side);
     };
 
@@ -167,21 +160,17 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
     // little toward the side, letting that action's indicator show, then
     // settles back. A finger landing mid-peek takes over (grant stops it).
     const nudge = (side: SwipeSide) => {
-      if (offsetRef.current !== 0 || activeSideRef.current !== null || !maxFor(side)) return;
+      if (offsetRef.current !== 0 || activeSideRef.current !== null || draggingRef.current || !maxFor(side)) return;
       const distance = Math.min(NUDGE_DISTANCE, maxFor(side) * 0.4);
-      const target = side === "left" ? distance : -distance;
-      const progress = side === "left" ? leftProgress : rightProgress;
-      Animated.sequence([
-        Animated.timing(translateX, { toValue: target, duration: NUDGE_OUT_MS, useNativeDriver: true }),
-        Animated.spring(translateX, { toValue: 0, useNativeDriver: true, damping: 14, stiffness: 180 }),
-      ]).start();
-      Animated.sequence([
-        Animated.timing(progress, { toValue: distance / maxFor(side), duration: NUDGE_OUT_MS, useNativeDriver: false }),
-        Animated.timing(progress, { toValue: 0, duration: NUDGE_BACK_MS, useNativeDriver: false }),
-      ]).start();
+      translateX.value = withSequence(
+        withTiming(side === "left" ? distance : -distance, { duration: NUDGE_OUT_MS }),
+        withSpring(0, NUDGE_BACK_SPRING),
+      );
     };
 
-    const release = () => {
+    // Where the finger left the row decides — no velocity shortcut, which
+    // keeps the outcome predictable.
+    const settle = () => {
       // Re-checked here and not only at grant time: a row that becomes
       // disabled mid-drag must release into nothing.
       if (!pastThresholdRef.current || disabledRef.current) {
@@ -189,6 +178,25 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
         return;
       }
       park();
+    };
+
+    const release = () => {
+      clearStolenTimer();
+      draggingRef.current = false;
+      settle();
+    };
+
+    // ⚠️ A parent list that takes the touch for a moment and hands it back
+    // used to get a settle (home or open) each time, then the finger again:
+    // the back-and-forth shake. The row stays where the finger left it and
+    // settles only if the touch does not come back.
+    const stolen = () => {
+      draggingRef.current = false;
+      clearStolenTimer();
+      stolenTimerRef.current = setTimeout(() => {
+        stolenTimerRef.current = null;
+        settle();
+      }, STOLEN_SETTLE_MS);
     };
 
     const panResponder = PanResponder.create({
@@ -214,13 +222,16 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
       onPanResponderTerminationRequest: () => false,
       onShouldBlockNativeResponder: () => true,
       onPanResponderGrant: () => {
-        // ⚠️ Whatever spring is still running (the row settling from the last
-        // release, a peek) stops here. Left running, it kept writing the row's
-        // position while the finger did too, and the row shook between the two.
-        translateX.stopAnimation();
-        leftProgress.stopAnimation();
-        rightProgress.stopAnimation();
-        baseRef.current = offsetRef.current;
+        clearStolenTimer();
+        draggingRef.current = true;
+        // ⚠️ Picked up from where the row IS. A running spring (the last
+        // release settling, a peek) stops here; left running it kept writing
+        // the row's position while the finger did too. And the drag goes on
+        // from the spot it stopped at, not from where it was headed.
+        cancelAnimation(translateX);
+        const current = translateX.value;
+        baseRef.current = current;
+        offsetRef.current = current;
         // Picking a parked row back up turns its button back into the
         // drag indicator, so it fades with the travel as the row closes.
         // Releasing past the threshold parks it again.
@@ -234,15 +245,13 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
         const total = baseRef.current + gesture.dx;
         const clamped = Math.max(-maxFor("right"), Math.min(maxFor("left"), total));
         offsetRef.current = clamped;
-        translateX.setValue(clamped);
+        translateX.value = clamped;
 
         const side: SwipeSide | null = clamped > 0 ? "left" : clamped < 0 ? "right" : null;
         if (side) activeSideRef.current = side;
 
         const cap = side ? maxFor(side) : 0;
         const fraction = cap > 0 ? Math.abs(clamped) / cap : 0;
-        leftProgress.setValue(side === "left" ? fraction : 0);
-        rightProgress.setValue(side === "right" ? fraction : 0);
 
         if (fraction >= PARK_THRESHOLD_RATIO && !armedRef.current) {
           armedRef.current = true;
@@ -251,25 +260,25 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
           armedRef.current = false;
         }
 
-        // No velocity shortcut: where the finger is on release decides,
-        // which keeps the outcome predictable.
         pastThresholdRef.current = cap > 0 && fraction >= PARK_THRESHOLD_RATIO;
       },
       onPanResponderRelease: release,
-      // ⚠️ A stolen gesture settles exactly like a release. It used to snap
-      // the row home, and when a parent scroll took the touch for a moment
-      // and gave it back, the row snapped home and jumped back under the
-      // finger over and over: the back-and-forth shake.
-      onPanResponderTerminate: release,
+      onPanResponderTerminate: stolen,
     });
 
-    return { close, nudge, panHandlers: panResponder.panHandlers };
+    return { close, nudge, clearStolenTimer, panHandlers: panResponder.panHandlers };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // A row that unmounts while parked must not leave the registry pointing at
-  // a reset that can no longer run.
-  useEffect(() => state.close, [state.close]);
+  // a reset that can no longer run, nor a settle timer running.
+  useEffect(
+    () => () => {
+      state.clearStolenTimer();
+      state.close();
+    },
+    [state],
+  );
 
   return {
     translateX,
@@ -281,4 +290,3 @@ export function useSwipeActions({ left, right, disabled }: UseSwipeActionsOption
     panHandlers: state.panHandlers,
   };
 }
-

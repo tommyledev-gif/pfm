@@ -1,5 +1,6 @@
 import { memo, useEffect, useRef, useState } from "react";
-import { Animated, LayoutChangeEvent, Pressable, View } from "react-native";
+import { LayoutChangeEvent, Pressable, View } from "react-native";
+import Animated from "react-native-reanimated";
 import { useRouter, usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
@@ -12,6 +13,7 @@ import {
   TransactionsTabIcon,
 } from "@/components/shared/nav-icons";
 import { NavBallLight } from "@/components/shared/NavBallLight";
+import { NavIconFade } from "@/components/shared/NavIconFade";
 import { useNavBallMotion } from "@/components/shared/use-nav-ball-motion";
 import { useColors } from "@/lib/theme";
 import {
@@ -76,7 +78,7 @@ interface BottomNavProps {
 // button.
 //
 // ballX is the single source of truth for both the ball and the hollow cut
-// out of the bar behind it — they read the same Animated.Value, offset by a
+// out of the bar behind it — they read the same shared value, offset by a
 // static left, so they can never drift out of sync with each other.
 export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavProps) {
   const colors = useColors();
@@ -108,9 +110,9 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
   const tabRects = useRef<{ x: number; width: number }[]>([]);
   const positioned = useRef(false);
   const lastAnimatedIndex = useRef(activeIndex);
-  const ball = useNavBallMotion(TABS.length, Math.max(activeIndex, 0));
-  const { ballOpacity, ballX, iconScale, ballIconOpacities, rowOpacities, bob } = ball;
-  const { ballScaleX, ballScaleY, ballBobY, bandCoverOpacity, followBall } = ball;
+  const ball = useNavBallMotion(Math.max(activeIndex, 0));
+  const { ballOpacity, ballX, bobPhase, activeIcon, initialIcon } = ball;
+  const { followBall, revealFollow, bandCover, ballStyle, iconPop } = ball;
   const ballTarget = (index: number) => {
     const rect = tabRects.current[index];
     return rect ? rect.x + rect.width / 2 - BALL_SIZE / 2 : null;
@@ -151,7 +153,7 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
         </Svg>
       </Animated.View>
       <Animated.View pointerEvents="none" style={[styles.bandFillerRight, followBall]} />
-      <Animated.View pointerEvents="none" style={[styles.bandCover, { opacity: bandCoverOpacity }]} />
+      <Animated.View pointerEvents="none" style={[styles.bandCover, bandCover]} />
       <View style={[styles.pill, { paddingBottom: insets.bottom }]}>
         <View style={styles.tabRow}>
           {TABS.map(({ href, Icon, label }, index) => (
@@ -170,7 +172,7 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
                 // the same batch, the navigation's render — a whole screen on
                 // a first visit — ran before the effect that starts the ball,
                 // so the ball sat still and then caught up late. Started here
-                // it runs on the native driver while JS mounts the screen.
+                // it runs on the UI thread while JS mounts the screen.
                 const x = ballTarget(index);
                 if (x !== null && lastAnimatedIndex.current !== index) {
                   lastAnimatedIndex.current = index;
@@ -182,9 +184,9 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
               style={styles.tab}
               hitSlop={8}
             >
-              <Animated.View style={{ opacity: rowOpacities[index] }}>
+              <NavIconFade index={index} activeIcon={activeIcon} initiallyActive={index === initialIcon} onBall={false}>
                 <Icon size={22} color={colors.textSecondary} weight="regular" />
-              </Animated.View>
+              </NavIconFade>
             </Pressable>
           ))}
         </View>
@@ -192,54 +194,31 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
       {/* Top hairline: two straight halves that stop where the hollow's
           rounded corners begin, joined by the hollow's own outline — see
           RIM_PATH. All three are translated by the same ballX as the ball, so
-          the hollow tracks it on the native driver. */}
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.topLine,
-          { left: LINE_LEFT_END, opacity: ballOpacity, transform: [{ translateX: ballX }] },
-        ]}
-      />
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.topLine,
-          { left: LINE_RIGHT_START, opacity: ballOpacity, transform: [{ translateX: ballX }] },
-        ]}
-      />
-      <Animated.View
-        pointerEvents="none"
-        style={[styles.rim, { opacity: ballOpacity, transform: [{ translateX: ballX }] }]}
-      >
+          the hollow tracks it on the UI thread. */}
+      <Animated.View pointerEvents="none" style={[styles.topLine, { left: LINE_LEFT_END }, revealFollow]} />
+      <Animated.View pointerEvents="none" style={[styles.topLine, { left: LINE_RIGHT_START }, revealFollow]} />
+      <Animated.View pointerEvents="none" style={[styles.rim, revealFollow]}>
         <Svg width="100%" height="100%">
           <Path d={RIM_PATH} stroke={colors.navBorder} strokeWidth={HAIRLINE} fill="none" />
         </Svg>
       </Animated.View>
       {/* Over the hollow and its rim, under the ball that casts it. */}
-      <NavBallLight ballX={ballX} bob={bob} opacity={ballOpacity} />
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.ball,
-          {
-            opacity: ballOpacity,
-            transform: [
-              { translateX: ballX },
-              { translateY: ballBobY },
-              { scaleX: ballScaleX },
-              { scaleY: ballScaleY },
-            ],
-          },
-        ]}
-      >
-        {TABS.map(({ href, Icon }, index) => (
-          <Animated.View
-            key={href}
-            style={[styles.ballIcon, { opacity: ballIconOpacities[index], transform: [{ scale: iconScale }] }]}
-          >
-            <Icon size={22} color={colors.onGreen} weight="fill" />
-          </Animated.View>
-        ))}
+      <NavBallLight ballX={ballX} bobPhase={bobPhase} opacity={ballOpacity} />
+      <Animated.View pointerEvents="none" style={[styles.ball, ballStyle]}>
+        <Animated.View style={[styles.ballIcons, iconPop]}>
+          {TABS.map(({ href, Icon }, index) => (
+            <NavIconFade
+              key={href}
+              index={index}
+              activeIcon={activeIcon}
+              initiallyActive={index === initialIcon}
+              onBall
+              style={styles.ballIcon}
+            >
+              <Icon size={22} color={colors.onGreen} weight="fill" />
+            </NavIconFade>
+          ))}
+        </Animated.View>
       </Animated.View>
     </View>
   );

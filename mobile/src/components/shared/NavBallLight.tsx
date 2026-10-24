@@ -1,5 +1,6 @@
-import { memo, useMemo } from "react";
-import { Animated } from "react-native";
+import { memo } from "react";
+import { StyleSheet } from "react-native";
+import Animated, { SharedValue, useAnimatedStyle } from "react-native-reanimated";
 import Svg, { Defs, Ellipse, Path, RadialGradient, Stop } from "react-native-svg";
 
 import {
@@ -10,6 +11,7 @@ import {
   hollowPathAt,
   rimPathAt,
 } from "@/components/shared/bottom-nav-styles";
+import { bobAt } from "@/components/shared/use-nav-ball-motion";
 import { useColors, useThemeDefinition } from "@/lib/theme";
 
 // The light's own box: wider than the hollow so the glow can spill onto the
@@ -40,11 +42,11 @@ const RIM = rimPathAt(CX);
 
 interface NavBallLightProps {
   /** The ball's left edge — the same value that moves the ball and its hollow. */
-  ballX: Animated.Value;
-  /** The ball's idle float, 0 seated → 1 raised. */
-  bob: Animated.AnimatedInterpolation<number>;
+  ballX: SharedValue<number>;
+  /** The ball's idle float, as a phase (see bobAt). */
+  bobPhase: SharedValue<number>;
   /** Hides the light with the ball until the tab row is measured. */
-  opacity: Animated.Value;
+  opacity: SharedValue<number>;
 }
 
 /**
@@ -54,33 +56,22 @@ interface NavBallLightProps {
  * meets the hollow's curved edge.
  *
  * Gradients only — no blur filter, which react-native-svg cannot be relied on
- * for — and one SVG riding ballX on the native driver, like the hollow itself.
+ * for — and one SVG riding ballX on the UI thread, like the hollow itself.
  * The light theme keeps the plain ball: on white this reads as a smudge.
  */
-export const NavBallLight = memo(function NavBallLight({ ballX, bob, opacity }: NavBallLightProps) {
+export const NavBallLight = memo(function NavBallLight({ ballX, bobPhase, opacity }: NavBallLightProps) {
   const colors = useColors();
   const { isDark } = useThemeDefinition();
-  const lightOpacity = useMemo(
-    () => Animated.multiply(opacity, bob.interpolate({ inputRange: [0, 1], outputRange: [1, RAISED_INTENSITY] })),
-    [opacity, bob],
-  );
+  const lit = useAnimatedStyle(() => ({
+    opacity: opacity.value * (1 - (1 - RAISED_INTENSITY) * bobAt(bobPhase.value)),
+    transform: [{ translateX: ballX.value }],
+  }));
   if (!isDark) return null;
 
   const glow = colors.navGlow;
 
   return (
-    <Animated.View
-      pointerEvents="none"
-      style={{
-        position: "absolute",
-        top: 0,
-        left: BALL_SIZE / 2 - HALF_WIDTH,
-        width: WIDTH,
-        height: PILL_HEIGHT,
-        opacity: lightOpacity,
-        transform: [{ translateX: ballX }],
-      }}
-    >
+    <Animated.View pointerEvents="none" style={[styles.box, lit]}>
       <Svg width={WIDTH} height={PILL_HEIGHT}>
         <Defs>
           <RadialGradient id="glow" gradientUnits="userSpaceOnUse" cx={CX} cy={GLOW_CY} rx={GLOW_RX} ry={GLOW_RY}>
@@ -108,4 +99,8 @@ export const NavBallLight = memo(function NavBallLight({ ballX, bob, opacity }: 
       </Svg>
     </Animated.View>
   );
+});
+
+const styles = StyleSheet.create({
+  box: { position: "absolute", top: 0, left: BALL_SIZE / 2 - HALF_WIDTH, width: WIDTH, height: PILL_HEIGHT },
 });

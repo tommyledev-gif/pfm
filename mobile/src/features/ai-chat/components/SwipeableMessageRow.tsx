@@ -1,5 +1,6 @@
 import { ReactNode, useEffect } from "react";
-import { Animated, Dimensions, StyleSheet, View } from "react-native";
+import { Dimensions, StyleSheet, View } from "react-native";
+import Animated, { useAnimatedStyle } from "react-native-reanimated";
 
 import { SwipeAction, SwipeActionButton } from "@/components/shared/SwipeActionButton";
 import { DELETE_SWIPE_RATIO, EDIT_SWIPE_RATIO, useSwipeActions } from "@/components/shared/use-swipe-actions";
@@ -71,7 +72,8 @@ export function SwipeableMessageRow({
     disabled: Boolean(locked) || (disabled && !onTriggerDelete),
   });
 
-  const { close } = swipe;
+  const { close, translateX } = swipe;
+  const slide = useAnimatedStyle(() => ({ transform: [{ translateX: translateX.value }] }));
   // Locking also closes a row left parked open, so the popover never sits
   // beside a half-revealed Edit/Delete button offering the same actions.
   useEffect(() => {
@@ -128,7 +130,7 @@ export function SwipeableMessageRow({
           />
         );
       })}
-      <Animated.View style={{ transform: [{ translateX: swipe.translateX }] }}>
+      <Animated.View style={slide}>
         {children}
       </Animated.View>
     </View>

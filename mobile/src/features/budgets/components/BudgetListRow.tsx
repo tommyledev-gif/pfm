@@ -2,7 +2,7 @@ import { memo } from "react";
 import { Pressable, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 
-import { formatCurrency } from "@/lib/currency";
+import { formatCurrencyCompact } from "@/lib/currency";
 import { formatPercent } from "@/lib/percent";
 import { useHoldProgress } from "@/lib/use-hold-progress";
 import { withAlpha } from "@/lib/color";
@@ -41,7 +41,9 @@ interface BudgetListRowProps {
 // overspent) called out on the right, and the raw spent/limit pair underneath.
 //
 // Tap-to-edit and the 2s hold that opens the category picker are carried over
-// from the card unchanged.
+// from the card unchanged. Amounts are short (k / m / b, formatCurrencyCompact)
+// as on the Spending tab next door; the exact limit is in the edit form, the
+// exact spend in the bar's transactions sheet.
 export const BudgetListRow = memo(function BudgetListRow({
   budget,
   limit,
@@ -82,7 +84,7 @@ export const BudgetListRow = memo(function BudgetListRow({
         {/* What was spent, in the header's corner. Over-budget turns it red;
             otherwise it stays plain — the bar and caption below carry pace. */}
         <Text style={[styles.headline, status.over && styles.headlineOver]} numberOfLines={1}>
-          {formatCurrency(limit.spent, limit.currency)}
+          {formatCurrencyCompact(limit.spent, limit.currency)}
         </Text>
       </View>
 
@@ -103,10 +105,10 @@ export const BudgetListRow = memo(function BudgetListRow({
             times (385% — đã vượt, vượt 5.280.000 đ, 7.130.000 / 1.850.000). */}
         <View style={styles.footRow}>
           <Text style={[styles.caption, { color: status.over ? colors.danger : status.color }]} numberOfLines={1}>
-            {formatPercent(status.ratio * 100)} · {status.over ? "Vượt" : "Còn"} {formatCurrency(Math.abs(status.remaining), limit.currency)}
+            {formatPercent(status.ratio * 100)} · {status.over ? "Vượt" : "Còn"} {formatCurrencyCompact(Math.abs(status.remaining), limit.currency)}
           </Text>
           <Text style={styles.amounts} numberOfLines={1}>
-            Hạn mức: {formatCurrency(limit.amount_limit, limit.currency)}
+            Hạn mức: {formatCurrencyCompact(limit.amount_limit, limit.currency)}
           </Text>
         </View>
 

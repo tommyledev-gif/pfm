@@ -13,8 +13,8 @@ export interface User {
   role: UserRole;
   activated_at: string | null;
   created_at: string;
-  // Public URL of the uploaded avatar; null = none. Filled by GET /users/me
-  // and the account-switch responses, null in the admin user list.
+  // Public URL of the uploaded avatar; null = none. Filled by GET /users/me,
+  // the account-switch responses and the admin user list.
   avatar_url: string | null;
   // Pending users only: the earliest moment POST
   // /admin/users/:id/resend-invite accepts (1 minute after the invite, then

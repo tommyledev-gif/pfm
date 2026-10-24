@@ -1,4 +1,4 @@
-import { RefObject, useCallback, useMemo, useState } from "react";
+import { RefObject, useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, LayoutChangeEvent, ListRenderItemInfo, StyleSheet, View } from "react-native";
 
 import { closeParkedSwipeRow } from "@/components/shared/use-swipe-actions";
@@ -12,6 +12,7 @@ import { RecordingEmptyState } from "@/features/ai-chat/components/RecordingEmpt
 import { useChatThreadStyles } from "@/features/ai-chat/components/chat-thread-styles";
 import { ChatDraftStore } from "@/features/ai-chat/chat-draft";
 import { ChatMode } from "@/features/ai-chat/chat-mode";
+import { pinFreshProposals, withAutoPin } from "@/features/ai-chat/proposal-auto-pin";
 import { useChatActions } from "@/features/ai-chat/hooks/use-chat-actions";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
@@ -24,6 +25,7 @@ import { PROPOSAL_CURRENCY } from "@/lib/constants";
 import { useLatestCallback } from "@/lib/use-latest-callback";
 import { useColors } from "@/lib/theme";
 import { useChatStore } from "@/stores/chat-store";
+import { useUiPrefsStore } from "@/stores/ui-prefs-store";
 
 // Retry delay when a deep-linked row had not been measured yet.
 const FOCUS_RETRY_DELAY_MS = 100;
@@ -111,9 +113,20 @@ export function RecordingPane({
     return map;
   }, [budgets.data]);
 
+  // "Ghim vị trí khi tạo giao dịch" (Cài đặt người dùng) covers what is
+  // recorded here too: a fresh proposal gets the device's position as soon
+  // as there is one. Saving never waits for it — a save that beats the fix
+  // is pinned when the fix lands (proposal-auto-pin.ts).
+  const pinByDefault = useUiPrefsStore((s) => s.pinLocationByDefault);
+  useEffect(() => {
+    if (pinByDefault && !loading) pinFreshProposals(messages);
+  }, [messages, pinByDefault, loading]);
+
   // Stable identities, so a memoized row re-renders only when its own message
   // (or its confirming flag) changes.
-  const handleConfirm = useLatestCallback((message: ChatMessage) => requireOnline(() => chat.confirmAction(message)));
+  const handleConfirm = useLatestCallback((message: ChatMessage) =>
+    requireOnline(() => chat.confirmAction(withAutoPin(message))),
+  );
   const handleTriggerEdit = useLatestCallback(onTriggerEdit);
   const handleTriggerDelete = useLatestCallback(onTriggerDelete);
   const handlePressHistory = useLatestCallback(onPressHistory);

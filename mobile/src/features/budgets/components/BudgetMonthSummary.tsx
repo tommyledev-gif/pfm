@@ -1,6 +1,7 @@
 import { Text, View } from "react-native";
 
-import { formatCurrency } from "@/lib/currency";
+import { RevealableAmount } from "@/components/shared/RevealableAmount";
+import { formatCurrencyCompact } from "@/lib/currency";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { MonthPace } from "@/features/budgets/budget-pace";
 import { BudgetProgressBar } from "@/features/budgets/components/BudgetProgressBar";
@@ -55,21 +56,20 @@ export function BudgetMonthSummary({
       {/* ⚠️ Two lines, never one clipped one. These used to share a single
           numberOfLines={1} line, which fit at a glance but cut the limit
           mid-number ("7.210.000 đ còn lại trên 7.21…") — a figure the user
-          could see was there but not read. The headline amount shrinks to fit
-          its own line rather than clip; the "of the limit" line can wrap. */}
+          could see was there but not read. Both figures are short now
+          (k / m / b, as on the Spending tab); holding the headline shows it
+          exact. The "of the limit" line can wrap. */}
       <View style={styles.amountBlock}>
-        <Text
+        <RevealableAmount
+          amountCents={Math.abs(remaining)}
+          currency={currency}
           style={[styles.amount, over && styles.amountOver]}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.6}
+          containerStyle={styles.amountTarget}
           testID="text-budget-summary-remaining"
-        >
-          {formatCurrency(Math.abs(remaining), currency)}
-        </Text>
+        />
         <Text style={styles.amountSuffix}>
           {over ? "vượt hạn mức " : "còn lại trong hạn mức "}
-          <Text style={styles.amountLimit}>{formatCurrency(totalLimit, currency)}</Text>
+          <Text style={styles.amountLimit}>{formatCurrencyCompact(totalLimit, currency)}</Text>
         </Text>
       </View>
 
@@ -91,6 +91,8 @@ const useStyles = createStyles((colors) => ({
   month: { ...typography.cardTitle, color: colors.textPrimary },
   daysLeft: { ...typography.caption, color: colors.textSecondary },
   amountBlock: { gap: 2 },
+  // The hold target hugs the figure instead of the whole row.
+  amountTarget: { alignSelf: "flex-start" },
   amount: { ...typography.hero, color: colors.textPrimary },
   amountOver: { color: colors.peach },
   amountSuffix: { ...typography.body, color: colors.textSecondary, fontWeight: "600" },

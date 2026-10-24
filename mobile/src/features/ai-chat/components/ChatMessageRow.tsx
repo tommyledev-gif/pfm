@@ -12,6 +12,7 @@ import { TransactionTombstoneCard } from "@/features/ai-chat/components/Transact
 import { useHoldMenu } from "@/features/ai-chat/hooks/use-hold-menu";
 import { useMessageActions } from "@/features/ai-chat/hooks/use-message-actions";
 import { isEditLocked } from "@/features/ai-chat/edit-lock";
+import { useAutoPinLabel } from "@/features/ai-chat/proposal-auto-pin";
 import { proposalCategoryName } from "@/features/ai-chat/proposal-kind";
 import { isSavableProposal, proposalLinesGap, proposalWalletName } from "@/features/ai-chat/proposal-wallet";
 import { isRemovable, tombstoneKind } from "@/features/ai-chat/tombstone";
@@ -112,6 +113,7 @@ function ChatMessageRowView({
     (message.action && proposalCategoryName(message.action.payload, (id) => categoryById.get(id)?.name)) || "Danh mục";
   const onEdit = isEditLocked(message) ? undefined : () => onTriggerEdit(message);
   const onDelete = isRemovable(message) ? () => onTriggerDelete(message) : undefined;
+  const locationLabel = useAutoPinLabel(message);
 
   const entering = useFreshEntrance(messageCreatedAt(message.id));
   const menu = useHoldMenu();
@@ -159,6 +161,7 @@ function ChatMessageRowView({
             budgetSpent={budget?.spent}
             walletName={walletName}
             categoryName={categoryName}
+            locationLabel={locationLabel}
             categoryIcon={isTransfer ? TRANSFER_CATEGORY_ICON : category?.icon}
             categoryIconUrl={category?.icon_url}
             currency={currency}

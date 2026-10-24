@@ -4,15 +4,17 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { BellIcon, TargetIcon, UserIcon, UsersIcon } from "@/components/ui/Icon";
 import { IconProps } from "@/components/ui/icons/primitives";
 import { formatTime } from "@/lib/format-date";
+import { LIST_ROW_PADDING_X } from "@/components/ui/grouped-list/list-metrics";
 import { withAlpha } from "@/lib/color";
 import { colors as palette, spacing, typography, createStyles } from "@/lib/theme";
 import { Notification } from "@/features/notifications/types";
 
 const ICON_TILE = 36;
 const UNREAD_DOT = 8;
-// The unread dot's column: every row keeps it, so icons and text line up
-// whether or not a row is unread.
-const GUTTER = 14;
+// The unread dot's column, which is also the row's leading padding inside its
+// group: every row keeps it, so icons and text line up whether or not a row
+// is unread.
+const GUTTER = 20;
 
 interface TypeLook {
   Icon: ComponentType<IconProps>;
@@ -40,7 +42,7 @@ interface NotificationRowProps {
 }
 
 /**
- * One notification as a plain row on the page, the way Mail lists messages:
+ * One notification as a row of its day's inset group, the way Mail lists messages:
  * a tinted glyph for its kind, the title with the time at the far end, the
  * body under it in two lines, and a small green dot in the leading gutter
  * while it is unread. No card, no coloured edge: the dot is the one unread
@@ -83,7 +85,7 @@ export function NotificationRow({ notification, onPress, action, separated }: No
 const useStyles = createStyles((colors) => ({
   row: { flexDirection: "row", alignItems: "flex-start" },
   pressed: { backgroundColor: withAlpha(colors.overlayBase, 0.05) },
-  gutter: { width: GUTTER + spacing.xs, paddingLeft: spacing.xs, paddingTop: spacing.md + ICON_TILE / 2 - UNREAD_DOT / 2 },
+  gutter: { width: GUTTER, alignItems: "center", paddingTop: spacing.md + ICON_TILE / 2 - UNREAD_DOT / 2 },
   dot: { width: UNREAD_DOT, height: UNREAD_DOT, borderRadius: UNREAD_DOT / 2, backgroundColor: colors.green },
   tile: {
     width: ICON_TILE,
@@ -95,7 +97,7 @@ const useStyles = createStyles((colors) => ({
     marginRight: spacing.md,
   },
   // The hairline sits on the text column, so it starts where the text does.
-  content: { flex: 1, gap: 2, paddingVertical: spacing.md, paddingRight: spacing.xl },
+  content: { flex: 1, gap: 2, paddingVertical: spacing.md, paddingRight: LIST_ROW_PADDING_X },
   separated: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.surfaceBorder },
   titleRow: { flexDirection: "row", alignItems: "baseline", gap: spacing.sm },
   title: { flex: 1, ...typography.body, color: colors.textPrimary },

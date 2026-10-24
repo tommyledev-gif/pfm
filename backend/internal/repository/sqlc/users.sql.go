@@ -177,7 +177,7 @@ func (q *Queries) CountUserByEmailAnyStatus(ctx context.Context, email string) (
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at, invite_sent_at, invite_resend_count, username FROM users
+SELECT id, email, full_name, password_hash, status, role, invited_by, invite_token, invite_expires_at, activated_at, created_at, updated_at, deleted_at, invite_sent_at, invite_resend_count, username, avatar_url FROM users
 WHERE deleted_at IS NULL
   AND ($2::text IS NULL OR status = $2)
   AND ($3::text IS NULL OR role = $3)
@@ -212,7 +212,7 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 			&i.ID, &i.Email, &i.FullName, &i.PasswordHash, &i.Status, &i.Role,
 			&i.InvitedBy, &i.InviteToken, &i.InviteExpiresAt, &i.ActivatedAt,
 			&i.CreatedAt, &i.UpdatedAt, &i.DeletedAt, &i.InviteSentAt, &i.InviteResendCount,
-			&i.Username,
+			&i.Username, &i.AvatarURL,
 		); err != nil {
 			return nil, err
 		}

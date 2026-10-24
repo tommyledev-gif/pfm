@@ -53,6 +53,8 @@ export function PendingRow({
     <SwipeableRow
       closeSignal={closeSignal}
       peek={peek}
+      // Full-height colour behind the row, as Mail does in its inset groups.
+      fill
       leftAction={{
         Icon: EditIcon,
         color: colors.green,

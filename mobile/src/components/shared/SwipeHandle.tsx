@@ -1,4 +1,4 @@
-import { Animated } from "react-native";
+import Animated, { DerivedValue, Extrapolation, interpolate, useAnimatedStyle } from "react-native-reanimated";
 
 import { PARK_THRESHOLD_RATIO, SwipeSide } from "@/components/shared/use-swipe-actions";
 import { createStyles, useColors } from "@/lib/theme";
@@ -14,7 +14,7 @@ interface SwipeHandleProps {
   side: SwipeSide;
   destructive?: boolean;
   /** Swipe travel toward either side, 0 at rest — the handle fades out with it. */
-  progress: Animated.AnimatedInterpolation<number> | Animated.Value;
+  progress: DerivedValue<number>;
   /** A row parked open hides its handles entirely. */
   hidden: boolean;
 }
@@ -28,11 +28,9 @@ interface SwipeHandleProps {
 export function SwipeHandle({ side, destructive, progress, hidden }: SwipeHandleProps) {
   const colors = useColors();
   const styles = useStyles();
-  const opacity = progress.interpolate({
-    inputRange: [0, PARK_THRESHOLD_RATIO],
-    outputRange: [HANDLE_OPACITY, 0],
-    extrapolate: "clamp",
-  });
+  const fade = useAnimatedStyle(() => ({
+    opacity: hidden ? 0 : interpolate(progress.value, [0, PARK_THRESHOLD_RATIO], [HANDLE_OPACITY, 0], Extrapolation.CLAMP),
+  }));
 
   return (
     <Animated.View
@@ -43,7 +41,8 @@ export function SwipeHandle({ side, destructive, progress, hidden }: SwipeHandle
       style={[
         styles.handle,
         side === "left" ? styles.left : styles.right,
-        { backgroundColor: destructive ? colors.danger : colors.textSecondary, opacity: hidden ? 0 : opacity },
+        { backgroundColor: destructive ? colors.danger : colors.textSecondary },
+        fade,
       ]}
     />
   );

@@ -3,9 +3,13 @@ package service
 import (
 	"bytes"
 	_ "embed"
+	"encoding/base64"
 	"fmt"
 	"html/template"
+	"io"
 	"mime"
+	"mime/multipart"
+	"net/textproto"
 
 	"github.com/example/pfm/backend/internal/common"
 )
@@ -42,6 +46,20 @@ var emailLayoutHTML string
 var emailLayout = template.Must(template.New("email").
 	Funcs(template.FuncMap{"inc": func(i int) int { return i + 1 }}).
 	Parse(emailLayoutHTML))
+
+// The app's logo (mobile/assets/icon.png, cropped to the wallet and scaled
+// to 96px for a 40px slot at 2x), sent inside every email as an inline part
+// the layout points at with cid:. Nothing to host, and it shows without the
+// reader allowing remote images. A data: URI would be smaller still, but
+// Gmail drops those.
+//
+//go:embed email_logo.png
+var emailLogoPNG []byte
+
+const emailLogoCID = "budgest-logo"
+
+// RFC 2045's limit for a base64 body line.
+const base64LineLength = 76
 
 const (
 	activationSubject  = "Kích hoạt tài khoản Budgest"
@@ -120,18 +138,59 @@ func passwordResetEmail(code string) emailContent {
 	}
 }
 
-// buildEmailMessage renders headers + HTML. The subject goes through MIME
-// B-encoding: it is Vietnamese (non-ASCII), and the encoding also keeps any
-// user-supplied part of it from breaking out of the header line.
+// buildEmailMessage renders headers + a multipart/related body: the HTML,
+// then the logo it shows. The subject goes through MIME B-encoding: it is
+// Vietnamese (non-ASCII), and the encoding also keeps any user-supplied part
+// of it from breaking out of the header line.
 func buildEmailMessage(fromEmail, fromName, toEmail string, email emailContent) ([]byte, error) {
+	var body bytes.Buffer
+	parts := multipart.NewWriter(&body)
+	htmlPart, err := parts.CreatePart(textproto.MIMEHeader{
+		"Content-Type":              {`text/html; charset="UTF-8"`},
+		"Content-Transfer-Encoding": {"8bit"},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("service.buildEmailMessage: %w", err)
+	}
+	if err := emailLayout.Execute(htmlPart, email); err != nil {
+		return nil, fmt.Errorf("service.buildEmailMessage: %w", err)
+	}
+	logoPart, err := parts.CreatePart(textproto.MIMEHeader{
+		"Content-Type":              {"image/png"},
+		"Content-Transfer-Encoding": {"base64"},
+		"Content-ID":                {"<" + emailLogoCID + ">"},
+		"Content-Disposition":       {`inline; filename="budgest.png"`},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("service.buildEmailMessage: %w", err)
+	}
+	if err := writeBase64Lines(logoPart, emailLogoPNG); err != nil {
+		return nil, fmt.Errorf("service.buildEmailMessage: %w", err)
+	}
+	if err := parts.Close(); err != nil {
+		return nil, fmt.Errorf("service.buildEmailMessage: %w", err)
+	}
+
 	var msg bytes.Buffer
 	fmt.Fprintf(&msg,
 		"From: %s <%s>\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\n"+
-			"Content-Type: text/html; charset=\"UTF-8\"\r\nContent-Transfer-Encoding: 8bit\r\n\r\n",
+			"Content-Type: multipart/related; boundary=\"%s\"; type=\"text/html\"\r\n\r\n",
 		mime.BEncoding.Encode("UTF-8", fromName), fromEmail, toEmail, mime.BEncoding.Encode("UTF-8", email.Subject),
+		parts.Boundary(),
 	)
-	if err := emailLayout.Execute(&msg, email); err != nil {
-		return nil, fmt.Errorf("service.buildEmailMessage: %w", err)
-	}
+	msg.Write(body.Bytes())
 	return msg.Bytes(), nil
+}
+
+// writeBase64Lines writes data base64-encoded in CRLF-ended lines, as a mail
+// body part has to be.
+func writeBase64Lines(w io.Writer, data []byte) error {
+	encoded := base64.StdEncoding.EncodeToString(data)
+	for start := 0; start < len(encoded); start += base64LineLength {
+		end := min(start+base64LineLength, len(encoded))
+		if _, err := io.WriteString(w, encoded[start:end]+"\r\n"); err != nil {
+			return err
+		}
+	}
+	return nil
 }

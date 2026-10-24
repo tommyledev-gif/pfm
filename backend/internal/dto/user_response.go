@@ -41,8 +41,8 @@ type UserResponse struct {
 	ActivatedAt *time.Time `json:"activated_at"`
 	CreatedAt   time.Time  `json:"created_at"`
 	// AvatarURL is null when the user has no avatar. Filled only by the
-	// queries that select it (GetUserByID and the profile queries), so it is
-	// null in the admin user list.
+	// queries that select it: GetUserByID, the profile queries and the admin
+	// user list (ListUsers).
 	AvatarURL *string `json:"avatar_url"`
 	// InviteResendAvailableAt is set only for pending users: the earliest
 	// moment POST /admin/users/:id/resend-invite will accept, so a client can

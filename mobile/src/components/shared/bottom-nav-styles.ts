@@ -85,10 +85,6 @@ export const ICON_BOUNCE_SCALE = 1.15;
 // forever. Kept tiny (and slow) so it reads as "alive", not as motion.
 export const BOB_DISTANCE = 4;
 export const BOB_DURATION = 1600;
-// One breath (0 → 1 → 0) per cycle, sampled from a cosine so a single linear
-// native timing can loop it; a looped sequence is restarted from JS each cycle.
-export const BOB_INPUT = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((k) => k / 12);
-export const BOB_OUTPUT = BOB_INPUT.map((t) => (1 - Math.cos(2 * Math.PI * t)) / 2);
 
 export const useStyles = createStyles((colors) => ({
   wrapper: {
@@ -153,7 +149,9 @@ export const useStyles = createStyles((colors) => ({
   rim: { position: "absolute", top: 0, left: RIM_LEFT_OFFSET, width: RIM_WIDTH, height: RIM_HEIGHT },
   tabRow: { flexDirection: "row", width: "100%", height: PILL_HEIGHT },
   tab: { flex: 1, alignItems: "center", justifyContent: "center" },
-  // Every tab's filled icon sits stacked in the ball; only the active one is opaque.
+  // Every tab's filled icon sits stacked in the ball; only the active one is
+  // opaque. They pop together, in one box the size of the ball.
+  ballIcons: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" },
   ballIcon: { position: "absolute" },
   ball: {
     position: "absolute",

@@ -39,6 +39,29 @@ func TestBuildEmailMessage_Activation(t *testing.T) {
 	}
 }
 
+// The logo travels inside the message, and the layout points at it.
+func TestBuildEmailMessage_EmbedsLogo(t *testing.T) {
+	msg := render(t, "user@example.com", passwordResetEmail("123456"))
+
+	for _, want := range []string{
+		"Content-Type: multipart/related; boundary=",
+		"Content-Type: image/png",
+		"Content-ID: <" + emailLogoCID + ">",
+		`src="cid:` + emailLogoCID + `"`,
+	} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("buildEmailMessage() missing %q", want)
+		}
+	}
+	// The HTML part keeps the layout's bare LFs; net/smtp's DATA writer
+	// turns them into CRLFs on the wire.
+	for _, line := range strings.Split(msg, "\n") {
+		if len(line) > 998 {
+			t.Fatalf("line longer than SMTP's 998-character limit: %d", len(line))
+		}
+	}
+}
+
 // The requester's email lands in both the subject and the body; neither may
 // let it inject a header line or markup.
 func TestBuildEmailMessage_AccessRequestEscapesRequester(t *testing.T) {

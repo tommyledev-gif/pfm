@@ -254,6 +254,7 @@ function WalletCarouselView({
         positionCount={rendered.length}
         looping={looping}
         scrollX={scrollX}
+        areaWidth={containerWidth}
         canGoBack={looping || centreIndex > 0}
         canGoForward={looping || centreIndex < rendered.length - 1}
         onBack={() => step(-1)}

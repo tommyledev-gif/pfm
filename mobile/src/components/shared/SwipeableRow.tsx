@@ -1,5 +1,6 @@
-import { ReactNode, useEffect, useMemo } from "react";
-import { Animated, Dimensions, StyleSheet, View } from "react-native";
+import { ReactNode, useEffect } from "react";
+import { Dimensions, StyleSheet, View } from "react-native";
+import Animated, { useAnimatedStyle, useDerivedValue } from "react-native-reanimated";
 
 import { SwipeAction, SwipeActionButton } from "@/components/shared/SwipeActionButton";
 import { SwipeHandle } from "@/components/shared/SwipeHandle";
@@ -33,6 +34,8 @@ interface SwipeableRowProps {
    * after mounting, so the row says it swipes without grips on its edges.
    */
   peek?: boolean;
+  /** The revealed actions fill their whole strip in their colour (SwipeActionButton). */
+  fill?: boolean;
 }
 
 // After the row has settled into view, so the peek reads as a hint, not as
@@ -54,6 +57,7 @@ export function SwipeableRow({
   closeSignal,
   showHandles = false,
   peek = false,
+  fill = false,
 }: SwipeableRowProps) {
   // A destructive side gets the wider cap so its parked button has room for a
   // label; a plain one keeps the narrower, long-standing feel.
@@ -69,7 +73,9 @@ export function SwipeableRow({
   const { close, leftProgress, rightProgress } = swipe;
   // Only one side ever moves at a time, so the sum is "how far into a swipe,
   // either way" — both handles fade on any drag.
-  const handleProgress = useMemo(() => Animated.add(leftProgress, rightProgress), [leftProgress, rightProgress]);
+  const handleProgress = useDerivedValue(() => leftProgress.value + rightProgress.value);
+  const { translateX } = swipe;
+  const slide = useAnimatedStyle(() => ({ transform: [{ translateX: translateX.value }] }));
   const handlesHidden = swipe.parkedSide !== null;
   useEffect(() => {
     close();
@@ -114,6 +120,7 @@ export function SwipeableRow({
           width={SCREEN_WIDTH * leftRatio}
           parked={swipe.parkedSide === "left"}
           positionStyle={styles.left}
+          fill={fill}
         />
       ) : null}
       {rightAction ? (
@@ -123,9 +130,10 @@ export function SwipeableRow({
           width={SCREEN_WIDTH * rightRatio}
           parked={swipe.parkedSide === "right"}
           positionStyle={styles.right}
+          fill={fill}
         />
       ) : null}
-      <Animated.View style={{ transform: [{ translateX: swipe.translateX }] }}>
+      <Animated.View style={slide}>
         {children}
         {/* After the content, so they paint over the card they sit on. */}
         {showHandles && leftAction ? (

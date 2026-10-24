@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, SectionList, Text, View } from "react-nat
 import { useRouter } from "expo-router";
 
 import { BellIcon } from "@/components/ui/Icon";
+import { GroupedListCell, ListSectionHeader } from "@/components/ui/grouped-list";
 import { SearchField } from "@/components/ui/SearchField";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { Screen } from "@/components/shared/Screen";
@@ -33,9 +34,10 @@ interface DaySection {
   data: Notification[];
 }
 
-// A plain list grouped by day, as Mail does it: large title, a two-way
-// filter and a search field over the rows, quiet day headers, and rows on the
-// page itself (NotificationRow) rather than a stack of tinted cards.
+// A list grouped by day, as Mail does it: large title, a two-way filter and a
+// search field over the rows, quiet day headers, and each day's rows in one
+// inset group (NotificationRow), inset from the screen edges like every other
+// list in the app rather than running edge to edge.
 export default function NotificationsScreen() {
   const colors = useColors();
   const styles = useStyles();
@@ -155,14 +157,20 @@ export default function NotificationsScreen() {
           contentContainerStyle={styles.list}
           stickySectionHeadersEnabled={false}
           keyboardShouldPersistTaps="handled"
-          renderSectionHeader={({ section }) => <Text style={styles.sectionHeader}>{section.title}</Text>}
-          renderItem={({ item, index }) => (
-            <NotificationRow
-              notification={item}
-              onPress={() => openNotification(item)}
-              action={approveActionFor(item)}
-              separated={index > 0}
-            />
+          renderSectionHeader={({ section }) => (
+            <View style={styles.sectionHeader}>
+              <ListSectionHeader title={section.title} />
+            </View>
+          )}
+          renderItem={({ item, index, section }) => (
+            <GroupedListCell index={index} count={section.data.length}>
+              <NotificationRow
+                notification={item}
+                onPress={() => openNotification(item)}
+                action={approveActionFor(item)}
+                separated={index > 0}
+              />
+            </GroupedListCell>
           )}
           ListEmptyComponent={empty}
           onEndReachedThreshold={0.4}
@@ -181,15 +189,9 @@ export default function NotificationsScreen() {
 const useStyles = createStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bgApp },
   controls: { gap: spacing.md, paddingHorizontal: spacing.xl, paddingBottom: spacing.sm },
-  list: { paddingBottom: spacing.xxl * 2 },
-  sectionHeader: {
-    ...typography.label,
-    color: colors.textSecondary,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.xs,
-  },
-  empty: { alignItems: "center", gap: spacing.sm, paddingTop: spacing.xxl * 2, paddingHorizontal: spacing.xl },
+  list: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl * 2 },
+  sectionHeader: { paddingTop: spacing.lg },
+  empty: { alignItems: "center", gap: spacing.sm, paddingTop: spacing.xxl * 2 },
   emptyTitle: { ...typography.body, color: colors.textSecondary, textAlign: "center" },
   emptyHint: { ...typography.caption, color: colors.textMuted, textAlign: "center" },
   retry: { ...typography.body, color: colors.green },
