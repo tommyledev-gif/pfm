@@ -25,6 +25,7 @@ export { DeviceMobileIcon as DeviceGlyph } from "phosphor-react-native/src/icons
 export { PasswordIcon as PasswordGlyph } from "phosphor-react-native/src/icons/Password";
 export { KeyIcon as PasskeyGlyph } from "phosphor-react-native/src/icons/Key";
 export { FingerprintIcon as IdentityCheckGlyph } from "phosphor-react-native/src/icons/Fingerprint";
+export { DotsNineIcon as PinGlyph } from "phosphor-react-native/src/icons/DotsNine";
 export { MapPinIcon as MapPinGlyph } from "phosphor-react-native/src/icons/MapPin";
 export { ReceiptIcon as ReceiptGlyph } from "phosphor-react-native/src/icons/Receipt";
 export { ArrowRightIcon as ArrowRightGlyph } from "phosphor-react-native/src/icons/ArrowRight";

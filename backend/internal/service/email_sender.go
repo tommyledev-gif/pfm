@@ -21,6 +21,10 @@ type EmailSender interface {
 	// SendAccessApprovedEmail tells the requester their request was approved;
 	// it carries the same activation link an invite does.
 	SendAccessApprovedEmail(ctx context.Context, toEmail, inviteToken string) error
+	// SendPasswordResetCode sends the 6-digit forgot-password code
+	// (specs/forgot-password). The code is in the email body only, never a
+	// link: the app asks for it.
+	SendPasswordResetCode(ctx context.Context, toEmail, code string) error
 }
 
 // LogEmailSender is a placeholder implementation: it logs that an email
@@ -52,6 +56,14 @@ func (s *LogEmailSender) SendAccessRequestEmail(_ context.Context, adminEmail, _
 
 func (s *LogEmailSender) SendAccessApprovedEmail(_ context.Context, toEmail, _ string) error {
 	s.logger.Info("access approved email dispatched (placeholder sender)",
+		zap.String("email", common.MaskEmail(toEmail)),
+	)
+	return nil
+}
+
+// SendPasswordResetCode logs that a code went out — never the code itself.
+func (s *LogEmailSender) SendPasswordResetCode(_ context.Context, toEmail, _ string) error {
+	s.logger.Info("password reset email dispatched (placeholder sender)",
 		zap.String("email", common.MaskEmail(toEmail)),
 	)
 	return nil

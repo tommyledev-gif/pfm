@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -68,7 +67,9 @@ func main() {
 	authService := service.NewAuthService(userRepo, revokedRepo, tokenService, sessionService, logger)
 	accountSwitchService := service.NewAccountSwitchService(userRepo, revokedRepo, tokenService, sessionService, logger)
 	sessionRevocationService := service.NewSessionRevocationService(userRepo, accountSwitchService, sessionService, logger)
-	tokenRetention := service.NewTokenRetention(sessionRepo, revokedRepo, logger)
+	passwordResetRepo := repository.NewPasswordResetRepository(queries, pool)
+	passwordResetService := service.NewPasswordResetService(userRepo, passwordResetRepo, cfg.JWTSecret, emailSender, sessionService, logger)
+	tokenRetention := service.NewTokenRetention(sessionRepo, revokedRepo, logger).WithResetCodes(passwordResetRepo)
 	openLegacyRefreshWindow(context.Background(), queries, authService, logger)
 	enableUnboundSessionCleanup(context.Background(), queries, sessionService, logger)
 	walletService := service.NewWalletService(walletRepo, logger)
@@ -156,6 +157,7 @@ func main() {
 	registerRoutes(app, userHandler, authHandler, walletHandler, walletMemberHandler, categoryHandler, budgetHandler, transactionHandler, transactionExportHandler, transactionImportHandler, auditLogHandler, reportHandler, notificationHandler, chatHandler, chatImageHandler, budgetWizardHandler, analyticsHandler, accountSwitchHandler, sessionRevocationHandler, profileHandler, accessRequestHandler, accountDeletionHandler, passkeyHandler, assetLinks, tokenService, sessionService, pool, logger)
 	appUpdateHandler := handler.NewAppUpdateHandler(service.NewAppUpdateService(cfg.AppUpdatesDir), logger).WithPublicAPKURL(cfg.APKPublicURL)
 	registerAppUpdateRoutes(app, appUpdateHandler, cfg.AppUpdatesDir)
+	registerPasswordResetRoutes(app, handler.NewPasswordResetHandler(passwordResetService, logger), logger)
 
 	go func() {
 		if err := app.Listen(":" + cfg.Port); err != nil {
@@ -174,25 +176,6 @@ func main() {
 	go runTokenRetention(schedulerCtx, tokenRetention, logger)
 
 	waitForShutdown(app, stopScheduler, logger)
-}
-
-// runNotificationScheduler runs NotificationService.EvaluateBudgets on a
-// fixed interval until ctx is cancelled. A ticker, not a one-shot timer
-// loop, so a slow evaluation never causes ticks to pile up.
-func runNotificationScheduler(ctx context.Context, notificationService *service.NotificationService, logger *zap.Logger) {
-	ticker := time.NewTicker(common.NotificationJobInterval)
-	defer ticker.Stop()
-
-	logger.Info("notification scheduler started", zap.Duration("interval", common.NotificationJobInterval))
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("notification scheduler stopped")
-			return
-		case <-ticker.C:
-			notificationService.EvaluateBudgets(ctx)
-		}
-	}
 }
 
 func waitForShutdown(app *fiber.App, stopScheduler context.CancelFunc, logger *zap.Logger) {
@@ -255,42 +238,4 @@ func newIconUploader(cfg *config.Config, logger *zap.Logger) service.IconUploade
 	}
 	logger.Info("R2 icon uploader configured", zap.String("bucket", cfg.R2Bucket))
 	return uploader
-}
-
-// runTokenRetention deletes finished session rows and expired deny-list rows
-// (service.TokenRetention) at startup and then on a fixed interval.
-func runTokenRetention(ctx context.Context, retention *service.TokenRetention, logger *zap.Logger) {
-	ticker := time.NewTicker(common.TokenPurgeInterval)
-	defer ticker.Stop()
-
-	retention.Purge(ctx)
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("token retention stopped")
-			return
-		case <-ticker.C:
-			retention.Purge(ctx)
-		}
-	}
-}
-
-// runIntentLogRetention applies the question log's privacy retention
-// (specs/ai-chat-query-spending/spec.md US-07) once at startup and then on a
-// fixed interval — at startup too, so a backend that restarts more often
-// than the interval still purges.
-func runIntentLogRetention(ctx context.Context, retention *service.IntentLogRetention, logger *zap.Logger) {
-	ticker := time.NewTicker(common.IntentLogPurgeInterval)
-	defer ticker.Stop()
-
-	retention.Purge(ctx)
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("intent log retention stopped")
-			return
-		case <-ticker.C:
-			retention.Purge(ctx)
-		}
-	}
 }

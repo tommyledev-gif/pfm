@@ -78,6 +78,7 @@ db/
 | POST | `/api/v1/auth/login` | `LoginRateLimiter` | `AuthHandler.Login` |
 | POST | `/api/v1/auth/logout` | — | `AuthHandler.Logout` |
 | POST | `/api/v1/auth/refresh` | — | `AuthHandler.Refresh` — also the mobile account switch since 2026-10-19 |
+| POST | `/api/v1/auth/password-reset/request` · `/confirm` | `PasswordResetRequestRateLimiter` · `PasswordResetConfirmRateLimiter` | `PasswordResetHandler` — forgot password by email code (2026-10-23, mig 036) |
 | GET · DELETE | `/api/v1/auth/sessions` · `/api/v1/auth/sessions/:id` | `JWTAuth` | Device list · sign out one device (2026-10-19) |
 | POST | `/api/v1/auth/sessions/revoke-all` | `JWTAuth` | `SessionRevocationHandler.RevokeAllSelf` |
 | POST | `/api/v1/auth/switch-token` · `/switch` · `/switch-token/revoke` | `JWTAuth` · `SwitchRateLimiter` · — | `AccountSwitchHandler` — **deprecated 2026-10-19**, older app builds only |

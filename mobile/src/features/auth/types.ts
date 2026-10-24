@@ -17,3 +17,16 @@ export interface LoginResponse {
 export interface LoginResult extends LoginResponse {
   email?: string;
 }
+
+/** POST /auth/password-reset/request (backend dto/password_reset_dto.go). */
+export interface PasswordResetRequestBody {
+  /** An email or a tên đăng nhập, read like login reads it. */
+  identifier: string;
+}
+
+/** POST /auth/password-reset/confirm. Answers like POST /auth/login. */
+export interface PasswordResetConfirmBody {
+  identifier: string;
+  code: string;
+  new_password: string;
+}

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"html/template"
 	"mime"
+
+	"github.com/example/pfm/backend/internal/common"
 )
 
 // emailContent is one rendered email. Pure data, so every template is
@@ -99,6 +101,22 @@ func accessRequestEmail(requesterEmail, link string) emailContent {
 			"Yêu cầu cũng có trong mục Thông báo của ứng dụng.",
 			"Không nhận ra người gửi thì bỏ qua email.",
 		},
+	}
+}
+
+// passwordResetEmail carries the forgot-password code (specs/forgot-password).
+// No button: the app asks for the code, and a link would invite phishing
+// copies.
+func passwordResetEmail(code string) emailContent {
+	life := fmt.Sprintf("Mã dùng được trong %d phút.", int(common.ResetCodeTTL.Minutes()))
+	return emailContent{
+		Subject:    "Mã đặt lại mật khẩu Budgest",
+		Preheader:  life,
+		Eyebrow:    "Quên mật khẩu",
+		Heading:    "Đặt lại mật khẩu",
+		Detail:     &emailDetail{Label: "Mã đặt lại", Value: code},
+		Paragraphs: []string{life},
+		Footnotes:  []string{"Không phải bạn yêu cầu thì bỏ qua email này. Mật khẩu chưa thay đổi."},
 	}
 }
 

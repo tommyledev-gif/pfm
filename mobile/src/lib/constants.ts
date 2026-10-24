@@ -171,6 +171,25 @@ export const MAX_SAVED_ACCOUNTS = 5;
 export const AVATAR_GROUP_MAX_VISIBLE = 3;
 // Mirrors common.MinPasswordLength (backend/internal/common/constants.go).
 export const MIN_PASSWORD_LENGTH = 8;
+// Mirrors common.MaxPasswordBytes: bcrypt's limit, in UTF-8 bytes.
+export const MAX_PASSWORD_BYTES = 72;
+// Forgot password (specs/forgot-password): the emailed code's length, and how
+// long "Gửi lại mã" waits (the server's per-account cooldown, BR-05).
+export const PASSWORD_RESET_CODE_LENGTH = 6;
+export const PASSWORD_RESET_RESEND_SECONDS = 60;
+// App PIN (specs/mobile-app-pin): 6 digits; the 5th wrong one in a row signs
+// out every account on the phone (BR-06). Stored as PBKDF2-HMAC-SHA256 in
+// secure storage; the iteration count is tuned per phone when the PIN is set
+// (a probe run, scaled to the target time, kept between MIN and MAX).
+export const PIN_LENGTH = 6;
+export const PIN_MAX_WRONG = 5;
+export const PIN_SALT_BYTES = 16;
+export const PIN_PBKDF2_PROBE_ITERATIONS = 1000;
+export const PIN_PBKDF2_MIN_ITERATIONS = 2000;
+export const PIN_PBKDF2_MAX_ITERATIONS = 10000;
+export const PIN_CHECK_TARGET_MS = 250;
+export const SECURE_STORE_PIN_KEY = "pfm_app_pin";
+export const SECURE_STORE_PIN_WRONG_KEY = "pfm_app_pin_wrong";
 // App lock (Security screen, opt-in): back from the background after this
 // long, the app asks for the owner check again.
 export const APP_LOCK_AFTER_BACKGROUND_MS = 5 * 60 * 1000;

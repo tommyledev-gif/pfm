@@ -23,12 +23,21 @@ type ExpiredPurger interface {
 type TokenRetention struct {
 	sessions      ExpiredPurger
 	revokedTokens ExpiredPurger
-	logger        *zap.Logger
-	now           func() time.Time
+	// resetCodes is optional (WithResetCodes): forgot-password codes.
+	resetCodes ExpiredPurger
+	logger     *zap.Logger
+	now        func() time.Time
 }
 
 func NewTokenRetention(sessions, revokedTokens ExpiredPurger, logger *zap.Logger) *TokenRetention {
 	return &TokenRetention{sessions: sessions, revokedTokens: revokedTokens, logger: logger, now: time.Now}
+}
+
+// WithResetCodes also deletes forgot-password codes older than
+// common.ResetCodeRetention (specs/forgot-password BR-10).
+func (r *TokenRetention) WithResetCodes(codes ExpiredPurger) *TokenRetention {
+	r.resetCodes = codes
+	return r
 }
 
 // Purge runs one pass. Failures are logged and retried on the next tick —
@@ -47,5 +56,10 @@ func (r *TokenRetention) Purge(ctx context.Context) {
 	}
 	if err == nil && err2 == nil {
 		r.logger.Info("token retention done", zap.Int64("sessions_deleted", sessions), zap.Int64("revoked_tokens_deleted", revoked))
+	}
+	if r.resetCodes != nil {
+		if _, err := r.resetCodes.DeleteExpired(ctx, now.Add(-common.ResetCodeRetention)); err != nil {
+			r.logger.Error("token retention: deleting old password reset codes failed", zap.Error(err))
+		}
 	}
 }

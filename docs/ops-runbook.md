@@ -73,7 +73,7 @@ A signed-in device is one row in `sessions` (migration 028). Access and refresh 
 - **Migration 033 first.** Login and every refresh write the device columns, so `033_session_devices.sql` must be applied **before** the new backend starts, same convention as 028/032: `deploy.sh` runs `cmd/migrate` before it recreates the backend; locally apply it by hand (`psql … < backend/db/migrations/033_session_devices.sql`). Then ship the mobile OTA bundle (`npm run ota:publish`, §8) **after** the backend is live: the new bundle stops asking for switch tokens and converts the ones it holds through `/auth/switch` with a device id, which only the new backend answers with a device-bound session.
 - **Limits:** 5 live sessions per user (the least recently used is revoked when a 6th starts) and **one live session per user per device** (a new sign-in on the same phone revokes the previous one, reason `replaced`). A session ends **60 days after its last refresh** (sliding, `RefreshTokenTTL`) or **180 days after its sign-in** (`SessionAbsoluteTTL`), whichever comes first (`backend/internal/common/constants.go`, `constants_session.go`). Access tokens: 15 minutes. *(Changed 2026-10-19: was 7 days idle, 30 days absolute.)*
 - **Saved accounts on a phone:** every account saved there keeps its own session; switching is a plain refresh of that account's session. One phone with three saved accounts is three rows (one per user).
-- **Instant revocation:** logout, removing a saved account from a phone, signing one device out (`DELETE /api/v1/auth/sessions/:id`, reason `device_sign_out`), "sign out everywhere" (self or admin), a password change (`PUT /api/v1/users/me/password`, every session, reason `password_changed`), a disabled user and a reused refresh token all stop the session's access token on its next request.
+- **Instant revocation:** logout, removing a saved account from a phone, signing one device out (`DELETE /api/v1/auth/sessions/:id`, reason `device_sign_out`), "sign out everywhere" (self or admin), a password change (`PUT /api/v1/users/me/password`, every session, reason `password_changed`), a password reset (every session, reason `password_reset`, §10), a disabled user and a reused refresh token all stop the session's access token on its next request.
 - **Reuse detection:** only the newest refresh token (and the one before it, for 5 minutes, so a refresh whose response was lost in a tunnel can be retried) is accepted. Anything older revokes the whole session. A `refresh token reuse: session revoked` warning in the log means a copy of a token was replayed.
 - **Audit lines:** device sign-out and `password.change` each log one line with the ids involved, role and IP; never the email, a token or a password.
 - **Look at them:** `SELECT id, device_id, device_name, created_at, last_used_at, expires_at, absolute_expires_at, revoked_at, revoked_reason FROM sessions WHERE user_id = '<id>' ORDER BY created_at DESC;` (the user sees the live ones under Cài đặt → Bảo mật → Thiết bị đang đăng nhập).
@@ -87,7 +87,7 @@ A signed-in device is one row in `sessions` (migration 028). Access and refresh 
 - **Failed-login lockout is a trade-off.** Anyone who knows an email can fail logins on purpose and keep that account from signing in for 15 minutes at a time. The password-change limit (5 failed tries per user per 15 minutes) works the same way, but only for someone already signed in as that user.
 - **The web app does not refresh or log out on cookie expiry**, so each web sign-in leaves a session that is never used again, now for up to 60 days. With five sessions allowed, a few web sign-ins can push out a phone that has been idle for days. Fine while the web app is not deployed; wire a refresh route before it is.
 - **The web proxy forwards no client IP**, so every web login shares one per-IP bucket (it did before sessions too).
-- **No password reset.** A user who forgets the password and has no passkey can only be helped with a database change; there is no reset by email yet.
+- **Password reset by email code** since 2026-10-23 (§10). It needs working SMTP; without it a user who forgot the password and has no passkey still needs a database change.
 
 ## 6. Secret rotation (do this once)
 
@@ -183,3 +183,20 @@ There is no need to judge which case applies: `ota:publish` refuses when native 
 **Image scan.** Images are built, scanned with Trivy (blocking on HIGH/CRITICAL that have a fix), and pushed only if clean. A blocked deploy leaves production untouched; fix by bumping the base image or the dependency named in the job log.
 
 **CI.** Third-party actions are pinned to commit SHAs (the version is in the trailing comment). To bump one: `git ls-remote https://github.com/<owner>/<repo> refs/tags/<tag> refs/tags/<tag>^{}`, take the `^{}` line's SHA when there is one, and update the SHA and the comment together.
+
+## 10. Forgot password and app PIN (2026-10, `specs/forgot-password/`, `specs/mobile-app-pin/`)
+
+**Forgot password.** `POST /api/v1/auth/password-reset/request` emails a 6-digit code; `POST /api/v1/auth/password-reset/confirm` sets the new password with it and signs the calling phone in (same response as login). Codes live in `password_reset_codes` (migration 036) as an HMAC keyed from `JWT_SECRET`, never in clear.
+
+- **Order:** migration 036 before the backend (`deploy.sh` runs `cmd/migrate` first), then the mobile OTA bundle (§8), which adds "Quên mật khẩu?" to the login screen.
+- **Needs SMTP.** The code only reaches the user by email. With `SMTP_HOST` unset the placeholder sender logs the masked address and drops the code, so a reset cannot finish. Locally, a catcher such as Mailpit (`axllent/mailpit`, `SMTP_PORT=1025`) shows the email.
+- **Limits:** a code works for 15 minutes, once, and dies on its 5th wrong try. One new code per account per 60 s, 5 per hour. Per client IP: 5 requests and 20 confirms per 15 minutes (429). Asking again ends the older code.
+- **Same answer for everyone.** The request route returns 200 whether or not the account exists, and every failed confirm is `RESET_CODE_INVALID`. Only the account lookup runs on the request path; storing and emailing the code happen in the background, so a database or SMTP failure there is a log line, not an error the caller sees: `password reset: could not store the code` / `email not sent`, with the user id only.
+- **Effect:** the new password, a new sign-out point (`tokens_valid_after`) and the used code are written in one transaction; then every session ends (`revoked_reason = 'password_reset'`) and the phone gets a fresh one. Passkeys are kept. One audit line per reset: `"action": "password_reset"` with the user id.
+- **Seeded admin:** `cmd/seed` re-syncs `SEED_ADMIN_PASSWORD` on every deploy, so a reset of that account lasts only until the next deploy. Change the secret instead.
+- **Retention:** code rows older than 24 hours are deleted with the token retention job (every 6 hours).
+
+**App PIN (mobile only).** A 6-digit PIN set under Cài đặt → Bảo mật → Mã PIN. It never leaves the phone: PBKDF2-HMAC-SHA256 in the phone's secure storage, with the iteration count tuned per phone when the PIN is set (2,000-10,000, aiming at 250 ms). It unlocks the app lock and confirms account switches; fingerprint/face keep working beside it. No server change and no APK change: it ships with the OTA bundle.
+
+- **5 wrong PINs in a row** (counted across restarts), or "Quên mã PIN?", sign out every account saved on that phone and delete the PIN. Support answer for a forgotten PIN: sign in again with the password (or reset it, above). Nothing on the server needs doing.
+- A phone without a screen lock can now use the app lock and switch to an admin account, as long as a PIN is set.

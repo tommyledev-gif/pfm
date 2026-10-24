@@ -3,6 +3,9 @@ import * as LocalAuthentication from "expo-local-authentication";
 import { UserRole } from "@/lib/constants";
 import { useSecurityPrefsStore } from "@/stores/security-prefs-store";
 import { useToastStore } from "@/stores/toast-store";
+import { PIN_COPY } from "@/features/security/pin/pin-copy";
+import { requestPin } from "@/features/security/pin/pin-prompt-store";
+import { usePinStore } from "@/features/security/pin/pin-store";
 
 export type IdentityCheckResult = "passed" | "cancelled" | "failed" | "unavailable";
 
@@ -12,10 +15,55 @@ const PROMPT_MESSAGE = "Xác minh để chuyển tài khoản";
 export const CHANGE_SETTING_PROMPT = "Xác minh để đổi cài đặt bảo mật";
 const CANCEL_LABEL = "Hủy";
 export const IDENTITY_CHECK_FAILED_MESSAGE = "Không xác minh được. Chưa chuyển tài khoản.";
+// The app PIN (specs/mobile-app-pin) is the answer for a phone with no lock.
 const NO_LOCK_WARNING =
-  "Máy chưa cài khóa màn hình nên ai cầm máy cũng có thể chuyển tài khoản. Hãy cài khóa màn hình trong cài đặt của máy.";
+  "Máy chưa cài khóa màn hình nên ai cầm máy cũng chuyển được tài khoản. Đặt mã PIN trong Bảo mật để chặn.";
 export const NO_LOCK_ADMIN_BLOCKED_MESSAGE =
-  "Máy chưa có khóa màn hình nên chưa chuyển sang tài khoản admin. Cài khóa màn hình rồi thử lại.";
+  "Máy chưa có khóa màn hình nên chưa chuyển sang tài khoản admin. Đặt mã PIN trong Bảo mật rồi thử lại.";
+
+const BIOMETRIC_LABEL = {
+  fingerprint: "Dùng vân tay",
+  face: "Dùng khuôn mặt",
+  screenLock: "Dùng khóa màn hình",
+} as const;
+
+/** Whether the phone has any lock (fingerprint, face or a screen-lock code). */
+export async function phoneHasLock(): Promise<boolean> {
+  try {
+    return (await LocalAuthentication.getEnrolledLevelAsync()) !== LocalAuthentication.SecurityLevel.NONE;
+  } catch {
+    return false;
+  }
+}
+
+/** The button that opens the phone's own check, named for it; null = none. */
+export async function phoneCheckLabel(): Promise<string | null> {
+  try {
+    const level = await LocalAuthentication.getEnrolledLevelAsync();
+    if (level === LocalAuthentication.SecurityLevel.NONE) return null;
+    if (level === LocalAuthentication.SecurityLevel.SECRET) return BIOMETRIC_LABEL.screenLock;
+    const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+    if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) return BIOMETRIC_LABEL.fingerprint;
+    if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) return BIOMETRIC_LABEL.face;
+    return BIOMETRIC_LABEL.screenLock;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Asks whoever holds the phone to prove they own it (BR-04). With an app PIN
+ * set: the PIN prompt, whose button also opens the phone's own check. Without
+ * one: the phone's check, as before. Closing the prompt, or a wipe on the 5th
+ * wrong PIN, is "cancelled": the caller stops without a message of its own.
+ */
+export async function verifyOwner(pinTitle: string, systemPrompt: string): Promise<IdentityCheckResult> {
+  if (!usePinStore.getState().hasPin) return confirmOwner(systemPrompt);
+  const result = await requestPin({ kind: "verify", title: pinTitle, biometricPrompt: systemPrompt });
+  if (result === "passed") return "passed";
+  if (result === "no-pin") return confirmOwner(systemPrompt);
+  return "cancelled";
+}
 
 const CANCELLED_ERRORS: readonly LocalAuthentication.LocalAuthenticationError[] = [
   "user_cancel",
@@ -74,11 +122,12 @@ export function warnNoLockOnce(): void {
  * for an admin account, whose switch would hand the holder invites and every
  * other member's session controls. That one stops here, with a toast saying
  * how to proceed. A debug build keeps the old behaviour so an emulator, which
- * usually has no lock, can still switch.
+ * usually has no lock, can still switch. With an app PIN the phone always has
+ * something to check, so neither the warning nor the refusal comes up (BR-05).
  */
 export async function passSwitchIdentityCheck(targetRole: UserRole): Promise<boolean> {
   if (!useSecurityPrefsStore.getState().identityCheckEnabled) return true;
-  const result = await confirmOwner();
+  const result = await verifyOwner(PIN_COPY.forSwitch, PROMPT_MESSAGE);
   if (result === "passed") return true;
   if (result === "unavailable") {
     if (targetRole === "admin" && !__DEV__) {

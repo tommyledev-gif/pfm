@@ -1,12 +1,12 @@
 import { useRef, useState } from "react";
-import { Keyboard, Text, TextInput, View } from "react-native";
+import { Keyboard, TextInput, View } from "react-native";
 
 import { PillButton } from "@/components/ui/PillButton";
 import { getErrorCode, getErrorMessage } from "@/lib/axios";
 import { isNetworkError } from "@/lib/api-envelope";
-import { withAlpha } from "@/lib/color";
-import { radii, spacing, typography, createStyles } from "@/lib/theme";
+import { spacing, createStyles } from "@/lib/theme";
 import { AuthField } from "@/features/auth/components/AuthField";
+import { AuthFormError } from "@/features/auth/components/AuthFormError";
 import { useRequestAccessMutation } from "@/features/auth/api/use-request-access-mutation";
 
 type Field = "email" | "adminEmail";
@@ -157,11 +157,7 @@ export function RequestAccessForm({ onSent }: RequestAccessFormProps) {
           testID="input-request-admin-email"
         />
       </View>
-      {formError ? (
-        <View style={styles.errorBox}>
-          <Text style={styles.error}>{formError}</Text>
-        </View>
-      ) : null}
+      <AuthFormError message={formError} />
       <PillButton
         label={COPY.submit}
         loading={request.isPending}
@@ -174,18 +170,9 @@ export function RequestAccessForm({ onSent }: RequestAccessFormProps) {
   );
 }
 
-const useStyles = createStyles((colors) => ({
+const useStyles = createStyles(() => ({
   form: { width: "100%", gap: spacing.lg },
   fields: { gap: 20 },
   button: { height: 56, borderRadius: 16, marginTop: spacing.sm },
   buttonLabel: { fontSize: 16 },
-  errorBox: {
-    backgroundColor: withAlpha(colors.peach, 0.12),
-    borderWidth: 1,
-    borderColor: withAlpha(colors.peach, 0.35),
-    borderRadius: radii.listCard,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-  },
-  error: { color: colors.peach, ...typography.caption },
 }));

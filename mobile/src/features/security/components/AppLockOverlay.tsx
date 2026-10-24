@@ -19,6 +19,8 @@ import { useProfileIdentity } from "@/features/profile/use-profile-identity";
 import { useAppLockStore } from "@/features/security/app-lock";
 import { confirmOwner } from "@/features/security/identity-check";
 import { AppLockGlow, AppLockHalo } from "@/features/security/components/AppLockHalo";
+import { AppLockPinScreen } from "@/features/security/components/AppLockPinScreen";
+import { usePinStore } from "@/features/security/pin/pin-store";
 
 const COPY = {
   locked: "Ứng dụng đang khóa",
@@ -49,8 +51,10 @@ type Status = "checking" | "idle" | "failed";
  */
 export function AppLockOverlay() {
   const locked = useAppLockStore((s) => s.locked);
+  // With an app PIN, its keypad (the phone's check stays one tap away).
+  const hasPin = usePinStore((s) => s.hasPin);
   if (!locked) return null;
-  return <LockScreen />;
+  return hasPin ? <AppLockPinScreen /> : <LockScreen />;
 }
 
 function LockScreen() {

@@ -188,8 +188,15 @@ func (s *AuthService) Login(ctx context.Context, identifier, password string, de
 }
 
 func (s *AuthService) loginUser(ctx context.Context, identifier string) (*model.User, error) {
+	return userByIdentifier(ctx, s.userRepo, identifier)
+}
+
+// userByIdentifier finds a live account by email or tên đăng nhập: anything
+// with an "@" is an email, since a username cannot contain one. Shared by
+// login and forgot password so both read the field the same way.
+func userByIdentifier(ctx context.Context, users UserRepo, identifier string) (*model.User, error) {
 	if strings.Contains(identifier, "@") {
-		return s.userRepo.GetUserByEmail(ctx, common.NormalizeEmail(identifier))
+		return users.GetUserByEmail(ctx, common.NormalizeEmail(identifier))
 	}
-	return s.userRepo.GetUserByUsername(ctx, common.NormalizeUsername(identifier))
+	return users.GetUserByUsername(ctx, common.NormalizeUsername(identifier))
 }

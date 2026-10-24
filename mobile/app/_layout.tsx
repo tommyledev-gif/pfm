@@ -26,6 +26,8 @@ import { installOutboxSync } from "@/features/transactions/outbox/install-outbox
 import { useAccountRegistryStore } from "@/features/accounts/account-registry-store";
 import { useSwitchProgressStore } from "@/features/accounts/switch-progress-store";
 import { installAppLock } from "@/features/security/app-lock";
+import { PinPromptHost } from "@/features/security/components/PinPromptHost";
+import { usePinStore } from "@/features/security/pin/pin-store";
 import { NativeUpdateDialog } from "@/features/app-update/components/NativeUpdateDialog";
 
 // Installed once at module scope, not inside the component — a global
@@ -95,7 +97,9 @@ export default function RootLayout() {
   const themeHydrated = useThemeStore((s) => s.isHydrated);
   // The login chooser must not pop in after first paint (AS-T24).
   const accountsHydrated = useAccountRegistryStore((s) => s.isHydrated);
-  const isHydrated = sessionHydrated && themeHydrated && accountsHydrated;
+  // The app lock shows the PIN keypad or the phone's prompt; known before it opens.
+  const pinHydrated = usePinStore((s) => s.isHydrated);
+  const isHydrated = sessionHydrated && themeHydrated && accountsHydrated && pinHydrated;
   const switching = useSwitchProgressStore((s) => s.switching);
   const hasSession = useSessionStore((s) => s.accessToken !== null);
   const hydrate = useSessionStore((s) => s.hydrate);
@@ -107,6 +111,7 @@ export default function RootLayout() {
   useEffect(() => {
     hydrate();
     hydrateAccounts();
+    void usePinStore.getState().hydrate();
   }, [hydrate, hydrateAccounts]);
 
   return (
@@ -139,6 +144,8 @@ export default function RootLayout() {
           {/* Account switch in progress — above Settings and the login
               chooser alike; input is blocked until it ends (AC-12). */}
           <BusyOverlay visible={switching} testID="overlay-account-switch" />
+          {/* The app PIN keypad (requestPin): above every screen and the app lock. */}
+          <PinPromptHost />
           <Toast />
           {/* An APK too old for the published updates blocks every screen,
               login included, until the newest one is installed. */}

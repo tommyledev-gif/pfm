@@ -63,6 +63,14 @@ func (s *SMTPEmailSender) SendAccessApprovedEmail(ctx context.Context, toEmail, 
 	return nil
 }
 
+// SendPasswordResetCode implements EmailSender: the forgot-password code.
+func (s *SMTPEmailSender) SendPasswordResetCode(ctx context.Context, toEmail, code string) error {
+	if err := s.send(ctx, toEmail, passwordResetEmail(code)); err != nil {
+		return fmt.Errorf("service.SMTPEmailSender.SendPasswordResetCode: %w", err)
+	}
+	return nil
+}
+
 func (s *SMTPEmailSender) link(path, token string) string {
 	return fmt.Sprintf("%s%s?token=%s", s.cfg.AppBaseURL, path, url.QueryEscape(token))
 }

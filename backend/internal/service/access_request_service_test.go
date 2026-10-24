@@ -37,6 +37,11 @@ func (r *recordingEmailSender) SendAccessApprovedEmail(_ context.Context, to, to
 	return nil
 }
 
+func (r *recordingEmailSender) SendPasswordResetCode(_ context.Context, to, code string) error {
+	r.sent <- sentEmail{"reset", to, code}
+	return nil
+}
+
 func (r *recordingEmailSender) next(t *testing.T) sentEmail {
 	t.Helper()
 	select {

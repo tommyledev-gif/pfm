@@ -13,6 +13,7 @@ import { DeleteAccountsSection } from "@/features/security/components/DeleteAcco
 import { DeviceSessionsSection } from "@/features/security/components/DeviceSessionsSection";
 import { IDENTITY_CHECK_FOOTER, IdentityCheckToggleRow } from "@/features/security/components/IdentityCheckToggleRow";
 import { PasskeysSection } from "@/features/security/components/PasskeysSection";
+import { PinSection } from "@/features/security/components/PinSection";
 import { REVOKE_ALL_FOOTER, RevokeAllSessionsRow } from "@/features/security/components/RevokeAllSessionsRow";
 
 const TITLE = "Bảo mật";
@@ -46,6 +47,7 @@ export default function SecurityScreen() {
     <ListSection key="app-lock" header={PROTECTIONS_HEADER} footer={APP_LOCK_FOOTER}>
       <AppLockToggleRow />
     </ListSection>,
+    <PinSection key="pin" />,
     <ListSection key="identity-check" footer={IDENTITY_CHECK_FOOTER}>
       <IdentityCheckToggleRow />
     </ListSection>,

@@ -1,16 +1,17 @@
 import { useRef, useState } from "react";
 import { Keyboard, LayoutAnimation, Pressable, Text, TextInput, View } from "react-native";
+import { useRouter } from "expo-router";
 
 import { PillButton } from "@/components/ui/PillButton";
 import { ArrowRightIcon, EyeIcon, EyeOffIcon, UserIcon } from "@/components/ui/Icon";
-import { withAlpha } from "@/lib/color";
 import { DEV_LOGIN } from "@/lib/dev-login";
-import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useReduceMotion } from "@/lib/use-reduce-motion";
 import { useLoginMutation } from "@/features/auth/api/use-login-mutation";
 import { loginErrorMessage } from "@/features/auth/login-error";
 import { completeLogin, LoginOutcome } from "@/features/accounts/complete-login";
 import { AuthField } from "@/features/auth/components/AuthField";
+import { AuthFormError } from "@/features/auth/components/AuthFormError";
 
 export type LoginFormMode = "login" | "add-account";
 
@@ -49,6 +50,7 @@ const COPY = {
   showPassword: "Hiện mật khẩu",
   hidePassword: "Ẩn mật khẩu",
   next: "Tiếp tục",
+  forgotPassword: "Quên mật khẩu?",
   emailMissing: "Nhập email hoặc tên đăng nhập.",
   passwordMissing: "Nhập mật khẩu.",
 } as const;
@@ -84,6 +86,7 @@ export function LoginForm({
 }: LoginFormProps) {
   const colors = useColors();
   const styles = useStyles();
+  const router = useRouter();
   const reduceMotion = useReduceMotion();
   const [initial] = useState(() => initialFields(initialEmail, initialPassword));
   const [email, setEmail] = useState(initial.email);
@@ -138,6 +141,11 @@ export function LoginForm({
   };
 
   const atIdentifier = step === "identifier";
+  // Signed out only: "+ Thêm tài khoản" runs inside a session, where the
+  // reset screen (an auth route) cannot open.
+  const canReset = mode === "login" && !disabled && !atIdentifier;
+  const forgotPassword = () =>
+    router.push({ pathname: "/reset-password", params: { identifier: email.trim() } });
 
   return (
     <View style={styles.form}>
@@ -203,12 +211,19 @@ export function LoginForm({
             testID="input-login-password"
           />
         )}
+        {canReset ? (
+          <Pressable
+            onPress={forgotPassword}
+            hitSlop={8}
+            style={styles.forgot}
+            accessibilityRole="button"
+            testID="btn-login-forgot-password"
+          >
+            <Text style={styles.forgotLabel}>{COPY.forgotPassword}</Text>
+          </Pressable>
+        ) : null}
       </View>
-      {login.isError ? (
-        <View style={styles.errorBox}>
-          <Text style={styles.error}>{loginErrorMessage(login.error)}</Text>
-        </View>
-      ) : null}
+      <AuthFormError message={login.isError ? loginErrorMessage(login.error) : null} />
       <PillButton
         label={atIdentifier ? COPY.next : SUBMIT_LABEL[mode]}
         icon={atIdentifier ? <ArrowRightIcon size={20} color={colors.onGreen} /> : undefined}
@@ -234,13 +249,7 @@ const useStyles = createStyles((colors) => ({
   buttonTight: { marginTop: 0 },
   buttonLoose: { marginTop: spacing.sm },
   buttonLabel: { fontSize: 16 },
-  errorBox: {
-    backgroundColor: withAlpha(colors.peach, 0.12),
-    borderWidth: 1,
-    borderColor: withAlpha(colors.peach, 0.35),
-    borderRadius: radii.listCard,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-  },
-  error: { color: colors.peach, ...typography.caption },
+  // Right under the password field, at its right edge, pulled into the gap.
+  forgot: { alignSelf: "flex-end", marginTop: -spacing.sm, paddingVertical: 2 },
+  forgotLabel: { ...typography.label, fontWeight: "600", color: colors.green },
 }));

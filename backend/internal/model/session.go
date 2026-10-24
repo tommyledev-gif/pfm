@@ -74,6 +74,8 @@ const (
 	SessionRevokedDeviceSignOut = "device_sign_out"
 	// The user changed their password; every session ends.
 	SessionRevokedPasswordChanged = "password_changed"
+	// The password was reset with an emailed code (specs/forgot-password).
+	SessionRevokedPasswordReset = "password_reset"
 	// Never bound to a device and unused since devices were introduced; a
 	// sign-in on a device ended it (RevokeUnboundSessions).
 	SessionRevokedUnboundStale = "unbound_stale"

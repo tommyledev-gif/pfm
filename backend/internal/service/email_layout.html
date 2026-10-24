@@ -46,14 +46,14 @@
 </td>
 </tr>
 </table>{{end}}
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 24px;">
+{{if .ButtonURL}}<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 24px;">
 <tr>
 <td align="center" bgcolor="#85FF33" style="border-radius:999px;background-color:#85FF33;">
 <a href="{{.ButtonURL}}" target="_blank"
   style="display:inline-block;padding:15px 32px;border-radius:999px;color:#06130A;font-size:16px;font-weight:700;text-decoration:none;">{{.ButtonLabel}}</a>
 </td>
 </tr>
-</table>
+</table>{{end}}
 {{if .Steps}}<div style="margin:0 0 12px;color:#050B14;font-size:14px;font-weight:700;">{{.StepsTitle}}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;">
 {{range $i, $step := .Steps}}<tr>
@@ -70,9 +70,9 @@
 <tr>
 <td bgcolor="#FFFFFF" style="background-color:#FFFFFF;border-radius:0 0 24px 24px;padding:0 32px 28px;">
 <div style="border-top:1px solid #E6E9EE;padding-top:18px;color:#6B7383;font-size:13px;line-height:20px;">
-<div>Nút không mở được? Dùng liên kết này:</div>
+{{if .ButtonURL}}<div>Nút không mở được? Dùng liên kết này:</div>
 <a href="{{.ButtonURL}}" target="_blank" style="color:#2E6B12;word-break:break-all;">{{.ButtonURL}}</a>
-{{range .Footnotes}}<div style="margin-top:10px;">{{.}}</div>
+{{end}}{{range .Footnotes}}<div style="margin-top:10px;">{{.}}</div>
 {{end}}</div>
 </td>
 </tr>
