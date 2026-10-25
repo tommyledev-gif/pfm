@@ -33,7 +33,13 @@ export function LocationPinToggle() {
       hitSlop={4}
       style={styles.button}
     >
-      <View style={[styles.well, on && { backgroundColor: withAlpha(colors.green, 0.14) }]}>
+      {/* ⚠️ Never flattened. Off, the well has nothing to draw, so Fabric
+          dropped its native view; turned on again it came back as a new view
+          that lost the round corners, a square fill. */}
+      <View
+        collapsable={false}
+        style={[styles.well, { backgroundColor: on ? withAlpha(colors.green, 0.14) : "transparent" }]}
+      >
         <MapPinIcon size={ICON_SIZE} color={on ? colors.green : colors.textMuted} />
         {on ? null : <View style={[styles.slash, { backgroundColor: colors.textMuted }]} />}
       </View>

@@ -11,14 +11,18 @@ import { ChatModeBackdrop } from "@/features/ai-chat/components/ChatModeBackdrop
 import { ChatModeHeader } from "@/features/ai-chat/components/ChatModeHeader";
 import { ChatModePicker } from "@/features/ai-chat/components/ChatModePicker";
 import { ChatOverlays } from "@/features/ai-chat/components/ChatOverlays";
+import { ChatSearchBar } from "@/features/ai-chat/components/ChatSearchBar";
+import { ChatSearchResults } from "@/features/ai-chat/components/ChatSearchResults";
 import { ConsultPane } from "@/features/ai-chat/components/ConsultPane";
 import { RecordingPane } from "@/features/ai-chat/components/RecordingPane";
 import { useTransactionRemoval } from "@/features/ai-chat/components/use-transaction-removal";
 import { createChatDraftStore } from "@/features/ai-chat/chat-draft";
-import { ChatMode, useChatModeStore } from "@/features/ai-chat/chat-mode";
+import { CHAT_MODE_META, ChatMode, useChatModeStore } from "@/features/ai-chat/chat-mode";
 import { isConsultMessage } from "@/features/ai-chat/consult-message";
 import { useChatActions } from "@/features/ai-chat/hooks/use-chat-actions";
 import { useChatOverlays } from "@/features/ai-chat/hooks/use-chat-overlays";
+import { useChatSearch } from "@/features/ai-chat/hooks/use-chat-search";
+import { MessageJump } from "@/features/ai-chat/hooks/use-message-jump";
 import { isTombstone } from "@/features/ai-chat/tombstone";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
@@ -28,10 +32,6 @@ import { isWaitingForNetwork } from "@/lib/query-status";
 import { useLatestCallback } from "@/lib/use-latest-callback";
 import { useChatStore, useChatThreadRestored } from "@/stores/chat-store";
 import { useCurrentUserId } from "@/stores/use-current-user-id";
-
-// A beat for the list to finish its mount/measure pass before scrolling to a
-// deep-linked message — RecordingPane retries if the row still was not measured.
-const FOCUS_SCROLL_DELAY_MS = 50;
 
 // For anything that opens a Modal over the composer: close the keyboard
 // first. A Modal is its own Android window; it hides the keyboard but leaves
@@ -110,6 +110,20 @@ export default function AiChatScreen() {
   const walletById = useMemo(() => new Map(wallets.data?.map((w) => [w.id, w])), [wallets.data]);
   const categoryById = useMemo(() => new Map(categories.data?.map((c) => [c.id, c])), [categories.data]);
 
+  // The header's search covers the pane on screen; a picked result (or a deep
+  // link) is a jump the pane carries out (useMessageJump).
+  const paneMessages = useMemo(
+    () => (mode === "consult" ? thread.filter(isConsultMessage).reverse() : invertedThread),
+    [mode, thread, invertedThread],
+  );
+  const search = useChatSearch(paneMessages);
+  const [jump, setJump] = useState<MessageJump | null>(null);
+  const jumpToResult = useLatestCallback((id: string) => {
+    Keyboard.dismiss();
+    search.closeSearch();
+    setJump({ id, nonce: Date.now() });
+  });
+
   // A parked swipe row never stays open over a thread that moved under it.
   useEffect(() => {
     closeParkedSwipeRow();
@@ -119,16 +133,13 @@ export default function AiChatScreen() {
     if (!focusMessageId) return;
     // Deep links always point at a Transaction proposal (recording pane).
     setMode("transaction");
-    const index = invertedThread.findIndex((m) => m.id === focusMessageId);
-    if (index === -1) return;
-    const timer = setTimeout(() => {
-      listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
-    }, FOCUS_SCROLL_DELAY_MS);
+    search.closeSearch();
+    if (!invertedThread.some((m) => m.id === focusMessageId)) return;
+    setJump({ id: focusMessageId, nonce: Date.now() });
     if (openEdit === "1") {
       const message = thread.find((m) => m.id === focusMessageId);
       if (message?.action && !isTombstone(message)) overlays.setEditingActionMessage(message);
     }
-    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusMessageId, focusedAt]);
 
@@ -186,7 +197,16 @@ export default function AiChatScreen() {
       {/* Outside the content View so its wash runs up under the status bar too. */}
       <ChatModeBackdrop mode={mode} />
       <View style={styles.screen}>
-        <ChatModeHeader mode={mode} onPressMode={openModePicker} />
+        {search.open ? (
+          <ChatSearchBar
+            query={search.query}
+            onChangeQuery={search.setQuery}
+            searchableCount={search.searchableCount}
+            onClose={search.closeSearch}
+          />
+        ) : (
+          <ChatModeHeader mode={mode} onPressMode={openModePicker} onPressSearch={search.openSearch} />
+        )}
 
         {/* Keyed by pane, not mode: recording and the budget wizard share one. */}
         <Animated.View
@@ -199,6 +219,7 @@ export default function AiChatScreen() {
               loading={threadLoading}
               bottomInset={insets.bottom}
               onSwitchToRecording={handleSwitchToRecording}
+              jump={jump}
             />
           ) : (
             <RecordingPane
@@ -218,8 +239,14 @@ export default function AiChatScreen() {
               onPressHistory={openHistory}
               onOpenBudgetWizard={openBudgetWizard}
               onOpenManualEntry={openManualEntry}
+              jump={jump}
             />
           )}
+          {/* Only once there is something typed: an empty search leaves the
+              thread in view. */}
+          {search.open && search.query.trim() ? (
+            <ChatSearchResults hits={search.hits} tint={CHAT_MODE_META[mode].tint} onSelect={jumpToResult} />
+          ) : null}
         </Animated.View>
       </View>
 

@@ -10,6 +10,8 @@ interface SearchFieldProps {
   testID?: string;
   /** Off for non-Vietnamese queries (OpenMoji's English names). */
   autoCorrect?: boolean;
+  /** Takes the keyboard as soon as it mounts (a search opened on purpose). */
+  autoFocus?: boolean;
 }
 
 const FIELD_HEIGHT = 44;
@@ -20,7 +22,7 @@ const FIELD_HEIGHT = 44;
  * outline in a stack of them. The clear button only exists while there is
  * something to clear.
  */
-export function SearchField({ value, onChangeText, placeholder, testID, autoCorrect }: SearchFieldProps) {
+export function SearchField({ value, onChangeText, placeholder, testID, autoCorrect, autoFocus }: SearchFieldProps) {
   const colors = useColors();
   const styles = useStyles();
   return (
@@ -34,6 +36,7 @@ export function SearchField({ value, onChangeText, placeholder, testID, autoCorr
         style={styles.input}
         autoCorrect={autoCorrect}
         autoCapitalize={autoCorrect === false ? "none" : undefined}
+        autoFocus={autoFocus}
         returnKeyType="search"
         testID={testID}
       />

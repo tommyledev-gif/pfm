@@ -1,5 +1,5 @@
-import { ReactNode } from "react";
-import { GestureResponderEvent, Pressable, PressableProps, StyleProp, ViewStyle } from "react-native";
+import { ReactNode, Ref } from "react";
+import { GestureResponderEvent, Pressable, PressableProps, StyleProp, View, ViewStyle } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 
 import { PRESS_SCALE, PRESS_SPRING } from "@/components/motion/motion-tokens";
@@ -11,6 +11,8 @@ interface PressableScaleProps extends Omit<PressableProps, "style" | "children">
   style?: StyleProp<ViewStyle>;
   /** How far it shrinks while held. */
   scaleTo?: number;
+  /** The pressable's own view, e.g. to measure it (useHintTooltip). */
+  ref?: Ref<View>;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);

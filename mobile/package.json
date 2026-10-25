@@ -62,5 +62,10 @@
     "ota:publish": "node scripts/ota/publish-update.mjs",
     "ota:rollback": "node scripts/ota/rollback-update.mjs"
   },
-  "private": true
+  "private": true,
+  "reanimated": {
+    "staticFeatureFlags": {
+      "ANDROID_SYNCHRONOUSLY_UPDATE_UI_PROPS": true
+    }
+  }
 }

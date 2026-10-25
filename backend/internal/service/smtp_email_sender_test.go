@@ -9,7 +9,7 @@ import (
 // render builds a message, failing the test on a template error.
 func render(t *testing.T, toEmail string, email emailContent) string {
 	t.Helper()
-	msg, err := buildEmailMessage("no-reply@pfm.local", "PFM", toEmail, email)
+	msg, err := buildEmailMessage("no-reply@pfm.local", toEmail, email)
 	if err != nil {
 		t.Fatalf("buildEmailMessage() error: %v", err)
 	}
@@ -20,7 +20,7 @@ func TestBuildEmailMessage_Activation(t *testing.T) {
 	msg := render(t, "user@example.com", activationEmail("https://app.pfm.local/activate?token=abc123"))
 
 	wantSubstrings := []string{
-		"From: PFM <no-reply@pfm.local>",
+		"From: Budgest <no-reply@pfm.local>",
 		"To: user@example.com",
 		// Vietnamese subject, so it must arrive MIME-encoded.
 		"Subject: " + mime.BEncoding.Encode("UTF-8", activationSubject),

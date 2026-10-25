@@ -23,7 +23,6 @@ type Config struct {
 	SMTPUsername  string
 	SMTPPassword  string
 	SMTPFromEmail string
-	SMTPFromName  string
 	// AppBaseURL is the web frontend origin the activation link points at
 	// (`{AppBaseURL}/activate?token=...`), not the API's own origin.
 	AppBaseURL string
@@ -106,7 +105,6 @@ func Load() (*Config, error) {
 		SMTPUsername:  os.Getenv("SMTP_USERNAME"),
 		SMTPPassword:  os.Getenv("SMTP_PASSWORD"),
 		SMTPFromEmail: getEnvOrDefault("SMTP_FROM_EMAIL", "no-reply@pfm.local"),
-		SMTPFromName:  getEnvOrDefault("SMTP_FROM_NAME", "PFM"),
 		AppBaseURL:    getEnvOrDefault("APP_BASE_URL", "http://localhost:8082"),
 
 		AIServiceURL:   getEnvOrDefault("AI_SERVICE_URL", "http://ai-service:8000"),

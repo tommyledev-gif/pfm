@@ -3,18 +3,20 @@ import { ActivityIndicator, FlatList, LayoutChangeEvent, ListRenderItemInfo, Sty
 
 import { closeParkedSwipeRow, closeParkedSwipeRowOnOutsideTouch } from "@/components/shared/use-swipe-actions";
 import { TypingIndicator } from "@/components/shared/TypingIndicator";
-import { ChatDayLabel, dayStartAt } from "@/features/ai-chat/components/ChatDayLabel";
+import { dayStartAt } from "@/features/ai-chat/components/ChatDayLabel";
 import { ChatMessageRow } from "@/features/ai-chat/components/ChatMessageRow";
 import { ChatThreadList } from "@/features/ai-chat/components/ChatThreadList";
 import { ChatThreadSkeleton } from "@/features/ai-chat/components/ChatThreadSkeleton";
 import { KeyboardLiftView } from "@/features/ai-chat/components/KeyboardLiftView";
 import { RecordingComposer } from "@/features/ai-chat/components/RecordingComposer";
 import { RecordingEmptyState } from "@/features/ai-chat/components/RecordingEmptyState";
+import { ChatRowFrame } from "@/features/ai-chat/components/ChatRowFrame";
 import { useChatThreadStyles } from "@/features/ai-chat/components/chat-thread-styles";
 import { ChatDraftStore } from "@/features/ai-chat/chat-draft";
 import { CHAT_MODE_META, ChatMode } from "@/features/ai-chat/chat-mode";
 import { pinFreshProposals, withAutoPin } from "@/features/ai-chat/proposal-auto-pin";
 import { useChatActions } from "@/features/ai-chat/hooks/use-chat-actions";
+import { MessageJump, useMessageJump } from "@/features/ai-chat/hooks/use-message-jump";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { Category } from "@/features/categories/types";
@@ -27,9 +29,6 @@ import { useLatestCallback } from "@/lib/use-latest-callback";
 import { useColors } from "@/lib/theme";
 import { useChatStore } from "@/stores/chat-store";
 import { useUiPrefsStore } from "@/stores/ui-prefs-store";
-
-// Retry delay when a deep-linked row had not been measured yet.
-const FOCUS_RETRY_DELAY_MS = 100;
 
 const messageKey = (m: ChatMessage) => m.id;
 
@@ -59,6 +58,8 @@ interface RecordingPaneProps {
   onPressHistory: (message: ChatMessage) => void;
   onOpenBudgetWizard: (originMessageId: string | null) => void;
   onOpenManualEntry: () => void;
+  /** A message to scroll to and light up: a search result, a deep link. */
+  jump: MessageJump | null;
 }
 
 /**
@@ -82,6 +83,7 @@ export function RecordingPane({
   onPressHistory,
   onOpenBudgetWizard,
   onOpenManualEntry,
+  jump,
 }: RecordingPaneProps) {
   const chatThreadStyles = useChatThreadStyles();
   const colors = useColors();
@@ -139,6 +141,7 @@ export function RecordingPane({
   const handleRetryText = useLatestCallback((message: ChatMessage) => requireOnline(() => void chat.retryReply(message)));
   const confirmingId = chat.confirmingId;
   const dayTint = CHAT_MODE_META[mode].tint;
+  const { highlightId, highlightOpacity, onScrollToIndexFailed } = useMessageJump(listRef, messages, jump);
 
   const renderItem = useCallback(
     ({ item, index }: ListRenderItemInfo<ChatMessage>) => {
@@ -162,19 +165,21 @@ export function RecordingPane({
         />
       );
       // Messages grouped by day: the day's first one carries its date.
-      const dayAt = dayStartAt(messages, index);
-      return dayAt === undefined ? (
-        row
-      ) : (
-        <View>
-          <ChatDayLabel at={dayAt} tint={dayTint} />
+      return (
+        <ChatRowFrame
+          dayAt={dayStartAt(messages, index)}
+          tint={dayTint}
+          highlightOpacity={item.id === highlightId ? highlightOpacity : undefined}
+        >
           {row}
-        </View>
+        </ChatRowFrame>
       );
     },
     [
       messages,
       dayTint,
+      highlightId,
+      highlightOpacity,
       walletById,
       categoryById,
       budgetByCategoryCurrency,
@@ -210,11 +215,7 @@ export function RecordingPane({
           keyboardShouldPersistTaps="handled"
           // A parked swipe row is never left open over content moving under it.
           onScrollBeginDrag={closeParkedSwipeRow}
-          onScrollToIndexFailed={(info) => {
-            setTimeout(() => {
-              listRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.5 });
-            }, FOCUS_RETRY_DELAY_MS);
-          }}
+          onScrollToIndexFailed={onScrollToIndexFailed}
           renderItem={renderItem}
           // The end of an inverted list is its top: the oldest message.
           onEndReached={loading ? undefined : loadOlder}

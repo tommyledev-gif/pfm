@@ -10,7 +10,7 @@ import { useColors } from "@/lib/theme";
 // width), not a full-page push: the bar stays put, so the content only has
 // to say which way it moved. (Scaling both scenes, tried earlier, read as
 // the whole screen lurching.)
-const SWITCH_MS = 260;
+const SWITCH_MS = 220;
 const SLIDE = Math.round(Dimensions.get("window").width * 0.2);
 // The tabs other than the one the app opens on, mounted ahead of their first
 // visit once the app has settled, a little apart, in the order they tend to
@@ -81,12 +81,20 @@ function usePreloadTabs() {
 // The bar itself stays our own BottomNav, rendered as an overlay by the
 // parent (app) layout so it also shows on pushed sub-screens; the navigator's
 // built-in bar is switched off.
+//
+// ⚠️ detachInactiveScreens off: by default a tab out of view was taken out
+// of the window, and every switch put the arriving one back, a whole screen
+// laid out and redrawn on the UI thread in the frames the slide and the nav
+// ball were meant to start in. Kept attached, a tab out of view costs nothing
+// to draw: the interpolator leaves it at opacity 0, which Android also skips
+// for touch (pointerEvents) and TalkBack.
 export default function TabsLayout() {
   const colors = useColors();
   usePreloadTabs();
   return (
     <Tabs
       tabBar={() => null}
+      detachInactiveScreens={false}
       screenOptions={{
         headerShown: false,
         sceneStyle: { backgroundColor: colors.bgApp },

@@ -17,7 +17,6 @@ type SMTPConfig struct {
 	Username  string
 	Password  string
 	FromEmail string
-	FromName  string
 	// AppBaseURL is the origin the email links point at: the backend serves
 	// /activate and /approve-access itself (handler.ActivatePageHandler).
 	AppBaseURL string
@@ -79,7 +78,7 @@ func (s *SMTPEmailSender) link(path, token string) string {
 // 587; net/smtp.SendMail upgrades the connection automatically when the
 // server offers it, so no manual TLS dialing is needed here.
 func (s *SMTPEmailSender) send(ctx context.Context, toEmail string, email emailContent) error {
-	msg, err := buildEmailMessage(s.cfg.FromEmail, s.cfg.FromName, toEmail, email)
+	msg, err := buildEmailMessage(s.cfg.FromEmail, toEmail, email)
 	if err != nil {
 		return err
 	}

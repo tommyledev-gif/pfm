@@ -47,16 +47,21 @@ var emailLayout = template.Must(template.New("email").
 	Funcs(template.FuncMap{"inc": func(i int) int { return i + 1 }}).
 	Parse(emailLayoutHTML))
 
-// The app's logo (mobile/assets/icon.png, cropped to the wallet and scaled
-// to 96px for a 40px slot at 2x), sent inside every email as an inline part
-// the layout points at with cid:. Nothing to host, and it shows without the
-// reader allowing remote images. A data: URI would be smaller still, but
-// Gmail drops those.
+// The app's logo in its light-theme form: mobile/assets/simple-budgest-logo.png
+// on a white rounded tile, 96px for a 40px slot at 2x. The dark app icon sat
+// on the dark header with nothing around it and all but vanished. Sent inside
+// every email as an inline part the layout points at with cid:. Nothing to
+// host, and it shows without the reader allowing remote images. A data: URI
+// would be smaller still, but Gmail drops those.
 //
 //go:embed email_logo.png
 var emailLogoPNG []byte
 
 const emailLogoCID = "budgest-logo"
+
+// The sender's display name. The brand, not deployment config: it used to
+// come from SMTP_FROM_NAME, and the production value still said "PFM".
+const emailSenderName = "Budgest"
 
 // RFC 2045's limit for a base64 body line.
 const base64LineLength = 76
@@ -142,7 +147,7 @@ func passwordResetEmail(code string) emailContent {
 // then the logo it shows. The subject goes through MIME B-encoding: it is
 // Vietnamese (non-ASCII), and the encoding also keeps any user-supplied part
 // of it from breaking out of the header line.
-func buildEmailMessage(fromEmail, fromName, toEmail string, email emailContent) ([]byte, error) {
+func buildEmailMessage(fromEmail, toEmail string, email emailContent) ([]byte, error) {
 	var body bytes.Buffer
 	parts := multipart.NewWriter(&body)
 	htmlPart, err := parts.CreatePart(textproto.MIMEHeader{
@@ -175,7 +180,7 @@ func buildEmailMessage(fromEmail, fromName, toEmail string, email emailContent) 
 	fmt.Fprintf(&msg,
 		"From: %s <%s>\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\n"+
 			"Content-Type: multipart/related; boundary=\"%s\"; type=\"text/html\"\r\n\r\n",
-		mime.BEncoding.Encode("UTF-8", fromName), fromEmail, toEmail, mime.BEncoding.Encode("UTF-8", email.Subject),
+		mime.BEncoding.Encode("UTF-8", emailSenderName), fromEmail, toEmail, mime.BEncoding.Encode("UTF-8", email.Subject),
 		parts.Boundary(),
 	)
 	msg.Write(body.Bytes())

@@ -152,7 +152,7 @@ export function TransactionActionCard({
   return (
     // The hold menu (copy, edit, delete) belongs to the whole message —
     // ChatMessageRow — so only the amount's own reveal hold lives in here.
-    <View style={styles.card}>
+    <View style={[styles.card, confirmed && styles.cardSaved]}>
       {edited ? (
         <Pressable style={styles.editedBadge} onPress={onPressHistory} disabled={!onPressHistory}>
           <EditIcon size={12} color={colors.lavender} />
@@ -271,6 +271,9 @@ export function TransactionActionCard({
 
 const useStyles = createStyles((colors) => ({
   card: { gap: spacing.md, marginTop: spacing.sm },
+  // A saved card has no text above it (ChatMessageRow blanks the bubble's
+  // text), so the space that set it off from the text would only pad the top.
+  cardSaved: { marginTop: 0 },
   editedBadge: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start" },
   editedLabel: { ...typography.tiny, color: colors.lavender },
   compactRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },

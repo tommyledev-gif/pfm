@@ -212,7 +212,6 @@ func newEmailSender(cfg *config.Config, logger *zap.Logger) service.EmailSender 
 		Username:   cfg.SMTPUsername,
 		Password:   cfg.SMTPPassword,
 		FromEmail:  cfg.SMTPFromEmail,
-		FromName:   cfg.SMTPFromName,
 		AppBaseURL: cfg.AppBaseURL,
 	})
 }

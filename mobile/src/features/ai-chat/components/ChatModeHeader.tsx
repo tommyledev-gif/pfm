@@ -3,15 +3,19 @@ import { Image, Pressable, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 
 import { entrance } from "@/components/motion/motion-tokens";
-import { ChevronDownIcon } from "@/components/ui/Icon";
+import { useHintTooltip } from "@/components/shared/use-hint-tooltip";
+import { ChevronDownIcon, SearchIcon } from "@/components/ui/Icon";
 import { CHAT_MODE_META, ChatMode } from "@/features/ai-chat/chat-mode";
-import { radii, spacing, typography, createStyles } from "@/lib/theme";
+import { withAlpha } from "@/lib/color";
+import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 const BRAND_LOGO = require("../../../../assets/simple-budgest-logo.png");
 
 interface ChatModeHeaderProps {
   mode: ChatMode;
   onPressMode: () => void;
+  /** Opens the message search (ChatSearchBar takes this header's place). */
+  onPressSearch: () => void;
 }
 
 /**
@@ -27,8 +31,10 @@ interface ChatModeHeaderProps {
  * Switching mode fades the pill's new icon and name in (keyed by mode), in
  * step with ChatModeBackdrop's wash; the first render just shows it.
  */
-export const ChatModeHeader = memo(function ChatModeHeader({ mode, onPressMode }: ChatModeHeaderProps) {
+export const ChatModeHeader = memo(function ChatModeHeader({ mode, onPressMode, onPressSearch }: ChatModeHeaderProps) {
   const styles = useStyles();
+  const colors = useColors();
+  const searchHint = useHintTooltip("Tìm tin nhắn");
   const meta = CHAT_MODE_META[mode];
   const ModeIcon = meta.icon;
   const mounted = useRef(false);
@@ -43,38 +49,60 @@ export const ChatModeHeader = memo(function ChatModeHeader({ mode, onPressMode }
           <Image source={BRAND_LOGO} style={styles.logo} resizeMode="contain" />
         </View>
         <View style={styles.brandText}>
-          <Text style={styles.headerTitle}>Budgest AI</Text>
-          <Text style={styles.headerSubtitle}>Trợ lý tài chính của bạn</Text>
+          {/* One line each: with the search button beside the mode pill, a
+              narrow phone wrapped them and the header grew a line. */}
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            Budgest AI
+          </Text>
+          <Text style={styles.headerSubtitle} numberOfLines={1}>
+            Trợ lý tài chính của bạn
+          </Text>
         </View>
       </View>
 
-      {/* The halo is its own wrapper so it stays visible on Android, where a
-          coloured shadow isn't drawn. */}
-      <View style={[styles.halo, { backgroundColor: `${meta.tint}14`, shadowColor: meta.tint }]}>
+      <View style={styles.actions}>
+        {/* A plain round icon button, like the Transactions header's: the
+            mode pill stays the one control that glows. */}
         <Pressable
-          testID="btn-chat-mode"
+          testID="btn-chat-search"
           accessibilityRole="button"
-          accessibilityLabel={`Chế độ: ${meta.label}. Chạm để đổi.`}
-          style={({ pressed }) => [
-            styles.modePill,
-            { borderColor: `${meta.tint}66`, backgroundColor: `${meta.tint}1F` },
-            pressed && styles.modePillPressed,
-          ]}
-          onPress={onPressMode}
-          hitSlop={6}
+          accessibilityLabel="Tìm tin nhắn"
+          onPress={onPressSearch}
+          {...searchHint}
+          hitSlop={4}
+          style={({ pressed }) => [styles.searchButton, pressed && styles.modePillPressed]}
         >
-          <Animated.View
-            key={mode}
-            entering={mounted.current ? entrance("fade") : undefined}
-            style={styles.modeContent}
-          >
-            <ModeIcon size={18} color={meta.tint} toColor={meta.iconToColor} />
-            <Text style={[styles.modeLabel, { color: meta.tint }]} numberOfLines={1}>
-              {meta.shortLabel}
-            </Text>
-            <ChevronDownIcon size={14} color={meta.tint} />
-          </Animated.View>
+          <SearchIcon size={18} color={colors.textSecondary} />
         </Pressable>
+
+        {/* The halo is its own wrapper so it stays visible on Android, where a
+            coloured shadow isn't drawn. */}
+        <View style={[styles.halo, { backgroundColor: `${meta.tint}14`, shadowColor: meta.tint }]}>
+          <Pressable
+            testID="btn-chat-mode"
+            accessibilityRole="button"
+            accessibilityLabel={`Chế độ: ${meta.label}. Chạm để đổi.`}
+            style={({ pressed }) => [
+              styles.modePill,
+              { borderColor: `${meta.tint}66`, backgroundColor: `${meta.tint}1F` },
+              pressed && styles.modePillPressed,
+            ]}
+            onPress={onPressMode}
+            hitSlop={6}
+          >
+            <Animated.View
+              key={mode}
+              entering={mounted.current ? entrance("fade") : undefined}
+              style={styles.modeContent}
+            >
+              <ModeIcon size={18} color={meta.tint} toColor={meta.iconToColor} />
+              <Text style={[styles.modeLabel, { color: meta.tint }]} numberOfLines={1}>
+                {meta.shortLabel}
+              </Text>
+              <ChevronDownIcon size={14} color={meta.tint} />
+            </Animated.View>
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -110,6 +138,15 @@ const useStyles = createStyles((colors) => ({
   brandText: { flexShrink: 1, gap: 1 },
   headerTitle: { ...typography.cardTitle, color: colors.textPrimary },
   headerSubtitle: { ...typography.tiny, color: colors.textSecondary },
+  actions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  searchButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: withAlpha(colors.overlayBase, 0.06),
+  },
   halo: {
     padding: 3,
     borderRadius: radii.pill,

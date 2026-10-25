@@ -39,6 +39,9 @@ const ELLIPSIS_GAP = 2;
 const ELLIPSIS_WIDTH = ELLIPSIS_DOT * 3 + ELLIPSIS_GAP * 2;
 // How fast the window catches up when it jumps (across the loop's seam).
 const WINDOW_GLIDE_MS = 160;
+// Across the seam the capsule is fully shown until a quarter of the way,
+// gone at the halfway mark, and back by three quarters.
+const SEAM_FADE = 4;
 
 const dotsWidth = (count: number) => count * STEP - DOT_GAP + EDGE * 2;
 
@@ -57,6 +60,19 @@ function dotPosition(scrollX: number, dotCount: number, looping: boolean): numbe
   return looping ? ((raw % dotCount) + dotCount) % dotCount : Math.min(Math.max(raw, 0), dotCount - 1);
 }
 
+// Where the capsule is drawn: `dotPosition`, except across the loop's seam
+// (last wallet → first), where there is no dot in between to slide over. It
+// used to slide out past the last dot while a twin slid in before the first,
+// so mid-swipe it was cut in two, part at each end. Now it stays whole at the
+// nearer end, fading out towards the halfway mark and back in at the other.
+function capsuleAt(scrollX: number, dotCount: number, looping: boolean): { position: number; opacity: number } {
+  "worklet";
+  const position = dotPosition(scrollX, dotCount, looping);
+  const past = position - (dotCount - 1);
+  if (!looping || past <= 0) return { position, opacity: 1 };
+  return { position: past < 0.5 ? dotCount - 1 : 0, opacity: Math.min(1, Math.abs(past - 0.5) * SEAM_FADE) };
+}
+
 // Fixed height whatever the wallet count, including one wallet (no pager
 // drawn), so the content below never moves. WalletCardSkeleton reserves it.
 export const PAGER_HEIGHT = 36;
@@ -70,30 +86,25 @@ interface ActiveCapsuleProps {
   scrollX: SharedValue<number>;
   /** The active colour of each dot, by wallet index. */
   colors: string[];
-  /** The twin that slides in from the far side across the loop's seam. */
-  twin?: boolean;
 }
 
 /**
  * The one capsule that marks the centred card, sliding along the dots with
  * the scroll frame by frame (the carousel's own Reanimated value), drawing
  * out a little mid-way and blending from one wallet's colour into the next.
- *
- * Across the loop's seam (last wallet → first) it keeps going: it slides out
- * past the last dot while its twin slides in before the first, the row
- * clipping both, so it never jumps back across the whole bar.
+ * Across the loop's seam it fades from one end to the other (capsuleAt).
  */
-function ActiveCapsule({ dotCount, looping, scrollX, colors, twin = false }: ActiveCapsuleProps) {
+function ActiveCapsule({ dotCount, looping, scrollX, colors }: ActiveCapsuleProps) {
   const styles = useStyles();
   const style = useAnimatedStyle(() => {
-    const position = dotPosition(scrollX.value, dotCount, looping);
+    const { position, opacity } = capsuleAt(scrollX.value, dotCount, looping);
     const index = Math.floor(position);
     const frac = position - index;
-    const shift = twin ? position - dotCount : position;
     const width = PILL + PILL_STRETCH * Math.sin(Math.PI * frac);
     return {
       width,
-      transform: [{ translateX: EDGE + shift * STEP + DOT / 2 - width / 2 }],
+      opacity,
+      transform: [{ translateX: EDGE + position * STEP + DOT / 2 - width / 2 }],
       backgroundColor: interpolateColor(frac, [0, 1], [colors[index] ?? colors[0], colors[(index + 1) % dotCount] ?? colors[0]]),
     };
   });
@@ -126,7 +137,7 @@ function useDotWindow(dotCount: number, visible: number, looping: boolean, scrol
   useAnimatedReaction(
     () => {
       if (lastStart <= 0) return 0;
-      const position = dotPosition(scrollX.value, dotCount, looping);
+      const { position } = capsuleAt(scrollX.value, dotCount, looping);
       return Math.min(Math.max(position - (visible - 1) / 2, 0), lastStart);
     },
     (target, previous) => {
@@ -155,7 +166,7 @@ interface WalletCarouselPagerProps {
   dotColors?: string[];
   /** Rendered cards, loop copies included. */
   positionCount: number;
-  /** The carousel wraps around: the capsule slides across the seam. */
+  /** The carousel wraps around: the capsule fades across the seam. */
   looping: boolean;
   scrollX: SharedValue<number>;
   /** The carousel's width; the bar takes at most MAX_WIDTH_RATIO of it. 0 = not measured yet. */
@@ -220,9 +231,6 @@ export function WalletCarouselPager({
                 <View key={dot} style={[styles.dot, { left: EDGE + dot * STEP }]} />
               ))}
               <ActiveCapsule dotCount={dotCount} looping={looping} scrollX={scrollX} colors={activeColors} />
-              {looping ? (
-                <ActiveCapsule dotCount={dotCount} looping scrollX={scrollX} colors={activeColors} twin />
-              ) : null}
             </Animated.View>
           </View>
 
@@ -271,8 +279,7 @@ const useStyles = createStyles((colors) => ({
   },
   buttonPressed: { backgroundColor: withAlpha(colors.overlayBase, 0.08) },
   buttonDisabled: { opacity: 0.3 },
-  // Clips the capsule and its twin as they cross the loop's seam, and the
-  // dots outside the window.
+  // Clips the dots outside the window.
   dots: { height: DOT, overflow: "hidden" },
   dotRow: { position: "absolute", top: 0, left: 0, height: DOT },
   dot: { position: "absolute", top: 0, width: DOT, height: DOT, borderRadius: DOT / 2, backgroundColor: colors.trackMuted },

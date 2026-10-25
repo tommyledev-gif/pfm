@@ -3,7 +3,8 @@ import { FlatList, ListRenderItemInfo, StyleSheet, View } from "react-native";
 
 import { TypingIndicator } from "@/components/shared/TypingIndicator";
 import { ChatComposer } from "@/features/ai-chat/components/ChatComposer";
-import { ChatDayLabel, dayStartAt } from "@/features/ai-chat/components/ChatDayLabel";
+import { dayStartAt } from "@/features/ai-chat/components/ChatDayLabel";
+import { ChatRowFrame } from "@/features/ai-chat/components/ChatRowFrame";
 import { ChatThreadSkeleton } from "@/features/ai-chat/components/ChatThreadSkeleton";
 import { ConsultEmptyState } from "@/features/ai-chat/components/ConsultEmptyState";
 import { ChatInputBar } from "@/features/ai-chat/components/ChatInputBar";
@@ -14,6 +15,7 @@ import { useChatThreadStyles } from "@/features/ai-chat/components/chat-thread-s
 import { CHAT_MODE_META } from "@/features/ai-chat/chat-mode";
 import { isConsultMessage } from "@/features/ai-chat/consult-message";
 import { useConsultActions } from "@/features/ai-chat/hooks/use-consult-actions";
+import { MessageJump, useMessageJump } from "@/features/ai-chat/hooks/use-message-jump";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { StarterChipsRow } from "@/features/analytics/components/StarterChipsRow";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
@@ -32,6 +34,8 @@ interface ConsultPaneProps {
   bottomInset: number;
   /** `prefill` = the question to carry into the recording input. */
   onSwitchToRecording: (prefill?: string) => void;
+  /** A message to scroll to and light up: a search result. */
+  jump: MessageJump | null;
 }
 
 /**
@@ -39,7 +43,7 @@ interface ConsultPaneProps {
  * thread, typing indicator, starter chips and input. No swipe rows — answers
  * are snapshots, never edited or removed.
  */
-export function ConsultPane({ loading, bottomInset, onSwitchToRecording }: ConsultPaneProps) {
+export function ConsultPane({ loading, bottomInset, onSwitchToRecording, jump }: ConsultPaneProps) {
   const styles = useChatThreadStyles();
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const thread = useChatStore((s) => s.thread);
@@ -55,6 +59,7 @@ export function ConsultPane({ loading, bottomInset, onSwitchToRecording }: Consu
 
   // Inverted list, same as the recording pane: offset 0 is "newest".
   const messages = useMemo(() => thread.filter(isConsultMessage).reverse(), [thread]);
+  const { highlightId, highlightOpacity, onScrollToIndexFailed } = useMessageJump(listRef, messages, jump);
 
   const renderItem = useCallback(
     ({ item, index }: ListRenderItemInfo<ChatMessage>) => {
@@ -63,17 +68,17 @@ export function ConsultPane({ loading, bottomInset, onSwitchToRecording }: Consu
       const startsTurn = previous !== undefined && (item.role === "user" || previous.role === "assistant");
       const row = <ConsultMessageRow message={item} startsTurn={startsTurn} handlers={consult.handlers} />;
       // Messages grouped by day: the day's first one carries its date.
-      const dayAt = dayStartAt(messages, index);
-      return dayAt === undefined ? (
-        row
-      ) : (
-        <View>
-          <ChatDayLabel at={dayAt} tint={CHAT_MODE_META.consult.tint} />
+      return (
+        <ChatRowFrame
+          dayAt={dayStartAt(messages, index)}
+          tint={CHAT_MODE_META.consult.tint}
+          highlightOpacity={item.id === highlightId ? highlightOpacity : undefined}
+        >
           {row}
-        </View>
+        </ChatRowFrame>
       );
     },
-    [messages, consult.handlers],
+    [messages, consult.handlers, highlightId, highlightOpacity],
   );
 
   return (
@@ -86,6 +91,7 @@ export function ConsultPane({ loading, bottomInset, onSwitchToRecording }: Consu
           // Each row spaces itself (ConsultMessageRow).
           contentContainerStyle={[styles.thread, consultStyles.thread]}
           keyboardShouldPersistTaps="handled"
+          onScrollToIndexFailed={onScrollToIndexFailed}
           reservedBottom={composerHeight}
           renderItem={renderItem}
           ListEmptyComponent={loading ? <ChatThreadSkeleton /> : <ConsultEmptyState />}
