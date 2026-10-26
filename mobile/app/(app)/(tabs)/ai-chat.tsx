@@ -205,7 +205,12 @@ export default function AiChatScreen() {
             onClose={search.closeSearch}
           />
         ) : (
-          <ChatModeHeader mode={mode} onPressMode={openModePicker} onPressSearch={search.openSearch} />
+          <ChatModeHeader
+            mode={mode}
+            onPressMode={openModePicker}
+            onPressSearch={search.openSearch}
+            onOpenManualEntry={openManualEntry}
+          />
         )}
 
         {/* Keyed by pane, not mode: recording and the budget wizard share one. */}

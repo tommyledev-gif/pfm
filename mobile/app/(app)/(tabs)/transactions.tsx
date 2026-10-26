@@ -36,6 +36,8 @@ import { isDefaultSort, sortTransactions, SORT_OPTIONS, SortKey } from "@/featur
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { Category } from "@/features/categories/types";
 import { Wallet } from "@/features/wallets/types";
+import { touchesSharedWallet } from "@/features/wallets/wallet-access";
+import { useWalletLookups } from "@/features/wallets/use-wallet-lookups";
 
 const NO_CATEGORIES: Category[] = [];
 const NO_WALLETS: Wallet[] = [];
@@ -70,11 +72,7 @@ export default function TransactionsScreen() {
   const transactions = useTransactionsQuery({ ...sharedFilters, type: filter }, { keepPrevious: true });
   const switchingFilters = transactions.isPlaceholderData;
 
-  const walletCurrencyMap = useMemo(() => {
-    const map = new Map<string, string>();
-    wallets.data?.forEach((w) => map.set(w.id, w.currency));
-    return map;
-  }, [wallets.data]);
+  const { currencyById: walletCurrencyMap, sharedIds } = useWalletLookups(wallets.data);
 
   const categoryById = useMemo(() => new Map(categories.data?.map((c) => [c.id, c])), [categories.data]);
 
@@ -186,10 +184,11 @@ export default function TransactionsScreen() {
         currency={walletCurrencyMap.get(item.wallet_id)}
         category={categoryById.get(item.category_id)}
         highlightOpacity={item.id === highlightId ? highlightOpacity : undefined}
+        shared={touchesSharedWallet(sharedIds, item)}
         onSelect={openEdit}
       />
     ),
-    [walletCurrencyMap, categoryById, highlightId, highlightOpacity, openEdit],
+    [walletCurrencyMap, categoryById, sharedIds, highlightId, highlightOpacity, openEdit],
   );
 
   // Everything the screen shows, not just the list: a stale header total

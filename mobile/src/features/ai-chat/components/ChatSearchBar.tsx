@@ -45,20 +45,16 @@ export function ChatSearchBar({ query, onChangeQuery, searchableCount, onClose }
   );
 }
 
-const useStyles = createStyles((colors) => ({
-  // ChatModeHeader's strip, 2px less padding each way: its row is the 40px
-  // logo tile, this one the 44px field, so the thread below does not move.
+const useStyles = createStyles(() => ({
+  // ChatModeHeader's 56px bar, so the thread below does not move when the
+  // search takes its place.
   bar: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
-    paddingTop: spacing.md - 2,
-    paddingBottom: spacing.lg - 2,
+    minHeight: 56,
     paddingLeft: spacing.md,
     paddingRight: spacing.xl,
-    marginBottom: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.surfaceBorder,
   },
   back: { width: 32, height: 44, alignItems: "center", justifyContent: "center" },
   field: { flex: 1 },

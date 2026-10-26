@@ -120,7 +120,6 @@ export function WalletMembersSheet({ wallet, faceColor, visible, onClose }: Wall
               list.map(renderMember)
             )}
           </View>
-          {owner && others.length > 0 ? <Text style={styles.hint}>Chạm vào vai trò để đổi.</Text> : null}
         </View>
 
         {owner ? <WalletInviteForm walletId={wallet.id} memberCount={others.length} /> : null}
@@ -134,7 +133,7 @@ export function WalletMembersSheet({ wallet, faceColor, visible, onClose }: Wall
                 onClose();
                 router.push({ pathname: "/shared-wallets", params: { walletId: wallet.id } });
               }}
-              style={({ pressed }) => [styles.allEntries, pressed && styles.leavePressed]}
+              style={({ pressed }) => [styles.allEntries, pressed && styles.cellPressed]}
               accessibilityRole="link"
               testID="btn-wallet-sheet-all-entries"
             >
@@ -144,10 +143,11 @@ export function WalletMembersSheet({ wallet, faceColor, visible, onClose }: Wall
           ) : null}
         </View>
 
+        {/* A quiet cell at the end, as a settings list puts its one way out. */}
         {!owner && self ? (
           <Pressable
             onPress={() => setPending({ kind: "leave", member: self })}
-            style={({ pressed }) => [styles.leave, pressed && styles.leavePressed]}
+            style={({ pressed }) => [styles.leave, pressed && styles.cellPressed]}
             accessibilityRole="button"
             testID="btn-wallet-leave"
           >
@@ -172,36 +172,35 @@ export function WalletMembersSheet({ wallet, faceColor, visible, onClose }: Wall
   );
 }
 
+// Every section the same way: a quiet title (and a count) over a borderless
+// rounded group, as Home's lists are.
 const useStyles = createStyles((colors) => ({
-  body: { gap: spacing.xl },
+  body: { gap: spacing.xxl },
   section: { gap: spacing.sm },
-  sectionHeader: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between" },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.xs,
+  },
   sectionTitle: { ...typography.label, color: colors.textSecondary },
   sectionMeta: { ...typography.caption, color: colors.textMuted },
-  group: {
-    paddingHorizontal: spacing.lg,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    backgroundColor: colors.surface,
-  },
+  group: { paddingHorizontal: spacing.lg, borderRadius: radii.card, backgroundColor: colors.surface },
   skeletonRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.md },
   retry: { flexDirection: "row", justifyContent: "space-between", paddingVertical: spacing.lg },
   retryText: { ...typography.body, color: colors.textSecondary },
   retryAction: { ...typography.body, color: colors.green },
-  hint: { ...typography.caption, color: colors.textMuted, paddingHorizontal: spacing.xs },
   leave: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.sm,
-    paddingVertical: spacing.md,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
+    paddingVertical: spacing.lg,
+    borderRadius: radii.card,
+    backgroundColor: colors.surface,
   },
-  leavePressed: { backgroundColor: colors.surface },
-  leaveLabel: { ...typography.body, color: colors.peach },
+  cellPressed: { opacity: 0.6 },
+  leaveLabel: { ...typography.body, fontWeight: "600", color: colors.peach },
   allEntries: {
     flexDirection: "row",
     alignItems: "center",

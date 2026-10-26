@@ -12,3 +12,11 @@ export const canRecordInto = (wallet: Wallet) => wallet.access !== "viewer";
 
 /** Shared with someone: either the User's own with members, or someone else's. */
 export const isSharedWallet = (wallet: Wallet) => !isOwnWallet(wallet) || (wallet.member_count ?? 0) > 0;
+
+/** The ids of the shared ones, for marking their transactions in a mixed list. */
+export const sharedWalletIds = (wallets: Wallet[] | undefined) =>
+  new Set((wallets ?? []).filter(isSharedWallet).map((w) => w.id));
+
+/** A transaction touches a shared wallet: its own, or a transfer's other end. */
+export const touchesSharedWallet = (ids: Set<string>, t: { wallet_id: string; to_wallet_id: string | null }) =>
+  ids.has(t.wallet_id) || (t.to_wallet_id !== null && ids.has(t.to_wallet_id));

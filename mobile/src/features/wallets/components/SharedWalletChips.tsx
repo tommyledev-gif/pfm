@@ -40,7 +40,11 @@ export function SharedWalletChips({ wallets, faceById, selectedId, onSelect }: S
             accessibilityState={{ checked: active }}
             testID={`chip-shared-wallet-${wallet.id}`}
           >
-            <WalletMiniCard accentColor={faceById.get(wallet.id) ?? colors.green} icon={wallet.icon} />
+            <WalletMiniCard
+              accentColor={faceById.get(wallet.id) ?? colors.green}
+              icon={wallet.icon}
+              iconUrl={wallet.icon_url}
+            />
             <Text style={[styles.label, active && styles.labelActive]} numberOfLines={1}>
               {wallet.name}
             </Text>

@@ -10,6 +10,8 @@ interface TransactionListRowProps {
   currency: string | undefined;
   category: Category | undefined;
   highlightOpacity: Animated.Value | undefined;
+  /** Its wallet is shared (TransactionRow's "Ví chung" tag). */
+  shared: boolean;
   onSelect: (transaction: Transaction) => void;
 }
 
@@ -19,6 +21,7 @@ export const TransactionListRow = memo(function TransactionListRow({
   currency,
   category,
   highlightOpacity,
+  shared,
   onSelect,
 }: TransactionListRowProps) {
   return (
@@ -28,6 +31,7 @@ export const TransactionListRow = memo(function TransactionListRow({
       category={category}
       onPress={() => onSelect(item)}
       highlightOpacity={highlightOpacity}
+      shared={shared}
     />
   );
 });

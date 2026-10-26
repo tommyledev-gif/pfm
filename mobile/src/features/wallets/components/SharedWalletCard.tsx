@@ -48,7 +48,7 @@ export function SharedWalletCard({ wallet, faceColor, onPress, separated, highli
       {highlightOpacity ? (
         <Animated.View pointerEvents="none" style={[styles.highlight, { opacity: highlightOpacity }]} />
       ) : null}
-      <WalletMiniCard accentColor={faceColor} icon={wallet.icon} />
+      <WalletMiniCard accentColor={faceColor} icon={wallet.icon} iconUrl={wallet.icon_url} />
       <View style={[styles.content, separated && styles.separated]}>
         <View style={styles.texts}>
           <Text style={styles.name} numberOfLines={1}>

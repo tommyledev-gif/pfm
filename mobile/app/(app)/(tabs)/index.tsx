@@ -36,6 +36,8 @@ import { Category } from "@/features/categories/types";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { HomeOnboardingCard } from "@/features/onboarding/components/HomeOnboardingCard";
 import { useOpenWalletCreator } from "@/features/wallets/use-open-wallet-creator";
+import { useWalletLookups } from "@/features/wallets/use-wallet-lookups";
+import { touchesSharedWallet } from "@/features/wallets/wallet-access";
 import { useUiPrefsStore, HomePeriod } from "@/stores/ui-prefs-store";
 
 const RECENT_TRANSACTION_COUNT = 4;
@@ -57,13 +59,12 @@ interface RecentRowProps {
   transaction: Transaction;
   currency: string | undefined;
   category: Category | undefined;
+  shared: boolean;
   onPress: (transaction: Transaction) => void;
 }
 
-const RecentRow = memo(function RecentRow({ transaction, currency, category, onPress }: RecentRowProps) {
-  return (
-    <TransactionRow transaction={transaction} currency={currency} category={category} onPress={() => onPress(transaction)} />
-  );
+const RecentRow = memo(function RecentRow({ transaction, onPress, ...row }: RecentRowProps) {
+  return <TransactionRow transaction={transaction} {...row} onPress={() => onPress(transaction)} />;
 });
 
 /**
@@ -98,11 +99,7 @@ export default function HomeScreen() {
   const openWalletCreator = useOpenWalletCreator();
 
   const categoryById = useMemo(() => new Map(categories.data?.map((c) => [c.id, c])), [categories.data]);
-  const walletCurrencyMap = useMemo(() => {
-    const map = new Map<string, string>();
-    wallets.data?.forEach((w) => map.set(w.id, w.currency));
-    return map;
-  }, [wallets.data]);
+  const { currencyById: walletCurrencyMap, sharedIds } = useWalletLookups(wallets.data);
 
   // "Recent" means recent, and the list is ordered newest first — so a
   // transaction booked for next month would sit above things that have
@@ -253,6 +250,7 @@ export default function HomeScreen() {
                   transaction={item}
                   currency={walletCurrencyMap.get(item.wallet_id)}
                   category={categoryById.get(item.category_id)}
+                  shared={touchesSharedWallet(sharedIds, item)}
                   onPress={setEditingTransaction}
                 />
               </Animated.View>

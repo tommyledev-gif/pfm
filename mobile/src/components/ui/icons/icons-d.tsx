@@ -159,3 +159,14 @@ export function FingerprintIcon({ size, color = colors.textPrimary, strokeWidth 
     </Svg>
   );
 }
+
+/** Three stacked dots: a screen's overflow menu. Filled, so they hold up at 20px. */
+export function MoreVerticalIcon({ size, color = colors.textPrimary }: IconProps) {
+  return (
+    <Svg {...base(size)} fill="none">
+      <Circle cx="12" cy="5" r="1.9" fill={color} />
+      <Circle cx="12" cy="12" r="1.9" fill={color} />
+      <Circle cx="12" cy="19" r="1.9" fill={color} />
+    </Svg>
+  );
+}

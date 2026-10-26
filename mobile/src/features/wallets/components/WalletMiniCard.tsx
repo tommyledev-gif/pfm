@@ -1,4 +1,5 @@
 import { View } from "react-native";
+import { Image } from "expo-image";
 
 import { EmojiGlyph } from "@/components/ui/EmojiGlyph";
 import { UsersIcon, WalletIcon } from "@/components/ui/Icon";
@@ -7,14 +8,16 @@ import { createStyles, walletCardInk } from "@/lib/theme";
 import { WalletCardArt } from "@/features/wallets/components/WalletCardArt";
 
 const SIZES = {
-  sm: { width: 52, height: 34, radius: 8, glyph: 16, badge: 16 },
-  lg: { width: 84, height: 54, radius: 12, glyph: 24, badge: 22 },
+  sm: { width: 52, height: 34, radius: 8, glyph: 16, photo: 22, photoRadius: 6, badge: 16 },
+  lg: { width: 84, height: 54, radius: 12, glyph: 24, photo: 34, photoRadius: 9, badge: 22 },
 } as const;
 
 interface WalletMiniCardProps {
   accentColor: string;
-  /** The wallet's emoji icon; a plain wallet glyph without one. */
+  /** The wallet's emoji icon; a plain wallet glyph without one (or a photo). */
   icon?: string | null;
+  /** The wallet's uploaded photo: wins over `icon`, as on the full card. */
+  iconUrl?: string | null;
   size?: keyof typeof SIZES;
   /** Adds the small people badge in the corner — a wallet with members. */
   shared?: boolean;
@@ -27,7 +30,7 @@ interface WalletMiniCardProps {
  * not fit — the shared-wallet list, the members sheet, invitations — so it is
  * recognisably the same object as the card on Home.
  */
-export function WalletMiniCard({ accentColor, icon, size = "sm", shared = false }: WalletMiniCardProps) {
+export function WalletMiniCard({ accentColor, icon, iconUrl, size = "sm", shared = false }: WalletMiniCardProps) {
   const styles = useStyles();
   const m = SIZES[size];
   const ink = readableInk(accentColor, walletCardInk.dark, walletCardInk.light);
@@ -42,7 +45,23 @@ export function WalletMiniCard({ accentColor, icon, size = "sm", shared = false 
         <View style={[styles.clip, { borderRadius: m.radius }]}>
           <WalletCardArt accentColor={accentColor} width={m.width} height={m.height} />
           <View style={styles.glyph}>
-            {icon ? <EmojiGlyph emoji={icon} size={m.glyph} /> : <WalletIcon size={m.glyph} color={withAlpha(ink, 0.9)} />}
+            {iconUrl ? (
+              // A small tile on the face, like the full card's icon tile: a
+              // photo stretched over the whole card would hide which card it is.
+              <Image
+                source={{ uri: iconUrl }}
+                cachePolicy="memory-disk"
+                recyclingKey={iconUrl}
+                style={[
+                  styles.photo,
+                  { width: m.photo, height: m.photo, borderRadius: m.photoRadius, borderColor: withAlpha(ink, 0.35) },
+                ]}
+              />
+            ) : icon ? (
+              <EmojiGlyph emoji={icon} size={m.glyph} />
+            ) : (
+              <WalletIcon size={m.glyph} color={withAlpha(ink, 0.9)} />
+            )}
           </View>
         </View>
       </View>
@@ -61,6 +80,7 @@ const useStyles = createStyles((colors) => ({
   face: { shadowOpacity: 0.35, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
   clip: { flex: 1, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   glyph: { alignItems: "center", justifyContent: "center" },
+  photo: { borderWidth: 1 },
   badge: {
     position: "absolute",
     right: -5,
