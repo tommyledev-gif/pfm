@@ -22,10 +22,13 @@ export function memberStatusLine(member: WalletMember): string {
   return member.status === "pending" ? `${role} · Chờ trả lời` : role;
 }
 
+/** No account has what was typed: the invite's error and the field's lookup say the same. */
+export const NO_ACCOUNT_MESSAGE = "Không có tài khoản nào với email hoặc tên đăng nhập này.";
+
 // Every invite failure the server names gets its own sentence (pfm-ux-copy:
 // never the server's raw message).
 const INVITE_ERRORS: Record<string, string> = {
-  WALLET_MEMBER_USER_NOT_FOUND: "Không có tài khoản nào với email hoặc tên đăng nhập này.",
+  WALLET_MEMBER_USER_NOT_FOUND: NO_ACCOUNT_MESSAGE,
   WALLET_MEMBER_EXISTS: "Người này đã ở trong ví hoặc chưa trả lời lời mời.",
   WALLET_MEMBER_LIMIT: "Ví đã đủ 10 người.",
   INVALID_INPUT: "Đây là tài khoản của bạn.",

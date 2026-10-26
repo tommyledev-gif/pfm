@@ -164,6 +164,7 @@ func registerRoutes(app *fiber.App, userHandler *handler.UserHandler, authHandle
 	wallets.Patch("/:id", walletHandler.UpdateWallet)
 	wallets.Post("/:id/set-default", walletHandler.SetDefaultWallet)
 	wallets.Get("/:id/members", walletMemberHandler.ListMembers)
+	wallets.Get("/:id/members/lookup", middleware.MemberLookupRateLimiter(logger), walletMemberHandler.LookupInvitee)
 	wallets.Post("/:id/members", walletMemberHandler.Invite)
 	wallets.Patch("/:id/members/:user_id", walletMemberHandler.UpdateRole)
 	wallets.Delete("/:id/members/:user_id", walletMemberHandler.Remove)

@@ -63,7 +63,7 @@ export const ChatModeHeader = memo(function ChatModeHeader({
   ];
 
   // The menu is a Modal: the keyboard goes first, or the composer stays
-  // lifted under it (see ai-chat.tsx, dismissKeyboardThen).
+  // lifted under it (see dismiss-keyboard-then.ts).
   // ⚠️ Page coordinates (measure), not measureInWindow: edge to edge, the
   // window ones start under the status bar while the popover's Modal draws
   // from the top of the screen, and the menu opened a status bar too high,

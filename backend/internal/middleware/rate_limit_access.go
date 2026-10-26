@@ -80,6 +80,23 @@ func AILocalRateLimiter(logger *zap.Logger) fiber.Handler {
 	})
 }
 
+// MemberLookupRateLimiter caps, per owner, the shared-wallet invite field's
+// account lookup (GET /wallets/:id/members/lookup), which answers whether an
+// email or tên đăng nhập belongs to an account. Must run after JWTAuth.
+func MemberLookupRateLimiter(logger *zap.Logger) fiber.Handler {
+	return limiter.New(limiter.Config{
+		Max:        common.MemberLookupRateLimit,
+		Expiration: common.MemberLookupRateLimitWindow,
+		KeyGenerator: func(c *fiber.Ctx) string {
+			userID, _ := c.Locals(common.LocalsUserID).(string)
+			return "member-lookup:" + userID
+		},
+		LimitReached: func(c *fiber.Ctx) error {
+			return response.Error(c, logger, common.ErrRateLimited)
+		},
+	})
+}
+
 // AccessApproveRateLimiter caps the email-link approval per client IP. The
 // token cannot be guessed (32 random bytes); this only bounds the noise.
 func AccessApproveRateLimiter(logger *zap.Logger) fiber.Handler {

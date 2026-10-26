@@ -61,6 +61,26 @@ func (h *WalletMemberHandler) Invite(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusCreated, "wallet member invited", dto.NewWalletMemberResponse(member))
 }
 
+// LookupInvitee handles GET /wallets/:id/members/lookup?identifier=.
+func (h *WalletMemberHandler) LookupInvitee(c *fiber.Ctx) error {
+	var q dto.WalletInviteeQuery
+	if err := c.QueryParser(&q); err != nil {
+		return response.Error(c, h.logger, common.NewInvalidInputError("malformed query"))
+	}
+	if err := validate.Struct(q); err != nil {
+		return response.Error(c, h.logger, newValidationError(err))
+	}
+	userID, walletID, err := callerAndWallet(c)
+	if err != nil {
+		return response.Error(c, h.logger, err)
+	}
+	found, err := h.service.LookupInvitee(c.Context(), userID, walletID, q.Identifier)
+	if err != nil {
+		return response.Error(c, h.logger, err)
+	}
+	return response.Success(c, fiber.StatusOK, "invitee found", dto.NewWalletInviteeResponse(found.User, found.Membership))
+}
+
 // UpdateRole handles PATCH /wallets/:id/members/:user_id.
 func (h *WalletMemberHandler) UpdateRole(c *fiber.Ctx) error {
 	var req dto.UpdateWalletMemberRequest

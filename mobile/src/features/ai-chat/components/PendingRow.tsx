@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SwipeableRow } from "@/components/shared/SwipeableRow";
 import { ChevronRightIcon, EditIcon, HistoryIcon, TrashIcon } from "@/components/ui/Icon";
 import { formatCurrency } from "@/lib/currency";
-import { withAlpha } from "@/lib/color";
+import { mixHex, withAlpha } from "@/lib/color";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { proposalAmountSign } from "@/features/ai-chat/proposal-kind";
 import { ChatMessage } from "@/features/ai-chat/types";
@@ -113,7 +113,11 @@ const useStyles = createStyles((colors) => ({
     paddingLeft: spacing.lg,
     backgroundColor: colors.surface,
   },
-  rowPressed: { backgroundColor: withAlpha(colors.overlayBase, 0.05) },
+  // ⚠️ Opaque, mixed rather than layered. A see-through press tint let the
+  // swipe strip behind show through the whole row the moment a drag began
+  // (the strip turns on with the first pixel of travel, the press clears a
+  // beat later): the row seemed to fly open and snap back to the finger.
+  rowPressed: { backgroundColor: mixHex(colors.surface, colors.overlayBase, 0.05) },
   icon: {
     width: ICON_SIZE,
     height: ICON_SIZE,

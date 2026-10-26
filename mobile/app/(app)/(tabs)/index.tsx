@@ -173,14 +173,14 @@ export default function HomeScreen() {
             {isFresh ? null : (
               <HomeSnapshotCard
                 loading={snapshot.loading || deciding}
-                periodIndex={PERIODS.findIndex((p) => p.value === homePeriod)}
-                isDay={homePeriod === "day"}
+                periodIndex={PERIODS.findIndex((p) => p.value === snapshot.period)}
+                isDay={snapshot.period === "day"}
                 currency={snapshot.currency}
                 currencies={snapshot.currencies}
                 onChangeCurrency={snapshot.setCurrency}
                 periodSpent={snapshot.periodSpent}
                 spentDelta={snapshot.spentDelta}
-                previousPeriodLabel={previousPeriodLabel(homePeriod)}
+                previousPeriodLabel={previousPeriodLabel(snapshot.period)}
                 budgetSnapshot={snapshot.budgetSnapshot}
                 remainingToday={snapshot.remainingToday}
                 todayAllowance={snapshot.todayAllowance}

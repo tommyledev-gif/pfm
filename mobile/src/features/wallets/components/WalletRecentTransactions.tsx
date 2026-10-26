@@ -1,4 +1,5 @@
-import { Pressable, Text, View } from "react-native";
+import { useEffect } from "react";
+import { Text, View } from "react-native";
 
 import { TransactionRow } from "@/components/shared/TransactionRow";
 import { useCategoryLookup } from "@/features/categories/api/use-category-lookup";
@@ -9,9 +10,15 @@ import { isSharedWallet } from "@/features/wallets/wallet-access";
 import { spacing, typography, createStyles } from "@/lib/theme";
 import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
 import { isWaitingForNetwork } from "@/lib/query-status";
+import { useLatestCallback } from "@/lib/use-latest-callback";
 
 interface WalletRecentTransactionsProps {
   wallet: Wallet;
+  /**
+   * Bumped by the scroll view around it when its end comes within reach
+   * (Drawer's onEndReached): a shared wallet's list then loads its next page.
+   */
+  loadMoreSignal?: number;
 }
 
 // Enough to answer "what moved in this wallet lately" at a glance; the full
@@ -27,13 +34,20 @@ const SHARED_PAGE = 10;
  * balance. Follows the carousel: a different card, a different list.
  *
  * On a shared wallet it is everyone's entries, each saying who recorded it
- * when that was someone else, with "Xem thêm" for older ones.
+ * when that was someone else, and older ones load as the list nears its end
+ * (loadMoreSignal), no "Xem thêm" to tap.
  */
-export function WalletRecentTransactions({ wallet }: WalletRecentTransactionsProps) {
+export function WalletRecentTransactions({ wallet, loadMoreSignal = 0 }: WalletRecentTransactionsProps) {
   const styles = useStyles();
   const shared = isSharedWallet(wallet);
   const limit = shared ? SHARED_PAGE : RECENT_LIMIT;
   const transactions = useTransactionsQuery({ wallet_id: wallet.id, limit });
+  const loadMore = useLatestCallback(() => {
+    if (shared && transactions.hasNextPage && !transactions.isFetchingNextPage) void transactions.fetchNextPage();
+  });
+  useEffect(() => {
+    if (loadMoreSignal > 0) loadMore();
+  }, [loadMoreSignal, loadMore]);
   const categories = useCategoryLookup();
   const items = shared
     ? (transactions.data?.pages.flatMap((page) => page.data) ?? [])
@@ -62,18 +76,10 @@ export function WalletRecentTransactions({ wallet }: WalletRecentTransactionsPro
           </View>
         ))
       )}
-      {shared && transactions.hasNextPage ? (
-        <Pressable
-          onPress={() => void transactions.fetchNextPage()}
-          disabled={transactions.isFetchingNextPage}
-          hitSlop={8}
-          style={styles.more}
-          accessibilityRole="button"
-          testID="btn-wallet-recent-more"
-        >
-          <Text style={styles.moreLabel}>{transactions.isFetchingNextPage ? "Đang tải…" : "Xem thêm"}</Text>
-        </Pressable>
-      ) : null}
+      {/* The next page arriving, in the shape of what it will be. */}
+      {transactions.isFetchingNextPage
+        ? Array.from({ length: 2 }).map((_, i) => <TransactionRowSkeleton key={`more-${i}`} />)
+        : null}
     </View>
   );
 }
@@ -84,6 +90,4 @@ const useStyles = createStyles((colors) => ({
   empty: { ...typography.body, color: colors.textSecondary, paddingVertical: spacing.lg },
   // Under the row, aligned past its icon, so it reads as part of that entry.
   recorder: { ...typography.tiny, color: colors.textMuted, marginTop: -spacing.xs, marginBottom: spacing.xs, paddingLeft: 56 },
-  more: { alignSelf: "center", paddingVertical: spacing.md },
-  moreLabel: { ...typography.label, color: colors.green },
 }));

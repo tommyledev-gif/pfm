@@ -2,14 +2,14 @@ import { memo, useState } from "react";
 import { Animated, Pressable, Text, View } from "react-native";
 
 import { AmountRevealPopup } from "@/components/ui/AmountRevealPopup";
-import { ReceiptIcon, UsersIcon } from "@/components/ui/Icon";
+import { ReceiptIcon } from "@/components/ui/Icon";
 import { TintedIconTile } from "@/components/ui/TintedIconTile";
 import { colorForCategory } from "@/lib/category-color";
-import { withAlpha } from "@/lib/color";
 import { TRANSFER_CATEGORY_ICON } from "@/lib/constants";
 import { formatCurrencyTruncated } from "@/lib/currency";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { Transaction } from "@/features/transactions/types";
+import { SharedWalletTag } from "@/features/wallets/components/SharedWalletTag";
 
 const ICON_SIZE = 42;
 
@@ -117,12 +117,7 @@ export const TransactionRow = memo(function TransactionRow({
           <View style={styles.metaRow}>
             {/* First, so a long note's category or a transfer's route
                 truncates before it does. */}
-            {shared ? (
-              <View style={styles.sharedTag} testID={`badge-shared-wallet-${transaction.id}`}>
-                <UsersIcon size={11} color={colors.green} strokeWidth={2.4} />
-                <Text style={styles.sharedTagLabel}>Ví chung</Text>
-              </View>
-            ) : null}
+            {shared ? <SharedWalletTag testID={`badge-shared-wallet-${transaction.id}`} /> : null}
             {leftMeta ? (
               <Text style={styles.sub} numberOfLines={1}>
                 {leftMeta}
@@ -182,18 +177,6 @@ const useStyles = createStyles((colors) => ({
   metaRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   sub: { ...typography.caption, fontWeight: "500", color: colors.textSecondary, flexShrink: 1 },
   items: { flexDirection: "row", alignItems: "center", gap: 3 },
-  // A quiet tint, not a filled pill: it marks the row without outweighing
-  // the amount. Green with the people glyph, as on WalletMiniCard's badge.
-  sharedTag: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    height: 18,
-    paddingHorizontal: 6,
-    borderRadius: radii.pill,
-    backgroundColor: withAlpha(colors.green, 0.13),
-  },
-  sharedTagLabel: { ...typography.tiny, fontWeight: "600", color: colors.green },
   itemsLabel: { ...typography.caption, fontWeight: "500", color: colors.textMuted },
   right: { alignItems: "flex-end", gap: 3, maxWidth: "45%" },
   amount: { ...typography.body, fontWeight: "700" },

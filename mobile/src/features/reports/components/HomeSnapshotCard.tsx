@@ -1,6 +1,7 @@
 import { memo, useState } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
 
+import { useContentReveal } from "@/components/motion/use-content-reveal";
 import { Card } from "@/components/ui/Card";
 import { LiquidCircle } from "@/components/shared/LiquidCircle";
 import { SnapshotCardSkeleton } from "@/components/shared/SnapshotCardSkeleton";
@@ -97,6 +98,7 @@ export const HomeSnapshotCard = memo(function HomeSnapshotCard({
   // been is kept as its minimum, so no tab can ever make the card shrink.
   const [contentMinHeight, setContentMinHeight] = useState(0);
   const slideStyle = usePeriodSlide(periodIndex);
+  const reveal = useContentReveal(loading);
   const isOverBudget = Boolean(budgetSnapshot && periodSpent > budgetSnapshot.limit);
 
   // The figure under the ring is the one the user acts on, and it was rendered
@@ -127,10 +129,11 @@ export const HomeSnapshotCard = memo(function HomeSnapshotCard({
           approximate the card's height (the ring is measured, the rows have
           their own padding), so the card grew or shrank the moment data
           arrived. Rendering the real thing underneath makes the loading and
-          loaded card exactly the same height by construction. */}
+          loaded card exactly the same height by construction, and the two
+          cross-fade when the data lands (useContentReveal). */}
       <Animated.View style={slideStyle}>
-        <View
-          style={[styles.body, loading && styles.hidden]}
+        <Animated.View
+          style={[styles.body, reveal.contentStyle]}
           pointerEvents={loading ? "none" : "auto"}
           importantForAccessibility={loading ? "no-hide-descendants" : "auto"}
         >
@@ -262,11 +265,11 @@ export const HomeSnapshotCard = memo(function HomeSnapshotCard({
               </View>
             )}
           </View>
-        </View>
-        {loading ? (
-          <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        </Animated.View>
+        {reveal.placeholderMounted ? (
+          <Animated.View style={[StyleSheet.absoluteFill, reveal.placeholderStyle]} pointerEvents="none">
             <SnapshotCardSkeleton />
-          </View>
+          </Animated.View>
         ) : null}
       </Animated.View>
     </Card>
@@ -276,7 +279,6 @@ export const HomeSnapshotCard = memo(function HomeSnapshotCard({
 const useStyles = createStyles((colors) => ({
   card: { gap: spacing.md, overflow: "hidden" }, // clips the period slide at the rounded edge
   body: { gap: spacing.md },
-  hidden: { opacity: 0 },
   row: { flexDirection: "row", gap: spacing.md, alignItems: "flex-start" },
   // Widened from 3/9 (the ring column was narrower than its contents). Both
   // need a zero minimum, or a long category name widens the right column and

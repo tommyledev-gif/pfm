@@ -1,6 +1,9 @@
 package common
 
-import "net/http"
+import (
+	"net/http"
+	"time"
+)
 
 // Shared wallets (specs/shared-wallets plan §3). Access failures reuse
 // WALLET_ACCESS_DENIED / WALLET_NOT_FOUND; these cover the membership
@@ -16,6 +19,14 @@ const (
 // WalletMemberLimit caps live memberships (pending + active) per wallet
 // (spec BR-02): a household, not a company.
 const WalletMemberLimit = 10
+
+// Invitee lookups per owner (middleware.MemberLookupRateLimiter). The invite
+// field looks the account up as the owner types, so a burst is normal; the
+// hourly cap keeps it from being a way to test addresses in bulk.
+const (
+	MemberLookupRateLimit       = 120
+	MemberLookupRateLimitWindow = time.Hour
+)
 
 var (
 	ErrWalletMemberUserNotFound = &AppError{Code: ErrCodeWalletMemberUserNotFound, Status: http.StatusNotFound, Message: "không tìm thấy tài khoản này"}

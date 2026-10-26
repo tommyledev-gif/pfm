@@ -9,6 +9,8 @@ import { formatCurrency } from "@/lib/currency";
 import { walletFace } from "@/lib/wallet-colors";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
+import { isSharedWallet } from "@/features/wallets/wallet-access";
+import { SharedWalletTag } from "@/features/wallets/components/SharedWalletTag";
 
 const AVATAR_SIZE = 36;
 
@@ -60,6 +62,7 @@ export const WalletFilterModal = memo(function WalletFilterModal({
             active={wallet.id === selectedId}
             title={wallet.name}
             subtitle={formatCurrency(wallet.balance, wallet.currency)}
+            shared={isSharedWallet(wallet)}
             onPress={() => pick(wallet.id)}
             leading={
               <Avatar
@@ -82,12 +85,14 @@ interface OptionProps {
   active: boolean;
   title: string;
   subtitle?: string;
+  /** A shared wallet: the "Ví chung" tag leads the subtitle line. */
+  shared?: boolean;
   leading: ReactNode;
   onPress: () => void;
   testID?: string;
 }
 
-function Option({ active, title, subtitle, leading, onPress, testID }: OptionProps) {
+function Option({ active, title, subtitle, shared = false, leading, onPress, testID }: OptionProps) {
   const styles = useStyles();
   return (
     <Pressable
@@ -102,7 +107,16 @@ function Option({ active, title, subtitle, leading, onPress, testID }: OptionPro
         <Text style={styles.title} numberOfLines={1}>
           {title}
         </Text>
-        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+        {subtitle || shared ? (
+          <View style={styles.metaRow}>
+            {shared ? <SharedWalletTag /> : null}
+            {subtitle ? (
+              <Text style={styles.subtitle} numberOfLines={1}>
+                {subtitle}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
       </View>
       <View style={[styles.radio, active && styles.radioActive]}>{active ? <CheckIcon size={14} /> : null}</View>
     </Pressable>
@@ -133,7 +147,8 @@ const useStyles = createStyles((colors) => ({
   },
   texts: { flex: 1, gap: 2 },
   title: { ...typography.body, color: colors.textPrimary },
-  subtitle: { ...typography.caption, color: colors.textSecondary },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  subtitle: { ...typography.caption, color: colors.textSecondary, flexShrink: 1 },
   radio: {
     width: 22,
     height: 22,

@@ -59,6 +59,8 @@ export function WalletMembersSheet({ wallet, faceColor, visible, onClose }: Wall
   const changeRole = useChangeWalletMemberRoleMutation(wallet.id);
   const remove = useRemoveWalletMemberMutation(wallet.id);
   const [pending, setPending] = useState<PendingMemberAction | null>(null);
+  // Bumped as the sheet's end comes into reach: the entries list pages on.
+  const [entriesEnd, setEntriesEnd] = useState(0);
 
   const list = members.data ?? [];
   const others = list.filter((m) => m.role !== "owner");
@@ -94,7 +96,7 @@ export function WalletMembersSheet({ wallet, faceColor, visible, onClose }: Wall
   );
 
   return (
-    <Drawer visible={visible} onClose={onClose}>
+    <Drawer visible={visible} onClose={onClose} onEndReached={() => setEntriesEnd((n) => n + 1)}>
       <View testID="sheet-wallet-members" style={styles.body}>
         <WalletSheetHero wallet={wallet} faceColor={faceColor} />
 
@@ -103,7 +105,7 @@ export function WalletMembersSheet({ wallet, faceColor, visible, onClose }: Wall
             <Text style={styles.sectionTitle}>Người trong ví</Text>
             {members.data ? <Text style={styles.sectionMeta}>{memberCountLine(list)}</Text> : null}
           </View>
-          <View style={styles.group}>
+          <View>
             {members.isLoading ? (
               [0, 1].map((i) => (
                 <View key={i} style={styles.skeletonRow}>
@@ -125,7 +127,7 @@ export function WalletMembersSheet({ wallet, faceColor, visible, onClose }: Wall
         {owner ? <WalletInviteForm walletId={wallet.id} memberCount={others.length} /> : null}
 
         <View style={styles.section}>
-          <WalletRecentTransactions wallet={wallet} />
+          <WalletRecentTransactions wallet={wallet} loadMoreSignal={entriesEnd} />
           {/* The full list, with search and filters (shared-wallets.tsx). */}
           {isSharedWallet(wallet) ? (
             <Pressable
@@ -143,7 +145,7 @@ export function WalletMembersSheet({ wallet, faceColor, visible, onClose }: Wall
           ) : null}
         </View>
 
-        {/* A quiet cell at the end, as a settings list puts its one way out. */}
+        {/* A quiet action at the end, as a settings list puts its one way out. */}
         {!owner && self ? (
           <Pressable
             onPress={() => setPending({ kind: "leave", member: self })}
@@ -172,33 +174,20 @@ export function WalletMembersSheet({ wallet, faceColor, visible, onClose }: Wall
   );
 }
 
-// Every section the same way: a quiet title (and a count) over a borderless
-// rounded group, as Home's lists are.
+// Every section the same way, the way the entries list already was: a quiet
+// title (and a count) over rows that sit flush on the sheet, split by
+// hairlines. No card around them, so nothing is inset twice.
 const useStyles = createStyles((colors) => ({
   body: { gap: spacing.xxl },
   section: { gap: spacing.sm },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.xs,
-  },
+  sectionHeader: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between" },
   sectionTitle: { ...typography.label, color: colors.textSecondary },
   sectionMeta: { ...typography.caption, color: colors.textMuted },
-  group: { paddingHorizontal: spacing.lg, borderRadius: radii.card, backgroundColor: colors.surface },
   skeletonRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.md },
   retry: { flexDirection: "row", justifyContent: "space-between", paddingVertical: spacing.lg },
   retryText: { ...typography.body, color: colors.textSecondary },
   retryAction: { ...typography.body, color: colors.green },
-  leave: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.sm,
-    paddingVertical: spacing.lg,
-    borderRadius: radii.card,
-    backgroundColor: colors.surface,
-  },
+  leave: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, paddingVertical: spacing.lg },
   cellPressed: { opacity: 0.6 },
   leaveLabel: { ...typography.body, fontWeight: "600", color: colors.peach },
   allEntries: {

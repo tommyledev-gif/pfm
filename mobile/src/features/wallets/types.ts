@@ -42,6 +42,19 @@ export interface WalletMember {
   accepted_at: string | null;
 }
 
+/**
+ * GET /wallets/{id}/members/lookup: the account an invitation would reach,
+ * found by an exact email or tên đăng nhập, and where that person already
+ * stands with the wallet. Mirrors backend/internal/dto/wallet_invitee.go.
+ */
+export interface WalletInvitee {
+  user_id: string;
+  name: string;
+  username: string | null;
+  avatar_url: string | null;
+  membership: "none" | "pending" | "active" | "self";
+}
+
 /** A pending invitation to someone else's wallet (GET /wallets/invitations). */
 export interface WalletInvitation {
   wallet_id: string;

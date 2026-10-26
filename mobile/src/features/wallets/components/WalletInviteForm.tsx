@@ -7,7 +7,9 @@ import { withAlpha } from "@/lib/color";
 import { useRequireOnline } from "@/lib/connectivity";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useInviteWalletMemberMutation } from "@/features/wallets/api/use-wallet-member-mutations";
+import { MIN_INVITE_IDENTIFIER, useWalletInviteeLookup } from "@/features/wallets/api/use-wallet-invitee-lookup";
 import { WalletMemberRole } from "@/features/wallets/types";
+import { InviteeLookupRow } from "@/features/wallets/components/InviteeLookupRow";
 import {
   ROLE_DESCRIPTION,
   ROLE_LABEL,
@@ -16,7 +18,6 @@ import {
 } from "@/features/wallets/components/wallet-member-copy";
 
 const ROLES: WalletMemberRole[] = ["editor", "viewer"];
-const MIN_IDENTIFIER = 3;
 
 interface WalletInviteFormProps {
   walletId: string;
@@ -25,12 +26,14 @@ interface WalletInviteFormProps {
 }
 
 /**
- * The owner's "invite someone" card in the members sheet
- * (specs/shared-wallets US-01). One field for email or tên đăng nhập, then
- * the role as two choices that each say what the person will be able to do
- * — the old two-word segmented control left that to a footnote nobody read.
- * The invitee answers from their own Ví chung tab; nothing is shared until
- * they accept. Locked once the wallet holds WALLET_MEMBER_LIMIT people.
+ * The owner's "invite someone" section of the members sheet
+ * (specs/shared-wallets US-01). One field for email or tên đăng nhập, the
+ * account it belongs to looked up as it is typed (InviteeLookupRow: their
+ * photo and name, or that no account has it), then the role as two choices
+ * that each say what the person will be able to do — the old two-word
+ * segmented control left that to a footnote nobody read. The invitee answers
+ * from their own Ví chung tab; nothing is shared until they accept. Locked
+ * once the wallet holds WALLET_MEMBER_LIMIT people.
  */
 export function WalletInviteForm({ walletId, memberCount }: WalletInviteFormProps) {
   const colors = useColors();
@@ -43,7 +46,12 @@ export function WalletInviteForm({ walletId, memberCount }: WalletInviteFormProp
 
   const full = memberCount >= WALLET_MEMBER_LIMIT;
   const trimmed = identifier.trim();
-  const canSend = !full && trimmed.length >= MIN_IDENTIFIER;
+  const lookup = useWalletInviteeLookup(walletId, identifier);
+  // Sent only to someone the lookup found and can still invite; without a
+  // lookup to go by (offline, an older server) the server checks on send.
+  const invitable =
+    lookup.kind === "unavailable" || (lookup.kind === "found" && lookup.invitee.membership === "none");
+  const canSend = !full && trimmed.length >= MIN_INVITE_IDENTIFIER && invitable;
   const send = () =>
     requireOnline(() => invite.mutate({ identifier: trimmed, role }, { onSuccess: () => setIdentifier("") }));
 
@@ -87,7 +95,11 @@ export function WalletInviteForm({ walletId, memberCount }: WalletInviteFormProp
             testID="input-wallet-invite"
           />
         </View>
-        {invite.isError ? <Text style={styles.error}>{inviteErrorMessage(invite.error)}</Text> : null}
+        {invite.isError ? (
+          <Text style={styles.error}>{inviteErrorMessage(invite.error)}</Text>
+        ) : (
+          <InviteeLookupRow lookup={lookup} />
+        )}
 
         <View style={styles.roles} accessibilityRole="radiogroup" testID="tabs-wallet-invite-role">
           {ROLES.map((value) => {
@@ -132,13 +144,9 @@ export function WalletInviteForm({ walletId, memberCount }: WalletInviteFormProp
 
 const useStyles = createStyles((colors) => ({
   section: { gap: spacing.sm },
-  card: { gap: spacing.md, padding: spacing.lg, borderRadius: radii.card, backgroundColor: colors.surface },
-  header: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.xs,
-  },
+  // Flush on the sheet, like the entries list below it: no card around it.
+  card: { gap: spacing.md },
+  header: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between" },
   title: { ...typography.label, color: colors.textSecondary },
   capacity: { ...typography.caption, color: colors.textMuted },
   capacityFull: { color: colors.mustard },

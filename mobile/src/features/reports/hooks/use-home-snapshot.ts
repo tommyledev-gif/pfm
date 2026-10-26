@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 
 import { isAwaitingFirstData } from "@/lib/query-status";
 import { useThemeName } from "@/lib/theme";
@@ -19,6 +19,10 @@ import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { HomePeriod } from "@/stores/ui-prefs-store";
 
 const TOP_CATEGORIES_COUNT = 3;
+
+/** A query's data, unless it is another key's stand-in that cannot be replaced (offline). */
+const settledData = <T>(query: { data: T | undefined; isPlaceholderData: boolean; isPaused: boolean }) =>
+  query.isPlaceholderData && query.isPaused ? undefined : query.data;
 
 /** One budget limit running hot enough to show on the snapshot card. */
 export interface AtRiskBudgetRow {
@@ -42,8 +46,13 @@ export function useHomeSnapshot(homePeriod: HomePeriod) {
   const wallets = useWalletsQuery();
   const budgets = useBudgetsQuery();
 
+  // ⚠️ A period's first visit keeps the last one's figures on the card until
+  // its own land; `period` (returned) is the one those figures belong to, so
+  // the card slides over once, with everything ready. It used to drop to the
+  // skeleton on the tap: the skeleton slid in, then the figures replaced it
+  // in a single frame and the ring sprang up under them.
   const periodRange = useMemo(() => currentPeriodRange(homePeriod), [homePeriod]);
-  const periodSummary = useReportSummaryQuery(periodRange);
+  const periodSummary = useReportSummaryQuery(periodRange, { keepPrevious: true });
   // Top categories always reflect the calendar month, independent of the
   // selector above — a "top categories today" list usually holds one row or
   // none, which is noise rather than insight.
@@ -52,7 +61,14 @@ export function useHomeSnapshot(homePeriod: HomePeriod) {
   // The trend badge, by contrast, does track the selected period — comparing
   // against yesterday only means anything while the day is selected.
   const previousRange = useMemo(() => previousPeriodRange(homePeriod), [homePeriod]);
-  const previousPeriodSummary = useReportSummaryQuery(previousRange);
+  const previousPeriodSummary = useReportSummaryQuery(previousRange, { keepPrevious: true });
+  // Offline, the new period's request waits for the network: its stand-in
+  // figures are dropped (zeros, as before) rather than shown under its name.
+  const periodData = settledData(periodSummary);
+  const previousPeriodData = settledData(previousPeriodSummary);
+  const switching = [periodSummary, previousPeriodSummary].some((q) => q.isPlaceholderData && !q.isPaused);
+  const shownPeriod = useRef(homePeriod);
+  if (!switching) shownPeriod.current = homePeriod;
 
   // One currency at a time, switchable on the card (useCurrencyChoice, VND
   // first). It used to be the report's first total — sorted by code, so a
@@ -60,13 +76,12 @@ export function useHomeSnapshot(homePeriod: HomePeriod) {
   // currency the user holds a wallet in or spent in this month or period.
   const { currency, currencies, setCurrency } = useCurrencyChoice([
     ...(wallets.data?.map((w) => w.currency) ?? []),
-    ...(periodSummary.data?.totals.map((t) => t.currency) ?? []),
+    ...(periodData?.totals.map((t) => t.currency) ?? []),
     ...(thisMonthSummary.data?.totals.map((t) => t.currency) ?? []),
   ]);
 
-  const periodSpent = periodSummary.data?.totals.find((t) => t.currency === currency)?.total_expense ?? 0;
-  const previousPeriodSpent =
-    previousPeriodSummary.data?.totals.find((t) => t.currency === currency)?.total_expense ?? 0;
+  const periodSpent = periodData?.totals.find((t) => t.currency === currency)?.total_expense ?? 0;
+  const previousPeriodSpent = previousPeriodData?.totals.find((t) => t.currency === currency)?.total_expense ?? 0;
   // Memoized like every other object handed to the (memoized) card — a fresh
   // one per render would redraw it on every Home render regardless.
   const budgetSnapshot = useMemo(
@@ -128,6 +143,8 @@ export function useHomeSnapshot(homePeriod: HomePeriod) {
     thisMonthSummary.data?.totals.find((t) => t.currency === currency)?.total_expense ?? 0;
 
   return {
+    /** The period the figures are for: lags the tapped one until its data lands. */
+    period: shownPeriod.current,
     currency,
     currencies,
     setCurrency,

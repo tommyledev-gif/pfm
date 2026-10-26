@@ -9,6 +9,7 @@ import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { Screen } from "@/components/shared/Screen";
 import { ScreenLoader } from "@/components/shared/ScreenLoader";
 import { ScreenHeader } from "@/components/shared/ScreenHeader";
+import { useScrollEnd } from "@/components/shared/use-scroll-end";
 import { spacing, createStyles, useColors } from "@/lib/theme";
 import { walletFace } from "@/lib/wallet-colors";
 import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
@@ -72,6 +73,9 @@ export default function WalletsScreen() {
     setMembersOpen(true);
   };
   const [sharePickerOpen, setSharePickerOpen] = useState(false);
+  // A shared wallet's entries under the cards load on as the list nears its end.
+  const [recentEnd, setRecentEnd] = useState(0);
+  const recentScrollEnd = useScrollEnd(() => setRecentEnd((n) => n + 1));
   // The wallet the card view is centred on — kept here rather than in the
   // carousel so switching to the list and back lands on the same one.
   const [activeWalletId, setActiveWalletId] = useState<string | null>(focusWalletId ?? null);
@@ -206,6 +210,7 @@ export default function WalletsScreen() {
               style={styles.recentScroll}
               contentContainerStyle={styles.recentBody}
               showsVerticalScrollIndicator={false}
+              {...recentScrollEnd}
             >
               {/* Keyed by wallet: swiping to another card swaps its list, the
                   new one rising from below (next) or dropping in from above
@@ -215,7 +220,7 @@ export default function WalletsScreen() {
                 preset={listDirection > 0 ? "fadeUp" : "fadeDown"}
                 exitPreset={listDirection > 0 ? "fadeUp" : "fadeDown"}
               >
-                <WalletRecentTransactions wallet={activeWallet} />
+                <WalletRecentTransactions wallet={activeWallet} loadMoreSignal={recentEnd} />
               </MotionView>
             </ScrollView>
           ) : null}

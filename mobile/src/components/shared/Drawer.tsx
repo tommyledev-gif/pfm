@@ -2,37 +2,16 @@ import { ReactNode, useEffect, useRef, useState } from "react";
 import { Animated, BackHandler, Dimensions, Easing, Keyboard, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { DrawerChildPanel } from "@/components/shared/DrawerChildPanel";
+import { DrawerChild, DrawerChildPanel } from "@/components/shared/DrawerChildPanel";
 import { SheetHandle } from "@/components/shared/SheetHandle";
+import { useScrollEnd } from "@/components/shared/use-scroll-end";
 import { useSheetDrag } from "@/components/shared/use-sheet-drag";
 import { radii, spacing, createStyles } from "@/lib/theme";
 import { useKeyboardHeight } from "@/lib/use-keyboard-height";
 import { useSheetStore } from "@/stores/sheet-store";
 
-// A secondary panel that slides in from the right *over* an already-open
-// Drawer — for a step that needs the full sheet to itself (searching a long
-// category list, say) but must not lose the half-filled form underneath it.
-// Modelled on the same pattern native filter sheets use: the parent stays
-// mounted and untouched, and the panel slides back out to reveal it.
-//
-// Declared as a prop on Drawer rather than as a component the caller nests in
-// `children` because it has to render *outside* the sheet's ScrollView (an
-// absolutely-positioned child of a scrolling content container would scroll
-// with it), and Drawer is the only thing that knows the overlay's real window
-// geometry — see the anchor-measuring note below.
-export interface DrawerChild {
-  visible: boolean;
-  onClose: () => void;
-  title: string;
-  children: ReactNode;
-  // Rendered pinned below the panel body rather than after it, so the
-  // confirm/reset actions stay reachable no matter how long the list is.
-  footer?: ReactNode;
-  // Drops the back chevron for a panel whose footer already has its exit
-  // (the Items editor's "Xong"): two controls that do the same thing read as
-  // two different things. Close (X) stays.
-  hideBack?: boolean;
-}
+// The panel that slides in over an open sheet (Drawer's `child`).
+export type { DrawerChild } from "@/components/shared/DrawerChildPanel";
 
 interface DrawerProps {
   visible: boolean;
@@ -41,6 +20,8 @@ interface DrawerProps {
   // Pinned below the sheet's scrolling body, same rationale as DrawerChild's.
   footer?: ReactNode;
   child?: DrawerChild;
+  /** The body's bottom comes within reach (useScrollEnd): load the next page. */
+  onEndReached?: () => void;
 }
 
 // Bottom-sheet chrome for every form and picker: dimmed backdrop that closes
@@ -96,7 +77,7 @@ interface DrawerSheetProps extends DrawerProps {
   onExited: () => void;
 }
 
-function DrawerSheet({ visible, onClose, children, footer, child, startOpen, onExited }: DrawerSheetProps) {
+function DrawerSheet({ visible, onClose, children, footer, child, onEndReached, startOpen, onExited }: DrawerSheetProps) {
   const styles = useStyles();
   const keyboardHeight = useKeyboardHeight();
   // The sheet runs to the bottom edge, under the gesture bar / nav buttons;
@@ -109,6 +90,7 @@ function DrawerSheet({ visible, onClose, children, footer, child, startOpen, onE
   const drag = useSheetDrag({ translateY, onClose });
   // The sheet's last measured height: how far closing has to slide it.
   const sheetHeight = useRef(0);
+  const scrollEnd = useScrollEnd(onEndReached);
 
   // Rendering in-tree (see the note above) means an absolutely-positioned
   // child fills its parent's *padding box*, not the window: from a padded
@@ -229,6 +211,7 @@ function DrawerSheet({ visible, onClose, children, footer, child, startOpen, onE
                 style={[styles.sheetScroll, drag.expanded && styles.sheetScrollExpanded]}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
+                {...scrollEnd}
               >
                 {/* ⚠️ Takes every touch nothing inside takes. Left to the
                     Pressable above, its view (Android intercepts at the JS

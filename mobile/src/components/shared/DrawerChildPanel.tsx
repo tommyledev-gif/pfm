@@ -4,14 +4,32 @@ import { Animated, Pressable, Text, View } from "react-native";
 import { ChevronLeftIcon, CloseIcon } from "@/components/ui/Icon";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
-interface DrawerChildPanelProps {
+// A secondary panel that slides in from the right *over* an already-open
+// Drawer — for a step that needs the full sheet to itself (searching a long
+// category list, say) but must not lose the half-filled form underneath it.
+// Modelled on the same pattern native filter sheets use: the parent stays
+// mounted and untouched, and the panel slides back out to reveal it.
+//
+// Declared as a prop on Drawer rather than as a component the caller nests in
+// `children` because it has to render *outside* the sheet's ScrollView (an
+// absolutely-positioned child of a scrolling content container would scroll
+// with it), and Drawer is the only thing that knows the overlay's real window
+// geometry — see the anchor-measuring note there. Drawer re-exports it.
+export interface DrawerChild {
   visible: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
+  // Rendered pinned below the panel body rather than after it, so the
+  // confirm/reset actions stay reachable no matter how long the list is.
   footer?: ReactNode;
-  // See DrawerChild.hideBack.
+  // Drops the back chevron for a panel whose footer already has its exit
+  // (the Items editor's "Xong"): two controls that do the same thing read as
+  // two different things. Close (X) stays.
   hideBack?: boolean;
+}
+
+interface DrawerChildPanelProps extends DrawerChild {
   // The overlay's own width, measured by Drawer — the panel parks exactly one
   // screen-width to the right when closed, so it is never partly visible at
   // rest regardless of device size.
@@ -29,7 +47,7 @@ interface DrawerChildPanelProps {
 const TOP_INSET = "10%";
 
 // The sliding half of Drawer's `child` prop — see the DrawerChild doc comment
-// there for why this lives on Drawer rather than being nested in its children.
+// above for why this lives on Drawer rather than being nested in its children.
 // Rendered only by Drawer, which supplies the geometry.
 //
 // No grab bar and no drag (2026-10-14): the panel is a step of the sheet under

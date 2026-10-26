@@ -1,8 +1,8 @@
-import { memo, ReactNode, useEffect } from "react";
+import { memo, ReactNode, useEffect, useRef } from "react";
 import { StyleProp, View, ViewStyle } from "react-native";
 import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
-import { MotionHighlight, useOptionRects } from "@/components/motion/MotionHighlight";
+import { MotionHighlight, MotionHighlightHandle, useOptionRects } from "@/components/motion/MotionHighlight";
 import { PressableScale } from "@/components/motion/PressableScale";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useReduceMotion } from "@/lib/use-reduce-motion";
@@ -46,16 +46,26 @@ function SegmentedTabsView<T extends string>({ options, value, onChange, style, 
   const reduceMotion = useReduceMotion();
   const { rects, onOptionLayout } = useOptionRects();
   const activeRect = rects[value];
+  const highlight = useRef<MotionHighlightHandle>(null);
+  // ⚠️ The fill moves first, the selection a frame later (as BottomNav's
+  // ball does): the screen's render for the new selection (Home's whole
+  // snapshot card) would otherwise run before the slide had even started.
+  const select = (next: T) => {
+    if (next === value) return;
+    const rect = rects[next];
+    if (rect) highlight.current?.moveTo(rect);
+    requestAnimationFrame(() => onChange(next));
+  };
   return (
     <View style={[styles.track, disabled && styles.disabled, style]} accessibilityRole="tablist" testID={testID}>
       <View style={styles.row}>
-        {activeRect ? <MotionHighlight rect={activeRect} style={styles.highlight} /> : null}
+        {activeRect ? <MotionHighlight ref={highlight} rect={activeRect} style={styles.highlight} /> : null}
         {options.map((option) => {
           const active = option.value === value;
           return (
             <PressableScale
               key={option.value}
-              onPress={() => onChange(option.value)}
+              onPress={() => select(option.value)}
               onLayout={(e) => onOptionLayout(option.value, e)}
               disabled={disabled}
               accessibilityRole="tab"

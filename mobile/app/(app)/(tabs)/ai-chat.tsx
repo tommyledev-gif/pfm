@@ -13,16 +13,19 @@ import { ChatModePicker } from "@/features/ai-chat/components/ChatModePicker";
 import { ChatOverlays } from "@/features/ai-chat/components/ChatOverlays";
 import { ChatSearchBar } from "@/features/ai-chat/components/ChatSearchBar";
 import { ChatSearchResults } from "@/features/ai-chat/components/ChatSearchResults";
+import { ChatSearchStepper } from "@/features/ai-chat/components/ChatSearchStepper";
 import { ConsultPane } from "@/features/ai-chat/components/ConsultPane";
 import { RecordingPane } from "@/features/ai-chat/components/RecordingPane";
 import { useTransactionRemoval } from "@/features/ai-chat/components/use-transaction-removal";
 import { createChatDraftStore } from "@/features/ai-chat/chat-draft";
+import { dismissKeyboardThen } from "@/features/ai-chat/dismiss-keyboard-then";
 import { CHAT_MODE_META, ChatMode, useChatModeStore } from "@/features/ai-chat/chat-mode";
 import { isConsultMessage } from "@/features/ai-chat/consult-message";
 import { useChatActions } from "@/features/ai-chat/hooks/use-chat-actions";
 import { useChatOverlays } from "@/features/ai-chat/hooks/use-chat-overlays";
 import { useChatSearch } from "@/features/ai-chat/hooks/use-chat-search";
 import { MessageJump } from "@/features/ai-chat/hooks/use-message-jump";
+import { useSearchStepper } from "@/features/ai-chat/hooks/use-search-stepper";
 import { isTombstone } from "@/features/ai-chat/tombstone";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
@@ -32,16 +35,6 @@ import { isWaitingForNetwork } from "@/lib/query-status";
 import { useLatestCallback } from "@/lib/use-latest-callback";
 import { useChatStore, useChatThreadRestored } from "@/stores/chat-store";
 import { useCurrentUserId } from "@/stores/use-current-user-id";
-
-// For anything that opens a Modal over the composer: close the keyboard
-// first. A Modal is its own Android window; it hides the keyboard but leaves
-// the input focused, and the input bar stayed lifted under the overlay.
-const dismissKeyboardThen =
-  <A extends unknown[]>(open: (...args: A) => void) =>
-  (...args: A) => {
-    Keyboard.dismiss();
-    open(...args);
-  };
 
 export default function AiChatScreen() {
   const insets = useSafeAreaInsets();
@@ -118,8 +111,11 @@ export default function AiChatScreen() {
   );
   const search = useChatSearch(paneMessages);
   const [jump, setJump] = useState<MessageJump | null>(null);
+  const pane = mode === "consult" ? "consult" : "recording";
+  const stepper = useSearchStepper((id) => setJump({ id, nonce: Date.now() }), { searching: search.open, pane });
   const jumpToResult = useLatestCallback((id: string) => {
     Keyboard.dismiss();
+    stepper.start(search.hits.map((hit) => hit.message.id), id);
     search.closeSearch();
     setJump({ id, nonce: Date.now() });
   });
@@ -215,7 +211,7 @@ export default function AiChatScreen() {
 
         {/* Keyed by pane, not mode: recording and the budget wizard share one. */}
         <Animated.View
-          key={mode === "consult" ? "consult" : "recording"}
+          key={pane}
           entering={firstRender.current ? undefined : entrance("fade")}
           style={styles.pane}
         >
@@ -251,6 +247,16 @@ export default function AiChatScreen() {
               thread in view. */}
           {search.open && search.query.trim() ? (
             <ChatSearchResults hits={search.hits} tint={CHAT_MODE_META[mode].tint} onSelect={jumpToResult} />
+          ) : null}
+          {stepper.active && !search.open ? (
+            <ChatSearchStepper
+              position={stepper.position}
+              count={stepper.count}
+              tint={CHAT_MODE_META[mode].tint}
+              onOlder={stepper.older}
+              onNewer={stepper.newer}
+              onClose={stepper.stop}
+            />
           ) : null}
         </Animated.View>
       </View>
