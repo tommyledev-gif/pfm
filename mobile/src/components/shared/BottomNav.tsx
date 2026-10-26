@@ -1,6 +1,5 @@
 import { memo, useEffect, useMemo, useRef } from "react";
-import { LayoutChangeEvent, Pressable, View } from "react-native";
-import Animated from "react-native-reanimated";
+import { Animated, LayoutChangeEvent, Pressable, View } from "react-native";
 import { useRouter, usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
@@ -13,7 +12,6 @@ import {
   TransactionsTabIcon,
 } from "@/components/shared/nav-icons";
 import { NavBallLight } from "@/components/shared/NavBallLight";
-import { NavIconFade } from "@/components/shared/NavIconFade";
 import { useNavBallMotion } from "@/components/shared/use-nav-ball-motion";
 import { useColors } from "@/lib/theme";
 import { useLatestCallback } from "@/lib/use-latest-callback";
@@ -84,11 +82,11 @@ interface BottomNavProps {
 //
 // ⚠️ A switch re-renders this bar once, when the pathname lands, and that
 // render commits nothing animated: every layer that moves is built in a
-// useMemo whose inputs never change during a switch. Each commit of a view
-// Reanimated is animating has to be reconciled with the animation on the UI
-// thread, and the three renders a switch used to cost (the tap's held tab,
-// the pathname, the hold letting go) landed mid-slide, while the new screen
-// was mounting: the ball and its icon shook and flashed.
+// useMemo whose inputs never change during a switch. The ball runs on the
+// native driver (see useNavBallMotion), and a render of a view it animates
+// sends the JS side's values (where the ball was before the tap) back to the
+// view: the renders a switch used to cost landed mid-slide, and the ball and
+// its icon shook and flashed.
 export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavProps) {
   const colors = useColors();
   const styles = useStyles();
@@ -111,8 +109,8 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
   const tabRects = useRef<{ x: number; width: number }[]>([]);
   const positioned = useRef(false);
   const lastAnimatedIndex = useRef(routeIndex);
-  const ball = useNavBallMotion(Math.max(routeIndex, 0));
-  const { ballOpacity, ballX, bobPhase, activeIcon, initialIcon } = ball;
+  const ball = useNavBallMotion(TABS.length, Math.max(routeIndex, 0));
+  const { ballOpacity, ballX, bob, ballIconStyles, rowIconStyles } = ball;
   const { followBall, revealFollow, bandCover, ballStyle, iconPop } = ball;
   const ballTarget = (index: number) => {
     const rect = tabRects.current[index];
@@ -142,6 +140,9 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
   useEffect(() => releasePending, []);
 
   const handleTabLayout = (index: number) => (e: LayoutChangeEvent) => {
+    // While hidden (display: none) the row lays out at 0 wide: a switch then
+    // would send the ball to the left edge. Keep the last real rects.
+    if (e.nativeEvent.layout.width === 0) return;
     tabRects.current[index] = { x: e.nativeEvent.layout.x, width: e.nativeEvent.layout.width };
     if (positioned.current || tabRects.current.filter(Boolean).length < TABS.length) return;
     positioned.current = true;
@@ -175,16 +176,16 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
     requestAnimationFrame(() => router.navigate(href));
   });
 
-  // Built once per theme: their inputs are the theme and Reanimated's own
-  // handles, which never change during a switch (see the note above).
+  // Built once per theme: their inputs are the theme and the ball's own
+  // styles, which never change during a switch (see the note above).
   const rowIcons = useMemo(
     () =>
       TABS.map(({ href, Icon }, index) => (
-        <NavIconFade key={href} index={index} activeIcon={activeIcon} initiallyActive={index === initialIcon} onBall={false}>
+        <Animated.View key={href} style={rowIconStyles[index]}>
           <Icon size={22} color={colors.textSecondary} weight="regular" />
-        </NavIconFade>
+        </Animated.View>
       )),
-    [colors, activeIcon, initialIcon],
+    [colors, rowIconStyles],
   );
 
   // The bar's surface, with the hollow cut out of its top band so the screen
@@ -209,8 +210,8 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
   // Top hairline: two straight halves that stop where the hollow's rounded
   // corners begin, joined by the hollow's own outline — see RIM_PATH. All
   // three are translated by the same ballX as the ball, so the hollow tracks
-  // it on the UI thread. Then the light (over the hollow and its rim, under
-  // the ball that casts it) and the ball.
+  // it on the native driver. Then the light (over the hollow and its rim,
+  // under the ball that casts it) and the ball.
   const ballLayer = useMemo(
     () => (
       <>
@@ -221,26 +222,19 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
             <Path d={RIM_PATH} stroke={colors.navBorder} strokeWidth={HAIRLINE} fill="none" />
           </Svg>
         </Animated.View>
-        <NavBallLight ballX={ballX} bobPhase={bobPhase} opacity={ballOpacity} />
+        <NavBallLight ballX={ballX} bob={bob} opacity={ballOpacity} />
         <Animated.View pointerEvents="none" style={[styles.ball, ballStyle]}>
           <Animated.View style={[styles.ballIcons, iconPop]}>
             {TABS.map(({ href, Icon }, index) => (
-              <NavIconFade
-                key={href}
-                index={index}
-                activeIcon={activeIcon}
-                initiallyActive={index === initialIcon}
-                onBall
-                style={styles.ballIcon}
-              >
+              <Animated.View key={href} style={[styles.ballIcon, ballIconStyles[index]]}>
                 <Icon size={22} color={colors.onGreen} weight="fill" />
-              </NavIconFade>
+              </Animated.View>
             ))}
           </Animated.View>
         </Animated.View>
       </>
     ),
-    [styles, colors, revealFollow, ballX, bobPhase, ballOpacity, ballStyle, iconPop, activeIcon, initialIcon],
+    [styles, colors, revealFollow, ballX, bob, ballOpacity, ballStyle, iconPop, ballIconStyles],
   );
 
   return (

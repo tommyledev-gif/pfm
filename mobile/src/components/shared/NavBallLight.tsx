@@ -1,6 +1,5 @@
-import { memo } from "react";
-import { StyleSheet } from "react-native";
-import Animated, { SharedValue, useAnimatedStyle } from "react-native-reanimated";
+import { memo, useMemo } from "react";
+import { Animated, StyleSheet } from "react-native";
 import Svg, { Defs, Ellipse, Path, RadialGradient, Stop } from "react-native-svg";
 
 import {
@@ -11,7 +10,6 @@ import {
   hollowPathAt,
   rimPathAt,
 } from "@/components/shared/bottom-nav-styles";
-import { bobAt } from "@/components/shared/use-nav-ball-motion";
 import { useColors, useThemeDefinition } from "@/lib/theme";
 
 // The light's own box: wider than the hollow so the glow can spill onto the
@@ -42,11 +40,11 @@ const RIM = rimPathAt(CX);
 
 interface NavBallLightProps {
   /** The ball's left edge — the same value that moves the ball and its hollow. */
-  ballX: SharedValue<number>;
-  /** The ball's idle float, as a phase (see bobAt). */
-  bobPhase: SharedValue<number>;
+  ballX: Animated.Value;
+  /** The ball's idle float, 0 seated → 1 raised. */
+  bob: Animated.AnimatedInterpolation<number>;
   /** Hides the light with the ball until the tab row is measured. */
-  opacity: SharedValue<number>;
+  opacity: Animated.Value;
 }
 
 /**
@@ -56,16 +54,21 @@ interface NavBallLightProps {
  * meets the hollow's curved edge.
  *
  * Gradients only — no blur filter, which react-native-svg cannot be relied on
- * for — and one SVG riding ballX on the UI thread, like the hollow itself.
- * The light theme keeps the plain ball: on white this reads as a smudge.
+ * for — and one SVG riding ballX on the native driver, like the hollow
+ * itself. The light theme keeps the plain ball: on white this reads as a
+ * smudge.
  */
-export const NavBallLight = memo(function NavBallLight({ ballX, bobPhase, opacity }: NavBallLightProps) {
+export const NavBallLight = memo(function NavBallLight({ ballX, bob, opacity }: NavBallLightProps) {
   const colors = useColors();
   const { isDark } = useThemeDefinition();
-  const lit = useAnimatedStyle(() => ({
-    opacity: opacity.value * (1 - (1 - RAISED_INTENSITY) * bobAt(bobPhase.value)),
-    transform: [{ translateX: ballX.value }],
-  }));
+  // Built once: a new node on a native-driven view resets it for a frame.
+  const lit = useMemo(
+    () => ({
+      opacity: Animated.multiply(opacity, bob.interpolate({ inputRange: [0, 1], outputRange: [1, RAISED_INTENSITY] })),
+      transform: [{ translateX: ballX }],
+    }),
+    [opacity, bob, ballX],
+  );
   if (!isDark) return null;
 
   const glow = colors.navGlow;

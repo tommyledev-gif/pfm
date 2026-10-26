@@ -15,11 +15,11 @@ import { ReportCategoryEntry } from "@/features/reports/types";
 import { AtRiskBudgetRow } from "@/features/reports/hooks/use-home-snapshot";
 import { usePeriodSlide } from "@/features/reports/hooks/use-period-slide";
 
-// The left column is 3/12 of the card, so the ring cannot be a fixed size —
-// on a narrow phone that column is about 67px and a hardcoded circle would
-// bleed across the gap into the meters beside it. Measured, then clamped:
-// below the floor the amount inside stops being readable at all, and nothing
-// is gained by letting it grow past the old size on a tablet.
+// The left column is half the card, so the ring cannot be a fixed size — on
+// a narrow phone that column is narrower than the ring and a hardcoded circle
+// would bleed across the gap into the meters beside it. Measured, then
+// clamped: below the floor the amount inside stops being readable at all, and
+// nothing is gained by letting it grow past the old size on a tablet.
 // Raised from 64: at that floor the amount inside had to shrink far enough
 // that "Đã chi" and the figure ran into each other and into the fill's edge.
 const RING_MIN_SIZE = 84;
@@ -85,14 +85,18 @@ export const HomeSnapshotCard = memo(function HomeSnapshotCard({
 }: HomeSnapshotCardProps) {
   const colors = useColors();
   const styles = useStyles();
-  // Measured rather than assumed — see RING_MIN_SIZE. Zero until the first
-  // layout pass, which clamps to the floor for that one frame.
-  const [ringColumnWidth, setRingColumnWidth] = useState(0);
+  // Measured rather than assumed — see RING_MIN_SIZE.
+  // ⚠️ Starts at the largest size, which is what any phone about 350dp or
+  // wider measures anyway, and stores the clamped size, so the measurement
+  // usually changes nothing. It used to start at the floor and grow a frame
+  // after mount: the card reflowed (and Home's layout spring bounced it), and
+  // LiquidCircle rebuilt its native fill animation, which shows the circle
+  // full for a frame.
+  const [ringSize, setRingSize] = useState(RING_MAX_SIZE);
   // Belt-and-braces for the reserved slots above: the tallest the content has
   // been is kept as its minimum, so no tab can ever make the card shrink.
   const [contentMinHeight, setContentMinHeight] = useState(0);
   const slideStyle = usePeriodSlide(periodIndex);
-  const ringSize = Math.min(RING_MAX_SIZE, Math.max(RING_MIN_SIZE, ringColumnWidth));
   const isOverBudget = Boolean(budgetSnapshot && periodSpent > budgetSnapshot.limit);
 
   // The figure under the ring is the one the user acts on, and it was rendered
@@ -145,7 +149,14 @@ export const HomeSnapshotCard = memo(function HomeSnapshotCard({
               setContentMinHeight((prev) => (height > prev ? height : prev));
             }}
           >
-            <View style={styles.left} onLayout={(e) => setRingColumnWidth(e.nativeEvent.layout.width)}>
+            <View
+              style={styles.left}
+              onLayout={(e) => {
+                // A screen out of view can lay out at 0 wide: keep the last real size.
+                const width = Math.round(e.nativeEvent.layout.width);
+                if (width > 0) setRingSize(Math.min(RING_MAX_SIZE, Math.max(RING_MIN_SIZE, width)));
+              }}
+            >
               <LiquidCircle
                 size={ringSize}
                 progress={ringProgress}

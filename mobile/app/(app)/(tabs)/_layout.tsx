@@ -82,19 +82,19 @@ function usePreloadTabs() {
 // parent (app) layout so it also shows on pushed sub-screens; the navigator's
 // built-in bar is switched off.
 //
-// ⚠️ detachInactiveScreens off: by default a tab out of view was taken out
-// of the window, and every switch put the arriving one back, a whole screen
-// laid out and redrawn on the UI thread in the frames the slide and the nav
-// ball were meant to start in. Kept attached, a tab out of view costs nothing
-// to draw: the interpolator leaves it at opacity 0, which Android also skips
-// for touch (pointerEvents) and TalkBack.
+// ⚠️ Keep detachInactiveScreens at its default (2026-10-26). Turned off, a
+// tab out of view is not left attached at opacity 0: react-native-screens'
+// fallback gives it `display: none`, and on Android Yoga then lays its whole
+// tree out at 0×0. Every switch laid two whole screens out again, fired every
+// onLayout in them with zeros and back, and replayed their layout transitions
+// from a 0×0 box: the switch lagged, the nav ball stalled, and Home's
+// snapshot card sprang in from its corner each time.
 export default function TabsLayout() {
   const colors = useColors();
   usePreloadTabs();
   return (
     <Tabs
       tabBar={() => null}
-      detachInactiveScreens={false}
       screenOptions={{
         headerShown: false,
         sceneStyle: { backgroundColor: colors.bgApp },
