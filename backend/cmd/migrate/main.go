@@ -22,6 +22,8 @@
 //   - A failure here exits non-zero, which fails the deploy. That is the
 //     point: a broken schema should stop the release, not surface later as a
 //     runtime 500.
+//   - One run at a time per database (lockMigrations). A second run waits for
+//     the first, then reads the ledger and finds nothing left to apply.
 package main
 
 import (
@@ -94,6 +96,14 @@ func main() {
 		log.Fatalf("migrate: connecting to database: %v", err)
 	}
 	defer pool.Close()
+
+	// Taken before the ledger is read, so what this run sees as applied is
+	// never stale by the time it applies anything.
+	unlock, err := lockMigrations(ctx, pool)
+	if err != nil {
+		log.Fatalf("migrate: %v", err)
+	}
+	defer unlock()
 
 	if _, err := pool.Exec(ctx, createLedgerSQL); err != nil {
 		log.Fatalf("migrate: creating schema_migrations: %v", err)
@@ -245,41 +255,6 @@ func applyMigration(ctx context.Context, pool *pgxpool.Pool, migration db.Migrat
 		return err
 	}
 	return tx.Commit(ctx)
-}
-
-// runBaseline records every migration as applied without executing any of
-// them — the one-time bridge for a database that already has the schema but
-// no ledger (every environment created before this runner existed).
-//
-// ⚠️ Only correct when the database really is up to date with every embedded
-// migration. Run against a partially-migrated database it would mark the
-// missing ones as done and leave the schema permanently short — exactly the
-// failure this runner exists to prevent. It refuses to touch files that are
-// already recorded, and prints everything it marks so the operator can check
-// the list against reality.
-func runBaseline(ctx context.Context, pool *pgxpool.Pool, migrations []db.Migration, applied map[string]string) error {
-	marked := 0
-	for _, migration := range migrations {
-		if _, ok := applied[migration.Filename]; ok {
-			continue
-		}
-		if _, err := pool.Exec(ctx,
-			`INSERT INTO schema_migrations (filename, checksum) VALUES ($1, $2)
-			 ON CONFLICT (filename) DO NOTHING`,
-			migration.Filename, checksum(migration.SQL),
-		); err != nil {
-			return fmt.Errorf("baselining %s: %w", migration.Filename, err)
-		}
-		log.Printf("migrate: baseline — marked %s as applied (no SQL run)", migration.Filename)
-		marked++
-	}
-
-	if marked == 0 {
-		log.Print("migrate: baseline — nothing to do, every migration was already recorded")
-		return nil
-	}
-	log.Printf("migrate: baseline — recorded %d migration(s) as applied without running them", marked)
-	return nil
 }
 
 func checksum(sql string) string {

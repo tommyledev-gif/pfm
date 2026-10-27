@@ -11,9 +11,12 @@ on:
       - ".github/workflows/deploy-backend.yml"
   workflow_dispatch:
 
+# A newer push waits for this run instead of cancelling it: cancelling killed
+# the SSH session mid-deploy (between migrate and `up -d`, say), and the
+# newer run then started from whatever state that left.
 concurrency:
   group: backend-deploy-develop
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   # Same go vet/test steps as ci-pr.yml's PR gate — defined once in
@@ -82,12 +85,22 @@ jobs:
     needs: build-and-push
     permissions:
       contents: read
+    # One VPS deploy at a time, across BOTH deploy workflows (concurrency
+    # groups are repository-wide). deploy-ai-service.yml also runs deploy.sh
+    # — migrate, `up -d` of every service, seed — and reads .last_good_tag,
+    # and a push that touches backend/docker-compose.yml starts both. Run
+    # side by side, they raced each other's migrate and `up -d`, and the AI
+    # deploy could restart the backend on the tag from before this one.
+    concurrency:
+      group: vps-deploy
+      cancel-in-progress: false
     steps:
       - name: Checkout source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       # Only the backend's deploy files land on the VPS — no frontend/
-      # mobile/ai-service source ever leaves the CI runner.
+      # mobile/ai-service source ever leaves the CI runner. Not the SQL
+      # migrations: they are compiled into the image (backend/db/migrations.go).
       - name: Sync deployment files to VPS
         uses: appleboy/scp-action@917f8b81dfc1ccd331fef9e2d61bdc6c8be94634 # v0.1.7
         with:
@@ -95,7 +108,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
-          source: "backend/deploy.sh,backend/docker-compose.yml,backend/db/migrations,backend/ops"
+          source: "backend/deploy.sh,backend/docker-compose.yml,backend/ops"
           target: "${{ secrets.VPS_APP_DIR }}"
 
       # Secrets reach the remote script as environment variables (`envs`),
@@ -138,7 +151,7 @@ jobs:
             chmod +x deploy.sh
 
             # .last_good_tag persists on the VPS across runs (this SCP step
-            # only adds/overwrites deploy.sh/docker-compose.yml/migrations, it
+            # only adds/overwrites deploy.sh/docker-compose.yml/ops, it
             # never deletes other files here) — it's how a failed health
             # check below knows which image tag to roll back to.
             LAST_GOOD_TAG_FILE=".last_good_tag"

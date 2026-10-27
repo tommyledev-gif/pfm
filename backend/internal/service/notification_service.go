@@ -47,6 +47,11 @@ func (s *NotificationService) EvaluateBudgets(ctx context.Context) {
 	}
 
 	for _, userID := range userIDs {
+		// Shutting down: stop between users rather than log a failure for
+		// every one left. The next run picks them up.
+		if ctx.Err() != nil {
+			return
+		}
 		if err := s.evaluateBudgetsForUser(ctx, userID); err != nil {
 			// One user's failure must not stop the rest of the run — there is
 			// no HTTP caller to fail this back to (spec.md US-00).

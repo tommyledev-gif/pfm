@@ -167,35 +167,13 @@ func (h *CategoryHandler) DeleteCategory(c *fiber.Ctx) error {
 // pick an image before a category exists yet (the create form) and reuse
 // the same returned icon_url on both Create and Update requests.
 func (h *CategoryHandler) UploadIcon(c *fiber.Ctx) error {
-	if _, err := callerUUID(c); err != nil {
-		return response.Error(c, h.logger, common.ErrUnauthenticated)
-	}
-
-	img, err := readImageUpload(c)
-	if err != nil {
-		return response.Error(c, h.logger, err)
-	}
-
-	iconURL, err := h.iconUploader.UploadIcon(c.Context(), common.CategoryIconKeyPrefix, img.ContentType, img.Data)
-	if err != nil {
-		h.logger.Error("icon upload failed", zap.Error(err))
-		if _, unconfigured := h.iconUploader.(service.UnconfiguredIconUploader); unconfigured {
-			return response.Error(c, h.logger, common.ErrIconUploadUnavailable)
-		}
-		return response.Error(c, h.logger, common.ErrIconUploadFailed)
-	}
-
-	return response.Success(c, fiber.StatusOK, "icon uploaded successfully", fiber.Map{"icon_url": iconURL})
+	return uploadIcon(c, h.iconUploader, common.CategoryIconKeyPrefix, h.logger)
 }
 
 // categoryIDParam parses the :id path segment, returning 400 INVALID_INPUT
 // (spec.md S-CAT-18) before any service/DB call for a malformed UUID.
 func categoryIDParam(c *fiber.Ctx) (uuid.UUID, error) {
-	id, err := uuid.Parse(c.Params("id"))
-	if err != nil {
-		return uuid.UUID{}, common.NewInvalidInputError("category id must be a valid UUID")
-	}
-	return id, nil
+	return pathUUID(c, "id", "category id")
 }
 
 // categoryTypeQueryParam validates an optional ?type= filter against the

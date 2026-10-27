@@ -173,9 +173,5 @@ func callerAndWallet(c *fiber.Ctx) (uuid.UUID, uuid.UUID, error) {
 }
 
 func memberIDParam(c *fiber.Ctx) (uuid.UUID, error) {
-	id, err := uuid.Parse(c.Params("user_id"))
-	if err != nil {
-		return uuid.UUID{}, common.NewInvalidInputError("user id must be a valid UUID")
-	}
-	return id, nil
+	return pathUUID(c, "user_id", "user id")
 }

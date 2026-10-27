@@ -97,10 +97,3 @@ func (h *UserHandler) ListUsers(c *fiber.Ctx) error {
 		Pagination: dto.PaginationResponse{NextCursor: nextCursor, Total: total},
 	})
 }
-
-// callerUUID reads the user ID JWTAuth already resolved and stored in
-// locals — never re-parses the token here.
-func callerUUID(c *fiber.Ctx) (uuid.UUID, error) {
-	idStr, _ := c.Locals(common.LocalsUserID).(string)
-	return uuid.Parse(idStr)
-}

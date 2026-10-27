@@ -2,67 +2,77 @@ package main
 
 import (
 	"context"
+	"runtime/debug"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
-
-	"github.com/example/pfm/backend/internal/common"
-	"github.com/example/pfm/backend/internal/service"
 )
 
-// runNotificationScheduler runs NotificationService.EvaluateBudgets on a
-// fixed interval until ctx is cancelled. A ticker, not a one-shot timer
-// loop, so a slow evaluation never causes ticks to pile up.
-func runNotificationScheduler(ctx context.Context, notificationService *service.NotificationService, logger *zap.Logger) {
-	ticker := time.NewTicker(common.NotificationJobInterval)
+// backgroundJob is work the server repeats on a timer, outside any HTTP
+// request: the budget-crossing check and the table clean-ups (see wire).
+type backgroundJob struct {
+	name     string
+	interval time.Duration
+	// runAtStart also runs the job once immediately, instead of only after
+	// the first interval has passed.
+	runAtStart bool
+	run        func(ctx context.Context)
+}
+
+// startBackgroundJobs runs each job in its own goroutine (a lightweight
+// thread) and returns a function that stops them all and waits for any run
+// still in progress to return, so none is cut off mid-query when the
+// database pool closes.
+func startBackgroundJobs(jobs []backgroundJob, logger *zap.Logger) (stop func()) {
+	ctx, cancel := context.WithCancel(context.Background())
+	var running sync.WaitGroup
+	for _, job := range jobs {
+		running.Add(1)
+		go func() {
+			defer running.Done()
+			runEvery(ctx, job, logger)
+		}()
+	}
+	return func() {
+		cancel()
+		running.Wait()
+	}
+}
+
+// runEvery runs job on a ticker until ctx is cancelled. A ticker, not a
+// sleep loop, so a slow run never makes the next ones pile up.
+func runEvery(ctx context.Context, job backgroundJob, logger *zap.Logger) {
+	ticker := time.NewTicker(job.interval)
 	defer ticker.Stop()
 
-	logger.Info("notification scheduler started", zap.Duration("interval", common.NotificationJobInterval))
+	logger.Info("background job started", zap.String("job", job.name), zap.Duration("interval", job.interval))
+	if job.runAtStart {
+		runOnce(ctx, job, logger)
+	}
 	for {
 		select {
 		case <-ctx.Done():
-			logger.Info("notification scheduler stopped")
+			logger.Info("background job stopped", zap.String("job", job.name))
 			return
 		case <-ticker.C:
-			notificationService.EvaluateBudgets(ctx)
+			runOnce(ctx, job, logger)
 		}
 	}
 }
 
-// runTokenRetention deletes finished session rows and expired deny-list rows
-// (service.TokenRetention) at startup and then on a fixed interval.
-func runTokenRetention(ctx context.Context, retention *service.TokenRetention, logger *zap.Logger) {
-	ticker := time.NewTicker(common.TokenPurgeInterval)
-	defer ticker.Stop()
-
-	retention.Purge(ctx)
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("token retention stopped")
-			return
-		case <-ticker.C:
-			retention.Purge(ctx)
+// runOnce runs the job one time. A panic is logged and the job carries on at
+// its next tick: middleware.Recover only guards HTTP requests, and a panic
+// nobody recovers ends the whole process, taking every request with it.
+func runOnce(ctx context.Context, job backgroundJob, logger *zap.Logger) {
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error("background job panicked",
+				zap.String("job", job.name),
+				zap.Any("panic", r),
+				zap.ByteString("stack", debug.Stack()),
+			)
 		}
-	}
-}
-
-// runIntentLogRetention applies the question log's privacy retention
-// (specs/ai-chat-query-spending/spec.md US-07) once at startup and then on a
-// fixed interval — at startup too, so a backend that restarts more often
-// than the interval still purges.
-func runIntentLogRetention(ctx context.Context, retention *service.IntentLogRetention, logger *zap.Logger) {
-	ticker := time.NewTicker(common.IntentLogPurgeInterval)
-	defer ticker.Stop()
-
-	retention.Purge(ctx)
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("intent log retention stopped")
-			return
-		case <-ticker.C:
-			retention.Purge(ctx)
-		}
-	}
+	}()
+	job.run(ctx)
 }

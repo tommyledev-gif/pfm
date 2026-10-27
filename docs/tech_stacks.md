@@ -92,7 +92,7 @@ SDK 54 is **pinned on purpose**, not lagging by accident. The tester's installed
 | uuid-ossp | — | `uuid_generate_v4()` for all PKs |
 | pgvector | **not enabled** | No RAG/vector work exists |
 
-Migrations are plain numbered `.sql`, mounted individually into `docker-entrypoint-initdb.d` — **no migration runner in the deploy path.** They apply on first volume init only.
+Migrations are plain numbered `.sql`, compiled into the backend image and applied by `cmd/migrate` (a `schema_migrations` ledger, one transaction per file, a Postgres advisory lock so two runs never race). It runs on every deploy before `up -d`, in CI on an empty database, and as the dev compose's `migrate` service. Nothing is mounted into `docker-entrypoint-initdb.d`.
 
 Postgres 16 matters for one planned change: `CREATE UNIQUE INDEX … NULLS NOT DISTINCT` (PG 15+) is what makes a single unified notification dedup index possible.
 
@@ -151,7 +151,7 @@ Postgres 16 matters for one planned change: `CREATE UNIQUE INDEX … NULLS NOT D
 
 ### Environment variables (`.env.example`, values masked)
 
-`POSTGRES_{USER,PASSWORD,DB,PORT}` · `BACKEND_PORT` · `WEB_FRONTEND_PORT` · `JWT_SECRET` · `CORS_ALLOWED_ORIGINS` · `SMTP_{HOST,PORT,USERNAME,PASSWORD,FROM_EMAIL}` · `APP_BASE_URL` · `AI_SERVICE_URL` (defaults to `http://ai-service:8000`) · `R2_{ACCOUNT_ID,ACCESS_KEY_ID,SECRET_ACCESS_KEY,BUCKET,PUBLIC_BASE_URL}` · `GROQ_API_KEY` · `ANTHROPIC_API_KEY` · `ADMIN_SEED_{EMAIL,PASSWORD_HASH}` · prod-only: `DOCKER_REGISTRY_USER`, `PFM_*_IMAGE_TAG`, `MEM_LIMIT_*`, `SEED_ADMIN_*`
+`POSTGRES_{USER,PASSWORD,DB,PORT}` · `BACKEND_PORT` · `WEB_FRONTEND_PORT` · `JWT_SECRET` · `CORS_ALLOWED_ORIGINS` · `SMTP_{HOST,PORT,USERNAME,PASSWORD,FROM_EMAIL}` · `APP_BASE_URL` · `AI_SERVICE_URL` (defaults to `http://ai-service:8000`) · `R2_{ACCOUNT_ID,ACCESS_KEY_ID,SECRET_ACCESS_KEY,BUCKET,PUBLIC_BASE_URL}` · `GROQ_API_KEY` · `ANTHROPIC_API_KEY` · `SEED_ADMIN_{EMAIL,PASSWORD,NAME}` (dev and prod) · prod-only: `DOCKER_REGISTRY_USER`, `PFM_*_IMAGE_TAG`, `MEM_LIMIT_*`
 
 **Graceful degradation is deliberate:** blank `R2_ACCOUNT_ID` → `503 ICON_UPLOAD_UNAVAILABLE`; AI Service down → `502 AI_SERVICE_UNAVAILABLE`; blank `SMTP_HOST` → log-only email sender. None of these fail startup.
 

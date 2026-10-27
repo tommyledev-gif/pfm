@@ -29,8 +29,10 @@ _Updated by: /renew-docs_
 
 | Service | Image / Build | Host port | Notes |
 |---------|---------------|-----------|-------|
-| `postgres` | `postgres:16-alpine` | `${POSTGRES_PORT}` → 5432 | Named volume `pfm_pgdata`; migrations mounted individually into `docker-entrypoint-initdb.d` |
-| `backend` | build `./backend` | `${BACKEND_PORT}` → 8080 | Waits on `postgres` healthcheck |
+| `postgres` | `postgres:16-alpine` | `${POSTGRES_PORT}` → 5432 | Named volume `pfm_pgdata`; starts empty, no init scripts |
+| `migrate` | build `./backend` (`./migrate`) | none | Applies pending migrations, then exits |
+| `seed` | build `./backend` (`./seed`) | none | Creates the first admin from `SEED_ADMIN_*`, then exits |
+| `backend` | build `./backend` | `${BACKEND_PORT}` → 8080 | Waits on `postgres` healthcheck and `migrate` |
 | `ai-service` | build `./ai-service` | **none** | Internal only — reachable at `http://ai-service:8000` on the compose network |
 | `web` | build `./frontend` | `${WEB_FRONTEND_PORT}` → 3000 | `API_PROXY_TARGET=http://backend:8080` |
 
@@ -48,9 +50,13 @@ _Updated by: /renew-docs_
 
 ```
 cmd/server/
-  main.go        — DI wiring, notification ticker, graceful shutdown
-  routes.go      — every route registration
-  hashgen/       — bcrypt hash helper for the admin seed
+  main.go        — config, DB pool, HTTP app + middleware, graceful shutdown
+  wiring.go      — builds repositories → services → handlers (routeHandlers) and the job list
+  routes.go      — every route registration (registerRoutes(app, routeHandlers))
+  jobs.go        — background jobs on a ticker, each run panic-safe, stopped and awaited on shutdown
+cmd/migrate/     — ledger-based migration runner (advisory-locked, one tx per file)
+cmd/seed/        — creates/updates the first admin from SEED_ADMIN_*
+cmd/hashgen/     — bcrypt hash helper (dev utility)
 internal/
   handler/       — HTTP only: parse, validate shape, format response
   service/       — business rules, owns DB transactions
@@ -119,16 +125,16 @@ db/
 
 ### Notification background job
 
-`main.go` starts a `time.NewTicker(common.NotificationJobInterval)` (**5 minutes**) in a goroutine, cancelled via `schedulerCtx` on shutdown. Notifications have **no create endpoint** — the job is the only producer.
+`jobs.go` runs `NotificationService.EvaluateBudgets` every `common.NotificationJobInterval` (**5 minutes**), next to the token and question-log retention jobs; shutdown cancels them and waits for a run in progress. Notifications have **no create endpoint** — the job is the only producer.
 
 ### Database schema
 
-PostgreSQL 16. Migrations are plain numbered `.sql` (no `.up`/`.down` pair), mounted individually into `docker-entrypoint-initdb.d` — **so they run once, on first volume initialization only.** An existing environment needs them applied by hand.
+PostgreSQL 16. Migrations are plain numbered `.sql` (no `.up`/`.down` pair), compiled into the backend image (`backend/db/migrations.go`) and applied by `cmd/migrate`: on every deploy (`deploy.sh`, before `up -d`), in CI on an empty database, and by the dev compose's `migrate` service. It records each file in `schema_migrations` and holds a Postgres advisory lock, so two runs never race. Nothing is mounted into `docker-entrypoint-initdb.d`.
 
 | # | File | What it adds |
 |---|------|--------------|
 | 001 | `init.sql` | `users`, uuid extension |
-| 002 | `seed_admin.sql` | **Not auto-mounted** — manual placeholder-hash script |
+| 002 | `seed_admin.sql` | **Never applied** (`db.SkippedMigrations`) — manual placeholder-hash script; `cmd/seed` replaced it |
 | 003 | `revoked_tokens.sql` | Refresh-token revocation |
 | 004 | `wallets.sql` | `wallets` + one-default-wallet partial unique index |
 | 005 | `categories.sql` | `categories` + owner/name/type dedup index |
@@ -146,7 +152,7 @@ PostgreSQL 16. Migrations are plain numbered `.sql` (no `.up`/`.down` pair), mou
 | 017 | `seed_savings_category.sql` | System `Tiết kiệm` category (the one Vietnamese-named seed) |
 | 018 | `transaction_audit_logs.sql` | `transaction_audit_logs` |
 
-> ⚠️ **Known drift, documented in both compose files:** 015–018 were absent from the initdb mount lists, so even a fresh volume came up without `chat_thread_messages` and `transaction_audit_logs`, and `/ai/chat/thread`, `/transactions/audit-logs` and `POST /transactions` all returned 500 (SQLSTATE 42P01). The mounts are fixed; **already-running environments still need 015–018 applied manually.**
+> History: migrations used to be mounted into `docker-entrypoint-initdb.d`, which runs only on a brand-new volume, from two hand-kept lists. Those drifted (015–018, later 022+, were missing) and fresh volumes came up without tables (500, SQLSTATE 42P01). The mounts were removed 2026-10-27; `cmd/migrate` is the only path.
 
 ---
 

@@ -256,9 +256,6 @@ func NewInvalidInputErrorWithDetails(message string, details interface{}) *AppEr
 	return &AppError{Code: ErrCodeInvalidInput, Status: http.StatusBadRequest, Message: message, Details: details}
 }
 
-// NewWeakPasswordError builds a 400 WEAK_PASSWORD error — kept distinct from
-// INVALID_INPUT because spec.md treats "too short" and "missing" as different
-// codes (S-USR-13 vs S-USR-14).
 // NewInviteResendCooldownError carries when the next resend is allowed, so a
 // client that raced past its own countdown can resync instead of guessing.
 func NewInviteResendCooldownError(availableAt time.Time) *AppError {
@@ -270,6 +267,9 @@ func NewInviteResendCooldownError(availableAt time.Time) *AppError {
 	}
 }
 
+// NewWeakPasswordError builds a 400 WEAK_PASSWORD error — kept distinct from
+// INVALID_INPUT because spec.md treats "too short" and "missing" as different
+// codes (S-USR-13 vs S-USR-14).
 func NewWeakPasswordError(message string) *AppError {
 	return &AppError{Code: ErrCodeWeakPassword, Status: http.StatusBadRequest, Message: message}
 }

@@ -12,9 +12,11 @@ on:
       - ".github/workflows/deploy-ai-service.yml"
   workflow_dispatch:
 
+# A newer push waits for this run instead of cancelling it mid-deploy (same
+# reasoning as deploy-backend.yml).
 concurrency:
   group: ai-service-deploy-develop
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   # Same tests as the PR gate, defined once in ai-service-test.yml, so a
@@ -79,6 +81,12 @@ jobs:
     needs: build-and-push
     permissions:
       contents: read
+    # Shared with deploy-backend.yml's deploy job: this one runs the same
+    # deploy.sh (the whole stack) and reads the .last_good_tag that one
+    # writes, so the two must never overlap on the VPS.
+    concurrency:
+      group: vps-deploy
+      cancel-in-progress: false
     steps:
       - name: Checkout source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

@@ -102,10 +102,10 @@
 | Backup DB thực sự chạy + thử restore | Script có (`ops/backup-postgres.sh`), chỉ cài khi set `BACKUP_R2_BUCKET`; **chưa từng test restore** | **P0** | S |
 | Log archive phụ thuộc biến backup | `deploy.sh:141-145`: thiếu bucket → log archive cũng không được cài | P1 | S |
 | Không có staging | Push `develop` = deploy prod | P1 | M |
-| Hai workflow deploy có thể chạy chồng | Cùng `deploy.sh`, khác concurrency group → dùng chung group | P1 | S |
+| ~~Hai workflow deploy có thể chạy chồng~~ | **Xong 2026-10-27:** job `deploy` của hai workflow dùng chung group `vps-deploy`, không hủy deploy đang chạy; `cmd/migrate` giữ advisory lock | ~~P1~~ | S |
 | ai-service không rollback khi health fail | Backend có `.last_good_tag`, ai-service thì không | P1 | S |
 | Rollback không lùi migration | Viết quy ước migration chỉ thêm (expand/contract) | P2 | S |
-| Dev compose thiếu migration 022–026 | Volume dev mới bị sai schema → chạy `cmd/migrate` thay vì mount initdb | P1 | S |
+| ~~Dev compose thiếu migration 022–026~~ | **Xong 2026-10-27:** bỏ mount initdb ở cả hai compose, schema chỉ do `cmd/migrate` tạo; admin dev do service `seed` (`cmd/seed`) tạo | ~~P1~~ | S |
 | `.env.example` lệch thực tế | Thiếu `R2_*`, `AI_SERVICE_URL`, `BACKUP_*`, tunnel | P2 | S |
 | Rác trong repo | 13 file `__pycache__/*.pyc` đang được track; `mobile/pfm/` thừa (51 file) | P2 | S |
 

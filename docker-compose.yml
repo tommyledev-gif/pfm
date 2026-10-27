@@ -5,45 +5,16 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-      ADMIN_SEED_EMAIL: ${ADMIN_SEED_EMAIL}
-      ADMIN_SEED_PASSWORD_HASH: ${ADMIN_SEED_PASSWORD_HASH}
     ports:
       # Loopback only by default: published on every interface, the dev
       # database (with its dev password) was reachable from the whole Wi-Fi.
       # Set POSTGRES_BIND_ADDRESS=0.0.0.0 only if another machine needs it.
       - "${POSTGRES_BIND_ADDRESS:-127.0.0.1}:${POSTGRES_PORT}:5432"
     volumes:
+      # Starts empty: the `migrate` service below builds the whole schema.
+      # (Migrations used to be mounted into docker-entrypoint-initdb.d too, a
+      # hand-kept list that drifted behind backend/db/migrations/ twice.)
       - pfm_pgdata:/var/lib/postgresql/data
-      - ./backend/db/migrations/001_init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
-      - ./backend/db/migrations/003_revoked_tokens.sql:/docker-entrypoint-initdb.d/02_revoked_tokens.sql:ro
-      - ./backend/db/migrations/004_wallets.sql:/docker-entrypoint-initdb.d/03_wallets.sql:ro
-      - ./backend/db/migrations/005_categories.sql:/docker-entrypoint-initdb.d/04_categories.sql:ro
-      - ./backend/db/migrations/006_seed_categories.sql:/docker-entrypoint-initdb.d/05_seed_categories.sql:ro
-      - ./backend/db/migrations/007_budgets.sql:/docker-entrypoint-initdb.d/06_budgets.sql:ro
-      - ./backend/db/migrations/008_transactions.sql:/docker-entrypoint-initdb.d/07_transactions.sql:ro
-      - ./backend/db/migrations/009_notifications.sql:/docker-entrypoint-initdb.d/08_notifications.sql:ro
-      - ./backend/db/migrations/010_transactions_idempotency_key.sql:/docker-entrypoint-initdb.d/09_transactions_idempotency_key.sql:ro
-      - ./backend/db/migrations/011_chat_messages.sql:/docker-entrypoint-initdb.d/10_chat_messages.sql:ro
-      - ./backend/db/migrations/012_categories_icon_url.sql:/docker-entrypoint-initdb.d/11_categories_icon_url.sql:ro
-      - ./backend/db/migrations/013_wallets_icon.sql:/docker-entrypoint-initdb.d/12_wallets_icon.sql:ro
-      - ./backend/db/migrations/014_budgets_icon.sql:/docker-entrypoint-initdb.d/13_budgets_icon.sql:ro
-      - ./infra/postgres/init/seed_dev_admin.sh:/docker-entrypoint-initdb.d/14_seed_dev_admin.sh:ro
-      # 015-018 were missing from this list entirely — the mounts had drifted
-      # behind backend/db/migrations/, so even a genuinely fresh volume came
-      # up without chat_thread_messages (015) or transaction_audit_logs (018)
-      # and 500'd on /ai/chat/thread and /transactions/audit-logs. These run
-      # after the seed script only because nothing here depends on it.
-      - ./backend/db/migrations/015_chat_thread_sync.sql:/docker-entrypoint-initdb.d/15_chat_thread_sync.sql:ro
-      - ./backend/db/migrations/016_transactions_created_at_sort_index.sql:/docker-entrypoint-initdb.d/16_transactions_created_at_sort_index.sql:ro
-      - ./backend/db/migrations/017_seed_savings_category.sql:/docker-entrypoint-initdb.d/17_seed_savings_category.sql:ro
-      - ./backend/db/migrations/018_transaction_audit_logs.sql:/docker-entrypoint-initdb.d/18_transaction_audit_logs.sql:ro
-      # F-13.1 Phase 1 (specs/ai-budget-wizard-v2/plan.md BWZ2-T02). Mounted
-      # here AND in backend/docker-compose.yml — the 015-018 drift above is
-      # exactly what happens when only one of the two lists is updated.
-      - ./backend/db/migrations/019_categories_system_key.sql:/docker-entrypoint-initdb.d/19_categories_system_key.sql:ro
-      - ./backend/db/migrations/020_budget_plans.sql:/docker-entrypoint-initdb.d/20_budget_plans.sql:ro
-      # Feature-12 US-03 (specs/ai-chat-query-spending/plan.md AIQ-T11).
-      - ./backend/db/migrations/021_intent_parse_log.sql:/docker-entrypoint-initdb.d/21_intent_parse_log.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -52,12 +23,9 @@ services:
     networks:
       - pfm_network
 
-  # Applies every pending migration, then exits. Replaces relying on the
-  # docker-entrypoint-initdb.d mounts above, which fire only on a brand new
-  # volume and had drifted behind backend/db/migrations/ (022-028 were never
-  # added) — the same ledger-based runner production uses (deploy.sh). On a
-  # fresh volume the mounts still create 001-021 and this adopts them, then
-  # applies the rest.
+  # Applies every pending migration, then exits: the same ledger-based runner
+  # production (deploy.sh) and CI (backend-test.yml) use, so a fresh volume
+  # gets exactly the schema they do.
   migrate:
     build:
       context: ./backend
@@ -69,6 +37,28 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    restart: "no"
+    networks:
+      - pfm_network
+
+  # Creates the first admin (invite-only sign-up has nobody to invite from
+  # otherwise), then exits: the same cmd/seed production runs. Skipped when
+  # SEED_ADMIN_EMAIL/SEED_ADMIN_PASSWORD are blank. Runs on every `up` and
+  # resets that admin's password to SEED_ADMIN_PASSWORD each time.
+  seed:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: pfm-backend-dev
+    entrypoint: ["./seed"]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      SEED_ADMIN_NAME: ${SEED_ADMIN_NAME:-Admin}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     restart: "no"
     networks:
       - pfm_network

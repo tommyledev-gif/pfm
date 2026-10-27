@@ -185,33 +185,11 @@ func (h *BudgetHandler) BulkCreateBudgets(c *fiber.Ctx) error {
 // (specs/wallet-budget-icons/spec.md US-03), a standalone upload step so a
 // client can pick a photo before the budget exists yet (the create form).
 func (h *BudgetHandler) UploadIcon(c *fiber.Ctx) error {
-	if _, err := callerUUID(c); err != nil {
-		return response.Error(c, h.logger, common.ErrUnauthenticated)
-	}
-
-	img, err := readImageUpload(c)
-	if err != nil {
-		return response.Error(c, h.logger, err)
-	}
-
-	iconURL, err := h.iconUploader.UploadIcon(c.Context(), common.BudgetIconKeyPrefix, img.ContentType, img.Data)
-	if err != nil {
-		h.logger.Error("icon upload failed", zap.Error(err))
-		if _, unconfigured := h.iconUploader.(service.UnconfiguredIconUploader); unconfigured {
-			return response.Error(c, h.logger, common.ErrIconUploadUnavailable)
-		}
-		return response.Error(c, h.logger, common.ErrIconUploadFailed)
-	}
-
-	return response.Success(c, fiber.StatusOK, "icon uploaded successfully", fiber.Map{"icon_url": iconURL})
+	return uploadIcon(c, h.iconUploader, common.BudgetIconKeyPrefix, h.logger)
 }
 
 // budgetIDParam parses the :id path segment, returning 400 INVALID_INPUT
 // (spec.md S-BUD-26) before any service/DB call for a malformed UUID.
 func budgetIDParam(c *fiber.Ctx) (uuid.UUID, error) {
-	id, err := uuid.Parse(c.Params("id"))
-	if err != nil {
-		return uuid.UUID{}, common.NewInvalidInputError("budget id must be a valid UUID")
-	}
-	return id, nil
+	return pathUUID(c, "id", "budget id")
 }

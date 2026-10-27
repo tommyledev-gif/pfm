@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Pulls the freshly-pushed backend image and (re)starts the stack on the VPS.
-# Invoked over SSH by .github/workflows/deploy-backend.yml after
-# docker-compose.yml + deploy.sh + db/migrations/*.sql are synced.
+# Invoked over SSH by .github/workflows/deploy-backend.yml (and
+# deploy-ai-service.yml) after docker-compose.yml + deploy.sh + ops/ are
+# synced. The migrations ship inside the backend image (db/migrations.go).
 #
 # Expects to be run from the directory it was synced into, with:
 #   - .env.prod already present (workflow writes it from the VPS_ENV_PROD secret)
@@ -119,28 +120,16 @@ done
 mkdir -p app-updates
 
 # Apply any pending migrations before anything else touches the database.
+# This is the only thing that ever builds or changes the schema: on a brand
+# new volume it applies every migration from 001, on an existing one only
+# what is pending (cmd/migrate keeps a schema_migrations ledger, one
+# transaction per file). Before it existed, a migration added after the
+# volume's first boot silently never ran and the new code deployed green
+# against a missing table (500 SQLSTATE 42P01) — 009, and later 015-018.
 #
-# docker-entrypoint-initdb.d (the migration mounts in docker-compose.yml) only
-# fires once, when the volume is first initialized — so on every existing
-# environment it does nothing at all. Without this step, a migration added
-# after that first boot silently never ran, and the new code deployed green
-# against a schema missing its table (500 SQLSTATE 42P01 at runtime). That
-# happened to 009_notifications and again, in production, to 015-018. CI can't
-# catch it: it compiles Go and runs unit tests against in-memory fakes, never
-# Postgres.
-#
-# cmd/migrate keeps a schema_migrations ledger and applies only what's
-# pending, each file in its own transaction. `set -e` (top of this script)
-# plus the workflow's script_stop means a failed migration fails the deploy —
-# deliberately, since a half-migrated schema should stop the release rather
-# than surface as 500s afterwards.
-#
-# No operator step is needed to adopt an existing environment: on its first
-# run against a database that already has the schema but no ledger (every
-# environment built by docker-entrypoint-initdb.d), the runner records each
-# migration whose objects already exist instead of failing on it, and applies
-# only the genuinely missing ones. Adoption is allowed on that first run
-# only — afterwards a duplicate-object error is a real failure.
+# `set -e` (top of this script) plus the workflow's script_stop means a failed
+# migration fails the deploy — deliberately, since a half-migrated schema
+# should stop the release rather than surface as 500s afterwards.
 docker compose --env-file "$ENV_FILE_PATH" run --rm --entrypoint ./migrate pfm-backend
 
 # ⚠️ Migrate runs BEFORE `up -d`, not after. `run` starts pfm-postgres on its

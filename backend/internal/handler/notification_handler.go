@@ -105,9 +105,5 @@ func (h *NotificationHandler) MarkNotificationRead(c *fiber.Ctx) error {
 // notificationIDParam parses the :id path segment, returning 400
 // INVALID_INPUT before any service/DB call for a malformed UUID.
 func notificationIDParam(c *fiber.Ctx) (uuid.UUID, error) {
-	id, err := uuid.Parse(c.Params("id"))
-	if err != nil {
-		return uuid.UUID{}, common.NewInvalidInputError("notification id must be a valid UUID")
-	}
-	return id, nil
+	return pathUUID(c, "id", "notification id")
 }

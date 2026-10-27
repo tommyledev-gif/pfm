@@ -154,9 +154,5 @@ func (h *TransactionHandler) DeleteTransaction(c *fiber.Ctx) error {
 // transactionIDParam parses the :id path segment, returning 400 INVALID_INPUT
 // (spec.md S-TRX-34) before any service/DB call for a malformed UUID.
 func transactionIDParam(c *fiber.Ctx) (uuid.UUID, error) {
-	id, err := uuid.Parse(c.Params("id"))
-	if err != nil {
-		return uuid.UUID{}, common.NewInvalidInputError("transaction id must be a valid UUID")
-	}
-	return id, nil
+	return pathUUID(c, "id", "transaction id")
 }
