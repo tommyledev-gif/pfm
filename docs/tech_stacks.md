@@ -149,6 +149,8 @@ Postgres 16 matters for one planned change: `CREATE UNIQUE INDEX … NULLS NOT D
 
 **Nginx:** not present in either compose file — the backend is published directly.
 
+**Cache / shared store:** none. Rate-limit counters and the Groq token bucket live in the backend's memory, which is correct while there is one backend instance. When state must be shared (a second instance, counters that survive a restart), the choice is **Valkey** (`valkey/valkey`, BSD-3, Linux Foundation fork of Redis OSS 7.2; Fiber driver `github.com/gofiber/storage/valkey`), or a Postgres table — **not Redis** (decided 2026-10-27; Redis 7.4+ is no longer open source).
+
 ### Environment variables (`.env.example`, values masked)
 
 `POSTGRES_{USER,PASSWORD,DB,PORT}` · `BACKEND_PORT` · `WEB_FRONTEND_PORT` · `JWT_SECRET` · `CORS_ALLOWED_ORIGINS` · `SMTP_{HOST,PORT,USERNAME,PASSWORD,FROM_EMAIL}` · `APP_BASE_URL` · `AI_SERVICE_URL` (defaults to `http://ai-service:8000`) · `R2_{ACCOUNT_ID,ACCESS_KEY_ID,SECRET_ACCESS_KEY,BUCKET,PUBLIC_BASE_URL}` · `GROQ_API_KEY` · `ANTHROPIC_API_KEY` · `SEED_ADMIN_{EMAIL,PASSWORD,NAME}` (dev and prod) · prod-only: `DOCKER_REGISTRY_USER`, `PFM_*_IMAGE_TAG`, `MEM_LIMIT_*`

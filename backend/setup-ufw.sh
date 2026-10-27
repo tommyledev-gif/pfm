@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Locks down the VPS firewall so only Cloudflare edge IPs can reach 80/443,
 # with SSH left open for direct access. One-time setup, not part of the
-# recurring CI/CD flow. Copied from ci-cd-template/setup-ufw.sh (generic,
-# no project-specific values).
+# recurring CI/CD flow. Generic: no project-specific values.
 #
 # SAFETY: this rewrites live firewall rules. Keep a second SSH session open
 # while running this so you can undo (`ufw disable`) if something is wrong

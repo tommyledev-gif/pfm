@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One-time VPS provisioning: Docker Engine + swap + sysctl tuning. Run once
 # on a fresh Ubuntu VPS before the first deploy-backend.yml push; not part of
-# the recurring CI/CD flow. Adapted from ci-cd-template/vps-bootstrap.sh.
+# the recurring CI/CD flow.
 #
 # Run via `sudo bash vps-bootstrap.sh` as the same non-root user that
 # deploy-backend.yml SSHes in as (e.g. `ubuntu` on an AWS EC2 Ubuntu AMI,

@@ -677,7 +677,7 @@ Bắt hallucination **trước khi ra màn hình**.
 | Tầng | Cơ chế | Ngưỡng | Chặn gì |
 |---|---|---|---|
 | **Fiber limiter** | `AIChatRateLimiter` / `AIConsultRateLimiter` | 30/giờ · 20/giờ | request count, **per-user** |
-| **Groq org bucket** | in-memory (single instance, chưa cần Redis) | 80% limit | token, **per-org** |
+| **Groq org bucket** | in-memory (single instance, chưa cần store chung; khi cần thì dùng Valkey, không dùng Redis) | 80% limit | token, **per-org** |
 | **Evaluate quota** | counter, reset 00:00 GMT+7 | 15/ngày | prose call, per-user |
 
 Bucket riêng cho create-TX: **reserved 15% TPM, consult không mượn được.**
