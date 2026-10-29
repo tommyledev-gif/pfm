@@ -75,23 +75,37 @@ export function PendingSyncActionsSheet({ item, onClose }: PendingSyncActionsShe
                 <Text style={[styles.status, item.status === "failed" && { color: colors.danger }]}>
                   {isSending ? SENDING_HINT : pendingStatusText(item)}
                 </Text>
+                {/* One row, as in ConfirmDialog: the way out on the left, the
+                    primary action on the right. */}
                 <View style={styles.actions}>
-                  {canRetry ? <PillButton label="Thử lại" onPress={handleRetry} testID="btn-pending-sync-retry" /> : null}
-                  <PillButton
-                    label="Sửa"
-                    variant={canRetry ? "outline" : "solid"}
-                    onPress={handleEdit}
-                    disabled={isSending}
-                    testID="btn-pending-sync-edit"
-                  />
                   <PillButton
                     label="Bỏ"
                     variant="outline"
                     onPress={() => setConfirmOpen(true)}
                     disabled={isSending}
+                    singleLine
+                    style={styles.flexButton}
                     textStyle={styles.discardLabel}
                     testID="btn-pending-sync-discard"
                   />
+                  <PillButton
+                    label="Sửa"
+                    variant={canRetry ? "outline" : "solid"}
+                    onPress={handleEdit}
+                    disabled={isSending}
+                    singleLine
+                    style={styles.flexButton}
+                    testID="btn-pending-sync-edit"
+                  />
+                  {canRetry ? (
+                    <PillButton
+                      label="Thử lại"
+                      onPress={handleRetry}
+                      singleLine
+                      style={styles.flexButton}
+                      testID="btn-pending-sync-retry"
+                    />
+                  ) : null}
                 </View>
               </>
             ) : null}
@@ -135,6 +149,8 @@ const useStyles = createStyles((colors) => ({
   },
   title: { ...typography.cardTitle, color: colors.textPrimary },
   status: { ...typography.caption, color: colors.textSecondary },
-  actions: { gap: spacing.sm, marginTop: spacing.md },
+  actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md },
+  // ConfirmDialog's pill: narrower side padding so a label fits a third of the card.
+  flexButton: { flex: 1, paddingHorizontal: spacing.md },
   discardLabel: { color: colors.danger },
 }));

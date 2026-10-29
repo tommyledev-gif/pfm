@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Drawer } from "@/components/shared/Drawer";
-import { ChevronRightIcon, LogOutIcon } from "@/components/ui/Icon";
+import { ChevronRightIcon, LogOutIcon, UsersIcon } from "@/components/ui/Icon";
 import { SkeletonBlock } from "@/components/ui/SkeletonBlock";
 import { useRequireOnline } from "@/lib/connectivity";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
@@ -20,7 +20,7 @@ import { WalletInviteForm } from "@/features/wallets/components/WalletInviteForm
 import { WalletMemberRow } from "@/features/wallets/components/WalletMemberRow";
 import { WalletRecentTransactions } from "@/features/wallets/components/WalletRecentTransactions";
 import { WalletSheetHero } from "@/features/wallets/components/WalletSheetHero";
-import { memberCountLine } from "@/features/wallets/components/wallet-member-copy";
+import { NO_OTHER_MEMBERS, memberCountLine } from "@/features/wallets/components/wallet-member-copy";
 import {
   PendingMemberAction,
   dialogConfirm,
@@ -119,7 +119,16 @@ export function WalletMembersSheet({ wallet, faceColor, visible, onClose }: Wall
                 <Text style={styles.retryAction}>Thử lại</Text>
               </Pressable>
             ) : (
-              list.map(renderMember)
+              <>
+                {list.map(renderMember)}
+                {/* The owner alone: said in so many words, not left to the count. */}
+                {others.length === 0 ? (
+                  <View style={styles.noOthers} testID="text-wallet-no-other-members">
+                    <UsersIcon size={18} color={colors.textMuted} />
+                    <Text style={styles.noOthersText}>{NO_OTHER_MEMBERS}</Text>
+                  </View>
+                ) : null}
+              </>
             )}
           </View>
         </View>
@@ -185,6 +194,15 @@ const useStyles = createStyles((colors) => ({
   sectionMeta: { ...typography.caption, color: colors.textMuted },
   skeletonRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.md },
   retry: { flexDirection: "row", justifyContent: "space-between", paddingVertical: spacing.lg },
+  noOthers: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.surfaceBorder,
+  },
+  noOthersText: { ...typography.body, color: colors.textSecondary },
   retryText: { ...typography.body, color: colors.textSecondary },
   retryAction: { ...typography.body, color: colors.green },
   leave: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, paddingVertical: spacing.lg },

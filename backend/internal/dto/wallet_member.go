@@ -33,6 +33,9 @@ type WalletMemberResponse struct {
 	Status     string     `json:"status"`
 	InvitedAt  *time.Time `json:"invited_at"`
 	AcceptedAt *time.Time `json:"accepted_at"`
+	// Invited by email, account not created yet: the app says so instead of
+	// "waiting for an answer".
+	AccountPending bool `json:"account_pending"`
 }
 
 func NewWalletMemberResponse(m *model.WalletMember) WalletMemberResponse {
@@ -45,6 +48,8 @@ func NewWalletMemberResponse(m *model.WalletMember) WalletMemberResponse {
 		Status:     string(m.Status),
 		InvitedAt:  &invitedAt,
 		AcceptedAt: m.AcceptedAt,
+
+		AccountPending: m.AccountPending,
 	}
 }
 

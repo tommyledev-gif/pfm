@@ -165,7 +165,9 @@ func registerRoutes(app *fiber.App, h routeHandlers) {
 	wallets.Post("/:id/set-default", h.wallet.SetDefaultWallet)
 	wallets.Get("/:id/members", h.walletMember.ListMembers)
 	wallets.Get("/:id/members/lookup", middleware.MemberLookupRateLimiter(h.logger), h.walletMember.LookupInvitee)
-	wallets.Post("/:id/members", h.walletMember.Invite)
+	// Rate-limited per owner: an invitation to an address with no account
+	// creates that account and sends it an email.
+	wallets.Post("/:id/members", middleware.WalletInviteRateLimiter(h.logger), h.walletMember.Invite)
 	wallets.Patch("/:id/members/:user_id", h.walletMember.UpdateRole)
 	wallets.Delete("/:id/members/:user_id", h.walletMember.Remove)
 	wallets.Post("/:id/invitation/accept", h.walletMember.AcceptInvitation)
@@ -240,6 +242,9 @@ func registerRoutes(app *fiber.App, h routeHandlers) {
 	// produced by a background job (main.go's ticker), never a client request.
 	notifications := v1.Group("/notifications", jwtAuth)
 	notifications.Get("/", h.notification.ListNotifications)
+	// Batch and read-all: one segment each, so they never meet /:id/read.
+	notifications.Post("/read", h.notification.MarkNotificationsRead)
+	notifications.Post("/read-all", h.notification.MarkAllNotificationsRead)
 	notifications.Get("/:id", h.notification.GetNotification)
 	notifications.Post("/:id/read", h.notification.MarkNotificationRead)
 

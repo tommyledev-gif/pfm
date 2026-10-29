@@ -25,6 +25,9 @@ type EmailSender interface {
 	// (specs/forgot-password). The code is in the email body only, never a
 	// link: the app asks for it.
 	SendPasswordResetCode(ctx context.Context, toEmail, code string) error
+	// SendWalletInviteEmail invites someone with no account yet into a
+	// shared wallet: the activation link, naming whose wallet it is.
+	SendWalletInviteEmail(ctx context.Context, toEmail, ownerName, walletName, inviteToken string) error
 }
 
 // LogEmailSender is a placeholder implementation: it logs that an email
@@ -56,6 +59,14 @@ func (s *LogEmailSender) SendAccessRequestEmail(_ context.Context, adminEmail, _
 
 func (s *LogEmailSender) SendAccessApprovedEmail(_ context.Context, toEmail, _ string) error {
 	s.logger.Info("access approved email dispatched (placeholder sender)",
+		zap.String("email", common.MaskEmail(toEmail)),
+	)
+	return nil
+}
+
+// SendWalletInviteEmail logs that a wallet invitation went out — never the token.
+func (s *LogEmailSender) SendWalletInviteEmail(_ context.Context, toEmail, _, _, _ string) error {
+	s.logger.Info("wallet invite email dispatched (placeholder sender)",
 		zap.String("email", common.MaskEmail(toEmail)),
 	)
 	return nil

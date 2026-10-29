@@ -23,6 +23,7 @@ import { installSessionResume } from "@/stores/session-resume";
 import { installSessionScopedReset } from "@/stores/session-scoped-reset";
 import { useSessionStore } from "@/stores/session-store";
 import { useThemeStore } from "@/stores/theme-store";
+import { useUiPrefsHydrated } from "@/stores/ui-prefs-store";
 import { installOutboxSync } from "@/features/transactions/outbox/install-outbox-sync";
 import { useAccountRegistryStore } from "@/features/accounts/account-registry-store";
 import { useSwitchProgressStore } from "@/features/accounts/switch-progress-store";
@@ -100,7 +101,10 @@ export default function RootLayout() {
   const accountsHydrated = useAccountRegistryStore((s) => s.isHydrated);
   // The app lock shows the PIN keypad or the phone's prompt; known before it opens.
   const pinHydrated = usePinStore((s) => s.isHydrated);
-  const isHydrated = sessionHydrated && themeHydrated && accountsHydrated && pinHydrated;
+  // Home's Ngày / Tháng / Năm tab and the Wallets view mode: known before the
+  // first screen renders, so neither opens on the default and then switches.
+  const uiPrefsHydrated = useUiPrefsHydrated();
+  const isHydrated = sessionHydrated && themeHydrated && accountsHydrated && pinHydrated && uiPrefsHydrated;
   const switching = useSwitchProgressStore((s) => s.switching);
   const hasSession = useSessionStore((s) => s.accessToken !== null);
   const hydrate = useSessionStore((s) => s.hydrate);

@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { Avatar } from "@/components/ui/Avatar";
@@ -45,10 +45,10 @@ interface CategoryTransactionsDialogProps {
 // holding. Holding a row for a second opens a tooltip under it whose one
 // action jumps to that row in the Transactions tab (HoldableTransactionRow).
 //
-// Rows aren't paginated on scroll the way the Transactions screen's list is:
-// this is a Drawer (one ScrollView), so an inner infinite list would fight it
-// for the gesture. The first page is what's shown, with a footer saying so
-// when more exist.
+// Paged as the sheet scrolls: no inner list (it would fight the Drawer's own
+// ScrollView for the gesture) — the Drawer reports when its end comes within
+// reach and the next page loads before the User gets there. Used to be a
+// "Tải thêm" button under the first page.
 export const CategoryTransactionsDialog = memo(function CategoryTransactionsDialog({
   visible,
   onClose,
@@ -90,6 +90,10 @@ export const CategoryTransactionsDialog = memo(function CategoryTransactionsDial
     [transactions.data],
   );
 
+  const loadMore = () => {
+    if (transactions.hasNextPage && !transactions.isFetchingNextPage) void transactions.fetchNextPage();
+  };
+
   const router = useRouter();
   // The row whose tooltip is open — one at a time; a new hold moves it.
   const [heldId, setHeldId] = useState<string | null>(null);
@@ -112,7 +116,7 @@ export const CategoryTransactionsDialog = memo(function CategoryTransactionsDial
   };
 
   return (
-    <Drawer visible={visible} onClose={onClose}>
+    <Drawer visible={visible} onClose={onClose} onEndReached={loadMore}>
       <DrawerHeader title="Giao dịch" actions={[{ label: "Đóng", onPress: onClose, variant: "secondary" }]} />
 
       <View style={styles.summary}>
@@ -160,21 +164,7 @@ export const CategoryTransactionsDialog = memo(function CategoryTransactionsDial
         </View>
       )}
 
-      {transactions.hasNextPage ? (
-        <Pressable
-          style={styles.moreButton}
-          onPress={() => {
-            if (!transactions.isFetchingNextPage) transactions.fetchNextPage();
-          }}
-          disabled={transactions.isFetchingNextPage}
-        >
-          {transactions.isFetchingNextPage ? (
-            <ActivityIndicator color={colors.green} />
-          ) : (
-            <Text style={styles.moreLabel}>Tải thêm</Text>
-          )}
-        </Pressable>
-      ) : null}
+      {transactions.isFetchingNextPage ? <ActivityIndicator color={colors.green} style={styles.more} /> : null}
     </Drawer>
   );
 });
@@ -186,6 +176,5 @@ const useStyles = createStyles((colors) => ({
   summaryRange: { ...typography.tiny, color: colors.textSecondary },
   summaryAmount: { ...typography.cardTitle, color: colors.peach },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", paddingVertical: spacing.xl },
-  moreButton: { alignItems: "center", paddingVertical: spacing.sm },
-  moreLabel: { ...typography.label, color: colors.green },
+  more: { paddingVertical: spacing.md },
 }));

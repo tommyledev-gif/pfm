@@ -87,6 +87,7 @@ func TestBuildEmailMessage_AllTemplatesRender(t *testing.T) {
 		"activation":      activationEmail(link),
 		"access approved": accessApprovedEmail(link),
 		"access request":  accessRequestEmail("a@example.com", link),
+		"wallet invite":   walletInviteEmail("An", "Chi tiêu nhà", link),
 	} {
 		msg := render(t, "user@example.com", email)
 		for _, want := range []string{link, email.ButtonLabel, email.Heading} {

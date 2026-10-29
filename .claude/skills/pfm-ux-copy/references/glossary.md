@@ -51,7 +51,7 @@ Một khái niệm = một từ, ở cả VI và EN. Cột "Nguồn": `app` = đ
 | Wallet owner | chủ ví | owner | app | Người tạo ví. Một ví một chủ ví |
 | Recorder role (ví chung) | ghi chép | can record | app | Vai trò thêm được giao dịch vào ví chung. Khác "người ghi" (ai đã ghi một giao dịch: "{{name}} ghi") |
 | Viewer role (ví chung) | chỉ xem | view only | app | Vai trò chỉ xem số dư và giao dịch |
-| Invitation (ví chung) | lời mời | invitation | app | Nút: "Tham gia" / "Từ chối"; chủ ví rút lại: "Thu hồi lời mời". Trạng thái chưa trả lời: "Chờ trả lời" |
+| Invitation (ví chung) | lời mời | invitation | app | Nút: "Tham gia" / "Từ chối"; chủ ví rút lại: "Thu hồi lời mời". Trạng thái chưa trả lời: "Chờ trả lời"; mời bằng email chưa có tài khoản: "Chờ tạo tài khoản" |
 | Leave (ví chung) | rời ví | leave | app | Nút và tiêu đề hộp xác nhận: "Rời ví" / "Rời ví {{wallet}}?", nhánh an toàn "Giữ lại" |
 | Card colour (ví) | màu thẻ | card colour | app | Nhãn trong form ví; lựa chọn mặc định: "Màu tự động" |
 | Admin role (tài khoản) | quản trị | admin | app | Nhãn vai trò tài khoản: "Quản trị" / "Thành viên"; tiêu đề chọn: "Vai trò" |

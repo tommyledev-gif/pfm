@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, SectionList, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 
 import { BellIcon } from "@/components/ui/Icon";
 import { GroupedListCell, ListSectionHeader } from "@/components/ui/grouped-list";
@@ -14,11 +15,13 @@ import { dayLabelVi } from "@/lib/format-date";
 import { useRequireOnline } from "@/lib/connectivity";
 import { matchesSearch } from "@/lib/search-text";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
-import { useNotificationsInfiniteQuery } from "@/features/notifications/api/use-notifications-query";
+import { useHasUnreadNotifications, useNotificationsInfiniteQuery } from "@/features/notifications/api/use-notifications-query";
 import { useMarkNotificationReadMutation } from "@/features/notifications/api/use-mark-notification-read-mutation";
+import { useMarkAllNotificationsReadMutation } from "@/features/notifications/api/use-mark-notifications-read-mutations";
+import { SEEN_VIEWABILITY, useSeenNotifications } from "@/features/notifications/hooks/use-seen-notifications";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { Notification } from "@/features/notifications/types";
-import { useUsersQuery } from "@/features/users/api/use-users-query";
+import { useWaitingAccessRequestsQuery } from "@/features/users/api/use-users-query";
 import { AccessRequestActions } from "@/features/users/components/AccessRequestActions";
 import { useSessionStore } from "@/stores/session-store";
 
@@ -50,6 +53,18 @@ export default function NotificationsScreen() {
   const notifications = useNotificationsInfiniteQuery(filter === "unread");
   const items = useMemo(() => notifications.data?.pages.flatMap((page) => page.data) ?? [], [notifications.data]);
   const markRead = useMarkNotificationReadMutation();
+  const markAllRead = useMarkAllNotificationsReadMutation();
+  // Seen on screen = read on the server; the dot stays until the User leaves.
+  const seen = useSeenNotifications();
+  const { keptUnread } = seen;
+  const hasUnread = useHasUnreadNotifications();
+  const showsUnread = (n: Notification) => !n.is_read || keptUnread.has(n.id);
+  const canMarkAll = hasUnread || keptUnread.size > 0 || items.some((n) => !n.is_read);
+  const markAll = () =>
+    requireOnline(() => {
+      seen.clearKept();
+      markAllRead.mutate();
+    });
   // A notification names the Budget it was raised for, but Insights selects by
   // category — this is the hop between the two. Budgets are already cached by
   // Home/Insights in practice, so this rarely costs a request.
@@ -58,7 +73,7 @@ export default function NotificationsScreen() {
   // still waiting, so only those notifications offer "Duyệt yêu cầu" and
   // "Từ chối". A rejected request leaves this list, taking both buttons.
   const isAdmin = useSessionStore((s) => s.role) === "admin";
-  const users = useUsersQuery({ enabled: isAdmin });
+  const users = useWaitingAccessRequestsQuery({ enabled: isAdmin });
   const waitingRequestEmailById = useMemo(
     () => new Map((users.data?.data ?? []).filter((u) => u.status === "requested").map((u) => [u.id, u.email])),
     [users.data],
@@ -109,6 +124,8 @@ export default function NotificationsScreen() {
   const sections = useMemo<DaySection[]>(() => {
     const grouped: DaySection[] = [];
     for (const n of items) {
+      // Read since it was fetched, and not on screen this visit: not "unread" any more.
+      if (filter === "unread" && n.is_read && !keptUnread.has(n.id)) continue;
       if (search.trim() && !matchesSearch(`${n.title} ${n.body}`, search)) continue;
       const label = dayLabelVi(n.created_at);
       const section = grouped.find((g) => g.title === label);
@@ -116,7 +133,7 @@ export default function NotificationsScreen() {
       else grouped.push({ title: label, data: [n] });
     }
     return grouped;
-  }, [items, search]);
+  }, [items, search, filter, keptUnread]);
 
   const empty = notifications.isError ? (
     <View style={styles.empty}>
@@ -141,7 +158,25 @@ export default function NotificationsScreen() {
 
   return (
     <Screen style={styles.screen}>
-      <ScreenHeader title="Thông báo" />
+      <ScreenHeader
+        title="Thông báo"
+        trailing={
+          canMarkAll ? (
+            <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(140)}>
+              <Pressable
+                onPress={markAll}
+                disabled={markAllRead.isPending}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Đánh dấu mọi thông báo đã đọc"
+                testID="btn-notifications-read-all"
+              >
+                <Text style={styles.readAll}>Đánh dấu đã đọc</Text>
+              </Pressable>
+            </Animated.View>
+          ) : null
+        }
+      />
 
       <View style={styles.controls}>
         <SegmentedTabs options={FILTERS} value={filter} onChange={setFilter} testID="tabs-notifications-filter" />
@@ -157,6 +192,8 @@ export default function NotificationsScreen() {
           contentContainerStyle={styles.list}
           stickySectionHeadersEnabled={false}
           keyboardShouldPersistTaps="handled"
+          viewabilityConfig={SEEN_VIEWABILITY}
+          onViewableItemsChanged={seen.onViewableItemsChanged}
           renderSectionHeader={({ section }) => (
             <View style={styles.sectionHeader}>
               <ListSectionHeader title={section.title} />
@@ -169,6 +206,7 @@ export default function NotificationsScreen() {
                 onPress={() => openNotification(item)}
                 action={approveActionFor(item)}
                 separated={index > 0}
+                unread={showsUnread(item)}
               />
             </GroupedListCell>
           )}
@@ -196,4 +234,5 @@ const useStyles = createStyles((colors) => ({
   emptyHint: { ...typography.caption, color: colors.textMuted, textAlign: "center" },
   retry: { ...typography.body, color: colors.green },
   more: { paddingVertical: spacing.lg },
+  readAll: { ...typography.caption, color: colors.green },
 }));

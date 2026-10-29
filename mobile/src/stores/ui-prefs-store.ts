@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
@@ -74,3 +75,15 @@ export const useUiPrefsStore = create<UiPrefsState>()(
   ),
 );
 
+
+const subscribeHydration = (onChange: () => void) => useUiPrefsStore.persist.onFinishHydration(onChange);
+const getHydrated = () => useUiPrefsStore.persist.hasHydrated();
+
+/**
+ * Whether the saved prefs have been read back (AsyncStorage, asynchronous).
+ * The root layout holds the splash for it: Home rendered with the default
+ * period first and then slid over to the saved one on its very first frame.
+ */
+export function useUiPrefsHydrated(): boolean {
+  return useSyncExternalStore(subscribeHydration, getHydrated);
+}

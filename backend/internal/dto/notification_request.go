@@ -10,3 +10,16 @@ type ListNotificationsQuery struct {
 	Cursor string `query:"cursor"`
 	Limit  int    `query:"limit" validate:"omitempty,min=1,max=100"`
 }
+
+// MarkNotificationsReadRequest is the body of POST /notifications/read: the
+// notifications the app has shown on screen. Capped at one page's maximum
+// (common.MaxListLimit), the most a single screen can have shown at once.
+type MarkNotificationsReadRequest struct {
+	IDs []string `json:"ids" validate:"required,min=1,max=100,dive,uuid"`
+}
+
+// MarkNotificationsReadResponse says how many notifications actually moved
+// from unread to read (already-read and foreign ids are not counted).
+type MarkNotificationsReadResponse struct {
+	Updated int64 `json:"updated"`
+}

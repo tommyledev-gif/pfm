@@ -230,3 +230,27 @@ func (s *NotificationService) MarkRead(ctx context.Context, userID, notification
 	}
 	return updated, nil
 }
+
+// MarkReadBatch marks the caller's notifications among ids as read — the
+// rows the app has shown on screen. Unlike MarkRead there is no 403/404 per
+// id: an id that is unknown or someone else's is skipped by the user_id
+// scope, so one stale row cannot fail the rest. Returns how many changed.
+func (s *NotificationService) MarkReadBatch(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	updated, err := s.repo.MarkNotificationsRead(ctx, userID, ids)
+	if err != nil {
+		return 0, fmt.Errorf("service.MarkReadBatch: %w", err)
+	}
+	return updated, nil
+}
+
+// MarkAllRead marks every unread notification of the caller as read.
+func (s *NotificationService) MarkAllRead(ctx context.Context, userID uuid.UUID) (int64, error) {
+	updated, err := s.repo.MarkNotificationsRead(ctx, userID, nil)
+	if err != nil {
+		return 0, fmt.Errorf("service.MarkAllRead: %w", err)
+	}
+	return updated, nil
+}

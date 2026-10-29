@@ -40,6 +40,8 @@ export interface WalletMember {
   status: "pending" | "active";
   invited_at: string | null;
   accepted_at: string | null;
+  /** Invited by email, account not created yet. Absent from older servers. */
+  account_pending?: boolean;
 }
 
 /**

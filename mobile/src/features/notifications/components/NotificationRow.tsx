@@ -39,6 +39,8 @@ interface NotificationRowProps {
   action?: ReactNode;
   /** Draws the hairline above this row (every row of a day but its first). */
   separated: boolean;
+  /** Overrides is_read for the dot: a row read on being seen keeps it for the visit. */
+  unread?: boolean;
 }
 
 /**
@@ -49,10 +51,10 @@ interface NotificationRowProps {
  * mark, and rows are told apart by a hairline that starts where the text
  * does.
  */
-export function NotificationRow({ notification, onPress, action, separated }: NotificationRowProps) {
+export function NotificationRow({ notification, onPress, action, separated, unread: unreadOverride }: NotificationRowProps) {
   const styles = useStyles();
   const look = LOOK[notification.type] ?? DEFAULT_LOOK;
-  const unread = !notification.is_read;
+  const unread = unreadOverride ?? !notification.is_read;
 
   return (
     <Pressable

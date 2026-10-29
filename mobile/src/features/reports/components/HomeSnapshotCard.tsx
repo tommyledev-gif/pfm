@@ -1,7 +1,7 @@
 import { memo, useState } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
 
-import { useContentReveal } from "@/components/motion/use-content-reveal";
+import { SKELETON_DELAY_MS, useContentReveal } from "@/components/motion/use-content-reveal";
 import { Card } from "@/components/ui/Card";
 import { LiquidCircle } from "@/components/shared/LiquidCircle";
 import { SnapshotCardSkeleton } from "@/components/shared/SnapshotCardSkeleton";
@@ -98,7 +98,10 @@ export const HomeSnapshotCard = memo(function HomeSnapshotCard({
   // been is kept as its minimum, so no tab can ever make the card shrink.
   const [contentMinHeight, setContentMinHeight] = useState(0);
   const slideStyle = usePeriodSlide(periodIndex);
-  const reveal = useContentReveal(loading);
+  // Delayed skeleton: at launch the figures come back from the saved cache
+  // within a few hundred ms, and a skeleton shown for that long blinked
+  // before the cross-fade. A fast load now fades the figures in once.
+  const reveal = useContentReveal(loading, { placeholderDelayMs: SKELETON_DELAY_MS });
   const isOverBudget = Boolean(budgetSnapshot && periodSpent > budgetSnapshot.limit);
 
   // The figure under the ring is the one the user acts on, and it was rendered

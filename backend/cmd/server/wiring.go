@@ -123,7 +123,7 @@ func wire(cfg *config.Config, pool *pgxpool.Pool, logger *zap.Logger) (routeHand
 	// on what "this cycle" is.
 	cycleResolver := service.NewCycleResolver(budgetPlanRepo)
 	walletService := service.NewWalletService(walletRepo, logger)
-	walletMemberService := service.NewWalletMemberService(walletRepo, walletRepo, userRepo, logger)
+	walletMemberService := service.NewWalletMemberService(walletRepo, walletRepo, userRepo, emailSender, logger)
 	categoryService := service.NewCategoryService(categoryRepo, logger)
 	budgetService := service.NewBudgetService(budgetRepo, cycleResolver, logger)
 	transactionService := service.NewTransactionService(transactionRepo, walletRepo, categoryRepo, logger)

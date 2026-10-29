@@ -66,6 +66,10 @@ export function TransactionHistoryDrawer({
     () => auditLogs.data?.pages.flatMap((page) => page.data) ?? [],
     [auditLogs.data],
   );
+  // Older changes page in as the sheet nears its end — it used to stop at the first 20.
+  const loadOlder = () => {
+    if (auditLogs.hasNextPage && !auditLogs.isFetchingNextPage) void auditLogs.fetchNextPage();
+  };
 
   const formatValue = (field: string, value: unknown): string => {
     if (value === null || value === undefined) return "—";
@@ -132,7 +136,7 @@ export function TransactionHistoryDrawer({
   const localTrail = message?.editHistory ?? [];
 
   return (
-    <Drawer visible={message !== null} onClose={onClose}>
+    <Drawer visible={message !== null} onClose={onClose} onEndReached={kind === "deleted" ? loadOlder : undefined}>
       <View testID="drawer-transaction-history" style={styles.body}>
         <DrawerHeader title="Lịch sử giao dịch" actions={[{ label: "Đóng", onPress: onClose, variant: "secondary" }]} />
 
@@ -176,6 +180,7 @@ export function TransactionHistoryDrawer({
         ) : (
           serverEntries.map(renderServerEntry)
         )}
+        {auditLogs.isFetchingNextPage ? <ActivityIndicator color={colors.green} style={styles.loader} /> : null}
       </View>
     </Drawer>
   );

@@ -26,7 +26,7 @@ The glossary rule "one concept = one word; a wallet is always *ví*" also points
 - **Owner** (Chủ ví): the account that created the wallet (`wallets.user_id`). Exactly one per wallet. Never a row in the membership table.
 - **Editor** (Ghi chép): may view the wallet and record income, expenses and transfers into or out of it.
 - **Viewer** (Chỉ xem): may view the wallet's balance and entries; may not record.
-- **Invitee**: an active account that has a pending invitation and no access yet.
+- **Invitee**: an account that has a pending invitation and no access yet: an active account, or one invited by email that has not been activated (BR-03a).
 
 ### Domain Fields (conceptual; schema in `plan.md`)
 A **Wallet Membership** links one Wallet to one User with a `role` (`editor` | `viewer`), a `status` (`pending` | `active`), who invited them, and timestamps for invited / accepted / removed. A removed or declined membership is kept (soft, `removed_at`) for history; at most one live (not removed) membership per (wallet, user).
@@ -38,6 +38,7 @@ A **Wallet Membership** links one Wallet to one User with a `role` (`editor` | `
 | BR-01 | Only the owner invites, changes roles, removes members, and edits the wallet itself (name, type, currency, icon, card colour, default flag). |
 | BR-02 | A wallet has at most **10** live memberships (pending + active). **Explicit assumption**: a household, not a company. |
 | BR-03 | An invitation targets an existing **active** account, found by email (case-insensitive) or tên đăng nhập. The owner cannot invite themself. A user with a live membership cannot be invited again (409). |
+| BR-03a | **Invite by email (2026-10-29, product decision; replaces the old Out of Scope line).** An email with no account behind it is invited all the same: in the invitation's transaction the server creates a **pending** account (role member, `invited_by` = the owner, the same 72h activation token as an admin invite) and emails the activation link, naming the owner and the wallet. An account invited before but never activated is invited the same way; its link is re-sent while valid, renewed once expired. After activating and signing in, the invitation waits in Ví chung like any other. A tên đăng nhập with no account, and disabled or still-requested accounts, stay `404`. Invitations are rate-limited per owner like an admin's invites. |
 | BR-04 | An invitation grants nothing until accepted. It does not expire; the owner can cancel it (= remove the pending member). **Explicit assumption.** |
 | BR-05 | Read access (balance, entries, member list) = owner or **active** member of any role. Write access (record into the wallet) = owner or active **editor**. |
 | BR-06 | ⚠️ One wallet, one balance. A transaction recorded by any editor changes the wallet balance in the same DB transaction as the insert, exactly like the owner's (existing CLAUDE.md rule). |
@@ -71,7 +72,8 @@ A **Wallet Membership** links one Wallet to one User with a `role` (`editor` | `
 | S-SHW-01 | Owner, wallet W, account B active | invite B as editor | `201`, B pending; B gets a `wallet_invite` notification | Happy path |
 | S-SHW-02 | — | `role = "admin"` | `400 INVALID_INPUT` | Validation |
 | S-SHW-03 | Caller is a member, not owner | invites | `403 WALLET_ACCESS_DENIED` | BR-01 |
-| S-SHW-04 | identifier matches no active account | invites | `404 WALLET_MEMBER_USER_NOT_FOUND` | Pending/deleted accounts count as not found |
+| S-SHW-04 | identifier is a tên đăng nhập with no account, or a disabled / requested account | invites | `404 WALLET_MEMBER_USER_NOT_FOUND` | An email with no account, or a pending one, is BR-03a |
+| S-SHW-04a | identifier is an email with no account | invites | `201`, member `pending` with `account_pending: true`; pending account created; activation email sent | BR-03a |
 | S-SHW-05 | identifier is the owner | invites | `400 INVALID_INPUT` | BR-03 |
 | S-SHW-06 | B already pending or active | invites B | `409 WALLET_MEMBER_EXISTS` | Natural idempotency via the live-membership unique index |
 | S-SHW-07 | W has 10 live memberships | invites | `409 WALLET_MEMBER_LIMIT` | BR-02 |
@@ -187,7 +189,7 @@ Member list shape: owner first (`role: "owner"`), then members by invite time: `
 | Surface | Loading | Empty | Error | Success |
 |---|---|---|---|---|
 | Invitation cards | nothing shown (no skeleton: they are an extra, not the screen's content) | nothing shown | nothing shown; the wallet list still works | accepted: the card leaves, the wallet appears in the carousel; declined: the card leaves |
-| Members sheet | row skeletons | owner row only + invite form (owner) or "Chỉ có chủ ví" (member) | one line saying the list did not load + retry | invite: the new row appears as "Chờ chấp nhận"; remove/leave: the row leaves |
+| Members sheet | row skeletons | owner row, then "Chưa có ai khác trong ví." (+ invite form for the owner) | one line saying the list did not load + retry | invite: the new row appears as "Chờ chấp nhận"; remove/leave: the row leaves |
 | Invite form | button busy, inputs locked | — | the server's message under the field (not found, already a member, limit) | field clears |
 | Shared wallet entries | existing row skeletons | existing "Ví này chưa có giao dịch nào." | existing error line | rows with who recorded them |
 
@@ -205,7 +207,6 @@ Member list shape: owner first (`role: "owner"`), then members by invite time: `
 ## Out of Scope
 - Ownership transfer, multiple owners, an "admin" member role.
 - Shared budgets, shared categories, household-wide reports ("tổng chi cả nhà").
-- Inviting someone who has no account (the app is invite-only; an admin creates the account first).
 - Push notifications (in-app only), web client support.
 
 ## Open Questions

@@ -3,6 +3,22 @@ INSERT INTO users (email, role, invited_by, invite_token, invite_expires_at, inv
 VALUES ($1, $2, $3, $4, NOW() + INTERVAL '72 hours', NOW())
 RETURNING *;
 
+-- name: RefreshPendingInvite :execrows
+-- A wallet invitation by email to an account that was never activated and
+-- whose link has expired (WalletMemberService.Invite): a fresh token and 72h,
+-- in the invitation's own transaction. Unlike ResendInvite it does not count
+-- toward the admin's resend cooldown. Hand-authored in
+-- sqlc/users_wallet_invite.sql.go.
+UPDATE users
+SET
+    invite_token      = $2,
+    invite_expires_at = NOW() + INTERVAL '72 hours',
+    invite_sent_at    = NOW(),
+    updated_at        = NOW()
+WHERE id = $1
+  AND status = 'pending'
+  AND deleted_at IS NULL;
+
 -- name: GetUserByInviteToken :one
 SELECT * FROM users
 WHERE invite_token = $1

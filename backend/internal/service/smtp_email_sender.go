@@ -62,6 +62,16 @@ func (s *SMTPEmailSender) SendAccessApprovedEmail(ctx context.Context, toEmail, 
 	return nil
 }
 
+// SendWalletInviteEmail implements EmailSender: a wallet owner invited an
+// address with no account; the same activation link an admin's invite carries.
+func (s *SMTPEmailSender) SendWalletInviteEmail(ctx context.Context, toEmail, ownerName, walletName, inviteToken string) error {
+	email := walletInviteEmail(ownerName, walletName, s.link("/activate", inviteToken))
+	if err := s.send(ctx, toEmail, email); err != nil {
+		return fmt.Errorf("service.SMTPEmailSender.SendWalletInviteEmail: %w", err)
+	}
+	return nil
+}
+
 // SendPasswordResetCode implements EmailSender: the forgot-password code.
 func (s *SMTPEmailSender) SendPasswordResetCode(ctx context.Context, toEmail, code string) error {
 	if err := s.send(ctx, toEmail, passwordResetEmail(code)); err != nil {

@@ -17,6 +17,7 @@ type sharedWalletFixture struct {
 	svc     *WalletMemberService
 	wallets *fakeWalletRepo
 	users   *fakeUserRepo
+	email   *recordingEmailSender
 	owner   *model.User
 	wallet  *model.Wallet
 }
@@ -36,10 +37,12 @@ func newSharedWalletFixture(t *testing.T) *sharedWalletFixture {
 	owner := seedWalletUser(users, wallets, "an@example.com", "an", "An")
 	wallet := &model.Wallet{ID: uuid.New(), UserID: owner.ID, Name: "Chi tiêu nhà", Type: model.WalletTypeCash, Balance: 1_000_000_00, Currency: "VND"}
 	wallets.wallets[wallet.ID] = wallet
+	email := newRecordingEmailSender()
 	return &sharedWalletFixture{
-		svc:     NewWalletMemberService(wallets, wallets, users, zap.NewNop()),
+		svc:     NewWalletMemberService(wallets, wallets, users, email, zap.NewNop()),
 		wallets: wallets,
 		users:   users,
+		email:   email,
 		owner:   owner,
 		wallet:  wallet,
 	}
@@ -71,11 +74,13 @@ func TestWalletMemberService_Invite_Rejections(t *testing.T) {
 	_, err := f.svc.Invite(ctx, binh.ID, f.wallet.ID, "an@example.com", model.WalletMemberRoleEditor)
 	assertAppErrCode(t, err, common.ErrCodeWalletAccessDenied)
 
-	_, err = f.svc.Invite(ctx, f.owner.ID, f.wallet.ID, "nobody@example.com", model.WalletMemberRoleEditor)
+	// A tên đăng nhập nobody has. (An email nobody has is invited by email:
+	// see the WalletInvite tests.)
+	_, err = f.svc.Invite(ctx, f.owner.ID, f.wallet.ID, "nobody", model.WalletMemberRoleEditor)
 	assertAppErrCode(t, err, common.ErrCodeWalletMemberUserNotFound)
 
-	pending := seedWalletUser(f.users, f.wallets, "cuong@example.com", "cuong", "Cường")
-	pending.Status = model.UserStatusPending
+	disabled := seedWalletUser(f.users, f.wallets, "cuong@example.com", "cuong", "Cường")
+	disabled.Status = model.UserStatusDisabled
 	_, err = f.svc.Invite(ctx, f.owner.ID, f.wallet.ID, "cuong@example.com", model.WalletMemberRoleEditor)
 	assertAppErrCode(t, err, common.ErrCodeWalletMemberUserNotFound)
 

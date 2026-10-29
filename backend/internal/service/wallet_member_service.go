@@ -29,11 +29,12 @@ type WalletMemberService struct {
 	wallets WalletRepo
 	members WalletMemberRepo
 	users   WalletMemberUserLookup
+	email   EmailSender
 	logger  *zap.Logger
 }
 
-func NewWalletMemberService(wallets WalletRepo, members WalletMemberRepo, users WalletMemberUserLookup, logger *zap.Logger) *WalletMemberService {
-	return &WalletMemberService{wallets: wallets, members: members, users: users, logger: logger}
+func NewWalletMemberService(wallets WalletRepo, members WalletMemberRepo, users WalletMemberUserLookup, email EmailSender, logger *zap.Logger) *WalletMemberService {
+	return &WalletMemberService{wallets: wallets, members: members, users: users, email: email, logger: logger}
 }
 
 // requireOwner: 404 for a missing wallet, 403 for anyone but its owner
@@ -50,66 +51,6 @@ func (s *WalletMemberService) requireOwner(ctx context.Context, userID, walletID
 		return nil, common.ErrWalletAccessDenied
 	}
 	return wallet, nil
-}
-
-// Invite implements US-01: a pending membership plus the invitee's
-// notification, in one DB transaction.
-func (s *WalletMemberService) Invite(ctx context.Context, ownerID, walletID uuid.UUID, identifier string, role model.WalletMemberRole) (*model.WalletMember, error) {
-	wallet, err := s.requireOwner(ctx, ownerID, walletID)
-	if err != nil {
-		return nil, err
-	}
-	target, err := s.findInvitee(ctx, identifier)
-	if err != nil {
-		return nil, err
-	}
-	if target.ID == ownerID {
-		return nil, common.NewInvalidInputError("không thể mời chính mình vào ví của mình")
-	}
-	// A soft limit: two invitations for different people racing at nine can
-	// land eleven. Harmless, and not worth locking the wallet row (which
-	// every balance update also takes) to prevent.
-	count, err := s.members.CountLiveWalletMembers(ctx, walletID)
-	if err != nil {
-		return nil, fmt.Errorf("service.Invite: %w", err)
-	}
-	if count >= common.WalletMemberLimit {
-		return nil, common.ErrWalletMemberLimit
-	}
-
-	owner, err := s.users.GetUserByID(ctx, ownerID)
-	if err != nil {
-		return nil, fmt.Errorf("service.Invite: %w", err)
-	}
-	ownerName := model.DisplayName(owner.FullName, owner.Username, owner.Email)
-
-	tx, err := s.members.BeginTx(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("service.Invite: %w", err)
-	}
-	defer tx.Rollback(ctx) //nolint:errcheck // no-op once committed
-
-	member, err := s.members.CreateWalletMember(ctx, tx, walletID, target.ID, role, ownerID)
-	if err != nil {
-		// The live-membership unique index (mig 035): already invited or a
-		// member, including a duplicate invite racing this one (S-SHW-08).
-		if isUniqueViolation(err) {
-			return nil, common.ErrWalletMemberExists
-		}
-		return nil, fmt.Errorf("service.Invite: %w", err)
-	}
-	title := "Lời mời vào ví chung"
-	body := fmt.Sprintf("%s mời bạn vào ví %s.", ownerName, wallet.Name)
-	if err := s.members.CreateWalletNotification(ctx, tx, target.ID, NotificationTypeWalletInvite, title, body, ownerID); err != nil {
-		return nil, fmt.Errorf("service.Invite: %w", err)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("service.Invite: %w", err)
-	}
-
-	member.Name = model.DisplayName(target.FullName, target.Username, target.Email)
-	member.Username = target.Username
-	return member, nil
 }
 
 // findInvitee resolves an email or tên đăng nhập to an active account. Any

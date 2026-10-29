@@ -68,7 +68,7 @@ func (q *Queries) GetLiveWalletMember(ctx context.Context, walletID, userID uuid
 
 const listWalletMembers = `-- name: ListWalletMembers :many
 SELECT m.id, m.wallet_id, m.user_id, m.role, m.status, m.invited_by, m.created_at, m.updated_at, m.accepted_at, m.removed_at,
-       u.full_name, u.username, u.email
+       u.full_name, u.username, u.email, u.status
 FROM wallet_members m
 JOIN users u ON u.id = m.user_id
 WHERE m.wallet_id = $1
@@ -77,9 +77,10 @@ ORDER BY m.created_at ASC, m.id ASC`
 
 type ListWalletMembersRow struct {
 	WalletMember
-	FullName *string
-	Username *string
-	Email    string
+	FullName   *string
+	Username   *string
+	Email      string
+	UserStatus string
 }
 
 func (q *Queries) ListWalletMembers(ctx context.Context, walletID uuid.UUID) ([]ListWalletMembersRow, error) {
@@ -93,7 +94,7 @@ func (q *Queries) ListWalletMembers(ctx context.Context, walletID uuid.UUID) ([]
 		var i ListWalletMembersRow
 		if err := rows.Scan(
 			&i.ID, &i.WalletID, &i.UserID, &i.Role, &i.Status, &i.InvitedBy, &i.CreatedAt, &i.UpdatedAt, &i.AcceptedAt, &i.RemovedAt,
-			&i.FullName, &i.Username, &i.Email,
+			&i.FullName, &i.Username, &i.Email, &i.UserStatus,
 		); err != nil {
 			return nil, err
 		}

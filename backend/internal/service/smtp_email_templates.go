@@ -108,6 +108,30 @@ func accessApprovedEmail(link string) emailContent {
 	}
 }
 
+// walletInviteEmail goes to someone a wallet owner invited by email who has
+// no account yet (WalletMemberService.Invite). After activating, the
+// invitation is waiting in the app's Ví chung tab.
+func walletInviteEmail(ownerName, walletName, link string) emailContent {
+	return emailContent{
+		Subject:     ownerName + " mời bạn vào ví chung " + walletName,
+		Preheader:   activationLinkLife,
+		Eyebrow:     "Lời mời vào ví chung",
+		Heading:     ownerName + " mời bạn vào ví " + walletName,
+		Detail:      &emailDetail{Label: "Ví chung", Value: walletName},
+		Paragraphs:  []string{"Tạo tài khoản Budgest để tham gia ví.", activationLinkLife},
+		ButtonLabel: "Tạo tài khoản",
+		ButtonURL:   link,
+		StepsTitle:  "Cách tham gia",
+		Steps: []string{
+			"Bấm Tạo tài khoản",
+			"Đặt tên đăng nhập và mật khẩu",
+			"Đăng nhập trên ứng dụng Budgest",
+			"Mở Ví, thẻ Ví chung, chọn Tham gia",
+		},
+		Footnotes: []string{"Không nhận ra người mời thì bỏ qua email."},
+	}
+}
+
 // accessRequestEmail goes to the admin. The link opens a page with the
 // approve button, never approves by itself: mail scanners open links.
 func accessRequestEmail(requesterEmail, link string) emailContent {

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { SectionList, View } from "react-native";
+import { ActivityIndicator, SectionList, View } from "react-native";
 
 import { useListEntrance } from "@/components/motion/MotionView";
 import { GroupedListCell, ListSection, ListSectionHeader } from "@/components/ui/grouped-list";
@@ -8,7 +8,7 @@ import { SearchField } from "@/components/ui/SearchField";
 import { Screen } from "@/components/shared/Screen";
 import { ScreenHeader } from "@/components/shared/ScreenHeader";
 import { matchesSearch } from "@/lib/search-text";
-import { spacing, createStyles } from "@/lib/theme";
+import { spacing, createStyles, useColors } from "@/lib/theme";
 import { useProfileQuery } from "@/features/profile/api/use-profile-query";
 import { DeleteAccountsSection } from "@/features/security/components/DeleteAccountsSection";
 import { useUsersQuery } from "@/features/users/api/use-users-query";
@@ -40,6 +40,7 @@ interface UserSection {
 // "Tất cả tài khoản" on top: any account, outside the household too, found
 // and soft-deleted (DeleteAccountsSection).
 export default function UsersScreen() {
+  const colors = useColors();
   const styles = useStyles();
   const users = useUsersQuery();
   // The server says who is a super admin (GET /users/me); the app carries no email.
@@ -50,7 +51,12 @@ export default function UsersScreen() {
   const clearance = useFabClearance();
   // Rows stagger in once, when the list first has data; refetches keep the key.
   const enter = useListEntrance(users.isLoading ? "loading" : "ready");
-  const list = useMemo(() => users.data?.data ?? [], [users.data]);
+  const list = useMemo(() => users.data?.pages.flatMap((page) => page.data) ?? [], [users.data]);
+  // Everyone, not only the pages loaded so far (the server's count, first page).
+  const total = users.data?.pages[0]?.pagination.total ?? list.length;
+  const loadMore = () => {
+    if (users.hasNextPage && !users.isFetchingNextPage) void users.fetchNextPage();
+  };
 
   const sections = useMemo<UserSection[]>(() => {
     // Case and accents ignored: "tuan" finds "Tuấn".
@@ -66,7 +72,7 @@ export default function UsersScreen() {
 
   return (
     <Screen>
-      <ScreenHeader title="Thành viên" subtitle={users.data ? `${list.length} người` : undefined} />
+      <ScreenHeader title="Thành viên" subtitle={users.data ? `${total} người` : undefined} />
 
       {list.length >= SEARCH_FROM ? (
         <View style={styles.search}>
@@ -112,6 +118,11 @@ export default function UsersScreen() {
               <UserListItem user={item} />
             </GroupedListCell>
           )}
+          onEndReachedThreshold={0.4}
+          onEndReached={loadMore}
+          ListFooterComponent={
+            users.isFetchingNextPage ? <ActivityIndicator color={colors.textMuted} style={styles.more} /> : null
+          }
           ListEmptyComponent={
             query ? null : (
               <UsersEmptyState failed={users.isError} onInvite={invite} onRetry={() => void users.refetch()} />
@@ -132,5 +143,6 @@ const useStyles = createStyles(() => ({
   search: { paddingHorizontal: spacing.xl, paddingBottom: spacing.md },
   list: { paddingHorizontal: spacing.xl },
   sectionGap: { height: spacing.sm },
+  more: { paddingVertical: spacing.lg },
   allAccounts: { paddingBottom: spacing.xl },
 }));

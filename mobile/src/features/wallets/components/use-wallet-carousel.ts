@@ -14,6 +14,8 @@ import { scheduleOnRN, scheduleOnUI } from "react-native-worklets";
 import { useLatestCallback } from "@/lib/use-latest-callback";
 import { Wallet } from "@/features/wallets/types";
 import { CARD_OVERLAP, CARD_WIDTH } from "@/features/wallets/components/wallet-card-geometry";
+import { nextCentre } from "@/features/wallets/components/carousel-centre";
+import { useCarouselSettle } from "@/features/wallets/components/use-carousel-settle";
 
 // Each card steps less than its own width, so every card overlaps its
 // neighbour — the layout itself is a stack, not a row with gaps.
@@ -23,12 +25,6 @@ export const SNAP_INTERVAL = CARD_WIDTH - CARD_OVERLAP;
 // three distinct wallets is the floor; below it this is a plain bounded list.
 const MIN_WALLETS_TO_LOOP = 3;
 const LOOP_COPIES = 3;
-// How far past the halfway mark (in cards) the centred card changes. Without
-// it a finger resting at the halfway mark flipped the centred card — so both
-// cards' paint order and shadow, and the host's active wallet — on every
-// pixel of jitter: the two cards shook. Inside the swap's clear window
-// (0.3–0.7, wallet-carousel-motion), so the late flip is never visible.
-const CENTRE_HYSTERESIS = 0.08;
 // The pager arrows' and side-card taps' slide. Critically damped (damping =
 // 2·√stiffness): no overshoot past the card, and a re-aim mid-slide keeps the
 // current velocity instead of stopping and starting again.
@@ -50,24 +46,23 @@ interface UseWalletCarouselOptions {
  *   - The loop re-anchor was a JS scrollTo: for a frame the offset had jumped
  *     a whole copy while the cards still read the old `scrollX`, so the
  *     transparent far copies were drawn in place: the flash on a quick switch.
- *   - Arrows and side-card taps used RN's fixed 250ms scrollTo, presses
- *     mid-slide queued one after another (stop, start, stop). They now drive
- *     one spring a further press re-aims, wrapping as it goes.
+ *   - Arrows and side-card taps used RN's fixed 250ms scrollTo (presses queued:
+ *     stop, start, stop). They drive one spring a further press re-aims.
  */
 export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChange }: UseWalletCarouselOptions) {
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   // The scroll offset on the UI thread: every card and pager dot reads it.
   const scrollX = useSharedValue(0);
-  // The centred card in `rendered` indices, with hysteresis — the cards' paint
-  // order reads it too (wallet-carousel-motion).
+  // The centred card in `rendered` indices (carousel-centre), which the cards'
+  // paint order reads; `lastPosition` (in cards) gives the speed it needs.
   const centre = useSharedValue(0);
+  const lastPosition = useSharedValue(0);
   // A programmatic slide in flight: its unwrapped position, and where it ends.
   const driving = useSharedValue(false);
   const driveX = useSharedValue(0);
   const driveGoal = useSharedValue(0);
   const [containerWidth, setContainerWidth] = useState(0);
-  // The same centred index on the JS side, for the pager arrows and taps.
-  const [centreIndex, setCentreIndex] = useState(0);
+  const { centreIndex, settledCentre, settle: onSettle, settleNow, cancel: cancelSettle } = useCarouselSettle();
   const didInitialScroll = useRef(false);
   // JS mirror of `driving`: while a slide runs, a tap never "opens" a card.
   const isDriving = useRef(false);
@@ -91,12 +86,13 @@ export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChan
   // The rendered index showing wallets[walletIndex] — in the middle copy when looping.
   const renderedIndexOf = (walletIndex: number) => (looping ? wallets.length : 0) + walletIndex;
 
-  const onCentreChange = useLatestCallback((next: number) => setCentreIndex(next));
-  const onDriveEnd = useLatestCallback(() => {
+  const onDriveEnd = useLatestCallback((landed?: number) => {
     isDriving.current = false;
+    if (landed !== undefined) onSettle(landed);
   });
   const onBeginDrag = useLatestCallback(() => {
     isDriving.current = false;
+    cancelSettle();
   });
 
   // Folds an offset into the middle copy (half a copy of runway each side).
@@ -109,15 +105,14 @@ export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChan
     return ((((x - half) % loopWidth) + loopWidth) % loopWidth) + half;
   };
 
+  // UI thread only: React hears about the centre when the carousel settles.
   const track = (x: number) => {
     "worklet";
     scrollX.value = x;
     const position = x / SNAP_INTERVAL;
-    if (Math.abs(position - centre.value) < 0.5 + CENTRE_HYSTERESIS) return;
-    const next = Math.round(position);
-    if (next === centre.value) return;
-    centre.value = next;
-    scheduleOnRN(onCentreChange, next);
+    const next = nextCentre(position, lastPosition.value, centre.value);
+    lastPosition.value = position;
+    if (next !== centre.value) centre.value = next;
   };
 
   const place = (x: number) => {
@@ -138,7 +133,7 @@ export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChan
       if (!finished) return;
       place(wrap(goal));
       driving.value = false;
-      scheduleOnRN(onDriveEnd);
+      scheduleOnRN(onDriveEnd, centre.value);
     });
   };
 
@@ -174,8 +169,9 @@ export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChan
     const x = index * SNAP_INTERVAL;
     scrollRef.current?.scrollTo({ x, animated: false });
     scrollX.value = x;
+    lastPosition.value = index;
     centre.value = index;
-    setCentreIndex(index);
+    settleNow(index);
   };
 
   const onLayout = (event: LayoutChangeEvent) => {
@@ -196,7 +192,7 @@ export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChan
   /** One card left (-1) or right (+1) — the pager's arrows. */
   const step = (delta: 1 | -1) => {
     if (!looping && !isDriving.current) {
-      const target = centreIndex + delta;
+      const target = settledCentre.current + delta;
       if (target < 0 || target >= rendered.length) return;
     }
     isDriving.current = true;
@@ -207,14 +203,12 @@ export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChan
    * A tap on the card at rendered `index`: the centred card opens, a side
    * card slides to the centre — the same result as swiping it over.
    *
-   * ⚠️ While a slide is running, a tap never opens anything: a quick second
-   * tap on the card sliding in (one tap to bring it over, the next landing
-   * before it arrived) used to "open" it, which on Home navigates away.
-   * Mid-slide, a tap re-aims the slide at the tapped card instead — a no-op
-   * when it is the card already on its way.
+   * ⚠️ While a slide runs, a tap never opens anything: a quick second tap on
+   * the card sliding in used to "open" it (on Home, navigating away). It
+   * re-aims the slide at the tapped card instead.
    */
   const pressCard = (index: number, open?: () => void) => {
-    if (!isDriving.current && index === centreIndex) {
+    if (!isDriving.current && index === settledCentre.current) {
       open?.();
       return;
     }
@@ -225,12 +219,9 @@ export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChan
   const centredId = rendered[centreIndex]?.id;
   const centredIdRef = useRef(centredId);
 
-  // ⚠️ The list can reorder under the user — GET /wallets sorts the default
-  // wallet first, so setting a new default moves it to the front. The scroll
-  // offset would stay put and a different wallet would slide under the
-  // centre; instead the wallet that was centred is re-centred at its new
-  // position. Declared before the ref update below so it still reads the
-  // previously centred id.
+  // ⚠️ The list can reorder under the user (GET /wallets sorts the default
+  // first): the wallet that was centred is re-centred at its new position.
+  // Declared before the ref update below so it reads the previous id.
   const walletOrder = wallets.map((w) => w.id).join(",");
   useEffect(() => {
     if (!didInitialScroll.current || wallets.length === 0) return;
@@ -277,6 +268,13 @@ export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChan
         const x = event.contentOffset.x;
         const settled = wrap(x);
         if (Math.abs(settled - x) > 0.5) place(settled);
+        scheduleOnRN(onSettle, centre.value);
+      },
+      // Released exactly on a card (iOS): no momentum follows, so this is the settle.
+      onEndDrag: (event) => {
+        if (driving.value) return;
+        const position = event.contentOffset.x / SNAP_INTERVAL;
+        if (Math.abs(position - Math.round(position)) < 0.01) scheduleOnRN(onSettle, centre.value);
       },
     },
     [looping, loopWidth, maxX],

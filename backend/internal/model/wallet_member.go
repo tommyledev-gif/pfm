@@ -48,6 +48,9 @@ type WalletMember struct {
 
 	Name     string
 	Username *string
+	// The invitee was invited by email and has not created their account
+	// yet (users.status pending): the invitation waits on that first.
+	AccountPending bool
 }
 
 // IsActive reports whether the membership grants access (an accepted,

@@ -3,18 +3,18 @@ import { ScrollView, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 
 import { MotionView } from "@/components/motion/MotionView";
+import { LateSkeleton } from "@/components/motion/SkeletonSwap";
 import { Fab } from "@/components/ui/Fab";
 import { UsersIcon } from "@/components/ui/Icon";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { Screen } from "@/components/shared/Screen";
-import { ScreenLoader } from "@/components/shared/ScreenLoader";
 import { ScreenHeader } from "@/components/shared/ScreenHeader";
 import { useScrollEnd } from "@/components/shared/use-scroll-end";
 import { spacing, createStyles, useColors } from "@/lib/theme";
 import { walletFace } from "@/lib/wallet-colors";
 import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
 import { useRequireOnline } from "@/lib/connectivity";
-import { isWaitingForNetwork } from "@/lib/query-status";
+import { isAwaitingFirstData, isWaitingForNetwork } from "@/lib/query-status";
 import { useHighlightFade } from "@/lib/use-highlight-fade";
 import { useLatestCallback } from "@/lib/use-latest-callback";
 import { useUiPrefsStore, WalletsViewMode } from "@/stores/ui-prefs-store";
@@ -33,6 +33,7 @@ import { WalletMembersSheet } from "@/features/wallets/components/WalletMembersS
 import { WalletRecentTransactions } from "@/features/wallets/components/WalletRecentTransactions";
 import { WalletsEmptyState } from "@/features/wallets/components/WalletsEmptyState";
 import { WalletsGroupedList } from "@/features/wallets/components/WalletsGroupedList";
+import { WalletsListSkeleton } from "@/features/wallets/components/WalletsListSkeleton";
 
 const VIEW_MODES: { label: string; value: WalletsViewMode }[] = [
   { label: "Dạng thẻ", value: "carousel" },
@@ -125,6 +126,9 @@ export default function WalletsScreen() {
   // and list tabs show the create prompt, while the Ví chung tab may still
   // hold someone else's wallet or an invitation to one.
   const isEmpty = wallets.isSuccess && ownWallets.length === 0;
+  // Not isLoading: pending while the saved cache is read back, when the card
+  // view used to draw an empty carousel ("Chưa có ví") before the cards.
+  const awaiting = isAwaitingFirstData(wallets);
   const hasAnything = !isEmpty || (wallets.data?.length ?? 0) > 0 || (invitations.data?.length ?? 0) > 0;
 
   const openEditor = (wallet: Wallet | null) => {
@@ -181,8 +185,10 @@ export default function WalletsScreen() {
               the column and dragged the cards up or down with it. Only the
               recent list below scrolls now. */}
           <View style={styles.cardsPinned}>
-            {wallets.isLoading ? (
-              <WalletCardSkeleton />
+            {awaiting ? (
+              <LateSkeleton>
+                <WalletCardSkeleton />
+              </LateSkeleton>
             ) : isWaitingForNetwork(wallets) ? (
               <OfflinePlaceholder />
             ) : (
@@ -225,8 +231,11 @@ export default function WalletsScreen() {
             </ScrollView>
           ) : null}
         </View>
-      ) : wallets.isLoading ? (
-        <ScreenLoader />
+      ) : awaiting ? (
+        // The list views, and the Ví chung tab until its wallets land.
+        <LateSkeleton>
+          <WalletsListSkeleton />
+        </LateSkeleton>
       ) : isWaitingForNetwork(wallets) ? (
         <OfflinePlaceholder />
       ) : (

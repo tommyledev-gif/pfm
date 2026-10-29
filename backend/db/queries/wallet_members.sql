@@ -25,8 +25,9 @@ LIMIT 1;
 
 -- name: ListWalletMembers :many
 -- Live members with the names other members see (spec BR-13). The service
--- has already checked the caller may read this wallet.
-SELECT m.*, u.full_name, u.username, u.email
+-- has already checked the caller may read this wallet. user_status tells an
+-- invitee who has not created their account yet (invited by email).
+SELECT m.*, u.full_name, u.username, u.email, u.status AS user_status
 FROM wallet_members m
 JOIN users u ON u.id = m.user_id
 WHERE m.wallet_id = $1

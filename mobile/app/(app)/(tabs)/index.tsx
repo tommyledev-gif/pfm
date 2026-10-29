@@ -4,6 +4,7 @@ import Animated from "react-native-reanimated";
 import { useRouter } from "expo-router";
 
 import { MotionStagger } from "@/components/motion/MotionStagger";
+import { LateSkeleton } from "@/components/motion/SkeletonSwap";
 import { useListEntrance } from "@/components/motion/MotionView";
 import { layoutSpring } from "@/components/motion/motion-tokens";
 import { BankIcon, PlusIcon } from "@/components/ui/Icon";
@@ -213,7 +214,7 @@ export default function HomeScreen() {
                 </Pressable>
               </View>
               {isAwaitingFirstData(wallets) ? (
-                <WalletCardSkeleton />
+                <LateSkeleton><WalletCardSkeleton /></LateSkeleton>
               ) : isWaitingForNetwork(wallets) ? (
                 <OfflinePlaceholder />
               ) : wallets.data?.length === 0 ? (

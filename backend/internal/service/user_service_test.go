@@ -24,6 +24,9 @@ func (noopEmailSender) SendAccessRequestEmail(context.Context, string, string, s
 }
 func (noopEmailSender) SendAccessApprovedEmail(context.Context, string, string) error { return nil }
 func (noopEmailSender) SendPasswordResetCode(context.Context, string, string) error   { return nil }
+func (noopEmailSender) SendWalletInviteEmail(context.Context, string, string, string, string) error {
+	return nil
+}
 
 func newTestUserService(t *testing.T) (*UserService, *fakeUserRepo) {
 	t.Helper()

@@ -61,6 +61,16 @@ func MemberLookupRateLimiter(logger *zap.Logger) fiber.Handler {
 	}, logger)
 }
 
+// WalletInviteRateLimiter caps, per owner, shared-wallet invitations
+// (POST /wallets/:id/members). Inviting an email with no account creates the
+// account and emails it, so this is the same budget as an admin's invites.
+func WalletInviteRateLimiter(logger *zap.Logger) fiber.Handler {
+	return newLimiter(limit{
+		name: "wallet-invite", keyBy: byUser,
+		max: common.InviteRateLimit, window: common.InviteRateLimitWindow,
+	}, logger)
+}
+
 // AccessApproveRateLimiter caps the email-link approval per client IP. The
 // token cannot be guessed (32 random bytes); this only bounds the noise.
 func AccessApproveRateLimiter(logger *zap.Logger) fiber.Handler {

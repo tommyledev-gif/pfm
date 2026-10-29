@@ -29,9 +29,12 @@ type WalletMemberRepo interface {
 }
 
 // WalletMemberUserLookup finds the account an invitation is for — the two
-// login lookups, by email or by tên đăng nhập.
+// login lookups, by email or by tên đăng nhập — and, for an email with no
+// account yet, creates the pending one the invitation waits on.
 type WalletMemberUserLookup interface {
 	GetUserByEmail(ctx context.Context, email string) (*model.User, error)
 	GetUserByUsername(ctx context.Context, username string) (*model.User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (*model.User, error)
+	CreatePendingUserTx(ctx context.Context, tx pgx.Tx, email string, role model.UserRole, invitedBy uuid.UUID, inviteToken string) (*model.User, error)
+	RefreshPendingInvite(ctx context.Context, tx pgx.Tx, id uuid.UUID, inviteToken string) error
 }

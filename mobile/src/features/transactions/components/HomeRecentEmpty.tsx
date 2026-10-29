@@ -1,5 +1,4 @@
-import { View } from "react-native";
-
+import { LateSkeleton } from "@/components/motion/SkeletonSwap";
 import { ReceiptIcon } from "@/components/ui/Icon";
 import { EmptyInlineCard } from "@/components/shared/EmptyState";
 import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
@@ -14,17 +13,17 @@ interface HomeRecentEmptyProps {
 }
 
 // Home's "Giao dịch gần đây" with no rows to show: skeleton rows while the
-// first page loads, the offline state when it cannot, else a small empty card.
+// first page loads (only if that takes long enough to be seen — LateSkeleton), the offline state when it cannot, else a small empty card.
 // Moved out of the Home screen to keep that file under the 300-line cap.
 export function HomeRecentEmpty({ query }: HomeRecentEmptyProps) {
   const colors = useColors();
   if (isAwaitingFirstData(query)) {
     return (
-      <View>
+      <LateSkeleton>
         {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
           <TransactionRowSkeleton key={i} />
         ))}
-      </View>
+      </LateSkeleton>
     );
   }
   if (isWaitingForNetwork(query)) return <OfflinePlaceholder />;

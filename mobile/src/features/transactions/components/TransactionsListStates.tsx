@@ -1,5 +1,6 @@
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, Text } from "react-native";
 
+import { LateSkeleton } from "@/components/motion/SkeletonSwap";
 import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
 import { useIsOnline } from "@/lib/connectivity";
 import { isAwaitingFirstData, isWaitingForNetwork } from "@/lib/query-status";
@@ -51,14 +52,15 @@ export function TransactionsListEmpty({
 }: TransactionsListEmptyProps) {
   const styles = useStyles();
   if (isWaitingForNetwork(query)) return <OfflinePlaceholder />;
-  // Still loading a new filter: "nothing matches" would be a guess.
+  // Still loading a new filter: "nothing matches" would be a guess. Late, so
+  // the saved first page read back at launch never blinks a skeleton.
   if (isAwaitingFirstData(query) || query.isPlaceholderData) {
     return (
-      <View>
+      <LateSkeleton>
         {Array.from({ length: LIST_SKELETON_COUNT }).map((_, i) => (
           <TransactionRowSkeleton key={i} />
         ))}
-      </View>
+      </LateSkeleton>
     );
   }
   if (filtered) return <NoResultsState onClearFilters={onClearFilters} onSearch={onSearch} />;

@@ -6,7 +6,7 @@ import { OFFLINE_STRIP_SHOW_DELAY_MS, ONLINE_STABLE_DELAY_MS, RECONNECTED_STRIP_
 /**
  * What the offline strip under the status bar shows:
  *   hidden      — nothing; the strip is collapsed to zero height
- *   offline     — "Ngoại tuyến"
+ *   offline     — "Bạn đang ngoại tuyến"
  *   reconnected — "Đã kết nối lại · đang đồng bộ", briefly, then hidden
  */
 export type ConnectionStripState = "hidden" | "offline" | "reconnected";

@@ -116,6 +116,7 @@ func (r *WalletRepository) ListWalletMembers(ctx context.Context, walletID uuid.
 		m := toWalletMemberModel(row.WalletMember)
 		m.Name = model.DisplayName(row.FullName, row.Username, row.Email)
 		m.Username = row.Username
+		m.AccountPending = row.UserStatus == string(model.UserStatusPending)
 		members = append(members, m)
 	}
 	return members, nil

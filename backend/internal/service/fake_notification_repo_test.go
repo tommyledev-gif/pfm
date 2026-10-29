@@ -135,6 +135,27 @@ func (f *fakeNotificationRepo) MarkNotificationRead(_ context.Context, id, userI
 	return &cp, nil
 }
 
+// MarkNotificationsRead mirrors the real query: scoped by user_id, only
+// unread rows count, nil ids means every unread row of the User.
+func (f *fakeNotificationRepo) MarkNotificationsRead(_ context.Context, userID uuid.UUID, ids []uuid.UUID) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	wanted := make(map[uuid.UUID]bool, len(ids))
+	for _, id := range ids {
+		wanted[id] = true
+	}
+	var updated int64
+	for _, n := range f.notifications {
+		if n.UserID != userID || n.IsRead || (ids != nil && !wanted[n.ID]) {
+			continue
+		}
+		n.IsRead = true
+		updated++
+	}
+	return updated, nil
+}
+
 // seedNotification is a test helper for US-01/US-02/US-03 tests that need an
 // existing Notification without going through EvaluateBudgets first.
 func (f *fakeNotificationRepo) seedNotification(n *model.Notification) {

@@ -122,6 +122,17 @@ func (r *NotificationRepository) MarkNotificationRead(ctx context.Context, id, u
 	return toNotificationModel(row), nil
 }
 
+// MarkNotificationsRead marks userID's unread notifications among ids as
+// read — every unread one when ids is nil. Scoped by user_id, so ids that
+// belong to someone else are skipped. Returns the number of rows changed.
+func (r *NotificationRepository) MarkNotificationsRead(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) (int64, error) {
+	updated, err := r.q.MarkNotificationsRead(ctx, userID, ids)
+	if err != nil {
+		return 0, fmt.Errorf("repository.MarkNotificationsRead: %w", err)
+	}
+	return updated, nil
+}
+
 func toNotificationModel(row sqlc.Notification) *model.Notification {
 	return &model.Notification{
 		ID:              row.ID,

@@ -211,3 +211,66 @@ func TestNotificationService_MarkRead_AccessDenied(t *testing.T) {
 		t.Fatalf("expected NOTIFICATION_ACCESS_DENIED, got %v", err)
 	}
 }
+
+// Seen-on-screen batch: only the caller's listed unread rows change; another
+// User's id in the list is skipped rather than failing the batch.
+func TestNotificationService_MarkReadBatch_ScopedToCaller(t *testing.T) {
+	svc, notificationRepo, _ := newTestNotificationService(t)
+	userID, other := uuid.New(), uuid.New()
+	seen := &model.Notification{ID: uuid.New(), UserID: userID}
+	unseen := &model.Notification{ID: uuid.New(), UserID: userID}
+	foreign := &model.Notification{ID: uuid.New(), UserID: other}
+	notificationRepo.seedNotification(seen)
+	notificationRepo.seedNotification(unseen)
+	notificationRepo.seedNotification(foreign)
+
+	updated, err := svc.MarkReadBatch(context.Background(), userID, []uuid.UUID{seen.ID, foreign.ID})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if updated != 1 {
+		t.Fatalf("expected 1 updated, got %d", updated)
+	}
+	if !notificationRepo.notifications[seen.ID].IsRead {
+		t.Fatalf("expected the seen notification to be read")
+	}
+	if notificationRepo.notifications[unseen.ID].IsRead || notificationRepo.notifications[foreign.ID].IsRead {
+		t.Fatalf("expected the unseen and foreign notifications to stay unread")
+	}
+}
+
+func TestNotificationService_MarkReadBatch_EmptyIsNoOp(t *testing.T) {
+	svc, notificationRepo, _ := newTestNotificationService(t)
+	userID := uuid.New()
+	n := &model.Notification{ID: uuid.New(), UserID: userID}
+	notificationRepo.seedNotification(n)
+
+	updated, err := svc.MarkReadBatch(context.Background(), userID, nil)
+	if err != nil || updated != 0 {
+		t.Fatalf("expected a no-op, got updated=%d err=%v", updated, err)
+	}
+	if notificationRepo.notifications[n.ID].IsRead {
+		t.Fatalf("an empty batch must not mark everything read")
+	}
+}
+
+func TestNotificationService_MarkAllRead_OnlyCallersUnread(t *testing.T) {
+	svc, notificationRepo, _ := newTestNotificationService(t)
+	userID, other := uuid.New(), uuid.New()
+	notificationRepo.seedNotification(&model.Notification{ID: uuid.New(), UserID: userID})
+	notificationRepo.seedNotification(&model.Notification{ID: uuid.New(), UserID: userID})
+	notificationRepo.seedNotification(&model.Notification{ID: uuid.New(), UserID: userID, IsRead: true})
+	foreign := &model.Notification{ID: uuid.New(), UserID: other}
+	notificationRepo.seedNotification(foreign)
+
+	updated, err := svc.MarkAllRead(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if updated != 2 {
+		t.Fatalf("expected 2 updated, got %d", updated)
+	}
+	if notificationRepo.notifications[foreign.ID].IsRead {
+		t.Fatalf("another User's notification must stay unread")
+	}
+}

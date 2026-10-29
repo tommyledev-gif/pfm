@@ -161,8 +161,8 @@ const activatePageHTML = pageHead + `<title>Kích hoạt tài khoản Budgest</t
     PASSWORD_MISMATCH: "password_confirm"
   };
   var FORM_COPY = {
-    NOT_FOUND: "Liên kết này không còn dùng được. Nhờ admin gửi lại lời mời.",
-    TOKEN_EXPIRED: "Liên kết đã hết hạn. Nhờ admin gửi lại lời mời.",
+    NOT_FOUND: "Liên kết này không còn dùng được. Nhờ người mời bạn gửi lại lời mời.",
+    TOKEN_EXPIRED: "Liên kết đã hết hạn. Nhờ người mời bạn gửi lại lời mời.",
     RATE_LIMITED: "Thử quá nhiều lần. Đợi vài phút rồi thử lại."
   };
   var FIELD_COPY = { PASSWORD_MISMATCH: "Hai mật khẩu chưa khớp." };

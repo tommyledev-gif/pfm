@@ -55,7 +55,9 @@ const useStyles = createStyles((colors) => ({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: spacing.xl,
+    // No horizontal padding: Home's scroll content already insets every block
+    // by spacing.xl, and padding here as well put the wordmark and avatar
+    // 20px further in than the cards under them.
     paddingTop: spacing.md,
     // No bottom padding: Home's header stack spaces its blocks with its own
     // `gap`, and padding here stacked on top of that (plus the period tabs'

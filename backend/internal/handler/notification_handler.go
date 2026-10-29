@@ -102,6 +102,52 @@ func (h *NotificationHandler) MarkNotificationRead(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, "notification marked as read", dto.NewNotificationResponse(notification))
 }
 
+// MarkNotificationsRead handles POST /notifications/read — the batch the
+// app sends for the rows it has shown, so seeing a notification counts as
+// reading it.
+func (h *NotificationHandler) MarkNotificationsRead(c *fiber.Ctx) error {
+	var req dto.MarkNotificationsReadRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, h.logger, common.NewInvalidInputError("malformed request body"))
+	}
+	if err := validate.Struct(req); err != nil {
+		return response.Error(c, h.logger, newValidationError(err))
+	}
+	userID, err := callerUUID(c)
+	if err != nil {
+		return response.Error(c, h.logger, common.ErrUnauthenticated)
+	}
+
+	ids := make([]uuid.UUID, 0, len(req.IDs))
+	for _, raw := range req.IDs {
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			return response.Error(c, h.logger, common.NewInvalidInputError("invalid notification id"))
+		}
+		ids = append(ids, id)
+	}
+
+	updated, err := h.notificationService.MarkReadBatch(c.Context(), userID, ids)
+	if err != nil {
+		return response.Error(c, h.logger, err)
+	}
+	return response.Success(c, fiber.StatusOK, "notifications marked as read", dto.MarkNotificationsReadResponse{Updated: updated})
+}
+
+// MarkAllNotificationsRead handles POST /notifications/read-all.
+func (h *NotificationHandler) MarkAllNotificationsRead(c *fiber.Ctx) error {
+	userID, err := callerUUID(c)
+	if err != nil {
+		return response.Error(c, h.logger, common.ErrUnauthenticated)
+	}
+
+	updated, err := h.notificationService.MarkAllRead(c.Context(), userID)
+	if err != nil {
+		return response.Error(c, h.logger, err)
+	}
+	return response.Success(c, fiber.StatusOK, "all notifications marked as read", dto.MarkNotificationsReadResponse{Updated: updated})
+}
+
 // notificationIDParam parses the :id path segment, returning 400
 // INVALID_INPUT before any service/DB call for a malformed UUID.
 func notificationIDParam(c *fiber.Ctx) (uuid.UUID, error) {

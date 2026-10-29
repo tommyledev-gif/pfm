@@ -15,6 +15,7 @@ import {
   ROLE_LABEL,
   WALLET_MEMBER_LIMIT,
   inviteErrorMessage,
+  isEmailIdentifier,
 } from "@/features/wallets/components/wallet-member-copy";
 
 const ROLES: WalletMemberRole[] = ["editor", "viewer"];
@@ -34,6 +35,10 @@ interface WalletInviteFormProps {
  * segmented control left that to a footnote nobody read. The invitee answers
  * from their own Ví chung tab; nothing is shared until they accept. Locked
  * once the wallet holds WALLET_MEMBER_LIMIT people.
+ *
+ * An email no account has can be invited too: the server creates the account
+ * and emails a link to set it up, and the invitation waits for them in the
+ * app (row label "Chờ tạo tài khoản"). A tên đăng nhập nobody has cannot.
  */
 export function WalletInviteForm({ walletId, memberCount }: WalletInviteFormProps) {
   const colors = useColors();
@@ -47,10 +52,14 @@ export function WalletInviteForm({ walletId, memberCount }: WalletInviteFormProp
   const full = memberCount >= WALLET_MEMBER_LIMIT;
   const trimmed = identifier.trim();
   const lookup = useWalletInviteeLookup(walletId, identifier);
-  // Sent only to someone the lookup found and can still invite; without a
-  // lookup to go by (offline, an older server) the server checks on send.
+  // Sent to someone the lookup found and can still invite, or to an email no
+  // account has (invited by email); without a lookup to go by (offline, an
+  // older server) the server checks on send.
+  const emailInvite = lookup.kind === "not-found" && isEmailIdentifier(trimmed);
   const invitable =
-    lookup.kind === "unavailable" || (lookup.kind === "found" && lookup.invitee.membership === "none");
+    lookup.kind === "unavailable" ||
+    emailInvite ||
+    (lookup.kind === "found" && lookup.invitee.membership === "none");
   const canSend = !full && trimmed.length >= MIN_INVITE_IDENTIFIER && invitable;
   const send = () =>
     requireOnline(() => invite.mutate({ identifier: trimmed, role }, { onSuccess: () => setIdentifier("") }));
@@ -98,7 +107,7 @@ export function WalletInviteForm({ walletId, memberCount }: WalletInviteFormProp
         {invite.isError ? (
           <Text style={styles.error}>{inviteErrorMessage(invite.error)}</Text>
         ) : (
-          <InviteeLookupRow lookup={lookup} />
+          <InviteeLookupRow lookup={lookup} emailInvite={emailInvite} />
         )}
 
         <View style={styles.roles} accessibilityRole="radiogroup" testID="tabs-wallet-invite-role">

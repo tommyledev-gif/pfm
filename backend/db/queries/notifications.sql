@@ -48,6 +48,17 @@ WHERE id = $1
   AND user_id = $2
 RETURNING *;
 
+-- name: MarkNotificationsRead :execrows
+-- Batch form of MarkNotificationRead: the rows the app has shown on screen
+-- (ids), or every unread row of the User when ids is NULL ("read all").
+-- Scoped by user_id, so another User's id in the list is skipped, not an
+-- error. Hand-authored in sqlc/notifications_read.sql.go.
+UPDATE notifications
+SET is_read = TRUE
+WHERE user_id = $1
+  AND is_read = FALSE
+  AND (sqlc.narg('ids')::uuid[] IS NULL OR id = ANY(sqlc.narg('ids')::uuid[]));
+
 -- name: CreateAccessRequestNotification :exec
 -- Tells an admin that someone asked for an account (mig 031); related_user_id
 -- is the requester, so the app can approve straight from the notification.

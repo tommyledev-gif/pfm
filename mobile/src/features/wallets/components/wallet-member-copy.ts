@@ -19,8 +19,21 @@ export const ROLE_OPTIONS = [
 /** The line under a member's name: role, and whether they have answered yet. */
 export function memberStatusLine(member: WalletMember): string {
   const role = ROLE_LABEL[member.role];
-  return member.status === "pending" ? `${role} · Chờ trả lời` : role;
+  if (member.status !== "pending") return role;
+  // Invited by email: the account comes first, the answer after.
+  return member.account_pending ? `${role} · Chờ tạo tài khoản` : `${role} · Chờ trả lời`;
 }
+
+/** Whether what the owner typed is an email (an invite can create its account) rather than a tên đăng nhập. */
+export function isEmailIdentifier(text: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text.trim());
+}
+
+/** An email with no account: inviting it emails a link to create one (the lookup row). */
+export const NEW_ACCOUNT_INVITE = "Chưa có tài khoản. Lời mời sẽ gửi qua email để tạo tài khoản.";
+
+/** Only the owner in the wallet, nobody invited either: under the owner's row. */
+export const NO_OTHER_MEMBERS = "Chưa có ai khác trong ví.";
 
 /** No account has what was typed: the invite's error and the field's lookup say the same. */
 export const NO_ACCOUNT_MESSAGE = "Không có tài khoản nào với email hoặc tên đăng nhập này.";

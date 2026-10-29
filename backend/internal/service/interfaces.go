@@ -272,6 +272,7 @@ type NotificationRepo interface {
 	CountNotifications(ctx context.Context, userID uuid.UUID, isRead *bool) (int64, error)
 	GetNotificationByID(ctx context.Context, id uuid.UUID) (*model.Notification, error)
 	MarkNotificationRead(ctx context.Context, id, userID uuid.UUID) (*model.Notification, error)
+	MarkNotificationsRead(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) (int64, error)
 }
 
 // Compile-time checks that the real repositories satisfy these interfaces —

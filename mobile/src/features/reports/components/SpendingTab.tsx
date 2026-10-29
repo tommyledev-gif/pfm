@@ -1,8 +1,10 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Animated as RNAnimated, ScrollView, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 
 import { useListEntrance } from "@/components/motion/MotionView";
+import { SkeletonSwap } from "@/components/motion/SkeletonSwap";
+import { useDimWhile } from "@/components/motion/use-dim-while";
 import { CalendarIcon } from "@/components/ui/Icon";
 import { useFabBottom } from "@/components/ui/Fab";
 import { CategoryPickerDrawer } from "@/components/shared/CategoryPickerDrawer";
@@ -51,6 +53,8 @@ export const SpendingTab = memo(function SpendingTab({ focusCategoryId, focusNon
   const { currency, currencies, setCurrency } = useReportCurrency(summary.data);
   const navClearance = useFabBottom();
   const legendEntrance = useListEntrance();
+  // A new range keeps the current report up, dimmed, until its own lands.
+  const switchingDim = useDimWhile(summary.isPlaceholderData);
 
   const { segments, totalExpense, primaryTotal, budgetTotal, prorated, rangeDayCount } = useSpendingBreakdown({
     summary: summary.data,
@@ -85,154 +89,165 @@ export const SpendingTab = memo(function SpendingTab({ focusCategoryId, focusNon
   const closeCategoryPicker = useCallback(() => setCategoryPickerOpen(false), []);
   const closeDetail = useCallback(() => setDetailCategoryId(null), []);
 
-  if (isWaitingForNetwork(summary)) return <OfflinePlaceholder />;
-  // Not isLoading: a query still being restored from the saved cache is
-  // pending without fetching.
-  if (isAwaitingFirstData(summary)) return <SpendingTabSkeleton />;
-  if (!summary.data) {
+  const renderLoaded = () => {
+    if (!summary.data) {
+      return (
+        <View style={styles.loadError}>
+          <Text style={styles.empty}>Chưa tải được báo cáo.</Text>
+          <Pressable onPress={() => summary.refetch()} hitSlop={8} testID="btn-spending-retry">
+            <Text style={styles.retry}>Thử lại</Text>
+          </Pressable>
+        </View>
+      );
+    }
+
+    const { range } = summary.data;
+    const switchingRange = summary.isPlaceholderData;
+    const rangeLabel =
+      switchingRange && dateRange.from
+        ? formatDateRange(dateRange.from, dateRange.to ?? dateRange.from)
+        : formatDateRange(range.from, range.to);
+    const detailSegment = detailCategoryId ? segments.find((s) => s.key === detailCategoryId) : undefined;
+
+    // ⚠️ One scroll for the whole tab. Only the legend used to scroll, in what
+    // was left under the range row, two stat cards and the boxed donut — on a
+    // phone a strip a few rows tall. Now everything moves together and the
+    // legend gets the whole screen once scrolled to.
     return (
-      <View style={styles.loadError}>
-        <Text style={styles.empty}>Chưa tải được báo cáo.</Text>
-        <Pressable onPress={() => summary.refetch()} hitSlop={8} testID="btn-spending-retry">
-          <Text style={styles.retry}>Thử lại</Text>
-        </Pressable>
+      <View style={styles.container}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={scrollStyle}>
+          <View style={styles.filterRow}>
+            <Pressable style={styles.rangeButton} onPress={openRangePicker}>
+              {switchingRange ? (
+                <ActivityIndicator size={14} color={colors.textSecondary} />
+              ) : (
+                <CalendarIcon size={14} color={colors.textSecondary} />
+              )}
+              <Text style={styles.range}>{rangeLabel}</Text>
+            </Pressable>
+            <CurrencySwitch
+              currencies={currencies}
+              value={currency}
+              onChange={changeCurrency}
+              style={styles.currencyTabs}
+              testID="tabs-spending-currency"
+            />
+          </View>
+
+          <RNAnimated.View style={[styles.body, switchingDim]}>
+            {/* One surface split down the middle, not two boxes side by side. */}
+            <View style={styles.statRow}>
+              <RevealableAmount
+                label="Thu nhập"
+                amountCents={primaryTotal?.total_income ?? 0}
+                currency={currency}
+                containerStyle={styles.statCard}
+                labelStyle={styles.statLabel}
+                style={styles.statIncome}
+                testID="text-spending-income"
+              />
+              <View style={styles.statDivider} />
+              <RevealableAmount
+                label="Chi tiêu"
+                amountCents={primaryTotal?.total_expense ?? 0}
+                currency={currency}
+                containerStyle={styles.statCard}
+                labelStyle={styles.statLabel}
+                style={styles.statExpense}
+                testID="text-spending-expense"
+              />
+            </View>
+
+            {segments.length === 0 ? (
+              <SpendingEmptyState onOpenBudgets={onOpenBudgets} />
+            ) : (
+              <>
+                {/* Open on the page, not in a card: the ring is its own shape. */}
+                <View style={styles.donut}>
+                  <DonutChart
+                    segments={segments}
+                    currency={currency}
+                    selected={selected}
+                    onToggle={toggleSegment}
+                    budgetTotal={budgetTotal}
+                    onPressDetails={setDetailCategoryId}
+                  />
+                  {budgetTotal !== null && prorated ? (
+                    <Text style={styles.budgetHint}>
+                      Hạn mức tháng đã chia theo {rangeDayCount === 1 ? "ngày" : `${rangeDayCount} ngày`} bạn chọn.
+                    </Text>
+                  ) : null}
+                </View>
+
+                <View>
+                  <Text style={styles.legendTitle}>Theo danh mục</Text>
+                  {segments.map((seg, index) => (
+                    <Animated.View key={seg.key} entering={legendEntrance(index)}>
+                      <DonutLegendRow
+                        segment={seg}
+                        currency={currency}
+                        percentage={totalExpense > 0 ? (seg.amount / totalExpense) * 100 : 0}
+                        selected={selected === seg.key}
+                        onPress={toggleSegment}
+                        onHoldCategory={openCategoryPicker}
+                      />
+                    </Animated.View>
+                  ))}
+                </View>
+              </>
+            )}
+          </RNAnimated.View>
+        </ScrollView>
+
+        <DateRangePickerModal
+          visible={pickerOpen}
+          onClose={closeRangePicker}
+          from={dateRange.from}
+          to={dateRange.to}
+          onApply={setDateRange}
+        />
+
+        <CategoryTransactionsDialog
+          visible={detailCategoryId !== null}
+          onClose={closeDetail}
+          categoryId={detailCategoryId}
+          categoryName={detailSegment?.label ?? ""}
+          color={detailSegment?.color ?? colors.lavender}
+          icon={detailSegment?.icon}
+          iconUrl={detailSegment?.iconUrl}
+          // The backend's resolved window, so the rows match the donut even
+          // when no filter is applied.
+          from={range.from}
+          to={range.to}
+          currency={currency}
+          total={detailSegment?.amount ?? 0}
+        />
+
+        <CategoryPickerDrawer
+          visible={categoryPickerOpen}
+          onClose={closeCategoryPicker}
+          categories={pickerCategories}
+          onSelect={toggleSegment}
+        />
       </View>
     );
-  }
+  };
 
-  const { range } = summary.data;
-  const switchingRange = summary.isPlaceholderData;
-  const rangeLabel =
-    switchingRange && dateRange.from
-      ? formatDateRange(dateRange.from, dateRange.to ?? dateRange.from)
-      : formatDateRange(range.from, range.to);
-  const detailSegment = detailCategoryId ? segments.find((s) => s.key === detailCategoryId) : undefined;
-
-  // ⚠️ One scroll for the whole tab. Only the legend used to scroll, in what
-  // was left under the range row, two stat cards and the boxed donut — on a
-  // phone a strip a few rows tall. Now everything moves together and the
-  // legend gets the whole screen once scrolled to.
+  if (isWaitingForNetwork(summary)) return <OfflinePlaceholder />;
+  // Not isLoading: a query still being restored from the saved cache is
+  // pending without fetching. SkeletonSwap only shows the skeleton when the
+  // wait is long enough to be seen.
   return (
-    <View style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={scrollStyle}>
-        <View style={styles.filterRow}>
-          <Pressable style={styles.rangeButton} onPress={openRangePicker}>
-            {switchingRange ? (
-              <ActivityIndicator size={14} color={colors.textSecondary} />
-            ) : (
-              <CalendarIcon size={14} color={colors.textSecondary} />
-            )}
-            <Text style={styles.range}>{rangeLabel}</Text>
-          </Pressable>
-          <CurrencySwitch
-            currencies={currencies}
-            value={currency}
-            onChange={changeCurrency}
-            style={styles.currencyTabs}
-            testID="tabs-spending-currency"
-          />
-        </View>
-
-        {/* One surface split down the middle, not two boxes side by side. */}
-        <View style={styles.statRow}>
-          <RevealableAmount
-            label="Thu nhập"
-            amountCents={primaryTotal?.total_income ?? 0}
-            currency={currency}
-            containerStyle={styles.statCard}
-            labelStyle={styles.statLabel}
-            style={styles.statIncome}
-            testID="text-spending-income"
-          />
-          <View style={styles.statDivider} />
-          <RevealableAmount
-            label="Chi tiêu"
-            amountCents={primaryTotal?.total_expense ?? 0}
-            currency={currency}
-            containerStyle={styles.statCard}
-            labelStyle={styles.statLabel}
-            style={styles.statExpense}
-            testID="text-spending-expense"
-          />
-        </View>
-
-        {segments.length === 0 ? (
-          <SpendingEmptyState onOpenBudgets={onOpenBudgets} />
-        ) : (
-          <>
-            {/* Open on the page, not in a card: the ring is its own shape. */}
-            <View style={styles.donut}>
-              <DonutChart
-                segments={segments}
-                currency={currency}
-                selected={selected}
-                onToggle={toggleSegment}
-                budgetTotal={budgetTotal}
-                onPressDetails={setDetailCategoryId}
-              />
-              {budgetTotal !== null && prorated ? (
-                <Text style={styles.budgetHint}>
-                  Hạn mức tháng đã chia theo {rangeDayCount === 1 ? "ngày" : `${rangeDayCount} ngày`} bạn chọn.
-                </Text>
-              ) : null}
-            </View>
-
-            <View>
-              <Text style={styles.legendTitle}>Theo danh mục</Text>
-              {segments.map((seg, index) => (
-                <Animated.View key={seg.key} entering={legendEntrance(index)}>
-                  <DonutLegendRow
-                    segment={seg}
-                    currency={currency}
-                    percentage={totalExpense > 0 ? (seg.amount / totalExpense) * 100 : 0}
-                    selected={selected === seg.key}
-                    onPress={toggleSegment}
-                    onHoldCategory={openCategoryPicker}
-                  />
-                </Animated.View>
-              ))}
-            </View>
-          </>
-        )}
-      </ScrollView>
-
-      <DateRangePickerModal
-        visible={pickerOpen}
-        onClose={closeRangePicker}
-        from={dateRange.from}
-        to={dateRange.to}
-        onApply={setDateRange}
-      />
-
-      <CategoryTransactionsDialog
-        visible={detailCategoryId !== null}
-        onClose={closeDetail}
-        categoryId={detailCategoryId}
-        categoryName={detailSegment?.label ?? ""}
-        color={detailSegment?.color ?? colors.lavender}
-        icon={detailSegment?.icon}
-        iconUrl={detailSegment?.iconUrl}
-        // The backend's resolved window, so the rows match the donut even
-        // when no filter is applied.
-        from={range.from}
-        to={range.to}
-        currency={currency}
-        total={detailSegment?.amount ?? 0}
-      />
-
-      <CategoryPickerDrawer
-        visible={categoryPickerOpen}
-        onClose={closeCategoryPicker}
-        categories={pickerCategories}
-        onSelect={toggleSegment}
-      />
-    </View>
+    <SkeletonSwap fill loading={isAwaitingFirstData(summary)} skeleton={<SpendingTabSkeleton />}>
+      {renderLoaded}
+    </SkeletonSwap>
   );
 });
 
 const useStyles = createStyles((colors) => ({
   container: { flex: 1 },
   scroll: { gap: spacing.lg },
+  body: { gap: spacing.lg },
   filterRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
   currencyTabs: { marginLeft: "auto" },
   rangeButton: {

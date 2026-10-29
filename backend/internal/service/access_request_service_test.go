@@ -42,6 +42,11 @@ func (r *recordingEmailSender) SendPasswordResetCode(_ context.Context, to, code
 	return nil
 }
 
+func (r *recordingEmailSender) SendWalletInviteEmail(_ context.Context, to, _, _, token string) error {
+	r.sent <- sentEmail{"wallet-invite", to, token}
+	return nil
+}
+
 func (r *recordingEmailSender) next(t *testing.T) sentEmail {
 	t.Helper()
 	select {

@@ -15,7 +15,9 @@ import { useCurrentUserId } from "@/stores/use-current-user-id";
 const STRIP_HEIGHT = 28;
 const RESIZE_MS = 220;
 
-const OFFLINE_LABEL = "Ngoại tuyến";
+// Worded as the User's own state (user request, 2026-10-29): a bare
+// "Ngoại tuyến" read as a label, not as something about this phone.
+const OFFLINE_LABEL = "Bạn đang ngoại tuyến";
 const RECONNECTED_LABEL = "Đã kết nối lại · đang đồng bộ";
 const OPEN_HINT = "Xem dữ liệu cập nhật lúc nào và thao tác nào cần mạng";
 
@@ -32,7 +34,7 @@ type VisibleState = Exclude<ConnectionStripState, "hidden">;
  * the Fab and the nav for the same corner, covered the end of every list,
  * and lost — its right edge sat under the Fab.
  *
- * Says only "Ngoại tuyến", plus the waiting count when there is one (S-OFF-13).
+ * Says only "Bạn đang ngoại tuyến", plus the waiting count when there is one (S-OFF-13).
  * A tap opens OfflineInfoSheet with the saved data's time and the actions
  * that need a network. On reconnect it turns green for a moment, then folds
  * away by animating its height. Timing (and flapping, EC-OFF-04) is
@@ -109,14 +111,14 @@ export const OfflineBanner = memo(function OfflineBanner() {
           ]}
         >
           {offline ? (
-            <WifiOffIcon size={13} color={colors.textSecondary} />
+            <WifiOffIcon size={13} color={colors.warning} />
           ) : (
             <CheckIcon size={13} color={colors.green} strokeWidth={2.6} />
           )}
-          <Text style={[styles.label, !offline && styles.labelReconnected]} numberOfLines={1}>
+          <Text style={[styles.label, offline ? styles.labelOffline : styles.labelReconnected]} numberOfLines={1}>
             {label}
           </Text>
-          {offline ? <ChevronRightIcon size={12} color={colors.textMuted} /> : null}
+          {offline ? <ChevronRightIcon size={12} color={withAlpha(colors.warning, 0.7)} /> : null}
         </Pressable>
       </Animated.View>
       {/* Outside the strip: the strip clips to its own height. */}
@@ -138,15 +140,20 @@ const useStyles = createStyles((colors) => ({
     paddingHorizontal: spacing.xl,
     borderBottomWidth: 1,
   },
-  // Surface, not a warning colour: switching the network off is something
-  // the User did, not an error — and amber next to the brand green read as
-  // an alarm.
-  contentOffline: { backgroundColor: colors.surface, borderBottomColor: colors.surfaceBorder },
+  // Amber, tinted rather than filled: a grey surface band read as part of
+  // the screen and was missed (user, 2026-10-29). Amber is the usual "limited
+  // connection" signal and stays clear of red, which here means an error.
+  // `warning` has a darker light-theme value, so the text stays readable.
+  contentOffline: {
+    backgroundColor: withAlpha(colors.warning, 0.14),
+    borderBottomColor: withAlpha(colors.warning, 0.3),
+  },
   contentReconnected: {
     backgroundColor: withAlpha(colors.green, 0.12),
     borderBottomColor: withAlpha(colors.green, 0.25),
   },
   pressed: { opacity: 0.7 },
   label: { ...typography.caption, color: colors.textSecondary, flexShrink: 1 },
+  labelOffline: { color: colors.warning, fontWeight: "600" },
   labelReconnected: { color: colors.green },
 }));

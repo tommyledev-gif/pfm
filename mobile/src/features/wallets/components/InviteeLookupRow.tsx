@@ -1,13 +1,13 @@
 import { Text, View } from "react-native";
 
 import { Avatar } from "@/components/ui/Avatar";
-import { CheckCircleIcon, UsersIcon } from "@/components/ui/Icon";
+import { CheckCircleIcon, SendIcon, UsersIcon } from "@/components/ui/Icon";
 import { SkeletonBlock } from "@/components/ui/SkeletonBlock";
 import { colorForCategory } from "@/lib/category-color";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { InviteeLookup } from "@/features/wallets/api/use-wallet-invitee-lookup";
 import { WalletInvitee } from "@/features/wallets/types";
-import { NO_ACCOUNT_MESSAGE } from "@/features/wallets/components/wallet-member-copy";
+import { NEW_ACCOUNT_INVITE, NO_ACCOUNT_MESSAGE } from "@/features/wallets/components/wallet-member-copy";
 
 const AVATAR_SIZE = 36;
 
@@ -24,8 +24,11 @@ const STANDING: Record<Exclude<WalletInvitee["membership"], "none">, string> = {
  * account has it. One height in every state (searching, found, none), so the
  * form below does not jump as the answer lands. Nothing while too short, and
  * nothing when the lookup is unavailable (the server checks on send).
+ *
+ * An email no account has is not a dead end: `emailInvite` says the
+ * invitation goes out by email, with a link to create the account.
  */
-export function InviteeLookupRow({ lookup }: { lookup: InviteeLookup }) {
+export function InviteeLookupRow({ lookup, emailInvite = false }: { lookup: InviteeLookup; emailInvite?: boolean }) {
   const colors = useColors();
   const styles = useStyles();
   if (lookup.kind === "idle" || lookup.kind === "unavailable") return null;
@@ -43,9 +46,15 @@ export function InviteeLookupRow({ lookup }: { lookup: InviteeLookup }) {
       ) : lookup.kind === "not-found" ? (
         <>
           <View style={styles.noneIcon}>
-            <UsersIcon size={16} color={colors.textMuted} />
+            {emailInvite ? (
+              <SendIcon size={16} color={colors.green} />
+            ) : (
+              <UsersIcon size={16} color={colors.textMuted} />
+            )}
           </View>
-          <Text style={styles.none}>{NO_ACCOUNT_MESSAGE}</Text>
+          <Text style={styles.none} testID={emailInvite ? "text-wallet-invitee-new-account" : undefined}>
+            {emailInvite ? NEW_ACCOUNT_INVITE : NO_ACCOUNT_MESSAGE}
+          </Text>
         </>
       ) : (
         <>
