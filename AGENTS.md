@@ -1,4 +1,5 @@
 # PFM — Agent Notes
+DO NOT USE SUBAGENT MODE
 
 Project rules live in `CLAUDE.md`. Keep anything added here ABOVE the GitNexus block below: that block is regenerated wholesale by `npx gitnexus analyze`.
 

@@ -1,4 +1,6 @@
 # PFM — Personal Finance Management
+DO NOT USE SUBAGENT MODE
+
 
 Mobile app quản lý chi tiêu cá nhân. React Native (Expo) + Go + Python AI service.
 
