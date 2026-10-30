@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { useTranslation } from "react-i18next";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { EditHistoryDialog } from "@/features/ai-chat/components/EditHistoryDialog";
 import { EditMessageModal } from "@/features/ai-chat/components/EditMessageModal";
@@ -9,6 +10,7 @@ import { TransactionRemoval } from "@/features/ai-chat/components/use-transactio
 import { tombstoneKind } from "@/features/ai-chat/tombstone";
 import { BudgetWizardModal } from "@/features/budget-wizard/components/BudgetWizardModal";
 import { TransactionFormModal } from "@/features/transactions/components/TransactionFormModal";
+import { categoryLabel } from "@/features/categories/category-label";
 import { Category } from "@/features/categories/types";
 import { ChatMessage, SavedProposalPatch, TransactionActionPayload } from "@/features/ai-chat/types";
 import { Wallet } from "@/features/wallets/types";
@@ -63,12 +65,13 @@ export const ChatOverlays = memo(function ChatOverlays({
   onCloseBudgetWizard,
   onBudgetWizardCompleted,
 }: ChatOverlaysProps) {
+  const { t } = useTranslation();
   const currencyFor = (message: ChatMessage | null): string =>
     message?.action ? walletById.get(message.action.payload.wallet_id ?? "")?.currency ?? FALLBACK_CURRENCY : FALLBACK_CURRENCY;
 
   const removalCopy = removalDialogCopy(removal.target, removal.targetIsPersisted, {
     currency: currencyFor(removal.target),
-    resolveCategoryName: (id) => categoryById.get(id)?.name,
+    resolveCategoryName: (id) => categoryLabel(categoryById.get(id)) || undefined,
   });
 
   return (
@@ -113,8 +116,8 @@ export const ChatOverlays = memo(function ChatOverlays({
         message={tombstoneMessage}
         kind={tombstoneMessage ? tombstoneKind(tombstoneMessage) : null}
         currency={currencyFor(tombstoneMessage)}
-        resolveCategoryName={(id) => categoryById.get(id)?.name ?? "Danh mục"}
-        resolveWalletName={(id) => walletById.get(id)?.name ?? "Ví"}
+        resolveCategoryName={(id) => categoryLabel(categoryById.get(id), t("common.field.category"))}
+        resolveWalletName={(id) => walletById.get(id)?.name ?? t("common.field.wallet")}
         onClose={onCloseTombstone}
       />
 

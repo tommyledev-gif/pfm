@@ -1,0 +1,169 @@
+{
+  "common": {
+    "action": {
+      "cancel": "Cancel",
+      "close": "Close",
+      "retry": "Try again",
+      "keep": "Keep",
+      "save": "Save",
+      "delete": "Delete",
+      "back": "Back",
+      "create": "Create",
+      "edit": "Edit",
+      "apply": "Apply",
+      "choose": "Choose",
+      "discard": "Discard",
+      "add": "Add",
+      "done": "Done",
+      "skip": "Skip",
+      "continue": "Continue",
+      "later": "Not now",
+      "gotIt": "Got it",
+      "seeAll": "See all",
+      "openSettings": "Open Settings",
+      "clearSearch": "Clear search",
+      "clearFilters": "Clear filters",
+      "clearFilter": "Clear filters",
+      "signIn": "Sign in",
+      "signOut": "Sign out",
+      "saveAnyway": "Save anyway",
+      "max": "Max",
+      "sort": "Sort",
+      "createWallet": "Create wallet",
+      "addTransaction": "Add transaction",
+      "createBudget": "Create budget",
+      "createCategory": "Create category",
+      "chooseCategory": "Choose category",
+      "openInMaps": "Open in Google Maps",
+      "setDefault": "Set as default",
+      "showPassword": "Show password",
+      "hidePassword": "Hide password",
+      "manualEntry": "Enter manually",
+      "moreOptions": "More options"
+    },
+    "field": {
+      "wallet": "Wallet",
+      "category": "Category",
+      "amount": "Amount",
+      "date": "Date",
+      "note": "Note",
+      "type": "Type",
+      "location": "Location",
+      "name": "Name",
+      "icon": "Icon",
+      "fromWallet": "From wallet",
+      "toWallet": "To wallet",
+      "time": "Time",
+      "quantity": "Quantity",
+      "unitPrice": "Unit price",
+      "lineAmount": "Amount",
+      "total": "Total",
+      "items": "Items",
+      "username": "Username",
+      "identifier": "Email or username",
+      "newPassword": "New password",
+      "confirmNewPassword": "Re-enter new password",
+      "searchCategories": "Search categories",
+      "chooseIcon": "Choose icon"
+    },
+    "txType": {
+      "expense": "Spending",
+      "income": "Income",
+      "transfer": "Transfer",
+      "expenseShort": "Spending",
+      "incomeShort": "Income"
+    },
+    "walletType": {
+      "cash": "Cash",
+      "bank": "Bank",
+      "e_wallet": "E-wallet",
+      "other": "Other"
+    },
+    "adjustment": {
+      "tax": "Tax",
+      "fee": "Fee",
+      "discount": "Discount",
+      "other": "Other",
+      "group": "Tax, fees, discounts"
+    },
+    "label": {
+      "all": "All",
+      "default": "Default",
+      "sharedWallet": "Shared wallet",
+      "yourWallets": "Your wallets"
+    },
+    "role": {
+      "member": "Member",
+      "admin": "Admin"
+    },
+    "status": {
+      "pending": "Pending",
+      "awaitingReply": "Awaiting reply",
+      "awaitingApproval": "Awaiting approval",
+      "pendingSync": "Waiting to sync",
+      "notEntered": "Not set"
+    },
+    "budget": {
+      "spent": "Spent",
+      "left": "Left",
+      "over": "Over",
+      "nearLimit": "Near limit"
+    },
+    "date": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "thisMonth": "This month"
+    },
+    "count": {
+      "categories_one": "{{count}} category",
+      "categories_other": "{{count}} categories",
+      "transactions_one": "{{count}} transaction",
+      "transactions_other": "{{count}} transactions",
+      "items_one": "{{count}} item",
+      "items_other": "{{count}} items",
+      "wallets_one": "{{count}} wallet",
+      "wallets_other": "{{count}} wallets",
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days",
+      "months_one": "{{count}} month",
+      "months_other": "{{count}} months"
+    },
+    "empty": {
+      "noWallet": "No wallet yet. Create one to log transactions.",
+      "tryAnotherKeyword": "Try another keyword.",
+      "noMatchingCategories": "No matching categories."
+    },
+    "confirm": {
+      "cannotUndo": "This can't be undone."
+    },
+    "validation": {
+      "chooseCategory": "Choose a category.",
+      "enterAmount": "Enter an amount.",
+      "enterIdentifier": "Enter your email or username."
+    },
+    "loading": "Loading",
+    "brand": "Budgest"
+  },
+  "nav": {
+    "tab": {
+      "home": "Home",
+      "transactions": "Transactions",
+      "assistant": "Assistant",
+      "insights": "Insights",
+      "settings": "Settings"
+    },
+    "title": {
+      "wallets": "Wallets",
+      "categories": "Categories",
+      "auditLogs": "Transaction history",
+      "security": "Security",
+      "userSettings": "Preferences",
+      "developer": "Developer",
+      "changePassword": "Change password",
+      "addAccount": "Add account",
+      "notifications": "Notifications",
+      "members": "Family members",
+      "switchAccount": "Switch account"
+    }
+  }
+}

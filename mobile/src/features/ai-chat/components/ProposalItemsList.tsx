@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { Collapsible } from "@/components/ui/Collapsible";
 import { formatCurrency } from "@/lib/currency";
@@ -10,7 +11,7 @@ import { ADJUSTMENT_KIND_LABELS } from "@/features/transactions/components/Adjus
 import { adjustmentReviewKey, itemReviewKey } from "@/features/ai-chat/line-review";
 
 // Glossary: needs-review mark, and the lines-total gap wording of ItemsTotalsPanel.
-const NEEDS_REVIEW_LABEL = "Cần kiểm tra";
+const NEEDS_REVIEW_LABEL = "chat.proposal.needsReview";
 
 interface ProposalItemsListProps {
   items: TransactionItemInput[];
@@ -32,6 +33,7 @@ interface ProposalItemsListProps {
 // from the items' sum.
 export function ProposalItemsList({ items, adjustments = [], currency, testIDSuffix, reviewKeys = [], gap = 0, amount }: ProposalItemsListProps) {
   const styles = useStyles();
+  const { t } = useTranslation();
   const marked = new Set(reviewKeys);
   // Something to check opens the list by itself.
   const [expanded, setExpanded] = useState(reviewKeys.length > 0);
@@ -43,7 +45,7 @@ export function ProposalItemsList({ items, adjustments = [], currency, testIDSuf
         accessibilityRole="button"
         onPress={() => setExpanded((v) => !v)}
       >
-        <Text style={styles.toggle}>{expanded ? `Ẩn ${items.length} món` : `Xem ${items.length} món`}</Text>
+        <Text style={styles.toggle}>{expanded ? t("chat.proposal.items.hide", { count: items.length }) : t("chat.proposal.items.show", { count: items.length })}</Text>
       </Pressable>
       {/* Grows open rather than appearing: the card, and the thread around
           it, move with it instead of jumping. */}
@@ -57,7 +59,7 @@ export function ProposalItemsList({ items, adjustments = [], currency, testIDSuf
                 </Text>
                 {marked.has(itemReviewKey(item)) ? (
                   <Text style={styles.review} testID={testIDSuffix ? `badge-line-review-${testIDSuffix}-${index}` : undefined}>
-                    {NEEDS_REVIEW_LABEL}
+                    {t(NEEDS_REVIEW_LABEL)}
                   </Text>
                 ) : null}
               </View>
@@ -76,7 +78,7 @@ export function ProposalItemsList({ items, adjustments = [], currency, testIDSuf
               <Text style={styles.name} numberOfLines={1}>
                 {label}
               </Text>
-              {marked.has(adjustmentReviewKey(adjustment)) ? <Text style={styles.review}>{NEEDS_REVIEW_LABEL}</Text> : null}
+              {marked.has(adjustmentReviewKey(adjustment)) ? <Text style={styles.review}>{t(NEEDS_REVIEW_LABEL)}</Text> : null}
             </View>
             <Text style={styles.amount}>
               {`${direction === "subtract" ? "−" : "+"}${formatCurrency(adjustment.amount, currency)}`}
@@ -87,8 +89,11 @@ export function ProposalItemsList({ items, adjustments = [], currency, testIDSuf
       {gap !== 0 ? (
         <Text style={styles.review} testID={testIDSuffix ? `txt-proposal-gap-${testIDSuffix}` : undefined}>
           {amount === undefined
-            ? `Lệch ${formatCurrency(Math.abs(gap), currency)} so với số tiền giao dịch.`
-            : `Lệch ${formatCurrency(Math.abs(gap), currency)} so với số tiền giao dịch ${formatCurrency(amount, currency)}.`}
+            ? t("chat.proposal.items.gap", { gap: formatCurrency(Math.abs(gap), currency) })
+            : t("chat.proposal.items.gapWithAmount", {
+                gap: formatCurrency(Math.abs(gap), currency),
+                amount: formatCurrency(amount, currency),
+              })}
         </Text>
       ) : null}
     </View>

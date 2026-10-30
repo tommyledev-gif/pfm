@@ -1,4 +1,5 @@
 import { PROPOSAL_CURRENCY, TransactionKind } from "@/lib/constants";
+import { useTranslation } from "react-i18next";
 import { useWalletChangeGuard } from "@/features/transactions/components/use-wallet-change-guard";
 import { useWalletPickerPanel } from "@/features/transactions/components/use-wallet-picker-panel";
 import { Wallet } from "@/features/wallets/types";
@@ -42,6 +43,7 @@ export function useProposalWallets({
   originalAmount,
   currentAmount,
 }: UseProposalWalletsOptions) {
+  const { t } = useTranslation();
   const isTransfer = type === "transfer";
   const walletChange = useWalletChangeGuard({
     enabled: savedId !== null && !isTransfer,
@@ -64,13 +66,13 @@ export function useProposalWallets({
   const destination = destinations.find((w) => w.id === toWalletId) ?? null;
 
   const sourcePicker = useWalletPickerPanel({
-    title: isTransfer ? "Từ ví" : "Ví",
+    title: t(isTransfer ? "common.field.fromWallet" : "common.field.wallet"),
     wallets: selectable,
     selectedId: wallet?.id ?? null,
     onSelect: walletChange.select,
   });
   const destinationPicker = useWalletPickerPanel({
-    title: "Đến ví",
+    title: t("common.field.toWallet"),
     wallets: destinations,
     selectedId: destination?.id ?? null,
     onSelect: onChangeToWallet,

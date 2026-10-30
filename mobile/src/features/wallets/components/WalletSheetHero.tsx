@@ -1,11 +1,12 @@
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { formatCurrency } from "@/lib/currency";
 import { spacing, typography, createStyles } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
 import { isOwnWallet } from "@/features/wallets/wallet-access";
 import { WalletMiniCard } from "@/features/wallets/components/WalletMiniCard";
-import { ROLE_LABEL } from "@/features/wallets/components/wallet-member-copy";
+import { ROLE_LABEL_KEY } from "@/features/wallets/components/wallet-member-copy";
 
 /**
  * The top of a wallet's sharing sheet, centred: the wallet as a card, its
@@ -17,18 +18,22 @@ import { ROLE_LABEL } from "@/features/wallets/components/wallet-member-copy";
  * beside "Ví chung của bạn", which said "Chủ ví" twice.
  */
 export function WalletSheetHero({ wallet, faceColor }: { wallet: Wallet; faceColor: string }) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const own = isOwnWallet(wallet);
   // An own wallet opened to share it for the first time is not shared yet.
   const shared = !own || (wallet.member_count ?? 0) > 0;
   const whose = own
     ? shared
-      ? "Ví chung của bạn"
-      : "Ví của bạn"
-    : `Ví chung của ${wallet.owner_name ?? "người khác"} · ${ROLE_LABEL[wallet.access ?? "viewer"]}`;
+      ? t("wallets.owner.yoursShared")
+      : t("wallets.owner.yours")
+    : t("wallets.owner.sharedByWithRole", {
+        owner: wallet.owner_name ?? t("wallets.owner.unknown"),
+        role: t(ROLE_LABEL_KEY[wallet.access ?? "viewer"]),
+      });
   return (
     <View style={styles.hero}>
-      <WalletMiniCard accentColor={faceColor} icon={wallet.icon} iconUrl={wallet.icon_url} size="lg" shared={shared} />
+      <WalletMiniCard accentColor={faceColor} icon={wallet.icon} iconUrl={wallet.icon_url} size="lg" shared={shared} name={wallet.name} />
       <View style={styles.texts}>
         <Text style={styles.name} numberOfLines={2}>
           {wallet.name}

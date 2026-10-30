@@ -1,6 +1,8 @@
 import { Platform } from "react-native";
 import { requireOptionalNativeModule } from "expo";
 
+import { i18n } from "@/lib/i18n";
+
 // modules/biometric-vault (Android only): a Keystore key pair per locked
 // account. Sealing needs no prompt; opening needs the owner's fingerprint, or
 // from Android 11 the phone's PIN instead.
@@ -32,7 +34,6 @@ const KIND_BY_CODE: Record<string, VaultFailure> = {
   ERR_VAULT_UNAVAILABLE: "unavailable",
 };
 
-const CANCEL_LABEL = "Hủy";
 const aliasFor = (userId: string) => `pfm_vault_${userId}`;
 
 function toVaultError(error: unknown): VaultError {
@@ -72,7 +73,7 @@ export async function sealAccountToken(userId: string, refreshToken: string): Pr
 export async function openAccountToken(userId: string, sealed: string, title: string): Promise<string> {
   if (!native) throw new VaultError("unavailable", "vault not in this build");
   try {
-    return await native.open(aliasFor(userId), sealed, title, CANCEL_LABEL);
+    return await native.open(aliasFor(userId), sealed, title, i18n.t("common.action.cancel"));
   } catch (error) {
     throw toVaultError(error);
   }

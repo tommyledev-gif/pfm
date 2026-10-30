@@ -1,13 +1,15 @@
 import { PROPOSAL_CURRENCY } from "@/lib/constants";
+import { i18n } from "@/lib/i18n";
 import { ChatMessage, TransactionActionPayload } from "@/features/ai-chat/types";
 import { Wallet } from "@/features/wallets/types";
 
+// Locale keys; the components pass them to t().
 /** Shown on a card that cannot be saved until a VND Wallet is chosen. */
-export const WALLET_REQUIRED_MESSAGE = "Chọn ví VND để lưu giao dịch.";
+export const WALLET_REQUIRED_MESSAGE = "chat.proposal.walletRequired";
 /** Wallet label for a proposal that has no Wallet yet. */
-export const NO_WALLET_LABEL = "Chưa chọn ví";
+export const NO_WALLET_LABEL = "chat.proposal.noWallet";
 /** Edit-form hint when the User owns no VND Wallet at all. */
-export const NO_VND_WALLET_HINT = "Chưa có ví VND. Tạo ví VND để lưu giao dịch.";
+export const NO_VND_WALLET_HINT = "chat.proposal.noVndWallet";
 
 /**
  * Whether an AI proposal can be saved as-is. The amount was read as VND and
@@ -28,10 +30,10 @@ export function isSavableProposal(payload: TransactionActionPayload, walletById:
   return !wallet || wallet.currency === PROPOSAL_CURRENCY;
 }
 
-/** The Wallet a proposal names: "Chưa chọn ví" without one, "A → B" for a transfer. */
+/** The Wallet a proposal names: "Chưa chọn ví" without one, "A → B" for a transfer. In the current language. */
 export function proposalWalletName(payload: TransactionActionPayload, walletById: Map<string, Wallet>): string {
-  const nameOf = (id: string) => walletById.get(id)?.name ?? "Ví";
-  const source = payload.wallet_id === null ? NO_WALLET_LABEL : nameOf(payload.wallet_id);
+  const nameOf = (id: string) => walletById.get(id)?.name ?? i18n.t("common.field.wallet");
+  const source = payload.wallet_id === null ? i18n.t(NO_WALLET_LABEL) : nameOf(payload.wallet_id);
   return payload.type === "transfer" && payload.to_wallet_id ? `${source} → ${nameOf(payload.to_wallet_id)}` : source;
 }
 

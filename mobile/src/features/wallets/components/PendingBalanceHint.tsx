@@ -1,4 +1,5 @@
 import { StyleProp, Text, TextStyle } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { useOutboxStore } from "@/stores/outbox-store";
 import { useCurrentUserId } from "@/stores/use-current-user-id";
@@ -25,10 +26,11 @@ export function usePendingWalletCount(walletId: string): number {
 }
 
 export function PendingBalanceHint({ count, style }: PendingBalanceHintProps) {
+  const { t } = useTranslation();
   if (count === 0) return null;
   return (
     <Text style={style} numberOfLines={1} testID="text-wallet-pending-sync-hint">
-      Chưa tính {count} giao dịch chờ đồng bộ
+      {t("wallets.card.pendingNotCounted", { count })}
     </Text>
   );
 }

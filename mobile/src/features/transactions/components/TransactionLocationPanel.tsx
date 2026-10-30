@@ -1,8 +1,10 @@
 import { ActivityIndicator, Linking, Pressable, Text, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { MapPinIcon } from "@/components/ui/Icon";
 import { PillButton } from "@/components/ui/PillButton";
 import { TRANSACTION_NOTE_MAX_LENGTH } from "@/lib/constants";
+import { TranslationKey } from "@/lib/i18n";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { Coordinates, LocationFailure } from "@/features/transactions/location/capture-location";
 import { formatCoordinates, openInGoogleMaps } from "@/features/transactions/location/map-support";
@@ -34,10 +36,10 @@ interface TransactionLocationPanelProps {
   onRemoveSavedPlace: (place: SavedPlace) => void;
 }
 
-const FAILURE_COPY: Record<LocationFailure, string> = {
-  denied: "Budgest chưa được cấp quyền vị trí. Hãy cho phép trong Cài đặt rồi thử lại.",
-  services_off: "Định vị (GPS) đang tắt. Bật định vị để ghim vị trí giao dịch.",
-  unavailable: "Chưa lấy được vị trí hiện tại. Thử lại ở nơi thoáng hơn.",
+const FAILURE_COPY: Record<LocationFailure, TranslationKey> = {
+  denied: "transactions.location.error.denied",
+  services_off: "transactions.location.error.servicesOff",
+  unavailable: "transactions.location.error.unavailable",
 };
 
 // Body of the "Ghim vị trí" step (use-location-step.tsx owns its state).
@@ -57,6 +59,7 @@ export function TransactionLocationPanel({
   onPickPlace,
   onRemoveSavedPlace,
 }: TransactionLocationPanelProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
 
@@ -64,7 +67,7 @@ export function TransactionLocationPanel({
     return (
       <View style={styles.centered}>
         <ActivityIndicator color={colors.green} />
-        <Text style={styles.message}>Đang xác định vị trí…</Text>
+        <Text style={styles.message}>{t("transactions.location.locating")}</Text>
       </View>
     );
   }
@@ -73,11 +76,11 @@ export function TransactionLocationPanel({
     return (
       <View style={styles.centered}>
         <MapPinIcon size={32} color={colors.textMuted} />
-        <Text style={styles.message}>{FAILURE_COPY[failure]}</Text>
+        <Text style={styles.message}>{t(FAILURE_COPY[failure])}</Text>
         <View style={styles.actions}>
-          <PillButton label="Thử lại" onPress={onRetry} testID="btn-location-retry" />
+          <PillButton label={t("common.action.retry")} onPress={onRetry} testID="btn-location-retry" />
           {failure === "denied" ? (
-            <PillButton label="Mở Cài đặt" variant="outline" onPress={() => void Linking.openSettings()} />
+            <PillButton label={t("common.action.openSettings")} variant="outline" onPress={() => void Linking.openSettings()} />
           ) : null}
         </View>
       </View>
@@ -109,7 +112,7 @@ export function TransactionLocationPanel({
       <View style={styles.placeRow}>
         <MapPinIcon size={18} color={colors.green} />
         <Text style={styles.placeName} numberOfLines={2} testID="text-location-place">
-          {naming ? "Đang tìm khu vực…" : placeName ?? "Chưa có tên khu vực (cần mạng) — vẫn lưu toạ độ"}
+          {naming ? t("transactions.location.naming") : placeName ?? t("transactions.location.noAreaName")}
         </Text>
       </View>
       {viewing ? (
@@ -117,21 +120,21 @@ export function TransactionLocationPanel({
           <View style={styles.hintRow}>
             <Text style={styles.hint}>{formatCoordinates(coords)}</Text>
             <Pressable onPress={() => openInGoogleMaps(coords)} hitSlop={8} testID="btn-location-open-maps">
-              <Text style={styles.link}>Mở trên Google Maps</Text>
+              <Text style={styles.link}>{t("common.action.openInMaps")}</Text>
             </Pressable>
           </View>
           <View style={styles.noteView} testID="text-location-note">
-            <Text style={styles.noteLabel}>Ghi chú địa điểm</Text>
-            <Text style={note ? styles.noteText : styles.noteEmpty}>{note || "Chưa có ghi chú cho địa điểm này."}</Text>
+            <Text style={styles.noteLabel}>{t("transactions.location.noteLabel")}</Text>
+            <Text style={note ? styles.noteText : styles.noteEmpty}>{note || t("transactions.location.noteEmpty")}</Text>
           </View>
         </>
       ) : (
         <>
-          <Text style={styles.hint}>{formatCoordinates(coords)} · Chạm hoặc kéo ghim để chỉnh lại</Text>
+          <Text style={styles.hint}>{t("transactions.location.adjustHint", { coords: formatCoordinates(coords) })}</Text>
           <TextInput
             value={note}
             onChangeText={onChangeNote}
-            placeholder="Ghi chú về địa điểm: đường đi, cổng, tầng… (không bắt buộc)"
+            placeholder={t("transactions.location.notePlaceholder")}
             placeholderTextColor={colors.textMuted}
             style={styles.noteInput}
             multiline

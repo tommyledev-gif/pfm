@@ -1,4 +1,5 @@
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useRequireOnline } from "@/lib/connectivity";
@@ -33,6 +34,7 @@ export function WizardResultFooter({
   planSaved,
   canSubmit,
 }: WizardResultFooterProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   // Both submit paths write budgets on the server (AC-OFF-08); saving the
   // plan locally stays available offline.
@@ -51,7 +53,7 @@ export function WizardResultFooter({
           style={[styles.ghostBtn, planSaved && styles.ghostBtnDone]}
         >
           <Text style={[styles.ghostLabel, planSaved && styles.ghostLabelDone]} numberOfLines={2}>
-            {planSaved ? "Đã lưu kế hoạch" : "Lưu để dùng sau"}
+            {t(planSaved ? "budgetWizard.footer.planSaved" : "budgetWizard.footer.savePlan")}
           </Text>
         </Pressable>
 
@@ -62,7 +64,7 @@ export function WizardResultFooter({
           style={[styles.primaryBtn, (submitting || !canSubmit) && styles.primaryBtnDisabled]}
         >
           <Text style={styles.primaryLabel} numberOfLines={2}>
-            {submitting ? "Đang lưu…" : "Áp dụng ngân sách"}
+            {t(submitting ? "budgetWizard.footer.saving" : "budgetWizard.footer.apply")}
           </Text>
         </Pressable>
       </View>
@@ -75,9 +77,9 @@ export function WizardResultFooter({
           before. */}
       <ConfirmDialog
         visible={overwriteConfirmOpen && hasExistingBudgets}
-        title="Thay ngân sách hiện tại?"
-        message="Mọi ngân sách hiện tại sẽ bị thay bằng kế hoạch này. Không thể hoàn tác."
-        confirmLabel="Thay ngân sách"
+        title={t("budgetWizard.overwrite.title")}
+        message={t("budgetWizard.overwrite.body")}
+        confirmLabel={t("budgetWizard.overwrite.confirm")}
         onCancel={onCancelOverwrite}
         onConfirm={() => requireOnline(onConfirmOverwrite)}
         loading={submitting}

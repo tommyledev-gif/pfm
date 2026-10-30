@@ -1,0 +1,87 @@
+{
+  "home": {
+    "period": {
+      "day": "Ngày",
+      "month": "Tháng",
+      "year": "Năm"
+    },
+    "wallets": {
+      "title": "Ví",
+      "add": "Thêm ví"
+    },
+    "recent": {
+      "title": "Giao dịch gần đây",
+      "seeAll": "Xem tất cả →",
+      "empty": "Chưa có giao dịch."
+    },
+    "snapshot": {
+      "leftToday": "Hôm nay còn",
+      "daysLeft_other": "Còn {{count}} ngày trong tháng",
+      "overBudget": "Vượt ngân sách",
+      "withinBudget": "Trong ngân sách",
+      "topSpending": "Chi nhiều nhất",
+      "noSpending": "Chưa có khoản chi nào trong kỳ này.",
+      "trend": {
+        "same_day": "Bằng hôm qua",
+        "same_month": "Bằng tháng trước",
+        "same_year": "Bằng năm trước",
+        "more_day": "Nhiều hơn {{amount}} so với hôm qua",
+        "less_day": "Ít hơn {{amount}} so với hôm qua",
+        "more_month": "Nhiều hơn {{amount}} so với tháng trước",
+        "less_month": "Ít hơn {{amount}} so với tháng trước",
+        "more_year": "Nhiều hơn {{amount}} so với năm trước",
+        "less_year": "Ít hơn {{amount}} so với năm trước"
+      },
+      "hint": {
+        "category": "{{category}}: {{amount}}, {{percent}}% tổng chi",
+        "budget": "{{category}}: đã chi {{spent}} / {{limit}}"
+      }
+    },
+    "pendingSync": {
+      "more_other": "+{{count}} giao dịch khác chờ đồng bộ"
+    }
+  },
+  "onboarding": {
+    "title": "Biết tiền đi đâu",
+    "description": "Ghi thu chi, đặt ngân sách theo danh mục.",
+    "progress": "Xong {{done}}/{{total}} bước",
+    "step": {
+      "badge": {
+        "active": "Cần làm",
+        "done": "Xong",
+        "locked": "Bước {{number}}"
+      }
+    },
+    "steps": {
+      "wallet": {
+        "title": "Thêm ví",
+        "description": "Tiền mặt, ngân hàng hoặc ví điện tử.",
+        "cta": "Thêm ví đầu tiên"
+      },
+      "transaction": {
+        "title": "Ghi giao dịch đầu tiên",
+        "description": "Ghi khoản chi gần nhất, ví dụ bữa trưa hôm nay.",
+        "cta": "Ghi giao dịch đầu tiên"
+      },
+      "budget": {
+        "title": "Tạo ngân sách",
+        "description": "Đặt hạn mức theo danh mục để biết tháng này còn chi được bao nhiêu."
+      }
+    }
+  },
+  "transactions": {
+    "future": {
+      "count_other": "{{count}} giao dịch sắp tới",
+      "next": "Gần nhất: {{date}} · {{category}}",
+      "title": "Giao dịch sắp tới",
+      "note": "Những khoản này có ngày ở tương lai nên chưa nằm trong danh sách chính. Chạm để sửa lại ngày.",
+      "empty": "Không có giao dịch nào sắp tới."
+    }
+  },
+  "reports": {
+    "holdRow": {
+      "hint": "Giữ một giây để mở trong Giao dịch",
+      "show": "Xem trong Giao dịch"
+    }
+  }
+}

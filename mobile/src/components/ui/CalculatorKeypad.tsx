@@ -1,9 +1,11 @@
 import { ReactNode, memo, useEffect, useRef } from "react";
 import { ActivityIndicator, Animated, Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { BackspaceIcon, CalendarIcon, CheckIcon } from "@/components/ui/Icon";
 import { KeypadKey } from "@/lib/calculator/input";
 import { withAlpha } from "@/lib/color";
+import type { TranslationKey } from "@/lib/i18n";
 import { typography, createStyles, useColors } from "@/lib/theme";
 import { useJsIdle } from "@/lib/use-js-idle";
 import { useReduceMotion } from "@/lib/use-reduce-motion";
@@ -20,13 +22,13 @@ const LAST_ROW_OPERATOR: KeypadKey = "+";
 
 // What a screen reader says for each non-digit key — "×" read as "x" and "−"
 // as "dash" (or not at all) is the default otherwise.
-const SPOKEN_KEY: Partial<Record<KeypadKey, string>> = {
-  "+": "cộng",
-  "−": "trừ",
-  "×": "nhân",
-  "÷": "chia",
-  ".": "dấu thập phân",
-  "000": "ba số không",
+const SPOKEN_KEY: Partial<Record<KeypadKey, TranslationKey>> = {
+  "+": "ui.calculator.spoken.plus",
+  "−": "ui.calculator.spoken.minus",
+  "×": "ui.calculator.spoken.times",
+  "÷": "ui.calculator.spoken.divide",
+  ".": "ui.calculator.spoken.decimal",
+  "000": "ui.calculator.spoken.tripleZero",
 };
 
 // Keys are a fixed 48pt tall: past this the system font scale stops growing
@@ -95,9 +97,14 @@ function CalculatorKeypadView({
   dateAccessibilityLabel,
   testID,
 }: CalculatorKeypadProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const keyId = (name: string) => (testID ? `${testID}-key-${name}` : undefined);
+  const spoken = (key: KeypadKey) => {
+    const spokenKey = SPOKEN_KEY[key];
+    return spokenKey ? t(spokenKey) : key;
+  };
 
   // ⚠️ Shown and enabled only once the JS thread is free. The keypad mounts
   // with its whole sheet, and a press made while that sheet is still
@@ -118,7 +125,7 @@ function CalculatorKeypadView({
       <Pressable
         testID={keyId(key)}
         accessibilityRole="button"
-        accessibilityLabel={SPOKEN_KEY[key] ?? key}
+        accessibilityLabel={spoken(key)}
         // On touch-down, as a phone keypad does: nothing waits for the finger to lift.
         onPressIn={() => onInsert(key)}
         style={({ pressed }) => [styles.key, styles.digitKey, pressed && styles.digitKeyPressed]}
@@ -139,7 +146,7 @@ function CalculatorKeypadView({
       <Pressable
         testID={keyId(glyph)}
         accessibilityRole="button"
-        accessibilityLabel={SPOKEN_KEY[glyph] ?? glyph}
+        accessibilityLabel={spoken(glyph)}
         onPressIn={() => onInsert(glyph)}
         style={({ pressed }) => [styles.key, styles.operatorKey, pressed && styles.operatorKeyPressed]}
       >
@@ -174,8 +181,8 @@ function CalculatorKeypadView({
             <Pressable
               testID={keyId("backspace")}
               accessibilityRole="button"
-              accessibilityLabel="Xóa"
-              accessibilityHint={onClear ? "Nhấn giữ để xóa hết" : undefined}
+              accessibilityLabel={t("ui.calculator.backspace")}
+              accessibilityHint={onClear ? t("ui.calculator.backspaceHint") : undefined}
               onPressIn={onBackspace}
               onLongPress={onClear}
               style={({ pressed }) => [styles.key, styles.digitKey, pressed && styles.digitKeyPressed]}
@@ -207,7 +214,7 @@ function CalculatorKeypadView({
         <Pressable
           testID={keyId("confirm")}
           accessibilityRole="button"
-          accessibilityLabel="Xác nhận"
+          accessibilityLabel={t("ui.calculator.confirm")}
           accessibilityState={{ disabled: confirmBlocked, busy: confirmLoading }}
           disabled={confirmBlocked}
           onPress={onConfirm}

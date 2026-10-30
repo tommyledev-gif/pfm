@@ -1,0 +1,90 @@
+{
+  "home": {
+    "period": {
+      "day": "Day",
+      "month": "Month",
+      "year": "Year"
+    },
+    "wallets": {
+      "title": "Wallets",
+      "add": "Add wallet"
+    },
+    "recent": {
+      "title": "Recent transactions",
+      "seeAll": "See all →",
+      "empty": "No transactions yet."
+    },
+    "snapshot": {
+      "leftToday": "Left today",
+      "daysLeft_one": "{{count}} day left this month",
+      "daysLeft_other": "{{count}} days left this month",
+      "overBudget": "Over budget",
+      "withinBudget": "Within budget",
+      "topSpending": "Top spending",
+      "noSpending": "No spending in this period.",
+      "trend": {
+        "same_day": "Same as yesterday",
+        "same_month": "Same as last month",
+        "same_year": "Same as last year",
+        "more_day": "{{amount}} more than yesterday",
+        "less_day": "{{amount}} less than yesterday",
+        "more_month": "{{amount}} more than last month",
+        "less_month": "{{amount}} less than last month",
+        "more_year": "{{amount}} more than last year",
+        "less_year": "{{amount}} less than last year"
+      },
+      "hint": {
+        "category": "{{category}}: {{amount}}, {{percent}}% of spending",
+        "budget": "{{category}}: spent {{spent}} of {{limit}}"
+      }
+    },
+    "pendingSync": {
+      "more_one": "+{{count}} more transaction waiting to sync",
+      "more_other": "+{{count}} more transactions waiting to sync"
+    }
+  },
+  "onboarding": {
+    "title": "Know where your money goes",
+    "description": "Log income and spending. Set budgets by category.",
+    "progress": "{{done}} of {{total}} steps done",
+    "step": {
+      "badge": {
+        "active": "To do",
+        "done": "Done",
+        "locked": "Step {{number}}"
+      }
+    },
+    "steps": {
+      "wallet": {
+        "title": "Add a wallet",
+        "description": "Cash, bank or e-wallet.",
+        "cta": "Add first wallet"
+      },
+      "transaction": {
+        "title": "Log your first transaction",
+        "description": "Log your latest expense, like today's lunch.",
+        "cta": "Log first transaction"
+      },
+      "budget": {
+        "title": "Create a budget",
+        "description": "Set a limit per category to see what's left to spend this month."
+      }
+    }
+  },
+  "transactions": {
+    "future": {
+      "count_one": "{{count}} upcoming transaction",
+      "count_other": "{{count}} upcoming transactions",
+      "next": "Next: {{date}} · {{category}}",
+      "title": "Upcoming transactions",
+      "note": "These are dated in the future, so they're not in the main list yet. Tap one to change its date.",
+      "empty": "No upcoming transactions."
+    }
+  },
+  "reports": {
+    "holdRow": {
+      "hint": "Hold for a second to open in Transactions",
+      "show": "View in Transactions"
+    }
+  }
+}

@@ -194,6 +194,7 @@ The Wallets screen's "Ví chung" tab (`SharedWalletsView`) and the shared activi
 | `wallets.owner.yours` | Ví của bạn | Your wallet | SharedWalletCard.tsx:36 | Same key as WalletSheetHero.tsx:27 |
 | `wallets.owner.ownedBy` | Của ${wallet.owner_name ?? "người khác"} | Owned by {{owner}} | SharedWalletCard.tsx:36 | VI "Của {{owner}}". Missing owner passes `wallets.owner.unknown`. Same key: SharedActivityHeader.tsx:60 |
 | `sharedWallets.card.a11y` | ${wallet.name}, ${owner}, ${ROLE_LABEL[wallet.access ?? "owner"]}, ${balance}${people} | {{wallet}}, {{owner}}, {{role}}, {{amount}} | SharedWalletCard.tsx:45 | a11y. Not in the raw dump (VI only inside variables). `${people}` is ", " + `memberCountLine`: add `sharedWallets.card.a11yWithPeople` "{{wallet}}, {{owner}}, {{role}}, {{amount}}, {{people}}" (same in VI) |
+| `sharedWallets.card.a11yWithPeople` | ${wallet.name}, ${owner}, ${ROLE_LABEL[…]}, ${balance}, ${memberCountLine(…)} | {{wallet}}, {{owner}}, {{role}}, {{amount}}, {{people}} | SharedWalletCard.tsx:45 | a11y once the member list has loaded. `{{people}}` = `memberCountLine` |
 
 ### Shared tag (`mobile/src/features/wallets/components/SharedWalletTag.tsx`)
 
@@ -252,6 +253,9 @@ The members sheet (`WalletMembersSheet`) opens from "Chia sẻ" / "Thành viên"
 | `sharedWallets.role.editor` | Ghi chép | Can record | wallet-member-copy.ts:10 | Glossary. Also the invite form's role option title |
 | `sharedWallets.role.viewer` | Chỉ xem | View only | wallet-member-copy.ts:11 | Glossary |
 | `sharedWallets.member.statusPending` | ${role} · Chờ trả lời | {{role}} · Awaiting reply | wallet-member-copy.ts:22 | VI "{{role}} · Chờ trả lời" |
+| `sharedWallets.member.statusAccountPending` | ${role} · Chờ tạo tài khoản | {{role}} · Awaiting sign-up | wallet-member-copy.ts:24 | VI "{{role}} · Chờ tạo tài khoản". Invited by email, no account yet (glossary). Added after the inventory |
+| `sharedWallets.invitee.newAccount` | Chưa có tài khoản. Lời mời sẽ gửi qua email để tạo tài khoản. | No account yet. The invitation goes by email, with a link to create one. | wallet-member-copy.ts:33 | Lookup row under the invite field (InviteeLookupRow.tsx:56), email with no account. Added after the inventory |
+| `sharedWallets.members.noOthers` | Chưa có ai khác trong ví. | No one else in this wallet yet. | wallet-member-copy.ts:36 | Under the owner's row in the members sheet (WalletMembersSheet.tsx:128). Added after the inventory |
 | `sharedWallets.invite.error.noAccount` | Không có tài khoản nào với email hoặc tên đăng nhập này. | No account has this email or username. | wallet-member-copy.ts:26 | Also the `WALLET_MEMBER_USER_NOT_FOUND` copy (line 31) and InviteeLookupRow.tsx:48 |
 | `sharedWallets.invite.error.memberExists` | Người này đã ở trong ví hoặc chưa trả lời lời mời. | This person is already in the wallet or has an invitation waiting. | wallet-member-copy.ts:32 | `WALLET_MEMBER_EXISTS` |
 | `sharedWallets.invite.error.limit` | Ví đã đủ 10 người. | This wallet already has {{max}} people. | wallet-member-copy.ts:33 | `WALLET_MEMBER_LIMIT`. VI "Ví đã đủ {{max}} người."; `{{max}}` = `WALLET_MEMBER_LIMIT` (10, BR-02), not hardcoded |
@@ -302,7 +306,7 @@ refactor: today the role-change title, message and button interpolate `nextRole(
 | `sharedWallets.action.toViewer` / `sharedWallets.action.toEditor` | Đổi sang ${ROLE_LABEL[nextRole]} | Make view only / Allow recording | WalletMemberRow.tsx:55 | Popover menu item; one key per target role (see the dialogs refactor note) |
 | `sharedWallets.action.revokeInvitation` | Thu hồi lời mời | Withdraw invitation | WalletMemberRow.tsx:61 | Menu item, pending member |
 | `sharedWallets.action.removeMember` | Xóa khỏi ví | Remove from wallet | WalletMemberRow.tsx:61 | Menu item, destructive |
-| `sharedWallets.member.nameSelf` | (bạn) | {{name}} <0>(you)</0> | WalletMemberRow.tsx:76 | VI "{{name}} <0>(bạn)</0>". refactor: name + styled suffix → one key rendered with `<Trans>` (the suffix has its own style) |
+| `sharedWallets.member.nameSelf` | (bạn) | {{name}}<0> (you)</0> | WalletMemberRow.tsx:76 | VI "{{name}}<0> (bạn)</0>" (the space is inside the styled suffix, as today). refactor: name + styled suffix → one key rendered with `<Trans>` (the suffix has its own style) |
 | `common.status.awaitingReply` | Chờ trả lời | (common) | WalletMemberRow.tsx:80 | Line under a pending member's name |
 | `sharedWallets.member.roleA11y` | ${ROLE_LABEL[member.role]}. Tùy chọn cho ${member.name} | {{role}}. Options for {{name}} | WalletMemberRow.tsx:92 | a11y of the role pill (opens the menu) |
 

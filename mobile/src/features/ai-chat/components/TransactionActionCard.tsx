@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import Animated from "react-native-reanimated";
 
 import { entrance } from "@/components/motion/motion-tokens";
@@ -90,6 +91,7 @@ export function TransactionActionCard({
 }: TransactionActionCardProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const { payload } = action;
   const isIncome = payload.type === "income";
   const isTransfer = payload.type === "transfer";
@@ -156,7 +158,7 @@ export function TransactionActionCard({
       {edited ? (
         <Pressable style={styles.editedBadge} onPress={onPressHistory} disabled={!onPressHistory}>
           <EditIcon size={12} color={colors.lavender} />
-          <Text style={styles.editedLabel}>Đã sửa</Text>
+          <Text style={styles.editedLabel}>{t("chat.proposal.editedBadge")}</Text>
         </Pressable>
       ) : null}
 
@@ -234,13 +236,13 @@ export function TransactionActionCard({
           ) : null}
           {walletRequired ? (
             <Text testID={`txt-wallet-required-${testIDSuffix}`} style={styles.walletRequired}>
-              {onCreateWallet ? NO_VND_WALLET_HINT : WALLET_REQUIRED_MESSAGE}
+              {t(onCreateWallet ? NO_VND_WALLET_HINT : WALLET_REQUIRED_MESSAGE)}
             </Text>
           ) : null}
           <View style={styles.actionRow}>
             {walletRequired && onCreateWallet ? (
               <PillButton
-                label="Tạo ví VND"
+                label={t("chat.proposal.createVndWallet")}
                 icon={<WalletIcon size={16} color={colors.onGreen} />}
                 onPress={onCreateWallet}
                 style={styles.confirmButton}
@@ -249,7 +251,7 @@ export function TransactionActionCard({
             ) : (
               <PillButton
                 // A possible duplicate saves just the same, but says so (BR-17).
-                label={action.possible_duplicate ? "Vẫn lưu" : "Lưu"}
+                label={action.possible_duplicate ? t("common.action.saveAnyway") : t("common.action.save")}
                 onPress={onConfirm}
                 loading={saving}
                 style={styles.confirmButton}

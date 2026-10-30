@@ -9,7 +9,6 @@ import { Screen } from "@/components/shared/Screen";
 import { closeParkedSwipeRow } from "@/components/shared/use-swipe-actions";
 import { ChatModeBackdrop } from "@/features/ai-chat/components/ChatModeBackdrop";
 import { ChatModeHeader } from "@/features/ai-chat/components/ChatModeHeader";
-import { ChatModePicker } from "@/features/ai-chat/components/ChatModePicker";
 import { ChatOverlays } from "@/features/ai-chat/components/ChatOverlays";
 import { ChatSearchBar } from "@/features/ai-chat/components/ChatSearchBar";
 import { ChatSearchResults } from "@/features/ai-chat/components/ChatSearchResults";
@@ -49,7 +48,6 @@ export default function AiChatScreen() {
   // Not persisted — see chat-mode.ts.
   const mode = useChatModeStore((s) => s.mode);
   const setMode = useChatModeStore((s) => s.setMode);
-  const [modePickerOpen, setModePickerOpen] = useState(false);
   // The pane on screen when the tab first mounts just shows; a switch fades in.
   const firstRender = useRef(true);
   useEffect(() => {
@@ -139,11 +137,12 @@ export default function AiChatScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusMessageId, focusedAt]);
 
-  // "Lập ngân sách" opens the wizard at once; the mode lasts while it is open.
+  // "Lập ngân sách" opens the wizard at once (keyboard down first: it covers
+  // the composer); the mode lasts while it is open.
   const handleSelectMode = useLatestCallback((next: ChatMode) => {
+    if (next === mode && next !== "budget") return;
     setMode(next);
-    setModePickerOpen(false);
-    if (next === "budget") overlays.openBudgetWizard(null);
+    if (next === "budget") dismissKeyboardThen(() => overlays.openBudgetWizard(null))();
   });
   // Never sends: the carried question lands in the input for the User to send.
   const handleSwitchToRecording = useLatestCallback((prefill?: string) => {
@@ -158,8 +157,6 @@ export default function AiChatScreen() {
     if (mode === "budget") setMode("transaction");
   });
 
-  const openModePicker = useMemo(() => dismissKeyboardThen(() => setModePickerOpen(true)), []);
-  const closeModePicker = useCallback(() => setModePickerOpen(false), []);
   const clearInputFocusRequest = useCallback(() => setFocusRecordingInput(false), []);
   const openHistory = useMemo(() => dismissKeyboardThen(overlays.openHistory), [overlays.openHistory]);
   const openBudgetWizard = useMemo(() => dismissKeyboardThen(overlays.openBudgetWizard), [overlays.openBudgetWizard]);
@@ -203,7 +200,7 @@ export default function AiChatScreen() {
         ) : (
           <ChatModeHeader
             mode={mode}
-            onPressMode={openModePicker}
+            onSelectMode={handleSelectMode}
             onPressSearch={search.openSearch}
             onOpenManualEntry={openManualEntry}
           />
@@ -260,8 +257,6 @@ export default function AiChatScreen() {
           ) : null}
         </Animated.View>
       </View>
-
-      <ChatModePicker visible={modePickerOpen} mode={mode} onClose={closeModePicker} onSelect={handleSelectMode} />
 
       <ChatOverlays
         walletById={walletById}

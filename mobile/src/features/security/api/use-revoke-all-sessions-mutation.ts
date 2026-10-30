@@ -4,17 +4,19 @@ import { isAxiosError } from "axios";
 import { apiClient, unwrap, type ApiEnvelope } from "@/lib/axios";
 import { isNetworkError } from "@/lib/api-envelope";
 import { HTTP_STATUS } from "@/lib/constants";
+import { i18n } from "@/lib/i18n";
 import { useSessionStore } from "@/stores/session-store";
 import { useToastStore } from "@/stores/toast-store";
 import { useAccountRegistryStore } from "@/features/accounts/account-registry-store";
 import { revokeSwitchTokenQuietly } from "@/features/accounts/api/account-switch-requests";
 import { RevokeAllSessionsResponse } from "@/features/security/types";
 
-// Spec US-08 / S-ASW-61 / S-ASW-62 copy.
+// Spec US-08 / S-ASW-61 / S-ASW-62 copy, as keys: read in the language
+// in use when the toast shows.
 export const REVOKE_ALL_COPY = {
-  success: "Đã đăng xuất mọi thiết bị khác.",
-  offline: "Cần kết nối mạng để đăng xuất mọi thiết bị.",
-  failed: "Chưa đăng xuất được mọi thiết bị. Thử lại sau.",
+  success: "security.revokeAll.success",
+  offline: "security.revokeAll.offline",
+  failed: "security.revokeAll.failed",
 } as const;
 
 /**
@@ -39,13 +41,13 @@ export function useRevokeAllSessionsMutation() {
         .getState()
         .upsert(data.user, { protectedUserIds: [data.user.id] })
         .catch(() => {});
-      useToastStore.getState().show(REVOKE_ALL_COPY.success, "info");
+      useToastStore.getState().show(i18n.t(REVOKE_ALL_COPY.success), "info");
     },
     onError: (error) => {
       // 401: the session itself was refused — apiClient's interceptor has
       // already run the existing session-ended handling.
       if (isAxiosError(error) && error.response?.status === HTTP_STATUS.unauthorized) return;
-      useToastStore.getState().show(isNetworkError(error) ? REVOKE_ALL_COPY.offline : REVOKE_ALL_COPY.failed, "warning");
+      useToastStore.getState().show(i18n.t(isNetworkError(error) ? REVOKE_ALL_COPY.offline : REVOKE_ALL_COPY.failed), "warning");
     },
   });
 }

@@ -1,5 +1,6 @@
 import { Pressable, StyleProp, Text, View, ViewStyle } from "react-native";
 import MapView, { Marker } from "react-native-maps";
+import { useTranslation } from "react-i18next";
 
 import { MapPinIcon } from "@/components/ui/Icon";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
@@ -24,6 +25,7 @@ const ZOOM_DELTA = 0.004;
 // Callers remount it (`key`) for a new fix: the region is only the initial one,
 // so a pin the User moves never yanks the camera after it.
 export function LocationMap({ coords, onMove, pannable = false, style }: LocationMapProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
 
@@ -32,7 +34,7 @@ export function LocationMap({ coords, onMove, pannable = false, style }: Locatio
       <Pressable style={[styles.fallback, style]} onPress={() => openInGoogleMaps(coords)}>
         <MapPinIcon size={28} color={colors.green} />
         <Text style={styles.fallbackCoords}>{formatCoordinates(coords)}</Text>
-        <Text style={styles.fallbackLink}>Mở trên Google Maps</Text>
+        <Text style={styles.fallbackLink}>{t("common.action.openInMaps")}</Text>
       </Pressable>
     );
   }

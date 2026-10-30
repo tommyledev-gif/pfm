@@ -1,56 +1,52 @@
-import { getErrorCode, getErrorMessage, isNetworkError } from "@/lib/api-envelope";
+import { errorText, getErrorCode, isNetworkError } from "@/lib/api-envelope";
 import { MAX_PASSWORD_BYTES, MIN_PASSWORD_LENGTH, PASSWORD_RESET_CODE_LENGTH } from "@/lib/constants";
+import { i18n, TranslationKey } from "@/lib/i18n";
 import { passwordLengthProblem } from "@/lib/password-rules";
 
-// Forgot password (specs/forgot-password §UI copy).
+// The code's lifetime and the rate limits' window (backend common.ResetCodeTTL,
+// PasswordResetRequest/ConfirmRateLimitWindow): not sent with the answer, so
+// said from here.
+const RESET_WINDOW_MINUTES = 15;
+
+// Forgot password (specs/forgot-password §UI copy). Keys, passed to t() where
+// shown; codePlaceholder takes {{length}}, passwordPlaceholder {{count}}.
 export const RESET_COPY = {
-  title: "Đặt lại mật khẩu",
-  requestSub: "Mã đặt lại gửi tới email của tài khoản.",
-  identifierLabel: "Email hoặc tên đăng nhập",
-  identifierPlaceholder: "ten@email.com",
-  sendCode: "Gửi mã",
-  codeLabel: "Mã đặt lại",
-  codePlaceholder: "6 số trong email",
-  passwordLabel: "Mật khẩu mới",
-  passwordPlaceholder: `Ít nhất ${MIN_PASSWORD_LENGTH} ký tự`,
-  confirmLabel: "Nhập lại mật khẩu mới",
-  showPassword: "Hiện mật khẩu",
-  hidePassword: "Ẩn mật khẩu",
-  submit: "Đặt lại mật khẩu",
-  resend: "Gửi lại mã",
-  back: "Quay lại",
-  done: "Đã đặt lại mật khẩu",
-} as const;
+  title: "auth.resetPassword.title",
+  requestSub: "auth.resetPassword.requestSub",
+  identifierLabel: "common.field.identifier",
+  identifierPlaceholder: "auth.emailPlaceholder",
+  sendCode: "auth.resetPassword.sendCode",
+  codeLabel: "auth.resetPassword.codeLabel",
+  codePlaceholder: "auth.resetPassword.codePlaceholder",
+  passwordLabel: "common.field.newPassword",
+  passwordPlaceholder: "auth.resetPassword.passwordPlaceholder",
+  confirmLabel: "common.field.confirmNewPassword",
+  showPassword: "common.action.showPassword",
+  hidePassword: "common.action.hidePassword",
+  submit: "auth.resetPassword.submit",
+  resend: "auth.resetPassword.resend",
+  back: "common.action.back",
+  done: "auth.resetPassword.done",
+} as const satisfies Record<string, TranslationKey>;
 
 /** Step 2's line under the title. Never says whether the account exists. */
 export function confirmSub(identifier: string): string {
-  return `Nếu ${identifier} có tài khoản, mã ${PASSWORD_RESET_CODE_LENGTH} số đã gửi tới email của tài khoản đó. Mã dùng được trong 15 phút.`;
+  return i18n.t("auth.resetPassword.confirmSub", {
+    identifier,
+    length: PASSWORD_RESET_CODE_LENGTH,
+    minutes: RESET_WINDOW_MINUTES,
+  });
 }
 
 export function resendIn(seconds: number): string {
-  return `Gửi lại mã sau ${seconds} giây`;
+  return i18n.t("auth.resetPassword.resendIn", { count: seconds });
 }
-
-const FIELD_COPY = {
-  identifierMissing: "Nhập email hoặc tên đăng nhập.",
-  codeMissing: `Nhập mã ${PASSWORD_RESET_CODE_LENGTH} số.`,
-  codeInvalid: "Mã không đúng hoặc đã hết hạn.",
-  passwordShort: `Mật khẩu cần ít nhất ${MIN_PASSWORD_LENGTH} ký tự.`,
-  passwordLong: `Mật khẩu tối đa ${MAX_PASSWORD_BYTES} ký tự không dấu.`,
-  mismatch: "Hai mật khẩu chưa khớp.",
-} as const;
-
-const FORM_COPY = {
-  sendFailed: "Chưa gửi được mã. Thử lại.",
-  sendLimited: "Đã gửi quá nhiều mã. Thử lại sau 15 phút.",
-  resetFailed: "Chưa đặt lại được mật khẩu. Thử lại.",
-  resetLimited: "Thử quá nhiều lần. Thử lại sau 15 phút.",
-} as const;
 
 const CODE_PATTERN = new RegExp(`^[0-9]{${PASSWORD_RESET_CODE_LENGTH}}$`);
 
+// Sentences are read when the problem is found, in the language of the moment.
 export function identifierProblem(identifier: string): string | undefined {
-  return identifier ? undefined : FIELD_COPY.identifierMissing;
+  return identifier ? undefined : i18n.t("common.validation.enterIdentifier");
 }
 
 export interface ConfirmErrors {
@@ -60,39 +56,45 @@ export interface ConfirmErrors {
   form?: string;
 }
 
+function passwordTooLong(): string {
+  return i18n.t("auth.password.tooLong", { count: MAX_PASSWORD_BYTES });
+}
+
 function passwordProblem(password: string): string | undefined {
   const problem = passwordLengthProblem(password);
-  if (problem === "short") return FIELD_COPY.passwordShort;
-  if (problem === "long") return FIELD_COPY.passwordLong;
+  if (problem === "short") return i18n.t("auth.password.tooShort", { count: MIN_PASSWORD_LENGTH });
+  if (problem === "long") return passwordTooLong();
   return undefined;
 }
 
 /** Every field's problem at once, checked before anything is sent. */
 export function validateConfirm(code: string, password: string, confirm: string): ConfirmErrors {
   return {
-    code: CODE_PATTERN.test(code) ? undefined : FIELD_COPY.codeMissing,
+    code: CODE_PATTERN.test(code) ? undefined : i18n.t("auth.resetPassword.codeMissing", { length: PASSWORD_RESET_CODE_LENGTH }),
     password: passwordProblem(password),
-    confirm: password === confirm ? undefined : FIELD_COPY.mismatch,
+    confirm: password === confirm ? undefined : i18n.t("auth.password.mismatch"),
   };
 }
 
 /** Where a failed confirm's sentence goes. Never the server's own message. */
 export function confirmErrorsFor(error: unknown, password: string): ConfirmErrors {
-  if (isNetworkError(error)) return { form: getErrorMessage(error, FORM_COPY.resetFailed) };
+  if (isNetworkError(error)) return { form: errorText(error, "auth.resetPassword.resetFailed") };
   switch (getErrorCode(error)) {
     case "RESET_CODE_INVALID":
-      return { code: FIELD_COPY.codeInvalid };
+      return { code: i18n.t("auth.resetPassword.codeInvalid") };
     case "WEAK_PASSWORD":
-      return { password: passwordProblem(password) ?? FIELD_COPY.passwordLong };
+      return { password: passwordProblem(password) ?? passwordTooLong() };
     case "RATE_LIMITED":
-      return { form: FORM_COPY.resetLimited };
+      return { form: i18n.t("errors.tooManyAttempts", { minutes: RESET_WINDOW_MINUTES }) };
     default:
-      return { form: FORM_COPY.resetFailed };
+      return { form: i18n.t("auth.resetPassword.resetFailed") };
   }
 }
 
 /** What a failed "Gửi mã" / "Gửi lại mã" says. */
 export function requestErrorMessage(error: unknown): string {
-  if (isNetworkError(error)) return getErrorMessage(error, FORM_COPY.sendFailed);
-  return getErrorCode(error) === "RATE_LIMITED" ? FORM_COPY.sendLimited : FORM_COPY.sendFailed;
+  if (isNetworkError(error)) return errorText(error, "auth.resetPassword.sendFailed");
+  return getErrorCode(error) === "RATE_LIMITED"
+    ? i18n.t("auth.resetPassword.sendLimited", { minutes: RESET_WINDOW_MINUTES })
+    : i18n.t("auth.resetPassword.sendFailed");
 }

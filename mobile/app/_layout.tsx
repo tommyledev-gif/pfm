@@ -1,3 +1,5 @@
+// First: `t` must work before any other module (or screen) asks for text.
+import "@/lib/i18n";
 import { useEffect, useMemo } from "react";
 import { View } from "react-native";
 import { QueryClientProvider } from "@tanstack/react-query";

@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { CATEGORY_OPTION_ROW_HEIGHT, CategoryOptionRow } from "@/components/shared/CategoryOptionRow";
 import { CheckIcon, PlusIcon } from "@/components/ui/Icon";
 import { SearchField } from "@/components/ui/SearchField";
+import { categoryLabel } from "@/features/categories/category-label";
 import { CategoryQuickCreateForm } from "@/features/categories/components/CategoryQuickCreateForm";
 import { Category } from "@/features/categories/types";
 import { colorForCategory } from "@/lib/category-color";
@@ -45,14 +47,22 @@ export function CategoryPickerList({
 }: CategoryPickerListProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const [search, setSearch] = useState("");
 
-  const visible = useMemo(() => categories.filter((c) => matchesSearch(c.name, search)), [categories, search]);
+  // Searched by the name on screen: a default category reads in the app language.
+  const visible = useMemo(
+    () => categories.filter((c) => matchesSearch(categoryLabel(c), search)),
+    [categories, search, t],
+  );
   const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
   const query = search.trim();
   // A search that found nothing exact is most likely the name of the
   // category the User is about to wish existed — offer exactly that.
-  const createLabel = query && !visible.some((c) => sameName(c.name, query)) ? `Tạo “${query}”` : "Tạo danh mục mới";
+  const createLabel =
+    query && !visible.some((c) => sameName(categoryLabel(c), query))
+      ? t("categories.picker.createNamed", { name: query })
+      : t("categories.picker.createNew");
 
   if (creating) {
     return (
@@ -72,7 +82,7 @@ export function CategoryPickerList({
       <SearchField
         value={search}
         onChangeText={setSearch}
-        placeholder="Tìm danh mục"
+        placeholder={t("common.field.searchCategories")}
         testID="input-category-picker-search"
       />
 
@@ -100,7 +110,9 @@ export function CategoryPickerList({
         </Pressable>
 
         {visible.length === 0 ? (
-          <Text style={styles.empty}>{query ? "Không có danh mục nào khớp." : "Chưa có danh mục nào."}</Text>
+          <Text style={styles.empty}>
+            {query ? t("common.empty.noMatchingCategories") : t("categories.picker.empty")}
+          </Text>
         ) : (
           visible.map((c) => {
             const active = selected.has(c.id);
@@ -108,7 +120,7 @@ export function CategoryPickerList({
               <CategoryOptionRow
                 key={c.id}
                 testID="row-category-picker"
-                name={c.name}
+                name={categoryLabel(c)}
                 color={colorForCategory(c.id)}
                 icon={c.icon}
                 iconUrl={c.icon_url}

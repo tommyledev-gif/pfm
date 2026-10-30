@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { RankedList } from "@/features/analytics/components/RankedList";
 import { AnalyticsTxRow } from "@/features/analytics/types";
@@ -15,10 +16,11 @@ interface InlineTransactionsProps {
 // a few (backend attachInlineRows): "tiêu hôm nay" then says what the money
 // went on without a second question. Same rows as a ranked-list answer.
 export function InlineTransactions({ rows, currency, colorFor }: InlineTransactionsProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   return (
     <View testID="list-analytics-inline-tx" style={styles.wrap}>
-      <Text style={styles.heading}>Giao dịch</Text>
+      <Text style={styles.heading}>{t("analytics.inline.heading")}</Text>
       <RankedList rows={rows} currency={currency} colorFor={colorFor} />
     </View>
   );

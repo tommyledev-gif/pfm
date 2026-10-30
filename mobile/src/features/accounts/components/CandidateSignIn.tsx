@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { PillButton } from "@/components/ui/PillButton";
 import { createStyles, spacing, typography } from "@/lib/theme";
@@ -14,9 +15,9 @@ const ACTION_HEIGHT = 56;
 const ACTION_RADIUS = 16;
 
 const COPY = {
-  signIn: "Đăng nhập",
-  awaiting: "Đăng nhập được sau khi admin duyệt.",
-  approved: "Mở email kích hoạt để đặt mật khẩu, rồi đăng nhập.",
+  signIn: "common.action.signIn",
+  awaiting: "accounts.candidate.awaitingHint",
+  approved: "accounts.candidate.approvedHint",
 } as const;
 
 interface CandidateSignInProps {
@@ -38,6 +39,7 @@ interface CandidateSignInProps {
  * Remounted per person (the caller keys it), so `refused` never carries over.
  */
 export function CandidateSignIn({ candidate, onDone, onRemove }: CandidateSignInProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const [switching, setSwitching] = useState(false);
   // switchToAccount can find the token refused even though it had not
@@ -63,12 +65,12 @@ export function CandidateSignIn({ candidate, onDone, onRemove }: CandidateSignIn
   return (
     <View style={styles.column}>
       <CandidateCard candidate={candidate} />
-      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
+      {hint ? <Text style={styles.hint}>{t(hint)}</Text> : null}
 
       <View style={styles.action}>
         {candidate.kind === "saved" && oneTap ? (
           <PillButton
-            label={COPY.signIn}
+            label={t(COPY.signIn)}
             loading={switching}
             onPress={() => continueAs(candidate.account.userId)}
             style={styles.signIn}
@@ -88,7 +90,7 @@ export function CandidateSignIn({ candidate, onDone, onRemove }: CandidateSignIn
 
       {onRemove ? (
         <Pressable onPress={onRemove} hitSlop={8} accessibilityRole="button" testID="btn-login-remove-candidate">
-          <Text style={styles.remove}>{REMOVE_ACCOUNT_COPY.action(candidateName(candidate))}</Text>
+          <Text style={styles.remove}>{t(REMOVE_ACCOUNT_COPY.action, { name: candidateName(candidate) })}</Text>
         </Pressable>
       ) : null}
     </View>

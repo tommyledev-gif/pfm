@@ -1,4 +1,5 @@
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { ListRow, ListSection } from "@/components/ui/grouped-list";
 import { ArrowRightGlyph } from "@/components/ui/grouped-list/list-icons";
@@ -61,12 +62,13 @@ export function EditTransactionChoices({
   otherCurrenciesHidden,
 }: EditTransactionChoicesProps) {
   const styles = useStyles();
+  const { t } = useTranslation();
   const isTransfer = type === "transfer";
 
   return (
     <>
       <View style={styles.fieldGroup}>
-        <Text style={styles.label}>Loại</Text>
+        <Text style={styles.label}>{t("common.field.type")}</Text>
         <TransactionTypeChips
           type={type}
           locked={typeLocked}
@@ -74,7 +76,7 @@ export function EditTransactionChoices({
           onSelect={onChangeType}
           onClearItems={onClearItems}
         />
-        {typeLocked ? <Text style={styles.hint}>Không đổi được loại của giao dịch đã lưu</Text> : null}
+        {typeLocked ? <Text style={styles.hint}>{t("chat.editTransaction.typeLocked")}</Text> : null}
       </View>
 
       {/* One inset group, as the manual form: "Ví", or "Từ ví" over "Đến ví". */}
@@ -86,38 +88,43 @@ export function EditTransactionChoices({
               {noVndWallet ? (
                 <>
                   <Text testID="txt-edit-no-vnd-wallet" style={styles.hint}>
-                    {NO_VND_WALLET_HINT}
+                    {t(NO_VND_WALLET_HINT)}
                   </Text>
                   <Pressable onPress={onCreateVndWallet} hitSlop={8} testID="btn-edit-create-vnd-wallet">
-                    <Text style={styles.createWalletLink}>Tạo ví VND</Text>
+                    <Text style={styles.createWalletLink}>{t("chat.proposal.createVndWallet")}</Text>
                   </Pressable>
                 </>
               ) : null}
-              {otherCurrenciesHidden ? <Text style={styles.hint}>Chỉ hiện ví cùng loại tiền</Text> : null}
+              {otherCurrenciesHidden ? <Text style={styles.hint}>{t("chat.editTransaction.sameCurrencyOnly")}</Text> : null}
             </View>
           ) : undefined
         }
       >
         <WalletSelectTile
-          label={isTransfer ? "Từ ví" : "Ví"}
+          label={isTransfer ? t("common.field.fromWallet") : t("common.field.wallet")}
           wallet={wallet}
-          placeholder="Chọn"
+          placeholder={t("common.action.choose")}
           onPress={onOpenWallets}
           locked={walletLocked}
           testID="field-edit-wallet"
         />
         {!isTransfer ? null : destinationCount > 0 || destination ? (
           <WalletSelectTile
-            label="Đến ví"
+            label={t("common.field.toWallet")}
             wallet={destination}
-            placeholder="Chọn"
+            placeholder={t("common.action.choose")}
             onPress={onOpenDestinations}
             locked={destinationLocked}
             destination
             testID="field-edit-to-wallet"
           />
         ) : (
-          <ListRow title="Đến ví" subtitle="Cần thêm một ví VND khác để chuyển khoản." icon={ArrowRightGlyph} disabled />
+          <ListRow
+            title={t("common.field.toWallet")}
+            subtitle={t("chat.editTransaction.needsSecondVndWallet")}
+            icon={ArrowRightGlyph}
+            disabled
+          />
         )}
       </ListSection>
     </>

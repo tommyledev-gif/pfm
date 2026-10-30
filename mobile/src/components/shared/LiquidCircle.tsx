@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, AppState, AppStateStatus, Easing, Text, View } from "react-native";
-import { useIsFocused } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import Svg, { Path } from "react-native-svg";
 
 import { withAlpha } from "@/lib/color";
@@ -109,49 +109,65 @@ export function LiquidCircle({
   // The wave only runs while it can be seen. Home stays mounted behind every
   // other tab, so an unconditional loop kept a native animation ticking for
   // the whole session.
+  // ⚠️ Focus is followed through the navigator's focus/blur events, not
+  // useIsFocused: that re-rendered the ring (its SVG and the auto-fitted
+  // figure) on every tab switch, both leaving Home and coming back to it,
+  // in the very frames the tab slide and the nav ball needed.
   const shift = useRef(new Animated.Value(0)).current;
-  const focused = useIsFocused();
+  const navigation = useNavigation();
   const foreground = useAppForeground();
-  const running = focused && foreground;
 
   useEffect(() => {
-    if (!running) return;
-    let cancelled = false;
-    let current: Animated.CompositeAnimation | null = null;
+    let run: { cancelled: boolean; current: Animated.CompositeAnimation | null } | null = null;
     const cycle = (toValue: number, duration: number) =>
       Animated.timing(shift, { toValue, duration, easing: Easing.linear, useNativeDriver: true });
-
-    const loopFromZero = () => {
-      shift.setValue(0);
-      current = Animated.loop(cycle(-hump, WAVE_LOOP_MS));
-      current.start();
+    const stop = () => {
+      if (!run) return;
+      run.cancelled = true;
+      run.current?.stop();
+      run = null;
     };
+    const start = () => {
+      if (run) return;
+      const current = { cancelled: false, current: null as Animated.CompositeAnimation | null };
+      run = current;
+      const loopFromZero = () => {
+        shift.setValue(0);
+        current.current = Animated.loop(cycle(-hump, WAVE_LOOP_MS));
+        current.current.start();
+      };
 
-    // ⚠️ Resumed from where it paused, by finishing that cycle first. A
-    // native loop restarts every iteration from the value it STARTED at, so
-    // looping straight from a paused offset would jump back there once per
-    // cycle — a visible seam. Restarting at 0 instead would jump the surface
-    // at the moment the screen comes back. Finishing the partial cycle and
-    // then looping whole cycles from 0 avoids both: −hump and 0 draw the same.
-    shift.stopAnimation((stoppedAt) => {
-      if (cancelled) return;
-      const done = (((-stoppedAt / hump) % 1) + 1) % 1;
-      if (!Number.isFinite(done) || done === 0) {
-        loopFromZero();
-        return;
-      }
-      shift.setValue(-done * hump);
-      current = cycle(-hump, WAVE_LOOP_MS * (1 - done));
-      current.start(({ finished }) => {
-        if (finished && !cancelled) loopFromZero();
+      // ⚠️ Resumed from where it paused, by finishing that cycle first. A
+      // native loop restarts every iteration from the value it STARTED at, so
+      // looping straight from a paused offset would jump back there once per
+      // cycle — a visible seam. Restarting at 0 instead would jump the surface
+      // at the moment the screen comes back. Finishing the partial cycle and
+      // then looping whole cycles from 0 avoids both: −hump and 0 draw the same.
+      shift.stopAnimation((stoppedAt) => {
+        if (current.cancelled) return;
+        const done = (((-stoppedAt / hump) % 1) + 1) % 1;
+        if (!Number.isFinite(done) || done === 0) {
+          loopFromZero();
+          return;
+        }
+        shift.setValue(-done * hump);
+        current.current = cycle(-hump, WAVE_LOOP_MS * (1 - done));
+        current.current.start(({ finished }) => {
+          if (finished && !current.cancelled) loopFromZero();
+        });
       });
-    });
-
-    return () => {
-      cancelled = true;
-      current?.stop();
     };
-  }, [running, shift, hump]);
+
+    const sync = () => (foreground && navigation.isFocused() ? start() : stop());
+    sync();
+    const offFocus = navigation.addListener("focus", sync);
+    const offBlur = navigation.addListener("blur", sync);
+    return () => {
+      offFocus();
+      offBlur();
+      stop();
+    };
+  }, [foreground, navigation, shift, hump]);
 
   return (
     <View

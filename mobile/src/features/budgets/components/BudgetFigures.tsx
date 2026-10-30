@@ -1,4 +1,5 @@
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { formatCurrency } from "@/lib/currency";
@@ -26,6 +27,7 @@ interface BudgetFiguresProps {
  * never the short k / m / b form.
  */
 export function BudgetFigures({ spent, limit, currency, periodLabel }: BudgetFiguresProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const remaining = limit - spent;
@@ -36,15 +38,17 @@ export function BudgetFigures({ spent, limit, currency, periodLabel }: BudgetFig
   return (
     <View style={styles.box} testID="budget-figures">
       <View style={styles.headRow}>
-        <Text style={[styles.share, { color: tone }]}>Đã dùng {formatPercent(ratio * 100)} hạn mức</Text>
+        <Text style={[styles.share, { color: tone }]}>
+          {t("budgets.figures.usedShare", { percent: formatPercent(ratio * 100) })}
+        </Text>
         {periodLabel ? <Text style={styles.period}>{periodLabel}</Text> : null}
       </View>
       <ProgressBar progress={ratio} color={tone} height={8} />
       <View style={styles.cells}>
-        <Figure label="Đã chi" value={formatCurrency(spent, currency)} />
-        <Figure label="Hạn mức" value={formatCurrency(limit, currency)} />
+        <Figure label={t("common.budget.spent")} value={formatCurrency(spent, currency)} />
+        <Figure label={t("budgets.figures.limit")} value={formatCurrency(limit, currency)} />
         <Figure
-          label={over ? "Vượt" : "Còn lại"}
+          label={over ? t("common.budget.over") : t("common.budget.left")}
           value={formatCurrency(Math.abs(remaining), currency)}
           color={over ? colors.peach : colors.textPrimary}
         />

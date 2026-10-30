@@ -1,4 +1,5 @@
 import { Modal, Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { PillButton } from "@/components/ui/PillButton";
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
@@ -26,21 +27,24 @@ interface WizardBackConfirmDialogProps {
  */
 export function WizardBackConfirmDialog({ visible, onKeep, onDiscard, onCancel }: WizardBackConfirmDialogProps) {
   const styles = useStyles();
+  const { t } = useTranslation();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <Pressable style={styles.backdrop} onPress={onCancel}>
         <Pressable onPress={() => {}} style={styles.card} testID="dialog-wizard-back-confirm">
-          <Text style={styles.title}>Giữ lại các danh mục?</Text>
-          <Text style={styles.message}>
-            Bạn sắp đổi câu trả lời trước đó. Các danh mục bạn đã chọn sẽ được giữ nguyên, còn số tiền sẽ được tính lại
-            theo câu trả lời mới.
-          </Text>
+          <Text style={styles.title}>{t("budgetWizard.backConfirm.title")}</Text>
+          <Text style={styles.message}>{t("budgetWizard.backConfirm.body")}</Text>
           <View style={styles.actions}>
-            <PillButton label="Giữ lại" onPress={onKeep} style={styles.action} />
-            <PillButton label="Làm lại từ đầu" variant="outline" onPress={onDiscard} style={styles.action} />
+            <PillButton label={t("budgetWizard.backConfirm.keep")} onPress={onKeep} style={styles.action} />
+            <PillButton
+              label={t("budgetWizard.backConfirm.discard")}
+              variant="outline"
+              onPress={onDiscard}
+              style={styles.action}
+            />
           </View>
           <Pressable onPress={onCancel} hitSlop={8} style={styles.cancelRow}>
-            <Text style={styles.cancelLabel}>Ở lại màn hình này</Text>
+            <Text style={styles.cancelLabel}>{t("budgetWizard.backConfirm.stay")}</Text>
           </Pressable>
         </Pressable>
       </Pressable>

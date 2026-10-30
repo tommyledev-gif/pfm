@@ -1,4 +1,5 @@
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { colorForCategory } from "@/lib/category-color";
@@ -22,12 +23,13 @@ interface CategorySelectFieldProps {
 // visible at a glance (the chip row hid it as soon as it scrolled past), and
 // the underlined link is the one fixed place to tap to change it, whether
 // something is selected yet or not.
-export function CategorySelectField({ categories, onPress, placeholder = "Chưa chọn danh mục" }: CategorySelectFieldProps) {
+export function CategorySelectField({ categories, onPress, placeholder }: CategorySelectFieldProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   return (
     <View style={styles.box}>
       {categories.length === 0 ? (
-        <Text style={styles.placeholder}>{placeholder}</Text>
+        <Text style={styles.placeholder}>{placeholder ?? t("ui.categoryField.placeholder")}</Text>
       ) : (
         <View style={styles.selectedWrap}>
           {categories.map((c) => (
@@ -42,7 +44,7 @@ export function CategorySelectField({ categories, onPress, placeholder = "Chưa 
       )}
 
       <Pressable onPress={onPress} hitSlop={8} testID="btn-open-category-picker">
-        <Text style={styles.link}>{categories.length === 0 ? "Chọn danh mục" : "Đổi danh mục"}</Text>
+        <Text style={styles.link}>{categories.length === 0 ? t("common.action.chooseCategory") : t("ui.categoryField.change")}</Text>
       </Pressable>
     </View>
   );

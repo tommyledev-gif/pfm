@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Animated, StyleSheet } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { ListInlineButton, ListRow } from "@/components/ui/grouped-list";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { formatCurrency } from "@/lib/currency";
 import { useRequireOnline } from "@/lib/connectivity";
+import { TranslationKey } from "@/lib/i18n";
 import { radii, createStyles } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
 import { isOwnWallet } from "@/features/wallets/wallet-access";
@@ -14,11 +16,11 @@ import { usePendingWalletCount } from "@/features/wallets/components/PendingBala
 
 const AVATAR_SIZE = 40;
 
-const TYPE_LABEL: Record<Wallet["type"], string> = {
-  cash: "Tiền mặt",
-  bank: "Ngân hàng",
-  e_wallet: "Ví điện tử",
-  other: "Khác",
+const TYPE_LABEL_KEY: Record<Wallet["type"], TranslationKey> = {
+  cash: "common.walletType.cash",
+  bank: "common.walletType.bank",
+  e_wallet: "common.walletType.e_wallet",
+  other: "common.walletType.other",
 };
 
 interface WalletListItemProps {
@@ -39,6 +41,7 @@ interface WalletListItemProps {
  */
 export function WalletListItem({ wallet, faceColor, onPress, highlightOpacity }: WalletListItemProps) {
   const styles = useStyles();
+  const { t } = useTranslation();
   const requireOnline = useRequireOnline();
   const setDefault = useSetDefaultWalletMutation();
   const pendingCount = usePendingWalletCount(wallet.id);
@@ -48,16 +51,22 @@ export function WalletListItem({ wallet, faceColor, onPress, highlightOpacity }:
   const [confirmDefaultOpen, setConfirmDefaultOpen] = useState(false);
   const own = isOwnWallet(wallet);
 
-  const kind = own ? TYPE_LABEL[wallet.type] : `Ví chung của ${wallet.owner_name ?? "người khác"}`;
-  const shared = own && (wallet.member_count ?? 0) > 0 ? " · Ví chung" : "";
-  const pending = pendingCount > 0 ? ` · ${pendingCount} chưa đồng bộ` : "";
+  const kind = own
+    ? t(TYPE_LABEL_KEY[wallet.type])
+    : t("wallets.owner.sharedBy", { owner: wallet.owner_name ?? t("wallets.owner.unknown") });
+  const shared = own && (wallet.member_count ?? 0) > 0 ? t("common.label.sharedWallet") : null;
+  const pending = pendingCount > 0 ? t("wallets.list.pendingSync", { count: pendingCount }) : null;
+  // Each part is its own phrase; only the separator joins them.
+  const subtitle = [kind, shared, formatCurrency(wallet.balance, wallet.currency), pending]
+    .filter((part) => part !== null)
+    .join(" · ");
 
   return (
     <>
       <ListRow
         title={wallet.name}
-        subtitle={`${kind}${shared} · ${formatCurrency(wallet.balance, wallet.currency)}${pending}`}
-        value={wallet.is_default && own ? "Mặc định" : undefined}
+        subtitle={subtitle}
+        value={wallet.is_default && own ? t("common.label.default") : undefined}
         leading={
           <Avatar name={wallet.name} color={faceColor} size={AVATAR_SIZE} icon={wallet.icon} iconUrl={wallet.icon_url} />
         }
@@ -65,7 +74,7 @@ export function WalletListItem({ wallet, faceColor, onPress, highlightOpacity }:
         trailing={
           own && !wallet.is_default ? (
             <ListInlineButton
-              label="Đặt mặc định"
+              label={t("common.action.setDefault")}
               tone="default"
               onPress={() => requireOnline(() => setConfirmDefaultOpen(true))}
               disabled={setDefault.isPending}
@@ -82,9 +91,9 @@ export function WalletListItem({ wallet, faceColor, onPress, highlightOpacity }:
       <ConfirmDialog
         visible={confirmDefaultOpen}
         tone="default"
-        title="Đặt ví mặc định?"
-        message={`"${wallet.name}" sẽ trở thành ví mặc định của bạn.`}
-        confirmLabel="Đặt mặc định"
+        title={t("wallets.setDefault.confirm.title")}
+        message={t("wallets.setDefault.confirm.body", { wallet: wallet.name })}
+        confirmLabel={t("common.action.setDefault")}
         onCancel={() => setConfirmDefaultOpen(false)}
         onConfirm={() => {
           setConfirmDefaultOpen(false);

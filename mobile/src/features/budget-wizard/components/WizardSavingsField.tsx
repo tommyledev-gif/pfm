@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { AmountPromptModal } from "@/components/ui/AmountPromptModal";
 import {
@@ -38,12 +39,13 @@ export function WizardSavingsField({
   errorMessage,
 }: WizardSavingsFieldProps) {
   const styles = useStyles();
+  const { t } = useTranslation();
   const [promptOpen, setPromptOpen] = useState(false);
 
   return (
     <View style={styles.field}>
       <View style={styles.header}>
-        <Text style={styles.label}>Muốn để dành</Text>
+        <Text style={styles.label}>{t("budgetWizard.savings.label")}</Text>
         <Text style={styles.amount}>{formatCurrency(savings, currency)}</Text>
       </View>
 
@@ -58,7 +60,7 @@ export function WizardSavingsField({
               style={[styles.chip, active && styles.chipActive]}
             >
               <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>
-                {pct === 0 ? "Chưa" : `${pct}%`}
+                {pct === 0 ? t("budgetWizard.savings.none") : `${pct}%`}
               </Text>
             </Pressable>
           );
@@ -73,7 +75,7 @@ export function WizardSavingsField({
           style={[styles.chip, choice.kind === "amount" && styles.chipActive]}
         >
           <Text style={[styles.chipLabel, choice.kind === "amount" && styles.chipLabelActive]}>
-            Số khác
+            {t("budgetWizard.savings.custom")}
           </Text>
         </Pressable>
       </View>
@@ -83,14 +85,14 @@ export function WizardSavingsField({
           costs they have not measured, breaks the plan in week two — and an
           abandoned plan saves nothing at all. */}
       {choice.kind === "pct" && choice.pct === DEFAULT_SAVINGS_PCT ? (
-        <Text style={styles.hint}>Mức dễ giữ. Tháng sau dư thì tăng lên.</Text>
+        <Text style={styles.hint}>{t("budgetWizard.savings.defaultHint")}</Text>
       ) : null}
       {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
 
       <AmountPromptModal
         visible={promptOpen}
-        title="Muốn để dành bao nhiêu?"
-        hint="Không quá thu nhập"
+        title={t("budgetWizard.savings.promptTitle")}
+        hint={t("budgetWizard.savings.promptHint")}
         value={savings}
         max={income}
         step={roundStepXu(Math.max(income, 1))}

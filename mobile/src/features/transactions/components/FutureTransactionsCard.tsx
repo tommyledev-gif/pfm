@@ -1,6 +1,7 @@
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
-import { formatDateViShort } from "@/lib/format-date";
+import { formatDateGroupHeader } from "@/lib/format-date";
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
 import { Transaction } from "@/features/transactions/types";
 
@@ -20,6 +21,7 @@ interface FutureTransactionsCardProps {
  * and cost nothing until asked for.
  */
 export function FutureTransactionsCard({ transactions, onPress }: FutureTransactionsCardProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   if (transactions.length === 0) return null;
   const next = transactions[0];
@@ -27,9 +29,9 @@ export function FutureTransactionsCard({ transactions, onPress }: FutureTransact
   return (
     <Pressable style={styles.card} onPress={onPress} testID="btn-future-transactions">
       <View style={styles.textBlock}>
-        <Text style={styles.title}>{transactions.length} giao dịch sắp tới</Text>
+        <Text style={styles.title}>{t("transactions.future.count", { count: transactions.length })}</Text>
         <Text style={styles.subtitle} numberOfLines={1}>
-          Gần nhất: {formatDateViShort(next.occurred_at)} · {next.category_name}
+          {t("transactions.future.next", { date: formatDateGroupHeader(next.occurred_at), category: next.category_name })}
         </Text>
       </View>
       <Text style={styles.chevron}>›</Text>

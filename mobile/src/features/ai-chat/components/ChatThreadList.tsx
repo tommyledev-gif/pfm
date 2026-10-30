@@ -1,5 +1,6 @@
 import { RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, FlatList, FlatListProps, NativeScrollEvent, NativeSyntheticEvent, Pressable, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { ChevronDownIcon } from "@/components/ui/Icon";
 import { useChatThreadStyles } from "@/features/ai-chat/components/chat-thread-styles";
@@ -38,6 +39,7 @@ const THREAD_WINDOW_SIZE = 7;
 export function ChatThreadList({ listRef, style, reservedBottom = 0, contentContainerStyle, ...listProps }: ChatThreadListProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const chatThreadStyles = useChatThreadStyles();
   const [awayFromLatest, setAwayFromLatest] = useState(false);
   const opacity = useRef(new Animated.Value(0)).current;
@@ -85,7 +87,7 @@ export function ChatThreadList({ listRef, style, reservedBottom = 0, contentCont
         <Pressable
           testID="btn-chat-scroll-latest"
           accessibilityRole="button"
-          accessibilityLabel="Xem tin nhắn mới nhất"
+          accessibilityLabel={t("chat.thread.scrollToLatest.a11y")}
           style={styles.fab}
           onPress={() => listRef.current?.scrollToOffset({ offset: 0, animated: true })}
         >

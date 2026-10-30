@@ -1,4 +1,5 @@
 import { ActivityIndicator, Text } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { LateSkeleton } from "@/components/motion/SkeletonSwap";
 import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
@@ -24,7 +25,6 @@ interface TransactionsListStateProps {
 }
 
 const LIST_SKELETON_COUNT = 6;
-const ONLY_FUTURE_MESSAGE = "Chưa có giao dịch nào tính đến hôm nay.";
 
 interface TransactionsListEmptyProps extends TransactionsListStateProps {
   /** Date, categories or search narrow the list: "nothing matches", not "nothing yet". */
@@ -50,6 +50,7 @@ export function TransactionsListEmpty({
   onClearFilters,
   onSearch,
 }: TransactionsListEmptyProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   if (isWaitingForNetwork(query)) return <OfflinePlaceholder />;
   // Still loading a new filter: "nothing matches" would be a guess. Late, so
@@ -66,7 +67,7 @@ export function TransactionsListEmpty({
   if (filtered) return <NoResultsState onClearFilters={onClearFilters} onSearch={onSearch} />;
   // The upcoming card above the list already shows those rows; "no
   // transactions yet" right under it would contradict it.
-  if (onlyFuture) return <Text style={styles.empty}>{ONLY_FUTURE_MESSAGE}</Text>;
+  if (onlyFuture) return <Text style={styles.empty}>{t("transactions.empty.onlyFuture")}</Text>;
   if (typeFilter) return <NoTransactionsOfTypeState type={typeFilter} onAdd={onAdd} />;
   return <NoTransactionsState onAdd={onAdd} />;
 }

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { PillButton } from "@/components/ui/PillButton";
@@ -16,17 +17,6 @@ interface LogoutGuardDialogProps {
   onLogout: () => void;
 }
 
-const COPY = {
-  title: (n: number) => `Còn ${n} giao dịch chưa đồng bộ`,
-  message: "Giữ lại: giao dịch được lưu trên máy này và tự đồng bộ khi bạn đăng nhập lại.",
-  syncNow: "Đồng bộ ngay",
-  keep: "Giữ lại và đăng xuất",
-  discard: "Bỏ và đăng xuất",
-  cancel: "Huỷ",
-  discardTitle: (n: number) => `Bỏ ${n} giao dịch và đăng xuất?`,
-  discardMessage: "Các giao dịch này sẽ bị xoá khỏi máy và không bao giờ được gửi lên tài khoản.",
-  discardConfirm: "Bỏ",
-} as const;
 const SCRIM = "rgba(0,0,0,0.6)";
 const CARD_MAX_WIDTH = 340;
 
@@ -37,6 +27,7 @@ const CARD_MAX_WIDTH = 340;
  * otherwise the dialog stays with the new count (step 3).
  */
 export function LogoutGuardDialog({ visible, onCancel, onLogout }: LogoutGuardDialogProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const userId = useCurrentUserId();
   const isOnline = useIsOnline();
@@ -66,28 +57,28 @@ export function LogoutGuardDialog({ visible, onCancel, onLogout }: LogoutGuardDi
       <Modal visible={visible && !confirmDiscard} transparent animationType="fade" onRequestClose={onCancel}>
         <Pressable style={styles.backdrop} onPress={syncing ? undefined : onCancel}>
           <Pressable onPress={() => {}} style={styles.card} testID="dialog-logout-unsynced">
-            <Text style={styles.title}>{COPY.title(count)}</Text>
-            <Text style={styles.message}>{COPY.message}</Text>
+            <Text style={styles.title}>{t("settings.logoutGuard.title", { count })}</Text>
+            <Text style={styles.message}>{t("settings.logoutGuard.message")}</Text>
             <View style={styles.actions}>
               {isOnline ? (
-                <PillButton label={COPY.syncNow} onPress={handleSyncNow} loading={syncing} testID="btn-logout-sync-now" />
+                <PillButton label={t("settings.logoutGuard.syncNow")} onPress={handleSyncNow} loading={syncing} testID="btn-logout-sync-now" />
               ) : null}
               <PillButton
-                label={COPY.keep}
+                label={t("settings.logoutGuard.keep")}
                 variant={isOnline ? "outline" : "solid"}
                 onPress={onLogout}
                 disabled={syncing}
                 testID="btn-logout-keep"
               />
               <PillButton
-                label={COPY.discard}
+                label={t("settings.logoutGuard.discard")}
                 variant="outline"
                 onPress={() => setConfirmDiscard(true)}
                 disabled={syncing}
                 textStyle={styles.discardLabel}
                 testID="btn-logout-discard"
               />
-              <PillButton label={COPY.cancel} variant="outline" onPress={onCancel} disabled={syncing} />
+              <PillButton label={t("common.action.cancel")} variant="outline" onPress={onCancel} disabled={syncing} />
             </View>
           </Pressable>
         </Pressable>
@@ -95,9 +86,9 @@ export function LogoutGuardDialog({ visible, onCancel, onLogout }: LogoutGuardDi
 
       <ConfirmDialog
         visible={visible && confirmDiscard}
-        title={COPY.discardTitle(count)}
-        message={COPY.discardMessage}
-        confirmLabel={COPY.discardConfirm}
+        title={t("settings.logoutGuard.discardTitle", { count })}
+        message={t("settings.logoutGuard.discardMessage")}
+        confirmLabel={t("settings.logoutGuard.discardConfirm")}
         onCancel={() => setConfirmDiscard(false)}
         onConfirm={handleDiscard}
       />

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Keyboard } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { DrawerChild } from "@/components/shared/Drawer";
 import { MapPinIcon } from "@/components/ui/Icon";
@@ -46,6 +47,7 @@ interface UseLocationStepOptions {
  * a "Sửa vị trí" button — nothing moves by accident while just looking.
  */
 export function useLocationStep({ sheetVisible, onConfirm }: UseLocationStepOptions) {
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
   const [status, setStatus] = useState<LocationStepStatus>("locating");
   const [failure, setFailure] = useState<LocationFailure>("unavailable");
@@ -178,9 +180,9 @@ export function useLocationStep({ sheetVisible, onConfirm }: UseLocationStepOpti
   const viewing = mode === "view";
   const footer = viewing ? (
     <>
-      <PillButton label="Đóng" variant="outline" onPress={close} style={{ flex: 1 }} testID="btn-location-close" />
+      <PillButton label={t("common.action.close")} variant="outline" onPress={close} style={{ flex: 1 }} testID="btn-location-close" />
       <PillButton
-        label="Sửa vị trí"
+        label={t("transactions.location.edit")}
         icon={<MapPinIcon size={16} color={colors.onGreen} />}
         onPress={() => setMode("edit")}
         disabled={status !== "ready"}
@@ -191,14 +193,20 @@ export function useLocationStep({ sheetVisible, onConfirm }: UseLocationStepOpti
   ) : (
     <>
       <PillButton
-        label={intent === "save" ? "Lưu không kèm vị trí" : intent === "saved" ? "Huỷ" : "Bỏ ghim"}
+        label={
+          intent === "save"
+            ? t("transactions.location.saveWithout")
+            : intent === "saved"
+              ? t("common.action.cancel")
+              : t("transactions.location.unpin")
+        }
         variant="outline"
         onPress={intent === "saved" ? cancelEdit : skip}
         style={{ flex: 1 }}
         testID="btn-location-skip"
       />
       <PillButton
-        label={intent === "save" ? "Lưu" : "Xong"}
+        label={intent === "save" ? t("common.action.save") : t("common.action.done")}
         onPress={confirm}
         // Waits for the area's name, which resolvePlaceName caps in time.
         disabled={status !== "ready" || naming}
@@ -212,7 +220,7 @@ export function useLocationStep({ sheetVisible, onConfirm }: UseLocationStepOpti
   const child: DrawerChild = {
     visible,
     onClose: close,
-    title: viewing ? "Vị trí giao dịch" : "Ghim vị trí",
+    title: viewing ? t("transactions.location.viewTitle") : t("transactions.location.pickTitle"),
     children: (
       <TransactionLocationPanel
         status={status}

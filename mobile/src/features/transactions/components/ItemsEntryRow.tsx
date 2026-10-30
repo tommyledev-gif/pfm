@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 import { ReceiptGlyph } from "@/components/ui/grouped-list/list-icons";
 import { formatCurrency } from "@/lib/currency";
 import { useColors } from "@/lib/theme";
@@ -22,16 +24,17 @@ interface ItemsEntryRowProps {
  * them — with the line count under the label once there are lines.
  */
 export function ItemsEntryRow({ lines, currency, pendingCount, loading, onPress, error }: ItemsEntryRowProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const count = lines.items.length || pendingCount;
   const total = lines.items.length > 0 ? formatCurrency(lines.total, currency) : undefined;
-  const summary = loading ? "Đang tải" : (total ?? (count > 0 ? `${count} món` : "Thêm"));
+  const summary = loading ? t("common.loading") : (total ?? (count > 0 ? t("common.count.items", { count }) : t("common.action.add")));
 
   return (
     <EntryTile
-      label="Các món"
+      label={t("common.field.items")}
       summary={summary}
-      detail={total ? `${lines.items.length} món` : undefined}
+      detail={total ? t("common.count.items", { count: lines.items.length }) : undefined}
       muted={!loading && count === 0}
       glyph={ReceiptGlyph}
       tone={colors.mint}
@@ -39,7 +42,11 @@ export function ItemsEntryRow({ lines, currency, pendingCount, loading, onPress,
       disabled={loading}
       error={error}
       testID="btn-transaction-items"
-      accessibilityLabel={total ? `Các món: ${lines.items.length} món, tổng ${total}` : `Các món: ${summary}`}
+      accessibilityLabel={
+        total
+          ? t("transactions.items.entryA11yTotal", { count: lines.items.length, total })
+          : t("transactions.items.entryA11y", { summary })
+      }
     />
   );
 }

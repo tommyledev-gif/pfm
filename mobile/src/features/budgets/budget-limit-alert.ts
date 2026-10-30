@@ -1,4 +1,5 @@
 import { formatCurrency } from "@/lib/currency";
+import { i18n } from "@/lib/i18n";
 import { Budget } from "@/features/budgets/types";
 import { ToastVariant } from "@/stores/toast-store";
 
@@ -18,6 +19,7 @@ export interface BudgetLimitAlert {
 // computeStatus — never stale, refetched by the caller right before this
 // runs) against `amount_limit` in `currency`. Returns null when there's no
 // budget for this category/currency, or spend is comfortably under it.
+// The message is written in the app language at the moment it is raised.
 export function budgetLimitAlert(budgets: Budget[], categoryId: string, currency: string): BudgetLimitAlert | null {
   const budget = budgets.find((b) => b.category_id === categoryId);
   if (!budget) return null;
@@ -26,18 +28,21 @@ export function budgetLimitAlert(budgets: Budget[], categoryId: string, currency
   if (!limit || limit.amount_limit <= 0) return null;
 
   const ratio = limit.spent / limit.amount_limit;
-  const spentLabel = formatCurrency(limit.spent, currency);
-  const limitLabel = formatCurrency(limit.amount_limit, currency);
+  const values = {
+    category: budget.category_name,
+    spent: formatCurrency(limit.spent, currency),
+    limit: formatCurrency(limit.amount_limit, currency),
+  };
 
   if (ratio >= 1) {
     return {
-      message: `Đã vượt hạn mức ngân sách "${budget.category_name}": ${spentLabel}/${limitLabel}.`,
+      message: i18n.t("budgets.alert.over", values),
       variant: "error",
     };
   }
   if (ratio >= ALMOST_LIMIT_RATIO) {
     return {
-      message: `Sắp đạt hạn mức ngân sách "${budget.category_name}": ${spentLabel}/${limitLabel}.`,
+      message: i18n.t("budgets.alert.near", values),
       variant: "warning",
     };
   }

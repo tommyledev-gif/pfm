@@ -1,4 +1,5 @@
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { PressableScale } from "@/components/motion/PressableScale";
 import { ChevronRightIcon } from "@/components/ui/Icon";
@@ -13,12 +14,6 @@ const MAX_AVATARS = 3;
 const OVERLAP = 12;
 const RING_WIDTH = 2;
 
-const COPY = {
-  // Names what the tap does: it sits under "hoặc" as one of the ways in.
-  title: "Chọn tài khoản đã lưu",
-  count: (n: number) => `${n} tài khoản trên thiết bị này`,
-} as const;
-
 interface SavedAccountsEntryProps {
   candidates: LoginCandidate[];
   onPress: () => void;
@@ -30,9 +25,10 @@ interface SavedAccountsEntryProps {
  * Rendered only when there is at least one.
  */
 export function SavedAccountsEntry({ candidates, onPress }: SavedAccountsEntryProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
-  const count = COPY.count(candidates.length);
+  const count = candidates.length;
 
   return (
     <PressableScale
@@ -40,7 +36,7 @@ export function SavedAccountsEntry({ candidates, onPress }: SavedAccountsEntryPr
       android_ripple={{ color: withAlpha(colors.overlayBase, 0.08) }}
       style={styles.row}
       accessibilityRole="button"
-      accessibilityLabel={`${COPY.title}, ${count}`}
+      accessibilityLabel={t("accounts.savedEntry.a11y", { count })}
       testID="btn-login-saved-accounts"
     >
       <View style={styles.faces}>
@@ -51,8 +47,9 @@ export function SavedAccountsEntry({ candidates, onPress }: SavedAccountsEntryPr
         ))}
       </View>
       <View style={styles.text}>
-        <Text style={styles.title} numberOfLines={1}>{COPY.title}</Text>
-        <Text style={styles.count} numberOfLines={1}>{count}</Text>
+        {/* Names what the tap does: it sits under "hoặc" as one of the ways in. */}
+        <Text style={styles.title} numberOfLines={1}>{t("accounts.savedEntry.title")}</Text>
+        <Text style={styles.count} numberOfLines={1}>{t("accounts.savedEntry.count", { count })}</Text>
       </View>
       <ChevronRightIcon size={20} color={colors.textSecondary} />
     </PressableScale>

@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useRef } from "react";
 import { Animated, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Trans, useTranslation } from "react-i18next";
 
 import { CheckIcon } from "@/components/ui/Icon";
 import { PillButton } from "@/components/ui/PillButton";
@@ -49,6 +50,7 @@ export function WizardStepSuccess({ createdCount, dailyAllowance, onDone }: Wiza
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const reduceMotion = useReduceMotion();
+  const { t } = useTranslation();
 
   const settled = reduceMotion ? 1 : 0;
   const circleScale = useRef(new Animated.Value(reduceMotion ? 1 : 0.7)).current;
@@ -110,20 +112,23 @@ export function WizardStepSuccess({ createdCount, dailyAllowance, onDone }: Wiza
         <Rise delay={TITLE_DELAY} reduceMotion={reduceMotion}>
           <Text style={styles.title}>
             {dailyAllowance ? (
-              <>
-                Từ hôm nay bạn có <Text style={styles.amount}>{dailyAllowance}</Text> mỗi ngày
-              </>
+              <Trans
+                t={t}
+                i18nKey="budgetWizard.success.perDay"
+                values={{ amount: dailyAllowance }}
+                components={[<Text key="amount" style={styles.amount} />]}
+              />
             ) : hasCount ? (
-              `Đã tạo ${createdCount} ngân sách`
+              t("budgetWizard.success.created", { count: createdCount })
             ) : (
-              "Đã lưu ngân sách"
+              t("budgetWizard.success.saved")
             )}
           </Text>
         </Rise>
 
         {dailyAllowance && hasCount ? (
           <Rise delay={SUBTITLE_DELAY} reduceMotion={reduceMotion}>
-            <Text style={styles.subtitle}>{createdCount} ngân sách đã sẵn sàng</Text>
+            <Text style={styles.subtitle}>{t("budgetWizard.success.readyCount", { count: createdCount })}</Text>
           </Rise>
         ) : null}
       </View>
@@ -134,7 +139,7 @@ export function WizardStepSuccess({ createdCount, dailyAllowance, onDone }: Wiza
           read as a stray dialog. */}
       <Rise delay={BUTTON_DELAY} rise={0} reduceMotion={reduceMotion}>
         <View style={styles.footer}>
-          <PillButton label="Xong" onPress={onDone} />
+          <PillButton label={t("common.action.done")} onPress={onDone} />
         </View>
       </Rise>
     </View>

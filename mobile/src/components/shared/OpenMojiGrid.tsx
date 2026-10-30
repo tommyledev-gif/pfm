@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { FlatList, Pressable, ScrollView, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { EmojiGlyph } from "@/components/ui/EmojiGlyph";
 import { SearchField } from "@/components/ui/SearchField";
@@ -39,6 +40,7 @@ interface OpenMojiGridProps {
  * already lives.
  */
 export function OpenMojiGrid({ value, onSelect, mode = "fill" }: OpenMojiGridProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const initialGroup = findOpenMoji(value)?.group ?? OPENMOJI_GROUPS[0].key;
   const [group, setGroup] = useState<OpenMojiGroupKey>(initialGroup);
@@ -63,7 +65,7 @@ export function OpenMojiGrid({ value, onSelect, mode = "fill" }: OpenMojiGridPro
 
   return (
     <View style={mode === "fill" ? styles.fill : undefined}>
-      <SearchField value={query} onChangeText={setQuery} placeholder="Tìm bằng tiếng Anh, vd: coffee" autoCorrect={false} />
+      <SearchField value={query} onChangeText={setQuery} placeholder={t("ui.openMoji.searchPlaceholder")} autoCorrect={false} />
 
       {!query.trim() ? (
         <ScrollView
@@ -79,14 +81,14 @@ export function OpenMojiGrid({ value, onSelect, mode = "fill" }: OpenMojiGridPro
               onPress={() => setGroup(g.key)}
               style={[styles.groupChip, group === g.key && styles.groupChipActive]}
             >
-              <Text style={[styles.groupLabel, group === g.key && styles.groupLabelActive]}>{g.label}</Text>
+              <Text style={[styles.groupLabel, group === g.key && styles.groupLabelActive]}>{t(g.labelKey)}</Text>
             </Pressable>
           ))}
         </ScrollView>
       ) : null}
 
       {items.length === 0 ? (
-        <Text style={styles.empty}>Không tìm thấy biểu tượng nào.</Text>
+        <Text style={styles.empty}>{t("ui.openMoji.empty")}</Text>
       ) : mode === "fill" ? (
         <FlatList
           // Remounted per group/search so the grid starts from the top.
@@ -105,7 +107,7 @@ export function OpenMojiGrid({ value, onSelect, mode = "fill" }: OpenMojiGridPro
         </ScrollView>
       )}
 
-      <Text style={styles.credit}>Biểu tượng: OpenMoji (CC BY-SA 4.0)</Text>
+      <Text style={styles.credit}>{t("ui.openMoji.credit")}</Text>
     </View>
   );
 }

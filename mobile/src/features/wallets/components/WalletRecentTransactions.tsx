@@ -1,8 +1,10 @@
 import { useEffect } from "react";
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { TransactionRow } from "@/components/shared/TransactionRow";
 import { useCategoryLookup } from "@/features/categories/api/use-category-lookup";
+import { Transaction } from "@/features/transactions/types";
 import { useTransactionsQuery } from "@/features/transactions/api/use-transactions-query";
 import { TransactionRowSkeleton } from "@/features/transactions/components/TransactionRowSkeleton";
 import { Wallet } from "@/features/wallets/types";
@@ -19,6 +21,10 @@ interface WalletRecentTransactionsProps {
    * (Drawer's onEndReached): a shared wallet's list then loads its next page.
    */
   loadMoreSignal?: number;
+  /** A tapped entry: the screen opens it in the transaction sheet. */
+  onSelect?: (transaction: Transaction) => void;
+  /** "Xem tất cả" beside the title: the wallet's full list elsewhere. */
+  onSeeAll?: () => void;
 }
 
 // Enough to answer "what moved in this wallet lately" at a glance; the full
@@ -37,7 +43,8 @@ const SHARED_PAGE = 10;
  * when that was someone else, and older ones load as the list nears its end
  * (loadMoreSignal), no "Xem thêm" to tap.
  */
-export function WalletRecentTransactions({ wallet, loadMoreSignal = 0 }: WalletRecentTransactionsProps) {
+export function WalletRecentTransactions({ wallet, loadMoreSignal = 0, onSelect, onSeeAll }: WalletRecentTransactionsProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const shared = isSharedWallet(wallet);
   const limit = shared ? SHARED_PAGE : RECENT_LIMIT;
@@ -55,22 +62,36 @@ export function WalletRecentTransactions({ wallet, loadMoreSignal = 0 }: WalletR
 
   return (
     <View style={styles.section} testID="section-wallet-recent">
-      <Text style={styles.title}>{shared ? "Giao dịch trong ví chung" : "Gần đây trong ví này"}</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.title} numberOfLines={1}>
+          {t(shared ? "wallets.recent.title.shared" : "wallets.recent.title.own")}
+        </Text>
+        {onSeeAll && items.length > 0 ? (
+          <Pressable onPress={onSeeAll} hitSlop={8} accessibilityRole="link" testID="btn-wallet-recent-see-all">
+            <Text style={styles.seeAll}>{t("common.action.seeAll")}</Text>
+          </Pressable>
+        ) : null}
+      </View>
       {transactions.isLoading ? (
         Array.from({ length: RECENT_LIMIT }).map((_, i) => <TransactionRowSkeleton key={i} />)
       ) : isWaitingForNetwork(transactions) ? (
         <OfflinePlaceholder />
       ) : transactions.isError ? (
-        <Text style={styles.empty}>Không tải được giao dịch của ví này.</Text>
+        <Text style={styles.empty}>{t("wallets.recent.error")}</Text>
       ) : items.length === 0 ? (
-        <Text style={styles.empty}>Ví này chưa có giao dịch nào.</Text>
+        <Text style={styles.empty}>{t("wallets.recent.empty")}</Text>
       ) : (
         items.map((item) => (
           <View key={item.id}>
-            <TransactionRow transaction={item} currency={wallet.currency} category={categories.get(item.category_id)} />
+            <TransactionRow
+              transaction={item}
+              currency={wallet.currency}
+              category={categories.get(item.category_id)}
+              onPress={onSelect ? () => onSelect(item) : undefined}
+            />
             {item.recorded_by ? (
               <Text style={styles.recorder} numberOfLines={1}>
-                {item.recorded_by.name} ghi
+                {t("sharedWallets.recordedBy", { name: item.recorded_by.name })}
               </Text>
             ) : null}
           </View>
@@ -86,7 +107,16 @@ export function WalletRecentTransactions({ wallet, loadMoreSignal = 0 }: WalletR
 
 const useStyles = createStyles((colors) => ({
   section: { gap: spacing.xs },
-  title: { ...typography.label, color: colors.textSecondary, marginBottom: spacing.xs },
+  // The link sits on the title's line, as every section header's does (Home).
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  title: { ...typography.label, color: colors.textSecondary, flexShrink: 1 },
+  seeAll: { ...typography.caption, color: colors.green },
   empty: { ...typography.body, color: colors.textSecondary, paddingVertical: spacing.lg },
   // Under the row, aligned past its icon, so it reads as part of that entry.
   recorder: { ...typography.tiny, color: colors.textMuted, marginTop: -spacing.xs, marginBottom: spacing.xs, paddingLeft: 56 },

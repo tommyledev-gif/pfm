@@ -1,10 +1,16 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
-import { TRANSACTION_KIND_LABELS, TRANSACTION_KINDS, TransactionKind } from "@/lib/constants";
+import { TRANSACTION_KINDS, TransactionKind } from "@/lib/constants";
+import { TranslationKey } from "@/lib/i18n";
 
-const TYPE_OPTIONS = TRANSACTION_KINDS.map((value) => ({ value, label: TRANSACTION_KIND_LABELS[value] }));
+const TYPE_KEYS: Record<TransactionKind, TranslationKey> = {
+  expense: "common.txType.expenseShort",
+  income: "common.txType.incomeShort",
+  transfer: "common.txType.transfer",
+};
 
 interface TransactionTypeChipsProps {
   type: TransactionKind;
@@ -20,7 +26,9 @@ interface TransactionTypeChipsProps {
 // segmented control is for. Split from TransactionFormModal for its 300-line
 // limit; the AI chat's edit sheet (EditTransactionChoices) uses it too.
 export function TransactionTypeChips({ type, locked, itemCount, onSelect, onClearItems }: TransactionTypeChipsProps) {
+  const { t } = useTranslation();
   const [confirmTransfer, setConfirmTransfer] = useState(false);
+  const typeOptions = useMemo(() => TRANSACTION_KINDS.map((value) => ({ value, label: t(TYPE_KEYS[value]) })), [t]);
 
   const pick = (next: TransactionKind) => {
     if (locked || next === type) return;
@@ -33,13 +41,13 @@ export function TransactionTypeChips({ type, locked, itemCount, onSelect, onClea
 
   return (
     <>
-      <SegmentedTabs options={TYPE_OPTIONS} value={type} onChange={pick} disabled={locked} testID="tabs-transaction-type" />
+      <SegmentedTabs options={typeOptions} value={type} onChange={pick} disabled={locked} testID="tabs-transaction-type" />
       <ConfirmDialog
         visible={confirmTransfer}
-        title={`Bỏ ${itemCount} món?`}
-        message="Giao dịch chuyển tiền không có món."
-        confirmLabel="Bỏ các món"
-        cancelLabel="Giữ lại"
+        title={t("transactions.dropItems.title", { count: itemCount })}
+        message={t("transactions.items.notOnTransfer")}
+        confirmLabel={t("transactions.dropItems.confirm")}
+        cancelLabel={t("common.action.keep")}
         onCancel={() => setConfirmTransfer(false)}
         onConfirm={() => {
           setConfirmTransfer(false);

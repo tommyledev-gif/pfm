@@ -3,6 +3,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { checkBudgetLimit } from "@/features/budgets/check-budget-limit";
 import { apiClient, unwrap, type ApiEnvelope } from "@/lib/axios";
 import { CreateTransactionRequest, Transaction } from "@/features/transactions/types";
+import { patchWalletBalance } from "@/features/wallets/api/patch-wallet-balance";
 
 interface CreateTransactionOptions {
   // Set by the outbox flusher: the request is cancelled rather than sent
@@ -27,6 +28,8 @@ export function invalidateAfterTransactionCreated(queryClient: QueryClient): voi
 }
 
 export async function afterTransactionCreated(queryClient: QueryClient, transaction: Transaction): Promise<void> {
+  // The new balance is in the answer already: on the cards now, reconciled by the refetch.
+  patchWalletBalance(queryClient, transaction);
   invalidateAfterTransactionCreated(queryClient);
   // Refetches budgets itself (fresher than a bare invalidate, see that
   // helper's doc comment) and updates the ["budgets"] cache as a side

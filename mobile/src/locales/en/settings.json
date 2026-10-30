@@ -1,0 +1,238 @@
+{
+  "settings": {
+    "title": "Settings",
+    "group": {
+      "money": "Money",
+      "account": "Account",
+      "other": "Other"
+    },
+    "row": {
+      "helpSupport": "Help & support"
+    },
+    "logout": {
+      "inProgress": "Signing out…"
+    },
+    "profileCard": {
+      "editProfileA11y": "Edit profile",
+      "netWorth": "Net worth"
+    },
+    "logoutGuard": {
+      "title_one": "{{count}} transaction hasn't synced",
+      "title_other": "{{count}} transactions haven't synced",
+      "message": "If you keep them, they stay on this phone and sync when you sign in again.",
+      "syncNow": "Sync now",
+      "keep": "Keep and sign out",
+      "discard": "Discard and sign out",
+      "discardTitle_one": "Discard {{count}} transaction and sign out?",
+      "discardTitle_other": "Discard {{count}} transactions and sign out?",
+      "discardMessage": "They'll be deleted from this phone and never reach your account.",
+      "discardConfirm": "Discard and sign out"
+    }
+  },
+  "userSettings": {
+    "transactions": {
+      "header": "Transactions"
+    },
+    "appearance": {
+      "header": "Appearance",
+      "optionA11y": "{{theme}} theme"
+    },
+    "language": {
+      "header": "Language",
+      "optionA11y": "Language: {{language}}",
+      "footer": "Assistant replies and notifications you already have keep their language."
+    },
+    "pinLocation": {
+      "title": "Pin location on new transactions",
+      "footer": "Can be turned off for a single transaction."
+    }
+  },
+  "profile": {
+    "title": "Profile",
+    "edit": {
+      "nameLabel": "Display name",
+      "usernameHint": "Set once at activation. It can't be changed.",
+      "namePlaceholder": "Alex Nguyen",
+      "changePhoto": "Change photo",
+      "removePhotoA11y": "Remove photo",
+      "saved": "Saved",
+      "photoChanged": "Photo changed",
+      "photoRemoved": "Photo removed",
+      "saveFailed": "Couldn't save the name. Try again.",
+      "photoFailed": "Couldn't change the photo. Try again.",
+      "removeFailed": "Couldn't remove the photo. Try again.",
+      "photosDenied": "No access to photos. Allow it in your phone's settings."
+    },
+    "username": {
+      "placeholder": "e.g. lan.nguyen",
+      "hint": "Set once. It can't be changed.",
+      "submit": "Set",
+      "confirmTitle": "Set username {{username}}?",
+      "confirmMessage": "This name can't be changed once set.",
+      "confirm": "Set username",
+      "cancel": "Edit",
+      "done": "Username set",
+      "failed": "Couldn't set the username. Try again."
+    },
+    "fallbackName": "Member"
+  },
+  "security": {
+    "protections": {
+      "header": "Lock and verification"
+    },
+    "devices": {
+      "title": "Signed-in devices",
+      "unnamed": "Unnamed device",
+      "current": "This device",
+      "confirmLabel": "Sign out device",
+      "loadFailed": "Couldn't load devices.",
+      "offline": "Connect to the internet to sign out a device.",
+      "failed": "Couldn't sign out the device. Try again later.",
+      "confirmTitle": "Sign out {{device}}?",
+      "confirmMessage": "{{device}} will need to sign in again to use this account.",
+      "signedOut": "{{device}} signed out",
+      "lastActive": "Active {{date}}",
+      "signOutA11y": "Sign out {{device}}"
+    },
+    "changePassword": {
+      "footer": "Other devices will need to sign in again.",
+      "current": "Current password",
+      "hint": "At least {{min}} characters.",
+      "submit": "Change password",
+      "enterCurrent": "Enter your current password.",
+      "wrongCurrent": "Incorrect current password.",
+      "tooShort": "New password needs at least {{min}} characters.",
+      "mismatch": "The new passwords don't match.",
+      "same": "New password is the same as the current one.",
+      "offline": "No connection. Try again later.",
+      "failed": "Couldn't change the password. Try again later.",
+      "done": "Password changed. Other devices need to sign in again."
+    },
+    "appLock": {
+      "title": "App lock",
+      "footer": "Asks for the app PIN, fingerprint, face or screen lock when the app opens.",
+      "noLock": "This phone has no screen lock, so app lock can't turn on. Set an app PIN to use it.",
+      "locked": "App locked",
+      "unlock": "Unlock",
+      "prompt": "Unlock app",
+      "hint": "Use fingerprint or screen lock"
+    },
+    "verifyFailed": "Couldn't verify.",
+    "pin": {
+      "section": "App PIN",
+      "footer": "6 digits to unlock the app and verify account switches. After 5 wrong tries in a row, every account on this phone is signed out.",
+      "setRow": "Set app PIN",
+      "changeRow": "Change app PIN",
+      "offRow": "Turn off app PIN",
+      "set": "PIN set",
+      "changed": "PIN changed",
+      "off": "PIN turned off",
+      "offWithLock": "PIN and app lock turned off",
+      "enter": "Enter app PIN",
+      "create": "Enter a {{length}}-digit PIN",
+      "repeat": "Re-enter PIN",
+      "current": "Enter current PIN",
+      "forSwitch": "Enter PIN to switch accounts",
+      "mismatch": "The PINs don't match. Enter it again.",
+      "checkFailed": "Couldn't check the PIN. Try again.",
+      "saveFailed": "Couldn't save the PIN. Enter it again.",
+      "forgot": "Forgot PIN?",
+      "forgotMessage": "Every account on this phone will be signed out and the PIN deleted. Sign in again with your password to continue.",
+      "forgotConfirm": "Sign out all accounts",
+      "wipedWrong": "Wrong PIN 5 times. Every account on this phone was signed out.",
+      "wipedForgot": "Every account on this phone was signed out.",
+      "deleteDigitA11y": "Delete digit",
+      "wrong_one": "Wrong PIN. {{count}} try left.",
+      "wrong_other": "Wrong PIN. {{count}} tries left.",
+      "digitKeyA11y": "{{digit}}",
+      "enteredA11y": "{{count}} of {{length}} digits entered"
+    },
+    "identityCheck": {
+      "title": "Verify when switching accounts",
+      "footer": "Asks for the app PIN, fingerprint, face or screen lock before switching to a saved account.",
+      "switchPrompt": "Verify to switch accounts",
+      "changeSettingPrompt": "Verify to change security settings",
+      "failed": "Couldn't verify. Account not switched.",
+      "noLockWarning": "This phone has no screen lock, so anyone holding it can switch accounts. Set an app PIN in Security to stop that.",
+      "noLockAdminBlocked": "This phone has no screen lock, so it can't switch to an admin account. Set an app PIN in Security and try again.",
+      "useFingerprint": "Use fingerprint",
+      "useFace": "Use face unlock",
+      "useScreenLock": "Use screen lock"
+    },
+    "passkeys": {
+      "title": "Passkeys",
+      "hint": "Optional. Sign in without a password, even on a new phone.",
+      "add": "Add passkey",
+      "unsupported": "This version of the app can't use passkeys yet.",
+      "empty": "No passkeys yet.",
+      "loadFailed": "Couldn't load passkeys.",
+      "added": "Passkey added",
+      "addFailed": "Couldn't add the passkey. Try again.",
+      "offline": "Connect to the internet to add a passkey.",
+      "deleted": "Passkey deleted",
+      "deleteFailed": "Couldn't delete the passkey. Try again.",
+      "confirmTitle": "Delete this passkey?",
+      "confirmLabel": "Delete passkey",
+      "confirmMessage": "{{device}} can't sign in with this passkey anymore.",
+      "addedLine": "Added {{date}}",
+      "addedUsedLine": "Added {{added}} · Used {{used}}",
+      "deleteA11y": "Delete passkey {{device}}",
+      "noProvider": "This phone can't save the passkey. Sign in to a Google account on the phone and try again.",
+      "timeout": "The phone didn't respond while opening the passkey. Try again.",
+      "exists": "This phone already has a passkey for this account.",
+      "noCredential": "This phone has no passkey yet. Sign in with your password, then add one in Security.",
+      "signInFailed": "Couldn't verify the passkey. Try again."
+    },
+    "passkeyHelp": {
+      "provider": {
+        "title": "This phone can't save passkeys yet",
+        "why": "Passkeys live in the phone's password manager, usually Google.",
+        "step1": "Tap Open Settings.",
+        "step2": "Check that Google is turned on in the list of services.",
+        "notFound": "Can't find the list? Search Settings for “passkeys”.",
+        "stillMissing": "Still couldn't save the passkey. If Google is on, try again later."
+      },
+      "account": {
+        "title": "No Google account on this phone",
+        "why": "Passkeys are saved to the Google account on the phone.",
+        "step1": "Tap Add Google account.",
+        "step2": "Sign in to a Google account.",
+        "open": "Add Google account",
+        "stillMissing": "Still no Google account on this phone. Add one, then come back."
+      },
+      "returnStep": "Come back here and the passkey is added automatically.",
+      "closeA11y": "Close guide"
+    },
+    "revokeAll": {
+      "label": "Sign out other devices",
+      "footer": "Every other device must sign in again with the password. This device stays signed in.",
+      "confirmTitle": "Sign out other devices?",
+      "confirmMessage": "{{email}} will be signed out on every other device, including phones that saved it for quick switching.",
+      "success": "Signed out other devices",
+      "offline": "Connect to the internet to sign out other devices.",
+      "failed": "Couldn't sign out other devices. Try again later."
+    },
+    "biometricFailed": "Didn't match. Try again.",
+    "deleteAccounts": {
+      "title": "All accounts",
+      "footer": "Find and delete any account, including ones outside the family.",
+      "placeholder": "Search by email or username",
+      "noResults": "No accounts found",
+      "searchFailed": "Couldn't load results.",
+      "confirmTitle": "Delete this account?",
+      "confirmLabel": "Delete account",
+      "offline": "Connect to the internet to delete accounts.",
+      "notFound": "This account wasn't found.",
+      "failed": "Couldn't delete the account. Try again.",
+      "confirmMessage": "{{email}} is signed out everywhere and can't sign in again. This can't be undone.",
+      "success": "Account {{email}} deleted",
+      "rowA11y": "Delete account {{email}}"
+    }
+  },
+  "developer": {
+    "debugBubble": {
+      "label": "Show debug bubble",
+      "footer": "API and navigation logs are still recorded while it's hidden."
+    }
+  }
+}

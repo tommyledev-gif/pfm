@@ -1,0 +1,167 @@
+{
+  "insights": {
+    "tab": {
+      "spending": "Spending",
+      "budgets": "Budgets"
+    },
+    "title": "Insights"
+  },
+  "reports": {
+    "spending": {
+      "loadError": "Couldn't load the report.",
+      "proratedHintOneDay": "Monthly limit prorated to the day you picked.",
+      "proratedHint_one": "Monthly limit prorated to the {{count}} day you picked.",
+      "proratedHint_other": "Monthly limit prorated to the {{count}} days you picked.",
+      "byCategory": "By category",
+      "empty": {
+        "title": "No spending yet",
+        "body": "Log transactions to see where your money goes."
+      },
+      "tip": {
+        "eyebrow": "Tip",
+        "body": "Set a budget per category to see what you can spend each day."
+      }
+    },
+    "categorySheet": {
+      "title": "Transactions",
+      "empty": "No transactions in this period.",
+      "loadMore": "Load more"
+    }
+  },
+  "budgets": {
+    "list": {
+      "emptyCurrency": "No budgets in {{currency}} yet.",
+      "emptyFilter": "No budgets match this filter."
+    },
+    "summary": {
+      "daysLeft_one": "{{count}} day left",
+      "daysLeft_other": "{{count}} days left",
+      "overLimit": "over the <0>{{limit}}</0> limit",
+      "leftOfLimit": "left of the <0>{{limit}}</0> limit",
+      "someOver_one": "{{count}} category is over its limit. The total still has room from the others.",
+      "someOver_other": "{{count}} categories are over their limits. The total still has room from the others."
+    },
+    "filter": {
+      "over": "Over limit"
+    },
+    "row": {
+      "over": "{{percent}} · {{amount}} over",
+      "left": "{{percent}} · {{amount}} left",
+      "limit": "Limit: {{amount}}",
+      "seeTransactions": "See transactions →"
+    },
+    "figures": {
+      "usedShare": "{{percent}} of limit used",
+      "limit": "Limit"
+    },
+    "empty": {
+      "title": "No budgets yet",
+      "body": "Set a limit per category to see what's left to spend this month.",
+      "suggestions": "Popular categories",
+      "savingsHint": "Suggested: 15–20% of income",
+      "typicalAmount": "Typical: ~{{amount}}",
+      "setOwn": "Set your own limit"
+    },
+    "fab": {
+      "wizard": "Suggest with AI",
+      "manual": "Add manually",
+      "a11y": "Add budget"
+    },
+    "form": {
+      "amountInvalid": "Enter a limit above 0.",
+      "titleEdit": "Edit budget",
+      "titleNew": "New budget",
+      "categoryLocked": "Category (locked after creation)",
+      "iconHint": "The budget uses this category's icon.",
+      "limitLabel": "Monthly limit ({{currency}})",
+      "saveError": "Couldn't save the budget.",
+      "delete": "Delete budget"
+    },
+    "delete": {
+      "title": "Delete this budget?"
+    },
+    "alert": {
+      "over": "Over the {{category}} budget: {{spent}} of {{limit}}",
+      "near": "{{category}} budget almost used: {{spent}} of {{limit}}"
+    }
+  },
+  "analytics": {
+    "starter": {
+      "spentThisMonth": "How much did I spend this month?",
+      "whereMoneyWent": "Where did my money go?",
+      "budgetLeft": "How much budget is left?",
+      "incomeThisMonth": "Income this month",
+      "unusualToday": "Anything unusual today?"
+    },
+    "period": {
+      "toDate": "{{range}} (to date)",
+      "soFar": "{{range}} (so far)"
+    },
+    "answer": {
+      "periodLine_one": "{{period}} · {{count}} transaction",
+      "periodLine_other": "{{period}} · {{count}} transactions",
+      "switchToRecording": "Switch to {{mode}}"
+    },
+    "banner": {
+      "countingFor": "Counting: <0>{{categories}}</0>",
+      "change": "Change"
+    },
+    "number": {
+      "avgCaption_one": "average over {{count}} day with spending",
+      "avgCaption_other": "average over {{count}} days with spending"
+    },
+    "columns": {
+      "hint": "Tap a bar to see its amount."
+    },
+    "compare": {
+      "same": "Same as {{previous}}",
+      "up": "Up {{percent}} from {{previous}}",
+      "down": "Down {{percent}} from {{previous}}"
+    },
+    "legend": {
+      "hide": "Hide categories",
+      "show_one": "Show {{count}} category",
+      "show_other": "Show {{count}} categories"
+    },
+    "inline": {
+      "heading": "Transactions"
+    },
+    "line": {
+      "peak": "Peak: {{amount}} ({{label}})"
+    },
+    "ranked": {
+      "collapse": "Show less",
+      "showMore": "Show {{count}} more",
+      "notShownExpanded_one": "{{count}} smaller one not shown. See all in Transactions.",
+      "notShownExpanded_other": "{{count}} smaller ones not shown. See all in Transactions.",
+      "notShownCollapsed": "and {{count}} more"
+    },
+    "budgetStatus": {
+      "over": "Over by <0/>",
+      "unused": "Nothing spent · Limit {{limit}}",
+      "spent": "Spent {{spent}} of {{limit}}"
+    },
+    "anomaly": {
+      "count_one": "{{count}} expense",
+      "count_other": "{{count}} expenses",
+      "countVsUsual_one": "{{count}} expense, usually {{usual}}",
+      "countVsUsual_other": "{{count}} expenses, usually {{usual}}",
+      "aboveUsual": "Above usual",
+      "largeExpenses": "Large expenses",
+      "largeIncome": "Large income",
+      "usualAmount": "Usually {{amount}}",
+      "noneInBaseline": "None in {{baseline}}"
+    },
+    "scenario": {
+      "caption_one": "to set aside each month · {{count}} month",
+      "caption_other": "to set aside each month · {{count}} months",
+      "captionDeadline_one": "to set aside each month · {{count}} month · by {{date}}",
+      "captionDeadline_other": "to set aside each month · {{count}} months · by {{date}}",
+      "goal": "Goal",
+      "avgIncome": "Avg income/month",
+      "avgSpending": "Avg spending/month",
+      "spendCap": "Max spending/month",
+      "cutNeeded": "Cut needed/month"
+    }
+  }
+}

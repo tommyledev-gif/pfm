@@ -222,15 +222,21 @@ export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChan
   // ⚠️ The list can reorder under the user (GET /wallets sorts the default
   // first): the wallet that was centred is re-centred at its new position.
   // Declared before the ref update below so it reads the previous id.
+  // Looping switching on or off (a third wallet arriving after the landing)
+  // re-anchors too: left in the first copy, a swipe back from the first
+  // wallet found no card there until the fling settled and wrapped.
   const walletOrder = wallets.map((w) => w.id).join(",");
+  const anchoredLooping = useRef(looping);
   useEffect(() => {
     if (!didInitialScroll.current || wallets.length === 0) return;
     const previous = centredIdRef.current;
-    if (previous && rendered[centreIndex]?.id === previous) return;
+    const loopChanged = anchoredLooping.current !== looping;
+    anchoredLooping.current = looping;
+    if (!loopChanged && previous && rendered[centreIndex]?.id === previous) return;
     const index = wallets.findIndex((w) => w.id === previous);
     jumpTo(renderedIndexOf(Math.max(0, index)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [walletOrder]);
+  }, [walletOrder, looping]);
 
   // Silent until the landing above has happened — before it, the centre is
   // just wherever the scroll view started, not a wallet anyone chose.
@@ -280,19 +286,9 @@ export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChan
     [looping, loopWidth, maxX],
   );
 
+  // prettier-ignore
   return {
-    scrollRef,
-    scrollX,
-    centre,
-    scrollHandler,
-    containerWidth,
-    centreIndex,
-    rendered,
-    sidePadding,
-    onLayout,
-    onContentSizeChange,
-    pressCard,
-    step,
-    looping,
+    scrollRef, scrollX, centre, scrollHandler, containerWidth, centreIndex, rendered,
+    sidePadding, onLayout, onContentSizeChange, pressCard, step, looping,
   };
 }

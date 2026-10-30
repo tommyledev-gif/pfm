@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 
 import { entrance, staggerDelay } from "@/components/motion/motion-tokens";
 import { Screen } from "@/components/shared/Screen";
@@ -15,13 +16,6 @@ import { passkeysAvailable } from "@/features/security/passkeys/native-passkey";
 import { useKeyboardHeight } from "@/lib/use-keyboard-height";
 import { spacing, typography, createStyles } from "@/lib/theme";
 import { useDebugTestAccountsStore } from "@/stores/debug-test-accounts-store";
-
-const COPY = {
-  title: "Đăng nhập",
-  or: "hoặc",
-  noAccount: "Chưa có tài khoản?",
-  requestAccess: "Gửi yêu cầu tạo tài khoản",
-} as const;
 
 // The same size as the form's own button, so the shortcuts line up under it.
 const ACTION_HEIGHT = 56;
@@ -38,6 +32,7 @@ const ACTION_RADIUS = 16;
 // title, form, shortcuts, the request link). Opening B slides it in from the
 // right; going back slides A in from the left, whole, without the stagger.
 export default function LoginScreen() {
+  const { t } = useTranslation();
   const styles = useStyles();
   const router = useRouter();
   const keyboardHeight = useKeyboardHeight();
@@ -90,7 +85,7 @@ export default function LoginScreen() {
             <BrandMark />
           </Animated.View>
           <Animated.Text entering={blockEntrance(1)} style={styles.title} accessibilityRole="header">
-            {COPY.title}
+            {t("auth.login.title")}
           </Animated.Text>
           <Animated.View entering={blockEntrance(2)} style={styles.form}>
             <LoginForm onDone={goHome} />
@@ -99,7 +94,7 @@ export default function LoginScreen() {
             <Animated.View entering={blockEntrance(3)}>
               <View style={styles.divider} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
                 <View style={styles.rule} />
-                <Text style={styles.dividerLabel}>{COPY.or}</Text>
+                <Text style={styles.dividerLabel}>{t("auth.login.or")}</Text>
                 <View style={styles.rule} />
               </View>
               <View style={styles.shortcuts}>
@@ -113,14 +108,14 @@ export default function LoginScreen() {
           ) : null}
           {/* Invite-only: without an invite, ask an admin for one. */}
           <Animated.View entering={blockEntrance(4)} style={styles.requestRow}>
-            <Text style={styles.requestHint}>{COPY.noAccount}</Text>
+            <Text style={styles.requestHint}>{t("auth.login.noAccount")}</Text>
             <Pressable
               onPress={() => router.push("/request-access")}
               hitSlop={8}
               accessibilityRole="button"
               testID="btn-login-request-access"
             >
-              <Text style={styles.requestLink}>{COPY.requestAccess}</Text>
+              <Text style={styles.requestLink}>{t("auth.login.requestAccess")}</Text>
             </Pressable>
           </Animated.View>
         </ScrollView>

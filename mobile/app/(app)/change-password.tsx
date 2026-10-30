@@ -1,5 +1,6 @@
 import { useRouter } from "expo-router";
 import { ScrollView } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { MotionView } from "@/components/motion/MotionView";
 import { Screen } from "@/components/shared/Screen";
@@ -8,10 +9,9 @@ import { useFabBottom } from "@/components/ui/Fab";
 import { spacing, createStyles } from "@/lib/theme";
 import { ChangePasswordForm } from "@/features/security/components/ChangePasswordForm";
 
-const TITLE = "Đổi mật khẩu";
-
 // Entry point: the Security screen's "Đổi mật khẩu" row (specs/mobile-account-switch US-11).
 export default function ChangePasswordScreen() {
+  const { t } = useTranslation();
   const styles = useStyles();
   const router = useRouter();
   // The button must clear the floating BottomNav (hidden only while typing).
@@ -19,7 +19,7 @@ export default function ChangePasswordScreen() {
 
   return (
     <Screen style={styles.screen}>
-      <ScreenHeader title={TITLE} backTestID="btn-change-password-back" />
+      <ScreenHeader title={t("nav.title.changePassword")} backTestID="btn-change-password-back" />
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: navClearance }]}
         keyboardShouldPersistTaps="handled"

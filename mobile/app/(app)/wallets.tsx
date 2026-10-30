@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
+import { useTranslation } from "react-i18next";
 
 import { MotionView } from "@/components/motion/MotionView";
 import { LateSkeleton } from "@/components/motion/SkeletonSwap";
@@ -9,13 +10,13 @@ import { UsersIcon } from "@/components/ui/Icon";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { Screen } from "@/components/shared/Screen";
 import { ScreenHeader } from "@/components/shared/ScreenHeader";
-import { useScrollEnd } from "@/components/shared/use-scroll-end";
 import { spacing, createStyles, useColors } from "@/lib/theme";
 import { walletFace } from "@/lib/wallet-colors";
 import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
 import { useRequireOnline } from "@/lib/connectivity";
 import { isAwaitingFirstData, isWaitingForNetwork } from "@/lib/query-status";
 import { useHighlightFade } from "@/lib/use-highlight-fade";
+import { TranslationKey } from "@/lib/i18n";
 import { useLatestCallback } from "@/lib/use-latest-callback";
 import { useUiPrefsStore, WalletsViewMode } from "@/stores/ui-prefs-store";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
@@ -30,15 +31,17 @@ import { WalletCarousel } from "@/features/wallets/components/WalletCarousel";
 import { WalletFormModal } from "@/features/wallets/components/WalletFormModal";
 import { WalletInvitationBanner } from "@/features/wallets/components/WalletInvitationBanner";
 import { WalletMembersSheet } from "@/features/wallets/components/WalletMembersSheet";
-import { WalletRecentTransactions } from "@/features/wallets/components/WalletRecentTransactions";
+import { WalletRecentPanel } from "@/features/wallets/components/WalletRecentPanel";
 import { WalletsEmptyState } from "@/features/wallets/components/WalletsEmptyState";
 import { WalletsGroupedList } from "@/features/wallets/components/WalletsGroupedList";
 import { WalletsListSkeleton } from "@/features/wallets/components/WalletsListSkeleton";
+import { TransactionFormModal } from "@/features/transactions/components/TransactionFormModal";
+import { Transaction } from "@/features/transactions/types";
 
-const VIEW_MODES: { label: string; value: WalletsViewMode }[] = [
-  { label: "Dạng thẻ", value: "carousel" },
-  { label: "Theo nhóm", value: "list" },
-  { label: "Ví chung", value: "shared" },
+const VIEW_MODES: { labelKey: TranslationKey; value: WalletsViewMode }[] = [
+  { labelKey: "wallets.view.carousel", value: "carousel" },
+  { labelKey: "wallets.view.list", value: "list" },
+  { labelKey: "wallets.view.shared", value: "shared" },
 ];
 const NO_WALLETS: Wallet[] = [];
 
@@ -46,6 +49,7 @@ const NO_WALLETS: Wallet[] = [];
 const BOTTOM_NAV_CLEARANCE = 200;
 
 export default function WalletsScreen() {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   // Set by Home when one of its wallet cards is tapped: open on that wallet
@@ -74,9 +78,15 @@ export default function WalletsScreen() {
     setMembersOpen(true);
   };
   const [sharePickerOpen, setSharePickerOpen] = useState(false);
-  // A shared wallet's entries under the cards load on as the list nears its end.
-  const [recentEnd, setRecentEnd] = useState(0);
-  const recentScrollEnd = useScrollEnd(() => setRecentEnd((n) => n + 1));
+  // An entry tapped under the cards (WalletRecentPanel), in the transaction
+  // sheet; kept after closing, like membersWallet, so the sheet slides down.
+  const [openedTransaction, setOpenedTransaction] = useState<Transaction | null>(null);
+  const [transactionOpen, setTransactionOpen] = useState(false);
+  const openTransaction = useLatestCallback((transaction: Transaction) => {
+    setOpenedTransaction(transaction);
+    setTransactionOpen(true);
+  });
+  const viewModes = useMemo(() => VIEW_MODES.map((m) => ({ label: t(m.labelKey), value: m.value })), [t]);
   // The wallet the card view is centred on — kept here rather than in the
   // carousel so switching to the list and back lands on the same one.
   const [activeWalletId, setActiveWalletId] = useState<string | null>(focusWalletId ?? null);
@@ -155,12 +165,12 @@ export default function WalletsScreen() {
 
   return (
     <Screen>
-      <ScreenHeader title="Ví" />
+      <ScreenHeader title={t("nav.title.wallets")} />
 
       {/* Three ways of looking at nothing is not a choice worth offering. */}
       {hasAnything ? (
         <MotionView preset="fade" style={styles.modeTabs}>
-          <SegmentedTabs options={VIEW_MODES} value={viewMode} onChange={setViewMode} />
+          <SegmentedTabs options={viewModes} value={viewMode} onChange={setViewMode} />
         </MotionView>
       ) : null}
 
@@ -179,11 +189,9 @@ export default function WalletsScreen() {
         <WalletsEmptyState onCreate={openCreator} />
       ) : viewMode === "carousel" ? (
         <View style={styles.cardsView}>
-          {/* Pinned under the tabs, outside any scroll: the carousel used to
-              sit in a vertically centred ScrollView, so every height change in
-              the recent list (skeleton → rows → "no transactions") re-centred
-              the column and dragged the cards up or down with it. Only the
-              recent list below scrolls now. */}
+          {/* Pinned under the tabs, outside any scroll: in a centred
+              ScrollView every height change of the recent list dragged the
+              cards up or down. Only the list below scrolls (WalletRecentPanel). */}
           <View style={styles.cardsPinned}>
             {awaiting ? (
               <LateSkeleton>
@@ -212,23 +220,12 @@ export default function WalletsScreen() {
             ) : null}
           </View>
           {activeWallet ? (
-            <ScrollView
-              style={styles.recentScroll}
-              contentContainerStyle={styles.recentBody}
-              showsVerticalScrollIndicator={false}
-              {...recentScrollEnd}
-            >
-              {/* Keyed by wallet: swiping to another card swaps its list, the
-                  new one rising from below (next) or dropping in from above
-                  (previous) while the old one leaves the other way. */}
-              <MotionView
-                key={activeWallet.id}
-                preset={listDirection > 0 ? "fadeUp" : "fadeDown"}
-                exitPreset={listDirection > 0 ? "fadeUp" : "fadeDown"}
-              >
-                <WalletRecentTransactions wallet={activeWallet} loadMoreSignal={recentEnd} />
-              </MotionView>
-            </ScrollView>
+            <WalletRecentPanel
+              wallet={activeWallet}
+              direction={listDirection}
+              bottomClearance={BOTTOM_NAV_CLEARANCE}
+              onSelectTransaction={openTransaction}
+            />
           ) : null}
         </View>
       ) : awaiting ? (
@@ -259,13 +256,18 @@ export default function WalletsScreen() {
           key="share"
           Icon={UsersIcon}
           onPress={() => setSharePickerOpen(true)}
-          accessibilityLabel="Chia sẻ một ví"
+          accessibilityLabel={t("sharedWallets.action.share")}
           testID="btn-wallets-share"
         />
       ) : (
-        <Fab key="create" onPress={openCreator} accessibilityLabel="Tạo ví" testID="btn-wallets-add" />
+        <Fab key="create" onPress={openCreator} accessibilityLabel={t("common.action.createWallet")} testID="btn-wallets-add" />
       )}
 
+      <TransactionFormModal
+        visible={transactionOpen}
+        onClose={() => setTransactionOpen(false)}
+        editingTransaction={openedTransaction}
+      />
       <WalletFormModal visible={modalOpen} onClose={() => setModalOpen(false)} editingWallet={editingWallet} />
       {membersWallet ? (
         <WalletMembersSheet
@@ -295,6 +297,4 @@ const useStyles = createStyles(() => ({
   // Same horizontal padding Home gives the carousel's section, which the
   // carousel cancels to run full-bleed.
   cardsPinned: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm, gap: spacing.lg },
-  recentScroll: { flex: 1 },
-  recentBody: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: BOTTOM_NAV_CLEARANCE },
 }));

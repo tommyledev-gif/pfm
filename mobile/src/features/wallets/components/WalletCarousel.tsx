@@ -1,6 +1,7 @@
 import { memo, useMemo, useRef } from "react";
 import { AccessibilityActionEvent, GestureResponderEvent, Pressable, Animated as RNAnimated, StyleSheet, Text, View } from "react-native";
-import Animated, { SharedValue } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
+import { useTranslation } from "react-i18next";
 
 import { formatCurrency } from "@/lib/currency";
 import { spacing, typography, createStyles } from "@/lib/theme";
@@ -12,16 +13,15 @@ import {
   CARD_WIDTH,
   CAROUSEL_SHADOW_BLEED_BOTTOM,
   CAROUSEL_SHADOW_BLEED_TOP,
-  WalletStackCard,
 } from "@/features/wallets/components/WalletStackCard";
 import { SNAP_INTERVAL, useWalletCarousel } from "@/features/wallets/components/use-wallet-carousel";
 import {
   cardAtOffset,
-  useCardMotion,
   useCarouselIntro,
   useCarouselPress,
 } from "@/features/wallets/components/wallet-carousel-motion";
 import { WalletCarouselPager } from "@/features/wallets/components/WalletCarouselPager";
+import { CarouselCard } from "@/features/wallets/components/WalletCarouselCard";
 
 // Each card's colour: the one its owner picked, else one from its position
 // in the list (walletFace, src/lib/wallet-colors.ts).
@@ -30,11 +30,11 @@ const accentFor = (wallets: Wallet[], index: number) =>
 
 const CARDS_HEIGHT = CARD_HEIGHT + CAROUSEL_SHADOW_BLEED_TOP + CAROUSEL_SHADOW_BLEED_BOTTOM;
 
-const ACCESSIBILITY_ACTIONS = [
-  { name: "increment" as const, label: "Ví sau" },
-  { name: "decrement" as const, label: "Ví trước" },
-  { name: "activate" as const },
-];
+// From this many wallets the deck draws one card per wallet, each at its
+// nearest loop copy (wallet-carousel-motion's slotOf). Below it a wallet can
+// be visible on both sides at once (at ±1.5 places with three wallets), so
+// every loop copy is drawn.
+const MIN_WALLETS_FOR_SINGLE_DECK = 4;
 
 interface WalletCarouselProps {
   wallets: Wallet[];
@@ -50,45 +50,6 @@ interface WalletCarouselProps {
   highlightOpacity?: RNAnimated.Value;
 }
 
-interface CarouselCardProps {
-  wallet: Wallet;
-  index: number;
-  accentColor: string;
-  left: number;
-  scrollX: SharedValue<number>;
-  centre: SharedValue<number>;
-  intro: SharedValue<number>;
-  pressTarget: SharedValue<number>;
-  pressDepth: SharedValue<number>;
-  highlightOpacity?: RNAnimated.Value;
-}
-
-// One card, so each gets its own motion hooks (hooks cannot run in a loop).
-// Memoized: a swipe changes the centred index, which must not re-render every card.
-const CarouselCard = memo(function CarouselCard({
-  wallet,
-  index,
-  accentColor,
-  left,
-  scrollX,
-  centre,
-  intro,
-  pressTarget,
-  pressDepth,
-  highlightOpacity,
-}: CarouselCardProps) {
-  const motion = useCardMotion(index, scrollX, centre, intro, pressTarget, pressDepth);
-  const layoutStyle = useMemo(() => ({ position: "absolute" as const, left, top: CAROUSEL_SHADOW_BLEED_TOP }), [left]);
-  return (
-    <WalletStackCard
-      wallet={wallet}
-      accentColor={accentColor}
-      motion={motion}
-      layoutStyle={layoutStyle}
-      highlightOpacity={highlightOpacity}
-    />
-  );
-});
 
 /**
  * The wallets section: the selected wallet centred, its neighbours tucked
@@ -119,6 +80,13 @@ const CarouselCard = memo(function CarouselCard({
  * A plain ScrollView rather than a FlatList: looping means silently jumping
  * the scroll offset by a whole copy's width, and wallet counts are small
  * enough that rendering every card outright is cheaper than windowing.
+ *
+ * ⚠️ The scroll space holds three copies of the list, the cards do not have
+ * to: from four wallets up each wallet is drawn once and placed at its
+ * nearest copy (MIN_WALLETS_FOR_SINGLE_DECK). Three copies of every card —
+ * each two SVG gradients, an image and auto-fitted text, with three animated
+ * styles re-run on every scroll frame — was what a swipe and the first
+ * render of the carousel were paying for (2026-10-30).
  */
 function WalletCarouselView({
   wallets,
@@ -128,6 +96,7 @@ function WalletCarouselView({
   highlightWalletId,
   highlightOpacity,
 }: WalletCarouselProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const {
     scrollRef,
@@ -152,6 +121,16 @@ function WalletCarouselView({
   const touched = useRef<number | null>(null);
   const dotColors = useMemo(() => wallets.map((_, i) => accentFor(wallets, i)), [wallets]);
   const contentWidth = sidePadding * 2 + Math.max(0, rendered.length - 1) * SNAP_INTERVAL + CARD_WIDTH;
+  const singleDeck = looping && wallets.length >= MIN_WALLETS_FOR_SINGLE_DECK;
+  const deck = singleDeck ? wallets : rendered;
+  const accessibilityActions = useMemo(
+    () => [
+      { name: "increment" as const, label: t("wallets.carousel.a11y.next") },
+      { name: "decrement" as const, label: t("wallets.carousel.a11y.previous") },
+      { name: "activate" as const },
+    ],
+    [t],
+  );
 
   const cardAt = (event: GestureResponderEvent): number | null => {
     // locationX is in the content's own coordinates; minus the scroll offset
@@ -182,7 +161,7 @@ function WalletCarouselView({
   });
 
   if (wallets.length === 0) {
-    return <Text style={styles.empty}>Chưa có ví. Tạo ví để ghi giao dịch.</Text>;
+    return <Text style={styles.empty}>{t("common.empty.noWallet")}</Text>;
   }
 
   const centred = rendered[centreIndex];
@@ -194,9 +173,9 @@ function WalletCarouselView({
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           {containerWidth === 0
             ? null
-            : rendered.map((wallet, index) => (
+            : deck.map((wallet, index) => (
                 <CarouselCard
-                  // Index, not wallet id — the loop copies repeat every id.
+                  // Index too, not the id alone — the loop copies repeat every id.
                   key={`${wallet.id}-${index}`}
                   wallet={wallet}
                   index={index}
@@ -210,6 +189,7 @@ function WalletCarouselView({
                   // Every loop copy of the wallet gets it — whichever copy is
                   // centred is the one the user sees.
                   highlightOpacity={wallet.id === highlightWalletId ? highlightOpacity : undefined}
+                  loopCount={singleDeck ? wallets.length : 0}
                 />
               ))}
         </View>
@@ -237,9 +217,13 @@ function WalletCarouselView({
               onPressOut={handlePressOut}
               onPress={handlePress}
               accessibilityRole="adjustable"
-              accessibilityLabel={centred ? `${centred.name}, ${formatCurrency(centred.balance, centred.currency)}` : undefined}
-              accessibilityHint="Vuốt lên hoặc xuống để đổi ví, chạm hai lần để mở"
-              accessibilityActions={ACCESSIBILITY_ACTIONS}
+              accessibilityLabel={
+                centred
+                  ? t("wallets.card.a11y", { wallet: centred.name, amount: formatCurrency(centred.balance, centred.currency) })
+                  : undefined
+              }
+              accessibilityHint={t("wallets.carousel.a11y.hint")}
+              accessibilityActions={accessibilityActions}
               onAccessibilityAction={handleAccessibilityAction}
               testID="carousel-wallets-tap"
             />

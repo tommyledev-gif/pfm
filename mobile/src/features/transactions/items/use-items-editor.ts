@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { i18n } from "@/lib/i18n";
 
 import { AmountExpression } from "@/lib/use-amount-expression";
 import { AdjustmentKind, TransactionAdjustment, TransactionAdjustmentInput, TransactionItem, TransactionItemInput } from "@/features/transactions/types";
@@ -40,9 +41,9 @@ export function useItemsEditor(amount: AmountExpression) {
   const gap = linesGap(cents, items, adjustments);
   const complete = linesComplete(items, adjustments);
   const problem = !complete
-    ? "Điền đủ từng món trước khi lưu."
+    ? i18n.t("transactions.items.problem.incomplete")
     : gap !== 0
-      ? "Tổng các món lệch số tiền giao dịch."
+      ? i18n.t("transactions.items.problem.mismatch")
       : undefined;
 
   useEffect(() => {

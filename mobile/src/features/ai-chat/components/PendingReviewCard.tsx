@@ -1,4 +1,5 @@
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { CalendarIcon, CheckIcon } from "@/components/ui/Icon";
@@ -8,6 +9,7 @@ import { formatDateShort } from "@/lib/format-date";
 import { withAlpha } from "@/lib/color";
 import { TRANSFER_CATEGORY_ICON } from "@/lib/constants";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { categoryLabel } from "@/features/categories/category-label";
 import { Category } from "@/features/categories/types";
 import { proposalAmountSign, proposalCategoryName } from "@/features/ai-chat/proposal-kind";
 import { ChatMessage } from "@/features/ai-chat/types";
@@ -48,12 +50,13 @@ export function PendingReviewCard({
 }: PendingReviewCardProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const payload = message.action?.payload;
   if (!payload) return null;
 
   const isIncome = payload.type === "income";
   const isTransfer = payload.type === "transfer";
-  const categoryName = proposalCategoryName(payload, () => category?.name) ?? "Danh mục";
+  const categoryName = proposalCategoryName(payload, () => category && categoryLabel(category)) ?? t("common.field.category");
   const title = payload.note || categoryName;
   const busy = locked || confirming;
 
@@ -62,7 +65,7 @@ export function PendingReviewCard({
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
       onPress={onEdit}
       disabled={busy}
-      accessibilityHint="Chạm để sửa trước khi duyệt"
+      accessibilityHint={t("pending.card.hint")}
     >
       <View style={styles.topRow}>
         <Avatar
@@ -105,7 +108,7 @@ export function PendingReviewCard({
           hitSlop={4}
           testID="btn-pending-review-discard"
         >
-          <Text style={styles.dismissLabel}>Bỏ qua</Text>
+          <Text style={styles.dismissLabel}>{t("pending.card.dismiss")}</Text>
         </Pressable>
         <Pressable
           style={({ pressed }) => [styles.action, styles.approve, pressed && styles.actionPressed, locked && styles.locked]}
@@ -119,7 +122,7 @@ export function PendingReviewCard({
           ) : (
             <>
               <CheckIcon size={14} color={colors.onGreen} />
-              <Text style={styles.approveLabel}>Duyệt</Text>
+              <Text style={styles.approveLabel}>{t("pending.card.approve")}</Text>
             </>
           )}
         </Pressable>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Animated, Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { AmountText } from "@/components/ui/AmountText";
 import { AnalyticsChartItem } from "@/features/analytics/types";
@@ -52,6 +53,7 @@ function peakIndex(items: AnalyticsChartItem[]): number {
 // line states the selected column in full — the peak by default — and
 // tapping a column moves it there.
 export function ColumnBars({ items, currency }: ColumnBarsProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const [selected, setSelected] = useState(() => peakIndex(items));
@@ -105,7 +107,7 @@ export function ColumnBars({ items, currency }: ColumnBarsProps) {
       </View>
 
       {/* Said once, until the first tap — after that it is known. */}
-      {!touched ? <Text style={styles.hint}>Chạm vào cột để xem từng mốc.</Text> : null}
+      {!touched ? <Text style={styles.hint}>{t("analytics.columns.hint")}</Text> : null}
     </View>
   );
 }

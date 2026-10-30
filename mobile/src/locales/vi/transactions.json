@@ -1,0 +1,240 @@
+{
+  "transactions": {
+    "typeTab": {
+      "transfer": "Chuyển"
+    },
+    "header": {
+      "incomeInPeriod": "Tổng thu {{period}}",
+      "spendingInPeriod": "Tổng chi {{period}}",
+      "sortHint": "Sắp xếp giao dịch",
+      "export": "Xuất Excel",
+      "exportHint": "Xuất ra Excel",
+      "import": "Nhập Excel"
+    },
+    "search": {
+      "placeholder": "Tìm theo ghi chú..."
+    },
+    "filter": {
+      "clearWallet": "Bỏ lọc ví",
+      "datePill": "Thời gian",
+      "clearDate": "Bỏ lọc thời gian",
+      "clearCategory": "Bỏ lọc danh mục"
+    },
+    "walletFilter": {
+      "title": "Lọc theo ví",
+      "all": "Tất cả ví"
+    },
+    "categoryFilter": {
+      "noMatch": "Không có danh mục khớp."
+    },
+    "sort": {
+      "reset": "Đặt lại",
+      "recent": "Mới nhất trước",
+      "oldest": "Cũ nhất trước",
+      "highest": "Số tiền cao nhất",
+      "lowest": "Số tiền thấp nhất"
+    },
+    "otherCurrencies": {
+      "one": "Có thêm {{currency}}",
+      "count_other": "Có thêm {{count}} loại tiền khác"
+    },
+    "empty": {
+      "none": {
+        "title": "Chưa có giao dịch nào"
+      },
+      "shortcut": {
+        "aiEyebrow": "Ghi bằng AI",
+        "aiExample": "Nhắn “Cà phê 50k”",
+        "categories": "Tuỳ chỉnh danh mục"
+      },
+      "filtered": {
+        "title": "Không tìm thấy giao dịch",
+        "suggestions": "Gợi ý từ ghi chú gần đây"
+      },
+      "type": {
+        "expense": "Chưa có khoản chi nào",
+        "income": "Chưa có khoản thu nào",
+        "transfer": "Chưa có lần chuyển tiền nào"
+      },
+      "onlyFuture": "Chưa có giao dịch nào tính đến hôm nay."
+    },
+    "form": {
+      "typeLocked": "Loại (khóa sau khi tạo)",
+      "editTitle": "Sửa giao dịch",
+      "newTitle": "Giao dịch mới",
+      "delete": "Xóa giao dịch",
+      "deleteConfirm": {
+        "title": "Xóa giao dịch?",
+        "body": "Hành động này không thể hoàn tác và sẽ điều chỉnh lại số dư ví."
+      },
+      "walletsOffline": "Kết nối mạng để tải danh sách ví.",
+      "sameCurrencyOnly": "Chỉ hiện ví cùng loại tiền",
+      "availableBalance": "Số dư khả dụng: {{balance}}",
+      "availableBalanceAfter": "Số dư khả dụng: {{balance}} → {{after}} sau giao dịch này",
+      "noTransferTarget": "Cần thêm một ví khác cùng đơn vị tiền tệ để chuyển khoản.",
+      "error": {
+        "wallet": "Vui lòng chọn ví",
+        "toWallet": "Vui lòng chọn ví nhận",
+        "amount": "Vui lòng nhập số tiền"
+      }
+    },
+    "dropItems": {
+      "title_other": "Bỏ {{count}} món?",
+      "confirm": "Bỏ các món"
+    },
+    "items": {
+      "notOnTransfer": "Giao dịch chuyển tiền không có món.",
+      "entryA11yTotal_other": "Các món: {{count}} món, tổng {{total}}",
+      "entryA11y": "Các món: {{summary}}",
+      "title": "Chi tiết món",
+      "undoFallbackName": "món",
+      "removed": "Đã xóa {{name}}",
+      "max_other": "Tối đa {{count}} món.",
+      "add": "Thêm món",
+      "unnamed": "Món chưa có tên",
+      "quantityOnly": "Số lượng {{quantity}}",
+      "incomplete": "Điền tên, số lượng và thành tiền.",
+      "nameLabel": "Tên món",
+      "namePlaceholder": "vd: Sữa đặc",
+      "delete": "Xóa món",
+      "decrease": "Bớt một",
+      "increase": "Thêm một",
+      "gapWithAmount": "Lệch {{gap}} so với số tiền giao dịch {{amount}}.",
+      "gap": "Lệch {{gap}} so với số tiền giao dịch.",
+      "addDifference": "Ghi phần lệch",
+      "useTotal": "Lấy theo tổng",
+      "undo": "Hoàn tác",
+      "offlineCount_other": "{{count}} món. Kết nối mạng để xem các món.",
+      "itemsTotal": "Tổng các món",
+      "problem": {
+        "incomplete": "Điền đủ từng món trước khi lưu.",
+        "mismatch": "Tổng các món lệch số tiền giao dịch."
+      }
+    },
+    "walletPicker": {
+      "empty": "Chưa có ví."
+    },
+    "walletChange": {
+      "body": {
+        "income": "Khi lưu, số dư ví {{from}} giảm {{oldAmount}}, ví {{to}} tăng {{newAmount}}.",
+        "expense": "Khi lưu, số dư ví {{from}} tăng {{oldAmount}}, ví {{to}} giảm {{newAmount}}."
+      },
+      "title": "Đổi sang ví {{wallet}}?",
+      "confirm": "Đổi ví",
+      "keep": "Giữ ví cũ"
+    },
+    "keypad": {
+      "chooseToWallet": "Chọn ví nhận",
+      "amountA11y": "Số tiền: {{amount}}",
+      "notePlaceholder": "Ghi chú (không bắt buộc)",
+      "dateA11y": "Ngày giao dịch: {{date}}"
+    },
+    "staleEdit": {
+      "title": "Giao dịch đã được sửa ở nơi khác",
+      "body": "Lưu bản này sẽ thay bản kia.",
+      "loadLatest": "Tải bản mới"
+    },
+    "saveError": {
+      "ITEMS_TOTAL_MISMATCH": "Chưa lưu được. Tổng các món lệch số tiền giao dịch. Số dư chưa thay đổi.",
+      "WALLET_CURRENCY_MISMATCH": "Chưa lưu được. Chỉ đổi sang ví cùng loại tiền. Số dư chưa thay đổi.",
+      "TRANSFER_WALLET_IMMUTABLE": "Chưa lưu được. Giao dịch chuyển tiền không đổi được ví. Số dư chưa thay đổi.",
+      "WALLET_NOT_FOUND": "Chưa lưu được. Không tìm thấy ví đã chọn. Số dư chưa thay đổi."
+    },
+    "adjustments": {
+      "max_other": "Tối đa {{count}} dòng.",
+      "add": "Thêm dòng",
+      "direction": {
+        "add": "Cộng thêm",
+        "subtract": "Trừ bớt"
+      },
+      "incompleteOther": "Chọn cộng hay trừ, ghi rõ và nhập số tiền.",
+      "labelPlaceholder": "Ghi rõ, ví dụ Làm tròn",
+      "delete": "Xóa dòng"
+    },
+    "location": {
+      "tileA11y": "Vị trí: {{place}}. Mở bản đồ",
+      "tileA11yUnnamed": "Vị trí: chưa có tên khu vực. Mở bản đồ",
+      "pinOnSave": "Ghim khi lưu",
+      "add": "Thêm vị trí",
+      "edit": "Sửa vị trí",
+      "saveWithout": "Lưu không kèm vị trí",
+      "unpin": "Bỏ ghim",
+      "viewTitle": "Vị trí giao dịch",
+      "pickTitle": "Ghim vị trí",
+      "error": {
+        "denied": "Budgest chưa được cấp quyền vị trí. Hãy cho phép trong Cài đặt rồi thử lại.",
+        "servicesOff": "Định vị (GPS) đang tắt. Bật định vị để ghim vị trí giao dịch.",
+        "unavailable": "Chưa lấy được vị trí hiện tại. Thử lại ở nơi thoáng hơn."
+      },
+      "locating": "Đang xác định vị trí…",
+      "naming": "Đang tìm khu vực…",
+      "noAreaName": "Chưa có tên khu vực (cần mạng) — vẫn lưu toạ độ",
+      "noteLabel": "Ghi chú địa điểm",
+      "noteEmpty": "Chưa có ghi chú cho địa điểm này.",
+      "adjustHint": "{{coords}} · Chạm hoặc kéo ghim để chỉnh lại",
+      "notePlaceholder": "Ghi chú về địa điểm: đường đi, cổng, tầng… (không bắt buộc)"
+    },
+    "place": {
+      "searchPlaceholder": "Tìm địa chỉ, tên đường",
+      "unnamed": "Vị trí chưa có tên",
+      "savedHeader": "Đã ghim trước đây",
+      "removeSaved": "Xóa nơi đã ghim",
+      "resultsHeader": "Kết quả",
+      "searching": "Đang tìm…",
+      "searchFailed": "Chưa tìm được địa điểm. Kiểm tra mạng rồi thử lại.",
+      "noResults": "Không tìm thấy địa điểm. Thử thêm tên quận, thành phố."
+    },
+    "sync": {
+      "queued": "Đã lưu trên máy, sẽ đồng bộ khi có mạng.",
+      "queueFull": "Có quá nhiều giao dịch chờ đồng bộ. Hãy kết nối mạng để đồng bộ trước.",
+      "status": {
+        "waiting": "Đang chờ",
+        "sending": "Đang gửi",
+        "failed": "Lỗi: {{message}}"
+      },
+      "discard": {
+        "title": "Bỏ giao dịch chưa đồng bộ này?",
+        "body": "Giao dịch sẽ bị xoá khỏi máy và không được gửi lên tài khoản.",
+        "maybeSent": "Giao dịch có thể đã được lưu lên tài khoản. Hãy kiểm tra danh sách sau khi đồng bộ."
+      },
+      "sendingHint": "Đang gửi — chờ một chút để sửa hoặc bỏ.",
+      "synced_other": "Đã đồng bộ {{count}} giao dịch",
+      "failed_other": "{{count}} giao dịch không thể đồng bộ — vui lòng kiểm tra.",
+      "replayDiffers": "Giao dịch này đã được lưu trước đó; thay đổi sau không được áp dụng. Hãy sửa trong danh sách.",
+      "serverError": "Lỗi máy chủ"
+    },
+    "export": {
+      "failed": "Không xuất được tệp",
+      "shareUnavailable": "Thiết bị này không hỗ trợ chia sẻ tệp.",
+      "shareTitle": "Xuất giao dịch"
+    },
+    "import": {
+      "wrongType": "Chỉ hỗ trợ tệp .xlsx",
+      "tooLarge": "Tệp vượt quá giới hạn {{limit}}",
+      "readFailed": "Không đọc được tệp",
+      "expired": "Phiên nhập đã hết hạn. Chọn lại tệp.",
+      "confirm_other": "Nhập {{count}} dòng",
+      "nothingToImport": "Không có dòng nào",
+      "preview": {
+        "title": "Xem trước khi nhập",
+        "body_other": "Chưa lưu gì. Kiểm tra {{count}} dòng bên dưới rồi xác nhận.",
+        "toImport": "Sẽ nhập",
+        "errors": "Lỗi",
+        "total": "Tổng: {{amount}}",
+        "errorRows": "Dòng bị lỗi — sửa trong file rồi tải lại",
+        "duplicates": "Đã nhập trước đó — sẽ bỏ qua"
+      },
+      "summary": {
+        "skipped": "Bỏ qua",
+        "imported": "Đã nhập",
+        "failed": "Thất bại"
+      },
+      "result": {
+        "title": "Đã nhập xong",
+        "failedRows": "Dòng không tạo được"
+      },
+      "issueRow": "Dòng {{row}}: {{reason}}",
+      "more_other": "và {{count}} dòng nữa"
+    }
+  }
+}

@@ -1,11 +1,13 @@
 import { memo } from "react";
 import { FlatList, ListRenderItemInfo, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTranslation } from "react-i18next";
 
 import { PILL_HEIGHT } from "@/components/shared/bottom-nav-styles";
 import { ChatSearchHit } from "@/features/ai-chat/chat-search";
 import { messageCreatedAt } from "@/features/ai-chat/components/ChatMessageRow";
-import { dayLabelVi, formatTime } from "@/lib/format-date";
+import { dayLabel, formatTime } from "@/lib/format-date";
+import { i18n } from "@/lib/i18n";
 import { useKeyboardHeight } from "@/lib/use-keyboard-height";
 import { useLatestCallback } from "@/lib/use-latest-callback";
 import { spacing, typography, createStyles } from "@/lib/theme";
@@ -19,13 +21,14 @@ interface ChatSearchResultsProps {
 
 const hitKey = (hit: ChatSearchHit) => hit.message.id;
 
-// "Bạn · Hôm nay 14:05": who said it and when.
+// "Bạn · Hôm nay 14:05": who said it and when. Called during render of a
+// row that uses useTranslation().
 function hitMeta(hit: ChatSearchHit): string {
-  const who = hit.message.role === "user" ? "Bạn" : "Trợ lý";
+  const who = i18n.t(hit.message.role === "user" ? "chat.search.who.user" : "chat.search.who.assistant");
   const at = messageCreatedAt(hit.message.id);
   if (at === undefined) return who;
   const iso = new Date(at).toISOString();
-  return `${who} · ${dayLabelVi(iso)} ${formatTime(iso)}`;
+  return i18n.t("chat.search.hitMeta", { who, day: dayLabel(iso), time: formatTime(iso) });
 }
 
 /**
@@ -35,6 +38,7 @@ function hitMeta(hit: ChatSearchHit): string {
  */
 export function ChatSearchResults({ hits, tint, onSelect }: ChatSearchResultsProps) {
   const styles = useStyles();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const keyboardHeight = useKeyboardHeight();
   const select = useLatestCallback(onSelect);
@@ -44,8 +48,8 @@ export function ChatSearchResults({ hits, tint, onSelect }: ChatSearchResultsPro
   if (hits.length === 0) {
     return (
       <View style={[styles.overlay, styles.empty]} testID="chat-search-empty">
-        <Text style={styles.emptyTitle}>Không tìm thấy tin nhắn</Text>
-        <Text style={styles.emptyHint}>Thử từ khóa khác.</Text>
+        <Text style={styles.emptyTitle}>{t("chat.search.empty.title")}</Text>
+        <Text style={styles.emptyHint}>{t("common.empty.tryAnotherKeyword")}</Text>
       </View>
     );
   }
@@ -62,7 +66,7 @@ export function ChatSearchResults({ hits, tint, onSelect }: ChatSearchResultsPro
       renderItem={renderItem}
       // The keyboard stays up between results; a tap still lands.
       keyboardShouldPersistTaps="handled"
-      ListHeaderComponent={<Text style={styles.count}>{hits.length} tin nhắn</Text>}
+      ListHeaderComponent={<Text style={styles.count}>{t("chat.search.resultCount", { count: hits.length })}</Text>}
       ItemSeparatorComponent={Separator}
       contentContainerStyle={{ paddingBottom: bottom }}
       testID="chat-search-results"
@@ -80,6 +84,8 @@ const HitRow = memo(function HitRow({
   onSelect: (messageId: string) => void;
 }) {
   const styles = useStyles();
+  // hitMeta reads the language; this re-renders the memoized row on a switch.
+  useTranslation();
   return (
     <Pressable
       accessibilityRole="button"

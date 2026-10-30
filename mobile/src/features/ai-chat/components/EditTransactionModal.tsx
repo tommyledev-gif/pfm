@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Keyboard } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Drawer } from "@/components/shared/Drawer";
@@ -67,6 +68,7 @@ export function EditTransactionModal({
   transactionId = null,
   vndOnly,
 }: EditTransactionModalProps) {
+  const { t } = useTranslation();
   const [type, setType] = useState<TransactionKind>("expense");
   const isTransfer = type === "transfer";
   const [categoryId, setCategoryId] = useState<string | null>(null);
@@ -175,8 +177,12 @@ export function EditTransactionModal({
   const amountValid = amount.cents !== null && amount.cents > 0;
   const kindChosen = isTransfer ? destinationChosen : Boolean(categoryId);
   const canSave = amountValid && kindChosen && Boolean(wallet) && Boolean(occurredAt);
-  const kindError = isTransfer ? (destinationChosen ? undefined : "Chọn ví nhận.") : categoryId ? undefined : "Chọn danh mục.";
-  const errors = submitAttempted ? [kindError, amount.problem ?? (amountValid ? undefined : "Nhập số tiền.")] : [];
+  const kindError = isTransfer
+    ? destinationChosen ? undefined : t("chat.editTransaction.error.chooseDestination")
+    : categoryId ? undefined : t("chat.editTransaction.error.chooseCategory");
+  const errors = submitAttempted
+    ? [kindError, amount.problem ?? (amountValid ? undefined : t("common.validation.enterAmount"))]
+    : [];
 
   const submit = () => {
     Keyboard.dismiss();
@@ -232,10 +238,10 @@ export function EditTransactionModal({
         }
       >
         <DrawerHeader
-          title="Sửa giao dịch"
+          title={t("chat.editTransaction.title")}
           actions={[
-            { label: "Hủy", onPress: onClose, variant: "secondary" },
-            { label: "Lưu", onPress: submit, disabled: !canSave },
+            { label: t("common.action.cancel"), onPress: onClose, variant: "secondary" },
+            { label: t("common.action.save"), onPress: submit, disabled: !canSave },
           ]}
         />
 

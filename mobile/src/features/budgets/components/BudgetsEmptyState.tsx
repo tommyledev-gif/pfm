@@ -1,4 +1,5 @@
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { EmptyStateCard } from "@/components/shared/EmptyState";
 import { ThemedIllustration } from "@/components/shared/ThemedIllustration";
@@ -9,6 +10,7 @@ import { WalletCurrency } from "@/lib/constants";
 import { formatCurrency } from "@/lib/currency";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
+import { categoryLabel } from "@/features/categories/category-label";
 
 export interface BudgetPreset {
   categoryId: string;
@@ -36,6 +38,7 @@ interface BudgetsEmptyStateProps {
 
 /** Insights → Budgets for an account with no budget at all. */
 export function BudgetsEmptyState({ currency, onOpenWizard, onCreate }: BudgetsEmptyStateProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const categories = useCategoriesQuery("expense");
@@ -48,10 +51,10 @@ export function BudgetsEmptyState({ currency, onOpenWizard, onCreate }: BudgetsE
     <View style={styles.stack} testID="empty-budgets">
       <EmptyStateCard
         illustration={<ThemedIllustration name="budgets" />}
-        title="Chưa có ngân sách"
-        description="Đặt hạn mức theo danh mục để biết tháng này còn chi được bao nhiêu."
+        title={t("budgets.empty.title")}
+        description={t("budgets.empty.body")}
         action={{
-          label: "Tạo ngân sách",
+          label: t("common.action.createBudget"),
           icon: <PlusIcon size={18} color={colors.onGreen} />,
           onPress: onOpenWizard,
           testID: "btn-empty-budgets-wizard",
@@ -62,11 +65,12 @@ export function BudgetsEmptyState({ currency, onOpenWizard, onCreate }: BudgetsE
       {rows.length > 0 ? (
         <>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Gợi ý danh mục phổ biến</Text>
+            <Text style={styles.sectionTitle}>{t("budgets.empty.suggestions")}</Text>
           </View>
           {rows.map(({ systemKey, amountCents, category }) => {
             const isSavings = amountCents === null;
             const offerAmount = !isSavings && currency === "VND";
+            const name = categoryLabel(category);
             return (
               <Pressable
                 key={systemKey}
@@ -81,18 +85,18 @@ export function BudgetsEmptyState({ currency, onOpenWizard, onCreate }: BudgetsE
                   size={40}
                   icon={category.icon}
                   iconUrl={category.icon_url}
-                  label={category.name}
+                  label={name}
                 />
                 <View style={styles.rowText}>
                   <Text style={styles.rowTitle} numberOfLines={1}>
-                    {category.name}
+                    {name}
                   </Text>
                   <Text style={styles.rowSubtitle} numberOfLines={1}>
                     {isSavings
-                      ? "Đề xuất 15–20% thu nhập"
+                      ? t("budgets.empty.savingsHint")
                       : offerAmount
-                        ? `Mức tiêu chuẩn ~ ${formatCurrency(amountCents, currency)}`
-                        : "Tự đặt hạn mức"}
+                        ? t("budgets.empty.typicalAmount", { amount: formatCurrency(amountCents, currency) })
+                        : t("budgets.empty.setOwn")}
                   </Text>
                 </View>
                 <View style={styles.chevron}>

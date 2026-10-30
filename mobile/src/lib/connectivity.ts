@@ -4,6 +4,7 @@ import NetInfo, { type NetInfoState } from "@react-native-community/netinfo";
 import { focusManager, onlineManager } from "@tanstack/react-query";
 
 import { NEEDS_CONNECTION_MESSAGE } from "@/lib/constants";
+import { i18n } from "@/lib/i18n";
 import { useToastStore } from "@/stores/toast-store";
 
 // Connectivity for the whole app (specs/mobile-offline-support US-02).
@@ -61,6 +62,6 @@ export function useRequireOnline(): (action: () => void) => void {
       action();
       return;
     }
-    useToastStore.getState().show(NEEDS_CONNECTION_MESSAGE, "warning");
+    useToastStore.getState().show(i18n.t(NEEDS_CONNECTION_MESSAGE), "warning");
   }, []);
 }

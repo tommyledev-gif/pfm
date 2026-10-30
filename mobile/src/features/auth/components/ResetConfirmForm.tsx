@@ -1,9 +1,10 @@
 import { useRef, useState } from "react";
 import { Keyboard, Pressable, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { PillButton } from "@/components/ui/PillButton";
 import { EyeIcon, EyeOffIcon } from "@/components/ui/Icon";
-import { PASSWORD_RESET_CODE_LENGTH } from "@/lib/constants";
+import { MIN_PASSWORD_LENGTH, PASSWORD_RESET_CODE_LENGTH } from "@/lib/constants";
 import { spacing, createStyles, useColors } from "@/lib/theme";
 import { completeLogin } from "@/features/accounts/complete-login";
 import { useConfirmPasswordResetMutation } from "@/features/auth/api/use-confirm-password-reset-mutation";
@@ -22,6 +23,7 @@ interface ResetConfirmFormProps {
 // here first so a typo never spends one of the code's 5 tries; on success the
 // returned pair signs this phone in exactly like a password login.
 export function ResetConfirmForm({ identifier, onDone }: ResetConfirmFormProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const confirmReset = useConfirmPasswordResetMutation();
@@ -72,7 +74,7 @@ export function ResetConfirmForm({ identifier, onDone }: ResetConfirmFormProps) 
       hitSlop={4}
       style={styles.trailing}
       accessibilityRole="button"
-      accessibilityLabel={showPassword ? RESET_COPY.hidePassword : RESET_COPY.showPassword}
+      accessibilityLabel={t(showPassword ? RESET_COPY.hidePassword : RESET_COPY.showPassword)}
     >
       {showPassword ? <EyeOffIcon size={22} color={colors.textSecondary} /> : <EyeIcon size={22} color={colors.textSecondary} />}
     </Pressable>
@@ -83,11 +85,11 @@ export function ResetConfirmForm({ identifier, onDone }: ResetConfirmFormProps) 
       <View style={styles.fields}>
         <AuthField
           ref={codeRef}
-          label={RESET_COPY.codeLabel}
+          label={t(RESET_COPY.codeLabel)}
           value={code}
           onChangeText={edit("code", (v) => setCode(v.replace(/[^0-9]/g, "")))}
           error={errors.code}
-          placeholder={RESET_COPY.codePlaceholder}
+          placeholder={t(RESET_COPY.codePlaceholder, { length: PASSWORD_RESET_CODE_LENGTH })}
           keyboardType="number-pad"
           maxLength={PASSWORD_RESET_CODE_LENGTH}
           autoComplete="one-time-code"
@@ -100,11 +102,11 @@ export function ResetConfirmForm({ identifier, onDone }: ResetConfirmFormProps) 
         />
         <AuthField
           ref={passwordRef}
-          label={RESET_COPY.passwordLabel}
+          label={t(RESET_COPY.passwordLabel)}
           value={password}
           onChangeText={edit("password", setPassword)}
           error={errors.password}
-          placeholder={RESET_COPY.passwordPlaceholder}
+          placeholder={t(RESET_COPY.passwordPlaceholder, { count: MIN_PASSWORD_LENGTH })}
           secureTextEntry={!showPassword}
           autoComplete="new-password"
           textContentType="newPassword"
@@ -116,7 +118,7 @@ export function ResetConfirmForm({ identifier, onDone }: ResetConfirmFormProps) 
         />
         <AuthField
           ref={confirmRef}
-          label={RESET_COPY.confirmLabel}
+          label={t(RESET_COPY.confirmLabel)}
           value={confirm}
           onChangeText={edit("confirm", setConfirm)}
           error={errors.confirm}
@@ -130,7 +132,7 @@ export function ResetConfirmForm({ identifier, onDone }: ResetConfirmFormProps) 
       </View>
       <AuthFormError message={errors.form} />
       <PillButton
-        label={RESET_COPY.submit}
+        label={t(RESET_COPY.submit)}
         loading={confirmReset.isPending}
         onPress={submit}
         style={styles.button}

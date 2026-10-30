@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Pressable, Text, View, useWindowDimensions } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
+import { useTranslation } from "react-i18next";
 
 import { BackspaceIcon } from "@/components/ui/Icon";
 import { PIN_LENGTH } from "@/lib/constants";
@@ -43,6 +44,8 @@ interface PinPadProps {
  * suggest, autofill or log.
  */
 export function PinPad({ value, onChange, onComplete, disabled = false, shakeKey = 0, message, messageTone = "error" }: PinPadProps) {
+  // Also re-renders the labels entered() and digitKey() read.
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const reduceMotion = useReduceMotion();
@@ -116,7 +119,7 @@ export function PinPad({ value, onChange, onComplete, disabled = false, shakeKey
                     pressed && styles.keyPressed,
                   ]}
                   accessibilityRole="button"
-                  accessibilityLabel={key === "del" ? PIN_COPY.deleteDigit : digitKey(key)}
+                  accessibilityLabel={key === "del" ? t(PIN_COPY.deleteDigit) : digitKey(key)}
                   testID={key === "del" ? "btn-pin-delete" : `btn-pin-digit-${key}`}
                 >
                   {key === "del" ? (

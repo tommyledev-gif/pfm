@@ -13,6 +13,7 @@ import {
   remainingDelayMs,
   scheduleRefresh,
 } from "@/lib/refresh-scheduler";
+import { i18n, TranslationKey } from "@/lib/i18n";
 import { secureStorage } from "@/lib/secure-storage";
 import { emitSessionRefused, emitSessionRenewed } from "@/lib/session-events";
 import { useToastStore } from "@/stores/toast-store";
@@ -24,8 +25,7 @@ import {
   REFRESH_RETRY_DELAY_SECONDS,
 } from "@/lib/constants";
 
-const SESSION_ENDED_MESSAGE = "Phiên đăng nhập đã hết hạn.";
-
+const SESSION_ENDED_MESSAGE = "errors.sessionExpired" satisfies TranslationKey;
 // The server answered and refused the refresh token (expired, revoked,
 // malformed, User disabled) — the only failure that really ends a session.
 function isRefreshRejected(err: unknown): boolean {
@@ -216,7 +216,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         // revoked) counts as a session actually "ending" out from under the
         // user; an explicit Log out on Settings also calls clear() but
         // already knows why it's happening, so it doesn't need telling.
-        useToastStore.getState().show(SESSION_ENDED_MESSAGE, "warning");
+        useToastStore.getState().show(i18n.t(SESSION_ENDED_MESSAGE), "warning");
         throw err;
       })
       .finally(() => {

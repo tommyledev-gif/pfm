@@ -3,6 +3,7 @@ import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 
 import { apiClient } from "@/lib/axios";
+import { i18n } from "@/lib/i18n";
 import { XLSX_MIME_TYPE, XLSX_UTI } from "@/lib/constants";
 
 export interface ExportTransactionsParams {
@@ -41,12 +42,12 @@ export function useExportTransactionsMutation() {
       file.write(new Uint8Array(res.data));
 
       if (!(await Sharing.isAvailableAsync())) {
-        throw new Error("Thiết bị này không hỗ trợ chia sẻ tệp.");
+        throw new Error(i18n.t("transactions.export.shareUnavailable"));
       }
       await Sharing.shareAsync(file.uri, {
         mimeType: XLSX_MIME_TYPE,
         UTI: XLSX_UTI,
-        dialogTitle: "Xuất giao dịch",
+        dialogTitle: i18n.t("transactions.export.shareTitle"),
       });
       return { filename };
     },

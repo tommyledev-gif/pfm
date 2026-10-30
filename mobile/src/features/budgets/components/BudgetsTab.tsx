@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, ScrollView, Text, View } from "react-native";
 import Reanimated from "react-native-reanimated";
+import { useTranslation } from "react-i18next";
 
 import { useListEntrance } from "@/components/motion/MotionView";
 import { LateSkeleton, SkeletonSwap } from "@/components/motion/SkeletonSwap";
@@ -31,6 +32,7 @@ import { BudgetMonthSummary } from "@/features/budgets/components/BudgetMonthSum
 import { BudgetRangeRow } from "@/features/budgets/components/BudgetRangeRow";
 import { BudgetPreset, BudgetsEmptyState } from "@/features/budgets/components/BudgetsEmptyState";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
+import { categoryLabel } from "@/features/categories/category-label";
 import { usePeriodSlide } from "@/features/reports/hooks/use-period-slide";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { primaryCurrency } from "@/features/wallets/wallet-totals";
@@ -50,6 +52,7 @@ interface BudgetsTabProps {
 }
 
 export const BudgetsTab = memo(function BudgetsTab({ initialRange, rangeNonce, onOpenBudgetWizard }: BudgetsTabProps = {}) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>(initialRange ?? {});
   const [rangePickerOpen, setRangePickerOpen] = useState(false);
@@ -109,12 +112,12 @@ export const BudgetsTab = memo(function BudgetsTab({ initialRange, rangeNonce, o
     () =>
       Array.from(new Map(rows.map(({ budget }) => [budget.category_id, budget])).values()).map((budget) => ({
         id: budget.category_id,
-        name: budget.category_name,
+        name: categoryLabel(categoryById.get(budget.category_id), budget.category_name),
         icon: budget.icon ?? categoryById.get(budget.category_id)?.icon,
         iconUrl: budget.icon_url ?? categoryById.get(budget.category_id)?.icon_url,
         color: colorForCategory(budget.category_id),
       })),
-    [rows, categoryById],
+    [rows, categoryById, t],
   );
   const scrollContentStyle = useMemo(() => ({ paddingBottom: fabClearance }), [fabClearance]);
 
@@ -181,7 +184,7 @@ export const BudgetsTab = memo(function BudgetsTab({ initialRange, rangeNonce, o
                       ? formatDateRange(dateRange.from, dateRange.to ?? dateRange.from)
                       : resolvedRange
                         ? formatDateRange(resolvedRange.from, resolvedRange.to)
-                        : "Tháng này"
+                        : t("common.date.thisMonth")
                   }
                   filtered={live.rangeActive}
                   onOpenPicker={() => setRangePickerOpen(true)}
@@ -200,12 +203,7 @@ export const BudgetsTab = memo(function BudgetsTab({ initialRange, rangeNonce, o
                       // Under a filter the card describes the selected window, not the
                       // month — its own totals already come from the filtered rows, so the
                       // pace and the wording have to follow or the card contradicts itself.
-                      pace={
-                        rangeActive && resolvedRange
-                          ? { elapsed: rangeElapsed, daysLeft: 0, label: formatDateRange(resolvedRange.from, resolvedRange.to) }
-                          : pace
-                      }
-                      periodNoun={rangeActive ? (rangeDayCount === 1 ? "ngày" : "khoảng này") : "tháng"}
+                      pace={rangeActive && resolvedRange ? { elapsed: rangeElapsed, daysLeft: 0 } : pace}
                       showDaysLeft={!rangeActive}
                       totalLimit={totals.limit}
                       totalSpent={totals.spent}
@@ -218,7 +216,7 @@ export const BudgetsTab = memo(function BudgetsTab({ initialRange, rangeNonce, o
                     <Animated.View style={filterSlide} onLayout={(e) => (rowsTop.current = e.nativeEvent.layout.y)}>
                       {visibleRows.length === 0 ? (
                         <Text style={styles.empty}>
-                          {rows.length === 0 ? `Chưa có ngân sách bằng ${currency}.` : "Không có ngân sách nào trong nhóm này."}
+                          {rows.length === 0 ? t("budgets.list.emptyCurrency", { currency }) : t("budgets.list.emptyFilter")}
                         </Text>
                       ) : (
                         visibleRows.map(({ budget, limit, periodElapsed }, index) => (

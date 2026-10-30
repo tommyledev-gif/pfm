@@ -1,5 +1,6 @@
 import { memo, useEffect, useRef, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { SearchIcon } from "@/components/ui/Icon";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
@@ -22,6 +23,7 @@ export const TransactionsSearchField = memo(function TransactionsSearchField({
   initialText,
   onSearch,
 }: TransactionsSearchFieldProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const [text, setText] = useState(initialText);
@@ -45,12 +47,12 @@ export const TransactionsSearchField = memo(function TransactionsSearchField({
       <TextInput
         value={text}
         onChangeText={change}
-        placeholder="Tìm theo ghi chú..."
+        placeholder={t("transactions.search.placeholder")}
         placeholderTextColor={colors.textMuted}
         style={styles.searchInput}
       />
       {text ? (
-        <Pressable onPress={() => change("")} hitSlop={8} accessibilityRole="button" accessibilityLabel="Xóa tìm kiếm">
+        <Pressable onPress={() => change("")} hitSlop={8} accessibilityRole="button" accessibilityLabel={t("common.action.clearSearch")}>
           <Text style={styles.clearSearch}>✕</Text>
         </Pressable>
       ) : null}

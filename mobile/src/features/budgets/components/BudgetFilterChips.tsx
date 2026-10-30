@@ -1,5 +1,7 @@
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
+import { TranslationKey } from "@/lib/i18n";
 import { colors, radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { BudgetPaceState } from "@/features/budgets/budget-pace";
 
@@ -10,16 +12,16 @@ export type BudgetFilterKey = "all" | "at-risk" | "over";
 // own chip is right next to this one.
 export const BUDGET_FILTERS: {
   key: BudgetFilterKey;
-  label: string;
+  labelKey: TranslationKey;
   states: readonly BudgetPaceState[] | null;
   /** ⚠️ The colour the matching rows already use. Taken from the same token
    *  the pace helper assigns, never chosen independently — a chip that
    *  disagrees with the rows beneath it contradicts the screen. */
   color: string;
 }[] = [
-  { key: "all", label: "Tất cả", states: null, get color() { return colors.green; } },
-  { key: "at-risk", label: "Sắp vượt", states: ["at-risk"], get color() { return colors.mustard; } },
-  { key: "over", label: "Đã vượt", states: ["over"], get color() { return colors.peach; } },
+  { key: "all", labelKey: "common.label.all", states: null, get color() { return colors.green; } },
+  { key: "at-risk", labelKey: "common.budget.nearLimit", states: ["at-risk"], get color() { return colors.mustard; } },
+  { key: "over", labelKey: "budgets.filter.over", states: ["over"], get color() { return colors.peach; } },
 ];
 
 interface BudgetFilterChipsProps {
@@ -39,6 +41,7 @@ interface BudgetFilterChipsProps {
  * Colour is never the only signal — every chip keeps its label and its count.
  */
 export function BudgetFilterChips({ value, onChange, counts }: BudgetFilterChipsProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   return (
@@ -61,7 +64,7 @@ export function BudgetFilterChips({ value, onChange, counts }: BudgetFilterChips
               muted && styles.chipMuted,
             ]}
           >
-            <Text style={[styles.label, { color: active ? filter.color : colors.textSecondary }]}>{filter.label}</Text>
+            <Text style={[styles.label, { color: active ? filter.color : colors.textSecondary }]}>{t(filter.labelKey)}</Text>
             {/* Lifted onto the chip's corner rather than run inline: "Sắp vượt
                 3" reads as one phrase and the number is easy to take for part
                 of the name. It also keeps every chip the same width whether

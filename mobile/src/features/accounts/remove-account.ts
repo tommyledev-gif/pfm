@@ -1,13 +1,12 @@
 import { accountTokens } from "@/lib/account-tokens";
 import { LOGOUT_FLUSH_TIMEOUT_MS } from "@/lib/constants";
 import { openAccountToken, VaultError } from "@/lib/biometric-vault";
+import { i18n } from "@/lib/i18n";
 import { userIdFromAccessToken } from "@/lib/jwt";
 import { useChatStore } from "@/stores/chat-store";
 import { useSessionStore } from "@/stores/session-store";
 import { useAccountRegistryStore } from "@/features/accounts/account-registry-store";
 import { logoutQuietly, logoutRequest } from "@/features/accounts/api/account-switch-requests";
-
-const REMOVE_PROMPT = "Xác minh để gỡ tài khoản";
 
 export type RemoveOutcome = "removed" | "cancelled";
 
@@ -27,7 +26,7 @@ export async function removeSavedAccount(userId: string): Promise<RemoveOutcome>
     const sealed = await accountTokens.getSealed(userId);
     if (sealed) {
       try {
-        logoutQuietly(await openAccountToken(userId, sealed, REMOVE_PROMPT));
+        logoutQuietly(await openAccountToken(userId, sealed, i18n.t("accounts.remove.verifyPrompt")));
       } catch (error) {
         if (error instanceof VaultError && error.kind === "cancelled") return "cancelled";
       }

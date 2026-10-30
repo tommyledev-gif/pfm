@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { useUiPrefsStore } from "@/stores/ui-prefs-store";
 import {
@@ -32,6 +33,7 @@ interface UseTransactionLocationOptions {
  * ("saved"), never removed; both reach the server with the form's PATCH.
  */
 export function useTransactionLocation({ visible, editingTransaction, editingQueued, onConfirm }: UseTransactionLocationOptions) {
+  const { t } = useTranslation();
   const [pinLocation, setPinLocationState] = useState(() => useUiPrefsStore.getState().pinLocationByDefault);
   const [pinned, setPinned] = useState<TransactionLocationInput | null>(null);
   // Editing a synced Transaction only.
@@ -137,15 +139,17 @@ export function useTransactionLocation({ visible, editingTransaction, editingQue
         muted: false,
         pinned: true,
         locked: false,
-        accessibilityLabel: `Vị trí: ${shownPin.place_name ?? "chưa có tên khu vực"}. Mở bản đồ`,
+        accessibilityLabel: shownPin.place_name
+          ? t("transactions.location.tileA11y", { place: shownPin.place_name })
+          : t("transactions.location.tileA11yUnnamed"),
       }
     : {
         // The Settings default still pins on save; the tile says so.
-        summary: !editingTransaction && pinLocation ? "Ghim khi lưu" : "Thêm vị trí",
+        summary: !editingTransaction && pinLocation ? t("transactions.location.pinOnSave") : t("transactions.location.add"),
         muted: true,
         pinned: false,
         locked: false,
-        accessibilityLabel: "Thêm vị trí",
+        accessibilityLabel: t("transactions.location.add"),
       };
 
   return {

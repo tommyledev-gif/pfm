@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { AmountInput } from "@/components/ui/AmountInput";
 import { MoneySlider } from "@/components/ui/MoneySlider";
 import { Drawer } from "@/components/shared/Drawer";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
+import { ListSection, ListTextField } from "@/components/ui/grouped-list";
 import { MIN_AMOUNT_PER_CATEGORY_XU, maxEditableAmount, roundStepXu } from "@/features/budget-wizard/budget-math";
+import { CATEGORY_NAME_MAX_LENGTH } from "@/lib/constants";
 import { formatCurrency, toCents, toMajorUnits } from "@/lib/currency";
 import { spacing, typography, createStyles } from "@/lib/theme";
 
@@ -17,8 +20,14 @@ interface EditAmountModalProps {
   /** What is still unallocated. This is what bounds the increase. */
   buffer: number;
   currency: string;
+  /**
+   * "new": a category the wizard creates on save, named here. "own": one of
+   * the User's categories, renamed everywhere on save. "system": a built-in
+   * category, whose name stays (budget-wizard/hooks/use-wizard-renames.ts).
+   */
+  nameKind: "new" | "own" | "system";
   onClose: () => void;
-  onConfirm: (amountXu: number) => void;
+  onConfirm: (amountXu: number, name: string) => void;
 }
 
 /**
@@ -37,6 +46,10 @@ interface EditAmountModalProps {
  * When the buffer is empty the slider simply has nowhere left to travel. That
  * reads as a real constraint rather than an error message, which is the honest
  * description of the situation: the money is already allocated.
+ *
+ * The row's category can be renamed here too, except a built-in one: a
+ * budget on a renamed copy would miss every transaction still filed under
+ * the original, so its name is shown, not edited.
  */
 export function EditAmountModal({
   visible,
@@ -44,19 +57,36 @@ export function EditAmountModal({
   amount,
   buffer,
   currency,
+  nameKind,
   onClose,
   onConfirm,
 }: EditAmountModalProps) {
   const styles = useStyles();
+  const { t } = useTranslation();
   const max = maxEditableAmount(amount, buffer);
   const [draft, setDraft] = useState(amount);
+  const [name, setName] = useState(categoryName);
+  const [nameMissing, setNameMissing] = useState(false);
+  const renamable = nameKind !== "system";
 
   // Re-seed whenever a different row is opened. Without this the drawer reopens
   // holding the previous category's figure for a frame, which reads as the app
   // having changed a number on its own.
   useEffect(() => {
-    if (visible) setDraft(amount);
-  }, [visible, amount]);
+    if (!visible) return;
+    setDraft(amount);
+    setName(categoryName);
+    setNameMissing(false);
+  }, [visible, amount, categoryName]);
+
+  const confirm = () => {
+    const trimmed = name.trim();
+    if (renamable && !trimmed) {
+      setNameMissing(true);
+      return;
+    }
+    onConfirm(clamped, renamable ? trimmed : categoryName);
+  };
 
   const clamped = Math.min(Math.max(draft, MIN_AMOUNT_PER_CATEGORY_XU), max);
   const delta = clamped - amount;
@@ -65,18 +95,46 @@ export function EditAmountModal({
   return (
     <Drawer visible={visible} onClose={onClose}>
       <DrawerHeader
-        title={categoryName}
+        title={t("budgetWizard.editRow.title")}
         actions={[
-          { label: "Hủy", onPress: onClose, variant: "secondary" },
+          { label: t("common.action.cancel"), onPress: onClose, variant: "secondary" },
           {
-            label: "Lưu",
-            onPress: () => onConfirm(clamped),
+            label: t("common.action.save"),
+            onPress: confirm,
             variant: "primary",
             testID: "btn-wizard-amount-confirm",
           },
         ]}
       />
       <View style={styles.body}>
+        <ListSection
+          onSheet
+          footer={
+            nameMissing
+              ? t("budgetWizard.editRow.nameRequired")
+              : nameKind === "own"
+                ? t("budgetWizard.editRow.renameNote")
+                : nameKind === "system"
+                  ? t("budgetWizard.editRow.systemNameNote")
+                  : undefined
+          }
+          footerTone={nameMissing ? "danger" : "default"}
+        >
+          <ListTextField
+            label={t("budgetWizard.editRow.nameLabel")}
+            value={name}
+            onChangeText={(text) => {
+              setName(text);
+              if (nameMissing) setNameMissing(false);
+            }}
+            editable={renamable}
+            maxLength={CATEGORY_NAME_MAX_LENGTH}
+            invalid={nameMissing}
+            returnKeyType="done"
+            testID="input-wizard-row-name"
+          />
+        </ListSection>
+
         <AmountInput
           testID="input-wizard-amount"
           value={clamped > 0 ? String(toMajorUnits(clamped)) : ""}
@@ -94,12 +152,12 @@ export function EditAmountModal({
         />
 
         <View style={styles.meta}>
-          <Text style={styles.metaLabel}>Tối đa có thể nâng</Text>
+          <Text style={styles.metaLabel}>{t("budgetWizard.editAmount.maxRaise")}</Text>
           <Text style={styles.metaValue}>{formatCurrency(max, currency)}</Text>
         </View>
 
         <View style={styles.meta}>
-          <Text style={styles.metaLabel}>Dự phòng còn lại</Text>
+          <Text style={styles.metaLabel}>{t("budgetWizard.editAmount.bufferLeft")}</Text>
           {/* Amber, never red — this is a tight constraint, not a fault. */}
           <Text style={[styles.metaValue, bufferAfter <= 0 && styles.metaValueTight]}>
             {formatCurrency(Math.max(bufferAfter, 0), currency)}
@@ -109,8 +167,8 @@ export function EditAmountModal({
         {delta !== 0 ? (
           <Text style={styles.explain}>
             {delta > 0
-              ? `Lấy thêm ${formatCurrency(delta, currency)} từ dự phòng. Các mục khác giữ nguyên.`
-              : `Trả lại ${formatCurrency(-delta, currency)} vào dự phòng.`}
+              ? t("budgetWizard.editAmount.takeMore", { amount: formatCurrency(delta, currency) })
+              : t("budgetWizard.editAmount.giveBack", { amount: formatCurrency(-delta, currency) })}
           </Text>
         ) : null}
       </View>

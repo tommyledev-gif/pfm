@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useRef } from "react";
 import { Animated, LayoutChangeEvent, Pressable, View } from "react-native";
 import { useRouter, usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTranslation } from "react-i18next";
 import Svg, { Path } from "react-native-svg";
 
 import {
@@ -28,13 +29,13 @@ import {
 
 // Phosphor, two weights of the same glyph: "regular" in the row, "fill" on
 // the ball, so the active tab reads as active from its shape alone. The bar
-// is icon-only, so `label` is what a screen reader announces.
+// is icon-only, so `labelKey` is what a screen reader announces.
 export const TABS = [
-  { href: "/", Icon: HomeTabIcon, label: "Trang chủ" },
-  { href: "/transactions", Icon: TransactionsTabIcon, label: "Giao dịch" },
-  { href: "/ai-chat", Icon: AssistantIcon, label: "Trợ lý" },
-  { href: "/insights", Icon: InsightsTabIcon, label: "Phân tích" },
-  { href: "/settings", Icon: SettingsTabIcon, label: "Cài đặt" },
+  { href: "/", Icon: HomeTabIcon, labelKey: "nav.tab.home" },
+  { href: "/transactions", Icon: TransactionsTabIcon, labelKey: "nav.tab.transactions" },
+  { href: "/ai-chat", Icon: AssistantIcon, labelKey: "nav.tab.assistant" },
+  { href: "/insights", Icon: InsightsTabIcon, labelKey: "nav.tab.insights" },
+  { href: "/settings", Icon: SettingsTabIcon, labelKey: "nav.tab.settings" },
 ] as const;
 
 // Screens reachable only through Settings' own menu (settings.tsx's
@@ -88,6 +89,7 @@ interface BottomNavProps {
 // view: the renders a switch used to cost landed mid-slide, and the ball and
 // its icon shook and flashed.
 export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
@@ -245,11 +247,11 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
       {surface}
       <View style={[styles.pill, { paddingBottom: insets.bottom }]}>
         <View style={styles.tabRow}>
-          {TABS.map(({ href, label }, index) => (
+          {TABS.map(({ href, labelKey }, index) => (
             <Pressable
               key={href}
               accessibilityRole="tab"
-              accessibilityLabel={label}
+              accessibilityLabel={t(labelKey)}
               accessibilityState={{ selected: index === routeIndex }}
               onLayout={handleTabLayout(index)}
               onPress={() => pressTab(index)}

@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { Animated, Dimensions, PanResponder, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import { useSafeAreaInsets, type EdgeInsets } from "react-native-safe-area-context";
 
 import { radii, createStyles, useColors } from "@/lib/theme";
@@ -33,6 +34,7 @@ function clamp(value: number, min: number, max: number): number {
 // Uses only React Native core's PanResponder/Animated — no
 // react-native-gesture-handler/reanimated dependency (spec.md decision #2).
 export function DebugBubble() {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
@@ -85,7 +87,7 @@ export function DebugBubble() {
       <Animated.View
         testID="debug-bubble"
         accessibilityRole="button"
-        accessibilityLabel="Mở debug console"
+        accessibilityLabel={t("debug.bubble.open")}
         style={[styles.bubble, { transform: pan.getTranslateTransform() }]}
         {...panResponder.panHandlers}
       >

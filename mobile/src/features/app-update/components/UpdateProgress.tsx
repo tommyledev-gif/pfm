@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import Animated, {
   cancelAnimation,
   Easing,
@@ -13,8 +14,6 @@ import { withAlpha } from "@/lib/color";
 import { formatPercent } from "@/lib/percent";
 import { createStyles, radii, spacing, typography } from "@/lib/theme";
 import { useReduceMotion } from "@/lib/use-reduce-motion";
-
-const LABEL = "Đang tải bản mới";
 
 const TRACK_HEIGHT = 8;
 // A fill step per whole percent would tick; easing between them reads as one movement.
@@ -35,6 +34,7 @@ interface UpdateProgressProps {
  * sitting empty, which looked stuck.
  */
 export function UpdateProgress({ progress }: UpdateProgressProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const percent = progress === null ? null : Math.round(progress * 100);
 
@@ -42,12 +42,12 @@ export function UpdateProgress({ progress }: UpdateProgressProps) {
     <View
       style={styles.panel}
       accessibilityRole="progressbar"
-      accessibilityLabel={LABEL}
+      accessibilityLabel={t("appUpdate.progress")}
       accessibilityValue={percent === null ? undefined : { min: 0, max: 100, now: percent }}
       testID="progress-native-update"
     >
       <View style={styles.row}>
-        <Text style={styles.label}>{LABEL}</Text>
+        <Text style={styles.label}>{t("appUpdate.progress")}</Text>
         {progress === null ? null : <Text style={styles.percent}>{formatPercent(progress * 100)}</Text>}
       </View>
       <View style={styles.track}>{progress === null ? <SweepBar /> : <FillBar fraction={progress} />}</View>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 
-import { getErrorMessage } from "@/lib/axios";
+import { errorText } from "@/lib/api-envelope";
+import { i18n } from "@/lib/i18n";
 import { useRequireOnline } from "@/lib/connectivity";
 import { IMPORT_MAX_UPLOAD_BYTES, XLSX_MIME_TYPE } from "@/lib/constants";
 import { useToastStore } from "@/stores/toast-store";
@@ -42,7 +43,7 @@ export function useTransactionIO({ range, walletId, currency }: TransactionIOPro
       { from: range.from, to: range.to, wallet_id: walletId },
       {
         onError: (error) =>
-          useToastStore.getState().show(getErrorMessage(error, "Không xuất được tệp"), "error"),
+          useToastStore.getState().show(errorText(error, "transactions.export.failed"), "error"),
       },
     );
   };
@@ -63,13 +64,13 @@ export function useTransactionIO({ range, walletId, currency }: TransactionIOPro
 
     const asset = picked.assets[0];
     if (!asset.name.toLowerCase().endsWith(".xlsx")) {
-      useToastStore.getState().show("Chỉ hỗ trợ tệp .xlsx", "error");
+      useToastStore.getState().show(i18n.t("transactions.import.wrongType"), "error");
       return;
     }
     // Checked here as well as server-side so a 20MB file fails instantly
     // instead of after uploading it over mobile data.
     if (asset.size !== undefined && asset.size > IMPORT_MAX_UPLOAD_BYTES) {
-      useToastStore.getState().show("Tệp vượt quá giới hạn 5MB", "error");
+      useToastStore.getState().show(i18n.t("transactions.import.tooLarge", { limit: "5MB" }), "error");
       return;
     }
 
@@ -82,7 +83,7 @@ export function useTransactionIO({ range, walletId, currency }: TransactionIOPro
           setModalOpen(true);
         },
         onError: (error) =>
-          useToastStore.getState().show(getErrorMessage(error, "Không đọc được tệp"), "error"),
+          useToastStore.getState().show(errorText(error, "transactions.import.readFailed"), "error"),
       },
     );
   };
@@ -96,7 +97,7 @@ export function useTransactionIO({ range, walletId, currency }: TransactionIOPro
         // outlive it — say so plainly rather than showing a bare 401.
         useToastStore
           .getState()
-          .show(getErrorMessage(error, "Phiên nhập đã hết hạn. Chọn lại tệp."), "error");
+          .show(errorText(error, "transactions.import.expired"), "error");
         setModalOpen(false);
       },
     });

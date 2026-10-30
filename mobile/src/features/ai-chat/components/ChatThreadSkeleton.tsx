@@ -1,4 +1,5 @@
 import { View, ViewProps } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { SkeletonBlock } from "@/components/ui/SkeletonBlock";
 import { radii, spacing, createStyles } from "@/lib/theme";
@@ -21,11 +22,12 @@ const BUBBLES = [
  */
 export function ChatThreadSkeleton({ style, onLayout }: Pick<ViewProps, "style" | "onLayout">) {
   const styles = useStyles();
+  const { t } = useTranslation();
   return (
     <View
       style={[styles.container, style]}
       onLayout={onLayout}
-      accessibilityLabel="Đang tải tin nhắn"
+      accessibilityLabel={t("chat.thread.loading.a11y")}
       testID="skeleton-chat-thread"
     >
       {BUBBLES.map((bubble, index) => (

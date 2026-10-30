@@ -2,6 +2,7 @@ import { memo, useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 
 import { entrance, exit, layoutSpring } from "@/components/motion/motion-tokens";
 
@@ -16,7 +17,6 @@ import { OutboxItem } from "@/features/transactions/outbox/outbox-types";
 // Home shows a glance, not the queue: the newest few, then a link to the rest
 // on Transactions, where retry / edit / discard live.
 const HOME_PENDING_SYNC_LIMIT = 3;
-const SECTION_TITLE = "Chờ đồng bộ";
 const ICON_SIZE = 16;
 const ICON_BOX = 32;
 
@@ -29,6 +29,7 @@ const ICON_BOX = 32;
  * never because Home re-rendered for something else.
  */
 export const HomePendingSyncSection = memo(function HomePendingSyncSection() {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
@@ -55,13 +56,13 @@ export const HomePendingSyncSection = memo(function HomePendingSyncSection() {
     >
       <View style={styles.headerRow}>
         <View style={styles.titleRow}>
-          <Text style={styles.sectionTitle}>{SECTION_TITLE}</Text>
+          <Text style={styles.sectionTitle}>{t("common.status.pendingSync")}</Text>
           <View style={styles.countBadge}>
             <Text style={styles.countLabel}>{items.length}</Text>
           </View>
         </View>
         <Pressable onPress={openTransactions} hitSlop={8} testID="btn-home-pending-sync-view-all">
-          <Text style={styles.action}>Xem tất cả</Text>
+          <Text style={styles.action}>{t("common.action.seeAll")}</Text>
         </Pressable>
       </View>
 
@@ -80,7 +81,7 @@ export const HomePendingSyncSection = memo(function HomePendingSyncSection() {
             onPress={openTransactions}
             style={({ pressed }) => [styles.overflowRow, pressed && styles.pressed]}
           >
-            <Text style={styles.overflowLabel}>+{hiddenCount} giao dịch khác chờ đồng bộ</Text>
+            <Text style={styles.overflowLabel}>{t("home.pendingSync.more", { count: hiddenCount })}</Text>
             <ChevronRightIcon size={ICON_SIZE} color={colors.textMuted} />
           </Pressable>
         ) : null}
@@ -90,6 +91,8 @@ export const HomePendingSyncSection = memo(function HomePendingSyncSection() {
 });
 
 function HomePendingSyncRow({ item, isLast, onPress }: { item: OutboxItem; isLast: boolean; onPress: () => void }) {
+  // Re-renders on a language switch: the title and status helpers translate.
+  useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const { payload, display } = item;

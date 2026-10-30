@@ -1,18 +1,20 @@
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { ListCell } from "@/components/ui/grouped-list";
 import { formatCurrency } from "@/lib/currency";
 import { withAlpha } from "@/lib/color";
 import { formatDateShort, formatTime } from "@/lib/format-date";
+import { TranslationKey } from "@/lib/i18n";
 import { colors, radii, spacing, typography, createStyles } from "@/lib/theme";
 import { AuditAction, AuditLogEntry, AuditSnapshot } from "@/features/audit-logs/types";
 import { formatCoordinates } from "@/features/transactions/location/map-support";
 import { AuditItemsDiff } from "@/features/audit-logs/components/AuditItemsDiff";
 
-const ACTION_LABEL: Record<AuditAction, string> = {
-  create: "Tạo",
-  update: "Sửa",
-  delete: "Đã xóa",
+const ACTION_LABEL: Record<AuditAction, TranslationKey> = {
+  create: "auditLogs.action.create",
+  update: "auditLogs.action.update",
+  delete: "auditLogs.action.delete",
 };
 
 // Getters, not values: read at render time so they follow a theme switch
@@ -23,15 +25,15 @@ const ACTION_COLOR: Record<AuditAction, string> = {
   get delete() { return colors.peach; },
 };
 
-const FIELD_LABEL: Record<string, string> = {
-  amount: "Số tiền",
-  category_id: "Danh mục",
-  occurred_at: "Ngày",
-  note: "Ghi chú",
-  wallet_id: "Ví",
-  type: "Loại",
-  location: "Vị trí",
-  location_note: "Ghi chú vị trí",
+const FIELD_LABEL: Record<string, TranslationKey> = {
+  amount: "common.field.amount",
+  category_id: "common.field.category",
+  occurred_at: "common.field.date",
+  note: "common.field.note",
+  wallet_id: "common.field.wallet",
+  type: "common.field.type",
+  location: "common.field.location",
+  location_note: "auditLogs.field.locationNote",
 };
 
 // A moved pin is logged as {latitude, longitude, place_name}: read as its
@@ -61,6 +63,7 @@ interface AuditLogRowProps {
 // as a compact summary line instead of a list of arrows. A cell of its day's
 // group (GroupedListCell), so entries are split by hairlines, not boxed.
 export function AuditLogRow({ entry, resolveCategoryName, resolveWalletName, currency }: AuditLogRowProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const formatValue = (field: string, value: unknown): string => {
     if (value === null || value === undefined) return "—";
@@ -102,7 +105,7 @@ export function AuditLogRow({ entry, resolveCategoryName, resolveWalletName, cur
       <View style={styles.headerRow}>
         <View style={[styles.actionBadge, { backgroundColor: withAlpha(ACTION_COLOR[entry.action], 0.14) }]}>
           <Text style={[styles.actionLabel, { color: ACTION_COLOR[entry.action] }]}>
-            {ACTION_LABEL[entry.action]}
+            {t(ACTION_LABEL[entry.action])}
           </Text>
         </View>
         <Text style={styles.time}>{formatTime(entry.created_at)}</Text>
@@ -111,7 +114,7 @@ export function AuditLogRow({ entry, resolveCategoryName, resolveWalletName, cur
       {entry.action === "update" ? (
         <View style={styles.changeList}>
           {changedFields.length === 0 ? (
-            <Text style={styles.changeLine}>Không có thay đổi được ghi nhận</Text>
+            <Text style={styles.changeLine}>{t("auditLogs.row.noChanges")}</Text>
           ) : (
             changedFields.map((field) =>
               field === "items" ? (
@@ -124,7 +127,7 @@ export function AuditLogRow({ entry, resolveCategoryName, resolveWalletName, cur
                 />
               ) : (
                 <Text key={field} style={styles.changeLine} numberOfLines={2}>
-                  <Text style={styles.fieldLabel}>{FIELD_LABEL[field] ?? field}: </Text>
+                  <Text style={styles.fieldLabel}>{FIELD_LABEL[field] ? t(FIELD_LABEL[field]) : field}: </Text>
                   {formatValue(field, (entry.before as Record<string, unknown>)?.[field])}
                   {"  →  "}
                   <Text style={styles.newValue}>
@@ -145,7 +148,7 @@ export function AuditLogRow({ entry, resolveCategoryName, resolveWalletName, cur
               it from the day header and the trailing time. */}
           {entry.action === "delete" ? (
             <Text style={styles.removedNote} numberOfLines={1}>
-              Đã xóa lúc {formatTime(entry.created_at)} · {formatDateShort(entry.created_at)}
+              {t("auditLogs.row.deletedAt", { time: formatTime(entry.created_at), date: formatDateShort(entry.created_at) })}
             </Text>
           ) : null}
         </>

@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 
-import { getErrorCode, getErrorMessage } from "@/lib/axios";
+import { errorText } from "@/lib/api-envelope";
+import { getErrorCode } from "@/lib/axios";
+import { i18n } from "@/lib/i18n";
 import { userIdFromAccessToken } from "@/lib/jwt";
 import { useCreateTransactionMutation } from "@/features/transactions/api/use-create-transaction-mutation";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
@@ -62,7 +64,7 @@ export function useConfirmProposal() {
       return true;
     } catch (error) {
       if (getErrorCode(error) === "INSUFFICIENT_BALANCE") {
-        useToastStore.getState().show(getErrorMessage(error, "Số dư không đủ"), "error");
+        useToastStore.getState().show(errorText(error), "error");
       }
       return false;
     }
@@ -94,7 +96,9 @@ export function useConfirmProposal() {
     useToastStore
       .getState()
       .show(
-        failed > 0 ? `Đã duyệt ${saved} mục, ${failed} mục chưa lưu được` : `Đã duyệt ${saved} mục`,
+        failed > 0
+          ? i18n.t("pending.toast.approvedPartial", { saved, failed })
+          : i18n.t("pending.toast.approved", { count: saved }),
         failed > 0 ? "warning" : "info",
       );
   };

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Animated, Easing, Pressable, Text, Vibration, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { TransactionRow } from "@/components/shared/TransactionRow";
 import { ChevronRightIcon, ListIcon } from "@/components/ui/Icon";
@@ -46,6 +47,7 @@ export function HoldableTransactionRow({
   onClose,
   onShowInTransactions,
 }: HoldableTransactionRowProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const reduceMotion = useReduceMotion();
@@ -102,7 +104,7 @@ export function HoldableTransactionRow({
         onPressOut={pressOut}
         onPress={press}
         style={[styles.row, (pressing || open) && styles.rowHeld]}
-        accessibilityHint="Giữ một giây để mở trong Giao dịch"
+        accessibilityHint={t("reports.holdRow.hint")}
         testID={`row-category-transaction-${transaction.id}`}
       >
         <TransactionRow transaction={transaction} currency={currency} category={category} revealAmountOnHold={false} />
@@ -121,7 +123,7 @@ export function HoldableTransactionRow({
             testID="btn-category-transaction-show"
           >
             <ListIcon size={16} color={colors.green} />
-            <Text style={styles.actionLabel}>Xem trong Giao dịch</Text>
+            <Text style={styles.actionLabel}>{t("reports.holdRow.show")}</Text>
             <ChevronRightIcon size={16} color={colors.textMuted} />
           </Pressable>
         </View>

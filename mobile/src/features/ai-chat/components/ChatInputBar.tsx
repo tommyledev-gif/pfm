@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { Keyboard, Pressable, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { CloseIcon, SendIcon } from "@/components/ui/Icon";
@@ -57,6 +58,7 @@ export function ChatInputBar({
 }: ChatInputBarProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const [focused, setFocused] = useState(false);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const inputRef = useRef<TextInput>(null);
@@ -127,7 +129,7 @@ export function ChatInputBar({
           <Pressable
             testID="btn-chat-clear"
             accessibilityRole="button"
-            accessibilityLabel="Xóa nội dung đang nhập"
+            accessibilityLabel={t("chat.input.clear.a11y")}
             style={styles.clearButton}
             onPress={askClear}
             hitSlop={CLEAR_HIT_SLOP}
@@ -140,7 +142,7 @@ export function ChatInputBar({
         <Pressable
           testID="btn-chat-send"
           accessibilityRole="button"
-          accessibilityLabel="Gửi"
+          accessibilityLabel={t("chat.input.send.a11y")}
           accessibilityState={{ disabled: !canSend }}
           style={[styles.sendButton, { backgroundColor: canSend ? tint : colors.surfaceRaised }]}
           onPress={onSend}
@@ -152,10 +154,10 @@ export function ChatInputBar({
 
       <ConfirmDialog
         visible={confirmClearOpen}
-        title="Xóa nội dung đang nhập?"
-        message="Không thể hoàn tác."
-        confirmLabel="Xóa nội dung"
-        cancelLabel="Giữ lại"
+        title={t("chat.input.clearConfirm.title")}
+        message={t("chat.input.clearConfirm.body")}
+        confirmLabel={t("chat.input.clearConfirm.confirm")}
+        cancelLabel={t("common.action.keep")}
         onConfirm={clear}
         onCancel={() => setConfirmClearOpen(false)}
         testID="dialog-chat-clear"

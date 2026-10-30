@@ -1,4 +1,5 @@
 import { Pressable, Text } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
 
@@ -7,9 +8,10 @@ import { radii, spacing, typography, createStyles } from "@/lib/theme";
 // the fallback belongs on the bubble rather than a screen away.
 export function ManualEntryButton({ onPress }: { onPress: () => void }) {
   const styles = useStyles();
+  const { t } = useTranslation();
   return (
     <Pressable testID="btn-chat-manual-entry" style={styles.button} onPress={onPress}>
-      <Text style={styles.label}>Nhập thủ công</Text>
+      <Text style={styles.label}>{t("common.action.manualEntry")}</Text>
     </Pressable>
   );
 }

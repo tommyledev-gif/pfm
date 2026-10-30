@@ -1,10 +1,11 @@
 import { memo, Fragment, useMemo } from "react";
 import { Text } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { Drawer } from "@/components/shared/Drawer";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
 import { TransactionRow } from "@/components/shared/TransactionRow";
-import { dayLabelVi, formatDateViShort } from "@/lib/format-date";
+import { dayLabel, formatDateGroupHeader } from "@/lib/format-date";
 import { spacing, typography, createStyles } from "@/lib/theme";
 import { Category } from "@/features/categories/types";
 import { Transaction } from "@/features/transactions/types";
@@ -32,6 +33,7 @@ export const FutureTransactionsDialog = memo(function FutureTransactionsDialog({
   categoryById,
   onSelect,
 }: FutureTransactionsDialogProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   // Grouped by day like the main list, so a month of scheduled rows does not
   // arrive as one undifferentiated column of dates.
@@ -41,24 +43,26 @@ export const FutureTransactionsDialog = memo(function FutureTransactionsDialog({
       const key = item.occurred_at.slice(0, 10);
       let group = groups.find((g) => g.key === key);
       if (!group) {
-        group = { key, label: `${dayLabelVi(item.occurred_at)} · ${formatDateViShort(item.occurred_at)}`, items: [] };
+        group = { key, label: `${dayLabel(item.occurred_at)} · ${formatDateGroupHeader(item.occurred_at)}`, items: [] };
         groups.push(group);
       }
       group.items.push(item);
     }
     return groups;
-  }, [transactions]);
+    // `t` changes with the language: the day labels are rebuilt in it.
+  }, [transactions, t]);
 
   return (
     <Drawer visible={visible} onClose={onClose}>
-      <DrawerHeader title="Giao dịch sắp tới" actions={[{ label: "Đóng", onPress: onClose, variant: "secondary" }]} />
+      <DrawerHeader
+        title={t("transactions.future.title")}
+        actions={[{ label: t("common.action.close"), onPress: onClose, variant: "secondary" }]}
+      />
 
-      <Text style={styles.note}>
-        Những khoản này có ngày ở tương lai nên chưa nằm trong danh sách chính. Chạm để sửa lại ngày.
-      </Text>
+      <Text style={styles.note}>{t("transactions.future.note")}</Text>
 
       {days.length === 0 ? (
-        <Text style={styles.empty}>Không có giao dịch nào sắp tới.</Text>
+        <Text style={styles.empty}>{t("transactions.future.empty")}</Text>
       ) : (
         days.map((day) => (
           <Fragment key={day.key}>

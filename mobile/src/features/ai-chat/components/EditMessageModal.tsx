@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Text, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { Drawer } from "@/components/shared/Drawer";
 import { PillButton } from "@/components/ui/PillButton";
@@ -29,6 +30,7 @@ interface EditMessageModalProps {
 export function EditMessageModal({ visible, initialText, onCancel, onSave }: EditMessageModalProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const [text, setText] = useState(initialText);
 
   useEffect(() => {
@@ -37,20 +39,20 @@ export function EditMessageModal({ visible, initialText, onCancel, onSave }: Edi
 
   return (
     <Drawer visible={visible} onClose={onCancel}>
-      <Text style={styles.title}>Sửa tin nhắn</Text>
+      <Text style={styles.title}>{t("chat.editMessage.title")}</Text>
       <TextInput
         value={text}
         onChangeText={setText}
-        placeholder="Sửa tin nhắn…"
+        placeholder={t("chat.editMessage.placeholder")}
         placeholderTextColor={colors.textMuted}
         style={styles.input}
         multiline
         textAlignVertical="top"
       />
       <View style={styles.actions}>
-        <PillButton label="Hủy" variant="outline" onPress={onCancel} style={styles.flexButton} />
+        <PillButton label={t("common.action.cancel")} variant="outline" onPress={onCancel} style={styles.flexButton} />
         <PillButton
-          label="Lưu"
+          label={t("common.action.save")}
           onPress={() => onSave(text.trim())}
           disabled={!text.trim()}
           style={styles.flexButton}

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ActivityIndicator, SectionList, View } from "react-native";
 
 import { useListEntrance } from "@/components/motion/MotionView";
@@ -40,6 +41,7 @@ interface UserSection {
 // "Tất cả tài khoản" on top: any account, outside the household too, found
 // and soft-deleted (DeleteAccountsSection).
 export default function UsersScreen() {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const users = useUsersQuery();
@@ -63,23 +65,23 @@ export default function UsersScreen() {
     const matches = list.filter((u) => matchesSearch(`${u.full_name ?? ""} ${u.email} ${u.username ?? ""}`, query));
     return STATUS_ORDER.map((status) => ({
       key: status,
-      title: STATUS_LABEL[status],
+      title: t(STATUS_LABEL[status]),
       data: matches.filter((u) => u.status === status),
     })).filter((section) => section.data.length > 0);
-  }, [list, query]);
+  }, [list, query, t]);
 
   const invite = () => setInviteOpen(true);
 
   return (
     <Screen>
-      <ScreenHeader title="Thành viên" subtitle={users.data ? `${total} người` : undefined} />
+      <ScreenHeader title={t("users.title")} subtitle={users.data ? t("users.subtitle.count", { count: total }) : undefined} />
 
       {list.length >= SEARCH_FROM ? (
         <View style={styles.search}>
           <SearchField
             value={query}
             onChangeText={setQuery}
-            placeholder="Tìm theo tên hoặc email"
+            placeholder={t("users.search.placeholder")}
             autoCorrect={false}
             testID="input-users-search"
           />
@@ -132,7 +134,7 @@ export default function UsersScreen() {
       )}
 
       {/* Before the sheet, so its overlay covers the button. */}
-      <Fab onPress={invite} accessibilityLabel="Mời thành viên" testID="btn-users-invite" />
+      <Fab onPress={invite} accessibilityLabel={t("users.invite.cta")} testID="btn-users-invite" />
 
       <InviteUserModal visible={inviteOpen} onClose={() => setInviteOpen(false)} />
     </Screen>

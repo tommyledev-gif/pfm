@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { i18n, TranslationKey } from "@/lib/i18n";
 
 import { apiClient } from "@/lib/axios";
 import { queryClient } from "@/lib/query-client";
@@ -21,7 +22,7 @@ const RECENT_PROPOSAL_MS = 10 * 60 * 1000;
 // A proposal saved before its fix arrived is pinned at most this long after.
 const LATE_PIN_DEADLINE_MS = 60 * 1000;
 
-export const CURRENT_LOCATION_LABEL = "Vị trí hiện tại";
+export const CURRENT_LOCATION_LABEL = "chat.location.current" satisfies TranslationKey;
 
 type FixStatus = "idle" | "locating" | "ready" | "failed";
 
@@ -174,5 +175,5 @@ export function useAutoPinLabel(message: ChatMessage): string | undefined {
   const location = message.action?.payload.location;
   if (location) return location.place_name ?? formatCoordinates(location);
   if (!pinByDefault || failed || message.confirmed) return undefined;
-  return wantsAutoPin(message) ? CURRENT_LOCATION_LABEL : undefined;
+  return wantsAutoPin(message) ? i18n.t(CURRENT_LOCATION_LABEL) : undefined;
 }

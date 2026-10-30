@@ -1,4 +1,16 @@
-import { AnalyticsFollowUp } from "@/features/analytics/types";
+import { AnalyticsFollowUp, AnalyticsQuery } from "@/features/analytics/types";
+import { i18n, TranslationKey } from "@/lib/i18n";
+
+// The label is read when the chip is shown (a getter), not when this module
+// loads, so the list kept below still follows the app language.
+function chip(labelKey: TranslationKey, query: AnalyticsQuery): AnalyticsFollowUp {
+  return {
+    get label() {
+      return i18n.t(labelKey);
+    },
+    query,
+  };
+}
 
 /**
  * The starter row shown in analysis mode (spec.md US-01, OQ #3: Q1, Q2, Q9,
@@ -8,10 +20,10 @@ import { AnalyticsFollowUp } from "@/features/analytics/types";
  * on every fallback reply.
  */
 export const STARTER_CHIPS: AnalyticsFollowUp[] = [
-  { label: "Tháng này tiêu bao nhiêu?", query: { metric: "sum", period: "this_cycle" } },
-  { label: "Tiền đi đâu?", query: { metric: "breakdown", group_by: "category", period: "this_cycle" } },
-  { label: "Còn bao nhiêu ngân sách?", query: { metric: "budget_status", period: "this_cycle" } },
-  { label: "Thu nhập tháng này", query: { metric: "sum", tx_type: "income", period: "this_cycle" } },
+  chip("analytics.starter.spentThisMonth", { metric: "sum", period: "this_cycle" }),
+  chip("analytics.starter.whereMoneyWent", { metric: "breakdown", group_by: "category", period: "this_cycle" }),
+  chip("analytics.starter.budgetLeft", { metric: "budget_status", period: "this_cycle" }),
+  chip("analytics.starter.incomeThisMonth", { metric: "sum", tx_type: "income", period: "this_cycle" }),
 ];
 
 /**
@@ -21,5 +33,5 @@ export const STARTER_CHIPS: AnalyticsFollowUp[] = [
  * midnight asks about the new day.
  */
 export function anomalyTodayChip(today: string): AnalyticsFollowUp {
-  return { label: "Hôm nay có gì bất thường?", query: { metric: "anomaly", period: "custom", from: today, to: today } };
+  return { label: i18n.t("analytics.starter.unusualToday"), query: { metric: "anomaly", period: "custom", from: today, to: today } };
 }

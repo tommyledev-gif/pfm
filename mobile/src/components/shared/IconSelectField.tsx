@@ -1,11 +1,12 @@
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import type { MutationStatus } from "@tanstack/react-query";
 import Animated from "react-native-reanimated";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { ChevronRightIcon } from "@/components/ui/Icon";
 import { SlideSwap } from "@/components/ui/SlideSwap";
-import { UPLOAD_WAITING_LABEL } from "@/components/ui/UploadButton";
+import { UPLOAD_WAITING_KEY } from "@/components/ui/UploadButton";
 import { findOpenMoji } from "@/lib/openmoji";
 import { withAlpha } from "@/lib/color";
 import { formatPercent } from "@/lib/percent";
@@ -28,21 +29,22 @@ interface IconSelectFieldProps {
 // fills like UploadButton, behind a percent that rolls to "Đang tải ảnh lên…"
 // and then back to the description once the new photo is in.
 export function IconSelectField({ name, color, icon, iconUrl, uploadStatus, onPress }: IconSelectFieldProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const upload = useUploadProgress(uploadStatus);
   const uploading = upload.phase === "progress" || upload.phase === "waiting";
   const description = iconUrl
-    ? "Ảnh đã tải lên"
+    ? t("ui.iconField.uploaded")
     : icon
       ? findOpenMoji(icon)?.annotation ?? icon
-      : "Biểu tượng mặc định";
+      : t("ui.iconField.default");
 
   // "done" shares the resting slot: the new photo in the preview says it.
   const slotKey = uploading ? upload.phase : "rest";
   const renderSlot = (key: string) => (
     <Text style={[styles.value, key === "progress" && styles.tabular]} numberOfLines={1}>
-      {key === "progress" ? formatPercent(upload.percent) : key === "waiting" ? UPLOAD_WAITING_LABEL : description}
+      {key === "progress" ? formatPercent(upload.percent) : key === "waiting" ? t(UPLOAD_WAITING_KEY) : description}
     </Text>
   );
 
@@ -58,7 +60,7 @@ export function IconSelectField({ name, color, icon, iconUrl, uploadStatus, onPr
       </View>
       <View style={styles.textCol}>
         <SlideSwap slotKey={slotKey} renderSlot={renderSlot} sizer={renderSlot("rest")} align="start" />
-        <Text style={styles.hint}>Chạm để chọn emoji hoặc tải ảnh</Text>
+        <Text style={styles.hint}>{t("ui.iconField.hint")}</Text>
       </View>
       <ChevronRightIcon size={18} color={colors.textMuted} />
     </Pressable>

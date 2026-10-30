@@ -2,9 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { StyleSheet, Text } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTranslation } from "react-i18next";
 
 import { entrance, exit } from "@/components/motion/motion-tokens";
 import { Avatar } from "@/components/ui/Avatar";
+import { i18n } from "@/lib/i18n";
 import { createStyles, spacing, typography } from "@/lib/theme";
 import { useProfileIdentity } from "@/features/profile/use-profile-identity";
 import { useAppLockStore } from "@/features/security/app-lock";
@@ -16,7 +18,6 @@ import { submitPin } from "@/features/security/pin/pin-entry";
 import { usePinStore } from "@/features/security/pin/pin-store";
 import { signOutEveryAccount } from "@/features/security/pin/sign-out-device";
 
-const UNLOCK_PROMPT = "Mở khóa ứng dụng";
 const AVATAR_SIZE = 64;
 
 /**
@@ -30,6 +31,7 @@ const AVATAR_SIZE = 64;
  * check (EC-4).
  */
 export function AppLockPinScreen() {
+  const { t } = useTranslation();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { name, avatarUrl } = useProfileIdentity();
@@ -44,11 +46,11 @@ export function AppLockPinScreen() {
     if (checking.current) return;
     checking.current = true;
     try {
-      const result = await confirmOwner(UNLOCK_PROMPT);
+      const result = await confirmOwner(i18n.t("security.appLock.prompt"));
       if (result === "passed") {
         await usePinStore.getState().resetWrongCount();
         useAppLockStore.getState().unlock();
-      } else if (result === "failed") setMessage(PIN_COPY.biometricFailed);
+      } else if (result === "failed") setMessage(i18n.t(PIN_COPY.biometricFailed));
     } finally {
       checking.current = false;
     }
@@ -73,7 +75,7 @@ export function AppLockPinScreen() {
     // "wiped" and "missing" take this screen away on their own.
     if (outcome.kind === "wiped" || outcome.kind === "missing") return;
     setBusy(false);
-    setMessage(outcome.kind === "wrong" ? wrongPin(outcome.triesLeft) : PIN_COPY.checkFailed);
+    setMessage(outcome.kind === "wrong" ? wrongPin(outcome.triesLeft) : t(PIN_COPY.checkFailed));
     setShakeKey((k) => k + 1);
     setValue("");
   };
@@ -95,7 +97,7 @@ export function AppLockPinScreen() {
           {name}
         </Text>
         <Text style={styles.title} accessibilityRole="header">
-          {PIN_COPY.enter}
+          {t(PIN_COPY.enter)}
         </Text>
       </Animated.View>
       <Animated.View entering={entrance("fadeUp", 120)} style={styles.pad}>

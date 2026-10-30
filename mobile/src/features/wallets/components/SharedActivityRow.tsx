@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { TransactionRow } from "@/components/shared/TransactionRow";
 import { spacing, typography, createStyles } from "@/lib/theme";
@@ -26,6 +27,7 @@ export const SharedActivityRow = memo(function SharedActivityRow({
   onSelect,
 }: SharedActivityRowProps) {
   const styles = useStyles();
+  const { t } = useTranslation();
   const mine = !item.recorded_by;
   return (
     <View>
@@ -37,7 +39,7 @@ export const SharedActivityRow = memo(function SharedActivityRow({
       />
       {item.recorded_by ? (
         <Text style={styles.recorder} numberOfLines={1}>
-          {item.recorded_by.name} ghi
+          {t("sharedWallets.recordedBy", { name: item.recorded_by.name })}
         </Text>
       ) : null}
     </View>

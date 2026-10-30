@@ -1,5 +1,6 @@
 import { memo, ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { BankIcon, CheckIcon } from "@/components/ui/Icon";
@@ -34,6 +35,7 @@ export const WalletFilterModal = memo(function WalletFilterModal({
   selectedId,
   onSelect,
 }: WalletFilterModalProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const pick = (walletId: string | undefined) => {
@@ -43,11 +45,11 @@ export const WalletFilterModal = memo(function WalletFilterModal({
 
   return (
     <Drawer visible={visible} onClose={onClose}>
-      <DrawerHeader title="Lọc theo ví" />
+      <DrawerHeader title={t("transactions.walletFilter.title")} />
       <View style={styles.list}>
         <Option
           active={selectedId === undefined}
-          title="Tất cả ví"
+          title={t("transactions.walletFilter.all")}
           onPress={() => pick(undefined)}
           leading={
             <View style={styles.allTile}>

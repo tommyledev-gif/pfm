@@ -1,3 +1,5 @@
+import { i18n } from "@/lib/i18n";
+
 // Every color the app paints with, per theme. A palette is a full set of the
 // same keys — adding a theme means adding one object here plus its entry in
 // THEMES, nothing else; adding a token means adding it to every palette
@@ -131,8 +133,9 @@ export interface ThemeDefinition {
 
 // Display order of the Settings → Giao diện picker.
 export const THEMES: Record<ThemeName, ThemeDefinition> = {
-  dark: { label: "Tối", palette: dark, isDark: true },
-  light: { label: "Sáng", palette: light, isDark: false },
+  // label: a getter, read in the current language wherever a theme is named.
+  dark: { get label() { return i18n.t("ui.theme.dark"); }, palette: dark, isDark: true },
+  light: { get label() { return i18n.t("ui.theme.light"); }, palette: light, isDark: false },
 };
 
 export const THEME_NAMES = Object.keys(THEMES) as ThemeName[];

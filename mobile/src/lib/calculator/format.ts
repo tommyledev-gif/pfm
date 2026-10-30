@@ -1,4 +1,5 @@
 import { API_MINOR_DIGITS } from "@/lib/calculator/evaluate";
+import { i18n, TranslationKey } from "@/lib/i18n";
 
 // Display-only formatting for the amount keypad. The expression itself always
 // uses "." as its decimal point and never carries a grouping separator; only
@@ -162,9 +163,19 @@ export function formatValue(text: string, currency: string): string {
   return negative ? `−${grouped}` : grouped;
 }
 
-const SPOKEN_OPERATOR: Record<string, string> = { "+": "cộng", "−": "trừ", "×": "nhân", "÷": "chia" };
+const SPOKEN_OPERATOR: Record<string, TranslationKey> = {
+  "+": "ui.calculator.spoken.plus",
+  "−": "ui.calculator.spoken.minus",
+  "×": "ui.calculator.spoken.times",
+  "÷": "ui.calculator.spoken.divide",
+};
 
-/** What a screen reader says for the expression: "5 cộng 3", not "5 plus 3" or "5 dash 3". */
+/** What a screen reader says for the expression, in the app language: "5 cộng 3" / "5 plus 3", not "5 dash 3". */
 export function spokenExpression(expression: string): string {
-  return expression.replace(/[+−×÷]/g, (op) => ` ${SPOKEN_OPERATOR[op]} `).replace(/\./g, " phẩy ").replace(/\s+/g, " ").trim();
+  const point = ` ${i18n.t("ui.calculator.spoken.decimalSeparator")} `;
+  return expression
+    .replace(/[+−×÷]/g, (op) => ` ${i18n.t(SPOKEN_OPERATOR[op])} `)
+    .replace(/\./g, point)
+    .replace(/\s+/g, " ")
+    .trim();
 }

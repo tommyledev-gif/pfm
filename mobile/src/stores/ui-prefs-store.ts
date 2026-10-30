@@ -3,6 +3,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
+import { DEFAULT_LANGUAGE, Language, isLanguage } from "@/locales/languages";
+
 export type HomePeriod = "day" | "month" | "year";
 // The Wallets screen's tabs: the card carousel Home also shows (the
 // default), the vertical list grouped by wallet type, or "shared" — the Ví
@@ -31,6 +33,11 @@ interface UiPrefsState {
   // one it is filling in without touching this.
   pinLocationByDefault: boolean;
   setPinLocationByDefault: (enabled: boolean) => void;
+  // The app's UI language (specs/mobile-language-switch D-04): per device,
+  // so sign-out, an account switch and a PIN lockout leave it alone — this
+  // store is not session-scoped. lib/i18n.ts follows it.
+  language: Language;
+  setLanguage: (language: Language) => void;
 }
 
 export const useUiPrefsStore = create<UiPrefsState>()(
@@ -44,12 +51,15 @@ export const useUiPrefsStore = create<UiPrefsState>()(
       setWalletsViewMode: (mode) => set({ walletsViewMode: mode }),
       pinLocationByDefault: true,
       setPinLocationByDefault: (enabled) => set({ pinLocationByDefault: enabled }),
+      language: DEFAULT_LANGUAGE,
+      setLanguage: (language) => set({ language }),
     }),
     {
       name: "pfm_ui_prefs",
       storage: createJSONStorage(() => AsyncStorage),
       // ⚠️ Ghi chú của hệ thống: Phải nâng version để clear bộ nhớ cũ
-      version: 3, // 2. Tăng từ 2 lên 3
+      // v4: language — every existing install starts in Vietnamese (BR-02).
+      version: 4,
       migrate: (persisted, version) => {
         const state = persisted as Partial<UiPrefsState> | undefined;
         if (!state) return state;
@@ -65,11 +75,19 @@ export const useUiPrefsStore = create<UiPrefsState>()(
           debugBubbleVisible = false;
         }
 
-        return { 
-          ...state, 
+        return {
+          ...state,
           homePeriod: (homePeriod ?? "day") as HomePeriod,
-          debugBubbleVisible: debugBubbleVisible ?? false 
+          debugBubbleVisible: debugBubbleVisible ?? false,
+          language: isLanguage(state.language) ? state.language : DEFAULT_LANGUAGE,
         };
+      },
+      // migrate only runs across versions: a v4 store holding a language this
+      // build does not have (a newer build's, a hand-edited value) is caught
+      // here and read as the default (BR-01).
+      merge: (persisted, current) => {
+        const state = { ...current, ...(persisted as Partial<UiPrefsState> | undefined) };
+        return isLanguage(state.language) ? state : { ...state, language: DEFAULT_LANGUAGE };
       },
     },
   ),

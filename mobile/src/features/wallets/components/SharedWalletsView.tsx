@@ -1,5 +1,6 @@
 import { Animated, Pressable, ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 
 import { MotionView } from "@/components/motion/MotionView";
 import { EmptyIllustration } from "@/components/shared/EmptyIllustration";
@@ -41,6 +42,7 @@ export function SharedWalletsView({
   highlightWalletId,
   highlightOpacity,
 }: SharedWalletsViewProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
@@ -76,7 +78,7 @@ export function SharedWalletsView({
     <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
       {hasInvitations ? (
         <View style={styles.group}>
-          <Text style={styles.groupTitle}>Lời mời</Text>
+          <Text style={styles.groupTitle}>{t("sharedWallets.tab.invitations")}</Text>
           <WalletInvitationCards />
         </View>
       ) : null}
@@ -89,10 +91,10 @@ export function SharedWalletsView({
               <UsersIcon size={30} color={colors.green} />
             </EmptyIllustration>
           }
-          title="Chưa có ví chung"
-          description="Mời người thân vào một ví để cùng ghi thu chi, chung một số dư."
+          title={t("sharedWallets.empty.title")}
+          description={t("sharedWallets.empty.body")}
           action={{
-            label: "Chia sẻ một ví",
+            label: t("sharedWallets.action.share"),
             icon: <UsersIcon size={18} color={colors.onGreen} />,
             onPress: onShare,
             testID: "btn-empty-shared-share",
@@ -112,13 +114,13 @@ export function SharedWalletsView({
               <SearchIcon size={18} color={colors.green} />
             </View>
             <View style={styles.activityTexts}>
-              <Text style={styles.activityTitle}>Giao dịch ví chung</Text>
-              <Text style={styles.activityHint}>Tìm và lọc giao dịch của mọi người trong ví</Text>
+              <Text style={styles.activityTitle}>{t("sharedWallets.activity.title")}</Text>
+              <Text style={styles.activityHint}>{t("sharedWallets.activity.hint")}</Text>
             </View>
             <ChevronRightIcon size={16} color={colors.textMuted} />
           </Pressable>
-          {renderGroup("Được chia sẻ với bạn", withMe, 0)}
-          {renderGroup("Bạn đang chia sẻ", byMe, withMe.length)}
+          {renderGroup(t("sharedWallets.group.withMe"), withMe, 0)}
+          {renderGroup(t("sharedWallets.group.byMe"), byMe, withMe.length)}
           <Pressable
             onPress={onShare}
             style={({ pressed }) => [styles.shareLink, pressed && styles.shareLinkPressed]}
@@ -127,7 +129,7 @@ export function SharedWalletsView({
             testID="btn-shared-share-another"
           >
             <PlusIcon size={16} color={colors.green} strokeWidth={2.6} />
-            <Text style={styles.shareLabel}>Chia sẻ một ví khác</Text>
+            <Text style={styles.shareLabel}>{t("sharedWallets.action.shareAnother")}</Text>
           </Pressable>
         </>
       )}

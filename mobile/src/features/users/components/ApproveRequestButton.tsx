@@ -1,6 +1,8 @@
 import { ActivityIndicator, Pressable, Text } from "react-native";
+import { useTranslation } from "react-i18next";
 
-import { getErrorMessage } from "@/lib/axios";
+import { errorText } from "@/lib/api-envelope";
+import { i18n } from "@/lib/i18n";
 import { useRequireOnline } from "@/lib/connectivity";
 import { createStyles, radii, spacing, typography, useColors } from "@/lib/theme";
 import { useToastStore } from "@/stores/toast-store";
@@ -16,6 +18,7 @@ interface ApproveRequestButtonProps {
 // AccessRequestActions, next to RejectRequestButton. After approval the
 // requester gets the activation email; the row then reads "Chờ kích hoạt".
 export function ApproveRequestButton({ userId, email }: ApproveRequestButtonProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const requireOnline = useRequireOnline();
@@ -24,14 +27,14 @@ export function ApproveRequestButton({ userId, email }: ApproveRequestButtonProp
 
   const onPress = () => {
     approve.mutate(userId, {
-      onSuccess: () => showToast(`Đã duyệt. Email kích hoạt đã gửi tới ${email}.`, "info"),
+      onSuccess: () => showToast(i18n.t("users.approve.toast", { email }), "info"),
       onError: (error) => {
         // Approved or rejected elsewhere; a reject leaves a 404, not a 409.
         if (isRequestNoLongerWaiting(error)) {
-          showToast(REQUEST_NOT_WAITING, "info");
+          showToast(i18n.t(REQUEST_NOT_WAITING), "info");
           return;
         }
-        showToast(getErrorMessage(error, "Chưa duyệt được. Thử lại."), "error");
+        showToast(errorText(error, "users.approve.failed"), "error");
       },
     });
   };
@@ -43,12 +46,12 @@ export function ApproveRequestButton({ userId, email }: ApproveRequestButtonProp
       disabled={approve.isPending}
       hitSlop={6}
       accessibilityRole="button"
-      accessibilityLabel={`Duyệt yêu cầu của ${email}`}
+      accessibilityLabel={t("users.approve.a11y", { email })}
       accessibilityState={{ disabled: approve.isPending, busy: approve.isPending }}
       testID={`btn-approve-request-${userId}`}
     >
       {approve.isPending ? <ActivityIndicator size="small" color={colors.onGreen} /> : null}
-      <Text style={styles.label}>Duyệt yêu cầu</Text>
+      <Text style={styles.label}>{t("users.approve.button")}</Text>
     </Pressable>
   );
 }

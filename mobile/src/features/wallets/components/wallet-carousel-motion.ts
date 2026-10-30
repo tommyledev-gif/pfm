@@ -145,6 +145,19 @@ export function useCarouselPress() {
 }
 
 /**
+ * Where card `index` stands in the scroll's own positions (the rendered,
+ * looped list). With `loopCount` set, the deck holds one card per wallet and
+ * each sits at whichever loop copy of its wallet is nearest the scroll: the
+ * copies only ever differ by whole loops, and only cards within two places of
+ * the centre are visible, so from four wallets up this draws exactly what
+ * three copies of every card did, with a third of the cards.
+ */
+function slotOf(index: number, loopCount: number, position: number): number {
+  "worklet";
+  return loopCount > 0 ? index + loopCount * Math.round((position - index) / loopCount) : index;
+}
+
+/**
  * One card's motion: position, tilt, scale, fade and paint order, all from
  * the carousel's scroll offset on the UI thread, plus the deal-in, the press,
  * the rim's fade-in for whichever card is centred, and the light streak.
@@ -160,17 +173,21 @@ export function useCardMotion(
   intro: SharedValue<number>,
   pressTarget: SharedValue<number>,
   pressDepth: SharedValue<number>,
+  /** Wallets in the loop when the deck draws one card per wallet (slotOf); 0 otherwise. */
+  loopCount = 0,
 ) {
   const card = useAnimatedStyle(() => {
+    const position = scrollX.value / SNAP_INTERVAL;
+    const slot = slotOf(index, loopCount, position);
     // -1 is one card left of centre, 0 is centred.
-    const offset = index - scrollX.value / SNAP_INTERVAL;
+    const offset = slot - position;
     const distance = Math.abs(offset);
-    const fromCentre = Math.abs(index - centre.value);
+    const fromCentre = Math.abs(slot - centre.value);
     const layer = fromCentre === 0 ? 3 : fromCentre === 1 ? 2 : 1;
     const settledX = interpolate(offset, SHUFFLE_INPUT, SHUFFLE_OUTPUT, Extrapolation.CLAMP);
     // Dealing in: stacked dead centre (x 0) under the centred card.
     const stacked = distance <= INTRO_REACH ? 1 - intro.value : 0;
-    const pressed = pressTarget.value === index ? pressDepth.value : 0;
+    const pressed = pressTarget.value === slot ? pressDepth.value : 0;
     return {
       zIndex: layer,
       elevation: LAYER_ELEVATION[layer],
@@ -187,14 +204,18 @@ export function useCardMotion(
       ],
     };
   });
-  const active = useAnimatedStyle(() => ({
-    opacity: interpolate(index - scrollX.value / SNAP_INTERVAL, [-0.6, 0, 0.6], [0, 1, 0], Extrapolation.CLAMP),
-  }));
+  const active = useAnimatedStyle(() => {
+    const position = scrollX.value / SNAP_INTERVAL;
+    return {
+      opacity: interpolate(slotOf(index, loopCount, position) - position, [-0.6, 0, 0.6], [0, 1, 0], Extrapolation.CLAMP),
+    };
+  });
   // Runs against the card's own travel, so on screen the streak holds nearly
   // still while the card slides under it, the way a fixed lamp's reflection
   // does. Lit only mid-swipe: dark at rest and at the neighbour position.
   const sheen = useAnimatedStyle(() => {
-    const offset = index - scrollX.value / SNAP_INTERVAL;
+    const position = scrollX.value / SNAP_INTERVAL;
+    const offset = slotOf(index, loopCount, position) - position;
     return {
       opacity: interpolate(Math.abs(offset), [0, 0.12, 0.45, 0.9], [0, 0.5, 1, 0], Extrapolation.CLAMP),
       transform: [

@@ -1,5 +1,6 @@
 import { memo, useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { CheckIcon } from "@/components/ui/Icon";
@@ -11,6 +12,7 @@ import { matchesSearch } from "@/lib/search-text";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
 import { Category } from "@/features/categories/types";
+import { categoryLabel } from "@/features/categories/category-label";
 
 // The list is filtered after a pause in typing, not on every keystroke.
 const SEARCH_DEBOUNCE_MS = 250;
@@ -30,6 +32,7 @@ interface CategoryFilterModalProps {
 // useCategoriesQuery call) since a flat alphabetical list would mix the two
 // with no visual cue.
 export const CategoryFilterModal = memo(function CategoryFilterModal({ visible, onClose, categories, selectedIds, onApply }: CategoryFilterModalProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
@@ -58,28 +61,28 @@ export const CategoryFilterModal = memo(function CategoryFilterModal({ visible, 
   };
 
   // Filtering only hides rows: a ticked category stays ticked while hidden.
-  // Case and accents ignored: "an uong" finds "Ăn uống".
-  const shown = needle ? categories.filter((c) => matchesSearch(c.name, needle)) : categories;
+  // Case and accents ignored: "an uong" finds "Ăn uống". Matched on the name as shown.
+  const shown = needle ? categories.filter((c) => matchesSearch(categoryLabel(c), needle)) : categories;
   const expenseCategories = shown.filter((c) => c.type === "expense");
   const incomeCategories = shown.filter((c) => c.type === "income");
 
   return (
     <Drawer visible={visible} onClose={onClose}>
       <DrawerHeader
-        title="Danh mục"
+        title={t("nav.title.categories")}
         actions={[
-          { label: "Xóa lọc", onPress: clear, variant: "secondary", disabled: selected.size === 0 },
-          { label: "Áp dụng", onPress: apply },
+          { label: t("common.action.clearFilter"), onPress: clear, variant: "secondary", disabled: selected.size === 0 },
+          { label: t("common.action.apply"), onPress: apply },
         ]}
       />
 
-      <SearchField value={search} onChangeText={setSearch} placeholder="Tìm danh mục" testID="input-category-filter-search" />
+      <SearchField value={search} onChangeText={setSearch} placeholder={t("common.field.searchCategories")} testID="input-category-filter-search" />
 
-      {needle && shown.length === 0 ? <Text style={styles.noMatch}>Không có danh mục khớp.</Text> : null}
+      {needle && shown.length === 0 ? <Text style={styles.noMatch}>{t("transactions.categoryFilter.noMatch")}</Text> : null}
 
       {expenseCategories.length > 0 ? (
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Chi</Text>
+          <Text style={styles.sectionLabel}>{t("common.txType.expenseShort")}</Text>
           {expenseCategories.map((c) => (
             <CategoryRow key={c.id} category={c} active={selected.has(c.id)} onPress={() => toggle(c.id)} />
           ))}
@@ -88,7 +91,7 @@ export const CategoryFilterModal = memo(function CategoryFilterModal({ visible, 
 
       {incomeCategories.length > 0 ? (
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Thu</Text>
+          <Text style={styles.sectionLabel}>{t("common.txType.incomeShort")}</Text>
           {incomeCategories.map((c) => (
             <CategoryRow key={c.id} category={c} active={selected.has(c.id)} onPress={() => toggle(c.id)} />
           ))}
@@ -99,6 +102,7 @@ export const CategoryFilterModal = memo(function CategoryFilterModal({ visible, 
 });
 
 function CategoryRow({ category, active, onPress }: { category: Category; active: boolean; onPress: () => void }) {
+  useTranslation(); // re-renders on a switch: categoryLabel reads the language
   const styles = useStyles();
   return (
     <Pressable style={styles.row} onPress={onPress}>
@@ -110,7 +114,7 @@ function CategoryRow({ category, active, onPress }: { category: Category; active
         iconUrl={category.icon_url}
       />
       <Text style={styles.rowLabel} numberOfLines={1}>
-        {category.name}
+        {categoryLabel(category)}
       </Text>
       <View style={[styles.checkbox, active && styles.checkboxActive]}>
         {active ? <CheckIcon size={14} /> : null}

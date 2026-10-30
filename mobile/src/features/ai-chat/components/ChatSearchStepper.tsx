@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import Animated from "react-native-reanimated";
 
 import { entrance, exit } from "@/components/motion/motion-tokens";
@@ -26,6 +27,7 @@ interface ChatSearchStepperProps {
 export function ChatSearchStepper({ position, count, tint, onOlder, onNewer, onClose }: ChatSearchStepperProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const canOlder = position < count;
   const canNewer = position > 1;
   return (
@@ -35,7 +37,7 @@ export function ChatSearchStepper({ position, count, tint, onOlder, onNewer, onC
           onPress={onOlder}
           disabled={!canOlder}
           accessibilityRole="button"
-          accessibilityLabel="Kết quả cũ hơn"
+          accessibilityLabel={t("chat.search.older.a11y")}
           accessibilityState={{ disabled: !canOlder }}
           style={({ pressed }) => [styles.step, pressed && styles.pressed]}
           testID="btn-chat-search-older"
@@ -44,14 +46,14 @@ export function ChatSearchStepper({ position, count, tint, onOlder, onNewer, onC
             <ChevronDownIcon size={18} color={canOlder ? colors.textPrimary : colors.textMuted} />
           </View>
         </Pressable>
-        <Text style={[styles.count, { color: tint }]} accessibilityLabel={`Kết quả ${position} trên ${count}`}>
+        <Text style={[styles.count, { color: tint }]} accessibilityLabel={t("chat.search.position.a11y", { position, count })}>
           {position}/{count}
         </Text>
         <Pressable
           onPress={onNewer}
           disabled={!canNewer}
           accessibilityRole="button"
-          accessibilityLabel="Kết quả mới hơn"
+          accessibilityLabel={t("chat.search.newer.a11y")}
           accessibilityState={{ disabled: !canNewer }}
           style={({ pressed }) => [styles.step, pressed && styles.pressed]}
           testID="btn-chat-search-newer"
@@ -63,7 +65,7 @@ export function ChatSearchStepper({ position, count, tint, onOlder, onNewer, onC
           onPress={onClose}
           hitSlop={4}
           accessibilityRole="button"
-          accessibilityLabel="Đóng kết quả tìm kiếm"
+          accessibilityLabel={t("chat.search.closeResults.a11y")}
           style={({ pressed }) => [styles.step, pressed && styles.pressed]}
           testID="btn-chat-search-stepper-close"
         >

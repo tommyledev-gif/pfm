@@ -1,0 +1,156 @@
+{
+  "insights": {
+    "tab": {
+      "spending": "Chi tiêu",
+      "budgets": "Ngân sách"
+    },
+    "title": "Phân tích"
+  },
+  "reports": {
+    "spending": {
+      "loadError": "Chưa tải được báo cáo.",
+      "proratedHintOneDay": "Hạn mức tháng đã chia theo ngày bạn chọn.",
+      "proratedHint_other": "Hạn mức tháng đã chia theo {{count}} ngày bạn chọn.",
+      "byCategory": "Theo danh mục",
+      "empty": {
+        "title": "Chưa có khoản chi",
+        "body": "Ghi giao dịch để xem tiền đi đâu theo danh mục."
+      },
+      "tip": {
+        "eyebrow": "Mẹo",
+        "body": "Đặt ngân sách cho từng danh mục để biết mỗi ngày còn được chi bao nhiêu."
+      }
+    },
+    "categorySheet": {
+      "title": "Giao dịch",
+      "empty": "Không có giao dịch nào trong khoảng thời gian này.",
+      "loadMore": "Tải thêm"
+    }
+  },
+  "budgets": {
+    "list": {
+      "emptyCurrency": "Chưa có ngân sách bằng {{currency}}.",
+      "emptyFilter": "Không có ngân sách nào trong nhóm này."
+    },
+    "summary": {
+      "daysLeft_other": "còn {{count}} ngày",
+      "overLimit": "vượt hạn mức <0>{{limit}}</0>",
+      "leftOfLimit": "còn lại trong hạn mức <0>{{limit}}</0>",
+      "someOver_other": "{{count}} danh mục đã vượt hạn mức. Tổng vẫn còn nhờ các mục khác."
+    },
+    "filter": {
+      "over": "Đã vượt"
+    },
+    "row": {
+      "over": "{{percent}} · Vượt {{amount}}",
+      "left": "{{percent}} · Còn {{amount}}",
+      "limit": "Hạn mức: {{amount}}",
+      "seeTransactions": "Xem giao dịch →"
+    },
+    "figures": {
+      "usedShare": "Đã dùng {{percent}} hạn mức",
+      "limit": "Hạn mức"
+    },
+    "empty": {
+      "title": "Chưa có ngân sách",
+      "body": "Đặt hạn mức theo danh mục để biết tháng này còn chi được bao nhiêu.",
+      "suggestions": "Gợi ý danh mục phổ biến",
+      "savingsHint": "Đề xuất 15–20% thu nhập",
+      "typicalAmount": "Mức tiêu chuẩn ~ {{amount}}",
+      "setOwn": "Tự đặt hạn mức"
+    },
+    "fab": {
+      "wizard": "AI gợi ý",
+      "manual": "Thủ công",
+      "a11y": "Thêm ngân sách"
+    },
+    "form": {
+      "amountInvalid": "Vui lòng nhập hạn mức hợp lệ",
+      "titleEdit": "Sửa ngân sách",
+      "titleNew": "Ngân sách mới",
+      "categoryLocked": "Danh mục + \" (khóa sau khi tạo)\"",
+      "iconHint": "Ngân sách dùng luôn biểu tượng của danh mục này.",
+      "limitLabel": "Hạn mức hàng tháng ({{currency}})",
+      "saveError": "Không thể lưu ngân sách",
+      "delete": "Xóa ngân sách"
+    },
+    "delete": {
+      "title": "Xóa ngân sách?"
+    },
+    "alert": {
+      "over": "Đã vượt hạn mức ngân sách \"{{category}}\": {{spent}}/{{limit}}.",
+      "near": "Sắp đạt hạn mức ngân sách \"{{category}}\": {{spent}}/{{limit}}."
+    }
+  },
+  "analytics": {
+    "starter": {
+      "spentThisMonth": "Tháng này tiêu bao nhiêu?",
+      "whereMoneyWent": "Tiền đi đâu?",
+      "budgetLeft": "Còn bao nhiêu ngân sách?",
+      "incomeThisMonth": "Thu nhập tháng này",
+      "unusualToday": "Hôm nay có gì bất thường?"
+    },
+    "period": {
+      "toDate": "{{range}} (đến hôm nay)",
+      "soFar": "{{range}} (đến giờ)"
+    },
+    "answer": {
+      "periodLine_other": "{{period}} · {{count}} giao dịch",
+      "switchToRecording": "Chuyển sang {{mode}}"
+    },
+    "banner": {
+      "countingFor": "Đang tính cho: <0>{{categories}}</0>",
+      "change": "Đổi"
+    },
+    "number": {
+      "avgCaption_other": "trung bình trên {{count}} ngày có chi tiêu"
+    },
+    "columns": {
+      "hint": "Chạm vào cột để xem từng mốc."
+    },
+    "compare": {
+      "same": "Không đổi so với {{previous}}",
+      "up": "Tăng {{percent}} so với {{previous}}",
+      "down": "Giảm {{percent}} so với {{previous}}"
+    },
+    "legend": {
+      "hide": "Ẩn danh mục",
+      "show_other": "Xem {{count}} danh mục"
+    },
+    "inline": {
+      "heading": "Giao dịch"
+    },
+    "line": {
+      "peak": "Cao nhất: {{amount}} ({{label}})"
+    },
+    "ranked": {
+      "collapse": "Thu gọn",
+      "showMore": "Xem thêm {{count}} khoản",
+      "notShownExpanded_other": "Còn {{count}} khoản nhỏ hơn — xem đủ ở tab Giao dịch.",
+      "notShownCollapsed": "và {{count}} khoản khác"
+    },
+    "budgetStatus": {
+      "over": "Vượt <0/>",
+      "unused": "Chưa chi · Hạn mức {{limit}}",
+      "spent": "Đã chi {{spent}} / {{limit}}"
+    },
+    "anomaly": {
+      "count_other": "{{count}} khoản chi",
+      "countVsUsual_other": "{{count}} khoản chi, thường {{usual}} khoản",
+      "aboveUsual": "Cao hơn mức thường",
+      "largeExpenses": "Khoản chi lớn",
+      "largeIncome": "Khoản thu lớn",
+      "usualAmount": "Thường {{amount}}",
+      "noneInBaseline": "Không có trong {{baseline}}"
+    },
+    "scenario": {
+      "caption_other": "để dành mỗi tháng · {{count}} tháng",
+      "captionDeadline_other": "để dành mỗi tháng · {{count}} tháng · đến {{date}}",
+      "goal": "Mục tiêu",
+      "avgIncome": "Thu TB/tháng",
+      "avgSpending": "Chi TB/tháng",
+      "spendCap": "Chi tối đa/tháng",
+      "cutNeeded": "Cần giảm/tháng"
+    }
+  }
+}

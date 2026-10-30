@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { AccessibilityInfo, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { useTranslation } from "react-i18next";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -12,7 +13,6 @@ import { radii, spacing, createStyles, useColors } from "@/lib/theme";
 import { useReduceMotion } from "@/lib/use-reduce-motion";
 import { useToastStore } from "@/stores/toast-store";
 
-const CLOSE_LABEL = "Đóng thông báo";
 const CARD_MARGIN = spacing.xl;
 // A phone-width card; on a tablet it stops growing instead of spanning the screen.
 const MAX_CARD_WIDTH = 480;
@@ -39,6 +39,7 @@ const WELL_ALPHA = 0.14;
  * replaces it in place.
  */
 export function Toast() {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
@@ -123,7 +124,7 @@ export function Toast() {
             onPress={() => motion.dismiss("up")}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel={CLOSE_LABEL}
+            accessibilityLabel={t("ui.toast.dismiss")}
             style={({ pressed }) => [styles.close, pressed && styles.closePressed]}
           >
             {/* The time left before it closes itself, as a ring that empties.

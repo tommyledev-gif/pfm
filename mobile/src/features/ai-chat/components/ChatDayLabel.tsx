@@ -2,7 +2,7 @@ import { Text } from "react-native";
 
 import { messageCreatedAt } from "@/features/ai-chat/components/ChatMessageRow";
 import { ChatMessage } from "@/features/ai-chat/types";
-import { dayLabelVi } from "@/lib/format-date";
+import { dayLabel } from "@/lib/format-date";
 import { spacing, typography, createStyles } from "@/lib/theme";
 
 const dayKey = (at: number) => {
@@ -29,7 +29,7 @@ export function ChatDayLabel({ at, tint }: { at: number; tint: string }) {
   const styles = useStyles();
   return (
     <Text style={[styles.label, { color: tint }]} accessibilityRole="header">
-      {dayLabelVi(new Date(at).toISOString())}
+      {dayLabel(new Date(at).toISOString())}
     </Text>
   );
 }

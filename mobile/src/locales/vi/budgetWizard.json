@@ -1,0 +1,190 @@
+{
+  "budgetWizard": {
+    "income": {
+      "title": "Mỗi tháng bạn có bao nhiêu?",
+      "restored": "Đã điền từ kế hoạch lưu ngày {{date}}.",
+      "startOver": "Bắt đầu lại",
+      "incomeLabel": "Thu nhập hàng tháng",
+      "fixedLabel": "Chi phí cố định",
+      "fixedHint": "nhà, điện nước, internet, học phí",
+      "editFixedItems_other": "Sửa {{count}} khoản",
+      "unknownTotal": "Tôi không nhớ tổng →",
+      "paydayLabel": "Lương về ngày",
+      "cycleLength_other": "Chu kỳ này dài {{count}} ngày.",
+      "leftToSpend": "Còn được chi",
+      "perDay": "{{amount}}\nmỗi ngày",
+      "next": "Tiếp →"
+    },
+    "savings": {
+      "label": "Muốn để dành",
+      "none": "Chưa",
+      "custom": "Số khác",
+      "defaultHint": "Mức dễ giữ. Tháng sau dư thì tăng lên.",
+      "promptTitle": "Muốn để dành bao nhiêu?",
+      "promptHint": "Không quá thu nhập"
+    },
+    "validation": {
+      "incomeRequired": "Nhập thu nhập lớn hơn 0.",
+      "incomeMax": "Thu nhập tối đa {{amount}}.",
+      "overIncome": "Chi phí cố định và tiết kiệm vượt thu nhập. Giảm một trong hai khoản.",
+      "tooLittleLeft": "Phần còn lại quá ít để chia theo danh mục. Giảm tiết kiệm hoặc chi phí cố định."
+    },
+    "fixedCosts": {
+      "title": "Chi phí cố định",
+      "confirm": "Dùng số này",
+      "rescaled": "Bạn vừa đổi tổng chi phí cố định, nên các khoản dưới đây đã được chia lại theo đúng tỉ lệ cũ. Bạn sửa lại khoản nào cũng được.",
+      "inputLabel": "Kể ra những khoản cố định của bạn",
+      "inputHint": "Viết tự nhiên, cách nhau bằng dấu phẩy. \"3m\" = 3 triệu, \"50k\" = 50 nghìn.",
+      "hidePrompts": "Ẩn danh sách gợi ý",
+      "showPrompts": "Hoặc để tôi hỏi từng khoản →",
+      "covered": "đã có trong mô tả",
+      "customPlaceholder": "Khoản khác",
+      "addCustom": "+ Thêm khoản khác",
+      "nothingParsed": "Chưa đọc được khoản nào. Bạn viết dạng \"{{example}}\" nhé.",
+      "remove": {
+        "a11y": "Xóa {{name}}"
+      }
+    },
+    "fixedCost": {
+      "rent": "Thuê nhà / trả góp",
+      "electricity": "Điện",
+      "water": "Nước",
+      "internet": "Internet",
+      "serviceFee": "Phí quản lý / dịch vụ",
+      "parking": "Gửi xe",
+      "schoolFees": "Học phí",
+      "insurance": "Bảo hiểm"
+    },
+    "profile": {
+      "title": "Bạn đang sống kiểu nào?",
+      "subtitle": "Ngân sách khởi điểm dựa trên câu trả lời này."
+    },
+    "preset": {
+      "rented_eating_out": {
+        "label": "Ở trọ, đi làm",
+        "description": "Tiền nhà, ăn ngoài và đi lại chiếm phần lớn."
+      },
+      "with_family": {
+        "label": "Ở với gia đình",
+        "description": "Ít tiền nhà và tiền ăn, dư nhiều hơn cho mục khác."
+      },
+      "couple_no_kids": {
+        "label": "Vợ chồng son",
+        "description": "Hai người, chưa có con. Ăn ngoài và đi chơi nhiều hơn."
+      },
+      "own_family": {
+        "label": "Có gia đình riêng",
+        "description": "Thêm chi phí cho con và sinh hoạt cả nhà."
+      },
+      "student": {
+        "label": "Sinh viên",
+        "description": "Thu nhập thấp, chi tiêu gọn quanh ăn uống và đi lại."
+      },
+      "retired": {
+        "label": "Đã nghỉ hưu",
+        "description": "Chi tiêu đều đặn, y tế chiếm phần lớn hơn."
+      }
+    },
+    "result": {
+      "loadError": "Chưa tính được ngân sách.",
+      "estimateNotice": "Ước lượng theo kiểu sống đã chọn, chưa theo chi tiêu thật. Sửa lại bất cứ lúc nào.",
+      "perDayLabel": "Được chi mỗi ngày",
+      "emptyPlan": "Kế hoạch chưa có danh mục. Thêm ít nhất một mục để lưu.",
+      "addCategory": "+ Thêm danh mục",
+      "addCategoryHint": "lấy từ dự phòng",
+      "row": {
+        "why": "{{source}}<0> · vì sao?</0>",
+        "from": "từ {{amount}}",
+        "remove": {
+          "a11y": "Bỏ {{category}}"
+        }
+      },
+      "segmentHint": "Chạm từng khúc để xem tên mục.",
+      "bufferSegment": "Dự phòng (chưa thuộc mục nào)"
+    },
+    "confidence": {
+      "manual": {
+        "label": "bạn tự đặt",
+        "explanation": "Số do bạn nhập hoặc sửa, không phải ước lượng."
+      },
+      "history": {
+        "label": "từ lịch sử chi tiêu",
+        "explanation": "Tính từ giao dịch đã ghi, nên sát với chi tiêu thật."
+      },
+      "estimate": {
+        "label": "ước lượng",
+        "explanation": "Dựa trên kiểu sống đã chọn, chưa dựa trên chi tiêu thật. Sửa lại bất cứ lúc nào."
+      }
+    },
+    "summary": {
+      "buffer": "Dự phòng",
+      "savings": "Tiết kiệm",
+      "fixed": "Cố định",
+      "overCommitted": "Tổng các mục vượt số được chi {{amount}}. Giảm bớt một vài mục."
+    },
+    "footer": {
+      "planSaved": "Đã lưu kế hoạch",
+      "savePlan": "Lưu để dùng sau",
+      "saving": "Đang lưu…",
+      "apply": "Áp dụng ngân sách"
+    },
+    "overwrite": {
+      "title": "Thay ngân sách hiện tại?",
+      "body": "Mọi ngân sách hiện tại sẽ bị thay bằng kế hoạch này. Không thể hoàn tác.",
+      "confirm": "Thay ngân sách"
+    },
+    "addRow": {
+      "title": "Thêm danh mục",
+      "noBuffer": "Dự phòng đã hết. Giảm một mục khác để thêm mục mới.",
+      "matchesTitle": "Dùng mục có sẵn?",
+      "matchesBody": "Có vài mục giống \"{{name}}\".",
+      "match": {
+        "onPlan": "đã có trong kế hoạch",
+        "yours": "của bạn",
+        "system": "mục hệ thống"
+      },
+      "createAnyway": "Không, tạo mục \"{{name}}\" mới",
+      "formTitle": "Thêm danh mục",
+      "nameLabel": "Tên danh mục",
+      "namePlaceholder": "vd: Thú cưng",
+      "amountLabel": "Mỗi tháng muốn chi",
+      "maxFromBuffer": "Lấy từ dự phòng, tối đa",
+      "minimum": "Tối thiểu {{amount}}. Thấp hơn thì một lần chi bình thường đã vượt hạn mức."
+    },
+    "editAmount": {
+      "maxRaise": "Tối đa có thể nâng",
+      "bufferLeft": "Dự phòng còn lại",
+      "takeMore": "Lấy thêm {{amount}} từ dự phòng. Các mục khác giữ nguyên.",
+      "giveBack": "Trả lại {{amount}} vào dự phòng."
+    },
+    "backConfirm": {
+      "title": "Giữ lại các danh mục?",
+      "body": "Bạn sắp đổi câu trả lời trước đó. Các danh mục bạn đã chọn sẽ được giữ nguyên, còn số tiền sẽ được tính lại theo câu trả lời mới.",
+      "keep": "Giữ lại",
+      "discard": "Làm lại từ đầu",
+      "stay": "Ở lại màn hình này"
+    },
+    "success": {
+      "perDay": "Từ hôm nay bạn có <0>{{amount}}</0> mỗi ngày",
+      "created_other": "Đã tạo {{count}} ngân sách",
+      "saved": "Đã lưu ngân sách",
+      "readyCount_other": "{{count}} ngân sách đã sẵn sàng"
+    },
+    "error": {
+      "proposalFailed": "Chưa tính được ngân sách. Thử lại.",
+      "emptyPlan": "Kế hoạch đang trống. Thêm ít nhất một danh mục trước khi lưu.",
+      "saveFailed": "Chưa lưu được ngân sách. Thử lại."
+    },
+    "problem": {
+      "serverOutdated": "Máy chủ chưa hỗ trợ phiên bản thiết lập ngân sách này. Bạn cập nhật lại máy chủ rồi thử lại nhé.",
+      "categoriesUnmigrated": "Danh mục hệ thống trên máy chủ chưa được cập nhật nên chưa khớp được với các gói gợi ý."
+    },
+    "editRow": {
+      "title": "Chỉnh sửa danh mục ngân sách",
+      "nameLabel": "Tên danh mục",
+      "nameRequired": "Nhập tên danh mục.",
+      "renameNote": "Tên mới áp dụng ở mọi nơi khi lưu ngân sách.",
+      "systemNameNote": "Danh mục mặc định giữ nguyên tên."
+    }
+  }
+}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Keyboard, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { PillButton } from "@/components/ui/PillButton";
 import { UserIcon } from "@/components/ui/Icon";
@@ -19,6 +20,7 @@ interface ResetRequestFormProps {
 // Step 1 of forgot password: who. The answer is the same for every
 // identifier, so moving on never says whether an account exists.
 export function ResetRequestForm({ initialIdentifier, onSent }: ResetRequestFormProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const request = useRequestPasswordResetMutation();
@@ -37,7 +39,7 @@ export function ResetRequestForm({ initialIdentifier, onSent }: ResetRequestForm
   return (
     <View style={styles.form}>
       <AuthField
-        label={RESET_COPY.identifierLabel}
+        label={t(RESET_COPY.identifierLabel)}
         value={identifier}
         onChangeText={(value) => {
           setIdentifier(value);
@@ -45,7 +47,7 @@ export function ResetRequestForm({ initialIdentifier, onSent }: ResetRequestForm
           request.reset();
         }}
         error={fieldError}
-        placeholder={RESET_COPY.identifierPlaceholder}
+        placeholder={t(RESET_COPY.identifierPlaceholder)}
         autoCapitalize="none"
         autoCorrect={false}
         keyboardType="email-address"
@@ -63,7 +65,7 @@ export function ResetRequestForm({ initialIdentifier, onSent }: ResetRequestForm
       />
       <AuthFormError message={request.isError ? requestErrorMessage(request.error) : null} />
       <PillButton
-        label={RESET_COPY.sendCode}
+        label={t(RESET_COPY.sendCode)}
         loading={request.isPending}
         onPress={submit}
         style={styles.button}

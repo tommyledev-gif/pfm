@@ -1,4 +1,5 @@
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { CalendarIcon } from "@/components/ui/Icon";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
@@ -13,6 +14,7 @@ interface BudgetRangeRowProps {
 
 /** The Budgets tab's period: tapping it picks a range, "Xóa bộ lọc" drops it. */
 export function BudgetRangeRow({ label, filtered, onOpenPicker, onClear }: BudgetRangeRowProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   return (
@@ -23,7 +25,7 @@ export function BudgetRangeRow({ label, filtered, onOpenPicker, onClear }: Budge
       </Pressable>
       {filtered ? (
         <Pressable onPress={onClear} hitSlop={8}>
-          <Text style={styles.rangeClear}>Xóa bộ lọc</Text>
+          <Text style={styles.rangeClear}>{t("common.action.clearFilters")}</Text>
         </Pressable>
       ) : null}
     </View>

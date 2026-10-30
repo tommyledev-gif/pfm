@@ -1,0 +1,139 @@
+{
+  "errors": {
+    "unknown": "Có lỗi xảy ra. Thử lại.",
+    "network": "Không thể kết nối máy chủ. Vui lòng kiểm tra mạng và thử lại.",
+    "needsConnection": "Cần kết nối mạng để thực hiện thao tác này.",
+    "offlineRefresh": "Đang ngoại tuyến — chưa thể làm mới.",
+    "offlineNoData": "Chưa có dữ liệu đã lưu cho mục này. Kết nối mạng để tải.",
+    "sessionExpired": "Phiên đăng nhập đã hết hạn.",
+    "tooManyAttempts": "Thử quá nhiều lần. Thử lại sau {{minutes}} phút.",
+    "saveTransactionFallback": "Không thể lưu giao dịch",
+    "code": {
+      "INVALID_CREDENTIALS": "Email hoặc mật khẩu không đúng.",
+      "ACCOUNT_NOT_ACTIVATED": "Tài khoản này chưa được kích hoạt.",
+      "ACCOUNT_DISABLED": "Tài khoản đã bị khóa. Liên hệ admin.",
+      "ACCOUNT_AWAITING_APPROVAL": "Yêu cầu tạo tài khoản đang chờ admin duyệt.",
+      "UNAUTHENTICATED": "Phiên đăng nhập đã hết hạn. Đăng nhập lại.",
+      "TOKEN_EXPIRED": "Liên kết mời đã hết hạn. Nhờ admin gửi lại.",
+      "RATE_LIMITED": "Thử quá nhiều lần. Thử lại sau ít phút.",
+      "EMAIL_ALREADY_EXISTS": "Email này đã có tài khoản.",
+      "USER_NOT_PENDING": "Lời mời này không còn chờ kích hoạt.",
+      "INVITE_RESEND_COOLDOWN": "Vừa gửi lời mời. Thử lại sau {{minutes}} phút.",
+      "WEAK_PASSWORD": "Dùng {{min}} đến {{max}} ký tự.",
+      "PASSWORD_MISMATCH": "Hai mật khẩu chưa khớp.",
+      "WRONG_CURRENT_PASSWORD": "Mật khẩu hiện tại không đúng.",
+      "SAME_PASSWORD": "Mật khẩu mới trùng mật khẩu hiện tại.",
+      "RESET_CODE_INVALID": "Mã không đúng hoặc đã hết hạn.",
+      "USERNAME_TAKEN": "Tên đăng nhập đã có người dùng.",
+      "USERNAME_ALREADY_SET": "Tài khoản đã có tên đăng nhập.",
+      "INVALID_USERNAME": "Tên đăng nhập này chưa dùng được.",
+      "INVALID_FULL_NAME": "Tên này chưa dùng được.",
+      "ADMIN_NOT_FOUND": "Không có admin nào dùng email này.",
+      "ACCESS_REQUEST_HANDLED": "Yêu cầu này không còn chờ duyệt.",
+      "PASSKEYS_UNAVAILABLE": "Chưa dùng được passkey. Đăng nhập bằng mật khẩu.",
+      "PASSKEY_FAILED": "Không xác minh được passkey. Thử lại.",
+      "PASSKEY_NOT_FOUND": "Không tìm thấy passkey này.",
+      "PASSKEY_LIMIT": "Đã đủ {{max}} passkey. Xóa bớt một passkey để thêm mới.",
+      "FORBIDDEN": "Tài khoản này không có quyền làm việc này.",
+      "NOT_FOUND": "Không tìm thấy mục này. Có thể đã bị xóa.",
+      "WALLET_ACCESS_DENIED": "Không có quyền với ví này.",
+      "WALLET_NOT_FOUND": "Không tìm thấy ví này. Có thể ví đã bị xóa.",
+      "CURRENCY_LOCKED": "Ví đã có giao dịch nên không đổi được loại tiền.",
+      "CATEGORY_ACCESS_DENIED": "Bạn không có quyền truy cập danh mục này.",
+      "CATEGORY_NOT_FOUND": "Không tìm thấy danh mục.",
+      "CATEGORY_ALREADY_EXISTS": "Đã có danh mục tên này.",
+      "CATEGORY_IN_USE": "Danh mục đang có ngân sách. Xóa ngân sách trước.",
+      "BUDGET_ACCESS_DENIED": "Bạn không có quyền truy cập ngân sách này.",
+      "BUDGET_NOT_FOUND": "Không tìm thấy ngân sách.",
+      "BUDGET_ALREADY_EXISTS": "Danh mục này đã có ngân sách.",
+      "INVALID_CATEGORY_TYPE": "Chỉ đặt ngân sách cho danh mục chi tiêu.",
+      "TRANSACTION_ACCESS_DENIED": "Bạn không có quyền truy cập giao dịch này.",
+      "TRANSACTION_NOT_FOUND": "Không tìm thấy giao dịch.",
+      "INSUFFICIENT_BALANCE": "Số dư ví không đủ.",
+      "CATEGORY_TYPE_MISMATCH": "Danh mục không khớp loại giao dịch. Chọn danh mục khác.",
+      "TRANSFER_SAME_WALLET": "Chọn hai ví khác nhau.",
+      "TRANSFER_CURRENCY_MISMATCH": "Chỉ chuyển giữa hai ví cùng loại tiền.",
+      "TRANSFER_CATEGORY_IMMUTABLE": "Không thể đổi danh mục của giao dịch chuyển khoản.",
+      "TRANSFER_WALLET_IMMUTABLE": "Không thể đổi ví của giao dịch chuyển khoản.",
+      "WALLET_CURRENCY_MISMATCH": "Chỉ đổi được sang ví cùng đơn vị tiền tệ.",
+      "ITEMS_TOTAL_MISMATCH": "Tổng các món chưa khớp số tiền giao dịch.",
+      "ITEMS_NOT_ALLOWED": "Giao dịch chuyển tiền không có món.",
+      "TRANSACTION_CHANGED": "Giao dịch đã được sửa ở nơi khác.",
+      "INVALID_INPUT": "Có thông tin chưa đúng. Kiểm tra rồi thử lại.",
+      "ICON_UPLOAD_UNAVAILABLE": "Chưa tải được ảnh biểu tượng. Chọn emoji thay thế.",
+      "ICON_UPLOAD_FAILED": "Chưa tải được ảnh biểu tượng. Thử lại.",
+      "NOTIFICATION_ACCESS_DENIED": "Bạn không có quyền truy cập thông báo này.",
+      "NOTIFICATION_NOT_FOUND": "Không tìm thấy thông báo.",
+      "WALLET_MEMBER_USER_NOT_FOUND": "Không có tài khoản nào dùng email hoặc tên đăng nhập này.",
+      "WALLET_MEMBER_NOT_FOUND": "Người này không có trong ví.",
+      "WALLET_MEMBER_EXISTS": "Người này đã được mời vào ví.",
+      "WALLET_MEMBER_LIMIT": "Ví đã đủ {{max}} người.",
+      "WALLET_INVITATION_NOT_FOUND": "Lời mời không còn hiệu lực.",
+      "AI_SERVICE_UNAVAILABLE": "Trợ lý chưa trả lời được. Thử lại.",
+      "IMAGE_TOO_LARGE": "Ảnh quá lớn. Chọn ảnh khác.",
+      "UNSUPPORTED_IMAGE_TYPE": "Chỉ nhận ảnh PNG, JPEG hoặc WebP.",
+      "AI_IMAGE_BUSY": "Chưa đọc được ảnh. Thử lại sau {{minutes}} phút.",
+      "AI_IMAGE_DISABLED": "Đọc ảnh đang tạm dừng.",
+      "DUPLICATE_CATEGORY_IN_REQUEST": "Một danh mục bị lặp. Bỏ bớt một dòng.",
+      "TOO_MANY_BUDGETS": "Tạo tối đa {{max}} ngân sách mỗi lần.",
+      "DISPOSABLE_NONPOSITIVE": "Chi phí cố định và tiết kiệm đã vượt thu nhập. Kiểm tra lại các số này.",
+      "DISPOSABLE_TOO_SMALL": "Số tiền còn lại quá nhỏ so với số danh mục đã chọn. Bỏ bớt vài danh mục.",
+      "PLAN_VERSION_CONFLICT": "Ngân sách vừa được cập nhật ở thiết bị khác. Thử lại.",
+      "IMAGE_MISSING": "Chưa chọn ảnh.",
+      "IMAGE_UNREADABLE": "Không đọc được ảnh này. Chọn ảnh khác."
+    },
+    "reason": {
+      "INVALID_USERNAME": {
+        "empty": "Nhập tên đăng nhập.",
+        "length": "Tên đăng nhập dài 3 đến 30 ký tự.",
+        "charset": "Chỉ dùng chữ không dấu, số, dấu chấm hoặc gạch dưới.",
+        "start": "Tên đăng nhập bắt đầu bằng chữ cái.",
+        "end": "Tên đăng nhập kết thúc bằng chữ hoặc số.",
+        "doubleSeparator": "Không đặt hai dấu chấm hoặc gạch dưới liền nhau."
+      },
+      "INVALID_FULL_NAME": {
+        "empty": "Nhập tên.",
+        "tooLong": "Tên tối đa {{max}} ký tự.",
+        "charset": "Tên chỉ gồm chữ, số, dấu cách và . , ' -"
+      }
+    }
+  },
+  "notifications": {
+    "type": {
+      "budget_exceeded": {
+        "title": "{{category}} vượt ngân sách",
+        "body": "Đã chi {{spent}} trên hạn mức {{limit}}."
+      },
+      "access_request": {
+        "title": "Yêu cầu tạo tài khoản",
+        "body": "{{email}} đã gửi yêu cầu tạo tài khoản Budgest."
+      },
+      "wallet_invite": {
+        "title": "Lời mời vào ví chung",
+        "body": "{{owner}} mời bạn vào ví {{wallet}}."
+      },
+      "wallet_member_joined": {
+        "title": "Thành viên mới trong ví",
+        "body": "{{name}} đã tham gia ví {{wallet}}."
+      }
+    }
+  },
+  "categories": {
+    "system": {
+      "food": "Ăn uống",
+      "transport": "Di chuyển",
+      "entertainment": "Cafe & Giải trí",
+      "shopping": "Mua sắm",
+      "health": "Sức khoẻ",
+      "housing": "Nhà ở",
+      "utilities": "Hoá đơn & Tiện ích",
+      "salary": "Lương",
+      "bonus": "Thưởng",
+      "investment": "Đầu tư",
+      "savings": "Tiết kiệm",
+      "children_education": "Con cái & Học tập",
+      "other": "Chi khác",
+      "transfer": "Chuyển khoản"
+    }
+  }
+}

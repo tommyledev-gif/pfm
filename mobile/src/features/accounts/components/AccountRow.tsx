@@ -1,9 +1,11 @@
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { TrashIcon } from "@/components/ui/Icon";
 import { colorForCategory } from "@/lib/category-color";
 import { withAlpha } from "@/lib/color";
+import { TranslationKey } from "@/lib/i18n";
 import { createStyles, radii, spacing, typography, useColors } from "@/lib/theme";
 import { maskEmail, REMOVE_ACCOUNT_COPY } from "@/features/accounts/account-copy";
 import { accountDisplayName, isAccountExpired } from "@/features/accounts/account-registry-store";
@@ -22,12 +24,13 @@ interface AccountRowProps {
 
 const AVATAR_SIZE = 40;
 export const ACCOUNT_STATUS_COPY = {
-  active: "Đang dùng",
-  expired: "Cần đăng nhập lại",
-} as const;
+  active: "accounts.row.active",
+  expired: "accounts.row.expired",
+} as const satisfies Record<string, TranslationKey>;
 
 /** One saved account in the switch dialog / login chooser (spec US-02 step 4). */
 export function AccountRow({ account, isActive, onPress, onRemove, maskEmail: masked = false, testID }: AccountRowProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const expired = !isActive && isAccountExpired(account);
@@ -53,7 +56,7 @@ export function AccountRow({ account, isActive, onPress, onRemove, maskEmail: ma
         <View style={styles.info}>
           <Text style={styles.name} numberOfLines={1}>{accountDisplayName(account)}</Text>
           <Text style={styles.email} numberOfLines={1}>{masked ? maskEmail(account.email) : account.email}</Text>
-          {status ? <Text style={[styles.status, isActive && styles.statusActive]}>{status}</Text> : null}
+          {status ? <Text style={[styles.status, isActive && styles.statusActive]}>{t(status)}</Text> : null}
         </View>
       </Pressable>
       {onRemove ? (
@@ -61,7 +64,7 @@ export function AccountRow({ account, isActive, onPress, onRemove, maskEmail: ma
           onPress={() => onRemove(account)}
           hitSlop={8}
           accessibilityRole="button"
-          accessibilityLabel={REMOVE_ACCOUNT_COPY.action(accountDisplayName(account))}
+          accessibilityLabel={t(REMOVE_ACCOUNT_COPY.action, { name: accountDisplayName(account) })}
           testID={`btn-account-remove-${account.userId}`}
           style={({ pressed }) => [styles.remove, pressed && styles.removePressed]}
         >

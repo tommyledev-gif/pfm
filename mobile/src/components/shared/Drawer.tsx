@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { Animated, BackHandler, Dimensions, Easing, Keyboard, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTranslation } from "react-i18next";
 
 import { DrawerChild, DrawerChildPanel } from "@/components/shared/DrawerChildPanel";
 import { SheetHandle } from "@/components/shared/SheetHandle";
@@ -78,6 +79,7 @@ interface DrawerSheetProps extends DrawerProps {
 }
 
 function DrawerSheet({ visible, onClose, children, footer, child, onEndReached, startOpen, onExited }: DrawerSheetProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const keyboardHeight = useKeyboardHeight();
   // The sheet runs to the bottom edge, under the gesture bar / nav buttons;
@@ -181,7 +183,7 @@ function DrawerSheet({ visible, onClose, children, footer, child, onEndReached, 
             while it was meant to be sliding down: a tap outside read as the
             sheet vanishing on the spot. */}
         <Animated.View pointerEvents="none" style={[styles.dim, { opacity: backdropOpacity }]} />
-        <Pressable style={[styles.backdrop, { paddingBottom: keyboardHeight }]} onPress={onClose} accessibilityLabel="Đóng">
+        <Pressable style={[styles.backdrop, { paddingBottom: keyboardHeight }]} onPress={onClose} accessibilityLabel={t("common.action.close")}>
           <Animated.View
             style={[
               styles.sheetTouchArea,

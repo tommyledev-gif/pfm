@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 
 import { ListRow } from "@/components/ui/grouped-list";
 import { SwitchAccountGlyph } from "@/components/ui/grouped-list/list-icons";
@@ -7,8 +8,6 @@ import { useColors } from "@/lib/theme";
 import { AccountSwitchDialog } from "@/features/accounts/components/AccountSwitchDialog";
 import { AvatarGroup } from "@/features/accounts/components/AvatarGroup";
 import { useSavedAccounts } from "@/features/accounts/hooks/use-saved-accounts";
-
-const LABEL = "Chuyển tài khoản";
 
 /**
  * Settings' "Chuyển tài khoản" row, directly above "Đăng xuất" (spec AC-05).
@@ -24,6 +23,7 @@ const LABEL = "Chuyển tài khoản";
  * AvatarGroup's rings are the group's surface colour, so they cut cleanly.
  */
 export function AccountSwitchRow() {
+  const { t } = useTranslation();
   const colors = useColors();
   const router = useRouter();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -36,7 +36,7 @@ export function AccountSwitchRow() {
   return (
     <>
       <ListRow
-        title={LABEL}
+        title={t("nav.title.switchAccount")}
         icon={SwitchAccountGlyph}
         tone={colors.lavender}
         trailing={<AvatarGroup accounts={all} />}

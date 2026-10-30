@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { WHEEL_ITEM_HEIGHT, WHEEL_VISIBLE_ROWS, WheelColumn } from "@/components/shared/WheelColumn";
@@ -7,8 +8,6 @@ import { CloseIcon } from "@/components/ui/Icon";
 import { PillButton } from "@/components/ui/PillButton";
 import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
-
-const MONTH_LABELS = Array.from({ length: 12 }, (_, i) => `Tháng ${i + 1}`);
 
 interface MonthYearWheelSheetProps {
   visible: boolean;
@@ -32,11 +31,13 @@ interface MonthYearWheelSheetProps {
  * above the wheels, so a vertical drag has exactly one place to go.
  */
 export function MonthYearWheelSheet({ visible, years, month, year, onClose, onApply }: MonthYearWheelSheetProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const [draftMonth, setDraftMonth] = useState(month);
   const [draftYearIndex, setDraftYearIndex] = useState(Math.max(0, years.indexOf(year)));
+  const monthLabels = useMemo(() => t("format.calendar.monthNames").split(", "), [t]);
 
   // Every open starts on the month the calendar is showing.
   useEffect(() => {
@@ -48,13 +49,13 @@ export function MonthYearWheelSheet({ visible, years, month, year, onClose, onAp
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.root}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Đóng" />
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t("common.action.close")} />
         <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}>
           <View style={styles.handle} />
 
           <View style={styles.header}>
-            <Text style={styles.title}>Chọn thời gian</Text>
-            <Pressable style={styles.closeButton} onPress={onClose} hitSlop={8} accessibilityLabel="Đóng">
+            <Text style={styles.title}>{t("ui.monthYearSheet.title")}</Text>
+            <Pressable style={styles.closeButton} onPress={onClose} hitSlop={8} accessibilityLabel={t("common.action.close")}>
               <CloseIcon size={16} color={colors.textPrimary} />
             </Pressable>
           </View>
@@ -62,7 +63,7 @@ export function MonthYearWheelSheet({ visible, years, month, year, onClose, onAp
           <View style={styles.wheels}>
             {/* One band behind both columns marks the row that will be applied. */}
             <View pointerEvents="none" style={styles.selectionBand} />
-            <WheelColumn items={MONTH_LABELS} selectedIndex={draftMonth} onChange={setDraftMonth} testID="wheel-month" />
+            <WheelColumn items={monthLabels} selectedIndex={draftMonth} onChange={setDraftMonth} testID="wheel-month" />
             <WheelColumn
               items={years.map(String)}
               selectedIndex={draftYearIndex}
@@ -72,7 +73,7 @@ export function MonthYearWheelSheet({ visible, years, month, year, onClose, onAp
           </View>
 
           <PillButton
-            label="Áp dụng"
+            label={t("common.action.apply")}
             onPress={() => onApply(years[draftYearIndex], draftMonth)}
             testID="btn-month-year-apply"
           />

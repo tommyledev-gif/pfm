@@ -1,4 +1,5 @@
 import { Text, View, ViewProps } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { MotionStagger } from "@/components/motion/MotionStagger";
 import { EmptyStateCard } from "@/components/shared/EmptyState";
@@ -10,7 +11,9 @@ import { useNeedsFirstWallet, useOpenWalletCreator } from "@/features/wallets/us
 
 // One of each shape the parser handles: an expense with a wallet named, a
 // bare expense, and an income — tapping one fills the input, never sends.
-const EXAMPLES = ["Cà phê 50k tiền mặt", "Ăn trưa 45k", "Nhận lương 15tr"];
+// They are what the User sends to the parser, which reads Vietnamese only
+// (specs/mobile-language-switch §6 edge case 5): Vietnamese in both languages.
+const EXAMPLES = ["Cà phê 50k tiền mặt", "Ăn trưa 45k", "Nhận lương 15tr"]; // i18n-ignore
 // The example chips follow the card in, one after another.
 const EXAMPLES_DELAY_MS = 160;
 // The robot art is nearly square: at full card width it took most of the
@@ -33,6 +36,7 @@ interface RecordingEmptyStateProps extends Pick<ViewProps, "style" | "onLayout">
 export function RecordingEmptyState({ onPickExample, style, onLayout }: RecordingEmptyStateProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const needsWallet = useNeedsFirstWallet();
   const openWalletCreator = useOpenWalletCreator();
 
@@ -40,16 +44,12 @@ export function RecordingEmptyState({ onPickExample, style, onLayout }: Recordin
     <View style={[styles.container, style]} onLayout={onLayout} testID="empty-chat-recording">
       <EmptyStateCard
         illustration={<ThemedIllustration name="aiChat" maxWidth={AI_CHAT_ART_MAX_WIDTH} />}
-        title="Ghi giao dịch bằng một câu"
-        description={
-          needsWallet
-            ? "Chưa có ví. Tạo ví để ghi giao dịch."
-            : "Nhắn khoản vừa chi hoặc thu. Giao dịch chỉ lưu khi bạn bấm Lưu."
-        }
+        title={t("chat.recording.empty.title")}
+        description={needsWallet ? t("common.empty.noWallet") : t("chat.recording.empty.body")}
         action={
           needsWallet
             ? {
-                label: "Tạo ví",
+                label: t("common.action.createWallet"),
                 icon: <WalletIcon size={18} color={colors.onGreen} />,
                 onPress: openWalletCreator,
                 testID: "btn-chat-empty-create-wallet",
@@ -59,7 +59,7 @@ export function RecordingEmptyState({ onPickExample, style, onLayout }: Recordin
       >
         {needsWallet ? null : (
           <View style={styles.examples}>
-            <Text style={styles.examplesTitle}>Thử nhắn</Text>
+            <Text style={styles.examplesTitle}>{t("chat.recording.examples.title")}</Text>
             <View style={styles.chips}>
               <MotionStagger delay={EXAMPLES_DELAY_MS}>
                 {EXAMPLES.map((example) => (

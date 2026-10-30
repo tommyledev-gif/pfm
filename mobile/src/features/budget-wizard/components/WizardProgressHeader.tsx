@@ -1,4 +1,5 @@
 import { Pressable, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { ChevronLeftIcon, CloseIcon } from "@/components/ui/Icon";
 import { withAlpha } from "@/lib/color";
@@ -22,6 +23,7 @@ interface WizardProgressHeaderProps {
 // BudgetWizardModal — split out purely to keep that file under the
 // project's 300-line cap.
 export function WizardProgressHeader({ step, totalSteps, onClose, onBack }: WizardProgressHeaderProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   return (
@@ -40,7 +42,7 @@ export function WizardProgressHeader({ step, totalSteps, onClose, onBack }: Wiza
           hitSlop={8}
           style={styles.slot}
           accessibilityRole="button"
-          accessibilityLabel="Quay lại"
+          accessibilityLabel={t("common.action.back")}
           testID="btn-wizard-back"
         >
           <ChevronLeftIcon size={ICON_SIZE} color={colors.textSecondary} />
@@ -62,7 +64,7 @@ export function WizardProgressHeader({ step, totalSteps, onClose, onBack }: Wiza
         hitSlop={8}
         style={styles.slot}
         accessibilityRole="button"
-        accessibilityLabel="Đóng"
+        accessibilityLabel={t("common.action.close")}
         testID="btn-wizard-dismiss"
       >
         <CloseIcon size={ICON_SIZE} color={colors.textSecondary} />

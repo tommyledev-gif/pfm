@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { ListRow, ListSection } from "@/components/ui/grouped-list";
 import { PinGlyph } from "@/components/ui/grouped-list/list-icons";
+import { i18n } from "@/lib/i18n";
 import { useColors } from "@/lib/theme";
 import { useSecurityPrefsStore } from "@/stores/security-prefs-store";
 import { useToastStore } from "@/stores/toast-store";
@@ -10,7 +11,6 @@ import { PIN_COPY } from "@/features/security/pin/pin-copy";
 import { requestPin } from "@/features/security/pin/pin-prompt-store";
 import { usePinStore } from "@/features/security/pin/pin-store";
 
-const NOT_VERIFIED = "Không xác minh được.";
 
 function toast(message: string, variant: "success" | "warning" = "success"): void {
   useToastStore.getState().show(message, variant);
@@ -41,7 +41,7 @@ export function PinSection() {
     run(async () => {
       const check = await confirmOwner(CHANGE_SETTING_PROMPT);
       if (check === "cancelled") return;
-      if (check === "failed") return toast(NOT_VERIFIED, "warning");
+      if (check === "failed") return toast(i18n.t("security.verifyFailed"), "warning");
       if ((await requestPin({ kind: "create" })) === "passed") toast(PIN_COPY.set);
     });
 

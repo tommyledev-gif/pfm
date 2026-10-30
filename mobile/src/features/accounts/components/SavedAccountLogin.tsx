@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
+import { useTranslation } from "react-i18next";
 
 import { entrance } from "@/components/motion/motion-tokens";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -16,10 +17,10 @@ import { candidateName, LoginCandidate } from "@/features/accounts/login-candida
 import { removeSavedAccount } from "@/features/accounts/remove-account";
 
 const COPY = {
-  back: "Quay lại",
-  pick: "Chọn tài khoản",
+  back: "common.action.back",
+  pick: "accounts.saved.pick",
   // A sent request is not an account yet: removing it here cancels nothing.
-  removeRequestMessage: "Yêu cầu đã gửi không bị hủy.",
+  removeRequestMessage: "accounts.saved.removeRequestMessage",
 } as const;
 
 interface SavedAccountLoginProps {
@@ -42,6 +43,7 @@ interface SavedAccountLoginProps {
  * (the login screen slides the whole view in).
  */
 export function SavedAccountLogin({ candidates, onBack, onDone }: SavedAccountLoginProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const keyboardHeight = useKeyboardHeight();
@@ -84,7 +86,7 @@ export function SavedAccountLogin({ candidates, onBack, onDone }: SavedAccountLo
             onPress={back}
             style={styles.back}
             accessibilityRole="button"
-            accessibilityLabel={COPY.back}
+            accessibilityLabel={t(COPY.back)}
             testID="btn-login-saved-back"
           >
             <ChevronLeftIcon size={24} color={colors.textPrimary} />
@@ -103,7 +105,7 @@ export function SavedAccountLogin({ candidates, onBack, onDone }: SavedAccountLo
             </Animated.View>
           ) : (
             <Animated.View key="list" entering={mounted.current ? entrance("slideRight") : undefined} style={styles.body}>
-              <Text style={styles.title} accessibilityRole="header">{COPY.pick}</Text>
+              <Text style={styles.title} accessibilityRole="header">{t(COPY.pick)}</Text>
               <View style={styles.list}>
                 {candidates.map((candidate) => (
                   <CandidateRow
@@ -121,10 +123,10 @@ export function SavedAccountLogin({ candidates, onBack, onDone }: SavedAccountLo
 
       <ConfirmDialog
         visible={pendingRemoval !== null}
-        title={pendingRemoval ? REMOVE_ACCOUNT_COPY.title(candidateName(pendingRemoval)) : ""}
-        message={pendingRemoval?.kind === "requested" ? COPY.removeRequestMessage : REMOVE_ACCOUNT_COPY.message}
-        confirmLabel={REMOVE_ACCOUNT_COPY.confirm}
-        cancelLabel={REMOVE_ACCOUNT_COPY.cancel}
+        title={pendingRemoval ? t(REMOVE_ACCOUNT_COPY.title, { name: candidateName(pendingRemoval) }) : ""}
+        message={t(pendingRemoval?.kind === "requested" ? COPY.removeRequestMessage : REMOVE_ACCOUNT_COPY.message)}
+        confirmLabel={t(REMOVE_ACCOUNT_COPY.confirm)}
+        cancelLabel={t(REMOVE_ACCOUNT_COPY.cancel)}
         onConfirm={remove}
         onCancel={() => setPendingRemoval(null)}
         testID="dialog-login-remove-account"

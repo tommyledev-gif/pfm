@@ -1,4 +1,5 @@
 import { Modal, Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { PillButton } from "@/components/ui/PillButton";
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
@@ -31,14 +32,15 @@ export function ConfirmDialog({
   visible,
   title,
   message,
-  confirmLabel = "Xóa",
-  cancelLabel = "Hủy",
+  confirmLabel,
+  cancelLabel,
   onConfirm,
   onCancel,
   loading,
   tone = "destructive",
   testID,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const isDestructive = tone === "destructive";
   return (
@@ -48,9 +50,9 @@ export function ConfirmDialog({
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.message}>{message}</Text>
           <View style={styles.actions}>
-            <PillButton label={cancelLabel} variant="outline" onPress={onCancel} style={styles.flexButton} singleLine />
+            <PillButton label={cancelLabel ?? t("common.action.cancel")} variant="outline" onPress={onCancel} style={styles.flexButton} singleLine />
             <PillButton
-              label={confirmLabel}
+              label={confirmLabel ?? t("common.action.delete")}
               onPress={onConfirm}
               loading={loading}
               singleLine

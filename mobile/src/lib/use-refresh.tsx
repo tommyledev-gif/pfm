@@ -3,6 +3,7 @@ import { RefreshControl } from "react-native";
 import { onlineManager } from "@tanstack/react-query";
 
 import { OFFLINE_REFRESH_MESSAGE } from "@/lib/constants";
+import { i18n } from "@/lib/i18n";
 import { useColors } from "@/lib/theme";
 import { useToastStore } from "@/stores/toast-store";
 
@@ -45,7 +46,7 @@ export function useRefresh(queries: Refetchable[]) {
     // Offline, a refetch would just pause — and the spinner with it, until
     // the network returns. End at once and say why (AC-OFF-06).
     if (!onlineManager.isOnline()) {
-      useToastStore.getState().show(OFFLINE_REFRESH_MESSAGE, "warning");
+      useToastStore.getState().show(i18n.t(OFFLINE_REFRESH_MESSAGE), "warning");
       return;
     }
     setRefreshing(true);

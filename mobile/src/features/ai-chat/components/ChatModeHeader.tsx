@@ -1,19 +1,21 @@
-import { memo, useEffect, useRef, useState } from "react";
-import { Keyboard, Pressable, Text, View } from "react-native";
-import Animated from "react-native-reanimated";
+import { memo, useState } from "react";
+import { Keyboard, Pressable, View } from "react-native";
 import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 
-import { entrance } from "@/components/motion/motion-tokens";
 import { ActionPopover, PopoverAction, PopoverAnchor } from "@/components/shared/ActionPopover";
 import { useHintTooltip } from "@/components/shared/use-hint-tooltip";
-import { ChevronDownIcon, EditIcon, HistoryIcon, MoreVerticalIcon, SearchIcon } from "@/components/ui/Icon";
-import { CHAT_MODE_META, ChatMode } from "@/features/ai-chat/chat-mode";
+import { EditIcon, HistoryIcon, MoreVerticalIcon, SearchIcon } from "@/components/ui/Icon";
+import { ChatMode } from "@/features/ai-chat/chat-mode";
+import { ChatModeSwitch } from "@/features/ai-chat/components/ChatModeSwitch";
 import { withAlpha } from "@/lib/color";
-import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { spacing, createStyles, useColors } from "@/lib/theme";
+
+const BUTTON_SIZE = 40;
 
 interface ChatModeHeaderProps {
   mode: ChatMode;
-  onPressMode: () => void;
+  onSelectMode: (mode: ChatMode) => void;
   /** Opens the message search (ChatSearchBar takes this header's place). */
   onPressSearch: () => void;
   /** The manual transaction form, for when typing a sentence is not the way. */
@@ -21,46 +23,42 @@ interface ChatModeHeaderProps {
 }
 
 /**
- * The chat's app bar: the mode as the title, and one overflow button.
+ * The chat's app bar: the mode switch on the left, search and a ⋮ menu on
+ * the right.
  *
- * The title IS the mode switch (a chevron says it opens), the way a chat app
- * puts its model picker in the title: the mode is what the next message
- * means, so it is what the screen is called. Everything else the screen can
- * do sits in the ⋮ menu instead of in a row of buttons. It used to be a logo,
- * a name, a tagline, a search button and a glowing pill, five things for the
- * eye to sort before the thread.
+ * The mode is what the next message means, so it leads the bar — as a
+ * segmented switch with every mode in view (ChatModeSwitch). It used to be
+ * the mode's full name as a title with a chevron, opening a sheet of three
+ * labels and descriptions: a lot of words to get past for a one-tap choice,
+ * and nothing on screen said what the other modes were.
  *
- * Switching mode fades the new title in (keyed by mode), in step with
- * ChatModeBackdrop's wash; the first render just shows it.
+ * Search is the one action every mode has, so it is a button of its own;
+ * the recording-only entries (manual entry, the pending list) stay in the
+ * menu, which a mode without them does not show.
  */
 export const ChatModeHeader = memo(function ChatModeHeader({
   mode,
-  onPressMode,
+  onSelectMode,
   onPressSearch,
   onOpenManualEntry,
 }: ChatModeHeaderProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const colors = useColors();
   const router = useRouter();
-  const menuHint = useHintTooltip("Tùy chọn khác");
+  const searchHint = useHintTooltip(t("chat.menu.search"));
+  const menuHint = useHintTooltip(t("common.action.moreOptions"));
   const [menuAnchor, setMenuAnchor] = useState<PopoverAnchor | null>(null);
-  const meta = CHAT_MODE_META[mode];
-  const mounted = useRef(false);
-  useEffect(() => {
-    mounted.current = true;
-  }, []);
 
   // Recording entries only where a transaction can be recorded: asking about
   // spending has nothing to enter or confirm.
-  const actions: PopoverAction[] = [
-    { Icon: SearchIcon, label: "Tìm tin nhắn", onPress: onPressSearch, testID: "menu-chat-search" },
-    ...(mode === "consult"
+  const actions: PopoverAction[] =
+    mode === "consult"
       ? []
       : [
-          { Icon: EditIcon, label: "Nhập thủ công", onPress: onOpenManualEntry, testID: "menu-chat-manual-entry" },
-          { Icon: HistoryIcon, label: "Chờ xác nhận", onPress: () => router.push("/pending"), testID: "menu-chat-pending" },
-        ]),
-  ];
+          { Icon: EditIcon, label: t("common.action.manualEntry"), onPress: onOpenManualEntry, testID: "menu-chat-manual-entry" },
+          { Icon: HistoryIcon, label: t("common.status.pending"), onPress: () => router.push("/pending"), testID: "menu-chat-pending" },
+        ];
 
   // The menu is a Modal: the keyboard goes first, or the composer stays
   // lifted under it (see dismiss-keyboard-then.ts).
@@ -77,33 +75,34 @@ export const ChatModeHeader = memo(function ChatModeHeader({
 
   return (
     <View style={styles.header}>
-      <Pressable
-        testID="btn-chat-mode"
-        accessibilityRole="button"
-        accessibilityLabel={`Chế độ: ${meta.label}. Chạm để đổi.`}
-        onPress={onPressMode}
-        hitSlop={8}
-        style={({ pressed }) => [styles.modeButton, pressed && styles.pressed]}
-      >
-        <Animated.View key={mode} entering={mounted.current ? entrance("fade") : undefined} style={styles.modeContent}>
-          <Text style={styles.title} numberOfLines={1}>
-            {meta.label}
-          </Text>
-          <ChevronDownIcon size={16} color={colors.textSecondary} />
-        </Animated.View>
-      </Pressable>
+      <ChatModeSwitch mode={mode} onSelect={onSelectMode} />
 
-      <Pressable
-        testID="btn-chat-menu"
-        accessibilityRole="button"
-        accessibilityLabel="Tùy chọn khác"
-        onPress={openMenu}
-        {...menuHint}
-        hitSlop={6}
-        style={({ pressed }) => [styles.menuButton, pressed && styles.pressed]}
-      >
-        <MoreVerticalIcon size={20} color={colors.textSecondary} />
-      </Pressable>
+      <View style={styles.actions}>
+        <Pressable
+          testID="btn-chat-search"
+          accessibilityRole="button"
+          accessibilityLabel={t("chat.menu.search")}
+          onPress={onPressSearch}
+          {...searchHint}
+          hitSlop={4}
+          style={({ pressed }) => [styles.button, pressed && styles.pressed]}
+        >
+          <SearchIcon size={20} color={colors.textSecondary} />
+        </Pressable>
+        {actions.length > 0 ? (
+          <Pressable
+            testID="btn-chat-menu"
+            accessibilityRole="button"
+            accessibilityLabel={t("common.action.moreOptions")}
+            onPress={openMenu}
+            {...menuHint}
+            hitSlop={4}
+            style={({ pressed }) => [styles.button, pressed && styles.pressed]}
+          >
+            <MoreVerticalIcon size={20} color={colors.textSecondary} />
+          </Pressable>
+        ) : null}
+      </View>
 
       <ActionPopover
         visible={menuAnchor !== null}
@@ -128,17 +127,13 @@ const useStyles = createStyles((colors) => ({
     paddingLeft: spacing.lg,
     paddingRight: spacing.md,
   },
-  // Padded so the pressed tint has room around the words; the negative
-  // margin keeps the title itself on the screen's text edge.
-  modeButton: {
-    flexShrink: 1,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    marginLeft: -spacing.sm + spacing.xs,
-    borderRadius: radii.listCard,
+  actions: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  button: {
+    width: BUTTON_SIZE,
+    height: BUTTON_SIZE,
+    borderRadius: BUTTON_SIZE / 2,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  modeContent: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
-  title: { ...typography.title, color: colors.textPrimary, flexShrink: 1 },
-  menuButton: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   pressed: { backgroundColor: withAlpha(colors.overlayBase, 0.08) },
 }));

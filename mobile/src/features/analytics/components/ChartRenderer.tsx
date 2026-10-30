@@ -1,4 +1,5 @@
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { AmountText } from "@/components/ui/AmountText";
 import { AnomalyAnswer } from "@/features/analytics/components/AnomalyAnswer";
@@ -29,6 +30,7 @@ const MIN_LINE_POINTS = 3;
 // stored by a newer app version) falls back to a plain list of whatever
 // figures it carries, never a blank bubble (spec.md S-AIQ-43).
 export function ChartRenderer({ chart, currency, elapsed }: ChartRendererProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const body = (() => {
     switch (chart.type) {
@@ -41,7 +43,7 @@ export function ChartRenderer({ chart, currency, elapsed }: ChartRendererProps) 
             <NumberStat
               value={chart.value}
               currency={currency}
-              caption={chart.days !== undefined ? `trung bình trên ${chart.days} ngày có chi tiêu` : undefined}
+              caption={chart.days !== undefined ? t("analytics.number.avgCaption", { count: chart.days }) : undefined}
             />
             {chart.items && chart.items.length >= MIN_LINE_POINTS ? (
               <LineChart items={chart.items} currency={currency} />

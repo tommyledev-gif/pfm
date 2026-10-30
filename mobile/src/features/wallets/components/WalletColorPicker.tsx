@@ -1,4 +1,5 @@
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { PressableScale } from "@/components/motion/PressableScale";
 import { CheckIcon } from "@/components/ui/Icon";
@@ -22,6 +23,7 @@ interface WalletColorPickerProps {
 export function WalletColorPicker({ value, onChange }: WalletColorPickerProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
 
   return (
     <View style={styles.row} accessibilityRole="radiogroup">
@@ -30,7 +32,7 @@ export function WalletColorPicker({ value, onChange }: WalletColorPickerProps) {
         style={[styles.swatch, styles.auto, value === null && styles.selected]}
         accessibilityRole="radio"
         accessibilityState={{ selected: value === null }}
-        accessibilityLabel="Màu tự động"
+        accessibilityLabel={t("wallets.form.colour.auto")}
         testID="swatch-wallet-color-auto"
       >
         {/* Four of the automatic colours as quarters: "one of these". */}

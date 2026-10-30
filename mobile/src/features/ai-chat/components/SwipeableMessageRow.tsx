@@ -1,5 +1,6 @@
 import { ReactNode, useEffect } from "react";
 import { Dimensions, StyleSheet, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
 
 import { SwipeAction, SwipeActionButton } from "@/components/shared/SwipeActionButton";
@@ -56,6 +57,7 @@ export function SwipeableMessageRow({
   locked,
 }: SwipeableMessageRowProps) {
   const colors = useColors();
+  const { t } = useTranslation();
   // Edit occupies the vacated edge; delete takes the other one, which is the
   // edge the bubble itself sits against.
   const editSide: SwipeDirection = direction === "left" ? "right" : "left";
@@ -85,7 +87,7 @@ export function SwipeableMessageRow({
     : {
         Icon: EditIcon,
         color: colors.green,
-        label: "Sửa",
+        label: t("common.action.edit"),
         testID: "btn-chat-edit-message",
         onPress: () => {
           close();
@@ -97,7 +99,7 @@ export function SwipeableMessageRow({
     ? {
         Icon: TrashIcon,
         color: colors.peach,
-        label: "Xóa",
+        label: t("common.action.delete"),
         destructive: true,
         testID: "btn-chat-delete-transaction",
         onPress: () => {

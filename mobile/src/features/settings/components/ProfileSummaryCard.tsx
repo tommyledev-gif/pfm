@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { ChevronGlyph } from "@/components/ui/grouped-list/list-icons";
@@ -13,7 +14,6 @@ import { useReportSummaryQuery } from "@/features/reports/api/use-report-summary
 import { useProfileIdentity } from "@/features/profile/use-profile-identity";
 
 const AVATAR_SIZE = 56;
-const EDIT_PROFILE_LABEL = "Sửa hồ sơ";
 
 interface ProfileSummaryCardProps {
   /** Opens Hồ sơ; the screen's own tap guard decides whether it may. */
@@ -26,6 +26,7 @@ interface ProfileSummaryCardProps {
  * card, split by hairlines instead of three boxes of their own.
  */
 export const ProfileSummaryCard = memo(function ProfileSummaryCard({ onOpenProfile }: ProfileSummaryCardProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const email = useSessionStore((s) => s.email);
@@ -41,7 +42,7 @@ export const ProfileSummaryCard = memo(function ProfileSummaryCard({ onOpenProfi
       <Pressable
         onPress={onOpenProfile}
         accessibilityRole="button"
-        accessibilityLabel={EDIT_PROFILE_LABEL}
+        accessibilityLabel={t("settings.profileCard.editProfileA11y")}
         style={({ pressed }) => [styles.identity, pressed && styles.pressed]}
         testID="btn-settings-edit-profile"
       >
@@ -49,7 +50,7 @@ export const ProfileSummaryCard = memo(function ProfileSummaryCard({ onOpenProfi
         <Pressable
           onPress={onOpenProfile}
           accessibilityRole="button"
-          accessibilityLabel={EDIT_PROFILE_LABEL}
+          accessibilityLabel={t("settings.profileCard.editProfileA11y")}
           testID="btn-settings-avatar"
         >
           <Avatar name={name} iconUrl={avatarUrl} size={AVATAR_SIZE} fallback="initial" />
@@ -75,7 +76,7 @@ export const ProfileSummaryCard = memo(function ProfileSummaryCard({ onOpenProfi
           column, not just its figure (see RevealableAmount). */}
       <View style={styles.stats}>
         <RevealableAmount
-          label="Tài sản ròng"
+          label={t("settings.profileCard.netWorth")}
           amountCents={netWorth ? netWorth.amount : null}
           currency={netWorth?.currency ?? "VND"}
           containerStyle={styles.stat}
@@ -85,7 +86,7 @@ export const ProfileSummaryCard = memo(function ProfileSummaryCard({ onOpenProfi
         />
         <View style={styles.statDivider} />
         <RevealableAmount
-          label="Thu nhập"
+          label={t("common.txType.income")}
           amountCents={primaryTotal ? primaryTotal.total_income : null}
           currency={primaryTotal?.currency ?? "VND"}
           containerStyle={styles.stat}
@@ -95,7 +96,7 @@ export const ProfileSummaryCard = memo(function ProfileSummaryCard({ onOpenProfi
         />
         <View style={styles.statDivider} />
         <RevealableAmount
-          label="Chi tiêu"
+          label={t("common.txType.expense")}
           amountCents={primaryTotal ? primaryTotal.total_expense : null}
           currency={primaryTotal?.currency ?? "VND"}
           containerStyle={styles.stat}

@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { InlineActionField } from "@/components/shared/InlineActionField";
-import { getErrorMessage } from "@/lib/axios";
+import { errorText } from "@/lib/api-envelope";
+import { copyOf, i18n } from "@/lib/i18n";
 import { useRequireOnline } from "@/lib/connectivity";
 import { useToastStore } from "@/stores/toast-store";
 import { useClaimUsernameMutation } from "@/features/profile/api/use-claim-username-mutation";
@@ -11,18 +13,18 @@ import { useClaimUsernameMutation } from "@/features/profile/api/use-claim-usern
 // Server rule (common.UsernameMaxLength).
 const USERNAME_MAX_LENGTH = 30;
 
-const COPY = {
-  label: "Tên đăng nhập",
-  placeholder: "vd: lan.nguyen",
-  hint: "Đặt một lần, không đổi được.",
+const COPY = copyOf({
+  label: "common.field.username",
+  placeholder: "profile.username.placeholder",
+  hint: "profile.username.hint",
   // Short: it sits inside the field, beside what is typed.
-  submit: "Đặt",
-  confirmMessage: "Tên này không đổi được sau khi đặt.",
-  confirm: "Đặt tên",
-  cancel: "Sửa lại",
-  done: "Đã đặt tên đăng nhập",
-  failed: "Chưa đặt được tên đăng nhập. Thử lại.",
-} as const;
+  submit: "profile.username.submit",
+  confirmMessage: "profile.username.confirmMessage",
+  confirm: "profile.username.confirm",
+  cancel: "profile.username.cancel",
+  done: "profile.username.done",
+  failed: "profile.username.failed",
+});
 
 /**
  * For an account activated before tên đăng nhập existed: it signs in by email
@@ -31,6 +33,7 @@ const COPY = {
  * while the profile has no username; afterwards the read-only value replaces it.
  */
 export function UsernameClaimField() {
+  useTranslation(); // COPY reads the current language: re-render on a switch
   const requireOnline = useRequireOnline();
   const claim = useClaimUsernameMutation();
   const [value, setValue] = useState("");
@@ -66,13 +69,13 @@ export function UsernameClaimField() {
         actionEnabled={username.length > 0}
         loading={claim.isPending}
         hint={COPY.hint}
-        error={claim.isError ? getErrorMessage(claim.error, COPY.failed) : null}
+        error={claim.isError ? errorText(claim.error, "profile.username.failed") : null}
         testID="input-profile-username"
         actionTestID="btn-profile-claim-username"
       />
       <ConfirmDialog
         visible={confirmOpen}
-        title={`Đặt tên đăng nhập ${username}?`}
+        title={i18n.t("profile.username.confirmTitle", { username })}
         message={COPY.confirmMessage}
         confirmLabel={COPY.confirm}
         cancelLabel={COPY.cancel}

@@ -13,8 +13,6 @@ export interface MonthPace {
   // marker drawn on every budget bar.
   elapsed: number;
   daysLeft: number;
-  // "Tháng 9" — budgets never span months, so the label needs no year.
-  label: string;
 }
 
 export function currentMonthPace(now = new Date()): MonthPace {
@@ -23,7 +21,6 @@ export function currentMonthPace(now = new Date()): MonthPace {
   return {
     elapsed: dayOfMonth / daysInMonth,
     daysLeft: daysInMonth - dayOfMonth,
-    label: `Tháng ${now.getMonth() + 1}`,
   };
 }
 
@@ -76,8 +73,6 @@ export interface BudgetRowStatus {
   ratio: number;
   percent: number;
   color: string;
-  // "đã vượt" / "nhanh hơn dự kiến" / …, shown after the percentage.
-  caption: string;
   // The headline figure on the right of the row: overspend when over,
   // remaining otherwise.
   remaining: number;
@@ -100,23 +95,15 @@ export function budgetRowStatus(limit: BudgetLimit, monthElapsed: number): Budge
   // computeStatus) — trusted over the local ratio so the two can't disagree
   // at the boundary.
   if (limit.status === "exceeded" || limit.spent > limit.amount_limit) {
-    return { state: "over", ratio, percent, color: colors.peach, caption: "đã vượt", remaining, over: true };
+    return { state: "over", ratio, percent, color: colors.peach, remaining, over: true };
   }
   if (limit.spent <= 0) {
-    return { state: "unused", ratio, percent, color: colors.trackMuted, caption: "chưa dùng", remaining, over: false };
+    return { state: "unused", ratio, percent, color: colors.trackMuted, remaining, over: false };
   }
   if (ratio > monthElapsed + PACE_TOLERANCE) {
-    return {
-      state: "at-risk",
-      ratio,
-      percent,
-      color: colors.mustard,
-      caption: "nhanh hơn dự kiến",
-      remaining,
-      over: false,
-    };
+    return { state: "at-risk", ratio, percent, color: colors.mustard, remaining, over: false };
   }
-  return { state: "on-track", ratio, percent, color: colors.mint, caption: "đúng tiến độ", remaining, over: false };
+  return { state: "on-track", ratio, percent, color: colors.mint, remaining, over: false };
 }
 
 /**

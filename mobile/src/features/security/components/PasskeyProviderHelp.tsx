@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { AppState, Pressable, Text, View } from "react-native";
+import { i18n } from "@/lib/i18n";
 
 import { PillButton } from "@/components/ui/PillButton";
 import { CloseIcon } from "@/components/ui/Icon";
@@ -21,27 +23,26 @@ interface PasskeyProviderHelpProps {
 // OR the one that is on refused Budgest (its check of the server's
 // assetlinks.json, cached on the phone for up to an hour). So the copy states
 // what failed and offers the usual fix, never that the settings are off.
+// Getters: read in the current language whenever the card renders.
 const PROVIDER_COPY = {
-  title: "Máy chưa lưu được passkey",
-  why: "Passkey nằm trong trình quản lý mật khẩu của máy, thường là Google.",
-  steps: ["Bấm Mở Cài đặt.", "Kiểm tra Google đang bật trong danh sách dịch vụ."],
-  open: "Mở Cài đặt",
-  notFound: "Không thấy danh sách: tìm “khóa truy cập” trong Cài đặt.",
-  stillMissing: "Vẫn chưa lưu được passkey. Google đã bật thì thử lại sau.",
-} as const;
+  get title() { return i18n.t("security.passkeyHelp.provider.title"); },
+  get why() { return i18n.t("security.passkeyHelp.provider.why"); },
+  get steps() { return [i18n.t("security.passkeyHelp.provider.step1"), i18n.t("security.passkeyHelp.provider.step2")]; },
+  get open() { return i18n.t("common.action.openSettings"); },
+  get notFound(): string | null { return i18n.t("security.passkeyHelp.provider.notFound"); },
+  get stillMissing() { return i18n.t("security.passkeyHelp.provider.stillMissing"); },
+};
 
 // Before Android 14: passkeys always go to Google, which needs an account.
 const ACCOUNT_COPY = {
-  title: "Máy chưa có tài khoản Google",
-  why: "Passkey được lưu vào tài khoản Google trên máy.",
-  steps: ["Bấm Thêm tài khoản Google.", "Đăng nhập một tài khoản Google."],
-  open: "Thêm tài khoản Google",
-  notFound: null,
-  stillMissing: "Máy vẫn chưa có tài khoản Google. Thêm tài khoản rồi quay lại.",
-} as const;
+  get title() { return i18n.t("security.passkeyHelp.account.title"); },
+  get why() { return i18n.t("security.passkeyHelp.account.why"); },
+  get steps() { return [i18n.t("security.passkeyHelp.account.step1"), i18n.t("security.passkeyHelp.account.step2")]; },
+  get open() { return i18n.t("security.passkeyHelp.account.open"); },
+  get notFound(): string | null { return null; },
+  get stillMissing() { return i18n.t("security.passkeyHelp.account.stillMissing"); },
+};
 
-const RETURN_STEP = "Quay lại đây, passkey tự thêm tiếp.";
-const RETRY_LABEL = "Thử lại";
 
 /**
  * What to do when the phone has nowhere to keep a passkey (Credential
@@ -52,10 +53,11 @@ const RETRY_LABEL = "Thử lại";
  * that return is missed.
  */
 export function PasskeyProviderHelp({ onRetry, retrying, onDismiss, stillMissing }: PasskeyProviderHelpProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const copy = choosesPasskeyProvider() ? PROVIDER_COPY : ACCOUNT_COPY;
-  const steps = [...copy.steps, RETURN_STEP];
+  const steps = [...copy.steps, t("security.passkeyHelp.returnStep")];
 
   // Set when Settings is opened from here; the next return to the app spends it.
   const awaitingReturn = useRef(false);
@@ -77,7 +79,7 @@ export function PasskeyProviderHelp({ onRetry, retrying, onDismiss, stillMissing
     <View style={styles.card} testID="card-passkey-provider-help">
       <View style={styles.header}>
         <Text style={styles.title}>{copy.title}</Text>
-        <Pressable onPress={onDismiss} hitSlop={10} accessibilityRole="button" accessibilityLabel="Đóng hướng dẫn">
+        <Pressable onPress={onDismiss} hitSlop={10} accessibilityRole="button" accessibilityLabel={t("security.passkeyHelp.closeA11y")}>
           <CloseIcon size={16} color={colors.textSecondary} />
         </Pressable>
       </View>
@@ -101,7 +103,7 @@ export function PasskeyProviderHelp({ onRetry, retrying, onDismiss, stillMissing
       <View style={styles.actions}>
         <PillButton label={copy.open} onPress={openSettings} style={styles.action} testID="btn-passkey-open-settings" />
         <PillButton
-          label={RETRY_LABEL}
+          label={t("common.action.retry")}
           variant="outline"
           onPress={onRetry}
           loading={retrying}

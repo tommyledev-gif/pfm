@@ -1,10 +1,12 @@
 import { SetStateAction, useEffect, useRef, useState } from "react";
 import { Keyboard, Pressable, ScrollView, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { DrawerChild } from "@/components/shared/Drawer";
 import { ChevronRightIcon, PlusIcon } from "@/components/ui/Icon";
 import { createStyles, spacing, useColors } from "@/lib/theme";
 import { TRANSACTION_ADJUSTMENTS_MAX, TRANSACTION_ITEMS_MAX } from "@/lib/constants";
+import { i18n } from "@/lib/i18n";
 import { useKeyboardHeight } from "@/lib/use-keyboard-height";
 import { useReduceMotion } from "@/lib/use-reduce-motion";
 import { ItemsEditor } from "@/features/transactions/items/use-items-editor";
@@ -12,7 +14,7 @@ import { AdjustmentDraft, ItemDraft } from "@/features/transactions/items/line-m
 import { useItemsEditorStyles } from "@/features/transactions/components/items-editor-styles";
 import { ItemRow } from "@/features/transactions/components/ItemRow";
 import { animateLineLayout } from "@/features/transactions/components/ExpandableLine";
-import { ADJUSTMENT_KIND_LABELS, AdjustmentRow } from "@/features/transactions/components/AdjustmentRow";
+import { ADJUSTMENT_KIND_KEYS, AdjustmentRow } from "@/features/transactions/components/AdjustmentRow";
 import { ItemsTotalsPanel } from "@/features/transactions/components/ItemsTotalsPanel";
 import { ItemsUndoRow } from "@/features/transactions/components/ItemsUndoRow";
 
@@ -33,12 +35,15 @@ type Removed =
   | { kind: "item"; line: ItemDraft; index: number; adjustmentsBefore?: AdjustmentDraft[] }
   | { kind: "adjustment"; line: AdjustmentDraft; index: number };
 
-/** The Items editor as the form's slide-in child panel (specs/transaction-line-items US-01/US-03). */
+/**
+ * The Items editor as the form's slide-in child panel (specs/transaction-line-items US-01/US-03).
+ * Called during the form's render, so the title is read in the current language.
+ */
 export function buildItemsPanelChild(options: ItemsPanelOptions): DrawerChild {
   return {
     visible: options.visible,
     onClose: options.onClose,
-    title: "Chi tiết món",
+    title: i18n.t("transactions.items.title"),
     // The back chevron, X and "Xong" all return to the form; none discards,
     // the form's Lưu saves. Back is kept (2026-10-14): without it the panel
     // read as a dead end over the form.
@@ -57,6 +62,7 @@ export function buildItemsPanelChild(options: ItemsPanelOptions): DrawerChild {
  * its place for a few seconds.
  */
 function ItemsEditorBody({ visible, lines, currency, showErrors }: ItemsPanelOptions) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const lineStyles = useItemsEditorStyles();
   const keyboardHeight = useKeyboardHeight();
@@ -128,9 +134,9 @@ function ItemsEditorBody({ visible, lines, currency, showErrors }: ItemsPanelOpt
     if (!removed || removed.kind !== kind || removed.index !== index) return null;
     const name =
       removed.kind === "item"
-        ? removed.line.name.trim() || "món"
-        : removed.line.kind === "other" && removed.line.label.trim() ? removed.line.label.trim() : ADJUSTMENT_KIND_LABELS[removed.line.kind];
-    return <ItemsUndoRow key={removed.line.key} label={`Đã xóa ${name}`} onUndo={undo} />;
+        ? removed.line.name.trim() || t("transactions.items.undoFallbackName")
+        : removed.line.kind === "other" && removed.line.label.trim() ? removed.line.label.trim() : t(ADJUSTMENT_KIND_KEYS[removed.line.kind]);
+    return <ItemsUndoRow key={removed.line.key} label={t("transactions.items.removed", { name })} onUndo={undo} />;
   };
 
   // The hairlines on either side of the open line give way to its card's edge.
@@ -169,18 +175,18 @@ function ItemsEditorBody({ visible, lines, currency, showErrors }: ItemsPanelOpt
       ))}
       {undoRow("item", lines.items.length)}
       {itemsFull ? (
-        <Text style={lineStyles.hint}>Tối đa {TRANSACTION_ITEMS_MAX} món.</Text>
+        <Text style={lineStyles.hint}>{t("transactions.items.max", { count: TRANSACTION_ITEMS_MAX })}</Text>
       ) : (
-        <AddRow label="Thêm món" onPress={() => openLine(lines.addItem())} testID="btn-add-item" />
+        <AddRow label={t("transactions.items.add")} onPress={() => openLine(lines.addItem())} testID="btn-add-item" />
       )}
 
       {/* No Adjustment without an Item (BR-08). Folded to one row until used. */}
       {lines.items.length > 0 && !showAdjustments ? (
-        <EntryRow label="Thuế, phí, giảm giá" onPress={() => openLine(lines.addAdjustment())} testID="btn-add-adjustment" />
+        <EntryRow label={t("common.adjustment.group")} onPress={() => openLine(lines.addAdjustment())} testID="btn-add-adjustment" />
       ) : null}
       {showAdjustments ? (
         <>
-          <Text style={lineStyles.sectionTitle}>Thuế, phí, giảm giá</Text>
+          <Text style={lineStyles.sectionTitle}>{t("common.adjustment.group")}</Text>
           {lines.adjustments.map((adjustment, index) => (
             <View key={adjustment.key}>
               {undoRow("adjustment", index)}
@@ -200,9 +206,9 @@ function ItemsEditorBody({ visible, lines, currency, showErrors }: ItemsPanelOpt
           ))}
           {undoRow("adjustment", lines.adjustments.length)}
           {adjustmentsFull ? (
-            <Text style={lineStyles.hint}>Tối đa {TRANSACTION_ADJUSTMENTS_MAX} dòng.</Text>
+            <Text style={lineStyles.hint}>{t("transactions.adjustments.max", { count: TRANSACTION_ADJUSTMENTS_MAX })}</Text>
           ) : (
-            <AddRow label="Thêm dòng" onPress={() => openLine(lines.addAdjustment())} testID="btn-add-adjustment-more" />
+            <AddRow label={t("transactions.adjustments.add")} onPress={() => openLine(lines.addAdjustment())} testID="btn-add-adjustment-more" />
           )}
         </>
       ) : null}

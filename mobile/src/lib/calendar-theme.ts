@@ -1,21 +1,10 @@
-import { LocaleConfig } from "react-native-calendars";
-
 import { useMemo } from "react";
 
 import { useColors } from "@/lib/theme";
 
-// Every <Calendar> in the app imports its theme from here, so registering the
-// Vietnamese locale as a side effect of this module is what translates the
-// month title ("Tháng 9 2026") and the weekday row (CN, T2, …) everywhere —
-// left alone the library renders them in English.
-LocaleConfig.locales.vi = {
-  monthNames: Array.from({ length: 12 }, (_, i) => `Tháng ${i + 1}`),
-  monthNamesShort: Array.from({ length: 12 }, (_, i) => `Th${i + 1}`),
-  dayNames: ["Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy"],
-  dayNamesShort: ["CN", "T2", "T3", "T4", "T5", "T6", "T7"],
-  today: "Hôm nay",
-};
-LocaleConfig.defaultLocale = "vi";
+// Month and weekday names ("Tháng 9 2026", CN, T2, … / "September 2026",
+// Sun, Mon, …) are registered with the library's LocaleConfig by lib/i18n.ts,
+// which also moves its default with the app language.
 
 // Shared `theme` prop for every react-native-calendars <Calendar> in the app,
 // for the active app theme. The library builds its stylesheets from this

@@ -1,5 +1,6 @@
 import { Pressable, Text, View } from "react-native";
 
+import { useHintTooltip } from "@/components/shared/use-hint-tooltip";
 import { Avatar } from "@/components/ui/Avatar";
 import { colors, spacing, typography, createStyles } from "@/lib/theme";
 import { BudgetProgressBar } from "@/features/budgets/components/BudgetProgressBar";
@@ -25,6 +26,8 @@ interface SnapshotProgressRowProps {
   // pace comparison means nothing (a share-of-spend has no pace).
   pace?: number;
   onPress?: () => void;
+  // Shown over the row on a hold (TooltipHost): the amounts behind the bar.
+  hint?: string;
   testID?: string;
 }
 
@@ -47,15 +50,16 @@ export function SnapshotProgressRow({
   percentColor = colors.textSecondary,
   pace,
   onPress,
+  hint,
   testID,
 }: SnapshotProgressRowProps) {
   const styles = useStyles();
-  // Pressable only where there is somewhere to go — a row that highlights on
-  // touch and then does nothing reads as a broken link.
-  const Container = onPress ? Pressable : View;
+  // The bar and the percentage are all a row has room for; the amounts they
+  // stand for are one hold away, the way an icon button's words are.
+  const hintTooltip = useHintTooltip(hint ?? "");
 
-  return (
-    <Container testID={testID} onPress={onPress} style={styles.row}>
+  const content = (
+    <>
       <Avatar name={name} color={color} size={AVATAR_SIZE} icon={icon} iconUrl={iconUrl} />
       <View style={styles.meter}>
         <View style={styles.meterHeader}>
@@ -68,12 +72,34 @@ export function SnapshotProgressRow({
         </View>
         <BudgetProgressBar ratio={ratio} pace={pace} color={barColor} height={BAR_HEIGHT} />
       </View>
-    </Container>
+    </>
+  );
+
+  // Pressable only where a tap or a hold does something — a row that
+  // highlights on touch and then does nothing reads as a broken link.
+  if (!onPress && !hint) {
+    return (
+      <View testID={testID} style={styles.row}>
+        {content}
+      </View>
+    );
+  }
+  return (
+    <Pressable
+      testID={testID}
+      onPress={onPress}
+      {...(hint ? hintTooltip : null)}
+      accessibilityHint={hint}
+      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+    >
+      {content}
+    </Pressable>
   );
 }
 
 const useStyles = createStyles((colors) => ({
   row: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.xs },
+  pressed: { opacity: 0.7 },
   // minWidth 0 so a long category name shrinks and ellipsizes instead of
   // pushing the percentage out of the card.
   meter: { flex: 1, minWidth: 0, gap: spacing.xs },

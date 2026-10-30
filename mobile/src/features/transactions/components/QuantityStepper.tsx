@@ -1,4 +1,5 @@
 import { Pressable, Text, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { TRANSACTION_ITEM_QUANTITY_MAX } from "@/lib/constants";
 import { useItemsEditorStyles } from "@/features/transactions/components/items-editor-styles";
@@ -19,6 +20,7 @@ function parseQuantity(text: string): number {
 // − n + for an Item's quantity. The middle is still typeable: 24 cans is too
 // many taps. An emptied field reads 0 and fails isQuantityValid until fixed.
 export function QuantityStepper({ value, onChange, testID }: QuantityStepperProps) {
+  const { t } = useTranslation();
   const styles = useItemsEditorStyles();
   const canDecrease = value > 1;
   const canIncrease = value < TRANSACTION_ITEM_QUANTITY_MAX;
@@ -27,7 +29,7 @@ export function QuantityStepper({ value, onChange, testID }: QuantityStepperProp
     <View style={styles.stepper}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Bớt một"
+        accessibilityLabel={t("transactions.items.decrease")}
         disabled={!canDecrease}
         onPress={() => onChange(value - 1)}
         style={[styles.stepButton, !canDecrease && styles.stepDisabled]}
@@ -40,14 +42,14 @@ export function QuantityStepper({ value, onChange, testID }: QuantityStepperProp
         onChangeText={(text) => onChange(parseQuantity(text))}
         keyboardType="number-pad"
         maxLength={MAX_DIGITS}
-        accessibilityLabel="Số lượng"
+        accessibilityLabel={t("common.field.quantity")}
         selectTextOnFocus
         style={styles.stepValue}
         testID={testID}
       />
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Thêm một"
+        accessibilityLabel={t("transactions.items.increase")}
         disabled={!canIncrease}
         onPress={() => onChange(value + 1)}
         style={[styles.stepButton, !canIncrease && styles.stepDisabled]}

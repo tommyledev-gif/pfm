@@ -1,5 +1,6 @@
 import { ScrollView, Text } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 
 import { Screen } from "@/components/shared/Screen";
 import { ScreenHeader } from "@/components/shared/ScreenHeader";
@@ -8,13 +9,11 @@ import { LoginOutcome } from "@/features/accounts/complete-login";
 import { LoginForm } from "@/features/auth/components/LoginForm";
 import { PasskeySignInButton } from "@/features/auth/components/PasskeySignInButton";
 
-const TITLE = "Thêm tài khoản";
-const HINT = "Đăng nhập tài khoản khác. Tài khoản hiện tại vẫn được lưu trên thiết bị này.";
-
 // Entry: "+ Thêm tài khoản" in the switch dialog, or an expired saved account
 // (prefilled email). The current session keeps running untouched until the
 // new login succeeds (spec AC-13); leaving changes nothing (S-ASW-29).
 export default function AddAccountScreen() {
+  const { t } = useTranslation();
   const styles = useStyles();
   const router = useRouter();
   const { email } = useLocalSearchParams<{ email?: string }>();
@@ -24,9 +23,9 @@ export default function AddAccountScreen() {
 
   return (
     <Screen style={styles.screen}>
-      <ScreenHeader title={TITLE} backTestID="btn-add-account-back" />
+      <ScreenHeader title={t("nav.title.addAccount")} backTestID="btn-add-account-back" />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" testID="screen-add-account">
-        <Text style={styles.hint}>{HINT}</Text>
+        <Text style={styles.hint}>{t("accounts.add.hint")}</Text>
         <LoginForm
           mode="add-account"
           initialEmail={typeof email === "string" ? email : undefined}

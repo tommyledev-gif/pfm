@@ -1,0 +1,178 @@
+{
+  "categories": {
+    "empty": {
+      "expense": "No spending categories yet.",
+      "income": "No income categories yet."
+    },
+    "section": {
+      "own": "Yours"
+    },
+    "row": {
+      "deleteA11y": "Delete category {{name}}"
+    },
+    "delete": {
+      "title": "Delete this category?",
+      "bodyNamed": "\"{{name}}\" will be deleted.",
+      "confirm": "Delete category"
+    },
+    "form": {
+      "nameRequired": "Enter a category name.",
+      "titleEdit": "Edit category",
+      "titleNew": "New category",
+      "namePlaceholder": "e.g. Groceries",
+      "typeLocked": "Type (can't change later)",
+      "saveFailed": "Couldn't save the category. Try again.",
+      "delete": "Delete category"
+    },
+    "picker": {
+      "createNamed": "Create “{{name}}”",
+      "createNew": "Create new category",
+      "empty": "No categories yet.",
+      "clearSelection": "Clear selection",
+      "confirmCount": "Choose ({{count}})",
+      "confirm": "Choose"
+    },
+    "quickCreate": {
+      "typeExpense": "Spending",
+      "typeIncome": "Income",
+      "nameAndIcon": "Name and icon",
+      "changeIconA11y": "Change icon",
+      "removeIcon": "Remove icon",
+      "iconOptional": "Icon is optional.",
+      "createFailed": "Couldn't create the category. Try again."
+    }
+  },
+  "auditLogs": {
+    "subtitle": "Created, edited and deleted transactions",
+    "fallback": {
+      "category": "Category",
+      "wallet": "Wallet"
+    },
+    "action": {
+      "create": "Created",
+      "update": "Edited",
+      "delete": "Deleted"
+    },
+    "field": {
+      "locationNote": "Location note"
+    },
+    "row": {
+      "noChanges": "No changes recorded",
+      "change": "<0>{{field}}: </0>{{from}}  →  <1>{{to}}</1>",
+      "deletedAt": "Deleted at {{time}} · {{date}}"
+    },
+    "items": {
+      "summary_one": "{{count}} item · {{amount}}",
+      "summary_other": "{{count}} items · {{amount}}",
+      "label": "Items",
+      "hide": "Hide items",
+      "show": "Show items",
+      "before": "Before",
+      "after": "After",
+      "none": "No items"
+    },
+    "empty": {
+      "title": "No changes yet",
+      "body": "Every transaction you create, edit or delete is listed here.",
+      "cta": "Go to Transactions"
+    }
+  },
+  "notifications": {
+    "filter": {
+      "unread": "Unread"
+    },
+    "error": {
+      "loadFailed": "Couldn't load notifications."
+    },
+    "search": {
+      "noResults": "No notifications found",
+      "placeholder": "Search notifications"
+    },
+    "empty": {
+      "unread": "No unread notifications.",
+      "all": "No notifications yet."
+    },
+    "markAllRead": {
+      "a11y": "Mark all notifications as read",
+      "button": "Mark all read",
+      "failed": "Couldn't mark them as read. Try again later."
+    },
+    "row": {
+      "a11y": "{{title}}. {{body}}",
+      "a11yUnread": "Unread. {{title}}. {{body}}"
+    }
+  },
+  "users": {
+    "title": "Members",
+    "subtitle": {
+      "count_one": "{{count}} person",
+      "count_other": "{{count}} people"
+    },
+    "search": {
+      "placeholder": "Search by name or email"
+    },
+    "section": {
+      "header": "{{status}} · {{count}}"
+    },
+    "invite": {
+      "cta": "Invite member",
+      "title": "Invite member",
+      "body": "They'll get an email to activate their account.",
+      "emailLabel": "Email",
+      "emailPlaceholder": "name@example.com",
+      "roleLabel": "Role",
+      "failed": "Couldn't send the invitation. Try again.",
+      "submit": "Send invitation"
+    },
+    "status": {
+      "pending": "Awaiting activation",
+      "active": "Active",
+      "disabled": "Locked"
+    },
+    "row": {
+      "selfTitle": "{{name}} (you)",
+      "a11y": "{{name}}, {{status}}",
+      "a11yAdmin": "{{name}}, {{status}}, admin"
+    },
+    "request": {
+      "notWaiting": "This request is no longer awaiting approval."
+    },
+    "approve": {
+      "toast": "Approved. Activation email sent to {{email}}.",
+      "failed": "Couldn't approve. Try again.",
+      "a11y": "Approve request from {{email}}",
+      "button": "Approve request"
+    },
+    "reject": {
+      "button": "Reject",
+      "title": "Reject this request?",
+      "toast": "Request rejected",
+      "failed": "Couldn't reject. Try again.",
+      "body": "{{email}} won't get an email about this. They can send a new request.",
+      "a11y": "Reject request from {{email}}"
+    },
+    "resend": {
+      "toast": "Invitation resent",
+      "failed": "Couldn't resend the invitation. Try again.",
+      "wait": "Resend in {{time}}",
+      "button": "Resend invitation"
+    },
+    "revokeSessions": {
+      "button": "Sign out everywhere",
+      "title": "Sign out everywhere?",
+      "notFound": "This account wasn't found.",
+      "offline": "Connect to the internet to sign out everywhere.",
+      "failed": "Couldn't sign out everywhere. Try again.",
+      "body": "Signs {{email}} out on every device. They'll need their password to sign in again.",
+      "toast": "{{email}} signed out everywhere"
+    },
+    "error": {
+      "title": "Couldn't load members",
+      "body": "Check your connection and try again."
+    },
+    "empty": {
+      "title": "No members yet",
+      "body": "Each person you invite gets an email to activate their own account."
+    }
+  }
+}

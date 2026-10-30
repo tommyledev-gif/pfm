@@ -1,0 +1,194 @@
+{
+  "budgetWizard": {
+    "income": {
+      "title": "How much do you get each month?",
+      "restored": "Filled in from the plan saved on {{date}}.",
+      "startOver": "Start over",
+      "incomeLabel": "Monthly income",
+      "fixedLabel": "Fixed costs",
+      "fixedHint": "rent, utilities, internet, school fees",
+      "editFixedItems_one": "Edit {{count}} cost",
+      "editFixedItems_other": "Edit {{count}} costs",
+      "unknownTotal": "I don't know the total →",
+      "paydayLabel": "Payday",
+      "cycleLength_one": "This cycle is {{count}} day long.",
+      "cycleLength_other": "This cycle is {{count}} days long.",
+      "leftToSpend": "Left to spend",
+      "perDay": "{{amount}}\nper day",
+      "next": "Next →"
+    },
+    "savings": {
+      "label": "Set aside",
+      "none": "None",
+      "custom": "Other amount",
+      "defaultHint": "Easy to keep up. Raise it next month if there's money left.",
+      "promptTitle": "How much to set aside?",
+      "promptHint": "Up to your income"
+    },
+    "validation": {
+      "incomeRequired": "Enter an income above 0.",
+      "incomeMax": "The maximum income is {{amount}}.",
+      "overIncome": "Fixed costs and savings are more than your income. Lower one of them.",
+      "tooLittleLeft": "Too little is left to split across categories. Lower savings or fixed costs."
+    },
+    "fixedCosts": {
+      "title": "Fixed costs",
+      "confirm": "Use this total",
+      "rescaled": "The total changed, so these costs were rescaled to keep their shares. Edit any of them.",
+      "inputLabel": "List your fixed costs",
+      "inputHint": "Separate costs with commas. \"3m\" = 3 million, \"50k\" = 50 thousand.",
+      "hidePrompts": "Hide the list",
+      "showPrompts": "Or fill in one by one →",
+      "covered": "already in your list",
+      "customPlaceholder": "Other cost",
+      "addCustom": "+ Add another cost",
+      "nothingParsed": "No costs found yet. Write them like \"{{example}}\".",
+      "remove": {
+        "a11y": "Remove {{name}}"
+      }
+    },
+    "fixedCost": {
+      "rent": "Rent / mortgage",
+      "electricity": "Electricity",
+      "water": "Water",
+      "internet": "Internet",
+      "serviceFee": "Building / service fees",
+      "parking": "Parking",
+      "schoolFees": "School fees",
+      "insurance": "Insurance"
+    },
+    "profile": {
+      "title": "What's your living situation?",
+      "subtitle": "Your starting budgets are based on this answer."
+    },
+    "preset": {
+      "rented_eating_out": {
+        "label": "Renting, working",
+        "description": "Rent, eating out and getting around take most of it."
+      },
+      "with_family": {
+        "label": "Living with family",
+        "description": "Little rent or food, more left for other things."
+      },
+      "couple_no_kids": {
+        "label": "Couple, no kids",
+        "description": "Two people, no children yet. More eating and going out."
+      },
+      "own_family": {
+        "label": "Family with kids",
+        "description": "Adds costs for children and the household."
+      },
+      "student": {
+        "label": "Student",
+        "description": "Low income, spending mostly on food and getting around."
+      },
+      "retired": {
+        "label": "Retired",
+        "description": "Steady spending, with a bigger share for health."
+      }
+    },
+    "result": {
+      "loadError": "Couldn't work out your budgets.",
+      "estimateNotice": "Estimated from your living situation, not your real spending. Edit any time.",
+      "perDayLabel": "To spend per day",
+      "emptyPlan": "The plan has no categories. Add at least one to save it.",
+      "addCategory": "+ Add category",
+      "addCategoryHint": "from the buffer",
+      "row": {
+        "why": "{{source}}<0> · why?</0>",
+        "from": "from {{amount}}",
+        "remove": {
+          "a11y": "Remove {{category}}"
+        }
+      },
+      "segmentHint": "Tap a segment to see its category.",
+      "bufferSegment": "Buffer (not in any category)"
+    },
+    "confidence": {
+      "manual": {
+        "label": "set by you",
+        "explanation": "A figure you entered or edited, not an estimate."
+      },
+      "history": {
+        "label": "from your spending history",
+        "explanation": "Worked out from your saved transactions, so close to what you really spend."
+      },
+      "estimate": {
+        "label": "estimate",
+        "explanation": "Based on your living situation, not your real spending. Edit any time."
+      }
+    },
+    "summary": {
+      "buffer": "Buffer",
+      "savings": "Savings",
+      "fixed": "Fixed costs",
+      "overCommitted": "Categories add up to {{amount}} more than you can spend. Lower a few."
+    },
+    "footer": {
+      "planSaved": "Plan saved",
+      "savePlan": "Save for later",
+      "saving": "Saving…",
+      "apply": "Apply budgets"
+    },
+    "overwrite": {
+      "title": "Replace current budgets?",
+      "body": "This plan replaces all your current budgets. This can't be undone.",
+      "confirm": "Replace budgets"
+    },
+    "addRow": {
+      "title": "Add category",
+      "noBuffer": "No buffer left. Lower another category to add one.",
+      "matchesTitle": "Use an existing category?",
+      "matchesBody": "Some categories look like \"{{name}}\".",
+      "match": {
+        "onPlan": "already in the plan",
+        "yours": "yours",
+        "system": "default"
+      },
+      "createAnyway": "Create \"{{name}}\" as new",
+      "formTitle": "Add category",
+      "nameLabel": "Category name",
+      "namePlaceholder": "e.g. Pets",
+      "amountLabel": "Monthly amount",
+      "maxFromBuffer": "From the buffer, up to",
+      "minimum": "Minimum {{amount}}. Any less and one normal purchase would go over the limit."
+    },
+    "editAmount": {
+      "maxRaise": "Can raise to",
+      "bufferLeft": "Buffer left",
+      "takeMore": "Takes {{amount}} more from the buffer. Other categories stay the same.",
+      "giveBack": "Returns {{amount}} to the buffer."
+    },
+    "backConfirm": {
+      "title": "Keep your categories?",
+      "body": "You're changing an earlier answer. Your categories stay, and amounts are recalculated from the new answer.",
+      "keep": "Keep categories",
+      "discard": "Start over",
+      "stay": "Stay here"
+    },
+    "success": {
+      "perDay": "From today you have <0>{{amount}}</0> a day",
+      "created_one": "Created {{count}} budget",
+      "created_other": "Created {{count}} budgets",
+      "saved": "Budgets saved",
+      "readyCount_one": "{{count}} budget ready",
+      "readyCount_other": "{{count}} budgets ready"
+    },
+    "error": {
+      "proposalFailed": "Couldn't work out your budgets. Try again.",
+      "emptyPlan": "The plan is empty. Add at least one category to save it.",
+      "saveFailed": "Couldn't save the budgets. Try again."
+    },
+    "problem": {
+      "serverOutdated": "The server doesn't support this budget setup yet. Update the server, then try again.",
+      "categoriesUnmigrated": "Default categories on the server are out of date and don't match the suggested plans."
+    },
+    "editRow": {
+      "title": "Edit budget category",
+      "nameLabel": "Category name",
+      "nameRequired": "Enter a category name.",
+      "renameNote": "The new name applies everywhere once the budgets are saved.",
+      "systemNameNote": "Built-in categories keep their name."
+    }
+  }
+}

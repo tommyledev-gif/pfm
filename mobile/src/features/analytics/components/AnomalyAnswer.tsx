@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { AmountText } from "@/components/ui/AmountText";
 import { CompareBars } from "@/features/analytics/components/CompareBars";
@@ -22,6 +23,7 @@ interface AnomalyAnswerProps {
 // list. Every figure comes from the backend; nothing here derives an amount.
 // Lists may be absent (nothing found, or too little history to compare).
 export function AnomalyAnswer({ chart, anomaly, currency }: AnomalyAnswerProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const categories = anomaly.categories ?? [];
   const large = chart.rows ?? [];
@@ -33,28 +35,28 @@ export function AnomalyAnswer({ chart, anomaly, currency }: AnomalyAnswerProps) 
       {chart.compare ? (
         <CompareBars compare={chart.compare} currency={currency} />
       ) : (
-        <NumberStat value={anomaly.total} currency={currency} caption={`${anomaly.count} khoản chi`} />
+        <NumberStat value={anomaly.total} currency={currency} caption={t("analytics.anomaly.count", { count: anomaly.count })} />
       )}
       {showCount ? (
         <Text style={styles.caption}>
-          {anomaly.count} khoản chi, thường {anomaly.typical_count} khoản
+          {t("analytics.anomaly.countVsUsual", { count: anomaly.count, usual: anomaly.typical_count })}
         </Text>
       ) : null}
 
       {categories.length > 0 ? (
-        <Section title="Cao hơn mức thường">
+        <Section title={t("analytics.anomaly.aboveUsual")}>
           {categories.map((c, i) => (
             <CategoryRow key={c.category_id} item={c} first={i === 0} currency={currency} baseline={anomaly.baseline_label} />
           ))}
         </Section>
       ) : null}
       {large.length > 0 ? (
-        <Section title="Khoản chi lớn">
+        <Section title={t("analytics.anomaly.largeExpenses")}>
           <RankedList rows={large} currency={currency} />
         </Section>
       ) : null}
       {income.length > 0 ? (
-        <Section title="Khoản thu lớn">
+        <Section title={t("analytics.anomaly.largeIncome")}>
           <RankedList rows={income} currency={currency} />
         </Section>
       ) : null}
@@ -82,8 +84,12 @@ interface CategoryRowProps {
 // "Ăn uống 450.000 ₫ / Thường 120.000 ₫", or, for a Category with no
 // spending in the whole baseline, "Không có trong 8 tuần trước đó".
 function CategoryRow({ item, first, currency, baseline }: CategoryRowProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
-  const usual = item.typical !== undefined ? `Thường ${formatCurrency(item.typical, currency)}` : `Không có trong ${baseline}`;
+  const usual =
+    item.typical !== undefined
+      ? t("analytics.anomaly.usualAmount", { amount: formatCurrency(item.typical, currency) })
+      : t("analytics.anomaly.noneInBaseline", { baseline });
   return (
     <View testID={`row-analytics-anomaly-${item.category_id}`} style={[styles.row, !first && styles.divider]}>
       <View style={styles.middle}>

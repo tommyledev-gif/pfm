@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
 
-import { getErrorCode, getErrorMessage } from "@/lib/axios";
+import { errorText, getErrorCode, isNetworkError } from "@/lib/api-envelope";
+import { i18n } from "@/lib/i18n";
 import { MIN_TYPING_MS } from "@/features/ai-chat/hooks/use-chat-actions";
 import { nextMessageId } from "@/features/ai-chat/message-id";
+import { appReply } from "@/features/ai-chat/message-text";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { useAnalyticsQueryMutation } from "@/features/analytics/api/use-analytics-query-mutation";
 import { useConsultMutation } from "@/features/analytics/api/use-consult-mutation";
@@ -15,16 +17,18 @@ import {
   ConsultCategoryRef,
   ConsultResponse,
 } from "@/features/analytics/types";
+import { categoryLabel } from "@/features/categories/category-label";
 import { Category } from "@/features/categories/types";
 import { useLatestCallback } from "@/lib/use-latest-callback";
 import { captureChatEpoch, useChatStore } from "@/stores/chat-store";
 
 const RATE_LIMITED = "RATE_LIMITED";
 // Ends on "Thử:" like the backend's own fallbacks — the reply's chips
-// are listed right under it as tappable rows (SuggestionRows).
-const LIMIT_REACHED_TEXT = "Đã đạt giới hạn câu hỏi trong giờ này. Trong lúc chờ, thử:";
-const PICK_CATEGORY_TEXT = "Danh mục nào?";
-const GENERIC_ERROR_TEXT = "Chưa trả lời được câu này. Thử lại.";
+// are listed right under it as tappable rows (SuggestionRows). Stored in the
+// thread as keys (message-text.ts).
+const LIMIT_REACHED_TEXT = "chat.consult.limitReached";
+const PICK_CATEGORY_TEXT = "chat.consult.pickCategory";
+const GENERIC_ERROR_TEXT = "chat.consult.error";
 
 interface UseConsultActionsOptions {
   /** Scrolls the thread to the newest message after the user asks. */
@@ -86,8 +90,9 @@ export function useConsultActions({ onSent, categories, onSwitchToRecording }: U
       try {
         return fromAnswer(await query.mutateAsync(q));
       } catch (err) {
-        // Retrying the exact question is the one chip that surely helps.
-        return errorReply(err, [{ label: "Thử lại", query: q }]);
+        // Retrying the exact question is the one chip that surely helps. The
+        // chip is stored with its label, so it keeps the language it was made in.
+        return errorReply(err, [{ label: i18n.t("common.action.retry"), query: q }]);
       }
     });
   };
@@ -103,10 +108,10 @@ export function useConsultActions({ onSent, categories, onSwitchToRecording }: U
     addMessage({
       id: nextMessageId(),
       role: "assistant",
-      text: PICK_CATEGORY_TEXT,
+      ...appReply(PICK_CATEGORY_TEXT),
       consult: {
         kind: "clarify_category",
-        category_choices: categories.filter((c) => c.type === type).map((c) => ({ id: c.id, name: c.name })),
+        category_choices: categories.filter((c) => c.type === type).map((c) => ({ id: c.id, name: categoryLabel(c) })),
         pending_query: { ...q, category_ids: undefined },
         chips: [],
       },
@@ -152,7 +157,16 @@ function errorReply(err: unknown, chips: AnalyticsFollowUp[]): ChatMessage {
   return {
     id: nextMessageId(),
     role: "assistant",
-    text: limited ? LIMIT_REACHED_TEXT : getErrorMessage(err, GENERIC_ERROR_TEXT),
+    ...(limited ? appReply(LIMIT_REACHED_TEXT) : failureCopy(err)),
     consult: { kind: "degraded", chips: limited ? STARTER_CHIPS : chips },
   };
+}
+
+// errorText's sentence. The generic line and the network line are stored as
+// keys; a code's own sentence (errors.code.*) only as text, in today's language.
+function failureCopy(err: unknown): Pick<ChatMessage, "text" | "textKey" | "textParams"> {
+  if (isNetworkError(err)) return appReply("errors.network");
+  const code = getErrorCode(err);
+  if (code && i18n.exists(`errors.code.${code}`)) return { text: errorText(err, GENERIC_ERROR_TEXT) };
+  return appReply(GENERIC_ERROR_TEXT);
 }

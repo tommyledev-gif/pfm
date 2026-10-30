@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, Text } from "react-native";
 
-import { getErrorMessage } from "@/lib/axios";
+import { errorText } from "@/lib/api-envelope";
+import { i18n } from "@/lib/i18n";
 import { withAlpha } from "@/lib/color";
 import { useRequireOnline } from "@/lib/connectivity";
 import { createStyles, radii, spacing, typography, useColors } from "@/lib/theme";
@@ -22,6 +24,7 @@ function formatWait(ms: number): string {
 // the invite, then 30 minutes after each resend — so the button never offers
 // a tap the backend is going to refuse.
 export function ResendInviteButton({ userId, availableAt }: { userId: string; availableAt: string }) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const requireOnline = useRequireOnline();
@@ -42,8 +45,8 @@ export function ResendInviteButton({ userId, availableAt }: { userId: string; av
 
   const onPress = () => {
     resend.mutate(userId, {
-      onSuccess: () => showToast("Đã gửi lại lời mời", "info"),
-      onError: (error) => showToast(getErrorMessage(error, "Không gửi lại được lời mời"), "error"),
+      onSuccess: () => showToast(i18n.t("users.resend.toast"), "info"),
+      onError: (error) => showToast(errorText(error, "users.resend.failed"), "error"),
     });
   };
 
@@ -60,7 +63,7 @@ export function ResendInviteButton({ userId, availableAt }: { userId: string; av
     >
       {resend.isPending ? <ActivityIndicator size="small" color={colors.green} /> : null}
       <Text style={[styles.label, disabled && styles.labelDisabled]}>
-        {waiting ? `Gửi lại sau ${formatWait(waitMs)}` : "Gửi lại lời mời"}
+        {waiting ? t("users.resend.wait", { time: formatWait(waitMs) }) : t("users.resend.button")}
       </Text>
     </Pressable>
   );

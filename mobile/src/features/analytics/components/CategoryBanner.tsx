@@ -1,4 +1,5 @@
 import { Pressable, Text, View } from "react-native";
+import { Trans, useTranslation } from "react-i18next";
 
 import { ConsultCategoryRef } from "@/features/analytics/types";
 import { spacing, typography, createStyles } from "@/lib/theme";
@@ -16,14 +17,20 @@ interface CategoryBannerProps {
 // with a text link — a reading the System is sure of needs no echo, the
 // answer's own sentence already says what it covers.
 export function CategoryBanner({ categories, onChange }: CategoryBannerProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   return (
     <View style={styles.line}>
       <Text style={styles.text}>
-        Đang tính cho: <Text style={styles.names}>{categories.map((c) => c.name).join(", ")}</Text>
+        <Trans
+          t={t}
+          i18nKey="analytics.banner.countingFor"
+          values={{ categories: categories.map((c) => c.name).join(", ") }}
+          components={[<Text key="names" style={styles.names} />]}
+        />
       </Text>
       <Pressable testID="btn-analytics-change-category" accessibilityRole="button" onPress={onChange} hitSlop={spacing.sm}>
-        <Text style={styles.change}>Đổi</Text>
+        <Text style={styles.change}>{t("analytics.banner.change")}</Text>
       </Pressable>
     </View>
   );

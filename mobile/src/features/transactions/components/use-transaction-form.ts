@@ -4,6 +4,7 @@ import { Keyboard } from "react-native";
 import { useIsOnline, useRequireOnline } from "@/lib/connectivity";
 import { TransactionKind } from "@/lib/constants";
 import { newIdempotencyKey } from "@/lib/idempotency-key";
+import { i18n } from "@/lib/i18n";
 import { useAmountExpression } from "@/lib/use-amount-expression";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
@@ -136,10 +137,9 @@ export function useTransactionForm({ visible, onClose, editingTransaction, editi
     if (visible && detail && detail.id === editingTransaction?.id) seedLines(detail.items, detail.adjustments);
   }, [visible, detail, editingTransaction?.id, seedLines, seedVersion]);
 
-  // Separate from the reset above on purpose: that effect also re-runs
-  // whenever `wallets.data` refetches in the background — bumping the remount
-  // key there too would yank focus out from under anyone still typing the
-  // note. This one only fires on the true open transition.
+  // Separate from the reset above on purpose: that effect also re-runs whenever `wallets.data`
+  // refetches in the background — bumping the remount key there too would yank focus out from
+  // under anyone still typing the note. This one only fires on the true open transition.
   useEffect(() => {
     if (!visible) return;
     setFormKey((k) => k + 1);
@@ -149,12 +149,12 @@ export function useTransactionForm({ visible, onClose, editingTransaction, editi
   const amountCents = amount.cents;
   const amountInvalid = (cents: number | null) => cents === null || cents <= 0;
   const errors = {
-    wallet: !isEditing && !walletId ? "Vui lòng chọn ví" : undefined,
-    category: !isTransfer && !categoryId ? "Vui lòng chọn danh mục" : undefined,
-    toWallet: isTransfer && !isEditing && !toWalletId ? "Vui lòng chọn ví nhận" : undefined,
+    wallet: !isEditing && !walletId ? i18n.t("transactions.form.error.wallet") : undefined,
+    category: !isTransfer && !categoryId ? i18n.t("common.validation.chooseCategory") : undefined,
+    toWallet: isTransfer && !isEditing && !toWalletId ? i18n.t("transactions.form.error.toWallet") : undefined,
     // The calculator's own reason first (÷0, rounds to 0, not above 0) — it
     // says what to fix; the generic line is only for an empty amount.
-    amount: amount.problem ?? (amountInvalid(amountCents) ? "Vui lòng nhập số tiền" : undefined),
+    amount: amount.problem ?? (amountInvalid(amountCents) ? i18n.t("transactions.form.error.amount") : undefined),
     // BR-07 / AC-07: an unexplained gap or an unfinished line blocks the save.
     items: isTransfer ? undefined : lines.problem,
   };

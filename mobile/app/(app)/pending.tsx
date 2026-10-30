@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -22,6 +23,7 @@ import { isSavableProposal, proposalWalletName } from "@/features/ai-chat/propos
 import { removalDialogCopy } from "@/features/ai-chat/removal-copy";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
+import { categoryLabel } from "@/features/categories/category-label";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useChatStore } from "@/stores/chat-store";
 
@@ -41,6 +43,7 @@ type TypeFilter = "all" | "expense" | "income";
 export default function PendingReviewScreen() {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const requireOnline = useRequireOnline();
@@ -76,33 +79,33 @@ export default function PendingReviewScreen() {
   }, 0);
   const netLabel =
     currencies.size > 1
-      ? "Nhiều loại tiền"
+      ? t("pending.footer.mixedCurrencies")
       : `${net > 0 ? "+" : ""}${formatCurrency(net, [...currencies][0] ?? FALLBACK_CURRENCY)}`;
 
   const removalCopy = removalDialogCopy(removal.target, removal.targetIsPersisted, {
     currency: removal.target ? currencyOf(removal.target) : FALLBACK_CURRENCY,
-    resolveCategoryName: (id) => categoryById.get(id)?.name,
+    resolveCategoryName: (id) => categoryLabel(categoryById.get(id)) || undefined,
   });
 
   const tabs = [
-    { value: "all" as const, label: `Tất cả (${pending.length})` },
-    { value: "expense" as const, label: `Khoản chi (${expenses.length})` },
-    { value: "income" as const, label: `Khoản thu (${incomes.length})` },
+    { value: "all" as const, label: t("pending.tabs.all", { count: pending.length }) },
+    { value: "expense" as const, label: t("pending.tabs.expense", { count: expenses.length }) },
+    { value: "income" as const, label: t("pending.tabs.income", { count: incomes.length }) },
   ];
 
   return (
     <Screen>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={12} accessibilityLabel="Quay lại">
+        <Pressable onPress={() => router.back()} hitSlop={12} accessibilityLabel={t("common.action.back")}>
           <ChevronLeftIcon size={24} />
         </Pressable>
         <View style={styles.headerText}>
           <Text style={styles.title}>
-            Chờ xác nhận <Text style={styles.titleCount}>{pending.length}</Text>
+            {t("common.status.pending")} <Text style={styles.titleCount}>{pending.length}</Text>
           </Text>
           {/* The one instruction the screen needs, in place of the old banner
               and footer hint that said it twice. */}
-          <Text style={styles.subtitle}>Trợ lý AI đề xuất · chạm vào một mục để sửa</Text>
+          <Text style={styles.subtitle}>{t("pending.subtitle")}</Text>
         </View>
       </View>
 
@@ -116,7 +119,7 @@ export default function PendingReviewScreen() {
           <PendingReviewCard
             message={item}
             category={categoryById.get(item.action?.payload.category_id ?? "")}
-            walletName={item.action ? proposalWalletName(item.action.payload, walletById) : "Ví"}
+            walletName={item.action ? proposalWalletName(item.action.payload, walletById) : t("common.field.wallet")}
             currency={currencyOf(item)}
             confirming={proposals.confirmingId === item.id}
             locked={proposals.confirmingAll}
@@ -135,8 +138,8 @@ export default function PendingReviewScreen() {
             <View style={styles.emptyIcon}>
               <CheckIcon size={24} color={colors.green} />
             </View>
-            <Text style={styles.emptyTitle}>Đã duyệt hết</Text>
-            <Text style={styles.emptyText}>Không còn giao dịch nào chờ bạn xác nhận.</Text>
+            <Text style={styles.emptyTitle}>{t("pending.empty.title")}</Text>
+            <Text style={styles.emptyText}>{t("pending.empty.body")}</Text>
           </View>
         }
       />
@@ -144,13 +147,13 @@ export default function PendingReviewScreen() {
       {visible.length > 0 ? (
         <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
           <View style={styles.footerSummary}>
-            <Text style={styles.footerLabel}>Thay đổi số dư</Text>
+            <Text style={styles.footerLabel}>{t("pending.footer.balanceChange")}</Text>
             <Text style={styles.footerNet} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
               {netLabel}
             </Text>
           </View>
           <PillButton
-            label={`Duyệt tất cả · ${visible.length}`}
+            label={t("pending.footer.approveAll", { count: visible.length })}
             onPress={() => requireOnline(() => proposals.confirmAll(visible))}
             loading={proposals.confirmingAll}
             testID="btn-pending-review-confirm-all"

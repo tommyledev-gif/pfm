@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { EmojiGlyph } from "@/components/ui/EmojiGlyph";
 import { OpenMojiGrid } from "@/components/shared/OpenMojiGrid";
@@ -23,7 +24,8 @@ interface EmojiPickerInputProps {
 // The grid is the full OpenMoji set, grouped (see OpenMojiGrid), in its
 // fixed-height inline mode — this field lives inside lists that already
 // scroll. Forms that own a Drawer use use-icon-picker's panel instead.
-export function EmojiPickerInput({ value, onChange, placeholder = "Chọn emoji" }: EmojiPickerInputProps) {
+export function EmojiPickerInput({ value, onChange, placeholder }: EmojiPickerInputProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const [open, setOpen] = useState(false);
 
@@ -31,11 +33,11 @@ export function EmojiPickerInput({ value, onChange, placeholder = "Chọn emoji"
     <View>
       <View style={styles.row}>
         <Pressable style={[styles.input, styles.flex]} onPress={() => setOpen((o) => !o)}>
-          {value ? <EmojiGlyph emoji={value} size={26} /> : <Text style={styles.placeholderText}>{placeholder}</Text>}
+          {value ? <EmojiGlyph emoji={value} size={26} /> : <Text style={styles.placeholderText}>{placeholder ?? t("ui.emojiPicker.placeholder")}</Text>}
         </Pressable>
         {value ? (
           <Pressable onPress={() => onChange("")} hitSlop={8} style={styles.clearButton}>
-            <Text style={styles.clearLabel}>Xóa</Text>
+            <Text style={styles.clearLabel}>{t("ui.emojiPicker.clear")}</Text>
           </Pressable>
         ) : null}
       </View>

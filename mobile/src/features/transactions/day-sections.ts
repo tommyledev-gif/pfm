@@ -1,4 +1,4 @@
-import { dayLabelVi, formatDateViShort } from "@/lib/format-date";
+import { dayLabel, formatDateGroupHeader } from "@/lib/format-date";
 import { Transaction } from "@/features/transactions/types";
 import { mainCurrency } from "@/features/transactions/other-currencies";
 
@@ -84,8 +84,8 @@ export function buildDaySections(
     if (!group) {
       group = {
         key: dayKey,
-        dayLabel: dayLabelVi(item.occurred_at),
-        dateLabel: formatDateViShort(item.occurred_at),
+        dayLabel: dayLabel(item.occurred_at),
+        dateLabel: formatDateGroupHeader(item.occurred_at),
         data: [],
         count: 0,
         income: undefined,

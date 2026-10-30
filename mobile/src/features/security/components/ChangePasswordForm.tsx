@@ -1,30 +1,33 @@
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { TextInput, View } from "react-native";
 
 import { ListSection, ListTextField } from "@/components/ui/grouped-list";
 import { PillButton } from "@/components/ui/PillButton";
 import { getErrorCode, isNetworkError } from "@/lib/api-envelope";
 import { MIN_PASSWORD_LENGTH } from "@/lib/constants";
+import { copyOf, i18n } from "@/lib/i18n";
 import { createStyles, spacing } from "@/lib/theme";
 import { useToastStore } from "@/stores/toast-store";
 import { useChangePasswordMutation } from "@/features/security/api/use-change-password-mutation";
 
-const COPY = {
-  current: "Mật khẩu hiện tại",
-  next: "Mật khẩu mới",
-  nextHint: `Ít nhất ${MIN_PASSWORD_LENGTH} ký tự.`,
-  confirm: "Nhập lại mật khẩu mới",
-  submit: "Đổi mật khẩu",
-  enterCurrent: "Nhập mật khẩu hiện tại.",
-  wrongCurrent: "Mật khẩu hiện tại không đúng.",
-  tooShort: `Mật khẩu mới cần ít nhất ${MIN_PASSWORD_LENGTH} ký tự.`,
-  mismatch: "Hai mật khẩu mới chưa khớp.",
-  same: "Mật khẩu mới trùng mật khẩu hiện tại.",
-  offline: "Không có kết nối mạng. Thử lại sau.",
-  rateLimited: "Thử quá nhiều lần. Thử lại sau 15 phút.",
-  failed: "Chưa đổi được mật khẩu. Thử lại sau.",
-  done: "Đã đổi mật khẩu. Thiết bị khác cần đăng nhập lại.",
-} as const;
+const COPY = copyOf({
+  current: "security.changePassword.current",
+  next: "common.field.newPassword",
+  confirm: "common.field.confirmNewPassword",
+  submit: "security.changePassword.submit",
+  enterCurrent: "security.changePassword.enterCurrent",
+  wrongCurrent: "security.changePassword.wrongCurrent",
+  mismatch: "security.changePassword.mismatch",
+  same: "security.changePassword.same",
+  offline: "security.changePassword.offline",
+  failed: "security.changePassword.failed",
+  done: "security.changePassword.done",
+});
+const tooShort = () => i18n.t("security.changePassword.tooShort", { min: MIN_PASSWORD_LENGTH });
+const nextHint = () => i18n.t("security.changePassword.hint", { min: MIN_PASSWORD_LENGTH });
+// The password screens' limit window (backend password-change rate limit).
+const RATE_LIMIT_MINUTES = 15;
 
 interface FieldErrors {
   current?: string;
@@ -35,7 +38,7 @@ interface FieldErrors {
 
 function validate(current: string, next: string, confirm: string): FieldErrors {
   if (!current) return { current: COPY.enterCurrent };
-  if (next.length < MIN_PASSWORD_LENGTH) return { next: COPY.tooShort };
+  if (next.length < MIN_PASSWORD_LENGTH) return { next: tooShort() };
   if (next !== confirm) return { confirm: COPY.mismatch };
   return {};
 }
@@ -48,11 +51,11 @@ function errorsFor(error: unknown): FieldErrors {
     case "WRONG_CURRENT_PASSWORD":
       return { current: COPY.wrongCurrent };
     case "WEAK_PASSWORD":
-      return { next: COPY.tooShort };
+      return { next: tooShort() };
     case "SAME_PASSWORD":
       return { next: COPY.same };
     case "RATE_LIMITED":
-      return { form: COPY.rateLimited };
+      return { form: i18n.t("errors.tooManyAttempts", { minutes: RATE_LIMIT_MINUTES }) };
     default:
       return { form: COPY.failed };
   }
@@ -69,6 +72,7 @@ function errorsFor(error: unknown): FieldErrors {
  * group's footer, and the field it is about has a red label.
  */
 export function ChangePasswordForm({ onDone }: { onDone: () => void }) {
+  useTranslation(); // COPY reads the current language: re-render on a switch
   const styles = useStyles();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -104,7 +108,7 @@ export function ChangePasswordForm({ onDone }: { onDone: () => void }) {
 
   return (
     <View style={styles.form}>
-      <ListSection footer={errorLine ?? COPY.nextHint} footerTone={errorLine ? "danger" : "default"}>
+      <ListSection footer={errorLine ?? nextHint()} footerTone={errorLine ? "danger" : "default"}>
         <ListTextField
           label={COPY.current}
           value={current}

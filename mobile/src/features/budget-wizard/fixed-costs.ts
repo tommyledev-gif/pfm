@@ -19,6 +19,8 @@
 // If a model is added later it should ADD items this parser missed, never
 // overwrite what it read.
 
+import type { TranslationKey } from "@/lib/i18n";
+
 /** One line of the fixed-cost breakdown. */
 export interface FixedCostItem {
   /** Normalised label, used only for dedup between the two entry paths. */
@@ -154,17 +156,18 @@ export function parseFixedCosts(text: string): FixedCostItem[] {
  * cannot invent a category that does not apply. `systemKey` links a prompt to a
  * real system category where one exists (class `fixed` — see
  * common.SystemCategoryClass); the rest are real costs that are simply not
- * categories in this app.
+ * categories in this app. `key` is matching vocabulary for the user's own
+ * Vietnamese text, not copy; `labelKey` is what the row shows.
  */
-export const FIXED_COST_PROMPTS: { key: string; label: string; systemKey?: string }[] = [
-  { key: "thue nha", label: "Thuê nhà / trả góp", systemKey: "housing" },
-  { key: "dien", label: "Điện", systemKey: "utilities" },
-  { key: "nuoc", label: "Nước", systemKey: "utilities" },
-  { key: "internet", label: "Internet", systemKey: "utilities" },
-  { key: "phi quan ly", label: "Phí quản lý / dịch vụ" },
-  { key: "gui xe", label: "Gửi xe" },
-  { key: "hoc phi", label: "Học phí", systemKey: "children_education" },
-  { key: "bao hiem", label: "Bảo hiểm" },
+export const FIXED_COST_PROMPTS: { key: string; labelKey: TranslationKey; systemKey?: string }[] = [
+  { key: "thue nha", labelKey: "budgetWizard.fixedCost.rent", systemKey: "housing" },
+  { key: "dien", labelKey: "budgetWizard.fixedCost.electricity", systemKey: "utilities" },
+  { key: "nuoc", labelKey: "budgetWizard.fixedCost.water", systemKey: "utilities" },
+  { key: "internet", labelKey: "budgetWizard.fixedCost.internet", systemKey: "utilities" },
+  { key: "phi quan ly", labelKey: "budgetWizard.fixedCost.serviceFee" },
+  { key: "gui xe", labelKey: "budgetWizard.fixedCost.parking" },
+  { key: "hoc phi", labelKey: "budgetWizard.fixedCost.schoolFees", systemKey: "children_education" },
+  { key: "bao hiem", labelKey: "budgetWizard.fixedCost.insurance" },
 ];
 
 /**

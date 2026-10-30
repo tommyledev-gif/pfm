@@ -1,4 +1,5 @@
 import { Modal, Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
 import { ConfidenceBadge } from "@/features/budget-wizard/types";
@@ -22,6 +23,7 @@ interface ConfidencePopupProps {
  */
 export function ConfidencePopup({ visible, categoryName, badge, onClose }: ConfidencePopupProps) {
   const styles = useStyles();
+  const { t } = useTranslation();
   return (
     <Modal visible={visible && badge !== null} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
@@ -45,7 +47,7 @@ export function ConfidencePopup({ visible, categoryName, badge, onClose }: Confi
           ) : null}
 
           <Pressable onPress={onClose} hitSlop={8} style={styles.closeRow}>
-            <Text style={styles.closeLabel}>Đã hiểu</Text>
+            <Text style={styles.closeLabel}>{t("common.action.gotIt")}</Text>
           </Pressable>
         </Pressable>
       </Pressable>

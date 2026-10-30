@@ -1,4 +1,5 @@
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { formatCurrency } from "@/lib/currency";
 import { formatDateShort } from "@/lib/format-date";
@@ -7,7 +8,7 @@ import { ProposalDuplicate } from "@/features/ai-chat/types";
 
 // Copy fixed by the spec (specs/ai-chat-image-capture BR-09, BR-17) and the
 // glossary ("Độ tin cậy thấp", "giống giao dịch").
-const LOW_CONFIDENCE_LABEL = "Độ tin cậy thấp";
+const LOW_CONFIDENCE_LABEL = "chat.proposal.lowConfidence";
 
 interface ProposalNoticesProps {
   lowConfidence: boolean;
@@ -24,17 +25,21 @@ interface ProposalNoticesProps {
  */
 export function ProposalNotices({ lowConfidence, duplicate, currency, testIDSuffix }: ProposalNoticesProps) {
   const styles = useStyles();
+  const { t } = useTranslation();
   if (!lowConfidence && !duplicate) return null;
   return (
     <View style={styles.container}>
       {lowConfidence ? (
         <Text style={styles.notice} testID={testIDSuffix ? `badge-low-confidence-${testIDSuffix}` : undefined}>
-          {LOW_CONFIDENCE_LABEL}
+          {t(LOW_CONFIDENCE_LABEL)}
         </Text>
       ) : null}
       {duplicate ? (
         <Text style={styles.notice} testID={testIDSuffix ? `txt-possible-duplicate-${testIDSuffix}` : undefined}>
-          {`Giống giao dịch ${formatCurrency(duplicate.amount, currency)} ngày ${formatDateShort(duplicate.occurred_at)}`}
+          {t("chat.proposal.possibleDuplicate", {
+            amount: formatCurrency(duplicate.amount, currency),
+            date: formatDateShort(duplicate.occurred_at),
+          })}
         </Text>
       ) : null}
     </View>

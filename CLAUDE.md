@@ -135,7 +135,7 @@ Non-negotiables (the skill has the full list and the reasoning):
 - One concept = one word per `glossary.md` (a wallet is always "ví", never "nguồn tiền"/"tài khoản"). New terms go into the glossary first.
 - Money and dates go through the shared formatters (`formatCurrency`, the format-date helpers) — never hand-written "đ", "VNĐ", "k", "1/10".
 
-Current reality: neither client has an i18n layer — strings are Vietnamese, hardcoded in components. Until one is adopted, write the VI string in place (no EN needed); the skill's locale-key/plural rules and `scripts/lint_copy.py` apply only once locale files exist. Adopting i18next is its own decision, not something to start inside a feature.
+Current reality: `mobile/` has an i18n layer (i18next, `specs/mobile-language-switch/`; VI default, EN picked in Preferences). Every user-visible string is a key in `mobile/src/locales/{vi,en}/<area>.json` — VI is the source of truth for the key set (typed keys: a wrong key fails `tsc`), EN has the same keys and placeholders. Read keys with `useTranslation()` in components (it is also what re-renders them on a switch) or `i18n.t()` / `copyOf()` from `@/lib/i18n` at call time — never a translated constant evaluated at import. Errors go through `errorText()` (never the server `message`), dates through `lib/format-date.ts`, built-in category names through `categoryLabel()`. `npm run check-i18n` (from `mobile/`) must stay clean, and `lint_copy.py mobile/src/locales` applies. `frontend/` (web) still has no i18n layer: write the VI string in place there.
 
 ## MVP Features
 

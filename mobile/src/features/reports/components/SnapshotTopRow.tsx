@@ -1,16 +1,19 @@
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { CurrencySwitch } from "@/components/shared/CurrencySwitch";
 import { formatCurrency } from "@/lib/currency";
 import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { HomePeriod } from "@/stores/ui-prefs-store";
 
 interface SnapshotTopRowProps {
   currency: string;
   currencies: string[];
   onChangeCurrency: (currency: string) => void;
   spentDelta: number;
-  previousPeriodLabel: string;
+  /** The period the figures are for: picks the trend sentence (one per period, so EN word order is free). */
+  period: HomePeriod;
 }
 
 /**
@@ -18,7 +21,8 @@ interface SnapshotTopRowProps {
  * when the user has more than one) and the trend against the previous period.
  * Split out of HomeSnapshotCard to keep that file under 300 lines.
  */
-export function SnapshotTopRow({ currency, currencies, onChangeCurrency, spentDelta, previousPeriodLabel }: SnapshotTopRowProps) {
+export function SnapshotTopRow({ currency, currencies, onChangeCurrency, spentDelta, period }: SnapshotTopRowProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const more = spentDelta > 0;
@@ -31,8 +35,10 @@ export function SnapshotTopRow({ currency, currencies, onChangeCurrency, spentDe
       <View style={[styles.trendBadge, more ? styles.trendNegative : styles.trendPositive]}>
         <Text style={[styles.trendLabel, { color: more ? colors.peach : colors.green }]} numberOfLines={1}>
           {spentDelta === 0
-            ? `Bằng ${previousPeriodLabel}`
-            : `${more ? "Nhiều hơn" : "Ít hơn"} ${formatCurrency(Math.abs(spentDelta), currency)} so với ${previousPeriodLabel}`}
+            ? t(`home.snapshot.trend.same_${period}`)
+            : t(`home.snapshot.trend.${more ? "more" : "less"}_${period}`, {
+                amount: formatCurrency(Math.abs(spentDelta), currency),
+              })}
         </Text>
       </View>
     </View>

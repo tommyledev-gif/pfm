@@ -1,4 +1,5 @@
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { AmountText } from "@/components/ui/AmountText";
 import { PillButton } from "@/components/ui/PillButton";
@@ -19,6 +20,7 @@ interface ItemsTotalsPanelProps {
 // discount lines, so a receipt with tax does not read as a gap. "Xong" never
 // saves; the form's Lưu does.
 export function ItemsTotalsPanel({ lines, amountCents, currency, onDone }: ItemsTotalsPanelProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const hasItems = lines.items.length > 0;
   const mismatch = hasItems && lines.gap !== 0;
@@ -28,7 +30,7 @@ export function ItemsTotalsPanel({ lines, amountCents, currency, onDone }: Items
     <View style={styles.container}>
       {hasItems ? (
         <View style={styles.totalRow}>
-          <Text style={styles.totalLabel}>Tổng</Text>
+          <Text style={styles.totalLabel}>{t("common.field.total")}</Text>
           <AmountText amountCents={lines.total} currency={currency} style={styles.totalValue} testID="txt-items-total" />
         </View>
       ) : null}
@@ -36,16 +38,16 @@ export function ItemsTotalsPanel({ lines, amountCents, currency, onDone }: Items
         <>
           <Text testID="txt-items-gap" style={styles.gap}>
             {amountCents !== null
-              ? `Lệch ${gapText} so với số tiền giao dịch ${formatCurrency(amountCents, currency)}.`
-              : `Lệch ${gapText} so với số tiền giao dịch.`}
+              ? t("transactions.items.gapWithAmount", { gap: gapText, amount: formatCurrency(amountCents, currency) })
+              : t("transactions.items.gap", { gap: gapText })}
           </Text>
           <View style={styles.fixes}>
-            <PillButton testID="btn-items-add-difference" label="Ghi phần lệch" variant="outline" onPress={lines.addDifference} style={styles.flex} />
-            <PillButton testID="btn-items-use-total" label="Lấy theo tổng" variant="outline" onPress={lines.applyTotalAsAmount} disabled={lines.total <= 0} style={styles.flex} />
+            <PillButton testID="btn-items-add-difference" label={t("transactions.items.addDifference")} variant="outline" onPress={lines.addDifference} style={styles.flex} />
+            <PillButton testID="btn-items-use-total" label={t("transactions.items.useTotal")} variant="outline" onPress={lines.applyTotalAsAmount} disabled={lines.total <= 0} style={styles.flex} />
           </View>
         </>
       ) : null}
-      <PillButton testID="btn-items-done" label="Xong" onPress={onDone} />
+      <PillButton testID="btn-items-done" label={t("common.action.done")} onPress={onDone} />
     </View>
   );
 }

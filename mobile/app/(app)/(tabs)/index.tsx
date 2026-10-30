@@ -2,6 +2,7 @@ import { memo, useCallback, useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 
 import { MotionStagger } from "@/components/motion/MotionStagger";
 import { LateSkeleton } from "@/components/motion/SkeletonSwap";
@@ -14,7 +15,7 @@ import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
 import { Screen } from "@/components/shared/Screen";
 import { TopBar } from "@/components/shared/TopBar";
 import { TransactionRow } from "@/components/shared/TransactionRow";
-import { previousPeriodLabel } from "@/lib/date-range";
+import { TranslationKey } from "@/lib/i18n";
 import { isAwaitingFirstData, isWaitingForNetwork } from "@/lib/query-status";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useLatestCallback } from "@/lib/use-latest-callback";
@@ -46,14 +47,13 @@ const RECENT_TRANSACTION_COUNT = 4;
 // asking for exactly four would leave the list short by however many there are.
 const RECENT_FETCH_LIMIT = 10;
 const NO_WALLETS: Wallet[] = [];
-// The header's staggered blocks (MotionStagger): the recent rows continue
-// the same top-to-bottom sequence after them.
+// The header's staggered blocks (MotionStagger); the recent rows continue after them.
 const HEADER_BLOCKS = 5;
 
-const PERIODS: { label: string; value: HomePeriod }[] = [
-  { label: "Ngày", value: "day" },
-  { label: "Tháng", value: "month" },
-  { label: "Năm", value: "year" },
+const PERIODS: { labelKey: TranslationKey; value: HomePeriod }[] = [
+  { labelKey: "home.period.day", value: "day" },
+  { labelKey: "home.period.month", value: "month" },
+  { labelKey: "home.period.year", value: "year" },
 ];
 
 interface RecentRowProps {
@@ -83,6 +83,7 @@ const RecentRow = memo(function RecentRow({ transaction, onPress, ...row }: Rece
  * one fades in while everything under it slides down instead of jumping.
  */
 export default function HomeScreen() {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
@@ -112,12 +113,10 @@ export default function HomeScreen() {
     [firstPage],
   );
   // A fresh account — not one transaction ever, future-dated included — gets
-  // the onboarding journey in place of a snapshot of zeros. Decided only once
-  // all three answers are in, so a slow query never flashes the wrong one.
+  // the onboarding journey in place of a snapshot of zeros. Decided once all
+  // three answers are in; until then the snapshot stays a skeleton, so a new
+  // User never sees it flash in before the onboarding card replaces it.
   const isFresh = recent.isSuccess && wallets.isSuccess && budgets.isSuccess && (firstPage?.length ?? 0) === 0;
-  // Fresh vs. returning is decided once, after all three have answered. Until
-  // then the snapshot card stays a skeleton, so a new User never sees the
-  // snapshot flash in before the onboarding card replaces it.
   const deciding = [recent, wallets, budgets].some(isAwaitingFirstData);
 
   const { refreshControl } = useRefresh([wallets, recent, categories, ...snapshot.queries]);
@@ -145,6 +144,8 @@ export default function HomeScreen() {
   }, []);
   const startTransaction = useCallback(() => setCreatingTransaction(true), []);
 
+  const periods = useMemo(() => PERIODS.map((p) => ({ label: t(p.labelKey), value: p.value })), [t]);
+
   // The header's blocks enter first (MotionStagger below), the rows after them.
   const rowEntrance = useListEntrance();
 
@@ -169,7 +170,7 @@ export default function HomeScreen() {
                 onAddTransaction={startTransaction}
               />
             ) : (
-              <SegmentedTabs style={styles.periodRow} options={PERIODS} value={homePeriod} onChange={setHomePeriod} />
+              <SegmentedTabs style={styles.periodRow} options={periods} value={homePeriod} onChange={setHomePeriod} />
             )}
             {isFresh ? null : (
               <HomeSnapshotCard
@@ -181,7 +182,7 @@ export default function HomeScreen() {
                 onChangeCurrency={snapshot.setCurrency}
                 periodSpent={snapshot.periodSpent}
                 spentDelta={snapshot.spentDelta}
-                previousPeriodLabel={previousPeriodLabel(snapshot.period)}
+                period={snapshot.period}
                 budgetSnapshot={snapshot.budgetSnapshot}
                 remainingToday={snapshot.remainingToday}
                 todayAllowance={snapshot.todayAllowance}
@@ -205,12 +206,12 @@ export default function HomeScreen() {
             <View style={styles.section}>
               <View style={styles.sectionHeaderRow}>
                 <View style={styles.sectionTitleRow}>
-                  <Text style={styles.sectionTitle}>Ví</Text>
-                  {wallets.data ? <Text style={styles.sectionCountHint}>{wallets.data.length} ví</Text> : null}
+                  <Text style={styles.sectionTitle}>{t("home.wallets.title")}</Text>
+                  {wallets.data ? <Text style={styles.sectionCountHint}>{t("common.count.wallets", { count: wallets.data.length })}</Text> : null}
                 </View>
                 <Pressable onPress={openWallets} hitSlop={8} style={styles.addWalletAction}>
                   <PlusIcon size={12} color={colors.green} />
-                  <Text style={styles.sectionAction}>Thêm ví</Text>
+                  <Text style={styles.sectionAction}>{t("home.wallets.add")}</Text>
                 </Pressable>
               </View>
               {isAwaitingFirstData(wallets) ? (
@@ -220,7 +221,7 @@ export default function HomeScreen() {
               ) : wallets.data?.length === 0 ? (
                 <EmptyInlineCard
                   icon={<BankIcon size={18} color={colors.textSecondary} />}
-                  text="Chưa có ví. Tạo ví để ghi giao dịch."
+                  text={t("common.empty.noWallet")}
                   onPress={openWalletCreator}
                   testID="empty-home-wallets"
                 />
@@ -230,9 +231,9 @@ export default function HomeScreen() {
             </View>
 
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Giao dịch gần đây</Text>
+              <Text style={styles.sectionTitle}>{t("home.recent.title")}</Text>
               <Pressable onPress={openTransactions} hitSlop={8}>
-                <Text style={styles.sectionAction}>Xem tất cả →</Text>
+                <Text style={styles.sectionAction}>{t("home.recent.seeAll")}</Text>
               </Pressable>
             </View>
           </MotionStagger>

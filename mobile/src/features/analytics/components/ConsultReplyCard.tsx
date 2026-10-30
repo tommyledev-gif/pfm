@@ -1,4 +1,6 @@
 import { Pressable, Text, View } from "react-native";
+import { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 
 import { CategoryBanner } from "@/features/analytics/components/CategoryBanner";
 import { CategoryChoiceList } from "@/features/analytics/components/CategoryChoiceList";
@@ -27,22 +29,19 @@ interface ConsultReplyCardProps {
   sourceText?: string;
 }
 
-const SO_FAR_SUFFIX = " (đến hôm nay)";
 // A single day that is today is still in progress — "up to now", since
 // "up to today" about today says nothing (spec.md S-AIQ-49).
-const SO_FAR_TODAY_SUFFIX = " (đến giờ)";
-
 function shortDate(isoDate: string): string {
   const [, month, day] = isoDate.split("-");
   return `${day}/${month}`;
 }
 
 // "28/09 (đến giờ)" for a single day, "01/09 – 30/09 (đến hôm nay)" for a range.
-function periodText(period: AnalyticsPeriodInfo): string {
+function periodText(t: TFunction, period: AnalyticsPeriodInfo): string {
   const singleDay = period.from_date === period.to_date;
   const range = singleDay ? shortDate(period.from_date) : `${shortDate(period.from_date)} – ${shortDate(period.to_date)}`;
   if (!period.partial) return range;
-  return range + (singleDay ? SO_FAR_TODAY_SUFFIX : SO_FAR_SUFFIX);
+  return t(singleDay ? "analytics.period.soFar" : "analytics.period.toDate", { range });
 }
 
 // Everything under an analysis reply's text: the answer's period and chart,
@@ -51,6 +50,7 @@ function periodText(period: AnalyticsPeriodInfo): string {
 // The reply text itself (the summary or the explanation) sits above this,
 // as the message's own first line — answer first, metadata under it.
 export function ConsultReplyCard({ data, handlers, sourceText }: ConsultReplyCardProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const answer = data.answer;
   const chips = answer ? answer.follow_ups : data.chips;
@@ -60,7 +60,7 @@ export function ConsultReplyCard({ data, handlers, sourceText }: ConsultReplyCar
       {answer ? (
         <>
           <Text testID="text-analytics-period" style={styles.period}>
-            {periodText(answer.period)} · {answer.tx_count} giao dịch
+            {t("analytics.answer.periodLine", { period: periodText(t, answer.period), count: answer.tx_count })}
           </Text>
           <ChartRenderer chart={answer.chart} currency={answer.currency} elapsed={periodElapsed(answer.period)} />
           {answer.notices.map((n) => (
@@ -86,7 +86,9 @@ export function ConsultReplyCard({ data, handlers, sourceText }: ConsultReplyCar
 
       {data.switch_to_recording ? (
         <Pressable testID="btn-analytics-switch-recording" style={styles.switch} onPress={() => handlers.onSwitchToRecording(sourceText)}>
-          <Text style={styles.switchLabel}>Chuyển sang Ghi giao dịch</Text>
+          <Text style={styles.switchLabel}>
+            {t("analytics.answer.switchToRecording", { mode: t("chat.mode.transaction.label") })}
+          </Text>
         </Pressable>
       ) : null}
 

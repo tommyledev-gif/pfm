@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { Trans, useTranslation } from "react-i18next";
 
 import { ActionPopover, PopoverAction, PopoverAnchor } from "@/components/shared/ActionPopover";
 import { Avatar } from "@/components/ui/Avatar";
@@ -8,7 +9,7 @@ import { colorForCategory } from "@/lib/category-color";
 import { spacing, typography, createStyles } from "@/lib/theme";
 import { WalletMember } from "@/features/wallets/types";
 import { RolePill } from "@/features/wallets/components/RolePill";
-import { ROLE_LABEL } from "@/features/wallets/components/wallet-member-copy";
+import { ROLE_LABEL_KEY } from "@/features/wallets/components/wallet-member-copy";
 
 const AVATAR_SIZE = 40;
 
@@ -36,6 +37,7 @@ interface WalletMemberRowProps {
  */
 export function WalletMemberRow({ member, isSelf, canManage, separated, onChangeRole, onRemove }: WalletMemberRowProps) {
   const styles = useStyles();
+  const { t } = useTranslation();
   const pending = member.status === "pending";
   // collapsable={false}: a View with only layout is flattened away on
   // Fabric, and there would be nothing to measure the menu's place from.
@@ -52,13 +54,13 @@ export function WalletMemberRow({ member, isSelf, canManage, separated, onChange
   const actions: PopoverAction[] = [
     {
       Icon: nextRole === "viewer" ? EyeIcon : EditIcon,
-      label: `Đổi sang ${ROLE_LABEL[nextRole]}`,
+      label: nextRole === "viewer" ? t("sharedWallets.action.toViewer") : t("sharedWallets.action.toEditor"),
       onPress: onChangeRole,
       testID: `menu-wallet-member-role-${member.user_id}`,
     },
     {
       Icon: pending ? CloseIcon : TrashIcon,
-      label: pending ? "Thu hồi lời mời" : "Xóa khỏi ví",
+      label: pending ? t("sharedWallets.action.revokeInvitation") : t("sharedWallets.action.removeMember"),
       onPress: onRemove,
       destructive: true,
       testID: `menu-wallet-member-remove-${member.user_id}`,
@@ -72,12 +74,23 @@ export function WalletMemberRow({ member, isSelf, canManage, separated, onChange
       </View>
       <View style={styles.texts}>
         <Text style={styles.name} numberOfLines={1}>
-          {member.name}
-          {isSelf ? <Text style={styles.self}> (bạn)</Text> : null}
+          {isSelf ? (
+            // The name is escaped into the markup and read back, so a "<" in
+            // it stays text.
+            <Trans
+              i18nKey="sharedWallets.member.nameSelf"
+              values={{ name: member.name }}
+              tOptions={{ interpolation: { escapeValue: true } }}
+              shouldUnescape
+              components={[<Text key="self" style={styles.self} />]}
+            />
+          ) : (
+            member.name
+          )}
         </Text>
         {pending ? (
           <Text style={styles.pending} numberOfLines={1}>
-            Chờ trả lời
+            {t("common.status.awaitingReply")}
           </Text>
         ) : member.username ? (
           <Text style={styles.username} numberOfLines={1}>
@@ -89,7 +102,7 @@ export function WalletMemberRow({ member, isSelf, canManage, separated, onChange
         <RolePill
           role={member.role}
           onPress={canManage ? openMenu : undefined}
-          accessibilityLabel={`${ROLE_LABEL[member.role]}. Tùy chọn cho ${member.name}`}
+          accessibilityLabel={t("sharedWallets.member.roleA11y", { role: t(ROLE_LABEL_KEY[member.role]), name: member.name })}
           testID={`pill-wallet-member-role-${member.user_id}`}
         />
       </View>

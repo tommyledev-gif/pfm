@@ -1,3 +1,4 @@
+import { i18n } from "@/lib/i18n";
 import { walletAccentPalette } from "@/lib/theme";
 
 // Card colours a User can pick for a Wallet (specs/shared-wallets plan F10,
@@ -15,18 +16,18 @@ import { walletAccentPalette } from "@/lib/theme";
 // failed both inks and was left out on purpose. Re-run the check before
 // adding a colour here.
 export const WALLET_COLORS = [
-  { key: "blue", label: "Xanh dương", face: "#1D4ED8" },
-  { key: "indigo", label: "Chàm", face: "#4338CA" },
-  { key: "violet", label: "Tím", face: "#6D28D9" },
-  { key: "magenta", label: "Tím hồng", face: "#A21CAF" },
-  { key: "rose", label: "Đỏ hồng", face: "#BE123C" },
-  { key: "orange", label: "Cam đất", face: "#9A3412" },
-  { key: "green", label: "Xanh lá", face: "#166534" },
-  { key: "teal", label: "Xanh két", face: "#115E59" },
-  { key: "slate", label: "Xám", face: "#334155" },
-  { key: "amber", label: "Vàng", face: "#FBBF24" },
-  { key: "lime", label: "Xanh nõn chuối", face: "#A3E635" },
-  { key: "cyan", label: "Xanh ngọc", face: "#22D3EE" },
+  { key: "blue", get label() { return i18n.t("ui.walletColor.blue"); }, face: "#1D4ED8" },
+  { key: "indigo", get label() { return i18n.t("ui.walletColor.indigo"); }, face: "#4338CA" },
+  { key: "violet", get label() { return i18n.t("ui.walletColor.violet"); }, face: "#6D28D9" },
+  { key: "magenta", get label() { return i18n.t("ui.walletColor.magenta"); }, face: "#A21CAF" },
+  { key: "rose", get label() { return i18n.t("ui.walletColor.rose"); }, face: "#BE123C" },
+  { key: "orange", get label() { return i18n.t("ui.walletColor.orange"); }, face: "#9A3412" },
+  { key: "green", get label() { return i18n.t("ui.walletColor.green"); }, face: "#166534" },
+  { key: "teal", get label() { return i18n.t("ui.walletColor.teal"); }, face: "#115E59" },
+  { key: "slate", get label() { return i18n.t("ui.walletColor.slate"); }, face: "#334155" },
+  { key: "amber", get label() { return i18n.t("ui.walletColor.amber"); }, face: "#FBBF24" },
+  { key: "lime", get label() { return i18n.t("ui.walletColor.lime"); }, face: "#A3E635" },
+  { key: "cyan", get label() { return i18n.t("ui.walletColor.cyan"); }, face: "#22D3EE" },
 ] as const;
 
 export type WalletColorKey = (typeof WALLET_COLORS)[number]["key"];

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Keyboard, Pressable, Text, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { OpenMojiGrid } from "@/components/shared/OpenMojiGrid";
 import { EmojiGlyph } from "@/components/ui/EmojiGlyph";
@@ -7,8 +8,9 @@ import { PlusIcon } from "@/components/ui/Icon";
 import { PillButton } from "@/components/ui/PillButton";
 import { SegmentedTabOption, SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { useCreateCategoryMutation } from "@/features/categories/api/use-create-category-mutation";
-import { getErrorMessage } from "@/lib/axios";
+import { errorText } from "@/lib/api-envelope";
 import { CATEGORY_NAME_MAX_LENGTH, CategoryType } from "@/lib/constants";
+import type { TranslationKey } from "@/lib/i18n";
 import { useRequireOnline } from "@/lib/connectivity";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
@@ -24,9 +26,9 @@ interface CategoryQuickCreateFormProps {
 const FIELD_HEIGHT = 48;
 const ICON_GLYPH_SIZE = 24;
 
-const TYPE_OPTIONS: SegmentedTabOption<CategoryType>[] = [
-  { value: "expense", label: "Khoản chi" },
-  { value: "income", label: "Khoản thu" },
+const TYPE_OPTIONS: { value: CategoryType; labelKey: TranslationKey }[] = [
+  { value: "expense", labelKey: "categories.quickCreate.typeExpense" },
+  { value: "income", labelKey: "categories.quickCreate.typeIncome" },
 ];
 
 /**
@@ -46,12 +48,17 @@ const TYPE_OPTIONS: SegmentedTabOption<CategoryType>[] = [
 export function CategoryQuickCreateForm({ initialName, onCreated, onCancel }: CategoryQuickCreateFormProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const requireOnline = useRequireOnline();
   const [name, setName] = useState(initialName);
   const [icon, setIcon] = useState("");
   const [type, setType] = useState<CategoryType>("expense");
   const [pickingIcon, setPickingIcon] = useState(false);
   const createCategory = useCreateCategoryMutation();
+  const typeOptions = useMemo<SegmentedTabOption<CategoryType>[]>(
+    () => TYPE_OPTIONS.map((option) => ({ value: option.value, label: t(option.labelKey) })),
+    [t],
+  );
 
   const submit = () => {
     const trimmed = name.trim();
@@ -74,9 +81,9 @@ export function CategoryQuickCreateForm({ initialName, onCreated, onCancel }: Ca
         {/* A text action, not a second back chevron — the panel's own header
             already has one, and two stacked arrows read as two levels. */}
         <View style={styles.pickerHead}>
-          <Text style={styles.pickerTitle}>Chọn biểu tượng</Text>
+          <Text style={styles.pickerTitle}>{t("common.field.chooseIcon")}</Text>
           <Pressable onPress={() => setPickingIcon(false)} hitSlop={10} accessibilityRole="button">
-            <Text style={styles.textAction}>Quay lại</Text>
+            <Text style={styles.textAction}>{t("common.action.back")}</Text>
           </Pressable>
         </View>
         <OpenMojiGrid
@@ -94,13 +101,13 @@ export function CategoryQuickCreateForm({ initialName, onCreated, onCancel }: Ca
   return (
     <View style={styles.form}>
       <View style={styles.group}>
-        <Text style={styles.label}>Tên và biểu tượng</Text>
+        <Text style={styles.label}>{t("categories.quickCreate.nameAndIcon")}</Text>
         <View style={styles.nameRow}>
           <Pressable
             style={styles.iconButton}
             onPress={openIconPicker}
             accessibilityRole="button"
-            accessibilityLabel={icon ? "Đổi biểu tượng" : "Chọn biểu tượng"}
+            accessibilityLabel={icon ? t("categories.quickCreate.changeIconA11y") : t("common.field.chooseIcon")}
             testID="btn-category-picker-new-icon"
           >
             {icon ? <EmojiGlyph emoji={icon} size={ICON_GLYPH_SIZE} /> : <PlusIcon size={18} color={colors.textSecondary} />}
@@ -108,7 +115,7 @@ export function CategoryQuickCreateForm({ initialName, onCreated, onCancel }: Ca
           <TextInput
             value={name}
             onChangeText={setName}
-            placeholder="vd: Đi chợ"
+            placeholder={t("categories.form.namePlaceholder")}
             placeholderTextColor={colors.textMuted}
             style={styles.nameInput}
             autoFocus
@@ -120,26 +127,26 @@ export function CategoryQuickCreateForm({ initialName, onCreated, onCancel }: Ca
         </View>
         {icon ? (
           <Pressable onPress={() => setIcon("")} hitSlop={8} style={styles.hintRow} accessibilityRole="button">
-            <Text style={styles.textAction}>Bỏ biểu tượng</Text>
+            <Text style={styles.textAction}>{t("categories.quickCreate.removeIcon")}</Text>
           </Pressable>
         ) : (
-          <Text style={styles.hint}>Biểu tượng không bắt buộc.</Text>
+          <Text style={styles.hint}>{t("categories.quickCreate.iconOptional")}</Text>
         )}
       </View>
 
       <View style={styles.group}>
-        <Text style={styles.label}>Loại</Text>
-        <SegmentedTabs options={TYPE_OPTIONS} value={type} onChange={setType} />
+        <Text style={styles.label}>{t("common.field.type")}</Text>
+        <SegmentedTabs options={typeOptions} value={type} onChange={setType} />
       </View>
 
       {createCategory.isError ? (
-        <Text style={styles.error}>{getErrorMessage(createCategory.error, "Không thể tạo danh mục")}</Text>
+        <Text style={styles.error}>{errorText(createCategory.error, "categories.quickCreate.createFailed")}</Text>
       ) : null}
 
       <View style={styles.actions}>
-        <PillButton label="Hủy" variant="outline" onPress={onCancel} style={styles.flexButton} />
+        <PillButton label={t("common.action.cancel")} variant="outline" onPress={onCancel} style={styles.flexButton} />
         <PillButton
-          label="Tạo danh mục"
+          label={t("common.action.createCategory")}
           onPress={() => requireOnline(submit)}
           loading={createCategory.isPending}
           disabled={!name.trim()}

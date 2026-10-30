@@ -1,7 +1,8 @@
 import { isAxiosError, isCancel } from "axios";
 
-import { getErrorCode, getErrorMessage, isNetworkError } from "@/lib/api-envelope";
+import { errorText, getErrorCode, isNetworkError } from "@/lib/api-envelope";
 import { HTTP_STATUS } from "@/lib/constants";
+import { SAVE_ERROR_KEYS } from "@/features/transactions/items/save-error-message";
 
 // How the flusher reacts to a failed send (plan "Error Flows" table).
 export type SendFailure =
@@ -10,9 +11,9 @@ export type SendFailure =
   // Session changed / refused (owner guard, 401): stop, nothing to blame on the item.
   | { kind: "aborted" }
   // The server answered and refused this item (4xx): Failed, run continues.
+  // `message` is the sentence in the language of the moment: what a Failed
+  // item shows when its code has no sentence of its own (PendingSyncRow).
   | { kind: "rejected"; code: string | null; message: string };
-
-const FALLBACK_REJECT_MESSAGE = "Không thể lưu giao dịch";
 
 export function classifySendError(error: unknown): SendFailure {
   if (isCancel(error)) return { kind: "aborted" };
@@ -29,6 +30,6 @@ export function classifySendError(error: unknown): SendFailure {
   return {
     kind: "rejected",
     code: getErrorCode(error) ?? null,
-    message: getErrorMessage(error, FALLBACK_REJECT_MESSAGE),
+    message: errorText(error, "errors.saveTransactionFallback", SAVE_ERROR_KEYS),
   };
 }

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { SectionList, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { useListEntrance } from "@/components/motion/MotionView";
 import { GroupedListCell, ListSection, ListSectionHeader } from "@/components/ui/grouped-list";
@@ -12,6 +13,7 @@ import { spacing, typography, createStyles } from "@/lib/theme";
 import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
 import { isWaitingForNetwork } from "@/lib/query-status";
 import { CategoryType } from "@/lib/constants";
+import type { TranslationKey } from "@/lib/i18n";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { Category } from "@/features/categories/types";
 import { CategoryFormModal } from "@/features/categories/components/CategoryFormModal";
@@ -20,14 +22,14 @@ import { CategoryListItemSkeleton } from "@/features/categories/components/Categ
 
 const LIST_SKELETON_COUNT = 6;
 
-const TYPE_OPTIONS: SegmentedTabOption<CategoryType>[] = [
-  { value: "expense", label: "Chi tiêu" },
-  { value: "income", label: "Thu nhập" },
+const TYPE_OPTIONS: { value: CategoryType; labelKey: TranslationKey }[] = [
+  { value: "expense", labelKey: "common.txType.expense" },
+  { value: "income", labelKey: "common.txType.income" },
 ];
 
-const EMPTY_LABEL: Record<CategoryType, string> = {
-  expense: "Chưa có danh mục chi tiêu.",
-  income: "Chưa có danh mục thu nhập.",
+const EMPTY_LABEL: Record<CategoryType, TranslationKey> = {
+  expense: "categories.empty.expense",
+  income: "categories.empty.income",
 };
 
 interface CategorySection {
@@ -38,6 +40,7 @@ interface CategorySection {
 
 export default function CategoriesScreen() {
   const styles = useStyles();
+  const { t } = useTranslation();
   const [type, setType] = useState<CategoryType>("expense");
   const categories = useCategoriesQuery(type);
   const [modalOpen, setModalOpen] = useState(false);
@@ -60,10 +63,15 @@ export default function CategoriesScreen() {
   const sections = useMemo<CategorySection[]>(() => {
     const all = categories.data ?? [];
     return [
-      { key: "own", title: "Của bạn", data: all.filter((c) => c.user_id !== null) },
-      { key: "system", title: "Mặc định", data: all.filter((c) => c.user_id === null) },
+      { key: "own", title: t("categories.section.own"), data: all.filter((c) => c.user_id !== null) },
+      { key: "system", title: t("common.label.default"), data: all.filter((c) => c.user_id === null) },
     ].filter((section) => section.data.length > 0);
-  }, [categories.data]);
+  }, [categories.data, t]);
+
+  const typeOptions = useMemo<SegmentedTabOption<CategoryType>[]>(
+    () => TYPE_OPTIONS.map((option) => ({ value: option.value, label: t(option.labelKey) })),
+    [t],
+  );
 
   // Each section's first row's position in the whole list, for the stagger.
   const sectionStart = useMemo(() => {
@@ -83,10 +91,10 @@ export default function CategoriesScreen() {
 
   return (
     <Screen>
-      <ScreenHeader title="Danh mục" />
+      <ScreenHeader title={t("nav.title.categories")} />
 
       <SegmentedTabs
-        options={TYPE_OPTIONS}
+        options={typeOptions}
         value={type}
         onChange={setType}
         style={styles.tabs}
@@ -126,15 +134,19 @@ export default function CategoriesScreen() {
           )}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Text style={styles.emptyLabel}>{EMPTY_LABEL[type]}</Text>
-              <PillButton label="Tạo danh mục" variant="outline" onPress={() => openForm(null)} />
+              <Text style={styles.emptyLabel}>{t(EMPTY_LABEL[type])}</Text>
+              <PillButton label={t("common.action.createCategory")} variant="outline" onPress={() => openForm(null)} />
             </View>
           }
         />
       )}
 
       {/* Before the sheet, so its overlay covers the button. */}
-      <Fab onPress={() => openForm(null)} accessibilityLabel="Tạo danh mục" testID="btn-categories-add" />
+      <Fab
+        onPress={() => openForm(null)}
+        accessibilityLabel={t("common.action.createCategory")}
+        testID="btn-categories-add"
+      />
 
       <CategoryFormModal visible={modalOpen} onClose={() => setModalOpen(false)} editingCategory={editingCategory} />
     </Screen>

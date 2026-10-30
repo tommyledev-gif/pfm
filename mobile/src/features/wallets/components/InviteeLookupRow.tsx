@@ -1,21 +1,23 @@
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { CheckCircleIcon, SendIcon, UsersIcon } from "@/components/ui/Icon";
 import { SkeletonBlock } from "@/components/ui/SkeletonBlock";
 import { colorForCategory } from "@/lib/category-color";
+import { TranslationKey } from "@/lib/i18n";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { InviteeLookup } from "@/features/wallets/api/use-wallet-invitee-lookup";
 import { WalletInvitee } from "@/features/wallets/types";
-import { NEW_ACCOUNT_INVITE, NO_ACCOUNT_MESSAGE } from "@/features/wallets/components/wallet-member-copy";
+import { NEW_ACCOUNT_INVITE_KEY, NO_ACCOUNT_KEY } from "@/features/wallets/components/wallet-member-copy";
 
 const AVATAR_SIZE = 36;
 
 // Why someone found cannot be invited again; "none" can.
-const STANDING: Record<Exclude<WalletInvitee["membership"], "none">, string> = {
-  pending: "Chờ trả lời",
-  active: "Đã ở trong ví",
-  self: "Tài khoản của bạn",
+const STANDING: Record<Exclude<WalletInvitee["membership"], "none">, TranslationKey> = {
+  pending: "common.status.awaitingReply",
+  active: "sharedWallets.invitee.active",
+  self: "sharedWallets.invitee.self",
 };
 
 /**
@@ -31,6 +33,7 @@ const STANDING: Record<Exclude<WalletInvitee["membership"], "none">, string> = {
 export function InviteeLookupRow({ lookup, emailInvite = false }: { lookup: InviteeLookup; emailInvite?: boolean }) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   if (lookup.kind === "idle" || lookup.kind === "unavailable") return null;
 
   return (
@@ -53,7 +56,7 @@ export function InviteeLookupRow({ lookup, emailInvite = false }: { lookup: Invi
             )}
           </View>
           <Text style={styles.none} testID={emailInvite ? "text-wallet-invitee-new-account" : undefined}>
-            {emailInvite ? NEW_ACCOUNT_INVITE : NO_ACCOUNT_MESSAGE}
+            {t(emailInvite ? NEW_ACCOUNT_INVITE_KEY : NO_ACCOUNT_KEY)}
           </Text>
         </>
       ) : (
@@ -79,7 +82,7 @@ export function InviteeLookupRow({ lookup, emailInvite = false }: { lookup: Invi
             <CheckCircleIcon size={20} />
           ) : (
             <Text style={[styles.standing, lookup.invitee.membership === "pending" && styles.standingPending]}>
-              {STANDING[lookup.invitee.membership]}
+              {t(STANDING[lookup.invitee.membership])}
             </Text>
           )}
         </>

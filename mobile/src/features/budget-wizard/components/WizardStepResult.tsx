@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { SegmentedBar } from "@/components/shared/SegmentedBar";
-import { ScreenLoader } from "@/components/shared/ScreenLoader";
 import { EditAmountModal } from "@/features/budget-wizard/components/EditAmountModal";
 import { AddBudgetRowModal, AddBudgetRowResult } from "@/features/budget-wizard/components/AddBudgetRowModal";
 import { ConfidencePopup } from "@/features/budget-wizard/components/ConfidencePopup";
@@ -10,10 +10,12 @@ import { ProposalRow } from "@/features/budget-wizard/components/ProposalRow";
 import { SegmentLegend } from "@/features/budget-wizard/components/SegmentLegend";
 import { WizardPlanSummaryRows } from "@/features/budget-wizard/components/WizardPlanSummaryRows";
 import { WizardResultFooter } from "@/features/budget-wizard/components/WizardResultFooter";
+import { WizardResultError, WizardResultLoading } from "@/features/budget-wizard/components/WizardResultStates";
 import { Category } from "@/features/categories/types";
 import { daysInCycle, perDayXu } from "@/features/budget-wizard/budget-math";
 import { buildProposalSegments, segmentLegendEntry } from "@/features/budget-wizard/proposal-segments";
 import { BudgetProposalsResponse, ConfidenceBadge, ProposalEntry } from "@/features/budget-wizard/types";
+import { RowNameKind } from "@/features/budget-wizard/hooks/use-wizard-renames";
 import { buildCategoryColorMap } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
@@ -29,6 +31,9 @@ interface WizardStepResultProps {
   submitting: boolean;
   error: string | null;
   onEditAmount: (categoryId: string, amountXu: number) => void;
+  /** What renaming a row would do to its category (use-wizard-renames). */
+  rowNameKind: (categoryId: string, categories: Category[]) => RowNameKind;
+  onRenameRow: (categoryId: string, name: string, kind: RowNameKind) => void;
   /** Ids of rows the user added by hand. Kept for the saved-plan shape only —
    *  it no longer gates removal, because every row is removable now. */
   addedIds: string[];
@@ -74,6 +79,8 @@ export function WizardStepResult({
   submitting,
   error,
   onEditAmount,
+  rowNameKind,
+  onRenameRow,
   addedIds,
   categories,
   addRowOpen,
@@ -91,6 +98,7 @@ export function WizardStepResult({
   planSaved,
   canSubmit,
 }: WizardStepResultProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const [editing, setEditing] = useState<ProposalEntry | null>(null);
@@ -129,24 +137,10 @@ export function WizardStepResult({
     [orderedProposals],
   );
 
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ScreenLoader />
-      </View>
-    );
-  }
+  const editingKind = editing ? rowNameKind(editing.category_id, categories) : "system";
 
-  if (error || !result) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>{error ?? "Chưa tính được ngân sách."}</Text>
-        <Pressable onPress={onRetry} style={styles.secondaryBtn}>
-          <Text style={styles.secondaryLabel}>Thử lại</Text>
-        </Pressable>
-      </View>
-    );
-  }
+  if (loading) return <WizardResultLoading />;
+  if (error || !result) return <WizardResultError error={error} onRetry={onRetry} />;
 
   const perDay = perDayXu(result.disposable, daysInCycle(cycleStartDay));
   const colorFor = (categoryId: string) => rowColors.get(categoryId) ?? colors.lavender;
@@ -157,13 +151,11 @@ export function WizardStepResult({
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View testID="text-wizard-estimate-notice" style={styles.notice}>
-          <Text style={styles.noticeText}>
-            Ước lượng theo kiểu sống đã chọn, chưa theo chi tiêu thật. Sửa lại bất cứ lúc nào.
-          </Text>
+          <Text style={styles.noticeText}>{t("budgetWizard.result.estimateNotice")}</Text>
         </View>
 
         <View style={styles.headline}>
-          <Text style={styles.headlineLabel}>Được chi mỗi ngày</Text>
+          <Text style={styles.headlineLabel}>{t("budgetWizard.result.perDayLabel")}</Text>
           <Text style={styles.headlineValue}>{formatCurrency(perDay, currency)}</Text>
         </View>
 
@@ -177,7 +169,7 @@ export function WizardStepResult({
         <View style={styles.rows}>
           {orderedProposals.length === 0 ? (
             <Text testID="text-wizard-empty-plan" style={styles.emptyPlan}>
-              Kế hoạch chưa có danh mục. Thêm ít nhất một mục để lưu.
+              {t("budgetWizard.result.emptyPlan")}
             </Text>
           ) : null}
           {orderedProposals.map((entry) => (
@@ -196,8 +188,8 @@ export function WizardStepResult({
               categories on purpose, and this is the way past that for the one or
               two things a particular person really does track separately. */}
           <Pressable testID="btn-wizard-add-row" onPress={onOpenAddRow} style={styles.addRow}>
-            <Text style={styles.addRowLabel}>+ Thêm danh mục</Text>
-            <Text style={styles.addRowHint}>lấy từ dự phòng</Text>
+            <Text style={styles.addRowLabel}>{t("budgetWizard.result.addCategory")}</Text>
+            <Text style={styles.addRowHint}>{t("budgetWizard.result.addCategoryHint")}</Text>
           </Pressable>
         </View>
 
@@ -246,9 +238,13 @@ export function WizardStepResult({
         amount={editing?.amount_max ?? 0}
         buffer={result.unallocated_amount}
         currency={currency}
+        nameKind={editingKind}
         onClose={() => setEditing(null)}
-        onConfirm={(amount) => {
-          if (editing) onEditAmount(editing.category_id, amount);
+        onConfirm={(amount, name) => {
+          if (editing) {
+            onEditAmount(editing.category_id, amount);
+            if (name !== editing.category_name) onRenameRow(editing.category_id, name, editingKind);
+          }
           setEditing(null);
         }}
       />
@@ -258,8 +254,6 @@ export function WizardStepResult({
 
 const useStyles = createStyles((colors) => ({
   container: { flex: 1 },
-  centered: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.md, padding: spacing.xl },
-  errorText: { ...typography.body, color: colors.textSecondary, textAlign: "center" },
   scroll: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl, gap: spacing.lg },
   // One hairline all the way round, on the card surface — no coloured stripe
   // down the left edge. The stripe is the stock "callout" treatment and read
@@ -289,12 +283,4 @@ const useStyles = createStyles((colors) => ({
   },
   addRowLabel: { ...typography.label, color: colors.green },
   addRowHint: { ...typography.tiny, color: colors.textMuted },
-  secondaryBtn: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xl,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-  },
-  secondaryLabel: { ...typography.body, color: colors.textPrimary },
 }));

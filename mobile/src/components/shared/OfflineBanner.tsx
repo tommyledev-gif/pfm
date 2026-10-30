@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef, useState } from "react";
 import { AccessibilityInfo, Pressable, Text } from "react-native";
-import { useIsFocused } from "@react-navigation/native";
+import { useTranslation } from "react-i18next";
+import { useNavigation } from "@react-navigation/native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
 import { OfflineInfoSheet } from "@/components/shared/OfflineInfoSheet";
@@ -17,9 +18,8 @@ const RESIZE_MS = 220;
 
 // Worded as the User's own state (user request, 2026-10-29): a bare
 // "Ngoại tuyến" read as a label, not as something about this phone.
-const OFFLINE_LABEL = "Bạn đang ngoại tuyến";
-const RECONNECTED_LABEL = "Đã kết nối lại · đang đồng bộ";
-const OPEN_HINT = "Xem dữ liệu cập nhật lúc nào và thao tác nào cần mạng";
+const OFFLINE_LABEL_KEY = "ui.offline.strip" as const;
+const RECONNECTED_LABEL_KEY = "ui.offline.reconnected" as const;
 
 type VisibleState = Exclude<ConnectionStripState, "hidden">;
 
@@ -41,11 +41,14 @@ type VisibleState = Exclude<ConnectionStripState, "hidden">;
  * lib/connection-strip.ts.
  */
 export const OfflineBanner = memo(function OfflineBanner() {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const status = useConnectionStrip();
   const queuedCount = useOutboxCount(useCurrentUserId());
-  const focused = useIsFocused();
+  // Read when needed, not subscribed to: useIsFocused re-rendered the strip
+  // of both screens on every tab switch.
+  const navigation = useNavigation();
   const reduceMotion = useReduceMotion();
   const [sheetOpen, setSheetOpen] = useState(false);
   const visible = status !== "hidden";
@@ -57,9 +60,9 @@ export const OfflineBanner = memo(function OfflineBanner() {
   const offline = shown === "offline";
   const label = offline
     ? queuedCount > 0
-      ? `${OFFLINE_LABEL} · ${queuedCount} chờ đồng bộ`
-      : OFFLINE_LABEL
-    : RECONNECTED_LABEL;
+      ? t("ui.offline.stripQueued", { count: queuedCount })
+      : t(OFFLINE_LABEL_KEY)
+    : t(RECONNECTED_LABEL_KEY);
 
   // Starts at its target, so a screen opened while offline has the strip
   // already in place — only a change of state moves anything.
@@ -68,7 +71,7 @@ export const OfflineBanner = memo(function OfflineBanner() {
     const target = visible ? STRIP_HEIGHT : 0;
     // Only the screen in view animates; every other mounted tab just settles.
     height.value =
-      reduceMotion || !focused ? target : withTiming(target, { duration: RESIZE_MS, easing: Easing.out(Easing.cubic) });
+      reduceMotion || !navigation.isFocused() ? target : withTiming(target, { duration: RESIZE_MS, easing: Easing.out(Easing.cubic) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, reduceMotion, height]);
   const heightStyle = useAnimatedStyle(() => ({ height: height.value }));
@@ -85,10 +88,10 @@ export const OfflineBanner = memo(function OfflineBanner() {
   useEffect(() => {
     const changed = previousStatus.current !== status;
     previousStatus.current = status;
-    if (changed && focused && status !== "hidden") {
-      AccessibilityInfo.announceForAccessibility(status === "offline" ? OFFLINE_LABEL : RECONNECTED_LABEL);
+    if (changed && navigation.isFocused() && status !== "hidden") {
+      AccessibilityInfo.announceForAccessibility(t(status === "offline" ? OFFLINE_LABEL_KEY : RECONNECTED_LABEL_KEY));
     }
-  }, [status, focused]);
+  }, [status, navigation, t]);
 
   return (
     <>
@@ -103,7 +106,7 @@ export const OfflineBanner = memo(function OfflineBanner() {
           disabled={!offline || !visible}
           accessibilityRole={offline ? "button" : undefined}
           accessibilityLabel={label}
-          accessibilityHint={offline ? OPEN_HINT : undefined}
+          accessibilityHint={offline ? t("ui.offline.openHint") : undefined}
           style={({ pressed }) => [
             styles.content,
             offline ? styles.contentOffline : styles.contentReconnected,

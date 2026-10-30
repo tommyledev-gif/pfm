@@ -1,15 +1,8 @@
 import { formatCurrency } from "@/lib/currency";
 import { formatDateDMY, formatTime } from "@/lib/format-date";
+import { i18n } from "@/lib/i18n";
 import { proposalAmountSign } from "@/features/ai-chat/proposal-kind";
 import { TransactionActionPayload } from "@/features/ai-chat/types";
-
-const COPY_LABELS = {
-  date: "Ngày",
-  amount: "Số tiền",
-  category: "Danh mục",
-  wallet: "Ví",
-  createdAt: "Tạo lúc",
-} as const;
 
 interface ProposalCopyInput {
   payload: TransactionActionPayload;
@@ -35,14 +28,16 @@ export function formatProposalForCopy({
   createdAtMs,
 }: ProposalCopyInput): string {
   const sign = proposalAmountSign(payload.type);
+  // One key per line ("Ngày: {{date}}"), read at copy time: the copied text
+  // is in the language of the moment.
   const lines = [
-    `${COPY_LABELS.date}: ${formatDateDMY(payload.occurred_at)}`,
-    `${COPY_LABELS.amount}: ${sign}${formatCurrency(payload.amount, currency)}`,
-    `${COPY_LABELS.category}: ${categoryName}`,
-    `${COPY_LABELS.wallet}: ${walletName}`,
+    i18n.t("chat.copyText.date", { date: formatDateDMY(payload.occurred_at) }),
+    i18n.t("chat.copyText.amount", { amount: `${sign}${formatCurrency(payload.amount, currency)}` }),
+    i18n.t("chat.copyText.category", { category: categoryName }),
+    i18n.t("chat.copyText.wallet", { wallet: walletName }),
   ];
   if (createdAtMs !== undefined) {
-    lines.push(`${COPY_LABELS.createdAt}: ${formatTime(new Date(createdAtMs).toISOString())}`);
+    lines.push(i18n.t("chat.copyText.createdAt", { time: formatTime(new Date(createdAtMs).toISOString()) }));
   }
   return lines.join("\n");
 }

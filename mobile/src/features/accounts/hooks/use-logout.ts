@@ -3,6 +3,7 @@ import { useCallback, useState } from "react";
 import { accountTokens } from "@/lib/account-tokens";
 import { sealAccountToken, vaultInstalled, vaultReady } from "@/lib/biometric-vault";
 import { LOGOUT_FLUSH_TIMEOUT_MS } from "@/lib/constants";
+import { i18n } from "@/lib/i18n";
 import { userIdFromAccessToken } from "@/lib/jwt";
 import { queryClient } from "@/lib/query-client";
 import { cancelScheduledRefresh } from "@/lib/refresh-scheduler";
@@ -11,8 +12,6 @@ import { useSessionStore } from "@/stores/session-store";
 import { useToastStore } from "@/stores/toast-store";
 import { useAccountRegistryStore } from "@/features/accounts/account-registry-store";
 import { removeActiveAccount } from "@/features/accounts/remove-account";
-
-const NO_LOCK_REMOVED = "Máy chưa cài khóa màn hình nên tài khoản đã được gỡ khỏi máy.";
 
 /**
  * Seals the session's refresh token in the biometric vault and drops the
@@ -77,7 +76,7 @@ export function useLogout(): { loggingOut: boolean; logout: () => Promise<void> 
 
     const noLock = listed && vaultInstalled() && !vaultReady();
     await removeActiveAccount();
-    if (noLock) useToastStore.getState().show(NO_LOCK_REMOVED, "info");
+    if (noLock) useToastStore.getState().show(i18n.t("accounts.logout.noLockRemoved"), "info");
   }, [loggingOut]);
 
   return { loggingOut, logout };

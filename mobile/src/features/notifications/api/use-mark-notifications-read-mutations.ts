@@ -1,12 +1,13 @@
 import { InfiniteData, QueryClient, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { apiClient } from "@/lib/axios";
+import { i18n, TranslationKey } from "@/lib/i18n";
 import { useToastStore } from "@/stores/toast-store";
 import { ListNotificationsResult } from "@/features/notifications/types";
 
 type NotificationPages = InfiniteData<ListNotificationsResult, string | undefined>;
 
-const READ_ALL_FAILED = "Chưa đánh dấu được. Thử lại sau.";
+const READ_ALL_FAILED = "notifications.markAllRead.failed" satisfies TranslationKey;
 
 // Flips is_read in the paged lists already in the cache, without refetching
 // them: a refetch would reorder nothing but re-render every row, and the
@@ -51,7 +52,7 @@ export function useMarkAllNotificationsReadMutation() {
       await apiClient.post("/notifications/read-all");
     },
     onMutate: () => markReadInCache(queryClient, "all"),
-    onError: () => useToastStore.getState().show(READ_ALL_FAILED, "warning"),
+    onError: () => useToastStore.getState().show(i18n.t(READ_ALL_FAILED), "warning"),
     // Success or failure, the server's answer replaces the optimistic one.
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
   });

@@ -1,10 +1,12 @@
 import { useMemo } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { Drawer } from "@/components/shared/Drawer";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
 import { formatCurrencyTruncated } from "@/lib/currency";
 import { formatDateShort, formatTime } from "@/lib/format-date";
+import { TranslationKey } from "@/lib/i18n";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useAuditLogsQuery } from "@/features/audit-logs/api/use-audit-logs-query";
 import { AuditAction, AuditLogEntry } from "@/features/audit-logs/types";
@@ -13,19 +15,24 @@ import { TombstoneKind } from "@/features/ai-chat/tombstone";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { AuditItemsDiff } from "@/features/audit-logs/components/AuditItemsDiff";
 
-const ACTION_LABEL: Record<AuditAction, string> = {
-  create: "Tạo giao dịch",
-  update: "Sửa",
-  delete: "Xóa giao dịch",
+const ACTION_LABEL: Record<AuditAction, TranslationKey> = {
+  create: "chat.history.action.create",
+  update: "chat.history.action.update",
+  delete: "chat.history.action.delete",
 };
 
-const FIELD_LABEL: Record<string, string> = {
-  amount: "Số tiền",
-  category_id: "Danh mục",
-  occurred_at: "Ngày",
-  note: "Ghi chú",
-  wallet_id: "Ví",
-  type: "Loại",
+const FIELD_LABEL: Record<string, TranslationKey> = {
+  amount: "common.field.amount",
+  category_id: "common.field.category",
+  occurred_at: "common.field.date",
+  note: "common.field.note",
+  wallet_id: "common.field.wallet",
+  type: "common.field.type",
+};
+
+const TYPE_LABEL: Record<string, TranslationKey> = {
+  income: "common.txType.incomeShort",
+  transfer: "common.txType.transfer",
 };
 
 interface TransactionHistoryDrawerProps {
@@ -59,6 +66,7 @@ export function TransactionHistoryDrawer({
 }: TransactionHistoryDrawerProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const transactionId = kind === "deleted" ? message?.transactionId : undefined;
   const auditLogs = useAuditLogsQuery(transactionId, Boolean(transactionId));
 
@@ -83,7 +91,7 @@ export function TransactionHistoryDrawer({
       case "occurred_at":
         return formatDateShort(String(value));
       case "type":
-        return value === "income" ? "Thu" : "Chi";
+        return t(TYPE_LABEL[String(value)] ?? "common.txType.expenseShort");
       default:
         return String(value);
     }
@@ -99,7 +107,7 @@ export function TransactionHistoryDrawer({
     return (
       <View key={entry.id} style={styles.entry}>
         <View style={styles.entryHead}>
-          <Text style={styles.entryLabel}>{ACTION_LABEL[entry.action]}</Text>
+          <Text style={styles.entryLabel}>{t(ACTION_LABEL[entry.action])}</Text>
           <Text style={styles.entryTime}>
             {formatDateShort(entry.created_at)} · {formatTime(entry.created_at)}
           </Text>
@@ -116,7 +124,7 @@ export function TransactionHistoryDrawer({
               />
             ) : (
               <Text key={field} style={styles.entryDetail} numberOfLines={2}>
-                <Text style={styles.fieldLabel}>{FIELD_LABEL[field] ?? field}: </Text>
+                <Text style={styles.fieldLabel}>{field in FIELD_LABEL ? t(FIELD_LABEL[field]) : field}: </Text>
                 {formatValue(field, (entry.before as Record<string, unknown>)?.[field])}
                 {"  →  "}
                 <Text style={styles.newValue}>{formatValue(field, (entry.after as Record<string, unknown>)?.[field])}</Text>
@@ -138,19 +146,24 @@ export function TransactionHistoryDrawer({
   return (
     <Drawer visible={message !== null} onClose={onClose} onEndReached={kind === "deleted" ? loadOlder : undefined}>
       <View testID="drawer-transaction-history" style={styles.body}>
-        <DrawerHeader title="Lịch sử giao dịch" actions={[{ label: "Đóng", onPress: onClose, variant: "secondary" }]} />
+        <DrawerHeader
+          title={t("chat.history.title")}
+          actions={[{ label: t("common.action.close"), onPress: onClose, variant: "secondary" }]}
+        />
 
         {kind === "discarded" ? (
           <>
-            <Text style={styles.notice}>Đề xuất này chưa từng được lưu, nên không có lịch sử trên máy chủ.</Text>
+            <Text style={styles.notice}>{t("chat.history.neverSaved")}</Text>
             {localTrail.length === 0 ? (
-              <Text style={styles.empty}>Không có thay đổi nào được ghi nhận.</Text>
+              <Text style={styles.empty}>{t("chat.history.empty")}</Text>
             ) : (
               [...localTrail].reverse().map((item, index) => (
                 <View key={`${item.timestamp}_${index}`} style={styles.entry}>
                   <View style={styles.entryHead}>
                     <Text style={styles.entryLabel}>
-                      {item.source === "created" ? "Tạo đề xuất" : `Lần sửa ${localTrail.length - 1 - index}`}
+                      {item.source === "created"
+                        ? t("chat.editHistory.created")
+                        : t("chat.editHistory.edit", { number: localTrail.length - 1 - index })}
                     </Text>
                     <Text style={styles.entryTime}>
                       {formatDateShort(new Date(item.timestamp).toISOString())} ·{" "}
@@ -170,13 +183,13 @@ export function TransactionHistoryDrawer({
           <ActivityIndicator color={colors.green} style={styles.loader} />
         ) : auditLogs.isError ? (
           <View style={styles.errorBlock}>
-            <Text style={styles.empty}>Chưa tải được lịch sử.</Text>
+            <Text style={styles.empty}>{t("chat.history.loadFailed")}</Text>
             <Pressable testID="btn-transaction-history-retry" onPress={() => auditLogs.refetch()}>
-              <Text style={styles.retry}>Thử lại</Text>
+              <Text style={styles.retry}>{t("common.action.retry")}</Text>
             </Pressable>
           </View>
         ) : serverEntries.length === 0 ? (
-          <Text style={styles.empty}>Không có thay đổi nào được ghi nhận.</Text>
+          <Text style={styles.empty}>{t("chat.history.empty")}</Text>
         ) : (
           serverEntries.map(renderServerEntry)
         )}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 
@@ -8,7 +9,8 @@ import { LockGlyph } from "@/components/ui/grouped-list/list-icons";
 import { LIST_ROW_MIN_HEIGHT } from "@/components/ui/grouped-list/list-metrics";
 import { UploadButton } from "@/components/ui/UploadButton";
 import { InlineActionField } from "@/components/shared/InlineActionField";
-import { getErrorMessage } from "@/lib/axios";
+import { errorText } from "@/lib/api-envelope";
+import { copyOf } from "@/lib/i18n";
 import { useRequireOnline } from "@/lib/connectivity";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useSessionStore } from "@/stores/session-store";
@@ -23,24 +25,24 @@ import { UsernameClaimField } from "@/features/profile/components/UsernameClaimF
 const NAME_MAX_LENGTH = 60;
 const AVATAR_SIZE = 88;
 
-const COPY = {
+const COPY = copyOf({
   // The display name; the tên đăng nhập below is a different thing.
-  nameLabel: "Tên hiển thị",
-  usernameLabel: "Tên đăng nhập",
-  usernameHint: "Đặt một lần lúc kích hoạt, không đổi được.",
-  namePlaceholder: "Nguyễn Văn A",
-  changePhoto: "Đổi ảnh",
+  nameLabel: "profile.edit.nameLabel",
+  usernameLabel: "common.field.username",
+  usernameHint: "profile.edit.usernameHint",
+  namePlaceholder: "profile.edit.namePlaceholder",
+  changePhoto: "profile.edit.changePhoto",
   // The upload card's trash button is icon-only: this names it for screen readers.
-  removePhoto: "Xóa ảnh",
-  save: "Lưu",
-  saved: "Đã lưu",
-  photoChanged: "Đã đổi ảnh",
-  photoRemoved: "Đã xóa ảnh",
-  saveFailed: "Chưa lưu được tên. Thử lại.",
-  photoFailed: "Chưa đổi được ảnh. Thử lại.",
-  removeFailed: "Chưa xóa được ảnh. Thử lại.",
-  photosDenied: "Chưa có quyền truy cập ảnh. Cấp quyền trong cài đặt của máy.",
-} as const;
+  removePhoto: "profile.edit.removePhotoA11y",
+  save: "common.action.save",
+  saved: "profile.edit.saved",
+  photoChanged: "profile.edit.photoChanged",
+  photoRemoved: "profile.edit.photoRemoved",
+  saveFailed: "profile.edit.saveFailed",
+  photoFailed: "profile.edit.photoFailed",
+  removeFailed: "profile.edit.removeFailed",
+  photosDenied: "profile.edit.photosDenied",
+});
 
 interface EditProfileFormProps {
   /** Called once the name has been saved — the screen leaves. */
@@ -52,6 +54,7 @@ interface EditProfileFormProps {
 // moment it is picked, like the wallet and category icons, while the name waits
 // for Lưu. Hosted by app/(app)/edit-profile.tsx.
 export function EditProfileForm({ onSaved }: EditProfileFormProps) {
+  useTranslation(); // COPY reads the current language: re-render on a switch
   const colors = useColors();
   const styles = useStyles();
   const requireOnline = useRequireOnline();
@@ -119,11 +122,11 @@ export function EditProfileForm({ onSaved }: EditProfileFormProps) {
 
   // Under the field it belongs to: the name's under the name, the photo's
   // under the photo.
-  const nameError = updateProfile.isError ? getErrorMessage(updateProfile.error, COPY.saveFailed) : null;
+  const nameError = updateProfile.isError ? errorText(updateProfile.error, "profile.edit.saveFailed") : null;
   const photoError = uploadAvatar.isError
-    ? getErrorMessage(uploadAvatar.error, COPY.photoFailed)
+    ? errorText(uploadAvatar.error, "profile.edit.photoFailed")
     : removeAvatar.isError
-      ? getErrorMessage(removeAvatar.error, COPY.removeFailed)
+      ? errorText(removeAvatar.error, "profile.edit.removeFailed")
       : null;
 
   return (

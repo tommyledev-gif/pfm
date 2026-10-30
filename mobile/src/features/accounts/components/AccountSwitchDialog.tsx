@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { MAX_SAVED_ACCOUNTS } from "@/lib/constants";
@@ -19,10 +20,6 @@ interface AccountSwitchDialogProps {
   onAddAccount: (prefillEmail?: string) => void;
 }
 
-const TITLE = "Chuyển tài khoản";
-const ADD_LABEL = "+ Thêm tài khoản";
-const LIMIT_HINT = `Đã đạt tối đa ${MAX_SAVED_ACCOUNTS} tài khoản trên thiết bị này`;
-
 /**
  * Every saved account (spec US-02 step 4): the active one first, labelled
  * "Đang dùng" and not tappable — shown even when it is the only one (AC-07);
@@ -31,6 +28,7 @@ const LIMIT_HINT = `Đã đạt tối đa ${MAX_SAVED_ACCOUNTS} tài khoản tr�
  * device after a confirm (US-04).
  */
 export function AccountSwitchDialog({ visible, onClose, onAddAccount }: AccountSwitchDialogProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const [pendingRemoval, setPendingRemoval] = useState<SavedAccount | null>(null);
   const { active, others, canAddMore } = useSavedAccounts();
@@ -62,7 +60,7 @@ export function AccountSwitchDialog({ visible, onClose, onAddAccount }: AccountS
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable onPress={() => {}} style={styles.card} testID="dialog-account-switch">
-          <Text style={styles.title}>{TITLE}</Text>
+          <Text style={styles.title}>{t("nav.title.switchAccount")}</Text>
           <View>
             {active ? (
               <AccountRow
@@ -95,20 +93,20 @@ export function AccountSwitchDialog({ visible, onClose, onAddAccount }: AccountS
               accessibilityRole="button"
               testID="btn-account-add"
             >
-              <Text style={styles.addLabel}>{ADD_LABEL}</Text>
+              <Text style={styles.addLabel}>{t("accounts.switch.add")}</Text>
             </Pressable>
           ) : (
-            <Text style={styles.hint} testID="text-account-limit-hint">{LIMIT_HINT}</Text>
+            <Text style={styles.hint} testID="text-account-limit-hint">{t("accounts.switch.limitHint", { count: MAX_SAVED_ACCOUNTS })}</Text>
           )}
         </Pressable>
       </Pressable>
 
       <ConfirmDialog
         visible={pendingRemoval !== null}
-        title={pendingRemoval ? REMOVE_ACCOUNT_COPY.title(accountDisplayName(pendingRemoval)) : ""}
-        message={REMOVE_ACCOUNT_COPY.message}
-        confirmLabel={REMOVE_ACCOUNT_COPY.confirm}
-        cancelLabel={REMOVE_ACCOUNT_COPY.cancel}
+        title={pendingRemoval ? t(REMOVE_ACCOUNT_COPY.title, { name: accountDisplayName(pendingRemoval) }) : ""}
+        message={t(REMOVE_ACCOUNT_COPY.message)}
+        confirmLabel={t(REMOVE_ACCOUNT_COPY.confirm)}
+        cancelLabel={t(REMOVE_ACCOUNT_COPY.cancel)}
         onConfirm={confirmRemoval}
         onCancel={() => setPendingRemoval(null)}
         testID="dialog-account-remove"

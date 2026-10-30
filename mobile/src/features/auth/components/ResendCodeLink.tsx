@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Pressable, Text } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { PASSWORD_RESET_RESEND_SECONDS } from "@/lib/constants";
 import { createStyles, typography } from "@/lib/theme";
@@ -18,6 +19,7 @@ interface ResendCodeLinkProps {
 // (the screen mounts this right after the first one), so it never offers a
 // tap the server would quietly ignore.
 export function ResendCodeLink({ identifier, onError }: ResendCodeLinkProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const request = useRequestPasswordResetMutation();
   const [sentAt, setSentAt] = useState(() => Date.now());
@@ -58,7 +60,7 @@ export function ResendCodeLink({ identifier, onError }: ResendCodeLinkProps) {
       accessibilityState={{ disabled, busy: request.isPending }}
       testID="btn-reset-resend"
     >
-      <Text style={[styles.link, disabled && styles.waiting]}>{waiting ? resendIn(left) : RESET_COPY.resend}</Text>
+      <Text style={[styles.link, disabled && styles.waiting]}>{waiting ? resendIn(left) : t(RESET_COPY.resend)}</Text>
     </Pressable>
   );
 }

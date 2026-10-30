@@ -1,8 +1,10 @@
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { HistoryIcon, TrashIcon } from "@/components/ui/Icon";
 import { formatCurrencyTruncated } from "@/lib/currency";
 import { formatDateShort, formatTime } from "@/lib/format-date";
+import { TranslationKey } from "@/lib/i18n";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { proposalAmountSign } from "@/features/ai-chat/proposal-kind";
 import { TombstoneKind } from "@/features/ai-chat/tombstone";
@@ -23,9 +25,9 @@ interface TransactionTombstoneCardProps {
 // the proposal never became anything, so there is nothing server side to look
 // up. Saying the second as if it were the first would promise a trail that
 // does not exist.
-const KIND_LABEL: Record<TombstoneKind, string> = {
-  deleted: "Đã xóa giao dịch",
-  discarded: "Đã bỏ, chưa lưu",
+const KIND_LABEL: Record<TombstoneKind, TranslationKey> = {
+  deleted: "chat.tombstone.deleted",
+  discarded: "chat.tombstone.discarded",
 };
 
 /**
@@ -45,6 +47,7 @@ export function TransactionTombstoneCard({
 }: TransactionTombstoneCardProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const label = payload.note || categoryName;
 
   return (
@@ -57,7 +60,7 @@ export function TransactionTombstoneCard({
       <View style={styles.headRow}>
         <TrashIcon size={13} color={colors.textMuted} />
         <Text style={styles.kindLabel} numberOfLines={1}>
-          {KIND_LABEL[kind]}
+          {t(KIND_LABEL[kind])}
         </Text>
       </View>
 
@@ -77,7 +80,7 @@ export function TransactionTombstoneCard({
         </Text>
         <View style={styles.historyLink}>
           <HistoryIcon size={12} color={colors.lavender} />
-          <Text style={styles.historyLabel}>Xem lịch sử</Text>
+          <Text style={styles.historyLabel}>{t("chat.tombstone.viewHistory")}</Text>
         </View>
       </View>
     </Pressable>

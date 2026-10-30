@@ -1,4 +1,5 @@
 import { ConsultMessageData } from "@/features/analytics/types";
+import type { TranslationKey } from "@/lib/i18n";
 import { TransactionKind } from "@/lib/constants";
 import {
   TransactionAdjustmentInput,
@@ -121,6 +122,13 @@ export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   text: string;
+  // On a reply the app writes itself (a failure, "no wallet yet"): the copy
+  // as a locale key + params, so the bubble follows a language switch
+  // (specs/mobile-language-switch BR-10). `text` still holds it in the
+  // language it was written in, for search and for older app versions.
+  // Absent on messages from before; message-text.ts reads both.
+  textKey?: TranslationKey;
+  textParams?: Record<string, string | number>;
   action?: ChatAction;
   confirmed?: boolean;
   // The real backend Transaction id, set once `confirmed` becomes true

@@ -1,4 +1,5 @@
 import { ScrollView, Text, View } from "react-native";
+import { Trans, useTranslation } from "react-i18next";
 
 import { Drawer } from "@/components/shared/Drawer";
 import { PillButton } from "@/components/ui/PillButton";
@@ -43,6 +44,7 @@ export function ImportPreviewModal({
   onConfirm,
   onClose,
 }: ImportPreviewModalProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const validCount = preview?.valid.length ?? 0;
@@ -55,12 +57,12 @@ export function ImportPreviewModal({
       onClose={onClose}
       footer={
         result ? (
-          <PillButton label="Xong" onPress={onClose} />
+          <PillButton label={t("common.action.done")} onPress={onClose} />
         ) : (
           <View style={styles.actions}>
-            <PillButton label="Hủy" variant="outline" onPress={onClose} style={styles.flexButton} />
+            <PillButton label={t("common.action.cancel")} variant="outline" onPress={onClose} style={styles.flexButton} />
             <PillButton
-              label={validCount > 0 ? `Nhập ${validCount} dòng` : "Không có dòng nào"}
+              label={validCount > 0 ? t("transactions.import.confirm", { count: validCount }) : t("transactions.import.nothingToImport")}
               onPress={onConfirm}
               disabled={validCount === 0 || committing}
               loading={committing}
@@ -76,29 +78,27 @@ export function ImportPreviewModal({
           <ImportResultSummary result={result} />
         ) : (
           <>
-            <Text style={styles.title}>Xem trước khi nhập</Text>
-            <Text style={styles.subtitle}>
-              Chưa có gì được lưu. Kiểm tra {total} dòng bên dưới rồi xác nhận.
-            </Text>
+            <Text style={styles.title}>{t("transactions.import.preview.title")}</Text>
+            <Text style={styles.subtitle}>{t("transactions.import.preview.body", { count: total })}</Text>
 
             <View style={styles.summaryRow}>
-              <SummaryTile testID="text-import-valid-count" label="Sẽ nhập" value={String(validCount)} tone={colors.mint} />
-              <SummaryTile label="Bỏ qua" value={String(preview?.duplicates.length ?? 0)} tone={colors.textSecondary} />
-              <SummaryTile label="Lỗi" value={String(preview?.errors.length ?? 0)} tone={colors.mustard} />
+              <SummaryTile testID="text-import-valid-count" label={t("transactions.import.preview.toImport")} value={String(validCount)} tone={colors.mint} />
+              <SummaryTile label={t("transactions.import.summary.skipped")} value={String(preview?.duplicates.length ?? 0)} tone={colors.textSecondary} />
+              <SummaryTile label={t("transactions.import.preview.errors")} value={String(preview?.errors.length ?? 0)} tone={colors.mustard} />
             </View>
 
             {validCount > 0 ? (
-              <Text style={styles.total}>Tổng: {formatCurrency(validTotal, currency)}</Text>
+              <Text style={styles.total}>{t("transactions.import.preview.total", { amount: formatCurrency(validTotal, currency) })}</Text>
             ) : null}
 
             <IssueList
               testID="list-import-errors"
-              title="Dòng bị lỗi — sửa trong file rồi tải lại"
+              title={t("transactions.import.preview.errorRows")}
               issues={preview?.errors ?? []}
               tone={colors.mustard}
             />
             <IssueList
-              title="Đã nhập trước đó — sẽ bỏ qua"
+              title={t("transactions.import.preview.duplicates")}
               issues={preview?.duplicates ?? []}
               tone={colors.textSecondary}
             />
@@ -110,17 +110,18 @@ export function ImportPreviewModal({
 }
 
 function ImportResultSummary({ result }: { result: ImportResult }) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   return (
     <View style={styles.body} testID="text-import-result">
-      <Text style={styles.title}>Đã nhập xong</Text>
+      <Text style={styles.title}>{t("transactions.import.result.title")}</Text>
       <View style={styles.summaryRow}>
-        <SummaryTile label="Đã nhập" value={String(result.imported)} tone={colors.mint} />
-        <SummaryTile label="Bỏ qua" value={String(result.skipped)} tone={colors.textSecondary} />
-        <SummaryTile label="Thất bại" value={String(result.failed)} tone={colors.mustard} />
+        <SummaryTile label={t("transactions.import.summary.imported")} value={String(result.imported)} tone={colors.mint} />
+        <SummaryTile label={t("transactions.import.summary.skipped")} value={String(result.skipped)} tone={colors.textSecondary} />
+        <SummaryTile label={t("transactions.import.summary.failed")} value={String(result.failed)} tone={colors.mustard} />
       </View>
-      <IssueList title="Dòng không tạo được" issues={result.failures} tone={colors.mustard} />
+      <IssueList title={t("transactions.import.result.failedRows")} issues={result.failures} tone={colors.mustard} />
     </View>
   );
 }
@@ -158,6 +159,7 @@ function IssueList({
   tone: string;
   testID?: string;
 }) {
+  const { t } = useTranslation();
   const styles = useStyles();
   if (issues.length === 0) return null;
   const listed = issues.slice(0, MAX_LISTED_ROWS);
@@ -169,11 +171,17 @@ function IssueList({
       <ScrollView style={styles.issueScroll} nestedScrollEnabled>
         {listed.map((issue) => (
           <Text key={issue.row} style={styles.issueRow} numberOfLines={2}>
-            <Text style={{ color: tone }}>Dòng {issue.row}</Text> — {issue.reason}
+            {/* The row number in the bucket's tone; the reason is the server's text. */}
+            <Trans
+              t={t}
+              i18nKey="transactions.import.issueRow"
+              values={{ row: issue.row, reason: issue.reason }}
+              components={{ tone: <Text style={{ color: tone }} /> }}
+            />
           </Text>
         ))}
       </ScrollView>
-      {hidden > 0 ? <Text style={styles.issueMore}>và {hidden} dòng nữa</Text> : null}
+      {hidden > 0 ? <Text style={styles.issueMore}>{t("transactions.import.more", { count: hidden })}</Text> : null}
     </View>
   );
 }

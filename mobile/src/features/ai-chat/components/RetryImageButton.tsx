@@ -1,4 +1,5 @@
 import { Pressable, Text } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { createStyles, radii, spacing, typography } from "@/lib/theme";
 
@@ -18,6 +19,7 @@ export function RetryImageButton({
   kind?: "image" | "text";
 }) {
   const styles = useStyles();
+  const { t } = useTranslation();
   return (
     <Pressable
       testID={`btn-retry-${kind}-${messageId}`}
@@ -25,7 +27,7 @@ export function RetryImageButton({
       style={({ pressed }) => [styles.button, pressed && styles.pressed]}
       onPress={onPress}
     >
-      <Text style={styles.label}>Thử lại</Text>
+      <Text style={styles.label}>{t("common.action.retry")}</Text>
     </Pressable>
   );
 }

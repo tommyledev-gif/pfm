@@ -1,0 +1,235 @@
+{
+  "settings": {
+    "title": "Cài đặt",
+    "group": {
+      "money": "Tài chính",
+      "account": "Tài khoản",
+      "other": "Khác"
+    },
+    "row": {
+      "helpSupport": "Trợ giúp & hỗ trợ"
+    },
+    "logout": {
+      "inProgress": "Đang đăng xuất…"
+    },
+    "profileCard": {
+      "editProfileA11y": "Sửa hồ sơ",
+      "netWorth": "Tài sản ròng"
+    },
+    "logoutGuard": {
+      "title_other": "Còn {{count}} giao dịch chưa đồng bộ",
+      "message": "Giữ lại: giao dịch được lưu trên máy này và tự đồng bộ khi bạn đăng nhập lại.",
+      "syncNow": "Đồng bộ ngay",
+      "keep": "Giữ lại và đăng xuất",
+      "discard": "Bỏ và đăng xuất",
+      "discardTitle_other": "Bỏ {{count}} giao dịch và đăng xuất?",
+      "discardMessage": "Các giao dịch này sẽ bị xoá khỏi máy và không bao giờ được gửi lên tài khoản.",
+      "discardConfirm": "Bỏ"
+    }
+  },
+  "userSettings": {
+    "transactions": {
+      "header": "Giao dịch"
+    },
+    "appearance": {
+      "header": "Giao diện",
+      "optionA11y": "Giao diện {{theme}}"
+    },
+    "language": {
+      "header": "Ngôn ngữ",
+      "optionA11y": "Ngôn ngữ: {{language}}",
+      "footer": "Tin nhắn trợ lý và thông báo đã có giữ nguyên ngôn ngữ cũ."
+    },
+    "pinLocation": {
+      "title": "Ghim vị trí khi tạo giao dịch",
+      "footer": "Tắt được riêng cho từng giao dịch."
+    }
+  },
+  "profile": {
+    "title": "Hồ sơ",
+    "edit": {
+      "nameLabel": "Tên hiển thị",
+      "usernameHint": "Đặt một lần lúc kích hoạt, không đổi được.",
+      "namePlaceholder": "Nguyễn Văn A",
+      "changePhoto": "Đổi ảnh",
+      "removePhotoA11y": "Xóa ảnh",
+      "saved": "Đã lưu",
+      "photoChanged": "Đã đổi ảnh",
+      "photoRemoved": "Đã xóa ảnh",
+      "saveFailed": "Chưa lưu được tên. Thử lại.",
+      "photoFailed": "Chưa đổi được ảnh. Thử lại.",
+      "removeFailed": "Chưa xóa được ảnh. Thử lại.",
+      "photosDenied": "Chưa có quyền truy cập ảnh. Cấp quyền trong cài đặt của máy."
+    },
+    "username": {
+      "placeholder": "vd: lan.nguyen",
+      "hint": "Đặt một lần, không đổi được.",
+      "submit": "Đặt",
+      "confirmTitle": "Đặt tên đăng nhập {{username}}?",
+      "confirmMessage": "Tên này không đổi được sau khi đặt.",
+      "confirm": "Đặt tên",
+      "cancel": "Sửa lại",
+      "done": "Đã đặt tên đăng nhập",
+      "failed": "Chưa đặt được tên đăng nhập. Thử lại."
+    },
+    "fallbackName": "Thành viên"
+  },
+  "security": {
+    "protections": {
+      "header": "Khóa và xác minh"
+    },
+    "devices": {
+      "title": "Thiết bị đang đăng nhập",
+      "unnamed": "Thiết bị không rõ tên",
+      "current": "Thiết bị này",
+      "confirmLabel": "Đăng xuất thiết bị",
+      "loadFailed": "Chưa tải được danh sách thiết bị.",
+      "offline": "Cần kết nối mạng để đăng xuất thiết bị.",
+      "failed": "Chưa đăng xuất được thiết bị. Thử lại sau.",
+      "confirmTitle": "Đăng xuất {{device}}?",
+      "confirmMessage": "{{device}} cần đăng nhập lại để vào tài khoản này.",
+      "signedOut": "Đã đăng xuất {{device}}",
+      "lastActive": "Hoạt động {{date}}",
+      "signOutA11y": "Đăng xuất {{device}}"
+    },
+    "changePassword": {
+      "footer": "Thiết bị khác sẽ phải đăng nhập lại.",
+      "current": "Mật khẩu hiện tại",
+      "hint": "Ít nhất {{min}} ký tự.",
+      "submit": "Đổi mật khẩu",
+      "enterCurrent": "Nhập mật khẩu hiện tại.",
+      "wrongCurrent": "Mật khẩu hiện tại không đúng.",
+      "tooShort": "Mật khẩu mới cần ít nhất {{min}} ký tự.",
+      "mismatch": "Hai mật khẩu mới chưa khớp.",
+      "same": "Mật khẩu mới trùng mật khẩu hiện tại.",
+      "offline": "Không có kết nối mạng. Thử lại sau.",
+      "failed": "Chưa đổi được mật khẩu. Thử lại sau.",
+      "done": "Đã đổi mật khẩu. Thiết bị khác cần đăng nhập lại."
+    },
+    "appLock": {
+      "title": "Khóa ứng dụng",
+      "footer": "Hỏi mã PIN, vân tay, khuôn mặt hoặc mã khóa màn hình khi mở ứng dụng.",
+      "noLock": "Máy chưa cài khóa màn hình nên chưa bật được khóa ứng dụng. Đặt mã PIN để bật.",
+      "locked": "Ứng dụng đang khóa",
+      "unlock": "Mở khóa",
+      "prompt": "Mở khóa ứng dụng",
+      "hint": "Dùng vân tay hoặc mã khóa màn hình"
+    },
+    "verifyFailed": "Không xác minh được.",
+    "pin": {
+      "section": "Mã PIN",
+      "footer": "Dùng 6 số để mở khóa ứng dụng và xác minh khi chuyển tài khoản. Sai 5 lần liên tiếp thì mọi tài khoản trên máy bị đăng xuất.",
+      "setRow": "Đặt mã PIN",
+      "changeRow": "Đổi mã PIN",
+      "offRow": "Tắt mã PIN",
+      "set": "Đã đặt mã PIN",
+      "changed": "Đã đổi mã PIN",
+      "off": "Đã tắt mã PIN",
+      "offWithLock": "Đã tắt mã PIN và khóa ứng dụng.",
+      "enter": "Nhập mã PIN",
+      "create": "Nhập mã PIN gồm {{length}} số",
+      "repeat": "Nhập lại mã PIN",
+      "current": "Nhập mã PIN hiện tại",
+      "forSwitch": "Nhập mã PIN để chuyển tài khoản",
+      "mismatch": "Hai mã PIN chưa khớp. Nhập lại.",
+      "checkFailed": "Chưa kiểm tra được mã PIN. Thử lại.",
+      "saveFailed": "Chưa lưu được mã PIN. Nhập lại.",
+      "forgot": "Quên mã PIN?",
+      "forgotMessage": "Mọi tài khoản trên máy sẽ bị đăng xuất và mã PIN bị xóa. Đăng nhập lại bằng mật khẩu để dùng tiếp.",
+      "forgotConfirm": "Đăng xuất mọi tài khoản",
+      "wipedWrong": "Nhập sai mã PIN 5 lần. Đã đăng xuất mọi tài khoản trên máy.",
+      "wipedForgot": "Đã đăng xuất mọi tài khoản trên máy.",
+      "deleteDigitA11y": "Xóa một số",
+      "wrong_other": "Sai mã PIN. Còn {{count}} lần thử.",
+      "digitKeyA11y": "Phím {{digit}}",
+      "enteredA11y": "Đã nhập {{count}} trên {{length}} số"
+    },
+    "identityCheck": {
+      "title": "Xác minh khi chuyển tài khoản",
+      "footer": "Hỏi mã PIN, vân tay, khuôn mặt hoặc mã khóa màn hình trước khi chuyển sang tài khoản đã lưu.",
+      "switchPrompt": "Xác minh để chuyển tài khoản",
+      "changeSettingPrompt": "Xác minh để đổi cài đặt bảo mật",
+      "failed": "Không xác minh được. Chưa chuyển tài khoản.",
+      "noLockWarning": "Máy chưa cài khóa màn hình nên ai cầm máy cũng chuyển được tài khoản. Đặt mã PIN trong Bảo mật để chặn.",
+      "noLockAdminBlocked": "Máy chưa có khóa màn hình nên chưa chuyển sang tài khoản admin. Đặt mã PIN trong Bảo mật rồi thử lại.",
+      "useFingerprint": "Dùng vân tay",
+      "useFace": "Dùng khuôn mặt",
+      "useScreenLock": "Dùng khóa màn hình"
+    },
+    "passkeys": {
+      "title": "Passkey",
+      "hint": "Không bắt buộc. Đăng nhập không cần mật khẩu, kể cả trên máy mới.",
+      "add": "Thêm passkey",
+      "unsupported": "Bản ứng dụng này chưa dùng được passkey.",
+      "empty": "Chưa có passkey.",
+      "loadFailed": "Chưa tải được danh sách passkey.",
+      "added": "Đã thêm passkey",
+      "addFailed": "Chưa thêm được passkey. Thử lại.",
+      "offline": "Cần kết nối mạng để thêm passkey.",
+      "deleted": "Đã xóa passkey",
+      "deleteFailed": "Chưa xóa được passkey. Thử lại.",
+      "confirmTitle": "Xóa passkey này?",
+      "confirmLabel": "Xóa passkey",
+      "confirmMessage": "{{device}} sẽ không đăng nhập bằng passkey này được nữa.",
+      "addedLine": "Thêm {{date}}",
+      "addedUsedLine": "Thêm {{added}} · Dùng {{used}}",
+      "deleteA11y": "Xóa passkey {{device}}",
+      "noProvider": "Máy chưa lưu được passkey. Đăng nhập tài khoản Google trên máy rồi thử lại.",
+      "timeout": "Máy không phản hồi khi mở passkey. Thử lại.",
+      "exists": "Máy này đã có passkey cho tài khoản này.",
+      "noCredential": "Máy này chưa có passkey. Đăng nhập bằng mật khẩu, rồi thêm passkey trong Bảo mật.",
+      "signInFailed": "Không xác minh được passkey. Thử lại."
+    },
+    "passkeyHelp": {
+      "provider": {
+        "title": "Máy chưa lưu được passkey",
+        "why": "Passkey nằm trong trình quản lý mật khẩu của máy, thường là Google.",
+        "step1": "Bấm Mở Cài đặt.",
+        "step2": "Kiểm tra Google đang bật trong danh sách dịch vụ.",
+        "notFound": "Không thấy danh sách: tìm “khóa truy cập” trong Cài đặt.",
+        "stillMissing": "Vẫn chưa lưu được passkey. Google đã bật thì thử lại sau."
+      },
+      "account": {
+        "title": "Máy chưa có tài khoản Google",
+        "why": "Passkey được lưu vào tài khoản Google trên máy.",
+        "step1": "Bấm Thêm tài khoản Google.",
+        "step2": "Đăng nhập một tài khoản Google.",
+        "open": "Thêm tài khoản Google",
+        "stillMissing": "Máy vẫn chưa có tài khoản Google. Thêm tài khoản rồi quay lại."
+      },
+      "returnStep": "Quay lại đây, passkey tự thêm tiếp.",
+      "closeA11y": "Đóng hướng dẫn"
+    },
+    "revokeAll": {
+      "label": "Đăng xuất mọi thiết bị",
+      "footer": "Mọi thiết bị khác phải đăng nhập lại bằng mật khẩu. Thiết bị này vẫn giữ đăng nhập.",
+      "confirmTitle": "Đăng xuất mọi thiết bị?",
+      "confirmMessage": "Tài khoản {{email}} sẽ bị đăng xuất khỏi mọi thiết bị khác, kể cả các máy đã lưu tài khoản để chuyển nhanh.",
+      "success": "Đã đăng xuất mọi thiết bị khác.",
+      "offline": "Cần kết nối mạng để đăng xuất mọi thiết bị.",
+      "failed": "Chưa đăng xuất được mọi thiết bị. Thử lại sau."
+    },
+    "biometricFailed": "Xác thực chưa khớp. Thử lại.",
+    "deleteAccounts": {
+      "title": "Tất cả tài khoản",
+      "footer": "Tìm và xóa bất kỳ tài khoản nào, kể cả ngoài gia đình.",
+      "placeholder": "Tìm theo email, tên đăng nhập",
+      "noResults": "Không tìm thấy tài khoản",
+      "searchFailed": "Chưa tải được kết quả.",
+      "confirmTitle": "Xóa tài khoản này?",
+      "confirmLabel": "Xóa tài khoản",
+      "offline": "Cần kết nối mạng để xóa tài khoản.",
+      "notFound": "Không tìm thấy tài khoản.",
+      "failed": "Chưa xóa được tài khoản. Thử lại.",
+      "confirmMessage": "{{email}} bị đăng xuất khỏi mọi thiết bị và không đăng nhập lại được. Không thể hoàn tác.",
+      "success": "Đã xóa tài khoản {{email}}",
+      "rowA11y": "Xóa tài khoản {{email}}"
+    }
+  },
+  "developer": {
+    "debugBubble": {
+      "label": "Hiển thị Debug Bubble",
+      "footer": "Khi ẩn, log API và điều hướng vẫn được ghi."
+    }
+  }
+}

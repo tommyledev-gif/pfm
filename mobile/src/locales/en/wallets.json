@@ -1,0 +1,207 @@
+{
+  "wallets": {
+    "view": {
+      "carousel": "Cards",
+      "list": "By type",
+      "shared": "Shared"
+    },
+    "empty": {
+      "title": "No wallets yet",
+      "body": "Each place you keep money is a wallet: cash, bank or e-wallet.",
+      "cta": "Create a wallet"
+    },
+    "owner": {
+      "sharedBy": "Shared by {{owner}}",
+      "unknown": "someone else",
+      "yoursShared": "Your shared wallet",
+      "yours": "Your wallet",
+      "sharedByWithRole": "Shared by {{owner}} · {{role}}",
+      "ownedBy": "Owned by {{owner}}"
+    },
+    "list": {
+      "pendingSync_one": "{{count}} not synced",
+      "pendingSync_other": "{{count}} not synced"
+    },
+    "setDefault": {
+      "confirm": {
+        "title": "Set default wallet?",
+        "body": "\"{{wallet}}\" becomes your default wallet."
+      }
+    },
+    "card": {
+      "balance": {
+        "onHand": "Current balance",
+        "available": "Available balance"
+      },
+      "typeShared": "{{type}} · Shared wallet",
+      "a11y": "{{wallet}}, {{amount}}",
+      "pendingNotCounted_one": "Excludes {{count}} unsynced transaction",
+      "pendingNotCounted_other": "Excludes {{count}} unsynced transactions"
+    },
+    "carousel": {
+      "a11y": {
+        "next": "Next wallet",
+        "previous": "Previous wallet",
+        "hint": "Swipe up or down to change wallet. Double-tap to open.",
+        "nextButton": "Next wallet"
+      }
+    },
+    "active": {
+      "sharedBadge": "{{role}} · {{owner}}",
+      "members": "Members",
+      "shareCount": "Share · {{count}}",
+      "share": "Share",
+      "edit": "Edit wallet"
+    },
+    "recent": {
+      "title": {
+        "shared": "Transactions in this wallet",
+        "own": "Recent in this wallet"
+      },
+      "error": "Couldn't load this wallet's transactions.",
+      "empty": "No transactions in this wallet yet."
+    },
+    "form": {
+      "name": {
+        "required": "Enter a wallet name.",
+        "placeholder": "e.g. Cash"
+      },
+      "title": {
+        "edit": "Edit wallet",
+        "create": "New wallet"
+      },
+      "colour": {
+        "label": "Card colour",
+        "auto": "Automatic colour"
+      },
+      "currency": {
+        "label": "Currency",
+        "labelLocked": "Currency (can't be changed)"
+      },
+      "initialBalance": {
+        "label": "Starting balance ({{currency}})"
+      },
+      "error": {
+        "saveFailed": "Couldn't save the wallet. Try again."
+      }
+    }
+  },
+  "sharedWallets": {
+    "action": {
+      "share": "Share a wallet",
+      "shareAnother": "Share another wallet",
+      "toViewer": "Make view only",
+      "toEditor": "Allow recording",
+      "leave": "Leave wallet",
+      "revokeInvitation": "Withdraw invitation",
+      "removeMember": "Remove from wallet"
+    },
+    "recordedBy": "{{name}} recorded",
+    "tab": {
+      "invitations": "Invitations"
+    },
+    "empty": {
+      "title": "No shared wallets yet",
+      "body": "Invite family to a wallet to log income and spending together, on one balance."
+    },
+    "activity": {
+      "title": "Shared wallet transactions",
+      "hint": "Search and filter everyone's transactions",
+      "empty": {
+        "body": "Share a wallet from the Shared tab to log income and spending together.",
+        "cta": "Open Shared tab"
+      }
+    },
+    "group": {
+      "withMe": "Shared with you",
+      "byMe": "Shared by you"
+    },
+    "card": {
+      "a11y": "{{wallet}}, {{owner}}, {{role}}, {{amount}}",
+      "a11yWithPeople": "{{wallet}}, {{owner}}, {{role}}, {{amount}}, {{people}}"
+    },
+    "picker": {
+      "title": "Choose wallet to share",
+      "sharedWith_one": "Shared wallet · {{count}} person",
+      "sharedWith_other": "Shared wallet · {{count}} people"
+    },
+    "filter": {
+      "clearDate": "Clear date filter",
+      "clearCategory": "Clear category filter"
+    },
+    "role": {
+      "owner": "Owner",
+      "editor": "Can record",
+      "viewer": "View only",
+      "editorHint": "Can add transactions. Can edit only their own.",
+      "viewerHint": "Sees the balance and transactions. Can't add any."
+    },
+    "member": {
+      "statusPending": "{{role}} · Awaiting reply",
+      "statusAccountPending": "{{role}} · Awaiting sign-up",
+      "count_one": "{{count}} person",
+      "count_other": "{{count}} people",
+      "countWithPending": "{{people}} · {{pending}} awaiting reply",
+      "nameSelf": "{{name}}<0> (you)</0>",
+      "roleA11y": "{{role}}. Options for {{name}}"
+    },
+    "invite": {
+      "error": {
+        "noAccount": "No account has this email or username.",
+        "memberExists": "This person is already in the wallet or has an invitation waiting.",
+        "limit": "This wallet already has {{max}} people.",
+        "self": "This is your own account.",
+        "failed": "Couldn't send the invitation. Try again."
+      },
+      "title": "Invite people",
+      "full": "This wallet is full ({{max}} people). Remove someone to invite more.",
+      "send": "Send invitation"
+    },
+    "memberDialog": {
+      "toViewer": {
+        "title": "Make {{name}} view only?",
+        "body": "They can still see the wallet but can't add transactions."
+      },
+      "toEditor": {
+        "title": "Let {{name}} record transactions?",
+        "body": "They can add transactions to the wallet."
+      },
+      "leave": {
+        "title": "Leave {{wallet}}?",
+        "body": "The wallet leaves your list. Transactions you recorded stay in it."
+      },
+      "revoke": {
+        "title": "Withdraw invitation?",
+        "body": "{{name}} won't be able to join this wallet."
+      },
+      "remove": {
+        "title": "Remove {{name}} from the wallet?",
+        "body": "Transactions {{name}} recorded stay in the wallet."
+      }
+    },
+    "members": {
+      "title": "People in this wallet",
+      "loadError": "Couldn't load the list.",
+      "allEntries": "Search and filter all transactions",
+      "noOthers": "No one else in this wallet yet."
+    },
+    "invitee": {
+      "active": "Already in this wallet",
+      "self": "Your account",
+      "newAccount": "No account yet. The invitation goes by email, with a link to create one."
+    },
+    "invitation": {
+      "single": "{{owner}} invited you to {{wallet}}",
+      "count_one": "{{count}} shared wallet invitation",
+      "count_other": "{{count}} shared wallet invitations",
+      "respondFailed": "Couldn't answer the invitation. Try again.",
+      "joined": "Joined {{wallet}}",
+      "eyebrow": "Shared wallet invitation",
+      "decline": "Decline",
+      "accept": "Join"
+    },
+    "invitationBanner": {
+      "a11yHint": "Opens the Shared tab"
+    }
+  }
+}

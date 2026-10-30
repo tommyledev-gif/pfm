@@ -1,5 +1,6 @@
 import { Budget } from "@/features/budgets/types";
 import { Category } from "@/features/categories/types";
+import { i18n, TranslationKey } from "@/lib/i18n";
 
 // Hand-mirrored from backend/internal/dto/budget_wizard_{request,response}.go.
 // There is no codegen between the two (CLAUDE.md), so a field added on one side
@@ -104,48 +105,25 @@ export interface WizardDraft {
 // the label alone does not. Picking a living situation is a proxy for a
 // spending shape, and a user who cannot see the shape is guessing at which
 // label fits them — the one thing this screen exists to avoid.
+// Labels as getters: read in the current language whenever screen 2 renders.
+const presetOption = (key: PresetKey, icon: string) => ({
+  key,
+  icon,
+  get label() {
+    return i18n.t(`budgetWizard.preset.${key}.label` as TranslationKey);
+  },
+  get description() {
+    return i18n.t(`budgetWizard.preset.${key}.description` as TranslationKey);
+  },
+});
+
 export const PRESET_OPTIONS: { key: PresetKey; icon: string; label: string; description: string }[] = [
-  {
-    key: "rented_eating_out",
-    icon: "🏙",
-    label: "Ở trọ, đi làm",
-    description: "Tiền nhà, ăn ngoài và đi lại chiếm phần lớn.",
-  },
-  {
-    key: "with_family",
-    icon: "🏡",
-    label: "Ở với gia đình",
-    description: "Ít tiền nhà và tiền ăn, dư nhiều hơn cho mục khác.",
-  },
-  {
-    // Between "ở với gia đình" and "có gia đình riêng" there was no answer for
-    // a couple without children, so they picked own_family and got a
-    // children_education line they will never spend on.
-    key: "couple_no_kids",
-    icon: "💑",
-    label: "Vợ chồng son",
-    description: "Hai người, chưa có con. Ăn ngoài và đi chơi nhiều hơn.",
-  },
-  {
-    key: "own_family",
-    icon: "👨‍👩‍👧",
-    label: "Có gia đình riêng",
-    description: "Thêm chi phí cho con và sinh hoạt cả nhà.",
-  },
-  {
-    key: "student",
-    icon: "🎓",
-    label: "Sinh viên",
-    description: "Thu nhập thấp, chi tiêu gọn quanh ăn uống và đi lại.",
-  },
-  {
-    // The one profile where health is a standing monthly line and transport is
-    // the smallest — no commute.
-    key: "retired",
-    icon: "🧓",
-    label: "Đã nghỉ hưu",
-    description: "Chi tiêu đều đặn, y tế chiếm phần lớn hơn.",
-  },
+  presetOption("rented_eating_out", "🏙"),
+  presetOption("with_family", "🏡"),
+  presetOption("couple_no_kids", "💑"),
+  presetOption("own_family", "👨‍👩‍👧"),
+  presetOption("student", "🎓"),
+  presetOption("retired", "🧓"),
 ];
 
 export interface ConfidenceBadge {
@@ -173,20 +151,20 @@ export function confidenceBadge(source: IntentSource): ConfidenceBadge {
     case "manual":
       return {
         level: 3,
-        label: "bạn tự đặt",
-        explanation: "Số do bạn nhập hoặc sửa, không phải ước lượng.",
+        label: i18n.t("budgetWizard.confidence.manual.label"),
+        explanation: i18n.t("budgetWizard.confidence.manual.explanation"),
       };
     case "history":
       return {
         level: 2,
-        label: "từ lịch sử chi tiêu",
-        explanation: "Tính từ giao dịch đã ghi, nên sát với chi tiêu thật.",
+        label: i18n.t("budgetWizard.confidence.history.label"),
+        explanation: i18n.t("budgetWizard.confidence.history.explanation"),
       };
     default:
       return {
         level: 1,
-        label: "ước lượng",
-        explanation: "Dựa trên kiểu sống đã chọn, chưa dựa trên chi tiêu thật. Sửa lại bất cứ lúc nào.",
+        label: i18n.t("budgetWizard.confidence.estimate.label"),
+        explanation: i18n.t("budgetWizard.confidence.estimate.explanation"),
       };
   }
 }

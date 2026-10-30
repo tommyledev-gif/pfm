@@ -1,7 +1,10 @@
+import { useTranslation } from "react-i18next";
+
 import { PopoverAction } from "@/components/shared/ActionPopover";
 import { CopyIcon, EditIcon, PinIcon, TrashIcon } from "@/components/ui/Icon";
 import { copyToClipboard } from "@/lib/clipboard";
 import { formatProposalForCopy } from "@/features/ai-chat/message-copy";
+import { messageText } from "@/features/ai-chat/message-text";
 import { proposalCreatedAt } from "@/features/ai-chat/proposal-time";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { usePhraseActions } from "@/features/ai-chat/hooks/use-phrase-actions";
@@ -36,6 +39,7 @@ export function useMessageActions({
   onDelete,
   phraseActions,
 }: UseMessageActionsOptions): PopoverAction[] {
+  const { t } = useTranslation();
   const phrase = usePhraseActions(phraseActions ? message.text : null);
 
   const copyText = (): string | null => {
@@ -46,7 +50,8 @@ export function useMessageActions({
         createdAtMs: proposalCreatedAt(message),
       });
     }
-    return message.text.trim() ? message.text : null;
+    const text = messageText(message);
+    return text.trim() ? text : null;
   };
   const hasCopy = Boolean(message.action && proposal) || message.text.trim().length > 0;
 
@@ -54,7 +59,7 @@ export function useMessageActions({
   if (hasCopy) {
     actions.push({
       Icon: CopyIcon,
-      label: "Sao chép",
+      label: t("chat.messageMenu.copy"),
       testID: "btn-msg-menu-copy",
       onPress: () => {
         const text = copyText();
@@ -63,12 +68,12 @@ export function useMessageActions({
     });
   }
   if (onEdit) {
-    actions.push({ Icon: EditIcon, label: "Sửa", testID: "btn-msg-menu-edit", onPress: onEdit });
+    actions.push({ Icon: EditIcon, label: t("common.action.edit"), testID: "btn-msg-menu-edit", onPress: onEdit });
   }
   if (phrase.available) {
     actions.push({
       Icon: PinIcon,
-      label: phrase.saved ? "Bỏ lưu câu mẫu" : "Lưu câu mẫu",
+      label: phrase.saved ? t("chat.phrases.unsave") : t("chat.phrases.save"),
       testID: phrase.saved ? "btn-msg-menu-unsave-phrase" : "btn-msg-menu-save-phrase",
       onPress: phrase.toggle,
     });
@@ -76,7 +81,7 @@ export function useMessageActions({
   if (onDelete) {
     actions.push({
       Icon: TrashIcon,
-      label: "Xóa",
+      label: t("common.action.delete"),
       destructive: true,
       testID: "btn-msg-menu-delete",
       onPress: onDelete,

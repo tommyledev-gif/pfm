@@ -3,8 +3,9 @@ import { isAxiosError } from "axios";
 
 import { accountTokens } from "@/lib/account-tokens";
 import { forgetAccountKey, openAccountToken, VaultError } from "@/lib/biometric-vault";
-import { getErrorMessage, isNetworkError } from "@/lib/api-envelope";
+import { errorText, isNetworkError } from "@/lib/api-envelope";
 import { HTTP_STATUS, SWITCH_CHAT_FLUSH_TIMEOUT_MS, SWITCH_REQUEST_TIMEOUT_MS } from "@/lib/constants";
+import { i18n, TranslationKey } from "@/lib/i18n";
 import { useToastStore } from "@/stores/toast-store";
 import { refreshTokenRequest } from "@/features/auth/api/use-refresh-mutation";
 import { LoginResponse } from "@/features/auth/types";
@@ -16,29 +17,26 @@ import { useSwitchProgressStore } from "@/features/accounts/switch-progress-stor
 
 export type SwitchOutcome = "switched" | "cancelled" | "failed" | "expired" | "ignored";
 
-// Spec US-02 / S-ASW-15/18/19 copy.
+// Spec US-02 / S-ASW-15/18/19 copy (keys, read when the toast shows).
 export const SWITCH_COPY = {
-  expired: "Cần đăng nhập lại tài khoản này.",
-  interrupted: "Lần chuyển trước bị gián đoạn. Cần đăng nhập lại tài khoản này.",
-  offline: "Cần kết nối mạng để chuyển tài khoản.",
-  generic: "Chưa chuyển được tài khoản. Thử lại sau.",
-  needsPassword: "Cần đăng nhập lại bằng mật khẩu.",
-  notVerified: "Không xác minh được. Thử lại sau.",
-} as const;
-
-// The system prompt that opens a locked account.
-const UNLOCK_PROMPT = "Mở khóa tài khoản";
+  expired: "accounts.switch.expired",
+  interrupted: "accounts.switch.interrupted",
+  offline: "accounts.switch.offline",
+  generic: "accounts.switch.generic",
+  needsPassword: "accounts.switch.needsPassword",
+  notVerified: "accounts.switch.notVerified",
+} as const satisfies Record<string, TranslationKey>;
 
 // Module-level, taken BEFORE the identity prompt: a second tap anywhere
 // (dialog, direct switch, login chooser) while one switch is running —
 // including while the prompt is up — is ignored (AC-12, S-ASW-23, EC-13/17).
 let inFlight = false;
 
-function capitalize(text: string): string {
-  return text.length ? text.charAt(0).toUpperCase() + text.slice(1) : text;
+function toast(key: (typeof SWITCH_COPY)[keyof typeof SWITCH_COPY]): void {
+  showWarning(i18n.t(key));
 }
 
-function toast(message: string): void {
+function showWarning(message: string): void {
   useToastStore.getState().show(message, "warning");
 }
 
@@ -129,7 +127,8 @@ async function unlockAccount(userId: string, email: string): Promise<SwitchOutco
 
   let token: string;
   try {
-    token = await openAccountToken(userId, sealed, UNLOCK_PROMPT);
+    // The system prompt that opens a locked account.
+    token = await openAccountToken(userId, sealed, i18n.t("accounts.switch.unlockPrompt"));
   } catch (error) {
     const kind = error instanceof VaultError ? error.kind : "failed";
     if (kind === "cancelled") return "cancelled";
@@ -207,7 +206,7 @@ function handleSwitchError(userId: string, error: unknown, token: string | null)
     return "expired";
   }
   if (status === HTTP_STATUS.tooManyRequests) {
-    toast(capitalize(getErrorMessage(error, SWITCH_COPY.generic)));
+    showWarning(errorText(error, SWITCH_COPY.generic));
     return "failed";
   }
   toast(SWITCH_COPY.generic);

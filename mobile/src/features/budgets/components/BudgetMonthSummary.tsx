@@ -1,4 +1,5 @@
 import { Text, View } from "react-native";
+import { Trans, useTranslation } from "react-i18next";
 
 import { RevealableAmount } from "@/components/shared/RevealableAmount";
 import { formatCurrencyCompact } from "@/lib/currency";
@@ -8,9 +9,6 @@ import { BudgetProgressBar } from "@/features/budgets/components/BudgetProgressB
 
 interface BudgetMonthSummaryProps {
   pace: MonthPace;
-  /** What the elapsed share is a share OF. The card is reused under a date
-   *  filter, where "% của tháng" would describe a window nobody selected. */
-  periodNoun?: string;
   /** Hidden under a filter: "còn 0 ngày" is what a single-day window would
    *  honestly report, and it reads as a fault rather than a fact. */
   showDaysLeft?: boolean;
@@ -27,13 +25,13 @@ interface BudgetMonthSummaryProps {
 // left" means something very different on the 5th than on the 25th.
 export function BudgetMonthSummary({
   pace,
-  periodNoun = "tháng",
   showDaysLeft = true,
   totalLimit,
   totalSpent,
   currency,
   overCount = 0,
 }: BudgetMonthSummaryProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const remaining = totalLimit - totalSpent;
@@ -50,7 +48,7 @@ export function BudgetMonthSummary({
   return (
     <View style={styles.container}>
       <View style={styles.headRow}>
-        {showDaysLeft ? <Text style={styles.daysLeft}>còn {pace.daysLeft} ngày</Text> : null}
+        {showDaysLeft ? <Text style={styles.daysLeft}>{t("budgets.summary.daysLeft", { count: pace.daysLeft })}</Text> : null}
       </View>
 
       {/* ⚠️ Two lines, never one clipped one. These used to share a single
@@ -68,17 +66,19 @@ export function BudgetMonthSummary({
           testID="text-budget-summary-remaining"
         />
         <Text style={styles.amountSuffix}>
-          {over ? "vượt hạn mức " : "còn lại trong hạn mức "}
-          <Text style={styles.amountLimit}>{formatCurrencyCompact(totalLimit, currency)}</Text>
+          <Trans
+            t={t}
+            i18nKey={over ? "budgets.summary.overLimit" : "budgets.summary.leftOfLimit"}
+            values={{ limit: formatCurrencyCompact(totalLimit, currency) }}
+            components={[<Text key="limit" style={styles.amountLimit} />]}
+          />
         </Text>
       </View>
 
       <BudgetProgressBar ratio={ratio} pace={pace.elapsed} color={barColor} height={10} />
 
       {someOver ? (
-        <Text style={styles.overNote}>
-          {overCount} danh mục đã vượt hạn mức. Tổng vẫn còn nhờ các mục khác.
-        </Text>
+        <Text style={styles.overNote}>{t("budgets.summary.someOver", { count: overCount })}</Text>
       ) : null}
 
     </View>

@@ -1,7 +1,9 @@
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { PillButton } from "@/components/ui/PillButton";
 import { formatCurrencyTruncated } from "@/lib/currency";
+import { formatDateDMY, formatTime } from "@/lib/format-date";
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
 import { proposalAmountSign } from "@/features/ai-chat/proposal-kind";
 import { EditHistoryEntry } from "@/features/ai-chat/types";
@@ -22,26 +24,30 @@ interface EditHistoryDialogProps {
 // underlying array or its "Lần sửa N" numbering.
 export function EditHistoryDialog({ visible, history, currency, onClose }: EditHistoryDialogProps) {
   const styles = useStyles();
+  const { t } = useTranslation();
   const newestFirst = history
-    .map((entry, index) => ({ entry, label: entry.source === "created" ? "Tạo đề xuất" : `Lần sửa ${index}` }))
+    .map((entry, index) => ({
+      entry,
+      label: entry.source === "created" ? t("chat.editHistory.created") : t("chat.editHistory.edit", { number: index }),
+    }))
     .reverse();
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable onPress={() => {}} style={styles.card}>
-          <Text style={styles.title}>Lịch sử chỉnh sửa</Text>
+          <Text style={styles.title}>{t("chat.editHistory.title")}</Text>
           <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
             {newestFirst.map(({ entry, label }, index) => {
-              const date = new Date(entry.timestamp);
+              const iso = new Date(entry.timestamp).toISOString();
               return (
                 <View key={`${entry.timestamp}_${index}`} style={styles.row}>
                   <View style={styles.rowHeader}>
                     <Text style={styles.rowLabel}>{label}</Text>
                     <Text style={styles.rowTime}>
-                      {date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                      {formatDateDMY(iso)}
                       {" · "}
-                      {date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                      {formatTime(iso)}
                     </Text>
                   </View>
                   <Text style={styles.rowDetail}>
@@ -53,7 +59,7 @@ export function EditHistoryDialog({ visible, history, currency, onClose }: EditH
               );
             })}
           </ScrollView>
-          <PillButton label="Đóng" variant="outline" onPress={onClose} style={styles.closeButton} />
+          <PillButton label={t("common.action.close")} variant="outline" onPress={onClose} style={styles.closeButton} />
         </Pressable>
       </Pressable>
     </Modal>

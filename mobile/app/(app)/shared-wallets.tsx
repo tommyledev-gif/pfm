@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { ScrollView } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 
 import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
 import { EmptyIllustration } from "@/components/shared/EmptyIllustration";
@@ -15,6 +16,7 @@ import { useRefresh } from "@/lib/use-refresh";
 import { walletFace } from "@/lib/wallet-colors";
 import { spacing, createStyles, useColors } from "@/lib/theme";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
+import { categoryLabel as labelForCategory } from "@/features/categories/category-label";
 import { Category } from "@/features/categories/types";
 import { useTransactionsQuery } from "@/features/transactions/api/use-transactions-query";
 import { CategoryFilterModal } from "@/features/transactions/components/CategoryFilterModal";
@@ -44,6 +46,7 @@ const NO_CATEGORIES: Category[] = [];
 export default function SharedWalletsScreen() {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const router = useRouter();
   const { walletId: initialWalletId } = useLocalSearchParams<{ walletId?: string }>();
   const wallets = useWalletsQuery();
@@ -102,8 +105,8 @@ export default function SharedWalletsScreen() {
     categoryIds.length === 0
       ? null
       : categoryIds.length === 1
-        ? (categoryById.get(categoryIds[0])?.name ?? "1 danh mục")
-        : `${categoryIds.length} danh mục`;
+        ? labelForCategory(categoryById.get(categoryIds[0]), t("common.count.categories", { count: 1 }))
+        : t("common.count.categories", { count: categoryIds.length });
 
   const openEdit = useCallback((transaction: Transaction) => {
     setEditing(transaction);
@@ -136,7 +139,7 @@ export default function SharedWalletsScreen() {
 
   return (
     <Screen>
-      <ScreenHeader title="Giao dịch ví chung" />
+      <ScreenHeader title={t("sharedWallets.activity.title")} />
 
       {wallets.isSuccess && !selected ? (
         <ScrollView contentContainerStyle={styles.emptyBody}>
@@ -147,9 +150,9 @@ export default function SharedWalletsScreen() {
                 <UsersIcon size={30} color={colors.green} />
               </EmptyIllustration>
             }
-            title="Chưa có ví chung"
-            description="Chia sẻ một ví ở tab Ví chung để cùng ghi thu chi."
-            action={{ label: "Mở tab Ví chung", onPress: () => router.back(), testID: "btn-shared-activity-back" }}
+            title={t("sharedWallets.empty.title")}
+            description={t("sharedWallets.activity.empty.body")}
+            action={{ label: t("sharedWallets.activity.empty.cta"), onPress: () => router.back(), testID: "btn-shared-activity-back" }}
           />
         </ScrollView>
       ) : selected ? (
@@ -201,7 +204,7 @@ export default function SharedWalletsScreen() {
       ) : null}
 
       {selected && canRecordInto(selected) ? (
-        <Fab onPress={openCreate} accessibilityLabel="Thêm giao dịch" testID="btn-shared-activity-add" />
+        <Fab onPress={openCreate} accessibilityLabel={t("common.action.addTransaction")} testID="btn-shared-activity-add" />
       ) : null}
 
       <DateRangePickerModal

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { FingerprintIcon } from "@/components/ui/Icon";
@@ -19,6 +20,7 @@ interface PinAltActionsProps {
 // Under a PIN keypad: the other way in, and the way out for a forgotten PIN.
 // The wipe asks first, naming what is lost; "Giữ lại" keeps everything.
 export function PinAltActions({ phoneCheckLabel, onPhoneCheck, onForgotConfirmed, busy = false }: PinAltActionsProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const [confirming, setConfirming] = useState(false);
@@ -47,15 +49,15 @@ export function PinAltActions({ phoneCheckLabel, onPhoneCheck, onForgotConfirmed
       ) : null}
       {onForgotConfirmed ? (
         <Pressable onPress={() => setConfirming(true)} hitSlop={8} accessibilityRole="button" testID="btn-pin-forgot">
-          <Text style={styles.forgot}>{PIN_COPY.forgot}</Text>
+          <Text style={styles.forgot}>{t(PIN_COPY.forgot)}</Text>
         </Pressable>
       ) : null}
       <ConfirmDialog
         visible={confirming}
-        title={PIN_COPY.forgot}
-        message={PIN_COPY.forgotMessage}
-        confirmLabel={PIN_COPY.forgotConfirm}
-        cancelLabel={PIN_COPY.forgotKeep}
+        title={t(PIN_COPY.forgot)}
+        message={t(PIN_COPY.forgotMessage)}
+        confirmLabel={t(PIN_COPY.forgotConfirm)}
+        cancelLabel={t(PIN_COPY.forgotKeep)}
         onCancel={() => setConfirming(false)}
         onConfirm={() => {
           setConfirming(false);

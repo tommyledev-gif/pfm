@@ -1,9 +1,11 @@
 import { View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { ListRow } from "@/components/ui/grouped-list";
 import { PillTag } from "@/components/ui/PillTag";
 import { colorForCategory } from "@/lib/category-color";
+import { TranslationKey } from "@/lib/i18n";
 import { colors, createStyles } from "@/lib/theme";
 import { User } from "@/features/users/types";
 import { AccessRequestActions } from "@/features/users/components/AccessRequestActions";
@@ -23,16 +25,15 @@ export const STATUS_COLOR: Record<User["status"], string> = {
   get disabled() { return colors.peach; },
 };
 
-export const STATUS_LABEL: Record<User["status"], string> = {
-  requested: "Chờ duyệt",
-  pending: "Chờ kích hoạt",
-  active: "Đang dùng",
-  disabled: "Đã khóa",
+export const STATUS_LABEL: Record<User["status"], TranslationKey> = {
+  requested: "common.status.awaitingApproval",
+  pending: "users.status.pending",
+  active: "users.status.active",
+  disabled: "users.status.disabled",
 };
 
 // Only admins are tagged: on the members screen every other row is a member,
 // and a tag on every row says nothing.
-const ADMIN_LABEL = "Quản trị";
 
 /**
  * One member as a row of the screen's grouped list: their photo (or initial
@@ -41,6 +42,7 @@ const ADMIN_LABEL = "Quản trị";
  * section the row sits in (users.tsx); the dot repeats it at a glance.
  */
 export function UserListItem({ user }: { user: User }) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const currentUserId = useCurrentUserId();
   const displayName = user.full_name ?? user.email.split("@")[0];
@@ -48,7 +50,7 @@ export function UserListItem({ user }: { user: User }) {
 
   return (
     <ListRow
-      title={isSelf ? `${displayName} (bạn)` : displayName}
+      title={isSelf ? t("users.row.selfTitle", { name: displayName }) : displayName}
       titleLines={1}
       subtitle={user.username ? `@${user.username} · ${user.email}` : user.email}
       subtitleLines={1}
@@ -66,8 +68,8 @@ export function UserListItem({ user }: { user: User }) {
         </View>
       }
       leadingWidth={AVATAR_SIZE}
-      trailing={user.role === "admin" ? <PillTag color="success" label={ADMIN_LABEL} /> : undefined}
-      accessibilityLabel={`${displayName}, ${STATUS_LABEL[user.status]}${user.role === "admin" ? `, ${ADMIN_LABEL}` : ""}`}
+      trailing={user.role === "admin" ? <PillTag color="success" label={t("common.role.admin")} /> : undefined}
+      accessibilityLabel={t(user.role === "admin" ? "users.row.a11yAdmin" : "users.row.a11y", { name: displayName, status: t(STATUS_LABEL[user.status]) })}
       testID={`row-user-${user.id}`}
     >
       {/* A request from the login screen: approving sends the activation

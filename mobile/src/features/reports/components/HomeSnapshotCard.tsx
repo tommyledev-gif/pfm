@@ -1,19 +1,19 @@
 import { memo, useState } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { SKELETON_DELAY_MS, useContentReveal } from "@/components/motion/use-content-reveal";
 import { Card } from "@/components/ui/Card";
 import { LiquidCircle } from "@/components/shared/LiquidCircle";
 import { SnapshotCardSkeleton } from "@/components/shared/SnapshotCardSkeleton";
-import { SnapshotProgressRow } from "@/components/shared/SnapshotProgressRow";
-import { RowPlaceholders, SnapshotHeader } from "@/features/reports/components/SnapshotColumnParts";
+import { SnapshotRightColumn } from "@/features/reports/components/SnapshotColumnParts";
 import { SnapshotTopRow } from "@/features/reports/components/SnapshotTopRow";
-import { colorForCategory } from "@/lib/category-color";
 import { formatCurrency } from "@/lib/currency";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { Category } from "@/features/categories/types";
 import { ReportCategoryEntry } from "@/features/reports/types";
 import { AtRiskBudgetRow } from "@/features/reports/hooks/use-home-snapshot";
+import { HomePeriod } from "@/stores/ui-prefs-store";
 import { usePeriodSlide } from "@/features/reports/hooks/use-period-slide";
 
 // The left column is half the card, so the ring cannot be a fixed size — on
@@ -27,10 +27,9 @@ const RING_MIN_SIZE = 84;
 const RING_MAX_SIZE = 132;
 // ⚠️ The card must keep ONE height across the Ngày / Tháng / Năm tabs —
 // the list below it jumping up and down on every tab switch read as the
-// screen reflowing. So the right column always reserves this many rows
-// (padding with invisible copies), and the left column always reserves its
-// status line, whether or not the active tab has anything to put there.
-const RIGHT_COLUMN_ROWS = 3;
+// screen reflowing. So the right column always reserves its rows
+// (SnapshotRightColumn), and the left column always reserves its status
+// line, whether or not the active tab has anything to put there.
 
 interface HomeSnapshotCardProps {
   loading: boolean;
@@ -42,7 +41,8 @@ interface HomeSnapshotCardProps {
   onChangeCurrency: (currency: string) => void;
   periodSpent: number;
   spentDelta: number;
-  previousPeriodLabel: string;
+  /** The tab in view: the trend line compares against the one before it. */
+  period: HomePeriod;
   budgetSnapshot: { limit: number; remaining: number } | null;
   remainingToday: number | null;
   todayAllowance: number | null;
@@ -72,7 +72,7 @@ export const HomeSnapshotCard = memo(function HomeSnapshotCard({
   onChangeCurrency,
   periodSpent,
   spentDelta,
-  previousPeriodLabel,
+  period,
   budgetSnapshot,
   remainingToday,
   todayAllowance,
@@ -84,6 +84,7 @@ export const HomeSnapshotCard = memo(function HomeSnapshotCard({
   onOpenBudgets,
   onOpenInsights,
 }: HomeSnapshotCardProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   // Measured rather than assumed — see RING_MIN_SIZE.
@@ -145,7 +146,7 @@ export const HomeSnapshotCard = memo(function HomeSnapshotCard({
             currencies={currencies}
             onChangeCurrency={onChangeCurrency}
             spentDelta={spentDelta}
-            previousPeriodLabel={previousPeriodLabel}
+            period={period}
           />
 
           <View
@@ -166,13 +167,13 @@ export const HomeSnapshotCard = memo(function HomeSnapshotCard({
               <LiquidCircle
                 size={ringSize}
                 progress={ringProgress}
-                topLabel="Đã chi"
+                topLabel={t("common.budget.spent")}
                 topValue={formatCurrency(periodSpent, currency)}
               />
               {/* Label above value, not on one line — a single inline run
                   wraps into a ragged three-line block in a column this narrow. */}
               <Text style={styles.remainingLabel} numberOfLines={1}>
-                {isDay ? "Hôm nay còn" : "Còn lại"}
+                {t(isDay ? "home.snapshot.leftToday" : "common.budget.left")}
               </Text>
               <Text
                 style={[styles.remainingValue, { color: remainingColor }]}
@@ -194,7 +195,7 @@ export const HomeSnapshotCard = memo(function HomeSnapshotCard({
                 // — it is the month's remainder spread over the days left.
                 // Rendered empty rather than omitted — see RIGHT_COLUMN_ROWS.
                 <Text style={styles.status} numberOfLines={2}>
-                  {budgetSnapshot ? `Còn ${daysLeft} ngày trong tháng` : " "}
+                  {budgetSnapshot ? t("home.snapshot.daysLeft", { count: daysLeft }) : " "}
                 </Text>
               ) : budgetSnapshot ? (
                 // In-budget stays muted: the figure above it is already green,
@@ -205,68 +206,22 @@ export const HomeSnapshotCard = memo(function HomeSnapshotCard({
                   style={[styles.status, isOverBudget ? { color: colors.peach } : null]}
                   numberOfLines={2}
                 >
-                  {isOverBudget ? "Vượt ngân sách" : "Trong ngân sách"}
+                  {t(isOverBudget ? "home.snapshot.overBudget" : "home.snapshot.withinBudget")}
                 </Text>
               ) : (
                 <Text style={styles.status}> </Text>
               )}
             </View>
 
-            {isDay && atRiskBudgets.length > 0 ? (
-              <View style={styles.right}>
-                <SnapshotHeader title="Sắp vượt" onPressAll={onOpenBudgets} />
-                {atRiskBudgets.map(({ budget, limit, status, elapsed }) => (
-                  <SnapshotProgressRow
-                    key={`${budget.id}-${limit.currency}`}
-                    testID={`row-home-at-risk-${budget.category_id}`}
-                    onPress={onOpenBudgets}
-                    name={budget.category_name}
-                    color={colorForCategory(budget.category_id)}
-                    icon={budget.icon ?? categoryById.get(budget.category_id)?.icon}
-                    iconUrl={budget.icon_url ?? categoryById.get(budget.category_id)?.icon_url}
-                    ratio={status.ratio}
-                    percent={status.percent}
-                    barColor={status.color}
-                    percentColor={status.color}
-                    pace={elapsed}
-                  />
-                ))}
-                <RowPlaceholders count={RIGHT_COLUMN_ROWS - atRiskBudgets.length} />
-              </View>
-            ) : topCategories.length > 0 ? (
-              <View style={styles.right}>
-                <SnapshotHeader title="Chi nhiều nhất" onPressAll={onOpenInsights} />
-                {topCategories.map((c) => {
-                  // Share of the month's expenses, so the bars read against
-                  // each other rather than against a limit — no pace tick,
-                  // because a share has no schedule to be ahead of.
-                  const share = topCategoriesExpenseTotal > 0 ? c.amount / topCategoriesExpenseTotal : 0;
-                  return (
-                    <SnapshotProgressRow
-                      key={c.category_id}
-                      name={c.category_name}
-                      color={colorForCategory(c.category_id)}
-                      icon={categoryById.get(c.category_id)?.icon}
-                      iconUrl={categoryById.get(c.category_id)?.icon_url}
-                      ratio={share}
-                      percent={Math.round(share * 100)}
-                      barColor={colorForCategory(c.category_id)}
-                    />
-                  );
-                })}
-                <RowPlaceholders count={RIGHT_COLUMN_ROWS - topCategories.length} />
-              </View>
-            ) : (
-              <View style={styles.right}>
-                <SnapshotHeader title="Chi nhiều nhất" onPressAll={onOpenInsights} />
-                {/* Laid over a full set of placeholder rows, so an empty period
-                    is exactly as tall as a full one. */}
-                <View>
-                  <RowPlaceholders count={RIGHT_COLUMN_ROWS} />
-                  <Text style={styles.emptyRight}>Chưa có khoản chi nào trong kỳ này.</Text>
-                </View>
-              </View>
-            )}
+            <SnapshotRightColumn
+              isDay={isDay}
+              atRiskBudgets={atRiskBudgets}
+              topCategories={topCategories}
+              topCategoriesExpenseTotal={topCategoriesExpenseTotal}
+              categoryById={categoryById}
+              onOpenBudgets={onOpenBudgets}
+              onOpenInsights={onOpenInsights}
+            />
           </View>
         </Animated.View>
         {reveal.placeholderMounted ? (
@@ -287,7 +242,6 @@ const useStyles = createStyles((colors) => ({
   // need a zero minimum, or a long category name widens the right column and
   // squeezes the left one below its measured width.
   left: { flex: 6, minWidth: 0, alignItems: "center", gap: 2 },
-  right: { flex: 6, gap: 2, minWidth: 0 },
   // Stepped down and centered: at 3/12 the column is about eleven characters.
   remainingLabel: { ...typography.tiny, color: colors.textSecondary, marginTop: spacing.xs },
   // Color is set per render from the sign — see remainingColor.
@@ -296,5 +250,4 @@ const useStyles = createStyles((colors) => ({
   // already secondary, and two identical greys around the figure flattened the
   // block into one undifferentiated paragraph.
   status: { ...typography.tiny, color: colors.textMuted, textAlign: "center" },
-  emptyRight: { ...typography.tiny, color: colors.textMuted, position: "absolute", top: spacing.sm, left: 0, right: 0 },
 }));

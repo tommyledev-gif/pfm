@@ -1,11 +1,13 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Text } from "react-native";
 import { isAxiosError } from "axios";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { ListCell, ListInlineButton, ListRow, ListSection } from "@/components/ui/grouped-list";
 import { SearchField } from "@/components/ui/SearchField";
-import { getErrorMessage, isNetworkError } from "@/lib/api-envelope";
+import { errorText, isNetworkError } from "@/lib/api-envelope";
+import { copyOf, i18n } from "@/lib/i18n";
 import { useRequireOnline } from "@/lib/connectivity";
 import { HTTP_STATUS } from "@/lib/constants";
 import { createStyles, typography, useColors } from "@/lib/theme";
@@ -16,23 +18,24 @@ import { useAccountSearchQuery } from "@/features/security/api/use-account-searc
 import { useDeleteAccountMutation } from "@/features/security/api/use-delete-account-mutation";
 import { AccountSearchRow } from "@/features/security/components/AccountSearchRow";
 
-const TITLE = "Tất cả tài khoản";
-const FOOTER = "Tìm và xóa bất kỳ tài khoản nào, kể cả ngoài gia đình.";
-const PLACEHOLDER = "Tìm theo email, tên đăng nhập";
-const NO_RESULTS = "Không tìm thấy tài khoản";
-const SEARCH_FAILED = "Chưa tải được kết quả.";
-const RETRY = "Thử lại";
-const CONFIRM_TITLE = "Xóa tài khoản này?";
-const CONFIRM_LABEL = "Xóa tài khoản";
-const CANCEL_LABEL = "Giữ lại";
-const OFFLINE = "Cần kết nối mạng để xóa tài khoản.";
-const NOT_FOUND = "Không tìm thấy tài khoản.";
-const FALLBACK_ERROR = "Chưa xóa được tài khoản. Thử lại.";
+const COPY = copyOf({
+  TITLE: "security.deleteAccounts.title",
+  FOOTER: "security.deleteAccounts.footer",
+  PLACEHOLDER: "security.deleteAccounts.placeholder",
+  NO_RESULTS: "security.deleteAccounts.noResults",
+  SEARCH_FAILED: "security.deleteAccounts.searchFailed",
+  RETRY: "common.action.retry",
+  CONFIRM_TITLE: "security.deleteAccounts.confirmTitle",
+  CONFIRM_LABEL: "security.deleteAccounts.confirmLabel",
+  CANCEL_LABEL: "common.action.keep",
+  OFFLINE: "security.deleteAccounts.offline",
+  NOT_FOUND: "security.deleteAccounts.notFound",
+  FALLBACK_ERROR: "security.deleteAccounts.failed",
+});
 const SEARCH_DEBOUNCE_MS = 300;
 
-const confirmMessage = (email: string) =>
-  `${email} bị đăng xuất khỏi mọi thiết bị và không đăng nhập lại được. Không thể hoàn tác.`;
-const successMessage = (email: string) => `Đã xóa tài khoản ${email}`;
+const confirmMessage = (email: string) => i18n.t("security.deleteAccounts.confirmMessage", { email });
+const successMessage = (email: string) => i18n.t("security.deleteAccounts.success", { email });
 
 /**
  * The super admin's tool on Thành viên (it used to sit on Bảo mật): find any
@@ -41,6 +44,7 @@ const successMessage = (email: string) => `Đã xóa tài khoản ${email}`;
  * (a super admin, mig 037); the server enforces the same on every call.
  */
 export function DeleteAccountsSection() {
+  useTranslation(); // COPY reads the current language: re-render on a switch
   const colors = useColors();
   const styles = useStyles();
   const requireOnline = useRequireOnline();
@@ -60,9 +64,9 @@ export function DeleteAccountsSection() {
       remove.mutate(user.id, {
         onSuccess: () => showToast(successMessage(user.email), "info"),
         onError: (error) => {
-          if (isNetworkError(error)) return showToast(OFFLINE, "warning");
+          if (isNetworkError(error)) return showToast(COPY.OFFLINE, "warning");
           const notFound = isAxiosError(error) && error.response?.status === HTTP_STATUS.notFound;
-          showToast(notFound ? NOT_FOUND : getErrorMessage(error, FALLBACK_ERROR), "error");
+          showToast(notFound ? COPY.NOT_FOUND : errorText(error, "security.deleteAccounts.failed"), "error");
         },
       }),
     );
@@ -73,12 +77,12 @@ export function DeleteAccountsSection() {
   return (
     <>
       {/* One group: the search field as its first row, results under it. */}
-      <ListSection header={TITLE} footer={FOOTER} testID="section-delete-accounts">
+      <ListSection header={COPY.TITLE} footer={COPY.FOOTER} testID="section-delete-accounts">
         <ListCell>
           <SearchField
             value={query}
             onChangeText={setQuery}
-            placeholder={PLACEHOLDER}
+            placeholder={COPY.PLACEHOLDER}
             autoCorrect={false}
             testID="input-account-search"
           />
@@ -90,12 +94,12 @@ export function DeleteAccountsSection() {
           </ListCell>
         ) : search.isError && results.length === 0 ? (
           <ListRow
-            title={SEARCH_FAILED}
-            trailing={<ListInlineButton label={RETRY} tone="default" onPress={() => search.refetch()} />}
+            title={COPY.SEARCH_FAILED}
+            trailing={<ListInlineButton label={COPY.RETRY} tone="default" onPress={() => search.refetch()} />}
           />
         ) : results.length === 0 ? (
           <ListCell>
-            <Text style={styles.statusText}>{NO_RESULTS}</Text>
+            <Text style={styles.statusText}>{COPY.NO_RESULTS}</Text>
           </ListCell>
         ) : (
           results.map((user) => (
@@ -111,10 +115,10 @@ export function DeleteAccountsSection() {
 
       <ConfirmDialog
         visible={target !== null}
-        title={CONFIRM_TITLE}
+        title={COPY.CONFIRM_TITLE}
         message={confirmMessage(target?.email ?? "")}
-        confirmLabel={CONFIRM_LABEL}
-        cancelLabel={CANCEL_LABEL}
+        confirmLabel={COPY.CONFIRM_LABEL}
+        cancelLabel={COPY.CANCEL_LABEL}
         onConfirm={confirm}
         onCancel={() => setTarget(null)}
         testID="dialog-delete-account"

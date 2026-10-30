@@ -1,5 +1,6 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import { DateData } from "react-native-calendars";
 import { MarkingProps } from "react-native-calendars/src/calendar/day/marking";
 
@@ -68,6 +69,7 @@ function addDaysIso(iso: string, days: number): string {
 // (MonthYearCalendar) — react-native-calendars' own header only has
 // prev/next arrows.
 export const DateRangePickerModal = memo(function DateRangePickerModal({ visible, onClose, from, to, onApply }: DateRangePickerModalProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const [start, setStart] = useState<string | null>(from ?? null);
   const [end, setEnd] = useState<string | null>(to ?? null);
@@ -121,11 +123,13 @@ export const DateRangePickerModal = memo(function DateRangePickerModal({ visible
 
   return (
     <Drawer visible={visible} onClose={onClose}>
-      <Text style={styles.title}>Khoảng thời gian</Text>
+      <Text style={styles.title}>{t("ui.dateRange.title")}</Text>
       <Text style={styles.subtitle}>
         {start
-          ? `${formatDateShort(start)}${end && end !== start ? `  –  ${formatDateShort(end)}` : ""}`
-          : "Chọn ngày bắt đầu"}
+          ? end && end !== start
+            ? t("ui.dateRange.selected", { from: formatDateShort(start), to: formatDateShort(end) })
+            : formatDateShort(start)
+          : t("ui.dateRange.pickStart")}
       </Text>
 
       <MonthYearCalendar
@@ -137,11 +141,11 @@ export const DateRangePickerModal = memo(function DateRangePickerModal({ visible
         maxDate={maxSelectableDate}
       />
 
-      <Text style={styles.maxRangeHint}>Khoảng thời gian tối đa {MAX_RANGE_DAYS} ngày.</Text>
+      <Text style={styles.maxRangeHint}>{t("ui.dateRange.maxHint", { count: MAX_RANGE_DAYS })}</Text>
 
       <View style={styles.actions}>
-        <PillButton label="Xóa lọc" variant="outline" onPress={clear} style={styles.flexButton} />
-        <PillButton label="Áp dụng" onPress={apply} disabled={!start} style={styles.flexButton} />
+        <PillButton label={t("common.action.clearFilter")} variant="outline" onPress={clear} style={styles.flexButton} />
+        <PillButton label={t("common.action.apply")} onPress={apply} disabled={!start} style={styles.flexButton} />
       </View>
     </Drawer>
   );

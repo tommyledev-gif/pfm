@@ -1,4 +1,5 @@
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { MotionView } from "@/components/motion/MotionView";
 import { PressableScale } from "@/components/motion/PressableScale";
@@ -16,14 +17,15 @@ import { useWalletInvitationsQuery } from "@/features/wallets/api/use-wallet-mem
 export function WalletInvitationBanner({ onPress }: { onPress: () => void }) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const invitations = useWalletInvitationsQuery();
   const items = invitations.data ?? [];
   if (items.length === 0) return null;
 
   const label =
     items.length === 1
-      ? `${items[0].owner_name} mời bạn vào ví ${items[0].wallet_name}`
-      : `${items.length} lời mời vào ví chung`;
+      ? t("sharedWallets.invitation.single", { owner: items[0].owner_name, wallet: items[0].wallet_name })
+      : t("sharedWallets.invitation.count", { count: items.length });
 
   return (
     <MotionView preset="fadeDown" exitPreset="fadeUp" style={styles.wrap}>
@@ -31,7 +33,7 @@ export function WalletInvitationBanner({ onPress }: { onPress: () => void }) {
         onPress={onPress}
         style={styles.banner}
         accessibilityRole="button"
-        accessibilityHint="Mở tab Ví chung"
+        accessibilityHint={t("sharedWallets.invitationBanner.a11yHint")}
         testID="banner-wallet-invitations"
       >
         <View style={styles.icon}>

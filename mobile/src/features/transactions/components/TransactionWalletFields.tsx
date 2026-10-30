@@ -1,4 +1,5 @@
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { ListRow, ListSection } from "@/components/ui/grouped-list";
 import { ArrowRightGlyph } from "@/components/ui/grouped-list/list-icons";
@@ -6,8 +7,6 @@ import { formatCurrency } from "@/lib/currency";
 import { typography, createStyles } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
 import { WalletSelectTile } from "@/features/transactions/components/WalletSelectTile";
-
-const NO_SAVED_WALLETS_MESSAGE = "Kết nối mạng để tải danh sách ví.";
 
 interface TransactionWalletFieldsProps {
   isTransfer: boolean;
@@ -51,16 +50,16 @@ export function TransactionWalletFields({
   walletError,
   destinationError,
 }: TransactionWalletFieldsProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
+  const balance = wallet ? formatCurrency(wallet.balance, wallet.currency) : "";
   const hints = [
-    noSavedWallets ? NO_SAVED_WALLETS_MESSAGE : null,
-    otherCurrenciesHidden ? "Chỉ hiện ví cùng loại tiền" : null,
+    noSavedWallets ? t("transactions.form.walletsOffline") : null,
+    otherCurrenciesHidden ? t("transactions.form.sameCurrencyOnly") : null,
     wallet
-      ? `Số dư khả dụng: ${formatCurrency(wallet.balance, wallet.currency)}${
-          showProjection && projectedBalance !== null
-            ? ` → ${formatCurrency(projectedBalance, wallet.currency)} sau giao dịch này`
-            : ""
-        }`
+      ? showProjection && projectedBalance !== null
+        ? t("transactions.form.availableBalanceAfter", { balance, after: formatCurrency(projectedBalance, wallet.currency) })
+        : t("transactions.form.availableBalance", { balance })
       : null,
   ].filter((hint): hint is string => hint !== null);
 
@@ -80,9 +79,9 @@ export function TransactionWalletFields({
       }
     >
       <WalletSelectTile
-        label={isTransfer ? "Từ ví" : "Ví"}
+        label={isTransfer ? t("common.field.fromWallet") : t("common.field.wallet")}
         wallet={wallet}
-        placeholder="Chọn"
+        placeholder={t("common.action.choose")}
         onPress={onOpenWallets}
         locked={walletLocked}
         error={walletError}
@@ -90,9 +89,9 @@ export function TransactionWalletFields({
       />
       {!isTransfer ? null : destinationCount > 0 || destination ? (
         <WalletSelectTile
-          label="Đến ví"
+          label={t("common.field.toWallet")}
           wallet={destination}
-          placeholder="Chọn"
+          placeholder={t("common.action.choose")}
           onPress={onOpenDestinations}
           locked={destinationLocked}
           destination
@@ -101,8 +100,8 @@ export function TransactionWalletFields({
         />
       ) : (
         <ListRow
-          title="Đến ví"
-          subtitle="Cần thêm một ví khác cùng đơn vị tiền tệ để chuyển khoản."
+          title={t("common.field.toWallet")}
+          subtitle={t("transactions.form.noTransferTarget")}
           icon={ArrowRightGlyph}
           disabled
         />

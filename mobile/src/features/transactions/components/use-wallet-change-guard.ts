@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { formatCurrency } from "@/lib/currency";
 import { TransactionKind } from "@/lib/constants";
@@ -45,6 +46,7 @@ export function useWalletChangeGuard({
   currentAmount,
   onChange,
 }: UseWalletChangeGuardOptions) {
+  const { t } = useTranslation();
   const [pendingId, setPendingId] = useState<string | null>(null);
   // Kept after closing so the dialog keeps its text while it fades out.
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -71,9 +73,12 @@ export function useWalletChangeGuard({
   // the other way round. Applied by the save, not by this tap.
   const message =
     pending && original
-      ? type === "income"
-        ? `Khi lưu, số dư ví ${original.name} giảm ${takenBack}, ví ${pending.name} tăng ${taken}.`
-        : `Khi lưu, số dư ví ${original.name} tăng ${takenBack}, ví ${pending.name} giảm ${taken}.`
+      ? t(type === "income" ? "transactions.walletChange.body.income" : "transactions.walletChange.body.expense", {
+          from: original.name,
+          oldAmount: takenBack,
+          to: pending.name,
+          newAmount: taken,
+        })
       : "";
 
   return {
@@ -84,10 +89,10 @@ export function useWalletChangeGuard({
     /** Spread onto ConfirmDialog. */
     dialog: {
       visible: dialogOpen && pending !== null,
-      title: pending ? `Đổi sang ví ${pending.name}?` : "",
+      title: pending ? t("transactions.walletChange.title", { wallet: pending.name }) : "",
       message,
-      confirmLabel: "Đổi ví",
-      cancelLabel: "Giữ ví cũ",
+      confirmLabel: t("transactions.walletChange.confirm"),
+      cancelLabel: t("transactions.walletChange.keep"),
       tone: "default" as const,
       testID: "dialog-change-wallet",
       onConfirm: () => {

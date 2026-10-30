@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { Drawer } from "@/components/shared/Drawer";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
@@ -7,6 +8,7 @@ import { AmountInput } from "@/components/ui/AmountInput";
 import { MoneySlider } from "@/components/ui/MoneySlider";
 import { MIN_AMOUNT_PER_CATEGORY_XU, roundStepXu } from "@/features/budget-wizard/budget-math";
 import { findSimilarCategories } from "@/features/budget-wizard/category-match";
+import { categoryLabel } from "@/features/categories/category-label";
 import { Category } from "@/features/categories/types";
 import { formatCurrency, toCents, toMajorUnits } from "@/lib/currency";
 import { withAlpha } from "@/lib/color";
@@ -56,6 +58,7 @@ export function AddBudgetRowModal({
 }: AddBudgetRowModalProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const [name, setName] = useState("");
   const [amount, setAmount] = useState(0);
   // Null while entering; set once the user submits a name with lookalikes.
@@ -90,12 +93,15 @@ export function AddBudgetRowModal({
   if (max < MIN_AMOUNT_PER_CATEGORY_XU) {
     return (
       <Drawer visible={visible} onClose={onClose}>
-        <DrawerHeader title="Thêm danh mục" actions={[{ label: "Đóng", onPress: onClose, variant: "secondary" }]} />
+        <DrawerHeader
+          title={t("budgetWizard.addRow.title")}
+          actions={[{ label: t("common.action.close"), onPress: onClose, variant: "secondary" }]}
+        />
         <View style={styles.body}>
           {/* Not an error — the plan is simply fully allocated. Saying so beats
               offering a form whose submit button could never be enabled. */}
           <Text style={styles.note}>
-            Dự phòng đã hết. Giảm một mục khác để thêm mục mới.
+            {t("budgetWizard.addRow.noBuffer")}
           </Text>
         </View>
       </Drawer>
@@ -107,12 +113,12 @@ export function AddBudgetRowModal({
       {confirmingMatches ? (
         <>
           <DrawerHeader
-            title="Dùng mục có sẵn?"
-            actions={[{ label: "Quay lại", onPress: () => setConfirmingMatches(null), variant: "secondary" }]}
+            title={t("budgetWizard.addRow.matchesTitle")}
+            actions={[{ label: t("common.action.back"), onPress: () => setConfirmingMatches(null), variant: "secondary" }]}
           />
           <View style={styles.body}>
             <Text style={styles.note}>
-              Có vài mục giống &quot;{name.trim()}&quot;.
+              {t("budgetWizard.addRow.matchesBody", { name: name.trim() })}
             </Text>
 
             {confirmingMatches.map((category) => {
@@ -129,10 +135,14 @@ export function AddBudgetRowModal({
                 >
                   <Text style={styles.matchName} numberOfLines={1}>
                     {category.icon ? `${category.icon} ` : ""}
-                    {category.name}
+                    {categoryLabel(category)}
                   </Text>
                   <Text style={styles.matchMeta}>
-                    {alreadyOnPlan ? "đã có trong kế hoạch" : category.user_id ? "của bạn" : "mục hệ thống"}
+                    {alreadyOnPlan
+                      ? t("budgetWizard.addRow.match.onPlan")
+                      : category.user_id
+                        ? t("budgetWizard.addRow.match.yours")
+                        : t("budgetWizard.addRow.match.system")}
                   </Text>
                 </Pressable>
               );
@@ -145,35 +155,43 @@ export function AddBudgetRowModal({
               onPress={() => onConfirm({ categoryId: null, name: name.trim(), amountXu: clamped })}
               style={styles.createAnyway}
             >
-              <Text style={styles.createAnywayLabel}>Không, tạo mục &quot;{name.trim()}&quot; mới</Text>
+              <Text style={styles.createAnywayLabel}>
+                {t("budgetWizard.addRow.createAnyway", { name: name.trim() })}
+              </Text>
             </Pressable>
           </View>
         </>
       ) : (
         <>
           <DrawerHeader
-            title="Thêm danh mục"
+            title={t("budgetWizard.addRow.formTitle")}
             actions={[
-              { label: "Hủy", onPress: onClose, variant: "secondary" },
-              { label: "Thêm", onPress: submit, variant: "primary", disabled: !canSubmit, testID: "btn-wizard-add-row-submit" },
+              { label: t("common.action.cancel"), onPress: onClose, variant: "secondary" },
+              {
+                label: t("common.action.add"),
+                onPress: submit,
+                variant: "primary",
+                disabled: !canSubmit,
+                testID: "btn-wizard-add-row-submit",
+              },
             ]}
           />
           <View style={styles.body}>
-            <Text style={styles.label}>Tên danh mục</Text>
+            <Text style={styles.label}>{t("budgetWizard.addRow.nameLabel")}</Text>
             <TextInput
               testID="input-wizard-add-row-name"
               value={name}
               onChangeText={setName}
-              placeholder="vd: Thú cưng"
+              placeholder={t("budgetWizard.addRow.namePlaceholder")}
               placeholderTextColor={colors.textMuted}
               style={styles.nameInput}
             />
 
-            <Text style={styles.label}>Mỗi tháng muốn chi</Text>
+            <Text style={styles.label}>{t("budgetWizard.addRow.amountLabel")}</Text>
             <AmountInput
               testID="input-wizard-add-row-amount"
               value={clamped > 0 ? String(toMajorUnits(clamped)) : ""}
-              onChangeText={(t) => setAmount(Math.min(toCents(Number(t) || 0), max))}
+              onChangeText={(text) => setAmount(Math.min(toCents(Number(text) || 0), max))}
               style={styles.amountInput}
             />
             <MoneySlider
@@ -186,13 +204,12 @@ export function AddBudgetRowModal({
             />
 
             <View style={styles.meta}>
-              <Text style={styles.metaLabel}>Lấy từ dự phòng, tối đa</Text>
+              <Text style={styles.metaLabel}>{t("budgetWizard.addRow.maxFromBuffer")}</Text>
               <Text style={styles.metaValue}>{formatCurrency(max, currency)}</Text>
             </View>
             {name.trim().length > 0 && clamped < MIN_AMOUNT_PER_CATEGORY_XU ? (
               <Text style={styles.note}>
-                Tối thiểu {formatCurrency(MIN_AMOUNT_PER_CATEGORY_XU, currency)}. Thấp hơn thì một lần chi
-                bình thường đã vượt hạn mức.
+                {t("budgetWizard.addRow.minimum", { amount: formatCurrency(MIN_AMOUNT_PER_CATEGORY_XU, currency) })}
               </Text>
             ) : null}
           </View>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { CheckIcon, EditIcon, UsersIcon } from "@/components/ui/Icon";
 import { PressableScale } from "@/components/motion/PressableScale";
@@ -11,7 +12,7 @@ import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme
 import { Wallet } from "@/features/wallets/types";
 import { isOwnWallet } from "@/features/wallets/wallet-access";
 import { useSetDefaultWalletMutation } from "@/features/wallets/api/use-set-default-wallet-mutation";
-import { ROLE_LABEL } from "@/features/wallets/components/wallet-member-copy";
+import { ROLE_LABEL_KEY } from "@/features/wallets/components/wallet-member-copy";
 
 interface WalletActiveActionsProps {
   wallet: Wallet;
@@ -30,6 +31,7 @@ interface WalletActiveActionsProps {
 export function WalletActiveActions({ wallet, onEdit, onOpenMembers }: WalletActiveActionsProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const requireOnline = useRequireOnline();
   const setDefault = useSetDefaultWalletMutation();
   const [confirmDefaultOpen, setConfirmDefaultOpen] = useState(false);
@@ -39,11 +41,14 @@ export function WalletActiveActions({ wallet, onEdit, onOpenMembers }: WalletAct
       <View style={styles.row}>
         <View style={[styles.badge, styles.sharedBadge]} testID="badge-wallet-shared">
           <Text style={styles.sharedLabel} numberOfLines={1}>
-            {ROLE_LABEL[wallet.access ?? "viewer"]} · {wallet.owner_name ?? "Ví chung"}
+            {t("wallets.active.sharedBadge", {
+              role: t(ROLE_LABEL_KEY[wallet.access ?? "viewer"]),
+              owner: wallet.owner_name ?? t("common.label.sharedWallet"),
+            })}
           </Text>
         </View>
         <PillButton
-          label="Thành viên"
+          label={t("wallets.active.members")}
           icon={<UsersIcon size={16} color={colors.onGreen} />}
           onPress={onOpenMembers}
           style={styles.flex}
@@ -61,11 +66,11 @@ export function WalletActiveActions({ wallet, onEdit, onOpenMembers }: WalletAct
         {wallet.is_default ? (
           <View style={[styles.badge, styles.defaultBadge]} testID="badge-wallet-default">
             <CheckIcon size={16} color={colors.green} />
-            <Text style={styles.defaultLabel}>Mặc định</Text>
+            <Text style={styles.defaultLabel}>{t("common.label.default")}</Text>
           </View>
         ) : (
           <PillButton
-            label="Đặt mặc định"
+            label={t("common.action.setDefault")}
             variant="outline"
             singleLine
             onPress={() => requireOnline(() => setConfirmDefaultOpen(true))}
@@ -75,7 +80,7 @@ export function WalletActiveActions({ wallet, onEdit, onOpenMembers }: WalletAct
           />
         )}
         <PillButton
-          label={memberCount > 0 ? `Chia sẻ · ${memberCount}` : "Chia sẻ"}
+          label={memberCount > 0 ? t("wallets.active.shareCount", { count: memberCount }) : t("wallets.active.share")}
           variant="outline"
           singleLine
           icon={<UsersIcon size={16} color={colors.textPrimary} />}
@@ -87,7 +92,7 @@ export function WalletActiveActions({ wallet, onEdit, onOpenMembers }: WalletAct
           onPress={onEdit}
           style={styles.square}
           accessibilityRole="button"
-          accessibilityLabel="Sửa ví"
+          accessibilityLabel={t("wallets.active.edit")}
           testID="btn-wallet-edit"
         >
           <EditIcon size={18} color={colors.onGreen} />
@@ -97,9 +102,9 @@ export function WalletActiveActions({ wallet, onEdit, onOpenMembers }: WalletAct
       <ConfirmDialog
         visible={confirmDefaultOpen}
         tone="default"
-        title="Đặt ví mặc định?"
-        message={`"${wallet.name}" sẽ trở thành ví mặc định của bạn.`}
-        confirmLabel="Lưu"
+        title={t("wallets.setDefault.confirm.title")}
+        message={t("wallets.setDefault.confirm.body", { wallet: wallet.name })}
+        confirmLabel={t("common.action.save")}
         onCancel={() => setConfirmDefaultOpen(false)}
         onConfirm={() => {
           setConfirmDefaultOpen(false);

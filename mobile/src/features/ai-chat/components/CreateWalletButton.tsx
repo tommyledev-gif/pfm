@@ -1,4 +1,5 @@
 import { Pressable, Text } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { WalletIcon } from "@/components/ui/Icon";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
@@ -9,10 +10,11 @@ import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme
 export function CreateWalletButton({ onPress }: { onPress: () => void }) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   return (
     <Pressable testID="btn-chat-create-wallet" style={styles.button} onPress={onPress} accessibilityRole="button">
       <WalletIcon size={16} color={colors.onGreen} />
-      <Text style={styles.label}>Tạo ví</Text>
+      <Text style={styles.label}>{t("common.action.createWallet")}</Text>
     </Pressable>
   );
 }

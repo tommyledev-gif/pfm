@@ -1,5 +1,6 @@
 import { formatCurrency } from "@/lib/currency";
 import { formatDateShort } from "@/lib/format-date";
+import { i18n } from "@/lib/i18n";
 import { proposalCategoryName } from "@/features/ai-chat/proposal-kind";
 import { ChatMessage } from "@/features/ai-chat/types";
 
@@ -27,6 +28,8 @@ export interface RemovalDialogCopy {
  * destroyed, and promising a history that does not exist would be worse than
  * saying nothing. Shared by the chat thread and the home pending list so the
  * two can never word the same decision differently.
+ *
+ * Read at call time, during render, in the app's current language.
  */
 export function removalDialogCopy(
   message: ChatMessage | null,
@@ -34,24 +37,28 @@ export function removalDialogCopy(
   { currency, resolveCategoryName }: RemovalCopyOptions,
 ): RemovalDialogCopy {
   const payload = message?.action?.payload;
-  if (!payload) return { title: "", message: "", confirmLabel: "Xóa" };
+  if (!payload) return { title: "", message: "", confirmLabel: i18n.t("common.action.delete") };
 
   if (!isPersisted) {
     return {
-      title: "Bỏ đề xuất này?",
-      message: "Đề xuất này chưa từng được lưu nên không có gì bị xóa. Nó vẫn nằm lại trong cuộc trò chuyện.",
-      confirmLabel: "Bỏ",
+      title: i18n.t("chat.removal.discard.title"),
+      message: i18n.t("chat.removal.discard.body"),
+      confirmLabel: i18n.t("common.action.discard"),
     };
   }
 
-  const name = payload.note || proposalCategoryName(payload, resolveCategoryName) || "Giao dịch";
+  const name = payload.note || proposalCategoryName(payload, resolveCategoryName) || i18n.t("chat.proposal.fallbackName");
   return {
-    title: "Xóa giao dịch này?",
+    title: i18n.t("chat.removal.delete.title"),
     message: [
-      `${name} · ${formatCurrency(payload.amount, currency)} · ${formatDateShort(payload.occurred_at)}`,
+      i18n.t("chat.removal.delete.summary", {
+        name,
+        amount: formatCurrency(payload.amount, currency),
+        date: formatDateShort(payload.occurred_at),
+      }),
       "",
-      "Giao dịch sẽ biến mất khỏi danh sách nhưng vẫn được giữ trong nhật ký giao dịch.",
+      i18n.t("chat.removal.delete.body"),
     ].join("\n"),
-    confirmLabel: "Xóa",
+    confirmLabel: i18n.t("common.action.delete"),
   };
 }

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { onlineManager } from "@tanstack/react-query";
 
 import { isNetworkError } from "@/lib/api-envelope";
+import { i18n } from "@/lib/i18n";
 import { useOutboxStore } from "@/stores/outbox-store";
 import { useToastStore } from "@/stores/toast-store";
 import { useCurrentUserId } from "@/stores/use-current-user-id";
@@ -9,9 +10,10 @@ import { useCreateTransactionMutation } from "@/features/transactions/api/use-cr
 import { flushOutbox } from "@/features/transactions/outbox/flush-outbox";
 import { OutboxDisplay, OutboxPayload } from "@/features/transactions/outbox/outbox-types";
 
+// Keys, translated when the toast is shown.
 export const QUEUE_COPY = {
-  queued: "Đã lưu trên máy, sẽ đồng bộ khi có mạng.",
-  full: "Có quá nhiều giao dịch chờ đồng bộ. Hãy kết nối mạng để đồng bộ trước.",
+  queued: "transactions.sync.queued",
+  full: "transactions.sync.queueFull",
 } as const;
 
 /**
@@ -32,11 +34,11 @@ export function useSaveOrQueue() {
     try {
       const result = await useOutboxStore.getState().enqueue(userId, { payload, display, maybeSent });
       if (result === "full") {
-        useToastStore.getState().show(QUEUE_COPY.full, "warning");
+        useToastStore.getState().show(i18n.t(QUEUE_COPY.full), "warning");
         return false;
       }
       // "duplicate" is the double tap of S-OFF-26: already queued once.
-      useToastStore.getState().show(QUEUE_COPY.queued, "info");
+      useToastStore.getState().show(i18n.t(QUEUE_COPY.queued), "info");
       return true;
     } finally {
       setQueueing(false);

@@ -1,0 +1,139 @@
+{
+  "errors": {
+    "unknown": "Something went wrong. Try again.",
+    "network": "Can't reach the server. Check your connection and try again.",
+    "needsConnection": "Connect to the internet to do this.",
+    "offlineRefresh": "You're offline. Can't refresh yet.",
+    "offlineNoData": "Nothing saved here yet. Connect to load it.",
+    "sessionExpired": "Your session expired.",
+    "tooManyAttempts": "Too many attempts. Try again in {{minutes}} min.",
+    "saveTransactionFallback": "Couldn't save the transaction.",
+    "code": {
+      "INVALID_CREDENTIALS": "Incorrect email or password.",
+      "ACCOUNT_NOT_ACTIVATED": "This account isn't activated. Open the invite email to activate it.",
+      "ACCOUNT_DISABLED": "This account is locked. Contact your admin.",
+      "ACCOUNT_AWAITING_APPROVAL": "Your access request is awaiting admin approval.",
+      "UNAUTHENTICATED": "Your session expired. Sign in again.",
+      "TOKEN_EXPIRED": "This invite link has expired. Ask your admin for a new one.",
+      "RATE_LIMITED": "Too many attempts. Try again in a few minutes.",
+      "EMAIL_ALREADY_EXISTS": "This email already has an account.",
+      "USER_NOT_PENDING": "This invitation is no longer waiting for activation.",
+      "INVITE_RESEND_COOLDOWN": "Invitation sent recently. Try again in {{minutes}} min.",
+      "WEAK_PASSWORD": "Use {{min}} to {{max}} characters.",
+      "PASSWORD_MISMATCH": "The two passwords don't match.",
+      "WRONG_CURRENT_PASSWORD": "Current password is incorrect.",
+      "SAME_PASSWORD": "The new password is the same as the current one.",
+      "RESET_CODE_INVALID": "The code is wrong or has expired.",
+      "USERNAME_TAKEN": "This username is taken.",
+      "USERNAME_ALREADY_SET": "This account already has a username.",
+      "INVALID_USERNAME": "This username can't be used.",
+      "INVALID_FULL_NAME": "This name can't be used.",
+      "ADMIN_NOT_FOUND": "No admin uses this email.",
+      "ACCESS_REQUEST_HANDLED": "This request is no longer awaiting approval.",
+      "PASSKEYS_UNAVAILABLE": "Passkeys aren't available. Sign in with your password.",
+      "PASSKEY_FAILED": "Couldn't verify the passkey. Try again.",
+      "PASSKEY_NOT_FOUND": "This passkey wasn't found.",
+      "PASSKEY_LIMIT": "You already have {{max}} passkeys. Delete one to add another.",
+      "FORBIDDEN": "You don't have access to this.",
+      "NOT_FOUND": "This item wasn't found. It may have been deleted.",
+      "WALLET_ACCESS_DENIED": "You don't have access to this wallet.",
+      "WALLET_NOT_FOUND": "This wallet wasn't found. It may have been deleted.",
+      "CURRENCY_LOCKED": "This wallet has transactions, so its currency can't change.",
+      "CATEGORY_ACCESS_DENIED": "You don't have access to this category.",
+      "CATEGORY_NOT_FOUND": "This category wasn't found. It may have been deleted.",
+      "CATEGORY_ALREADY_EXISTS": "A category with this name already exists.",
+      "CATEGORY_IN_USE": "A budget uses this category. Delete the budget first.",
+      "BUDGET_ACCESS_DENIED": "You don't have access to this budget.",
+      "BUDGET_NOT_FOUND": "This budget wasn't found. It may have been deleted.",
+      "BUDGET_ALREADY_EXISTS": "This category already has a budget.",
+      "INVALID_CATEGORY_TYPE": "Budgets work with spending categories only.",
+      "TRANSACTION_ACCESS_DENIED": "You don't have access to this transaction.",
+      "TRANSACTION_NOT_FOUND": "This transaction wasn't found. It may have been deleted.",
+      "INSUFFICIENT_BALANCE": "Not enough balance in this wallet.",
+      "CATEGORY_TYPE_MISMATCH": "This category doesn't match the transaction type. Choose another.",
+      "TRANSFER_SAME_WALLET": "Choose two different wallets.",
+      "TRANSFER_CURRENCY_MISMATCH": "Transfers only work between wallets with the same currency.",
+      "TRANSFER_CATEGORY_IMMUTABLE": "A transfer's category can't be changed.",
+      "TRANSFER_WALLET_IMMUTABLE": "A transfer's wallets can't be changed.",
+      "WALLET_CURRENCY_MISMATCH": "Move it only to a wallet with the same currency.",
+      "ITEMS_TOTAL_MISMATCH": "The items total doesn't match the transaction amount.",
+      "ITEMS_NOT_ALLOWED": "Transfers can't have items.",
+      "TRANSACTION_CHANGED": "This transaction was changed elsewhere.",
+      "INVALID_INPUT": "Some details aren't right. Check them and try again.",
+      "ICON_UPLOAD_UNAVAILABLE": "Icon upload isn't available. Choose an emoji instead.",
+      "ICON_UPLOAD_FAILED": "Couldn't upload the icon. Try again.",
+      "NOTIFICATION_ACCESS_DENIED": "You don't have access to this notification.",
+      "NOTIFICATION_NOT_FOUND": "This notification wasn't found.",
+      "WALLET_MEMBER_USER_NOT_FOUND": "No account with this email or username.",
+      "WALLET_MEMBER_NOT_FOUND": "This person isn't in the wallet.",
+      "WALLET_MEMBER_EXISTS": "This person is already invited.",
+      "WALLET_MEMBER_LIMIT": "This wallet already has {{max}} people.",
+      "WALLET_INVITATION_NOT_FOUND": "This invitation is no longer valid.",
+      "AI_SERVICE_UNAVAILABLE": "The assistant isn't available right now. Try again.",
+      "IMAGE_TOO_LARGE": "This photo is too large. Choose another.",
+      "UNSUPPORTED_IMAGE_TYPE": "Use a PNG, JPEG or WebP image.",
+      "AI_IMAGE_BUSY": "Couldn't read the photo. Try again in {{minutes}} min.",
+      "AI_IMAGE_DISABLED": "Photo reading is paused.",
+      "DUPLICATE_CATEGORY_IN_REQUEST": "A category appears twice. Remove one.",
+      "TOO_MANY_BUDGETS": "Up to {{max}} budgets at a time.",
+      "DISPOSABLE_NONPOSITIVE": "Fixed costs and savings are more than your income. Check these amounts.",
+      "DISPOSABLE_TOO_SMALL": "What's left is too little for this many categories. Remove a few.",
+      "PLAN_VERSION_CONFLICT": "Your budgets were just updated on another device. Try again.",
+      "IMAGE_MISSING": "No photo selected.",
+      "IMAGE_UNREADABLE": "Couldn't open this photo. Choose another."
+    },
+    "reason": {
+      "INVALID_USERNAME": {
+        "empty": "Enter a username.",
+        "length": "Use 3 to 30 characters.",
+        "charset": "Use letters without accents, digits, dots or underscores.",
+        "start": "Start with a letter.",
+        "end": "End with a letter or digit.",
+        "doubleSeparator": "Don't put two dots or underscores in a row."
+      },
+      "INVALID_FULL_NAME": {
+        "empty": "Enter a name.",
+        "tooLong": "Use at most {{max}} characters.",
+        "charset": "Use letters, digits, spaces and . , ' - only."
+      }
+    }
+  },
+  "notifications": {
+    "type": {
+      "budget_exceeded": {
+        "title": "{{category}} is over budget",
+        "body": "Spent {{spent}} of {{limit}}."
+      },
+      "access_request": {
+        "title": "Access request",
+        "body": "{{email}} asked for a Budgest account."
+      },
+      "wallet_invite": {
+        "title": "Shared wallet invitation",
+        "body": "{{owner}} invited you to {{wallet}}."
+      },
+      "wallet_member_joined": {
+        "title": "New wallet member",
+        "body": "{{name}} joined {{wallet}}."
+      }
+    }
+  },
+  "categories": {
+    "system": {
+      "food": "Food & drink",
+      "transport": "Transport",
+      "entertainment": "Coffee & entertainment",
+      "shopping": "Shopping",
+      "health": "Health",
+      "housing": "Housing",
+      "utilities": "Bills & utilities",
+      "salary": "Salary",
+      "bonus": "Bonus",
+      "investment": "Investment",
+      "savings": "Savings",
+      "children_education": "Kids & education",
+      "other": "Other spending",
+      "transfer": "Transfer"
+    }
+  }
+}

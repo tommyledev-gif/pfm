@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 import { ListSection } from "@/components/ui/grouped-list";
 import { MapPinGlyph } from "@/components/ui/grouped-list/list-icons";
 import { useColors } from "@/lib/theme";
@@ -53,6 +55,7 @@ export function TransactionExtrasRow({
   showItems = true,
   pin,
 }: TransactionExtrasRowProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   return (
     <ListSection onSheet>
@@ -60,8 +63,8 @@ export function TransactionExtrasRow({
         <TransactionLocationRow pin={pin} tile={location} onPress={onPressLocation} />
       ) : (
         <EntryTile
-          label="Vị trí"
-          summary={location.muted ? "Thêm" : location.summary}
+          label={t("common.field.location")}
+          summary={location.muted ? t("common.action.add") : location.summary}
           muted={location.muted}
           locked={location.locked}
           glyph={MapPinGlyph}

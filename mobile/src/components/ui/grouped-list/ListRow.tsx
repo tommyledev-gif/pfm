@@ -54,6 +54,8 @@ export interface ListRowProps {
   accessibilityLabel?: string;
   accessibilityHint?: string;
   accessibilityRole?: AccessibilityRole;
+  /** For a "radio" row: whether it is the option in use. */
+  selected?: boolean;
   testID?: string;
 }
 
@@ -88,6 +90,7 @@ export function ListRow({
   accessibilityLabel,
   accessibilityHint,
   accessibilityRole,
+  selected,
   testID,
 }: ListRowProps) {
   const colors = useColors();
@@ -145,7 +148,7 @@ export function ListRow({
       accessibilityRole={accessibilityRole ?? "button"}
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
-      accessibilityState={{ disabled: disabled || loading, busy: loading }}
+      accessibilityState={{ disabled: disabled || loading, busy: loading, selected }}
       testID={testID}
       style={({ pressed }) => [styles.row, pressed && styles.pressed, disabled && styles.disabled]}
     >

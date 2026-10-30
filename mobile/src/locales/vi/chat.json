@@ -1,0 +1,321 @@
+{
+  "chat": {
+    "mode": {
+      "transaction": {
+        "label": "Ghi giao dịch",
+        "shortLabel": "Giao dịch",
+        "description": "Ghi khoản thu chi bằng một câu.",
+        "placeholder": "Mô tả một giao dịch..."
+      },
+      "budget": {
+        "label": "Lập ngân sách",
+        "shortLabel": "Ngân sách",
+        "description": "Chia thu nhập thành hạn mức theo danh mục.",
+        "placeholder": "Mô tả một giao dịch..."
+      },
+      "consult": {
+        "label": "Hỏi phân tích",
+        "shortLabel": "Phân tích",
+        "description": "Hỏi tháng này chi bao nhiêu, mục nào nhiều nhất.",
+        "placeholder": "Hỏi về chi tiêu..."
+      }
+    },
+    "menu": {
+      "search": "Tìm tin nhắn"
+    },
+    "input": {
+      "clear": {
+        "a11y": "Xóa nội dung đang nhập"
+      },
+      "send": {
+        "a11y": "Gửi"
+      },
+      "clearConfirm": {
+        "title": "Xóa nội dung đang nhập?",
+        "body": "Không thể hoàn tác.",
+        "confirm": "Xóa nội dung"
+      }
+    },
+    "thread": {
+      "scrollToLatest": {
+        "a11y": "Xem tin nhắn mới nhất"
+      },
+      "loading": {
+        "a11y": "Đang tải tin nhắn"
+      }
+    },
+    "search": {
+      "close": {
+        "a11y": "Đóng tìm kiếm"
+      },
+      "placeholder_other": "Tìm trong {{count}} tin nhắn",
+      "placeholderEmpty": "Tìm tin nhắn",
+      "who": {
+        "user": "Bạn",
+        "assistant": "Trợ lý"
+      },
+      "hitMeta": "{{who}} · {{day}} {{time}}",
+      "empty": {
+        "title": "Không tìm thấy tin nhắn"
+      },
+      "resultCount_other": "{{count}} tin nhắn",
+      "older": {
+        "a11y": "Kết quả cũ hơn"
+      },
+      "position": {
+        "a11y": "Kết quả {{position}} trên {{count}}"
+      },
+      "newer": {
+        "a11y": "Kết quả mới hơn"
+      },
+      "closeResults": {
+        "a11y": "Đóng kết quả tìm kiếm"
+      }
+    },
+    "recording": {
+      "examples": {
+        "coffee": "Cà phê 50k tiền mặt",
+        "lunch": "Ăn trưa 45k",
+        "salary": "Nhận lương 15tr",
+        "title": "Thử nhắn"
+      },
+      "empty": {
+        "title": "Ghi giao dịch bằng một câu",
+        "body": "Nhắn khoản vừa chi hoặc thu. Giao dịch chỉ lưu khi bạn bấm Lưu."
+      },
+      "readingPhoto": "Đang đọc ảnh…",
+      "readingMessage": "Đang đọc tin nhắn…"
+    },
+    "pinToggle": {
+      "hint": {
+        "turnOff": "Tắt ghim vị trí",
+        "turnOn": "Bật ghim vị trí"
+      },
+      "a11y": "Ghim vị trí khi lưu"
+    },
+    "offlineEntry": {
+      "title": "Không có kết nối mạng",
+      "body": "Trợ lý cần mạng để đọc tin nhắn. Nhập thủ công thì giao dịch lưu trên máy và tự đồng bộ khi có mạng."
+    },
+    "proposal": {
+      "saveEditFailed": "Chưa lưu được thay đổi. Số dư chưa thay đổi.",
+      "editedBadge": "Đã sửa",
+      "createVndWallet": "Tạo ví VND",
+      "walletRequired": "Chọn ví VND để lưu giao dịch.",
+      "noWallet": "Chưa chọn ví",
+      "noVndWallet": "Chưa có ví VND. Tạo ví VND để lưu giao dịch.",
+      "lowConfidence": "Độ tin cậy thấp",
+      "possibleDuplicate": "Giống giao dịch {{amount}} ngày {{date}}",
+      "needsReview": "Cần kiểm tra",
+      "items": {
+        "hide_other": "Ẩn {{count}} món",
+        "show_other": "Xem {{count}} món",
+        "gap": "Lệch {{gap}} so với số tiền giao dịch.",
+        "gapWithAmount": "Lệch {{gap}} so với số tiền giao dịch {{amount}}."
+      },
+      "fallbackName": "Giao dịch"
+    },
+    "reply": {
+      "failed": "Chưa xử lý được tin nhắn này.",
+      "busy": "Hệ thống đang bận. Thử lại sau ít phút."
+    },
+    "consult": {
+      "empty": {
+        "title": "Hỏi về chi tiêu",
+        "body": "Số liệu lấy từ giao dịch, ngân sách và ví đã ghi."
+      },
+      "answering": "Đang xem số liệu…",
+      "limitReached": "Đã đạt giới hạn câu hỏi trong giờ này. Trong lúc chờ, thử:",
+      "pickCategory": "Danh mục nào?",
+      "error": "Chưa trả lời được câu này. Thử lại."
+    },
+    "location": {
+      "current": "Vị trí hiện tại",
+      "movedUnsaved": "Đã dời, chưa lưu",
+      "tile": {
+        "a11y": "Vị trí: {{place}}. Mở bản đồ"
+      },
+      "unnamedArea": "chưa có tên khu vực",
+      "add": "Thêm vị trí"
+    },
+    "budgetCard": {
+      "done_other": "Đã lập {{count}} ngân sách",
+      "open": "Lập ngân sách"
+    },
+    "tombstone": {
+      "deleted": "Đã xóa giao dịch",
+      "discarded": "Đã bỏ, chưa lưu",
+      "viewHistory": "Xem lịch sử"
+    },
+    "removal": {
+      "deleteFailed": "Chưa xóa được giao dịch",
+      "discard": {
+        "title": "Bỏ đề xuất này?",
+        "body": "Đề xuất này chưa từng được lưu nên không có gì bị xóa. Nó vẫn nằm lại trong cuộc trò chuyện."
+      },
+      "delete": {
+        "title": "Xóa giao dịch này?",
+        "summary": "{{name}} · {{amount}} · {{date}}",
+        "body": "Giao dịch sẽ biến mất khỏi danh sách nhưng vẫn được giữ trong nhật ký giao dịch."
+      }
+    },
+    "messageMenu": {
+      "copy": "Sao chép"
+    },
+    "phrases": {
+      "unsave": "Bỏ lưu câu mẫu",
+      "save": "Lưu câu mẫu",
+      "noMatch": "Không tìm thấy câu mẫu",
+      "search": {
+        "placeholder_other": "Tìm trong {{count}} câu mẫu"
+      },
+      "delete": "Xóa câu mẫu",
+      "saved": {
+        "toast": "Đã lưu câu mẫu"
+      },
+      "unsaved": {
+        "toast": "Đã bỏ lưu câu mẫu"
+      },
+      "full": {
+        "toast": "Đã đủ {{max}} câu mẫu. …"
+      },
+      "deleted": {
+        "toast": "Đã xóa câu mẫu"
+      }
+    },
+    "copyText": {
+      "createdAt": "Tạo lúc: {{time}}",
+      "date": "Ngày: {{date}}",
+      "amount": "Số tiền: {{amount}}",
+      "category": "Danh mục: {{category}}",
+      "wallet": "Ví: {{wallet}}"
+    },
+    "image": {
+      "placeholder": "Ảnh",
+      "view": {
+        "a11y": "Xem ảnh"
+      },
+      "close": {
+        "a11y": "Đóng ảnh"
+      },
+      "readingOff": {
+        "toast": "Đọc ảnh đang tạm dừng"
+      },
+      "needsConnection": {
+        "toast": "Đọc ảnh cần kết nối mạng"
+      },
+      "privacy": {
+        "title": "Ảnh được gửi đi để đọc",
+        "body": "Dịch vụ AI bên ngoài đọc ảnh rồi xóa ngay. Ảnh chỉ còn trên điện thoại này."
+      },
+      "denied": {
+        "camera": {
+          "title": "Cần quyền camera",
+          "body": "Cho phép camera trong Cài đặt để chụp hóa đơn."
+        },
+        "library": {
+          "title": "Cần quyền truy cập ảnh",
+          "body": "Cho phép truy cập ảnh trong Cài đặt để chọn hóa đơn."
+        }
+      },
+      "attach": {
+        "a11y": "Đọc giao dịch từ ảnh"
+      },
+      "source": {
+        "camera": "Chụp ảnh",
+        "library": "Chọn ảnh có sẵn"
+      },
+      "preview": {
+        "a11y": "Ảnh sẽ gửi"
+      },
+      "caption": {
+        "placeholder": "Chú thích, ví dụ: ví MB",
+        "a11y": "Chú thích ảnh"
+      },
+      "discard": "Bỏ ảnh",
+      "send": "Gửi ảnh",
+      "tooLarge": {
+        "toast": "Ảnh quá lớn, chọn ảnh khác"
+      },
+      "unreadable": {
+        "toast": "Không mở được ảnh này"
+      },
+      "reply": {
+        "readingOff": "Đọc ảnh đang tạm dừng.",
+        "limitReached": "Đã hết lượt đọc ảnh trong giờ này.",
+        "unavailable": "Chưa đọc được ảnh. Thử lại sau ít phút.",
+        "tooLarge": "Ảnh quá lớn. Chọn ảnh khác.",
+        "wrongType": "Chỉ nhận ảnh PNG, JPEG hoặc WebP.",
+        "busy_other": "… Thử lại sau {{count}} phút."
+      },
+      "captureGone": {
+        "toast": "Ảnh không còn trên máy"
+      }
+    },
+    "editMessage": {
+      "title": "Sửa tin nhắn",
+      "placeholder": "Sửa tin nhắn…"
+    },
+    "editTransaction": {
+      "error": {
+        "chooseDestination": "Chọn ví nhận.",
+        "chooseCategory": "Chọn danh mục."
+      },
+      "title": "Sửa giao dịch",
+      "typeLocked": "Không đổi được loại của giao dịch đã lưu",
+      "sameCurrencyOnly": "Chỉ hiện ví cùng loại tiền",
+      "needsSecondVndWallet": "Cần thêm một ví VND khác để chuyển khoản."
+    },
+    "editHistory": {
+      "created": "Tạo đề xuất",
+      "edit": "Lần sửa {{number}}",
+      "title": "Lịch sử chỉnh sửa"
+    },
+    "history": {
+      "action": {
+        "create": "Tạo giao dịch",
+        "update": "Sửa",
+        "delete": "Xóa giao dịch"
+      },
+      "title": "Lịch sử giao dịch",
+      "neverSaved": "Đề xuất này chưa từng được lưu, nên không có lịch sử trên máy chủ.",
+      "empty": "Không có thay đổi nào được ghi nhận.",
+      "loadFailed": "Chưa tải được lịch sử."
+    },
+    "pending": {
+      "more_other": "+{{count}} giao dịch khác đang chờ xác nhận",
+      "row": {
+        "hint": "Vuốt sang phải để sửa, sang trái để bỏ",
+        "reviewTransfer": "Chạm để duyệt mục chuyển khoản",
+        "reviewIncome": "Chạm để duyệt mục thu",
+        "reviewExpense": "Chạm để duyệt mục chi"
+      }
+    }
+  },
+  "pending": {
+    "footer": {
+      "mixedCurrencies": "Nhiều loại tiền",
+      "balanceChange": "Thay đổi số dư",
+      "approveAll": "Duyệt tất cả · {{count}}"
+    },
+    "tabs": {
+      "all": "Tất cả ({{count}})",
+      "expense": "Khoản chi ({{count}})",
+      "income": "Khoản thu ({{count}})"
+    },
+    "subtitle": "Trợ lý AI đề xuất · chạm vào một mục để sửa",
+    "empty": {
+      "title": "Đã duyệt hết",
+      "body": "Không còn giao dịch nào chờ bạn xác nhận."
+    },
+    "card": {
+      "hint": "Chạm để sửa trước khi duyệt",
+      "dismiss": "Bỏ qua",
+      "approve": "Duyệt"
+    },
+    "toast": {
+      "approvedPartial": "Đã duyệt {{saved}} mục, {{failed}} mục chưa lưu được",
+      "approved_other": "Đã duyệt {{count}} mục"
+    }
+  }
+}

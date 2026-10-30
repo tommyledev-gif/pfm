@@ -1,15 +1,21 @@
 import { BudgetWizardPrefill, CategoryIntentRequest, PresetKey } from "@/features/budget-wizard/types";
+import { i18n, TranslationKey } from "@/lib/i18n";
 
 /** Why the wizard could not build a proposal, when the reason is the server's
  *  state rather than the user's input. Kept separate from ordinary request
  *  failures because the fix is different: these need a deploy, not a retry. */
 export type WizardProblem = "server_outdated" | "categories_unmigrated";
 
+export const PROBLEM_KEYS: Record<WizardProblem, TranslationKey> = {
+  server_outdated: "budgetWizard.problem.serverOutdated",
+  categories_unmigrated: "budgetWizard.problem.categoriesUnmigrated",
+};
+
+/** The sentence for each problem, in the app language at the moment it is
+ *  read (getters, not values). Prefer PROBLEM_KEYS + t() in a component. */
 export const PROBLEM_MESSAGES: Record<WizardProblem, string> = {
-  server_outdated:
-    "Máy chủ chưa hỗ trợ phiên bản thiết lập ngân sách này. Bạn cập nhật lại máy chủ rồi thử lại nhé.",
-  categories_unmigrated:
-    "Danh mục hệ thống trên máy chủ chưa được cập nhật nên chưa khớp được với các gói gợi ý.",
+  get server_outdated() { return i18n.t(PROBLEM_KEYS.server_outdated); },
+  get categories_unmigrated() { return i18n.t(PROBLEM_KEYS.categories_unmigrated); },
 };
 
 /**

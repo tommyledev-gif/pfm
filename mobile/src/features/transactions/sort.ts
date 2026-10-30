@@ -1,3 +1,4 @@
+import { TranslationKey } from "@/lib/i18n";
 import { Transaction } from "@/features/transactions/types";
 
 // Client-side only — transactions are cursor-paginated (use-transactions-query.ts),
@@ -18,11 +19,11 @@ export function isDefaultSort(keys: SortKey[]): boolean {
   return keys.length === 0 || (keys.length === 1 && keys[0] === DEFAULT_SORT_KEY);
 }
 
-export const SORT_OPTIONS: { key: SortKey; label: string; group: SortGroup }[] = [
-  { key: "recent", label: "Mới nhất trước", group: "date" },
-  { key: "oldest", label: "Cũ nhất trước", group: "date" },
-  { key: "highest", label: "Số tiền cao nhất", group: "amount" },
-  { key: "lowest", label: "Số tiền thấp nhất", group: "amount" },
+export const SORT_OPTIONS: { key: SortKey; labelKey: TranslationKey; group: SortGroup }[] = [
+  { key: "recent", labelKey: "transactions.sort.recent", group: "date" },
+  { key: "oldest", labelKey: "transactions.sort.oldest", group: "date" },
+  { key: "highest", labelKey: "transactions.sort.highest", group: "amount" },
+  { key: "lowest", labelKey: "transactions.sort.lowest", group: "amount" },
 ];
 
 function compare(key: SortKey, a: Transaction, b: Transaction, time: Map<string, number>): number {

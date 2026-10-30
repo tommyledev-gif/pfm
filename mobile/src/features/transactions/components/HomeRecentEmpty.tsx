@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 import { LateSkeleton } from "@/components/motion/SkeletonSwap";
 import { ReceiptIcon } from "@/components/ui/Icon";
 import { EmptyInlineCard } from "@/components/shared/EmptyState";
@@ -16,6 +18,7 @@ interface HomeRecentEmptyProps {
 // first page loads (only if that takes long enough to be seen — LateSkeleton), the offline state when it cannot, else a small empty card.
 // Moved out of the Home screen to keep that file under the 300-line cap.
 export function HomeRecentEmpty({ query }: HomeRecentEmptyProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   if (isAwaitingFirstData(query)) {
     return (
@@ -30,7 +33,7 @@ export function HomeRecentEmpty({ query }: HomeRecentEmptyProps) {
   return (
     <EmptyInlineCard
       icon={<ReceiptIcon size={18} color={colors.textSecondary} />}
-      text="Chưa có giao dịch."
+      text={t("home.recent.empty")}
       testID="empty-home-recent"
     />
   );

@@ -1,9 +1,12 @@
 import { Pressable, Text, View } from "react-native";
 import { XIcon } from "phosphor-react-native/src/icons/X";
+import { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { colorForCategory } from "@/lib/category-color";
 import { withAlpha } from "@/lib/color";
+import { TranslationKey } from "@/lib/i18n";
 import { createStyles, radii, spacing, typography, useColors } from "@/lib/theme";
 import { useAccessRequestStatusQuery } from "@/features/auth/api/use-access-request-status-query";
 import { maskEmail, REMOVE_ACCOUNT_COPY } from "@/features/accounts/account-copy";
@@ -15,9 +18,10 @@ const ROW_AVATAR_SIZE = 40;
 const CARD_AVATAR_SIZE = 48;
 
 export const CANDIDATE_STATUS_COPY = {
-  awaiting: "Chờ duyệt",
-  test: "Test",
-} as const;
+  awaiting: "common.status.awaitingApproval",
+} as const satisfies Record<string, TranslationKey>;
+// Debug test accounts only (lib/dev-login.ts), seen in dev builds: not translated.
+const TEST_LABEL = "Test";
 
 /**
  * Whether a sent request still waits for an admin (spec: the sign-in stays
@@ -54,16 +58,17 @@ function secondaryLine(candidate: LoginCandidate): string {
   return username ? `@${username} · ${email}` : email;
 }
 
-function statusLabel(candidate: LoginCandidate, awaiting: boolean): string | null {
-  if (candidate.kind === "saved") return isAccountExpired(candidate.account) ? ACCOUNT_STATUS_COPY.expired : null;
-  if (candidate.kind === "test") return CANDIDATE_STATUS_COPY.test;
-  return awaiting ? CANDIDATE_STATUS_COPY.awaiting : null;
+function statusLabel(candidate: LoginCandidate, awaiting: boolean, t: TFunction): string | null {
+  if (candidate.kind === "saved") return isAccountExpired(candidate.account) ? t(ACCOUNT_STATUS_COPY.expired) : null;
+  if (candidate.kind === "test") return TEST_LABEL;
+  return awaiting ? t(CANDIDATE_STATUS_COPY.awaiting) : null;
 }
 
 function Identity({ candidate, large = false }: { candidate: LoginCandidate; large?: boolean }) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const awaiting = useCandidateAwaiting(candidate);
-  const status = statusLabel(candidate, awaiting);
+  const status = statusLabel(candidate, awaiting, t);
   return (
     <>
       <View style={styles.info}>
@@ -92,6 +97,7 @@ interface CandidateRowProps {
 
 /** One person in the saved-accounts list; the × removes them from the device. */
 export function CandidateRow({ candidate, onPress, onRemove }: CandidateRowProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   return (
@@ -112,7 +118,7 @@ export function CandidateRow({ candidate, onPress, onRemove }: CandidateRowProps
           hitSlop={8}
           style={styles.remove}
           accessibilityRole="button"
-          accessibilityLabel={REMOVE_ACCOUNT_COPY.action(candidateName(candidate))}
+          accessibilityLabel={t(REMOVE_ACCOUNT_COPY.action, { name: candidateName(candidate) })}
         >
           <XIcon size={18} color={colors.textSecondary} />
         </Pressable>

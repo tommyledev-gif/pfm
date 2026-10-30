@@ -1,22 +1,20 @@
 import { StyleSheet, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { AmountText } from "@/components/ui/AmountText";
 import { ConsultScenario } from "@/features/analytics/types";
+import { formatDateShort } from "@/lib/format-date";
 import { spacing, typography, createStyles } from "@/lib/theme";
 
 interface ScenarioPlanProps {
   scenario: ConsultScenario;
 }
 
-function longDate(isoDate: string): string {
-  const [year, month, day] = isoDate.split("-");
-  return `${day}/${month}/${year}`;
-}
-
 // A savings-goal plan: the monthly amount to set aside first, then the
 // spending cap it implies against recent averages. The sentence above says
 // the same in words; this is the glanceable version.
 export function ScenarioPlan({ scenario }: ScenarioPlanProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const { currency } = scenario;
   const short = scenario.feasible === false;
@@ -25,18 +23,19 @@ export function ScenarioPlan({ scenario }: ScenarioPlanProps) {
     <View testID="card-analytics-scenario" style={styles.wrap}>
       <AmountText amountCents={scenario.monthly_save} currency={currency} style={styles.value} />
       <Text style={styles.caption}>
-        để dành mỗi tháng · {scenario.months} tháng
-        {scenario.deadline ? ` · đến ${longDate(scenario.deadline)}` : ""}
+        {scenario.deadline
+          ? t("analytics.scenario.captionDeadline", { count: scenario.months, date: formatDateShort(scenario.deadline) })
+          : t("analytics.scenario.caption", { count: scenario.months })}
       </Text>
 
       <View style={styles.rows}>
-        <Row label="Mục tiêu" amount={scenario.goal} currency={currency} />
-        {scenario.avg_income !== undefined ? <Row label="Thu TB/tháng" amount={scenario.avg_income} currency={currency} /> : null}
-        {scenario.avg_expense !== undefined ? <Row label="Chi TB/tháng" amount={scenario.avg_expense} currency={currency} /> : null}
+        <Row label={t("analytics.scenario.goal")} amount={scenario.goal} currency={currency} />
+        {scenario.avg_income !== undefined ? <Row label={t("analytics.scenario.avgIncome")} amount={scenario.avg_income} currency={currency} /> : null}
+        {scenario.avg_expense !== undefined ? <Row label={t("analytics.scenario.avgSpending")} amount={scenario.avg_expense} currency={currency} /> : null}
         {scenario.spend_cap !== undefined && scenario.spend_cap > 0 ? (
-          <Row label="Chi tối đa/tháng" amount={scenario.spend_cap} currency={currency} strong />
+          <Row label={t("analytics.scenario.spendCap")} amount={scenario.spend_cap} currency={currency} strong />
         ) : null}
-        {short && scenario.cut_needed ? <Row label="Cần giảm/tháng" amount={scenario.cut_needed} currency={currency} warn /> : null}
+        {short && scenario.cut_needed ? <Row label={t("analytics.scenario.cutNeeded")} amount={scenario.cut_needed} currency={currency} warn /> : null}
       </View>
     </View>
   );

@@ -1,4 +1,5 @@
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { useItemsEditorStyles } from "@/features/transactions/components/items-editor-styles";
 
@@ -14,6 +15,7 @@ interface ItemsUndoRowProps {
  * height, which had the same unapplied-update problem ExpandableLine had).
  */
 export function ItemsUndoRow({ label, onUndo }: ItemsUndoRowProps) {
+  const { t } = useTranslation();
   const styles = useItemsEditorStyles();
   return (
     <View style={styles.undoRow} accessibilityLiveRegion="polite">
@@ -21,7 +23,7 @@ export function ItemsUndoRow({ label, onUndo }: ItemsUndoRowProps) {
         {label}
       </Text>
       <Pressable accessibilityRole="button" onPress={onUndo} hitSlop={12} testID="btn-items-undo">
-        <Text style={styles.undoAction}>Hoàn tác</Text>
+        <Text style={styles.undoAction}>{t("transactions.items.undo")}</Text>
       </Pressable>
     </View>
   );

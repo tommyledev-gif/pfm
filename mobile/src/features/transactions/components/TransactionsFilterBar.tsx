@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { GestureResponderEvent, ScrollView, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { ActionPopover, PopoverAnchor } from "@/components/shared/ActionPopover";
 import { CalendarIcon, CheckIcon } from "@/components/ui/Icon";
 import { spacing, createStyles, useColors } from "@/lib/theme";
 import { Category } from "@/features/categories/types";
+import { categoryLabel } from "@/features/categories/category-label";
 import { Wallet } from "@/features/wallets/types";
 import { FilterPill } from "@/features/transactions/components/FilterPill";
 import { useTransactionFilters } from "@/features/transactions/hooks/use-transaction-filters";
@@ -34,6 +36,7 @@ interface TransactionsFilterBarProps {
 // currency (useTransactionFilters), and this says which, with a small menu to
 // change it. An unset date range is a calendar glyph, not the word "Thời gian".
 export function TransactionsFilterBar({ filters, wallets, categoryById, dateLabel, currencies, openers }: TransactionsFilterBarProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const { walletId, setWalletId, setDateRange, categoryIds, setCategoryIds, currency, setCurrency } = filters;
   const [currencyMenu, setCurrencyMenu] = useState<PopoverAnchor | null>(null);
@@ -49,13 +52,14 @@ export function TransactionsFilterBar({ filters, wallets, categoryById, dateLabe
   };
   // "Ví" still lit when the picked wallet is gone from the list (deleted
   // elsewhere): the filter is on, and its × is how to drop it.
-  const walletLabel = walletId ? (wallets?.find((w) => w.id === walletId)?.name ?? "Ví") : null;
-  const categoryLabel =
+  const walletLabel = walletId ? (wallets?.find((w) => w.id === walletId)?.name ?? t("common.field.wallet")) : null;
+  const categoryCount = t("common.count.categories", { count: categoryIds.length });
+  const categoryPill =
     categoryIds.length === 0
       ? null
       : categoryIds.length === 1
-        ? (categoryById.get(categoryIds[0])?.name ?? "1 danh mục")
-        : `${categoryIds.length} danh mục`;
+        ? categoryLabel(categoryById.get(categoryIds[0]), categoryCount)
+        : categoryCount;
 
   return (
     <ScrollView
@@ -67,10 +71,10 @@ export function TransactionsFilterBar({ filters, wallets, categoryById, dateLabe
     >
       <FilterPill
         active={walletLabel !== null}
-        label={walletLabel ?? "Ví"}
+        label={walletLabel ?? t("common.field.wallet")}
         onPress={openers.wallet}
         onClear={() => setWalletId(undefined)}
-        clearLabel="Bỏ lọc ví"
+        clearLabel={t("transactions.filter.clearWallet")}
         testID="pill-filter-wallet"
       />
       <FilterPill
@@ -81,19 +85,19 @@ export function TransactionsFilterBar({ filters, wallets, categoryById, dateLabe
       />
       <FilterPill
         active={dateLabel !== null}
-        label={dateLabel ?? "Thời gian"}
+        label={dateLabel ?? t("transactions.filter.datePill")}
         icon={CalendarIcon}
         onPress={openers.date}
         onClear={() => setDateRange({})}
-        clearLabel="Bỏ lọc thời gian"
+        clearLabel={t("transactions.filter.clearDate")}
         testID="pill-filter-date"
       />
       <FilterPill
-        active={categoryLabel !== null}
-        label={categoryLabel ?? "Danh mục"}
+        active={categoryPill !== null}
+        label={categoryPill ?? t("common.field.category")}
         onPress={openers.category}
         onClear={() => setCategoryIds([])}
-        clearLabel="Bỏ lọc danh mục"
+        clearLabel={t("transactions.filter.clearCategory")}
         testID="pill-filter-category"
       />
 

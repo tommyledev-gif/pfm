@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { Text } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Drawer } from "@/components/shared/Drawer";
@@ -46,6 +47,7 @@ interface TransactionFormModalProps {
 // keypad instead of the OS keyboard — sits in the pinned footer with the
 // category chip, the note, the date key and the ✓ key that saves.
 export const TransactionFormModal = memo(function TransactionFormModal({ visible, onClose, editingTransaction, editingQueued, draft }: TransactionFormModalProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const {
@@ -113,13 +115,13 @@ export const TransactionFormModal = memo(function TransactionFormModal({ visible
   const walletMoved = isEditing && walletId !== editingTransaction?.wallet_id;
   // The wallet lists, as panels sliding in over the form like the category one.
   const sourcePicker = useWalletPickerPanel({
-    title: isTransfer ? "Từ ví" : "Ví",
+    title: isTransfer ? t("common.field.fromWallet") : t("common.field.wallet"),
     wallets: walletChange.selectableWallets,
     selectedId: walletId,
     onSelect: walletChange.select,
   });
   const destinationPicker = useWalletPickerPanel({
-    title: "Đến ví",
+    title: t("common.field.toWallet"),
     wallets: destinationWallets,
     selectedId: toWalletId,
     onSelect: setToWalletId,
@@ -127,7 +129,6 @@ export const TransactionFormModal = memo(function TransactionFormModal({ visible
   const child = useVisibleDrawerChild([drawerChild, sourcePicker.child, destinationPicker.child]);
 
   const activeError = mutation.isError ? mutation.error : deleteTransaction.isError ? deleteTransaction.error : null;
-  const lockedSuffix = isEditing ? " (khóa sau khi tạo)" : "";
 
   return (
     <>
@@ -156,11 +157,11 @@ export const TransactionFormModal = memo(function TransactionFormModal({ visible
         }
       >
         <DrawerHeader
-          title={isEditing || editingQueued ? "Sửa giao dịch" : "Giao dịch mới"}
+          title={isEditing || editingQueued ? t("transactions.form.editTitle") : t("transactions.form.newTitle")}
           actions={[
-            { label: "Hủy", onPress: onClose, variant: "secondary" },
+            { label: t("common.action.cancel"), onPress: onClose, variant: "secondary" },
             {
-              label: isEditing ? "Lưu" : "Tạo",
+              label: isEditing ? t("common.action.save") : t("common.action.create"),
               onPress: submit,
               disabled: saving || noSavedWallets || (submitAttempted && hasErrors),
               testID: "btn-transaction-submit",
@@ -168,14 +169,14 @@ export const TransactionFormModal = memo(function TransactionFormModal({ visible
           ]}
         />
 
-        <Text style={styles.label}>Loại{lockedSuffix}</Text>
+        <Text style={styles.label}>{isEditing ? t("transactions.form.typeLocked") : t("common.field.type")}</Text>
         <TransactionTypeChips
           type={type}
           locked={isEditing}
           itemCount={lines.items.length}
           onClearItems={lines.clear}
-          onSelect={(t) => {
-            setType(t);
+          onSelect={(kind) => {
+            setType(kind);
             setCategoryId(null);
           }}
         />
@@ -221,7 +222,7 @@ export const TransactionFormModal = memo(function TransactionFormModal({ visible
 
         {isEditing ? (
           <PillButton
-            label="Xóa giao dịch"
+            label={t("transactions.form.delete")}
             icon={<TrashIcon size={18} color={colors.onDanger} />}
             onPress={() => requireOnline(() => setConfirmDeleteOpen(true))}
             loading={deleteTransaction.isPending}
@@ -233,8 +234,8 @@ export const TransactionFormModal = memo(function TransactionFormModal({ visible
 
       <ConfirmDialog
         visible={confirmDeleteOpen}
-        title="Xóa giao dịch?"
-        message="Hành động này không thể hoàn tác và sẽ điều chỉnh lại số dư ví."
+        title={t("transactions.form.deleteConfirm.title")}
+        message={t("transactions.form.deleteConfirm.body")}
         onCancel={() => setConfirmDeleteOpen(false)}
         onConfirm={() => {
           setConfirmDeleteOpen(false);

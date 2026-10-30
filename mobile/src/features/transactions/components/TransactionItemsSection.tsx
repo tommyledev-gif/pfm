@@ -1,9 +1,10 @@
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { formatCurrency } from "@/lib/currency";
 import { createStyles, spacing, typography } from "@/lib/theme";
 import { ItemsEditor } from "@/features/transactions/items/use-items-editor";
-import { ADJUSTMENT_KIND_LABELS } from "@/features/transactions/components/AdjustmentRow";
+import { ADJUSTMENT_KIND_KEYS } from "@/features/transactions/components/AdjustmentRow";
 
 interface TransactionItemsSectionProps {
   lines: ItemsEditor;
@@ -15,31 +16,32 @@ interface TransactionItemsSectionProps {
 // Read-only view of a saved Transaction's Items while offline (spec EC-09,
 // AC-26): editing needs a connection, reading the cached copy does not.
 export function TransactionItemsSection({ lines, currency, itemCount }: TransactionItemsSectionProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
 
   if (lines.items.length === 0) {
     if (itemCount === 0) return null;
     return (
       <Text testID="section-transaction-items" style={styles.note}>
-        {itemCount} món. Kết nối mạng để xem các món.
+        {t("transactions.items.offlineCount", { count: itemCount })}
       </Text>
     );
   }
 
   return (
     <View testID="section-transaction-items" style={styles.container}>
-      <Text style={styles.title}>Các món</Text>
+      <Text style={styles.title}>{t("common.field.items")}</Text>
       {lines.items.map((item) => (
         <Row key={item.key} label={item.quantity > 1 ? `${item.name} × ${item.quantity}` : item.name} value={formatCurrency(item.amount ?? 0, currency)} />
       ))}
       {lines.adjustments.map((a) => (
         <Row
           key={a.key}
-          label={a.kind === "other" ? a.label : ADJUSTMENT_KIND_LABELS[a.kind]}
+          label={a.kind === "other" ? a.label : t(ADJUSTMENT_KIND_KEYS[a.kind])}
           value={`${a.direction === "subtract" ? "−" : "+"}${formatCurrency(a.amount ?? 0, currency)}`}
         />
       ))}
-      <Row label="Tổng các món" value={formatCurrency(lines.itemsTotal, currency)} strong />
+      <Row label={t("transactions.items.itemsTotal")} value={formatCurrency(lines.itemsTotal, currency)} strong />
     </View>
   );
 }

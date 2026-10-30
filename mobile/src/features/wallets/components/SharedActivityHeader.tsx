@@ -1,4 +1,6 @@
+import { useMemo } from "react";
 import { ActivityIndicator, ScrollView, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { formatCurrency } from "@/lib/currency";
@@ -57,7 +59,11 @@ export function SharedActivityHeader({
 }: SharedActivityHeaderProps) {
   const colors = useColors();
   const styles = useStyles();
-  const owner = isOwnWallet(selected) ? "Ví của bạn" : `Của ${selected.owner_name ?? "người khác"}`;
+  const { t } = useTranslation();
+  const typeOptions = useMemo(() => TYPE_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) })), [t]);
+  const owner = isOwnWallet(selected)
+    ? t("wallets.owner.yours")
+    : t("wallets.owner.ownedBy", { owner: selected.owner_name ?? t("wallets.owner.unknown") });
   return (
     <View style={styles.header}>
       <SharedWalletChips wallets={wallets} faceById={faceById} selectedId={selected.id} onSelect={onSelectWallet} />
@@ -77,29 +83,29 @@ export function SharedActivityHeader({
         {matchedCount === null ? (
           <ActivityIndicator size="small" color={colors.green} />
         ) : (
-          <Text style={styles.count}>{matchedCount} giao dịch</Text>
+          <Text style={styles.count}>{t("common.count.transactions", { count: matchedCount })}</Text>
         )}
       </View>
 
       <TransactionsSearchField key={searchSeed.key} initialText={searchSeed.text} onSearch={onSearch} />
 
-      <SegmentedTabs options={TYPE_OPTIONS} value={typeFilter} onChange={onChangeTypeFilter} />
+      <SegmentedTabs options={typeOptions} value={typeFilter} onChange={onChangeTypeFilter} />
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterRow}>
         <FilterPill
           active={dateLabel !== null}
-          label={dateLabel ?? "Thời gian"}
+          label={dateLabel ?? t("common.field.time")}
           onPress={onOpenDate}
           onClear={onClearDate}
-          clearLabel="Bỏ lọc thời gian"
+          clearLabel={t("sharedWallets.filter.clearDate")}
           testID="pill-shared-filter-date"
         />
         <FilterPill
           active={categoryLabel !== null}
-          label={categoryLabel ?? "Danh mục"}
+          label={categoryLabel ?? t("common.field.category")}
           onPress={onOpenCategory}
           onClear={onClearCategory}
-          clearLabel="Bỏ lọc danh mục"
+          clearLabel={t("sharedWallets.filter.clearCategory")}
           testID="pill-shared-filter-category"
         />
       </ScrollView>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useReducer, useRef } from "react";
 
 import { API_MINOR_DIGITS, Evaluation, evaluateExpression } from "@/lib/calculator/evaluate";
 import { backspaceAt, pressKeyAt } from "@/lib/calculator/caret";
+import { i18n, TranslationKey } from "@/lib/i18n";
 import { currencyDecimals, formatExpressionMapped, formatValue, spokenExpression } from "@/lib/calculator/format";
 import {
   CalcState,
@@ -66,9 +67,9 @@ interface Store {
   caret: number | null;
 }
 
-const ERROR_TEXT: Partial<Record<string, string>> = {
-  divide_by_zero: "Không thể chia cho 0",
-  out_of_range: "Vượt quá số tiền tối đa",
+const ERROR_TEXT: Partial<Record<string, TranslationKey>> = {
+  divide_by_zero: "ui.amount.error.divideByZero",
+  out_of_range: "ui.amount.error.outOfRange",
 };
 
 function valueOf(expression: string, decimals: number): Evaluation {
@@ -103,9 +104,9 @@ export function useAmountExpression(currency: string): AmountExpression {
     const outcome = rescale(store.current.calc, decimals);
     const notice =
       outcome.change === "rounded"
-        ? `Đã làm tròn thành ${formatValue(outcome.state.expression, currency)} vì ${currency} không có phần lẻ.`
+        ? i18n.t("ui.amount.notice.rounded", { amount: formatValue(outcome.state.expression, currency), currency })
         : outcome.change === "cleared"
-          ? `Đã xóa số tiền vì ${currency} không có phần lẻ.`
+          ? i18n.t("ui.amount.notice.cleared", { currency })
           : store.current.notice;
     commit({ calc: outcome.state, calcDecimals: decimals, notice, caret: null });
   });
@@ -182,7 +183,8 @@ export function useAmountExpression(currency: string): AmountExpression {
   const evaluation = valueOf(calc.expression, decimals);
   const mapped = formatExpressionMapped(calc.expression, currency);
   const showPreview = hasOperator(calc.expression) && !calc.justEvaluated;
-  const errorText = !evaluation.ok ? ERROR_TEXT[evaluation.error] : undefined;
+  const errorKey = !evaluation.ok ? ERROR_TEXT[evaluation.error] : undefined;
+  const errorText = errorKey ? i18n.t(errorKey) : undefined;
 
   let preview: AmountPreview | null = null;
   if (showPreview && evaluation.ok) preview = { text: `= ${formatValue(evaluation.text, currency)}`, tone: "result" };
@@ -191,8 +193,8 @@ export function useAmountExpression(currency: string): AmountExpression {
   let problem: string | null = errorText ?? null;
   if (evaluation.ok && evaluation.cents <= 0) {
     problem = evaluation.roundedToZero
-      ? `Số tiền làm tròn về 0 — nhỏ hơn đơn vị nhỏ nhất của ${currency}.`
-      : "Số tiền phải lớn hơn 0.";
+      ? i18n.t("ui.amount.problem.roundedToZero", { currency })
+      : i18n.t("ui.amount.problem.notPositive");
   }
 
   return {
@@ -201,7 +203,7 @@ export function useAmountExpression(currency: string): AmountExpression {
     display: mapped.text,
     caret: mapped.caretAt[caret ?? calc.expression.length] ?? mapped.text.length,
     placeCaretAfter: (displayIndex: number) => placeCaretAt(mapped.rawAfter[displayIndex] ?? calc.expression.length),
-    spoken: calc.expression ? spokenExpression(calc.expression) : "Chưa nhập số tiền",
+    spoken: calc.expression ? spokenExpression(calc.expression) : i18n.t("ui.amount.spokenEmpty"),
     preview,
     decimals,
     rejectCount,

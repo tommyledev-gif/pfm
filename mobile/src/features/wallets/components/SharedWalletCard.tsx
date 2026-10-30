@@ -1,4 +1,5 @@
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { formatCurrency } from "@/lib/currency";
 import { withAlpha } from "@/lib/color";
@@ -8,7 +9,7 @@ import { isOwnWallet } from "@/features/wallets/wallet-access";
 import { useWalletMembersQuery } from "@/features/wallets/api/use-wallet-members-query";
 import { MemberAvatarStack } from "@/features/wallets/components/MemberAvatarStack";
 import { WalletMiniCard } from "@/features/wallets/components/WalletMiniCard";
-import { ROLE_LABEL, memberCountLine } from "@/features/wallets/components/wallet-member-copy";
+import { ROLE_LABEL_KEY, memberCountLine } from "@/features/wallets/components/wallet-member-copy";
 
 const FACE_SIZE = 20;
 
@@ -30,25 +31,32 @@ interface SharedWalletCardProps {
  * group around it is the one surface (SharedWalletsView).
  */
 export function SharedWalletCard({ wallet, faceColor, onPress, separated, highlightOpacity }: SharedWalletCardProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const own = isOwnWallet(wallet);
   const members = useWalletMembersQuery(wallet.id);
-  const owner = own ? "Ví của bạn" : `Của ${wallet.owner_name ?? "người khác"}`;
+  const owner = own
+    ? t("wallets.owner.yours")
+    : t("wallets.owner.ownedBy", { owner: wallet.owner_name ?? t("wallets.owner.unknown") });
   const balance = formatCurrency(wallet.balance, wallet.currency);
-  const people = members.data ? `, ${memberCountLine(members.data)}` : "";
+  const a11y = { wallet: wallet.name, owner, role: t(ROLE_LABEL_KEY[wallet.access ?? "owner"]), amount: balance };
 
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
       accessibilityRole="button"
-      accessibilityLabel={`${wallet.name}, ${owner}, ${ROLE_LABEL[wallet.access ?? "owner"]}, ${balance}${people}`}
+      accessibilityLabel={
+        members.data
+          ? t("sharedWallets.card.a11yWithPeople", { ...a11y, people: memberCountLine(members.data) })
+          : t("sharedWallets.card.a11y", a11y)
+      }
       testID={`card-shared-wallet-${wallet.id}`}
     >
       {highlightOpacity ? (
         <Animated.View pointerEvents="none" style={[styles.highlight, { opacity: highlightOpacity }]} />
       ) : null}
-      <WalletMiniCard accentColor={faceColor} icon={wallet.icon} iconUrl={wallet.icon_url} />
+      <WalletMiniCard accentColor={faceColor} icon={wallet.icon} iconUrl={wallet.icon_url} name={wallet.name} />
       <View style={[styles.content, separated && styles.separated]}>
         <View style={styles.texts}>
           <Text style={styles.name} numberOfLines={1}>

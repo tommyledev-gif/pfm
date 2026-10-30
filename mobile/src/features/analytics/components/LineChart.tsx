@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Animated, LayoutChangeEvent, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import Svg, { Circle, Polyline } from "react-native-svg";
 
 import { AnalyticsChartItem } from "@/features/analytics/types";
@@ -21,6 +22,7 @@ const STROKE_WIDTH = 2;
 // first and last labels plus the peak are enough to read a trend inside a
 // chat bubble, and anything more crowds it.
 export function LineChart({ items, currency }: LineChartProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const [width, setWidth] = useState(0);
@@ -69,7 +71,7 @@ export function LineChart({ items, currency }: LineChartProps) {
         <Text style={styles.label}>{items[0]?.label}</Text>
         {peak ? (
           <Text style={styles.peak}>
-            Cao nhất: {formatCurrencyCompact(peak.amount, currency)} ({peak.label})
+            {t("analytics.line.peak", { amount: formatCurrencyCompact(peak.amount, currency), label: peak.label })}
           </Text>
         ) : null}
         <Text style={styles.label}>{items[items.length - 1]?.label}</Text>

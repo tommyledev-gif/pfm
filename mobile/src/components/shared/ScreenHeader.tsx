@@ -1,5 +1,6 @@
 import { ComponentType, ReactNode } from "react";
 import { StyleProp, Text, View, ViewStyle } from "react-native";
+import { useTranslation } from "react-i18next";
 import { useRouter } from "expo-router";
 
 import { PressableScale } from "@/components/motion/PressableScale";
@@ -31,6 +32,7 @@ interface ScreenHeaderProps {
  * never jumps.
  */
 export function ScreenHeader({ title, subtitle, onBack, backTestID, trailing, style }: ScreenHeaderProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
@@ -60,7 +62,7 @@ export function ScreenHeader({ title, subtitle, onBack, backTestID, trailing, st
             onPress={goBack}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel="Quay lại"
+            accessibilityLabel={t("common.action.back")}
             testID={backTestID}
             style={styles.back}
           >

@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import Animated, { ZoomIn, ZoomOut } from "react-native-reanimated";
 import { useRouter } from "expo-router";
 
@@ -15,6 +16,7 @@ import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 // Memoized: it re-renders from its own unread and profile queries, not with
 // every Home render. The avatar is the same picture Settings shows.
 export const TopBar = memo(function TopBar() {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
@@ -25,7 +27,12 @@ export const TopBar = memo(function TopBar() {
     <View style={styles.row}>
       <Text style={styles.logo}>Budgest</Text>
       <View style={styles.actions}>
-        <Pressable onPress={() => router.push("/notifications")} style={styles.bellButton} hitSlop={8}>
+        <Pressable
+          onPress={() => router.push("/notifications")}
+          style={styles.bellButton}
+          hitSlop={8}
+          accessibilityLabel={t("nav.title.notifications")}
+        >
           <BellIcon size={22} color={colors.textPrimary} />
           {/* Pops in when something new arrives, and out once it is read. */}
           {hasUnread ? (
@@ -40,7 +47,7 @@ export const TopBar = memo(function TopBar() {
           onPress={() => router.push("/settings")}
           hitSlop={8}
           accessibilityRole="button"
-          accessibilityLabel="Cài đặt"
+          accessibilityLabel={t("nav.tab.settings")}
           testID="btn-home-avatar"
         >
           <Avatar name={name} iconUrl={avatarUrl} size={36} fallback="initial" />

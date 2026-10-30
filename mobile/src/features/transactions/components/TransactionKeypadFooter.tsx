@@ -1,4 +1,5 @@
 import { Keyboard, Pressable, Text, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Avatar } from "@/components/ui/Avatar";
@@ -8,6 +9,7 @@ import { KeypadSheetFooter } from "@/components/shared/KeypadSheetFooter";
 import { colorForCategory } from "@/lib/category-color";
 import { TRANSACTION_NOTE_MAX_LENGTH, TransactionKind } from "@/lib/constants";
 import { formatDateShort } from "@/lib/format-date";
+import { currentLanguage, i18n } from "@/lib/i18n";
 import { withAlpha } from "@/lib/color";
 import { colors, radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { AmountExpression } from "@/lib/use-amount-expression";
@@ -15,6 +17,7 @@ import { useKeyboardVisible } from "@/lib/use-keyboard-height";
 import { todayDateOnly } from "@/lib/date-range";
 import { useLatestCallback } from "@/lib/use-latest-callback";
 import { Category } from "@/features/categories/types";
+import { categoryLabel } from "@/features/categories/category-label";
 import { Wallet } from "@/features/wallets/types";
 
 // Same tones TransactionRow paints a stored amount in, so the figure being
@@ -33,11 +36,17 @@ const DRAWER_FOOTER_BOTTOM_PADDING = spacing.xl;
 
 // The same "today" the transaction forms default occurred_at to.
 // Short enough for one keypad key: "Hôm nay", "24/09", or "24/09/25" outside
-// the current year.
+// the current year; in English "Today", "Sep 24", "Sep 24, 25" (month in
+// words, so the order is never a question).
 function shortDateLabel(isoDate: string): string {
-  if (isoDate === todayDateOnly()) return "Hôm nay";
+  if (isoDate === todayDateOnly()) return i18n.t("common.date.today");
   const [year, month, day] = isoDate.split("-");
-  return year === todayDateOnly().slice(0, 4) ? `${day}/${month}` : `${day}/${month}/${year.slice(2)}`;
+  const sameYear = year === todayDateOnly().slice(0, 4);
+  if (currentLanguage() === "en") {
+    const monthName = i18n.t("format.calendar.monthNamesShort").split(", ")[Number(month) - 1];
+    return sameYear ? `${monthName} ${Number(day)}` : `${monthName} ${Number(day)}, ${year.slice(2)}`;
+  }
+  return sameYear ? `${day}/${month}` : `${day}/${month}/${year.slice(2)}`;
 }
 
 interface TransactionKeypadFooterProps {
@@ -88,6 +97,7 @@ export function TransactionKeypadFooter({
   onSubmit,
   submitting,
 }: TransactionKeypadFooterProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const keyboardVisible = useKeyboardVisible();
@@ -120,7 +130,7 @@ export function TransactionKeypadFooter({
     <View style={styles.chip}>
       <WalletIcon size={16} color={colors.periwinkle} />
       <Text style={[styles.chipLabel, !transferTarget && styles.chipPlaceholder]} numberOfLines={1}>
-        {transferTarget ? `→ ${transferTarget.name}` : "Chọn ví nhận"}
+        {transferTarget ? `→ ${transferTarget.name}` : t("transactions.keypad.chooseToWallet")}
       </Text>
     </View>
   ) : (
@@ -129,7 +139,7 @@ export function TransactionKeypadFooter({
         <Avatar name={category.name} color={colorForCategory(category.id)} size={22} icon={category.icon} iconUrl={category.icon_url} />
       ) : null}
       <Text style={[styles.chipLabel, !category && styles.chipPlaceholder]} numberOfLines={1}>
-        {category ? category.name : "Chọn danh mục"}
+        {category ? categoryLabel(category) : t("common.action.chooseCategory")}
       </Text>
       {onPressCategory ? <ChevronDownIcon size={14} color={colors.textMuted} /> : null}
     </Pressable>
@@ -139,7 +149,7 @@ export function TransactionKeypadFooter({
     <KeypadSheetFooter
       leading={leading}
       amount={amount.display}
-      amountAccessibilityLabel={`Số tiền: ${amount.spoken}`}
+      amountAccessibilityLabel={t("transactions.keypad.amountA11y", { amount: amount.spoken })}
       amountSuffix={currency}
       preview={amount.preview}
       shakeKey={amount.rejectCount}
@@ -157,7 +167,7 @@ export function TransactionKeypadFooter({
         key={noteInputKey}
         value={note}
         onChangeText={onChangeNote}
-        placeholder="Ghi chú (không bắt buộc)"
+        placeholder={t("transactions.keypad.notePlaceholder")}
         placeholderTextColor={colors.textMuted}
         maxLength={TRANSACTION_NOTE_MAX_LENGTH}
         returnKeyType="done"
@@ -180,7 +190,7 @@ export function TransactionKeypadFooter({
           confirmLoading={submitting}
           onDatePress={pressDate}
           dateLabel={shortDateLabel(occurredAt)}
-          dateAccessibilityLabel={`Ngày giao dịch: ${formatDateShort(occurredAt)}`}
+          dateAccessibilityLabel={t("transactions.keypad.dateA11y", { date: formatDateShort(occurredAt) })}
         />
         </View>
       )}

@@ -1,4 +1,5 @@
 import { ScrollView } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { MotionView } from "@/components/motion/MotionView";
 import { ListSection } from "@/components/ui/grouped-list";
@@ -14,9 +15,6 @@ import { PasskeysSection } from "@/features/security/components/PasskeysSection"
 import { PinSection } from "@/features/security/components/PinSection";
 import { REVOKE_ALL_FOOTER, RevokeAllSessionsRow } from "@/features/security/components/RevokeAllSessionsRow";
 
-const TITLE = "Bảo mật";
-const PROTECTIONS_HEADER = "Khóa và xác minh";
-
 // Entry point: Settings' "Bảo mật" row (spec US-07 step 1, AC-34). Back
 // returns to Settings; BottomNav keeps Settings highlighted.
 //
@@ -27,6 +25,7 @@ const PROTECTIONS_HEADER = "Khóa và xác minh";
 // One grouped list (iOS Settings style): each topic is one rounded group,
 // with what it does said once in the group's footer, not in a box per row.
 export default function SecurityScreen() {
+  const { t } = useTranslation();
   const styles = useStyles();
   // The floating BottomNav covers the screen's foot, and the account-wide
   // sign-out at the end of the list sat under it.
@@ -35,25 +34,25 @@ export default function SecurityScreen() {
   // Groups stagger in top to bottom on mount; refetches never replay it.
   const groups = [
     <DeviceSessionsSection key="devices" />,
-    <ListSection key="password" footer={CHANGE_PASSWORD_FOOTER}>
+    <ListSection key="password" footer={t(CHANGE_PASSWORD_FOOTER)}>
       <ChangePasswordRow />
     </ListSection>,
-    <ListSection key="app-lock" header={PROTECTIONS_HEADER} footer={APP_LOCK_FOOTER}>
+    <ListSection key="app-lock" header={t("security.protections.header")} footer={t(APP_LOCK_FOOTER)}>
       <AppLockToggleRow />
     </ListSection>,
     <PinSection key="pin" />,
-    <ListSection key="identity-check" footer={IDENTITY_CHECK_FOOTER}>
+    <ListSection key="identity-check" footer={t(IDENTITY_CHECK_FOOTER)}>
       <IdentityCheckToggleRow />
     </ListSection>,
     <PasskeysSection key="passkeys" />,
-    <ListSection key="revoke-all" footer={REVOKE_ALL_FOOTER}>
+    <ListSection key="revoke-all" footer={t(REVOKE_ALL_FOOTER)}>
       <RevokeAllSessionsRow />
     </ListSection>,
   ];
 
   return (
     <Screen style={styles.screen}>
-      <ScreenHeader title={TITLE} backTestID="btn-security-back" />
+      <ScreenHeader title={t("nav.title.security")} backTestID="btn-security-back" />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: navClearance }]} testID="screen-security">
         {groups.map((group, index) => (
           <MotionView key={group.key} index={index}>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { AmountInput } from "@/components/ui/AmountInput";
 import { MoneySlider } from "@/components/ui/MoneySlider";
@@ -41,6 +42,7 @@ export function AmountPromptModal({
   onConfirm,
   testID,
 }: AmountPromptModalProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const [draft, setDraft] = useState(value);
 
@@ -57,8 +59,8 @@ export function AmountPromptModal({
       <DrawerHeader
         title={title}
         actions={[
-          { label: "Huỷ", onPress: onClose, variant: "secondary" },
-          { label: "Xong", onPress: () => onConfirm(clamped), variant: "primary", testID },
+          { label: t("common.action.cancel"), onPress: onClose, variant: "secondary" },
+          { label: t("common.action.done"), onPress: () => onConfirm(clamped), variant: "primary", testID },
         ]}
       />
       <View style={styles.body}>
@@ -69,7 +71,7 @@ export function AmountPromptModal({
         />
         <MoneySlider value={clamped} min={0} max={max} step={step} onChange={setDraft} />
         <View style={styles.meta}>
-          <Text style={styles.metaLabel}>{hint ?? "Tối đa"}</Text>
+          <Text style={styles.metaLabel}>{hint ?? t("common.action.max")}</Text>
           <Text style={styles.metaValue}>{formatCurrency(max, currency)}</Text>
         </View>
       </View>

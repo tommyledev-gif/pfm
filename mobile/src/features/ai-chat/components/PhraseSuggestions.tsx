@@ -1,5 +1,6 @@
 import { memo, useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { EdgeFade } from "@/components/ui/EdgeFade";
 import { CloseIcon, PinIcon, SearchIcon } from "@/components/ui/Icon";
@@ -42,6 +43,7 @@ interface PhraseSuggestionsProps {
 export function PhraseSuggestions({ input, userId, maxHeight, onSelect, onSearchFocusChange }: PhraseSuggestionsProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const reportComposerFocus = useReportComposerFocus();
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
@@ -107,7 +109,7 @@ export function PhraseSuggestions({ input, userId, maxHeight, onSelect, onSearch
           {moreBelow ? <EdgeFade edge="bottom" width={FADE_HEIGHT} color={colors.surface} /> : null}
         </View>
       ) : search.trim() ? (
-        <Text style={styles.noMatch}>Không tìm thấy câu mẫu</Text>
+        <Text style={styles.noMatch}>{t("chat.phrases.noMatch")}</Text>
       ) : null}
 
       <View style={styles.searchField}>
@@ -118,13 +120,13 @@ export function PhraseSuggestions({ input, userId, maxHeight, onSelect, onSearch
           onChangeText={setSearch}
           onFocus={() => handleSearchFocus(true)}
           onBlur={() => handleSearchFocus(false)}
-          placeholder={`Tìm trong ${total} câu mẫu`}
+          placeholder={t("chat.phrases.search.placeholder", { count: total })}
           placeholderTextColor={colors.textMuted}
           style={styles.searchInput}
           returnKeyType="search"
         />
         {search ? (
-          <Pressable onPress={() => setSearch("")} hitSlop={ICON_HIT_SLOP} accessibilityRole="button" accessibilityLabel="Xóa tìm kiếm">
+          <Pressable onPress={() => setSearch("")} hitSlop={ICON_HIT_SLOP} accessibilityRole="button" accessibilityLabel={t("common.action.clearSearch")}>
             <CloseIcon size={14} color={colors.textSecondary} />
           </Pressable>
         ) : null}
@@ -148,6 +150,7 @@ interface SuggestionRowProps {
 const SuggestionRow = memo(function SuggestionRow({ text, index, onSelect }: SuggestionRowProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const phrase = usePhraseActions(text);
 
   return (
@@ -165,7 +168,7 @@ const SuggestionRow = memo(function SuggestionRow({ text, index, onSelect }: Sug
           <Pressable
             testID={`btn-phrase-pin-${index}`}
             accessibilityRole="button"
-            accessibilityLabel={phrase.saved ? "Bỏ lưu câu mẫu" : "Lưu câu mẫu"}
+            accessibilityLabel={phrase.saved ? t("chat.phrases.unsave") : t("chat.phrases.save")}
             accessibilityState={{ selected: phrase.saved }}
             onPress={phrase.toggle}
             hitSlop={ICON_HIT_SLOP}
@@ -175,7 +178,7 @@ const SuggestionRow = memo(function SuggestionRow({ text, index, onSelect }: Sug
           <Pressable
             testID={`btn-phrase-remove-${index}`}
             accessibilityRole="button"
-            accessibilityLabel="Xóa câu mẫu"
+            accessibilityLabel={t("chat.phrases.delete")}
             onPress={phrase.remove}
             hitSlop={ICON_HIT_SLOP}
           >

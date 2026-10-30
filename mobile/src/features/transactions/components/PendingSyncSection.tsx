@@ -1,13 +1,12 @@
 import { useMemo, useState } from "react";
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { spacing, typography, createStyles } from "@/lib/theme";
 import { useOutboxItems } from "@/stores/outbox-store";
 import { useCurrentUserId } from "@/stores/use-current-user-id";
 import { PendingSyncRow } from "@/features/transactions/components/PendingSyncRow";
 import { PendingSyncActionsSheet } from "@/features/transactions/components/PendingSyncActionsSheet";
-
-const SECTION_TITLE = "Chờ đồng bộ";
 
 /**
  * "Waiting to sync" above the server list (specs/mobile-offline-support
@@ -16,6 +15,7 @@ const SECTION_TITLE = "Chờ đồng bộ";
  * when the queue is empty (S-OFF-52).
  */
 export function PendingSyncSection() {
+  const { t } = useTranslation();
   const styles = useStyles();
   const userId = useCurrentUserId();
   const items = useOutboxItems(userId);
@@ -30,7 +30,7 @@ export function PendingSyncSection() {
   return (
     <View style={styles.section} testID="section-pending-sync">
       <View style={styles.headerRow}>
-        <Text style={styles.title}>{SECTION_TITLE}</Text>
+        <Text style={styles.title}>{t("common.status.pendingSync")}</Text>
         <Text style={styles.count}>{items.length}</Text>
       </View>
       {newestFirst.map((item, index) => (

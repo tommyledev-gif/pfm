@@ -1,5 +1,6 @@
 import { memo, useState } from "react";
 import { Animated, Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { AmountRevealPopup } from "@/components/ui/AmountRevealPopup";
 import { ReceiptIcon } from "@/components/ui/Icon";
@@ -55,6 +56,7 @@ export const TransactionRow = memo(function TransactionRow({
   highlightOpacity,
   shared = false,
 }: TransactionRowProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const isIncome = transaction.type === "income";
@@ -128,7 +130,7 @@ export const TransactionRow = memo(function TransactionRow({
               <View style={styles.items}>
                 <ReceiptIcon size={11} color={colors.textMuted} />
                 <Text style={styles.itemsLabel} testID={`badge-item-count-${transaction.id}`}>
-                  {itemCount} món
+                  {t("common.count.items", { count: itemCount })}
                 </Text>
               </View>
             ) : null}

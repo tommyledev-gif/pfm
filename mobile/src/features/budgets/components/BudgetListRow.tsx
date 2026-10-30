@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { Pressable, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
+import { useTranslation } from "react-i18next";
 
 import { formatCurrencyCompact } from "@/lib/currency";
 import { formatPercent } from "@/lib/percent";
@@ -11,6 +12,7 @@ import { budgetRowStatus } from "@/features/budgets/budget-pace";
 import { BudgetIconTile } from "@/features/budgets/components/BudgetIconTile";
 import { BudgetProgressBar } from "@/features/budgets/components/BudgetProgressBar";
 import { Budget, BudgetLimit } from "@/features/budgets/types";
+import { categoryLabel } from "@/features/categories/category-label";
 import { Category } from "@/features/categories/types";
 
 interface BudgetListRowProps {
@@ -54,6 +56,7 @@ export const BudgetListRow = memo(function BudgetListRow({
   onPressBar,
   highlighted,
 }: BudgetListRowProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const status = budgetRowStatus(limit, periodElapsed);
@@ -63,6 +66,7 @@ export const BudgetListRow = memo(function BudgetListRow({
   // (specs/wallet-budget-icons/spec.md Edge Case US-04 #1).
   const icon = budget.icon ?? category?.icon;
   const iconUrl = budget.icon_url ?? category?.icon_url;
+  const name = categoryLabel(category, budget.category_name);
 
   return (
     <Pressable
@@ -77,9 +81,9 @@ export const BudgetListRow = memo(function BudgetListRow({
       style={[styles.row, highlighted && styles.rowHighlighted]}
     >
       <View style={styles.headRow}>
-        <BudgetIconTile name={budget.category_name} icon={icon} iconUrl={iconUrl} />
+        <BudgetIconTile name={name} icon={icon} iconUrl={iconUrl} />
         <Animated.Text style={[styles.name, tintStyle]} numberOfLines={1}>
-          {budget.category_name}
+          {name}
         </Animated.Text>
         {/* What was spent, in the header's corner. Over-budget turns it red;
             otherwise it stays plain — the bar and caption below carry pace. */}
@@ -105,17 +109,20 @@ export const BudgetListRow = memo(function BudgetListRow({
             times (385% — đã vượt, vượt 5.280.000 đ, 7.130.000 / 1.850.000). */}
         <View style={styles.footRow}>
           <Text style={[styles.caption, { color: status.over ? colors.danger : status.color }]} numberOfLines={1}>
-            {formatPercent(status.ratio * 100)} · {status.over ? "Vượt" : "Còn"} {formatCurrencyCompact(Math.abs(status.remaining), limit.currency)}
+            {t(status.over ? "budgets.row.over" : "budgets.row.left", {
+              percent: formatPercent(status.ratio * 100),
+              amount: formatCurrencyCompact(Math.abs(status.remaining), limit.currency),
+            })}
           </Text>
           <Text style={styles.amounts} numberOfLines={1}>
-            Hạn mức: {formatCurrencyCompact(limit.amount_limit, limit.currency)}
+            {t("budgets.row.limit", { amount: formatCurrencyCompact(limit.amount_limit, limit.currency) })}
           </Text>
         </View>
 
         {/* Said out loud, because a bar that happens to be tappable is a
             secret. Only on rows that have something to show — an untouched
             budget would open an empty sheet. */}
-        {status.state !== "unused" ? <Text style={styles.drillLink}>Xem giao dịch →</Text> : null}
+        {status.state !== "unused" ? <Text style={styles.drillLink}>{t("budgets.row.seeTransactions")}</Text> : null}
       </Pressable>
     </Pressable>
   );

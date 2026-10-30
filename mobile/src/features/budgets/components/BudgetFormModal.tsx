@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { AmountInput } from "@/components/ui/AmountInput";
 import { Avatar } from "@/components/ui/Avatar";
@@ -10,13 +11,14 @@ import { DrawerHeader } from "@/components/shared/DrawerHeader";
 import { FieldError } from "@/components/ui/FieldError";
 import { PillButton } from "@/components/ui/PillButton";
 import { TrashIcon } from "@/components/ui/Icon";
-import { getErrorMessage } from "@/lib/axios";
+import { errorText } from "@/lib/api-envelope";
 import { colorForCategory } from "@/lib/category-color";
 import { toCents, toMajorUnits } from "@/lib/currency";
 import { withAlpha } from "@/lib/color";
 import { useRequireOnline } from "@/lib/connectivity";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
+import { categoryLabel } from "@/features/categories/category-label";
 import { useCategoryPicker } from "@/features/categories/components/use-category-picker";
 import { useCreateBudgetMutation } from "@/features/budgets/api/use-create-budget-mutation";
 import { useUpdateBudgetMutation } from "@/features/budgets/api/use-update-budget-mutation";
@@ -58,6 +60,7 @@ interface BudgetFormModalProps {
 // before — that row rendered every expense category at once with no way to find
 // one, which is unusable past a dozen.
 export function BudgetFormModal({ visible, onClose, currency, editingBudget, preset }: BudgetFormModalProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const requireOnline = useRequireOnline();
@@ -96,8 +99,8 @@ export function BudgetFormModal({ visible, onClose, currency, editingBudget, pre
   const savedLimit = editingBudget?.limits.find((l) => l.currency === currency);
   const amountValue = Number(amount);
   const errors = {
-    category: !categoryId ? "Vui lòng chọn danh mục" : undefined,
-    amount: !amount || !(amountValue > 0) ? "Vui lòng nhập hạn mức hợp lệ" : undefined,
+    category: !categoryId ? t("common.validation.chooseCategory") : undefined,
+    amount: !amount || !(amountValue > 0) ? t("budgets.form.amountInvalid") : undefined,
   };
   const hasErrors = Boolean(errors.category || errors.amount);
 
@@ -137,9 +140,9 @@ export function BudgetFormModal({ visible, onClose, currency, editingBudget, pre
         child={isEditing ? undefined : categoryPicker.child}
         footer={
           <View style={styles.actions}>
-            <PillButton label="Hủy" variant="outline" onPress={onClose} style={styles.flexButton} />
+            <PillButton label={t("common.action.cancel")} variant="outline" onPress={onClose} style={styles.flexButton} />
             <PillButton
-              label={isEditing ? "Lưu" : "Tạo"}
+              label={isEditing ? t("common.action.save") : t("common.action.create")}
               onPress={() => requireOnline(submit)}
               loading={mutation.isPending}
               disabled={submitAttempted && hasErrors}
@@ -148,22 +151,22 @@ export function BudgetFormModal({ visible, onClose, currency, editingBudget, pre
           </View>
         }
       >
-        <DrawerHeader title={isEditing ? "Sửa ngân sách" : "Ngân sách mới"} />
+        <DrawerHeader title={isEditing ? t("budgets.form.titleEdit") : t("budgets.form.titleNew")} />
 
-        <Text style={styles.label}>Danh mục{isEditing ? " (khóa sau khi tạo)" : ""}</Text>
+        <Text style={styles.label}>{isEditing ? t("budgets.form.categoryLocked") : t("common.field.category")}</Text>
         {isEditing ? (
           // Locked, so it is shown rather than offered: the backend's
           // UpdateBudgetRequest does not accept category_id at all.
           <View style={styles.lockedCategory}>
             <Avatar
-              name={editingBudget?.category_name ?? "?"}
+              name={categoryLabel(selectedCategory, editingBudget?.category_name) || "?"}
               color={editingBudget ? colorForCategory(editingBudget.category_id) : colors.lavender}
               size={28}
               icon={inheritedIcon}
               iconUrl={inheritedIconUrl}
             />
             <Text style={styles.lockedCategoryLabel} numberOfLines={1}>
-              {editingBudget?.category_name}
+              {categoryLabel(selectedCategory, editingBudget?.category_name)}
             </Text>
           </View>
         ) : (
@@ -174,34 +177,34 @@ export function BudgetFormModal({ visible, onClose, currency, editingBudget, pre
             spent={savedLimit.spent}
             limit={savedLimit.amount_limit}
             currency={currency}
-            periodLabel="Tháng này"
+            periodLabel={t("common.date.thisMonth")}
           />
         ) : null}
         {submitAttempted ? <FieldError message={errors.category} /> : null}
         {selectedCategory ? (
-          <Text style={styles.iconHint}>Ngân sách dùng luôn biểu tượng của danh mục này.</Text>
+          <Text style={styles.iconHint}>{t("budgets.form.iconHint")}</Text>
         ) : null}
 
-        <Text style={styles.label}>Hạn mức hàng tháng ({currency})</Text>
+        <Text style={styles.label}>{t("budgets.form.limitLabel", { currency })}</Text>
         <AmountInput value={amount} onChangeText={setAmount} />
         {submitAttempted ? <FieldError message={errors.amount} /> : null}
 
         {activeError ? (
-          <Text style={styles.error}>{getErrorMessage(activeError, "Không thể lưu ngân sách")}</Text>
+          <Text style={styles.error}>{errorText(activeError, "budgets.form.saveError")}</Text>
         ) : null}
 
         {isEditing ? (
           <Pressable style={styles.deleteRow} onPress={() => requireOnline(() => setConfirmDeleteOpen(true))} disabled={deleteBudget.isPending}>
             <TrashIcon size={18} />
-            <Text style={styles.deleteLabel}>Xóa ngân sách</Text>
+            <Text style={styles.deleteLabel}>{t("budgets.form.delete")}</Text>
           </Pressable>
         ) : null}
       </Drawer>
 
       <ConfirmDialog
         visible={confirmDeleteOpen}
-        title="Xóa ngân sách?"
-        message="Hành động này không thể hoàn tác."
+        title={t("budgets.delete.title")}
+        message={t("common.confirm.cannotUndo")}
         onCancel={() => setConfirmDeleteOpen(false)}
         onConfirm={() => {
           setConfirmDeleteOpen(false);

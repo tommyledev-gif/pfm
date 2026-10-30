@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { useTransactionQuery } from "@/features/transactions/api/use-transaction-query";
 import { useLocationStep } from "@/features/transactions/components/use-location-step";
@@ -37,6 +38,7 @@ const toInput = (location: TransactionLocation): TransactionLocationInput => ({
  * still read: the pin may have been moved from the Transactions screen since.
  */
 export function useProposalLocation({ visible, payloadPin, transactionId }: UseProposalLocationOptions) {
+  const { t } = useTranslation();
   const saved = transactionId !== null;
   const detail = useTransactionQuery(transactionId, { enabled: visible && saved });
   // undefined = not touched in this sheet; null = removed (unsaved proposals only).
@@ -84,18 +86,18 @@ export function useProposalLocation({ visible, payloadPin, transactionId }: UseP
   const tile: LocationTileView = pin
     ? {
         summary: pin.place_name ?? formatCoordinates(pin),
-        detail: moved ? "Đã dời, chưa lưu" : pin.note || undefined,
+        detail: moved ? t("chat.location.movedUnsaved") : pin.note || undefined,
         muted: false,
         pinned: true,
         locked: false,
-        accessibilityLabel: `Vị trí: ${pin.place_name ?? "chưa có tên khu vực"}. Mở bản đồ`,
+        accessibilityLabel: t("chat.location.tile.a11y", { place: pin.place_name ?? t("chat.location.unnamedArea") }),
       }
     : {
-        summary: "Thêm vị trí",
+        summary: t("chat.location.add"),
         muted: true,
         pinned: false,
         locked: false,
-        accessibilityLabel: "Thêm vị trí",
+        accessibilityLabel: t("chat.location.add"),
       };
 
   return {

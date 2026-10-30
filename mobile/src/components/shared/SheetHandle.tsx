@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { Animated, GestureResponderHandlers, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { withAlpha } from "@/lib/color";
 import { createStyles } from "@/lib/theme";
@@ -28,6 +29,7 @@ interface SheetHandleProps {
  * marks a sheet that drags down to a smaller size.
  */
 export function SheetHandle({ panHandlers, progress, expanded }: SheetHandleProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const tilt = useMemo(
     () => ({
@@ -42,7 +44,7 @@ export function SheetHandle({ panHandlers, progress, expanded }: SheetHandleProp
       {...panHandlers}
       accessible
       accessibilityRole="adjustable"
-      accessibilityLabel={expanded ? "Kéo xuống để thu nhỏ" : "Kéo lên để mở rộng"}
+      accessibilityLabel={expanded ? t("ui.sheetHandle.collapse") : t("ui.sheetHandle.expand")}
       hitSlop={8}
     >
       <View style={styles.bar}>

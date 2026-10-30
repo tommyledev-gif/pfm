@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { MoneyField } from "@/features/budget-wizard/components/MoneyField";
 import { WizardSavingsField } from "@/features/budget-wizard/components/WizardSavingsField";
@@ -18,7 +19,7 @@ import {
   summarizeFixedCosts,
 } from "@/features/budget-wizard/fixed-costs";
 import { formatCurrency } from "@/lib/currency";
-import { formatSavedAt } from "@/features/budget-wizard/saved-plan";
+import { formatDateDMY } from "@/lib/format-date";
 import { WIZARD_MONEY_MAX_XU, WIZARD_MONEY_SCALE } from "@/features/budget-wizard/wizard-money-scale";
 import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
@@ -81,6 +82,7 @@ export function WizardStepIncome({
   onDiscardSavedPlan,
 }: WizardStepIncomeProps) {
   const styles = useStyles();
+  const { t } = useTranslation();
   const savings = savingsAmount(savingsChoice, income);
   const disposable = disposableXu(income, fixed, savings);
   const days = daysInCycle(cycleStartDay);
@@ -113,7 +115,7 @@ export function WizardStepIncome({
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Mỗi tháng bạn có bao nhiêu?</Text>
+        <Text style={styles.title}>{t("budgetWizard.income.title")}</Text>
 
         {/* Says where these numbers came from. A form that opens pre-filled with
             no explanation reads as the app having remembered something it was
@@ -121,11 +123,11 @@ export function WizardStepIncome({
         {restoredFromSavedAt ? (
           <View style={styles.restoredBanner}>
             <Text style={styles.restoredText}>
-              Đã điền từ kế hoạch lưu ngày {formatSavedAt(restoredFromSavedAt)}.
+              {t("budgetWizard.income.restored", { date: formatDateDMY(restoredFromSavedAt) })}
             </Text>
             {onDiscardSavedPlan ? (
               <Pressable onPress={onDiscardSavedPlan} hitSlop={8} testID="btn-wizard-discard-plan">
-                <Text style={styles.restoredAction}>Bắt đầu lại</Text>
+                <Text style={styles.restoredAction}>{t("budgetWizard.income.startOver")}</Text>
               </Pressable>
             ) : null}
           </View>
@@ -133,7 +135,7 @@ export function WizardStepIncome({
 
         <MoneyField
           testID="input-wizard-income"
-          label="Thu nhập hàng tháng"
+          label={t("budgetWizard.income.incomeLabel")}
           value={income}
           onChange={onChangeIncome}
           sliderScale={MONEY_SLIDER}
@@ -142,11 +144,11 @@ export function WizardStepIncome({
 
         <MoneyField
           testID="input-wizard-fixed"
-          label="Chi phí cố định"
+          label={t("budgetWizard.income.fixedLabel")}
           // Once the helper has run, the hint shows what the total is actually
           // made of instead of describing the category in the abstract — the
           // fastest way to spot that a cost is missing.
-          hint={breakdown.length > 0 ? summarizeFixedCosts(breakdown) : "nhà, điện nước, internet, học phí"}
+          hint={breakdown.length > 0 ? summarizeFixedCosts(breakdown) : t("budgetWizard.income.fixedHint")}
           value={fixed}
           onChange={onChangeFixed}
           sliderScale={MONEY_SLIDER}
@@ -154,7 +156,10 @@ export function WizardStepIncome({
           // what counts as fixed, and this is for the user who reads that list
           // and realises they do not know the total.
           action={{
-            label: breakdown.length > 0 ? `Sửa ${breakdown.length} khoản` : "Tôi không nhớ tổng →",
+            label:
+              breakdown.length > 0
+                ? t("budgetWizard.income.editFixedItems", { count: breakdown.length })
+                : t("budgetWizard.income.unknownTotal"),
             onPress: onOpenFixedCosts,
             testID: "btn-wizard-fixed-costs",
           }}
@@ -174,7 +179,7 @@ export function WizardStepIncome({
         />
 
         <View style={styles.field}>
-          <Text style={styles.label}>Lương về ngày</Text>
+          <Text style={styles.label}>{t("budgetWizard.income.paydayLabel")}</Text>
           <View style={styles.chipRow}>
             {CYCLE_DAY_CHOICES.map((day) => {
               const active = day === cycleStartDay;
@@ -190,7 +195,7 @@ export function WizardStepIncome({
               );
             })}
           </View>
-          <Text style={styles.hint}>Chu kỳ này dài {days} ngày.</Text>
+          <Text style={styles.hint}>{t("budgetWizard.income.cycleLength", { count: days })}</Text>
         </View>
 
         {/* ⚠️ Only once there is an answer to show.
@@ -204,14 +209,13 @@ export function WizardStepIncome({
         {disposable > 0 ? (
           <View style={styles.result}>
             <View style={styles.resultLeft}>
-              <Text style={styles.label}>Còn được chi</Text>
+              <Text style={styles.label}>{t("budgetWizard.income.leftToSpend")}</Text>
               <Text testID="text-wizard-disposable" style={styles.resultBig}>
                 {formatCurrency(disposable, currency)}
               </Text>
             </View>
             <Text testID="text-wizard-per-day" style={styles.resultPerDay}>
-              {perDay > 0 ? `${formatCurrency(perDay, currency)}
-mỗi ngày` : ""}
+              {perDay > 0 ? t("budgetWizard.income.perDay", { amount: formatCurrency(perDay, currency) }) : ""}
             </Text>
           </View>
         ) : null}
@@ -223,7 +227,7 @@ mỗi ngày` : ""}
         disabled={!validation.ok}
         style={[styles.primaryBtn, !validation.ok && styles.primaryBtnDisabled]}
       >
-        <Text style={styles.primaryLabel}>Tiếp →</Text>
+        <Text style={styles.primaryLabel}>{t("budgetWizard.income.next")}</Text>
       </Pressable>
 
 

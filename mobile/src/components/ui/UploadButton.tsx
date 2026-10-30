@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { LayoutChangeEvent, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import type { MutationStatus } from "@tanstack/react-query";
 import Animated from "react-native-reanimated";
 
@@ -13,7 +14,7 @@ import { formatPercent } from "@/lib/percent";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useUploadProgress } from "@/lib/use-upload-progress";
 
-export const UPLOAD_WAITING_LABEL = "Đang tải ảnh lên…";
+export const UPLOAD_WAITING_KEY = "ui.upload.waiting" as const;
 const MIN_HEIGHT = 64;
 const LINE_HEIGHT = 20;
 const REMOVE_SIZE = 36;
@@ -55,6 +56,7 @@ interface UploadButtonProps {
  * the run never changes its width.
  */
 export function UploadButton({ status, label, doneLabel, onPress, disabled, testID, hint, remove }: UploadButtonProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const upload = useUploadProgress(status);
@@ -63,7 +65,7 @@ export function UploadButton({ status, label, doneLabel, onPress, disabled, test
   const inactive = disabled || upload.busy;
 
   const textFor = (key: string) =>
-    key === "progress" ? formatPercent(upload.percent) : key === "waiting" ? UPLOAD_WAITING_LABEL : key === "done" ? doneLabel : label;
+    key === "progress" ? formatPercent(upload.percent) : key === "waiting" ? t(UPLOAD_WAITING_KEY) : key === "done" ? doneLabel : label;
 
   const renderSlot = (key: string) => (
     <Text
@@ -78,7 +80,7 @@ export function UploadButton({ status, label, doneLabel, onPress, disabled, test
   // content (no stretching container) still fits every label of the run.
   const sizer = (
     <View style={styles.sizer}>
-      {[label, doneLabel, UPLOAD_WAITING_LABEL].map((text, i) => (
+      {[label, doneLabel, t(UPLOAD_WAITING_KEY)].map((text, i) => (
         <Text key={i} style={styles.title} numberOfLines={1}>
           {text}
         </Text>

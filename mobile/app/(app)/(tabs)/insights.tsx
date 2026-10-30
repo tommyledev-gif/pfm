@@ -8,6 +8,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useLocalSearchParams } from "expo-router";
+import { useTranslation } from "react-i18next";
 
 import { MotionHighlight, useOptionRects } from "@/components/motion/MotionHighlight";
 import { ENTER_OFFSET, SPRING } from "@/components/motion/motion-tokens";
@@ -20,8 +21,8 @@ import { BudgetWizardModal } from "@/features/budget-wizard/components/BudgetWiz
 
 // Keys stay English: Home deep-links here with `tab: "Budgets"`.
 const SUB_TABS = [
-  { key: "Spending", label: "Chi tiêu" },
-  { key: "Budgets", label: "Ngân sách" },
+  { key: "Spending", labelKey: "insights.tab.spending" },
+  { key: "Budgets", labelKey: "insights.tab.budgets" },
 ] as const;
 type SubTab = (typeof SUB_TABS)[number]["key"];
 
@@ -29,6 +30,7 @@ const UNDERLINE_HEIGHT = 2;
 const LABEL_FADE_MS = 180;
 
 export default function InsightsScreen() {
+  const { t } = useTranslation();
   const styles = useStyles();
   const reduceMotion = useReduceMotion();
   // From a budget notification (categoryId) or Home's "sắp vượt" list (tab +
@@ -67,22 +69,22 @@ export default function InsightsScreen() {
 
   return (
     <Screen style={styles.screen}>
-      <Text style={styles.title}>Phân tích</Text>
+      <Text style={styles.title}>{t("insights.title")}</Text>
 
       <View style={styles.tabRow}>
         {activeRect ? <MotionHighlight rect={activeRect} style={styles.underline} /> : null}
-        {SUB_TABS.map((t) => (
+        {SUB_TABS.map((subTab) => (
           <Pressable
-            key={t.key}
-            onPress={() => setTab(t.key)}
-            onLayout={(e) => onOptionLayout(t.key, e)}
+            key={subTab.key}
+            onPress={() => setTab(subTab.key)}
+            onLayout={(e) => onOptionLayout(subTab.key, e)}
             style={styles.tabButton}
             accessibilityRole="tab"
-            accessibilityState={{ selected: tab === t.key }}
+            accessibilityState={{ selected: tab === subTab.key }}
           >
-            <SubTabLabel label={t.label} active={tab === t.key} reduceMotion={reduceMotion} />
+            <SubTabLabel label={t(subTab.labelKey)} active={tab === subTab.key} reduceMotion={reduceMotion} />
             {/* Keeps the tabs the same height; the highlight draws the line once measured. */}
-            <View style={[styles.underlineSlot, tab === t.key && !activeRect && styles.underlineStatic]} />
+            <View style={[styles.underlineSlot, tab === subTab.key && !activeRect && styles.underlineStatic]} />
           </Pressable>
         ))}
       </View>

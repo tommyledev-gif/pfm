@@ -1,12 +1,14 @@
 import { ReactNode } from "react";
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { Drawer } from "@/components/shared/Drawer";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
 import { CheckIcon, LockIcon } from "@/components/ui/Icon";
 import { PillButton } from "@/components/ui/PillButton";
-import { formatTime } from "@/lib/format-date";
+import { formatDateDMY, formatTime } from "@/lib/format-date";
+import { currentLanguage } from "@/lib/i18n";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 
 // The "last updated" time stands for the whole saved snapshot; Wallets are
@@ -15,14 +17,14 @@ const LAST_UPDATED_QUERY_KEY = ["wallets"] as const;
 
 // What still works offline, and what does not — the online-only list is
 // specs/mobile-offline-support S-OFF-11 (decision #2), in the User's words.
-const STILL_WORKS = ["Xem dữ liệu đã lưu", "Thêm giao dịch mới — tự đồng bộ khi có mạng"];
+const STILL_WORKS = ["ui.offline.sheet.stillWorks.viewSaved", "ui.offline.sheet.stillWorks.addTransaction"] as const;
 const NEEDS_NETWORK = [
-  "Sửa hoặc xoá giao dịch",
-  "Thêm, sửa ví, danh mục, ngân sách",
-  "Trò chuyện với AI và duyệt đề xuất",
-  "Nhập, xuất dữ liệu",
-  "Mời thành viên",
-];
+  "ui.offline.sheet.needsNetwork.editDelete",
+  "ui.offline.sheet.needsNetwork.manage",
+  "ui.offline.sheet.needsNetwork.assistant",
+  "ui.offline.sheet.needsNetwork.importExport",
+  "ui.offline.sheet.needsNetwork.inviteMembers",
+] as const;
 
 interface OfflineInfoSheetProps {
   visible: boolean;
@@ -37,6 +39,7 @@ interface OfflineInfoSheetProps {
  * strip has to stay one short phrase.
  */
 export function OfflineInfoSheet({ visible, onClose, queuedCount }: OfflineInfoSheetProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const queryClient = useQueryClient();
@@ -51,29 +54,29 @@ export function OfflineInfoSheet({ visible, onClose, queuedCount }: OfflineInfoS
     <Drawer
       visible={visible}
       onClose={onClose}
-      footer={<PillButton label="Đã hiểu" onPress={onClose} testID="btn-offline-info-close" />}
+      footer={<PillButton label={t("common.action.gotIt")} onPress={onClose} testID="btn-offline-info-close" />}
     >
-      <DrawerHeader title="Đang ngoại tuyến" />
+      <DrawerHeader title={t("ui.offline.sheet.title")} />
       <View style={styles.summary} testID="sheet-offline-info">
         <Text style={styles.updated}>
           {lastUpdatedMs > 0
-            ? `Dữ liệu cập nhật lúc ${formatLastUpdated(lastUpdatedMs)}`
-            : "Chưa có dữ liệu nào được lưu trên máy"}
+            ? t("ui.offline.sheet.lastUpdated", { time: formatLastUpdated(lastUpdatedMs) })
+            : t("ui.offline.sheet.noSavedData")}
         </Text>
-        <Text style={styles.caption}>Số dư và số liệu có thể đã cũ cho tới khi có mạng lại.</Text>
+        <Text style={styles.caption}>{t("ui.offline.sheet.staleNote")}</Text>
         {queuedCount > 0 ? (
-          <Text style={styles.queued}>{queuedCount} giao dịch đang chờ — sẽ tự đồng bộ khi có mạng.</Text>
+          <Text style={styles.queued}>{t("ui.offline.sheet.queued", { count: queuedCount })}</Text>
         ) : null}
       </View>
 
-      <Section title="Vẫn làm được">
-        {STILL_WORKS.map((text) => (
-          <Row key={text} icon={<CheckIcon size={14} color={colors.green} strokeWidth={2.4} />} text={text} />
+      <Section title={t("ui.offline.sheet.stillWorksTitle")}>
+        {STILL_WORKS.map((key) => (
+          <Row key={key} icon={<CheckIcon size={14} color={colors.green} strokeWidth={2.4} />} text={t(key)} />
         ))}
       </Section>
-      <Section title="Cần kết nối mạng">
-        {NEEDS_NETWORK.map((text) => (
-          <Row key={text} icon={<LockIcon size={14} color={colors.textMuted} />} text={text} />
+      <Section title={t("ui.offline.sheet.needsNetworkTitle")}>
+        {NEEDS_NETWORK.map((key) => (
+          <Row key={key} icon={<LockIcon size={14} color={colors.textMuted} />} text={t(key)} />
         ))}
       </Section>
     </Drawer>
@@ -101,11 +104,13 @@ function Row({ icon, text }: { icon: ReactNode; text: string }) {
 }
 
 // "HH:mm" when the data is from today, "dd/MM HH:mm" otherwise — an older
-// snapshot must not read as if it were from this morning.
+// snapshot must not read as if it were from this morning. English takes the
+// full "Oct 29, 2026": a bare "29/10" reads as month/day there.
 function formatLastUpdated(ms: number): string {
   const date = new Date(ms);
   const iso = date.toISOString();
   if (date.toDateString() === new Date().toDateString()) return formatTime(iso);
+  if (currentLanguage() === "en") return `${formatDateDMY(iso)} ${formatTime(iso)}`;
   const day = String(date.getDate()).padStart(2, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
   return `${day}/${month} ${formatTime(iso)}`;

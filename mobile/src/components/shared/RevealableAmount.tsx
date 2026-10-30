@@ -1,5 +1,6 @@
 import { memo, useRef } from "react";
 import { Animated, Easing, Pressable, StyleProp, Text, TextStyle, View, ViewStyle } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { formatCurrencyCompact } from "@/lib/currency";
 import { createStyles } from "@/lib/theme";
@@ -53,6 +54,7 @@ export const RevealableAmount = memo(function RevealableAmount({
   labelStyle,
   containerStyle,
 }: RevealableAmountProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const targetRef = useRef<View>(null);
   const holdProgress = useRef(new Animated.Value(0)).current;
@@ -98,7 +100,7 @@ export const RevealableAmount = memo(function RevealableAmount({
       disabled={!holdable}
       accessibilityRole={holdable ? "button" : undefined}
       accessibilityLabel={label}
-      accessibilityHint={holdable ? "Nhấn giữ để xem số tiền đầy đủ" : undefined}
+      accessibilityHint={holdable ? t("ui.amount.revealHint") : undefined}
       testID={testID}
     >
       {label ? (

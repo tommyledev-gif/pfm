@@ -1,0 +1,197 @@
+{
+  "ui": {
+    "sheetHandle": {
+      "collapse": "Kéo xuống để thu nhỏ",
+      "expand": "Kéo lên để mở rộng"
+    },
+    "toast": {
+      "dismiss": "Đóng thông báo"
+    },
+    "categoryField": {
+      "placeholder": "Chưa chọn danh mục",
+      "change": "Đổi danh mục"
+    },
+    "dateRange": {
+      "title": "Khoảng thời gian",
+      "selected": "{{from}}{{to}}` : \"\"}",
+      "pickStart": "Chọn ngày bắt đầu",
+      "maxHint_other": "Khoảng thời gian tối đa {{count}} ngày."
+    },
+    "datePicker": {
+      "title": "Chọn ngày"
+    },
+    "calendar": {
+      "pickMonthYear": "Chọn tháng và năm",
+      "monthYear": "{{month}}, {{year}}"
+    },
+    "monthYearSheet": {
+      "title": "Chọn thời gian"
+    },
+    "offline": {
+      "strip": "Bạn đang ngoại tuyến",
+      "reconnected": "Đã kết nối lại · đang đồng bộ",
+      "openHint": "thao tác",
+      "stripQueued_other": "Bạn đang ngoại tuyến · {{count}} chờ đồng bộ",
+      "sheet": {
+        "stillWorks": {
+          "viewSaved": "Xem dữ liệu đã lưu",
+          "addTransaction": "Thêm giao dịch mới — tự đồng bộ khi có mạng"
+        },
+        "needsNetwork": {
+          "editDelete": "xóa",
+          "manage": "Thêm, sửa ví, danh mục, ngân sách",
+          "assistant": "Trò chuyện với AI và duyệt đề xuất",
+          "importExport": "Nhập, xuất dữ liệu",
+          "inviteMembers": "Mời thành viên"
+        },
+        "title": "Đang ngoại tuyến",
+        "lastUpdated": "Dữ liệu cập nhật lúc {{time}}",
+        "noSavedData": "Chưa có dữ liệu nào được lưu trên máy",
+        "staleNote": "Số dư và số liệu có thể đã cũ cho tới khi có mạng lại.",
+        "queued_other": "{{count}} giao dịch đang chờ — sẽ tự đồng bộ khi có mạng.",
+        "stillWorksTitle": "Vẫn làm được",
+        "needsNetworkTitle": "Cần kết nối mạng"
+      }
+    },
+    "calculator": {
+      "spoken": {
+        "plus": "cộng",
+        "minus": "trừ",
+        "times": "nhân",
+        "divide": "chia",
+        "decimal": "dấu thập phân",
+        "tripleZero": "ba số không",
+        "decimalSeparator": "phẩy"
+      },
+      "backspace": "Xóa",
+      "backspaceHint": "Nhấn giữ để xóa hết",
+      "confirm": "Xác nhận"
+    },
+    "amount": {
+      "error": {
+        "divideByZero": "Không thể chia cho 0",
+        "outOfRange": "Vượt quá số tiền tối đa"
+      },
+      "notice": {
+        "rounded": "Đã làm tròn thành {{amount}} vì {{currency}} không có phần lẻ.",
+        "cleared": "Đã xóa số tiền vì {{currency}} không có phần lẻ."
+      },
+      "problem": {
+        "roundedToZero": "Số tiền làm tròn về 0 — nhỏ hơn đơn vị nhỏ nhất của {{currency}}.",
+        "notPositive": "Số tiền phải lớn hơn 0."
+      },
+      "spokenEmpty": "Chưa nhập số tiền",
+      "revealHint": "Nhấn giữ để xem số tiền đầy đủ"
+    },
+    "currencySwitch": {
+      "viewIn": "Xem theo {{currency}}"
+    },
+    "iconPicker": {
+      "upload": "Tải ảnh từ thiết bị"
+    },
+    "iconField": {
+      "uploaded": "Ảnh đã tải lên",
+      "default": "Biểu tượng mặc định",
+      "hint": "Chạm để chọn emoji hoặc tải ảnh"
+    },
+    "emojiPicker": {
+      "placeholder": "Chọn emoji",
+      "clear": "Xóa"
+    },
+    "openMoji": {
+      "searchPlaceholder": "Tìm bằng tiếng Anh, vd: coffee",
+      "empty": "Không tìm thấy biểu tượng nào.",
+      "credit": "Biểu tượng: OpenMoji (CC BY-SA 4.0)",
+      "group": {
+        "foodDrink": "Đồ ăn & Uống",
+        "objects": "Đồ vật",
+        "travelPlaces": "Du lịch & Địa điểm",
+        "activities": "Hoạt động",
+        "animalsNature": "Động vật & Thiên nhiên",
+        "smileysEmotion": "Cảm xúc",
+        "peopleBody": "Con người",
+        "symbols": "Ký hiệu",
+        "flags": "Cờ"
+      }
+    },
+    "donut": {
+      "seeTransactions": "Xem giao dịch"
+    },
+    "upload": {
+      "waiting": "Đang tải ảnh lên…"
+    },
+    "clipboard": {
+      "copied": "Đã sao chép",
+      "copyFailed": "Không sao chép được"
+    },
+    "device": {
+      "fallbackName": "Điện thoại"
+    },
+    "walletColor": {
+      "blue": "Xanh dương",
+      "indigo": "Chàm",
+      "violet": "Tím",
+      "magenta": "Tím hồng",
+      "rose": "Đỏ hồng",
+      "orange": "Cam đất",
+      "green": "Xanh lá",
+      "teal": "Xanh két",
+      "slate": "Xám",
+      "amber": "Vàng",
+      "lime": "Xanh nõn chuối",
+      "cyan": "Xanh ngọc"
+    },
+    "theme": {
+      "dark": "Tối",
+      "light": "Sáng"
+    }
+  },
+  "format": {
+    "calendar": {
+      "monthNames": "Tháng 1, Tháng 2, Tháng 3, Tháng 4, Tháng 5, Tháng 6, Tháng 7, Tháng 8, Tháng 9, Tháng 10, Tháng 11, Tháng 12",
+      "monthNamesShort": "Th1, Th2, Th3, Th4, Th5, Th6, Th7, Th8, Th9, Th10, Th11, Th12",
+      "dayNames": "Chủ nhật, Thứ hai, Thứ ba, Thứ tư, Thứ năm, Thứ sáu, Thứ bảy",
+      "dayNamesShort": "CN, T2, T3, T4, T5, T6, T7"
+    },
+    "previousPeriod": {
+      "day": "hôm qua",
+      "year": "năm trước",
+      "month": "tháng trước"
+    },
+    "amountWords": {
+      "currency": {
+        "VND": "đồng",
+        "USD": "đô la Mỹ"
+      }
+    }
+  },
+  "appUpdate": {
+    "title": "Cần cài bản Budgest mới",
+    "message": "Bản đang dùng đã cũ nên không nhận thêm cập nhật. Cài bản mới đè lên, dữ liệu và đăng nhập vẫn giữ nguyên.",
+    "version": "Bản {{name}}",
+    "hint": "Tải xong, chọn Cài đặt khi máy hỏi.",
+    "readyHint": "Máy hỏi quyền cài ứng dụng thì bật cho Budgest.",
+    "browserHint": "Tải xong, mở file vừa tải và chọn Cài đặt.",
+    "download": "Tải bản mới",
+    "install": "Cài bản mới",
+    "retry": "Tải lại",
+    "browser": "Tải bằng trình duyệt",
+    "downloadFailed": "Chưa tải được bản mới. Kiểm tra mạng rồi thử lại.",
+    "installFailed": "Chưa mở được trình cài đặt.",
+    "progress": "Đang tải bản mới"
+  },
+  "debug": {
+    "bubble": {
+      "open": "Mở debug console"
+    },
+    "viewer": {
+      "title": "Debug console",
+      "screen": "Screen: {{path}}",
+      "share": "Share",
+      "clear": "Clear log",
+      "testAccounts": "Test accounts",
+      "showNew_other": "Show {{count}} new",
+      "empty": "No log entries yet."
+    }
+  }
+}

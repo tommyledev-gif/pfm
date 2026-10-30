@@ -1,4 +1,5 @@
 import { Pressable, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { useHintTooltip } from "@/components/shared/use-hint-tooltip";
 import { MapPinIcon } from "@/components/ui/Icon";
@@ -18,15 +19,16 @@ const SLASH_LENGTH = 20;
 export function LocationPinToggle() {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const on = useUiPrefsStore((s) => s.pinLocationByDefault);
   const setOn = useUiPrefsStore((s) => s.setPinLocationByDefault);
-  const hint = useHintTooltip(on ? "Tắt ghim vị trí" : "Bật ghim vị trí");
+  const hint = useHintTooltip(on ? t("chat.pinToggle.hint.turnOff") : t("chat.pinToggle.hint.turnOn"));
 
   return (
     <Pressable
       testID="btn-chat-pin-location"
       accessibilityRole="switch"
-      accessibilityLabel="Ghim vị trí khi lưu"
+      accessibilityLabel={t("chat.pinToggle.a11y")}
       accessibilityState={{ checked: on }}
       onPress={() => setOn(!on)}
       {...hint}

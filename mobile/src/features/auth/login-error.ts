@@ -1,25 +1,27 @@
-import { getErrorCode, getErrorMessage } from "@/lib/axios";
-import { isNetworkError } from "@/lib/api-envelope";
+import { ErrorCodeKeys, errorText, getErrorCode } from "@/lib/api-envelope";
+import { i18n } from "@/lib/i18n";
 
-const FAILED = "Chưa đăng nhập được. Thử lại.";
+// LoginRateLimiter / LoginAccountRateLimiter: a 15-minute window. The server
+// does not send it in `details`, so it is said from here.
+const RATE_LIMIT_MINUTES = 15;
 
 // The server's messages are English fragments meant for logs ("invalid email
 // or password"), so login failures are worded here, by error code.
-const ERROR_COPY: Record<string, string> = {
+const LOGIN_ERROR_KEYS: ErrorCodeKeys = {
   // Never says which of the two was wrong.
-  INVALID_CREDENTIALS: "Tài khoản hoặc mật khẩu không đúng.",
-  // LoginRateLimiter / LoginAccountRateLimiter: a 15-minute window.
-  RATE_LIMITED: "Đăng nhập sai quá nhiều lần. Thử lại sau 15 phút.",
-  ACCOUNT_NOT_ACTIVATED: "Tài khoản chưa kích hoạt. Mở email mời để kích hoạt.",
-  ACCOUNT_AWAITING_APPROVAL: "Yêu cầu tạo tài khoản đang chờ admin duyệt.",
-  ACCOUNT_DISABLED: "Tài khoản đã bị khóa. Liên hệ admin.",
+  INVALID_CREDENTIALS: "auth.loginError.INVALID_CREDENTIALS",
+  ACCOUNT_NOT_ACTIVATED: "auth.loginError.ACCOUNT_NOT_ACTIVATED",
+  ACCOUNT_AWAITING_APPROVAL: "auth.loginError.ACCOUNT_AWAITING_APPROVAL",
+  ACCOUNT_DISABLED: "auth.loginError.ACCOUNT_DISABLED",
   // Passkey sign-in (PasskeySignInButton).
-  PASSKEY_FAILED: "Không xác minh được passkey. Thử lại.",
-  PASSKEYS_UNAVAILABLE: "Chưa dùng được passkey. Đăng nhập bằng mật khẩu.",
+  PASSKEY_FAILED: "auth.loginError.PASSKEY_FAILED",
+  PASSKEYS_UNAVAILABLE: "auth.loginError.PASSKEYS_UNAVAILABLE",
 };
 
 /** What a failed sign-in says — password or passkey, same account-status answers. */
 export function loginErrorMessage(error: unknown): string {
-  if (isNetworkError(error)) return getErrorMessage(error, FAILED);
-  return ERROR_COPY[getErrorCode(error) ?? ""] ?? FAILED;
+  if (getErrorCode(error) === "RATE_LIMITED") {
+    return i18n.t("auth.loginError.RATE_LIMITED", { minutes: RATE_LIMIT_MINUTES });
+  }
+  return errorText(error, "auth.loginError.failed", LOGIN_ERROR_KEYS);
 }

@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { ChevronRightIcon } from "@/components/ui/Icon";
 import { Drawer } from "@/components/shared/Drawer";
@@ -30,9 +31,10 @@ interface ShareWalletPickerProps {
 export function ShareWalletPicker({ visible, onClose, wallets, faceById, onPick }: ShareWalletPickerProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   return (
     <Drawer visible={visible} onClose={onClose}>
-      <DrawerHeader title="Chọn ví để chia sẻ" />
+      <DrawerHeader title={t("sharedWallets.picker.title")} />
       <View style={styles.group}>
         {wallets.map((wallet, index) => {
           const members = wallet.member_count ?? 0;
@@ -58,7 +60,7 @@ export function ShareWalletPicker({ visible, onClose, wallets, faceById, onPick 
                   </Text>
                   <Text style={styles.meta} numberOfLines={1}>
                     {members > 0
-                      ? `Ví chung · ${members + 1} người`
+                      ? t("sharedWallets.picker.sharedWith", { count: members + 1 })
                       : formatCurrency(wallet.balance, wallet.currency)}
                   </Text>
                 </View>

@@ -1,4 +1,5 @@
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { formatCurrency } from "@/lib/currency";
 import { withAlpha } from "@/lib/color";
@@ -33,11 +34,12 @@ interface SegmentLegendProps {
  */
 export function SegmentLegend({ entry, currency }: SegmentLegendProps) {
   const styles = useStyles();
+  const { t } = useTranslation();
   if (!entry) {
     return (
       <View style={styles.row}>
         <Text style={styles.hint} numberOfLines={1}>
-          Chạm từng khúc để xem tên mục.
+          {t("budgetWizard.result.segmentHint")}
         </Text>
       </View>
     );

@@ -1,4 +1,5 @@
 import { Modal, Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { PillButton } from "@/components/ui/PillButton";
 import { createStyles, radii, spacing, typography } from "@/lib/theme";
@@ -19,16 +20,17 @@ const DIALOG_MAX_WIDTH = 340;
 // ConfirmDialog: there the backdrop means "cancel", which here would be
 // "Load latest" — discarding the User's edit by a stray tap.
 export function StaleEditDialog({ visible, onLoadLatest, onSaveAnyway, onDismiss, loading }: StaleEditDialogProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss}>
       <Pressable style={styles.backdrop} onPress={onDismiss}>
         <Pressable onPress={() => {}} style={styles.card} testID="dialog-stale-edit">
-          <Text style={styles.title}>Giao dịch đã được sửa ở nơi khác</Text>
-          <Text style={styles.message}>Lưu bản này sẽ thay bản kia.</Text>
+          <Text style={styles.title}>{t("transactions.staleEdit.title")}</Text>
+          <Text style={styles.message}>{t("transactions.staleEdit.body")}</Text>
           <View style={styles.actions}>
-            <PillButton testID="btn-stale-load-latest" label="Tải bản mới" variant="outline" onPress={onLoadLatest} style={styles.flex} />
-            <PillButton testID="btn-stale-save-anyway" label="Vẫn lưu" onPress={onSaveAnyway} loading={loading} style={styles.flex} />
+            <PillButton testID="btn-stale-load-latest" label={t("transactions.staleEdit.loadLatest")} variant="outline" onPress={onLoadLatest} style={styles.flex} />
+            <PillButton testID="btn-stale-save-anyway" label={t("common.action.saveAnyway")} onPress={onSaveAnyway} loading={loading} style={styles.flex} />
           </View>
         </Pressable>
       </Pressable>

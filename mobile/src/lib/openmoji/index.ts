@@ -1,4 +1,5 @@
 import catalog from "@/lib/openmoji/catalog.json";
+import type { TranslationKey } from "@/lib/i18n";
 
 // OpenMoji (https://openmoji.org) — the open-source emoji set every icon
 // picker in the app draws from.
@@ -39,22 +40,24 @@ export interface OpenMoji {
   annotation: string;
 }
 
-const GROUP_LABELS: Record<OpenMojiGroupKey, string> = {
-  "food-drink": "Đồ ăn & Uống",
-  objects: "Đồ vật",
-  "travel-places": "Du lịch & Địa điểm",
-  activities: "Hoạt động",
-  "animals-nature": "Động vật & Thiên nhiên",
-  "smileys-emotion": "Cảm xúc",
-  "people-body": "Con người",
-  symbols: "Ký hiệu",
-  flags: "Cờ",
+// Chip labels are UI (locale keys); each emoji's annotation is OpenMoji's own
+// English data and is not translated.
+const GROUP_LABEL_KEYS: Record<OpenMojiGroupKey, TranslationKey> = {
+  "food-drink": "ui.openMoji.group.foodDrink",
+  objects: "ui.openMoji.group.objects",
+  "travel-places": "ui.openMoji.group.travelPlaces",
+  activities: "ui.openMoji.group.activities",
+  "animals-nature": "ui.openMoji.group.animalsNature",
+  "smileys-emotion": "ui.openMoji.group.smileysEmotion",
+  "people-body": "ui.openMoji.group.peopleBody",
+  symbols: "ui.openMoji.group.symbols",
+  flags: "ui.openMoji.group.flags",
 };
 
 // Picker order — the groups a finance label most often comes from first.
-export const OPENMOJI_GROUPS: { key: OpenMojiGroupKey; label: string }[] = (
-  Object.keys(GROUP_LABELS) as OpenMojiGroupKey[]
-).map((key) => ({ key, label: GROUP_LABELS[key] }));
+export const OPENMOJI_GROUPS: { key: OpenMojiGroupKey; labelKey: TranslationKey }[] = (
+  Object.keys(GROUP_LABEL_KEYS) as OpenMojiGroupKey[]
+).map((key) => ({ key, labelKey: GROUP_LABEL_KEYS[key] }));
 
 const groupKeys = catalog.groups as OpenMojiGroupKey[];
 

@@ -1,43 +1,47 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { onlineManager } from "@tanstack/react-query";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { ListCell, ListRow, ListSection } from "@/components/ui/grouped-list";
 import { PasskeyGlyph, PlusGlyph, TrashGlyph } from "@/components/ui/grouped-list/list-icons";
-import { getErrorMessage } from "@/lib/api-envelope";
+import { errorText } from "@/lib/api-envelope";
 import { formatDateDMY } from "@/lib/format-date";
 import { createStyles, spacing, typography, useColors } from "@/lib/theme";
 import { useToastStore } from "@/stores/toast-store";
 import { useDeletePasskeyMutation, usePasskeysQuery, useRegisterPasskeyMutation } from "@/features/security/api/use-passkeys-query";
 import { PasskeyNativeError, passkeysAvailable } from "@/features/security/passkeys/native-passkey";
 import { PasskeyItem } from "@/features/security/passkeys/types";
+import { copyOf, i18n } from "@/lib/i18n";
 import { passkeyFailureMessage } from "@/features/security/passkeys/passkey-messages";
 import { PasskeyProviderHelp } from "@/features/security/components/PasskeyProviderHelp";
 
-const COPY = {
-  title: "Passkey",
+const COPY = copyOf({
+  title: "security.passkeys.title",
   // Optional: switching and the app lock use the phone's own check, never a
   // passkey. A passkey only needs the phone's password service (Google…).
-  hint: "Không bắt buộc. Đăng nhập không cần mật khẩu, kể cả trên máy mới.",
-  add: "Thêm passkey",
-  unsupported: "Bản ứng dụng này chưa dùng được passkey.",
-  empty: "Chưa có passkey.",
-  loadFailed: "Chưa tải được danh sách passkey.",
-  added: "Đã thêm passkey",
-  addFailed: "Chưa thêm được passkey. Thử lại.",
-  offline: "Cần kết nối mạng để thêm passkey.",
-  deleted: "Đã xóa passkey",
-  deleteFailed: "Chưa xóa được passkey. Thử lại.",
-  confirmTitle: "Xóa passkey này?",
-  confirmLabel: "Xóa passkey",
-} as const;
+  hint: "security.passkeys.hint",
+  add: "security.passkeys.add",
+  unsupported: "security.passkeys.unsupported",
+  empty: "security.passkeys.empty",
+  loadFailed: "security.passkeys.loadFailed",
+  added: "security.passkeys.added",
+  addFailed: "security.passkeys.addFailed",
+  offline: "security.passkeys.offline",
+  deleted: "security.passkeys.deleted",
+  deleteFailed: "security.passkeys.deleteFailed",
+  confirmTitle: "security.passkeys.confirmTitle",
+  confirmLabel: "security.passkeys.confirmLabel",
+});
 
-const confirmMessage = (name: string) => `${name} sẽ không đăng nhập bằng passkey này được nữa.`;
+const confirmMessage = (device: string) => i18n.t("security.passkeys.confirmMessage", { device });
 
 function usedLine(p: PasskeyItem): string {
-  const added = `Thêm ${formatDateDMY(p.created_at)}`;
-  return p.last_used_at ? `${added} · Dùng ${formatDateDMY(p.last_used_at)}` : added;
+  const added = formatDateDMY(p.created_at);
+  return p.last_used_at
+    ? i18n.t("security.passkeys.addedUsedLine", { added, used: formatDateDMY(p.last_used_at) })
+    : i18n.t("security.passkeys.addedLine", { date: added });
 }
 
 /**
@@ -47,6 +51,7 @@ function usedLine(p: PasskeyItem): string {
  * One group: a row per passkey, then "Thêm passkey" as the group's last row.
  */
 export function PasskeysSection() {
+  useTranslation(); // COPY reads the current language: re-render on a switch
   const colors = useColors();
   const styles = useStyles();
   const available = passkeysAvailable();
@@ -87,7 +92,7 @@ export function PasskeysSection() {
           if (message) toast(message, "warning");
           return;
         }
-        toast(getErrorMessage(error, COPY.addFailed), "warning");
+        toast(errorText(error, "security.passkeys.addFailed"), "warning");
       },
     });
   };
@@ -98,7 +103,7 @@ export function PasskeysSection() {
     if (!target) return;
     remove.mutate(target.id, {
       onSuccess: () => toast(COPY.deleted, "info"),
-      onError: (error) => toast(getErrorMessage(error, COPY.deleteFailed), "warning"),
+      onError: (error) => toast(errorText(error, "security.passkeys.deleteFailed"), "warning"),
     });
   };
 
@@ -133,7 +138,7 @@ export function PasskeysSection() {
                   onPress={() => setConfirming(p)}
                   hitSlop={10}
                   accessibilityRole="button"
-                  accessibilityLabel={`${COPY.confirmLabel} ${p.name}`}
+                  accessibilityLabel={i18n.t("security.passkeys.deleteA11y", { device: p.name })}
                   style={({ pressed }) => pressed && styles.pressed}
                   testID="btn-passkey-delete"
                 >
@@ -177,7 +182,7 @@ export function PasskeysSection() {
         title={COPY.confirmTitle}
         message={confirmMessage(confirming?.name ?? "")}
         confirmLabel={COPY.confirmLabel}
-        cancelLabel="Giữ lại"
+        cancelLabel={i18n.t("common.action.keep")}
         onConfirm={confirmDelete}
         onCancel={() => setConfirming(null)}
         loading={remove.isPending}

@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { Linking, Pressable, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { ActionPopover } from "@/components/shared/ActionPopover";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -12,14 +13,12 @@ import { useImageReadingSessionStore } from "@/stores/image-reading-session-stor
 import { useToastStore } from "@/stores/toast-store";
 
 // Copy: spec BR-18, BR-21, the S-AIIMG-24 permission case — per pfm-ux-copy
-// (toasts are short phrases without a final period).
-const READING_OFF = "Đọc ảnh đang tạm dừng";
-const NEEDS_CONNECTION = "Đọc ảnh cần kết nối mạng";
-const PRIVACY_TITLE = "Ảnh được gửi đi để đọc";
-const PRIVACY_BODY = "Dịch vụ AI bên ngoài đọc ảnh rồi xóa ngay. Ảnh chỉ còn trên điện thoại này.";
+// (toasts are short phrases without a final period). Locale keys.
+const READING_OFF = "chat.image.readingOff.toast";
+const NEEDS_CONNECTION = "chat.image.needsConnection.toast";
 const DENIED_COPY = {
-  camera: { title: "Cần quyền camera", message: "Cho phép camera trong Cài đặt để chụp hóa đơn." },
-  library: { title: "Cần quyền truy cập ảnh", message: "Cho phép truy cập ảnh trong Cài đặt để chọn hóa đơn." },
+  camera: { title: "chat.image.denied.camera.title", message: "chat.image.denied.camera.body" },
+  library: { title: "chat.image.denied.library.title", message: "chat.image.denied.library.body" },
 } as const;
 const ICON_SIZE = 20;
 
@@ -38,6 +37,7 @@ interface ImageAttachButtonProps {
 export function ImageAttachButton({ disabled, onSend }: ImageAttachButtonProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const readingOff = useImageReadingSessionStore((s) => s.off);
   const online = useIsOnline();
   const buttonRef = useRef<View>(null);
@@ -46,7 +46,7 @@ export function ImageAttachButton({ disabled, onSend }: ImageAttachButtonProps) 
 
   const handlePress = () => {
     if (readingOff || !online) {
-      useToastStore.getState().show(readingOff ? READING_OFF : NEEDS_CONNECTION, "info");
+      useToastStore.getState().show(t(readingOff ? READING_OFF : NEEDS_CONNECTION), "info");
       return;
     }
     buttonRef.current?.measureInWindow((x, y, width, height) => void attach.open({ x, y, width, height }));
@@ -65,7 +65,7 @@ export function ImageAttachButton({ disabled, onSend }: ImageAttachButtonProps) 
         ref={buttonRef}
         testID="btn-attach-image"
         accessibilityRole="button"
-        accessibilityLabel="Đọc giao dịch từ ảnh"
+        accessibilityLabel={t("chat.image.attach.a11y")}
         accessibilityState={{ disabled: disabled || unavailable }}
         disabled={disabled}
         onPress={handlePress}
@@ -80,17 +80,27 @@ export function ImageAttachButton({ disabled, onSend }: ImageAttachButtonProps) 
         align="left"
         onClose={attach.closeMenu}
         actions={[
-          { Icon: CameraIcon, label: "Chụp ảnh", onPress: () => void attach.choose("camera"), testID: "btn-image-source-camera" },
-          { Icon: ImageIcon, label: "Chọn ảnh có sẵn", onPress: () => void attach.choose("library"), testID: "btn-image-source-library" },
+          {
+            Icon: CameraIcon,
+            label: t("chat.image.source.camera"),
+            onPress: () => void attach.choose("camera"),
+            testID: "btn-image-source-camera",
+          },
+          {
+            Icon: ImageIcon,
+            label: t("chat.image.source.library"),
+            onPress: () => void attach.choose("library"),
+            testID: "btn-image-source-library",
+          },
         ]}
       />
 
       <ConfirmDialog
         visible={attach.noticeOpen}
-        title={PRIVACY_TITLE}
-        message={PRIVACY_BODY}
-        confirmLabel="Tiếp tục"
-        cancelLabel="Để sau"
+        title={t("chat.image.privacy.title")}
+        message={t("chat.image.privacy.body")}
+        confirmLabel={t("common.action.continue")}
+        cancelLabel={t("common.action.later")}
         onConfirm={() => void attach.acceptNotice()}
         onCancel={attach.declineNotice}
         // Nothing is removed here: the app's own primary action, not red.
@@ -100,10 +110,10 @@ export function ImageAttachButton({ disabled, onSend }: ImageAttachButtonProps) 
 
       <ConfirmDialog
         visible={denied !== null}
-        title={denied?.title ?? ""}
-        message={denied?.message ?? ""}
-        confirmLabel="Mở Cài đặt"
-        cancelLabel="Để sau"
+        title={denied ? t(denied.title) : ""}
+        message={denied ? t(denied.message) : ""}
+        confirmLabel={t("common.action.openSettings")}
+        cancelLabel={t("common.action.later")}
         onConfirm={() => {
           attach.closeDenied();
           void Linking.openSettings();

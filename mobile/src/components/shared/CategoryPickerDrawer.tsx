@@ -1,5 +1,6 @@
 import { memo, useMemo, useState } from "react";
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { CategoryOptionRow } from "@/components/shared/CategoryOptionRow";
 import { Drawer } from "@/components/shared/Drawer";
@@ -35,7 +36,8 @@ const SEARCH_MIN_OPTIONS = 8;
 //
 // Same row, search and header as the form's category picker
 // (CategoryPickerList), so the two never read as different lists.
-export const CategoryPickerDrawer = memo(function CategoryPickerDrawer({ visible, onClose, title = "Chọn danh mục", categories, onSelect }: CategoryPickerDrawerProps) {
+export const CategoryPickerDrawer = memo(function CategoryPickerDrawer({ visible, onClose, title, categories, onSelect }: CategoryPickerDrawerProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const [search, setSearch] = useState("");
   const shown = useMemo(() => categories.filter((c) => matchesSearch(c.name, search)), [categories, search]);
@@ -47,13 +49,13 @@ export const CategoryPickerDrawer = memo(function CategoryPickerDrawer({ visible
 
   return (
     <Drawer visible={visible} onClose={close}>
-      <DrawerHeader title={title} actions={[{ label: "Đóng", variant: "secondary", onPress: close }]} />
+      <DrawerHeader title={title ?? t("common.action.chooseCategory")} actions={[{ label: t("common.action.close"), variant: "secondary", onPress: close }]} />
       {categories.length >= SEARCH_MIN_OPTIONS ? (
-        <SearchField value={search} onChangeText={setSearch} placeholder="Tìm danh mục" />
+        <SearchField value={search} onChangeText={setSearch} placeholder={t("common.field.searchCategories")} />
       ) : null}
       <View>
         {shown.length === 0 ? (
-          <Text style={styles.empty}>Không có danh mục nào khớp.</Text>
+          <Text style={styles.empty}>{t("common.empty.noMatchingCategories")}</Text>
         ) : (
           shown.map((c) => (
             <CategoryOptionRow

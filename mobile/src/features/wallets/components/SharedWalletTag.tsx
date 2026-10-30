@@ -1,4 +1,5 @@
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { UsersIcon } from "@/components/ui/Icon";
 import { withAlpha } from "@/lib/color";
@@ -12,10 +13,11 @@ import { radii, typography, createStyles, useColors } from "@/lib/theme";
 export function SharedWalletTag({ testID }: { testID?: string }) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   return (
     <View style={styles.tag} testID={testID}>
       <UsersIcon size={11} color={colors.green} strokeWidth={2.4} />
-      <Text style={styles.label}>Ví chung</Text>
+      <Text style={styles.label}>{t("common.label.sharedWallet")}</Text>
     </View>
   );
 }

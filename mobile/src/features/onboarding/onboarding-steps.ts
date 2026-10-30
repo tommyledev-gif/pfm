@@ -1,33 +1,36 @@
+import { TranslationKey } from "@/lib/i18n";
+
 export type OnboardingStepKey = "wallet" | "transaction" | "budget";
 export type OnboardingStepStatus = "done" | "active" | "locked";
 
 export interface OnboardingStep {
   key: OnboardingStepKey;
-  title: string;
-  description: string;
+  titleKey: TranslationKey;
+  descriptionKey: TranslationKey;
   /** The primary button's label while this is the active step. */
-  cta: string;
+  ctaKey: TranslationKey;
   status: OnboardingStepStatus;
 }
 
 const STEPS: Omit<OnboardingStep, "status">[] = [
   {
     key: "wallet",
-    title: "Thêm ví",
-    description: "Tiền mặt, ngân hàng hoặc ví điện tử.",
-    cta: "Thêm ví đầu tiên",
+    titleKey: "onboarding.steps.wallet.title",
+    descriptionKey: "onboarding.steps.wallet.description",
+    ctaKey: "onboarding.steps.wallet.cta",
   },
   {
     key: "transaction",
-    title: "Ghi giao dịch đầu tiên",
-    description: "Ghi khoản chi gần nhất, ví dụ bữa trưa hôm nay.",
-    cta: "Ghi giao dịch đầu tiên",
+    titleKey: "onboarding.steps.transaction.title",
+    descriptionKey: "onboarding.steps.transaction.description",
+    ctaKey: "onboarding.steps.transaction.cta",
   },
   {
     key: "budget",
-    title: "Tạo ngân sách",
-    description: "Đặt hạn mức theo danh mục để biết tháng này còn chi được bao nhiêu.",
-    cta: "Tạo ngân sách",
+    titleKey: "onboarding.steps.budget.title",
+    // Same sentence as the Budgets tab's empty state.
+    descriptionKey: "budgets.empty.body",
+    ctaKey: "common.action.createBudget",
   },
 ];
 

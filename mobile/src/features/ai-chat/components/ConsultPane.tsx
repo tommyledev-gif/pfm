@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { FlatList, ListRenderItemInfo, StyleSheet, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { TypingIndicator } from "@/components/shared/TypingIndicator";
 import { ChatComposer } from "@/features/ai-chat/components/ChatComposer";
@@ -24,7 +25,7 @@ import { spacing } from "@/lib/theme";
 import { useChatStore } from "@/stores/chat-store";
 
 // The assistant is pulling the figures the question asks about.
-const ANSWERING_LABEL = "Đang xem số liệu…";
+const ANSWERING_LABEL = "chat.consult.answering";
 
 const messageKey = (m: ChatMessage) => m.id;
 
@@ -45,6 +46,7 @@ interface ConsultPaneProps {
  */
 export function ConsultPane({ loading, bottomInset, onSwitchToRecording, jump }: ConsultPaneProps) {
   const styles = useChatThreadStyles();
+  const { t } = useTranslation();
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const thread = useChatStore((s) => s.thread);
   // Measured height of the floating composer, reserved inside the thread.
@@ -98,7 +100,7 @@ export function ConsultPane({ loading, bottomInset, onSwitchToRecording, jump }:
           ListHeaderComponent={
             consult.sending ? (
               <View style={[styles.typingRow, consultStyles.typing]}>
-                <TypingIndicator label={ANSWERING_LABEL} testID="typing-consult" />
+                <TypingIndicator label={t(ANSWERING_LABEL)} testID="typing-consult" />
               </View>
             ) : null
           }

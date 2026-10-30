@@ -1,4 +1,5 @@
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { formatCurrency } from "@/lib/currency";
 import { spacing, typography, createStyles } from "@/lib/theme";
@@ -32,11 +33,12 @@ export function WizardPlanSummaryRows({
   shortfall,
 }: WizardPlanSummaryRowsProps) {
   const styles = useStyles();
+  const { t } = useTranslation();
   return (
     <>
       {buffer > 0 ? (
         <View style={styles.bufferRow}>
-          <Text style={styles.bufferLabel}>Dự phòng</Text>
+          <Text style={styles.bufferLabel}>{t("budgetWizard.summary.buffer")}</Text>
           <Text testID="text-wizard-buffer" style={styles.bufferValue}>
             {formatCurrency(buffer, currency)}
           </Text>
@@ -45,18 +47,18 @@ export function WizardPlanSummaryRows({
 
       <View style={styles.deducted}>
         <View style={styles.deductedRow}>
-          <Text style={styles.deductedLabel}>Tiết kiệm</Text>
+          <Text style={styles.deductedLabel}>{t("budgetWizard.summary.savings")}</Text>
           <Text style={styles.deductedValue}>{formatCurrency(savings, currency)}</Text>
         </View>
         <View style={styles.deductedRow}>
-          <Text style={styles.deductedLabel}>Cố định</Text>
+          <Text style={styles.deductedLabel}>{t("budgetWizard.summary.fixed")}</Text>
           <Text style={styles.deductedValue}>{formatCurrency(fixed, currency)}</Text>
         </View>
       </View>
 
       {overCommitted ? (
         <Text style={styles.warn}>
-          Tổng các mục vượt số được chi {formatCurrency(shortfall, currency)}. Giảm bớt một vài mục.
+          {t("budgetWizard.summary.overCommitted", { amount: formatCurrency(shortfall, currency) })}
         </Text>
       ) : null}
     </>

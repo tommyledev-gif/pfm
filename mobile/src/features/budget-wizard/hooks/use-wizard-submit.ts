@@ -2,14 +2,17 @@ import { useCallback, useState } from "react";
 
 import { useBulkCreateBudgetsMutation } from "@/features/budget-wizard/api/use-bulk-create-budgets-mutation";
 import { useCreateCategoryMutation } from "@/features/categories/api/use-create-category-mutation";
+import { useUpdateCategoryMutation } from "@/features/categories/api/use-update-category-mutation";
 import { BudgetProposalsResponse } from "@/features/budget-wizard/types";
-import { getErrorMessage } from "@/lib/api-envelope";
+import { errorText } from "@/lib/api-envelope";
 
 interface SubmitInputs {
   result: BudgetProposalsResponse | null;
   currency: string;
   /** Placeholder id → name, for categories that do not exist on the server. */
   pendingCategories: Record<string, string>;
+  /** The User's own categories renamed on the result screen: id → new name. */
+  renamedCategories: Record<string, string>;
 }
 
 /**
@@ -22,7 +25,9 @@ interface SubmitInputs {
  *   1. Categories the user invented are created HERE, not when they were
  *      typed — backing out of the wizard must leave the account exactly as it
  *      was found, with no stray category behind.
- *   2. The budgets are written in bulk, which REPLACES the account's entire
+ *   2. Categories of the User's own renamed on the result screen are renamed,
+ *      for the same reason: only once the plan is confirmed.
+ *   3. The budgets are written in bulk, which REPLACES the account's entire
  *      active budget set. The caller is responsible for having confirmed that
  *      with the user first.
  *
@@ -31,10 +36,11 @@ interface SubmitInputs {
 export function useWizardSubmit() {
   const bulkCreate = useBulkCreateBudgetsMutation();
   const createCategory = useCreateCategoryMutation();
+  const updateCategory = useUpdateCategoryMutation();
   const [createdCount, setCreatedCount] = useState<number | null>(null);
 
   const submit = useCallback(
-    async ({ result, currency, pendingCategories }: SubmitInputs): Promise<{ count: number } | { error: string }> => {
+    async ({ result, currency, pendingCategories, renamedCategories }: SubmitInputs): Promise<{ count: number } | { error: string }> => {
       if (!result) return { error: "" };
       try {
         const idByPlaceholder: Record<string, string> = {};
@@ -43,6 +49,11 @@ export function useWizardSubmit() {
           if (!result.proposals.some((p) => p.category_id === placeholder)) continue;
           const created = await createCategory.mutateAsync({ name, type: "expense" });
           idByPlaceholder[placeholder] = created.id;
+        }
+        for (const [id, name] of Object.entries(renamedCategories)) {
+          // Skip a category whose row the user removed before submitting.
+          if (!result.proposals.some((p) => p.category_id === id)) continue;
+          await updateCategory.mutateAsync({ id, body: { name } });
         }
 
         const data = await bulkCreate.mutateAsync({
@@ -55,10 +66,10 @@ export function useWizardSubmit() {
         setCreatedCount(data.created_count);
         return { count: data.created_count };
       } catch (e) {
-        return { error: getErrorMessage(e, "Chưa lưu được ngân sách. Thử lại.") };
+        return { error: errorText(e, "budgetWizard.error.saveFailed") };
       }
     },
-    [bulkCreate, createCategory],
+    [bulkCreate, createCategory, updateCategory],
   );
 
   return { submit, createdCount, resetCreatedCount: () => setCreatedCount(null), submitting: bulkCreate.isPending };

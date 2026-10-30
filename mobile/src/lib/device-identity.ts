@@ -17,6 +17,7 @@ export function deviceName(): string {
   const brand = constants.Brand ?? constants.Manufacturer ?? "";
   const model = constants.Model ?? "";
   const name = `${brand.charAt(0).toUpperCase()}${brand.slice(1)} ${model}`.trim();
+  // i18n-ignore: stored by the server as the device's name; unnamed devices are an open follow-up (spec §6 #4)
   return name || "Điện thoại";
 }
 

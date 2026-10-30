@@ -1,3 +1,4 @@
+import { i18n } from "@/lib/i18n";
 import { userIdFromAccessToken } from "@/lib/jwt";
 import { useSessionStore } from "@/stores/session-store";
 import { useToastStore } from "@/stores/toast-store";
@@ -35,6 +36,6 @@ async function wipe(reason: WipeReason): Promise<void> {
     if (useSessionStore.getState().accessToken !== null) await removeActiveAccount().catch(() => {});
   } finally {
     await usePinStore.getState().clearPin();
-    useToastStore.getState().show(reason === "wrong-pin" ? PIN_COPY.wipedWrong : PIN_COPY.wipedForgot, "warning");
+    useToastStore.getState().show(i18n.t(reason === "wrong-pin" ? PIN_COPY.wipedWrong : PIN_COPY.wipedForgot), "warning");
   }
 }

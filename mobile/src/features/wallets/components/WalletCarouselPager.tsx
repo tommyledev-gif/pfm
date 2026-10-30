@@ -9,6 +9,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import { useTranslation } from "react-i18next";
 
 import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/Icon";
 import { withAlpha } from "@/lib/color";
@@ -190,6 +191,7 @@ export function WalletCarouselPager({
   onBack,
   onForward,
 }: WalletCarouselPagerProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const colors = useColors();
   // Not before the width is known: the bar could not tell yet how many dots fit.
@@ -210,7 +212,7 @@ export function WalletCarouselPager({
             hitSlop={6}
             style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, !canGoBack && styles.buttonDisabled]}
             accessibilityRole="button"
-            accessibilityLabel="Ví trước"
+            accessibilityLabel={t("wallets.carousel.a11y.previous")}
             accessibilityState={{ disabled: !canGoBack }}
           >
             <ChevronLeftIcon size={16} color={colors.textPrimary} />
@@ -242,7 +244,7 @@ export function WalletCarouselPager({
             hitSlop={6}
             style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, !canGoForward && styles.buttonDisabled]}
             accessibilityRole="button"
-            accessibilityLabel="Ví tiếp theo"
+            accessibilityLabel={t("wallets.carousel.a11y.nextButton")}
             accessibilityState={{ disabled: !canGoForward }}
           >
             <ChevronRightIcon size={16} color={colors.textPrimary} />

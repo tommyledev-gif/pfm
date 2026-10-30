@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Drawer } from "@/components/shared/Drawer";
@@ -20,7 +21,7 @@ import { WalletInviteForm } from "@/features/wallets/components/WalletInviteForm
 import { WalletMemberRow } from "@/features/wallets/components/WalletMemberRow";
 import { WalletRecentTransactions } from "@/features/wallets/components/WalletRecentTransactions";
 import { WalletSheetHero } from "@/features/wallets/components/WalletSheetHero";
-import { NO_OTHER_MEMBERS, memberCountLine } from "@/features/wallets/components/wallet-member-copy";
+import { NO_OTHER_MEMBERS_KEY, memberCountLine } from "@/features/wallets/components/wallet-member-copy";
 import {
   PendingMemberAction,
   dialogConfirm,
@@ -49,6 +50,7 @@ interface WalletMembersSheetProps {
  * is the one place its history shows.
  */
 export function WalletMembersSheet({ wallet, faceColor, visible, onClose }: WalletMembersSheetProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const requireOnline = useRequireOnline();
@@ -102,7 +104,7 @@ export function WalletMembersSheet({ wallet, faceColor, visible, onClose }: Wall
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Người trong ví</Text>
+            <Text style={styles.sectionTitle}>{t("sharedWallets.members.title")}</Text>
             {members.data ? <Text style={styles.sectionMeta}>{memberCountLine(list)}</Text> : null}
           </View>
           <View>
@@ -115,8 +117,8 @@ export function WalletMembersSheet({ wallet, faceColor, visible, onClose }: Wall
               ))
             ) : members.isError ? (
               <Pressable onPress={() => void members.refetch()} style={styles.retry} accessibilityRole="button">
-                <Text style={styles.retryText}>Chưa tải được danh sách.</Text>
-                <Text style={styles.retryAction}>Thử lại</Text>
+                <Text style={styles.retryText}>{t("sharedWallets.members.loadError")}</Text>
+                <Text style={styles.retryAction}>{t("common.action.retry")}</Text>
               </Pressable>
             ) : (
               <>
@@ -125,7 +127,7 @@ export function WalletMembersSheet({ wallet, faceColor, visible, onClose }: Wall
                 {others.length === 0 ? (
                   <View style={styles.noOthers} testID="text-wallet-no-other-members">
                     <UsersIcon size={18} color={colors.textMuted} />
-                    <Text style={styles.noOthersText}>{NO_OTHER_MEMBERS}</Text>
+                    <Text style={styles.noOthersText}>{t(NO_OTHER_MEMBERS_KEY)}</Text>
                   </View>
                 ) : null}
               </>
@@ -148,7 +150,7 @@ export function WalletMembersSheet({ wallet, faceColor, visible, onClose }: Wall
               accessibilityRole="link"
               testID="btn-wallet-sheet-all-entries"
             >
-              <Text style={styles.allEntriesLabel}>Tìm và lọc mọi giao dịch</Text>
+              <Text style={styles.allEntriesLabel}>{t("sharedWallets.members.allEntries")}</Text>
               <ChevronRightIcon size={16} color={colors.green} />
             </Pressable>
           ) : null}
@@ -163,7 +165,7 @@ export function WalletMembersSheet({ wallet, faceColor, visible, onClose }: Wall
             testID="btn-wallet-leave"
           >
             <LogOutIcon size={18} color={colors.peach} />
-            <Text style={styles.leaveLabel}>Rời ví</Text>
+            <Text style={styles.leaveLabel}>{t("sharedWallets.action.leave")}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -174,7 +176,7 @@ export function WalletMembersSheet({ wallet, faceColor, visible, onClose }: Wall
         title={dialogTitle(pending, wallet.name)}
         message={dialogMessage(pending)}
         confirmLabel={dialogConfirm(pending)}
-        cancelLabel="Giữ lại"
+        cancelLabel={t("common.action.keep")}
         onCancel={() => setPending(null)}
         onConfirm={confirm}
         loading={changeRole.isPending || remove.isPending}

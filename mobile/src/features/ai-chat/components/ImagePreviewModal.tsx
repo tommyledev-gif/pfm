@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Modal, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -9,6 +10,9 @@ import { createStyles, radii, spacing, typography, useColors } from "@/lib/theme
 
 // Mirrors backend common.AIImageCaptionMaxLength (confirmed 2026-10-04).
 const CAPTION_MAX_LENGTH = 300;
+// The caption goes to the parser, which reads Vietnamese only, so the example
+// stays Vietnamese in both languages (specs/mobile-language-switch §6 edge case 5).
+const CAPTION_EXAMPLE = "ví MB"; // i18n-ignore
 
 interface ImagePreviewModalProps {
   /** The picked photo; the modal is open while this is set. */
@@ -25,6 +29,7 @@ interface ImagePreviewModalProps {
 export function ImagePreviewModal({ uri, onSend, onCancel }: ImagePreviewModalProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const keyboardHeight = useKeyboardHeight();
   const [caption, setCaption] = useState("");
@@ -42,7 +47,7 @@ export function ImagePreviewModal({ uri, onSend, onCancel }: ImagePreviewModalPr
             source={{ uri }}
             style={styles.image}
             contentFit="contain"
-            accessibilityLabel="Ảnh sẽ gửi"
+            accessibilityLabel={t("chat.image.preview.a11y")}
           />
         ) : null}
         <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, keyboardHeight) + spacing.lg }]}>
@@ -51,14 +56,14 @@ export function ImagePreviewModal({ uri, onSend, onCancel }: ImagePreviewModalPr
             value={caption}
             onChangeText={setCaption}
             maxLength={CAPTION_MAX_LENGTH}
-            placeholder="Chú thích, ví dụ: ví MB"
+            placeholder={t("chat.image.caption.placeholder", { example: CAPTION_EXAMPLE })}
             placeholderTextColor={colors.textMuted}
-            accessibilityLabel="Chú thích ảnh"
+            accessibilityLabel={t("chat.image.caption.a11y")}
             style={styles.caption}
           />
           <View style={styles.actions}>
-            <PillButton label="Bỏ ảnh" variant="outline" onPress={onCancel} style={styles.action} testID="btn-cancel-image" />
-            <PillButton label="Gửi ảnh" onPress={() => onSend(caption)} style={styles.action} testID="btn-send-image" />
+            <PillButton label={t("chat.image.discard")} variant="outline" onPress={onCancel} style={styles.action} testID="btn-cancel-image" />
+            <PillButton label={t("chat.image.send")} onPress={() => onSend(caption)} style={styles.action} testID="btn-send-image" />
           </View>
         </View>
       </View>

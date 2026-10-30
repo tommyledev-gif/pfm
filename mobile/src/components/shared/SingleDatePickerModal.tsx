@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import { DateData } from "react-native-calendars";
 
 import { Drawer } from "@/components/shared/Drawer";
@@ -21,6 +22,7 @@ interface SingleDatePickerModalProps {
 // "YYYY-MM-DD" string directly (backend/internal/dto/transaction_request.go),
 // no time suffix needed.
 export function SingleDatePickerModal({ visible, onClose, value, onApply }: SingleDatePickerModalProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const [selected, setSelected] = useState(value);
@@ -40,7 +42,7 @@ export function SingleDatePickerModal({ visible, onClose, value, onApply }: Sing
 
   return (
     <Drawer visible={visible} onClose={onClose}>
-      <Text style={styles.title}>Chọn ngày</Text>
+      <Text style={styles.title}>{t("ui.datePicker.title")}</Text>
       <Text style={styles.subtitle}>{formatDateShort(selected)}</Text>
 
       <MonthYearCalendar
@@ -51,8 +53,8 @@ export function SingleDatePickerModal({ visible, onClose, value, onApply }: Sing
       />
 
       <View style={styles.actions}>
-        <PillButton label="Hủy" variant="outline" onPress={onClose} style={styles.flexButton} />
-        <PillButton label="Áp dụng" onPress={apply} style={styles.flexButton} />
+        <PillButton label={t("common.action.cancel")} variant="outline" onPress={onClose} style={styles.flexButton} />
+        <PillButton label={t("common.action.apply")} onPress={apply} style={styles.flexButton} />
       </View>
     </Drawer>
   );

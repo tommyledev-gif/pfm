@@ -1,0 +1,176 @@
+{
+  "categories": {
+    "empty": {
+      "expense": "Chưa có danh mục chi tiêu.",
+      "income": "Chưa có danh mục thu nhập."
+    },
+    "section": {
+      "own": "Của bạn"
+    },
+    "row": {
+      "deleteA11y": "Xóa danh mục {{name}}"
+    },
+    "delete": {
+      "title": "Xóa danh mục?",
+      "bodyNamed": "\"{{name}}\" sẽ bị xóa.",
+      "confirm": "Xóa danh mục"
+    },
+    "form": {
+      "nameRequired": "Vui lòng nhập tên danh mục",
+      "titleEdit": "Sửa danh mục",
+      "titleNew": "Danh mục mới",
+      "namePlaceholder": "vd: Đi chợ",
+      "typeLocked": "Loại (khóa sau khi tạo)",
+      "saveFailed": "Không thể lưu danh mục",
+      "delete": "Xóa danh mục"
+    },
+    "picker": {
+      "createNamed": "Tạo “{{name}}”",
+      "createNew": "Tạo danh mục mới",
+      "empty": "Chưa có danh mục nào.",
+      "clearSelection": "Bỏ chọn",
+      "confirmCount": "Chọn ({{count}})",
+      "confirm": "Chọn"
+    },
+    "quickCreate": {
+      "typeExpense": "Khoản chi",
+      "typeIncome": "Khoản thu",
+      "nameAndIcon": "Tên và biểu tượng",
+      "changeIconA11y": "Đổi biểu tượng",
+      "removeIcon": "Bỏ biểu tượng",
+      "iconOptional": "Biểu tượng không bắt buộc.",
+      "createFailed": "Không thể tạo danh mục"
+    }
+  },
+  "auditLogs": {
+    "subtitle": "Lịch sử tạo, sửa và xóa giao dịch",
+    "fallback": {
+      "category": "Danh mục",
+      "wallet": "Ví"
+    },
+    "action": {
+      "create": "Tạo",
+      "update": "Sửa",
+      "delete": "Đã xóa"
+    },
+    "field": {
+      "locationNote": "Ghi chú vị trí"
+    },
+    "row": {
+      "noChanges": "Không có thay đổi được ghi nhận",
+      "change": "<0>{{field}}: </0>{{from}}  →  <1>{{to}}</1>",
+      "deletedAt": "Đã xóa lúc {{time}} · {{date}}"
+    },
+    "items": {
+      "summary_other": "{{count}} món · {{amount}}",
+      "label": "Các món",
+      "hide": "Ẩn các món",
+      "show": "Xem các món",
+      "before": "Trước",
+      "after": "Sau",
+      "none": "Không có món"
+    },
+    "empty": {
+      "title": "Chưa có thay đổi nào",
+      "body": "Mỗi lần tạo, sửa hoặc xóa giao dịch đều được ghi ở đây.",
+      "cta": "Đến trang Giao dịch"
+    }
+  },
+  "notifications": {
+    "filter": {
+      "unread": "Chưa đọc"
+    },
+    "error": {
+      "loadFailed": "Chưa tải được thông báo."
+    },
+    "search": {
+      "noResults": "Không tìm thấy thông báo",
+      "placeholder": "Tìm thông báo"
+    },
+    "empty": {
+      "unread": "Không có thông báo chưa đọc.",
+      "all": "Chưa có thông báo."
+    },
+    "markAllRead": {
+      "a11y": "Đánh dấu mọi thông báo đã đọc",
+      "button": "Đánh dấu đã đọc",
+      "failed": "Chưa đánh dấu được. Thử lại sau."
+    },
+    "row": {
+      "a11y": "{{title}}. {{body}}",
+      "a11yUnread": "Chưa đọc. {{title}}. {{body}}"
+    }
+  },
+  "users": {
+    "title": "Thành viên",
+    "subtitle": {
+      "count_other": "{{count}} người"
+    },
+    "search": {
+      "placeholder": "Tìm theo tên hoặc email"
+    },
+    "section": {
+      "header": "{{status}} · {{count}}"
+    },
+    "invite": {
+      "cta": "Mời thành viên",
+      "title": "Mời thành viên",
+      "body": "Người được mời nhận email để kích hoạt tài khoản.",
+      "emailLabel": "Email",
+      "emailPlaceholder": "name@example.com",
+      "roleLabel": "Vai trò",
+      "failed": "Chưa gửi được lời mời. Thử lại.",
+      "submit": "Gửi lời mời"
+    },
+    "status": {
+      "pending": "Chờ kích hoạt",
+      "active": "Đang dùng",
+      "disabled": "Đã khóa"
+    },
+    "row": {
+      "selfTitle": "{{name}} (bạn)",
+      "a11y": "{{name}}, {{status}}",
+      "a11yAdmin": "{{name}}, {{status}}, Quản trị"
+    },
+    "request": {
+      "notWaiting": "Yêu cầu này không còn chờ duyệt."
+    },
+    "approve": {
+      "toast": "Đã duyệt. Email kích hoạt đã gửi tới {{email}}.",
+      "failed": "Chưa duyệt được. Thử lại.",
+      "a11y": "Duyệt yêu cầu của {{email}}",
+      "button": "Duyệt yêu cầu"
+    },
+    "reject": {
+      "button": "Từ chối",
+      "title": "Từ chối yêu cầu?",
+      "toast": "Đã từ chối yêu cầu",
+      "failed": "Chưa từ chối được. Thử lại.",
+      "body": "{{email}} sẽ không nhận được email báo. Người này có thể gửi lại yêu cầu.",
+      "a11y": "Từ chối yêu cầu của {{email}}"
+    },
+    "resend": {
+      "toast": "Đã gửi lại lời mời",
+      "failed": "Không gửi lại được lời mời",
+      "wait": "Gửi lại sau {{time}}",
+      "button": "Gửi lại lời mời"
+    },
+    "revokeSessions": {
+      "button": "Đăng xuất mọi thiết bị",
+      "title": "Đăng xuất mọi thiết bị?",
+      "notFound": "Không tìm thấy người dùng.",
+      "offline": "Cần kết nối mạng để đăng xuất mọi thiết bị.",
+      "failed": "Chưa đăng xuất được mọi thiết bị. Thử lại.",
+      "body": "Đăng xuất {{email}} khỏi mọi thiết bị? Người này sẽ phải đăng nhập lại bằng mật khẩu.",
+      "toast": "Đã đăng xuất {{email}} khỏi mọi thiết bị."
+    },
+    "error": {
+      "title": "Không tải được danh sách thành viên",
+      "body": "Kiểm tra kết nối mạng rồi thử lại."
+    },
+    "empty": {
+      "title": "Chưa có thành viên nào",
+      "body": "Người được mời nhận email để kích hoạt tài khoản riêng."
+    }
+  }
+}

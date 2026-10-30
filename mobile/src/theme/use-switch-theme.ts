@@ -33,7 +33,7 @@ export function useSwitchTheme(): (name: ThemeName) => void {
         return;
       }
       viewShot.captureScreen({ format: "jpg", quality: 0.9, result: "tmpfile" })
-        .then((uri) => transition.begin(uri, name))
+        .then((uri) => transition.begin(uri, { kind: "theme", theme: name }))
         .catch(() => setThemeName(name));
     },
     [reduceMotion],

@@ -1,0 +1,251 @@
+{
+  "transactions": {
+    "typeTab": {
+      "transfer": "Transfers"
+    },
+    "header": {
+      "incomeInPeriod": "Income in {{period}}",
+      "spendingInPeriod": "Spending in {{period}}",
+      "sortHint": "Sorts the transactions",
+      "export": "Export to Excel",
+      "exportHint": "Saves the list as an Excel file",
+      "import": "Import from Excel"
+    },
+    "search": {
+      "placeholder": "Search by note..."
+    },
+    "filter": {
+      "clearWallet": "Clear wallet filter",
+      "datePill": "Dates",
+      "clearDate": "Clear date filter",
+      "clearCategory": "Clear category filter"
+    },
+    "walletFilter": {
+      "title": "Filter by wallet",
+      "all": "All wallets"
+    },
+    "categoryFilter": {
+      "noMatch": "No matching categories."
+    },
+    "sort": {
+      "reset": "Reset",
+      "recent": "Newest first",
+      "oldest": "Oldest first",
+      "highest": "Highest amount",
+      "lowest": "Lowest amount"
+    },
+    "otherCurrencies": {
+      "one": "Also in {{currency}}",
+      "count_one": "Also in {{count}} other currency",
+      "count_other": "Also in {{count}} other currencies"
+    },
+    "empty": {
+      "none": {
+        "title": "No transactions yet"
+      },
+      "shortcut": {
+        "aiEyebrow": "Log with AI",
+        "aiExample": "Send “Coffee 50k”",
+        "categories": "Edit categories"
+      },
+      "filtered": {
+        "title": "No transactions found",
+        "suggestions": "From your recent notes"
+      },
+      "type": {
+        "expense": "No spending yet",
+        "income": "No income yet",
+        "transfer": "No transfers yet"
+      },
+      "onlyFuture": "No transactions up to today."
+    },
+    "form": {
+      "typeLocked": "Type (locked once saved)",
+      "editTitle": "Edit transaction",
+      "newTitle": "New transaction",
+      "delete": "Delete transaction",
+      "deleteConfirm": {
+        "title": "Delete this transaction?",
+        "body": "The wallet balance is updated. This can't be undone."
+      },
+      "walletsOffline": "Connect to the internet to load wallets.",
+      "sameCurrencyOnly": "Only wallets in the same currency",
+      "availableBalance": "Available balance: {{balance}}",
+      "availableBalanceAfter": "Available balance: {{balance}} → {{after}} after this transaction",
+      "noTransferTarget": "Add another wallet in the same currency to make a transfer.",
+      "error": {
+        "wallet": "Choose a wallet.",
+        "toWallet": "Choose a receiving wallet.",
+        "amount": "Enter an amount."
+      }
+    },
+    "dropItems": {
+      "title_one": "Discard {{count}} item?",
+      "title_other": "Discard {{count}} items?",
+      "confirm": "Discard items"
+    },
+    "items": {
+      "notOnTransfer": "Transfers can't have items.",
+      "entryA11yTotal_one": "Items: {{count}} item, total {{total}}",
+      "entryA11yTotal_other": "Items: {{count}} items, total {{total}}",
+      "entryA11y": "Items: {{summary}}",
+      "title": "Item details",
+      "undoFallbackName": "item",
+      "removed": "Deleted {{name}}",
+      "max_one": "Up to {{count}} item.",
+      "max_other": "Up to {{count}} items.",
+      "add": "Add item",
+      "unnamed": "Unnamed item",
+      "quantityOnly": "Quantity {{quantity}}",
+      "incomplete": "Enter the name, quantity and amount.",
+      "nameLabel": "Item name",
+      "namePlaceholder": "e.g. Condensed milk",
+      "delete": "Delete item",
+      "decrease": "Decrease quantity",
+      "increase": "Increase quantity",
+      "gapWithAmount": "Off by {{gap}} from the transaction amount of {{amount}}.",
+      "gap": "Off by {{gap}} from the transaction amount.",
+      "addDifference": "Add difference",
+      "useTotal": "Use total",
+      "undo": "Undo",
+      "offlineCount_one": "{{count}} item. Connect to the internet to see it.",
+      "offlineCount_other": "{{count}} items. Connect to the internet to see them.",
+      "itemsTotal": "Items total",
+      "problem": {
+        "incomplete": "Complete every item before saving.",
+        "mismatch": "The items total doesn't match the transaction amount."
+      }
+    },
+    "walletPicker": {
+      "empty": "No wallets yet."
+    },
+    "walletChange": {
+      "body": {
+        "income": "On save, {{from}} goes down by {{oldAmount}} and {{to}} goes up by {{newAmount}}.",
+        "expense": "On save, {{from}} goes up by {{oldAmount}} and {{to}} goes down by {{newAmount}}."
+      },
+      "title": "Move to {{wallet}}?",
+      "confirm": "Change wallet",
+      "keep": "Keep old wallet"
+    },
+    "keypad": {
+      "chooseToWallet": "Choose receiving wallet",
+      "amountA11y": "Amount: {{amount}}",
+      "notePlaceholder": "Note (optional)",
+      "dateA11y": "Transaction date: {{date}}"
+    },
+    "staleEdit": {
+      "title": "This transaction was changed elsewhere",
+      "body": "Saving this version replaces the other one.",
+      "loadLatest": "Load latest"
+    },
+    "saveError": {
+      "ITEMS_TOTAL_MISMATCH": "Couldn't save. The items total doesn't match the transaction amount. Your balance hasn't changed.",
+      "WALLET_CURRENCY_MISMATCH": "Couldn't save. Move it only to a wallet in the same currency. Your balance hasn't changed.",
+      "TRANSFER_WALLET_IMMUTABLE": "Couldn't save. A transfer's wallets can't be changed. Your balance hasn't changed.",
+      "WALLET_NOT_FOUND": "Couldn't save. The selected wallet wasn't found. Your balance hasn't changed."
+    },
+    "adjustments": {
+      "max_one": "Up to {{count}} line.",
+      "max_other": "Up to {{count}} lines.",
+      "add": "Add line",
+      "direction": {
+        "add": "Add",
+        "subtract": "Subtract"
+      },
+      "incompleteOther": "Choose add or subtract, describe it and enter the amount.",
+      "labelPlaceholder": "Describe it, e.g. Rounding",
+      "delete": "Delete line"
+    },
+    "location": {
+      "tileA11y": "Location: {{place}}. Opens the map",
+      "tileA11yUnnamed": "Location: no area name. Opens the map",
+      "pinOnSave": "Pinned on save",
+      "add": "Add location",
+      "edit": "Edit location",
+      "saveWithout": "Save without location",
+      "unpin": "Remove pin",
+      "viewTitle": "Transaction location",
+      "pickTitle": "Pin location",
+      "error": {
+        "denied": "Budgest doesn't have location access. Allow it in Settings, then try again.",
+        "servicesOff": "Location (GPS) is off. Turn it on to pin this transaction.",
+        "unavailable": "Couldn't get your location. Try again somewhere more open."
+      },
+      "locating": "Finding your location…",
+      "naming": "Finding the area…",
+      "noAreaName": "No area name (needs internet). Coordinates are still saved.",
+      "noteLabel": "Place note",
+      "noteEmpty": "No note for this place.",
+      "adjustHint": "{{coords}} · Tap or drag the pin to adjust",
+      "notePlaceholder": "Note about the place: directions, gate, floor… (optional)"
+    },
+    "place": {
+      "searchPlaceholder": "Search address or street",
+      "unnamed": "Unnamed place",
+      "savedHeader": "Saved places",
+      "removeSaved": "Delete saved place",
+      "resultsHeader": "Results",
+      "searching": "Searching…",
+      "searchFailed": "Couldn't search places. Check your connection and try again.",
+      "noResults": "No places found. Try adding a district or city."
+    },
+    "sync": {
+      "queued": "Saved on this phone. Syncs when you're online.",
+      "queueFull": "Too many transactions are waiting to sync. Connect to sync them first.",
+      "status": {
+        "waiting": "Waiting",
+        "sending": "Sending",
+        "failed": "Error: {{message}}"
+      },
+      "discard": {
+        "title": "Discard this unsynced transaction?",
+        "body": "It's removed from this phone and never sent to your account.",
+        "maybeSent": "It may already be saved to your account. Check the list after syncing."
+      },
+      "sendingHint": "Sending. Wait a moment to edit or discard it.",
+      "synced_one": "Synced {{count}} transaction",
+      "synced_other": "Synced {{count}} transactions",
+      "failed_one": "{{count}} transaction couldn't sync. Check the list.",
+      "failed_other": "{{count}} transactions couldn't sync. Check the list.",
+      "replayDiffers": "This transaction was already saved, without your later changes. Edit it in the list.",
+      "serverError": "The server had a problem"
+    },
+    "export": {
+      "failed": "Couldn't export the file",
+      "shareUnavailable": "This phone can't share files.",
+      "shareTitle": "Export transactions"
+    },
+    "import": {
+      "wrongType": "Choose an .xlsx file",
+      "tooLarge": "File is over {{limit}}",
+      "readFailed": "Couldn't read the file",
+      "expired": "This import expired. Choose the file again.",
+      "confirm_one": "Import {{count}} row",
+      "confirm_other": "Import {{count}} rows",
+      "nothingToImport": "No rows to import",
+      "preview": {
+        "title": "Review before import",
+        "body_one": "Nothing is saved yet. Check the {{count}} row below, then confirm.",
+        "body_other": "Nothing is saved yet. Check the {{count}} rows below, then confirm.",
+        "toImport": "To import",
+        "errors": "Errors",
+        "total": "Total: {{amount}}",
+        "errorRows": "Rows with errors: fix the file and upload it again",
+        "duplicates": "Already imported: will be skipped"
+      },
+      "summary": {
+        "skipped": "Skipped",
+        "imported": "Imported",
+        "failed": "Failed"
+      },
+      "result": {
+        "title": "Import finished",
+        "failedRows": "Rows not imported"
+      },
+      "issueRow": "Row {{row}}: {{reason}}",
+      "more_one": "and {{count}} more row",
+      "more_other": "and {{count}} more rows"
+    }
+  }
+}

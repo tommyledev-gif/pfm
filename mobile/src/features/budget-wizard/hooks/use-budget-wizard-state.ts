@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useBudgetProposalsMutation } from "@/features/budget-wizard/api/use-budget-proposals-mutation";
 import { useBudgetWizardPrefillQuery } from "@/features/budget-wizard/api/use-budget-wizard-prefill-query";
+import { useWizardRenames } from "@/features/budget-wizard/hooks/use-wizard-renames";
 import { AddBudgetRowResult } from "@/features/budget-wizard/components/AddBudgetRowModal";
 import {
   DEFAULT_SAVINGS_CHOICE,
@@ -20,7 +21,8 @@ import { useWizardKeptCategories } from "@/features/budget-wizard/hooks/use-wiza
 import { useWizardStepBack } from "@/features/budget-wizard/hooks/use-wizard-step-back";
 import { restoreProposal } from "@/features/budget-wizard/proposal-restore";
 import { BudgetProposalsResponse, CategoryIntentRequest, PresetKey } from "@/features/budget-wizard/types";
-import { getErrorMessage } from "@/lib/api-envelope";
+import { errorText } from "@/lib/api-envelope";
+import { i18n } from "@/lib/i18n";
 
 export const BUDGET_WIZARD_TOTAL_STEPS = 3;
 
@@ -61,6 +63,7 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
   // confirmation, so a user who backs out leaves no stray category behind.
   // submit() creates them first and swaps the placeholders for real ids.
   const [pendingCategories, setPendingCategories] = useState<Record<string, string>>({});
+  const renames = useWizardRenames({ setResult, pendingCategories, setPendingCategories });
   const [error, setError] = useState<string | null>(null);
   // Set when this run was seeded from a saved plan: the banner on screen 1
   // reads it, and the amounts are re-applied once the server's proposal for the
@@ -122,6 +125,7 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
     setResult(null);
     setAddedIds([]);
     setPendingCategories({});
+    renames.resetRenames();
     commit.resetCreatedCount();
     setError(null);
     setRestoredFrom(plan ?? null);
@@ -166,7 +170,7 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
         setPendingSavedRows(null);
       } catch (e) {
         setResult(null);
-        setError(getErrorMessage(e, "Chưa tính được ngân sách. Thử lại."));
+        setError(errorText(e, "budgetWizard.error.proposalFailed"));
       }
     },
     [proposals, income, fixed, savings, currency, cycleStartDay, pendingSavedRows, restoredFrom, keptCategories.keptPlan],
@@ -300,14 +304,19 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
 
   const submit = useCallback(async () => {
     setError(null);
-    const outcome = await commit.submit({ result, currency, pendingCategories });
+    const outcome = await commit.submit({
+      result,
+      currency,
+      pendingCategories,
+      renamedCategories: renames.renamedCategories,
+    });
     if ("error" in outcome) {
       if (outcome.error) setError(outcome.error);
       return;
     }
     setStep(BUDGET_WIZARD_TOTAL_STEPS + 1);
     onCompleted?.(outcome.count);
-  }, [commit, result, currency, pendingCategories, onCompleted]);
+  }, [commit, result, currency, pendingCategories, renames.renamedCategories, onCompleted]);
 
   const canLeaveIncomeStep = useMemo(
     () => validateIncomeStep(income, fixed, savings).ok,
@@ -339,6 +348,8 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
     addedIds,
     addRowOpen,
     availableCategories: prefill.data?.categories ?? [],
+    rowNameKind: renames.nameKind,
+    renameRow: renames.renameRow,
     createdCount: commit.createdCount,
     error,
     loadingProposal: proposals.isPending,
@@ -380,7 +391,7 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
       // ⚠️ Checked before the overwrite prompt, not after: an empty plan is
       // refused outright rather than offered as something to confirm.
       if ((result?.proposals.length ?? 0) < MIN_PLAN_ROWS) {
-        setError("Kế hoạch đang trống. Thêm ít nhất một danh mục trước khi lưu.");
+        setError(i18n.t("budgetWizard.error.emptyPlan"));
         return;
       }
       if (hasExistingBudgets) setOverwriteConfirmOpen(true);

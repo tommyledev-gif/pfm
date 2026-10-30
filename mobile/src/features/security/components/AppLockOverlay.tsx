@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { StyleSheet, Text, View } from "react-native";
 import Animated, {
   useAnimatedStyle,
@@ -12,6 +13,7 @@ import { entrance, exit } from "@/components/motion/motion-tokens";
 import { Avatar } from "@/components/ui/Avatar";
 import { PillButton } from "@/components/ui/PillButton";
 import { FingerprintIcon, LockIcon } from "@/components/ui/Icon";
+import { copyOf } from "@/lib/i18n";
 import { createStyles, spacing, typography, useColors } from "@/lib/theme";
 import { useReduceMotion } from "@/lib/use-reduce-motion";
 import { BrandMark } from "@/features/auth/components/BrandMark";
@@ -22,13 +24,13 @@ import { AppLockGlow, AppLockHalo } from "@/features/security/components/AppLock
 import { AppLockPinScreen } from "@/features/security/components/AppLockPinScreen";
 import { usePinStore } from "@/features/security/pin/pin-store";
 
-const COPY = {
-  locked: "Ứng dụng đang khóa",
-  unlock: "Mở khóa",
-  prompt: "Mở khóa ứng dụng",
-  hint: "Dùng vân tay hoặc mã khóa màn hình",
-  failed: "Xác thực chưa khớp. Thử lại.",
-} as const;
+const COPY = copyOf({
+  locked: "security.appLock.locked",
+  unlock: "security.appLock.unlock",
+  prompt: "security.appLock.prompt",
+  hint: "security.appLock.hint",
+  failed: "security.biometricFailed",
+});
 
 const AVATAR_SIZE = 96;
 const HALO_SIZE = 112;
@@ -50,6 +52,7 @@ type Status = "checking" | "idle" | "failed";
  * identity block shaking once on a failed check. Fades out on unlock.
  */
 export function AppLockOverlay() {
+  useTranslation(); // COPY reads the current language: re-render on a switch
   const locked = useAppLockStore((s) => s.locked);
   // With an app PIN, its keypad (the phone's check stays one tap away).
   const hasPin = usePinStore((s) => s.hasPin);

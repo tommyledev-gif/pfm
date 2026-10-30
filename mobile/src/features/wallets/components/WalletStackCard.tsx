@@ -1,9 +1,11 @@
 import { useId } from "react";
 import { Animated as RNAnimated, Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
 import Animated from "react-native-reanimated";
+import { useTranslation } from "react-i18next";
 
 import { TintedIconTile } from "@/components/ui/TintedIconTile";
 import { formatCurrency } from "@/lib/currency";
+import { i18n, TranslationKey } from "@/lib/i18n";
 import { readableInk, withAlpha } from "@/lib/color";
 import { radii, spacing, typography, walletCardInk, createStyles } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
@@ -24,20 +26,20 @@ export {
   CAROUSEL_SHADOW_BLEED_TOP,
 } from "@/features/wallets/components/wallet-card-geometry";
 
-const TYPE_LABEL: Record<Wallet["type"], string> = {
-  cash: "Tiền mặt",
-  bank: "Ngân hàng",
-  e_wallet: "Ví điện tử",
-  other: "Khác",
+const TYPE_LABEL: Record<Wallet["type"], TranslationKey> = {
+  cash: "common.walletType.cash",
+  bank: "common.walletType.bank",
+  e_wallet: "common.walletType.e_wallet",
+  other: "common.walletType.other",
 };
 
 // A bank or e-wallet balance is what the wallet still reports as usable right
 // now; cash and anything else is simply what is on hand.
-const BALANCE_LABEL: Record<Wallet["type"], string> = {
-  cash: "Số dư hiện có",
-  bank: "Số dư khả dụng",
-  e_wallet: "Số dư khả dụng",
-  other: "Số dư hiện có",
+const BALANCE_LABEL: Record<Wallet["type"], TranslationKey> = {
+  cash: "wallets.card.balance.onHand",
+  bank: "wallets.card.balance.available",
+  e_wallet: "wallets.card.balance.available",
+  other: "wallets.card.balance.onHand",
 };
 
 // Secondary text on the card (type, balance label): the ink, pulled back.
@@ -46,10 +48,16 @@ const BALANCE_LABEL: Record<Wallet["type"], string> = {
 const SECONDARY_INK_ALPHA = 0.8;
 
 // The small line under the name: the wallet's type, or who shares it
-// (specs/shared-wallets US-06).
+// (specs/shared-wallets US-06). In the current language: read while the card
+// renders, which re-renders on a switch through its useTranslation().
 function identityLine(wallet: Wallet): string {
-  if (!isOwnWallet(wallet)) return wallet.owner_name ? `Ví chung của ${wallet.owner_name}` : "Ví chung";
-  return (wallet.member_count ?? 0) > 0 ? `${TYPE_LABEL[wallet.type]} · Ví chung` : TYPE_LABEL[wallet.type];
+  if (!isOwnWallet(wallet)) {
+    return wallet.owner_name
+      ? i18n.t("wallets.owner.sharedBy", { owner: wallet.owner_name })
+      : i18n.t("common.label.sharedWallet");
+  }
+  const type = i18n.t(TYPE_LABEL[wallet.type]);
+  return (wallet.member_count ?? 0) > 0 ? i18n.t("wallets.card.typeShared", { type }) : type;
 }
 
 interface WalletStackCardProps {
@@ -96,6 +104,7 @@ export function WalletStackCard({
   onPressOut,
   highlightOpacity,
 }: WalletStackCardProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const pendingCount = usePendingWalletCount(wallet.id);
   const sheenId = `wallet-sheen-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
@@ -128,7 +137,7 @@ export function WalletStackCard({
           onPressOut={onPressOut}
           disabled={!onPress}
           accessibilityRole={onPress ? "button" : undefined}
-          accessibilityLabel={`${wallet.name}, ${formatCurrency(wallet.balance, wallet.currency)}`}
+          accessibilityLabel={t("wallets.card.a11y", { wallet: wallet.name, amount: formatCurrency(wallet.balance, wallet.currency) })}
         >
           <View style={styles.topRow}>
             <TintedIconTile color={ink} size={32} icon={wallet.icon} iconUrl={wallet.icon_url} label={wallet.name} />
@@ -149,7 +158,7 @@ export function WalletStackCard({
               <PendingBalanceHint count={pendingCount} style={[styles.balanceLabel, { color: secondaryInk }]} />
             ) : (
               <Text style={[styles.balanceLabel, { color: secondaryInk }]} numberOfLines={1}>
-                {BALANCE_LABEL[wallet.type]}
+                {t(BALANCE_LABEL[wallet.type])}
               </Text>
             )}
             <Text

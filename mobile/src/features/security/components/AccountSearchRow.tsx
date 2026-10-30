@@ -1,4 +1,5 @@
 import { ListInlineButton, ListRow } from "@/components/ui/grouped-list";
+import { useTranslation } from "react-i18next";
 import { User } from "@/features/users/types";
 
 interface AccountSearchRowProps {
@@ -9,6 +10,7 @@ interface AccountSearchRowProps {
 
 /** One search result in the account deletion tool: who it is, and [Xóa]. */
 export function AccountSearchRow({ user, deleting, onDelete }: AccountSearchRowProps) {
+  const { t } = useTranslation();
   const name = user.full_name ?? user.username ?? user.email;
   const detail = user.username ? `${user.email} · ${user.username}` : user.email;
 
@@ -21,11 +23,11 @@ export function AccountSearchRow({ user, deleting, onDelete }: AccountSearchRowP
       subtitleEllipsizeMode="middle"
       trailing={
         <ListInlineButton
-          label="Xóa"
+          label={t("common.action.delete")}
           tone="destructive"
           onPress={() => onDelete(user)}
           loading={deleting}
-          accessibilityLabel={`Xóa tài khoản ${user.email}`}
+          accessibilityLabel={t("security.deleteAccounts.rowA11y", { email: user.email })}
           testID={`btn-delete-account-${user.id}`}
         />
       }

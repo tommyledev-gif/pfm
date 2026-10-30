@@ -1,29 +1,33 @@
-import { ReactNode } from "react";
+import { ReactNode, useMemo } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 import Animated, { ZoomIn, ZoomOut } from "react-native-reanimated";
+import { useTranslation } from "react-i18next";
 
 import { PressableScale } from "@/components/motion/PressableScale";
 import { useHintTooltip } from "@/components/shared/use-hint-tooltip";
 import { DownloadIcon, IconProps, SortIcon } from "@/components/ui/Icon";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { TransactionsSearchField } from "@/features/transactions/components/TransactionsSearchField";
+import { TransactionsTotalSummary } from "@/features/transactions/components/TransactionsTotalSummary";
 import { SearchFieldSeed } from "@/features/transactions/hooks/use-transaction-filters";
-import { formatCurrency } from "@/lib/currency";
 import { withAlpha } from "@/lib/color";
+import { TranslationKey } from "@/lib/i18n";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { TransactionKind } from "@/lib/constants";
 import { ReportTotal } from "@/features/reports/types";
-import { otherCurrenciesLabel } from "@/features/transactions/other-currencies";
 
 export type TypeFilterValue = "all" | TransactionKind;
 
+const NO_CURRENCIES: string[] = [];
+const NO_TOTALS: ReportTotal[] = [];
+
 // Transfers carry no total of their own — they change no net worth, so the
 // tab only narrows the list.
-export const TYPE_OPTIONS: { value: TypeFilterValue; label: string }[] = [
-  { value: "all", label: "Tất cả" },
-  { value: "expense", label: "Chi tiêu" },
-  { value: "income", label: "Thu nhập" },
-  { value: "transfer", label: "Chuyển" },
+export const TYPE_OPTIONS: { value: TypeFilterValue; labelKey: TranslationKey }[] = [
+  { value: "all", labelKey: "common.label.all" },
+  { value: "expense", labelKey: "common.txType.expense" },
+  { value: "income", labelKey: "common.txType.income" },
+  { value: "transfer", labelKey: "transactions.typeTab.transfer" },
 ];
 
 interface TransactionsHeaderProps {
@@ -35,6 +39,8 @@ interface TransactionsHeaderProps {
   headerTotal: ReportTotal | null;
   /** The period's currencies other than headerTotal's — named under it. */
   otherCurrencies?: string[];
+  /** Their totals, shown when the note under the figure is tapped. */
+  otherTotals?: ReportTotal[];
   typeFilter: TypeFilterValue;
   onChangeTypeFilter: (value: TypeFilterValue) => void;
   searchSeed: SearchFieldSeed;
@@ -67,7 +73,8 @@ export function TransactionsHeader({
   matchedCount,
   periodLabel,
   headerTotal,
-  otherCurrencies = [],
+  otherCurrencies = NO_CURRENCIES,
+  otherTotals = NO_TOTALS,
   typeFilter,
   onChangeTypeFilter,
   searchSeed,
@@ -82,37 +89,19 @@ export function TransactionsHeader({
   importing,
   children,
 }: TransactionsHeaderProps) {
-  const colors = useColors();
+  const { t } = useTranslation();
   const styles = useStyles();
-  // The summary line's figure follows whichever tab is active: on Thu nhập
-  // it's the income figure (green, the positive register used for income
-  // everywhere else in the app), otherwise the expense figure in the danger
-  // red. The "Tất cả" tab keeps showing expense — it's the number people open
-  // this screen to check.
-  const headerAmount = headerTotal
-    ? typeFilter === "income"
-      ? {
-          label: "Tổng thu",
-          text: `+${formatCurrency(headerTotal.total_income, headerTotal.currency)}`,
-          color: colors.green,
-        }
-      : {
-          label: "Tổng chi",
-          text: formatCurrency(-headerTotal.total_expense, headerTotal.currency),
-          color: colors.peach,
-        }
-    : null;
-  const otherNote = otherCurrenciesLabel(otherCurrencies);
+  const typeOptions = useMemo(() => TYPE_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) })), [t]);
 
   return (
     <View style={styles.header}>
       <View style={styles.headerRow}>
-        <Text style={styles.title}>Giao dịch</Text>
+        <Text style={styles.title}>{t("nav.tab.transactions")}</Text>
         <View style={styles.actions}>
           <HeaderAction
             icon={SortIcon}
-            label="Sắp xếp"
-            hint="Sắp xếp giao dịch"
+            label={t("common.action.sort")}
+            hint={t("transactions.header.sortHint")}
             active={hasCustomSort}
             onPress={onOpenSort}
             testID="btn-sort-transactions"
@@ -125,15 +114,15 @@ export function TransactionsHeader({
           </HeaderAction>
           <HeaderAction
             icon={DownloadIcon}
-            label="Xuất Excel"
-            hint="Xuất ra Excel"
+            label={t("transactions.header.export")}
+            hint={t("transactions.header.exportHint")}
             busy={exporting}
             onPress={onExport}
             testID="btn-export-transactions"
           />
           {/* <HeaderAction
             icon={UploadIcon}
-            label="Nhập Excel"
+            label={t("transactions.header.import")}
             busy={importing}
             onPress={onImport}
             testID="btn-import-transactions"
@@ -141,36 +130,18 @@ export function TransactionsHeader({
         </View>
       </View>
 
-      {/* The period's total, stated plainly: what period, then the figure,
-          with how many rows match on the right. It used to be a green pill
-          beside the title and a subtitle strung together with a dot. */}
-      <View style={styles.summary}>
-        <View style={styles.summaryText}>
-          <Text style={styles.period} numberOfLines={1}>
-            {headerAmount ? `${headerAmount.label} ${periodLabel.toLowerCase()}` : periodLabel}
-          </Text>
-          {headerAmount ? (
-            <Text style={[styles.total, { color: headerAmount.color }]} numberOfLines={1} adjustsFontSizeToFit>
-              {headerAmount.text}
-            </Text>
-          ) : null}
-        </View>
-        {matchedCount === null ? (
-          <ActivityIndicator size="small" color={colors.textMuted} />
-        ) : (
-          <Text style={styles.count}>{matchedCount} giao dịch</Text>
-        )}
-      </View>
-      {/* The total is one currency; the period's others are named, not added in. */}
-      {otherNote ? (
-        <Text style={styles.otherCurrencies} testID="text-transactions-other-currencies">
-          {otherNote}
-        </Text>
-      ) : null}
+      <TransactionsTotalSummary
+        periodLabel={periodLabel}
+        total={headerTotal}
+        otherCurrencies={otherCurrencies}
+        otherTotals={otherTotals}
+        typeFilter={typeFilter}
+        matchedCount={matchedCount}
+      />
 
       <TransactionsSearchField key={searchSeed.key} initialText={searchSeed.text} onSearch={onSearch} />
 
-      <SegmentedTabs options={TYPE_OPTIONS} value={typeFilter} onChange={onChangeTypeFilter} />
+      <SegmentedTabs options={typeOptions} value={typeFilter} onChange={onChangeTypeFilter} />
 
       {filterBar}
 
@@ -238,12 +209,6 @@ const useStyles = createStyles((colors) => ({
   actionActive: { backgroundColor: withAlpha(colors.green, 0.14) },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   title: { ...typography.title, color: colors.textPrimary },
-  summary: { flexDirection: "row", alignItems: "flex-end", gap: spacing.md },
-  summaryText: { flex: 1, minWidth: 0, gap: 2 },
-  period: { ...typography.caption, fontWeight: "500", color: colors.textSecondary },
-  total: { ...typography.hero, fontSize: 26 },
-  count: { ...typography.caption, fontWeight: "500", color: colors.textMuted, paddingBottom: 4 },
-  otherCurrencies: { ...typography.caption, fontWeight: "500", color: colors.textMuted, marginTop: -spacing.xs },
   sortBadge: {
     position: "absolute",
     top: -4,

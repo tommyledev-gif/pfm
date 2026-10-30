@@ -50,12 +50,6 @@ export function previousPeriodRange(period: HomePeriod, now: Date = new Date()):
   return monthRange(1, now);
 }
 
-export function previousPeriodLabel(period: HomePeriod): string {
-  if (period === "day") return "hôm qua";
-  if (period === "year") return "năm trước";
-  return "tháng trước";
-}
-
 // A full calendar month N months back from `now` (0 = this month, 1 = last
 // month, ...) — used by the fixed month-over-month comparison block, which
 // is independent of the Day/Month/Year snapshot selector above.

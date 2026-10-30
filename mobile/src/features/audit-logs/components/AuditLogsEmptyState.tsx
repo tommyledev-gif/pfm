@@ -1,4 +1,5 @@
 import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 
 import { EmptyIllustration } from "@/components/shared/EmptyIllustration";
 import { EmptyStateCard } from "@/components/shared/EmptyState";
@@ -10,6 +11,7 @@ import { useColors } from "@/lib/theme";
  * read-only, so its one action leads to where changes are made.
  */
 export function AuditLogsEmptyState() {
+  const { t } = useTranslation();
   const colors = useColors();
   const router = useRouter();
   return (
@@ -20,10 +22,10 @@ export function AuditLogsEmptyState() {
           <HistoryIcon size={30} color={colors.green} />
         </EmptyIllustration>
       }
-      title="Chưa có thay đổi nào"
-      description="Mỗi lần tạo, sửa hoặc xóa giao dịch đều được ghi ở đây."
+      title={t("auditLogs.empty.title")}
+      description={t("auditLogs.empty.body")}
       action={{
-        label: "Đến trang Giao dịch",
+        label: t("auditLogs.empty.cta"),
         icon: <ReceiptIcon size={18} color={colors.onGreen} />,
         onPress: () => router.navigate("/transactions"),
         testID: "btn-empty-audit-logs-transactions",

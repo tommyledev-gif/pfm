@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { CheckIcon, EditIcon, EyeIcon, UsersIcon } from "@/components/ui/Icon";
 import { PillButton } from "@/components/ui/PillButton";
@@ -11,8 +12,8 @@ import { MIN_INVITE_IDENTIFIER, useWalletInviteeLookup } from "@/features/wallet
 import { WalletMemberRole } from "@/features/wallets/types";
 import { InviteeLookupRow } from "@/features/wallets/components/InviteeLookupRow";
 import {
-  ROLE_DESCRIPTION,
-  ROLE_LABEL,
+  ROLE_DESCRIPTION_KEY,
+  ROLE_LABEL_KEY,
   WALLET_MEMBER_LIMIT,
   inviteErrorMessage,
   isEmailIdentifier,
@@ -43,6 +44,7 @@ interface WalletInviteFormProps {
 export function WalletInviteForm({ walletId, memberCount }: WalletInviteFormProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const requireOnline = useRequireOnline();
   const invite = useInviteWalletMemberMutation(walletId);
   const [identifier, setIdentifier] = useState("");
@@ -68,7 +70,7 @@ export function WalletInviteForm({ walletId, memberCount }: WalletInviteFormProp
     <View style={styles.section} testID="form-wallet-invite">
       {/* The members sheet's section header, so the sheet reads as one list. */}
       <View style={styles.header}>
-        <Text style={styles.title}>Mời thêm người</Text>
+        <Text style={styles.title}>{t("sharedWallets.invite.title")}</Text>
         <Text style={[styles.capacity, full && styles.capacityFull]}>
           {memberCount}/{WALLET_MEMBER_LIMIT}
         </Text>
@@ -90,7 +92,7 @@ export function WalletInviteForm({ walletId, memberCount }: WalletInviteFormProp
               setIdentifier(text);
               if (invite.isError) invite.reset();
             }}
-            placeholder="Email hoặc tên đăng nhập"
+            placeholder={t("common.field.identifier")}
             placeholderTextColor={colors.textMuted}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
@@ -100,7 +102,7 @@ export function WalletInviteForm({ walletId, memberCount }: WalletInviteFormProp
             returnKeyType="send"
             onSubmitEditing={() => (canSend ? send() : undefined)}
             editable={!invite.isPending && !full}
-            accessibilityLabel="Email hoặc tên đăng nhập"
+            accessibilityLabel={t("common.field.identifier")}
             testID="input-wallet-invite"
           />
         </View>
@@ -127,8 +129,8 @@ export function WalletInviteForm({ walletId, memberCount }: WalletInviteFormProp
                   <Icon size={16} color={active ? colors.onGreen : colors.textSecondary} />
                 </View>
                 <View style={styles.roleTexts}>
-                  <Text style={styles.roleTitle}>{ROLE_LABEL[value]}</Text>
-                  <Text style={styles.roleHint}>{ROLE_DESCRIPTION[value]}</Text>
+                  <Text style={styles.roleTitle}>{t(ROLE_LABEL_KEY[value])}</Text>
+                  <Text style={styles.roleHint}>{t(ROLE_DESCRIPTION_KEY[value])}</Text>
                 </View>
                 <View style={[styles.radio, active && styles.radioActive]}>
                   {active ? <CheckIcon size={12} /> : null}
@@ -138,9 +140,9 @@ export function WalletInviteForm({ walletId, memberCount }: WalletInviteFormProp
           })}
         </View>
 
-        {full ? <Text style={styles.full}>Ví đã đủ {WALLET_MEMBER_LIMIT} người. Xóa bớt người để mời thêm.</Text> : null}
+        {full ? <Text style={styles.full}>{t("sharedWallets.invite.full", { max: WALLET_MEMBER_LIMIT })}</Text> : null}
         <PillButton
-          label="Gửi lời mời"
+          label={t("sharedWallets.invite.send")}
           onPress={send}
           loading={invite.isPending}
           disabled={!canSend}

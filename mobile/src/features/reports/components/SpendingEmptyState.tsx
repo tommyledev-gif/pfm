@@ -1,4 +1,5 @@
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { EmptyStateCard } from "@/components/shared/EmptyState";
 import { ThemedIllustration } from "@/components/shared/ThemedIllustration";
@@ -15,6 +16,7 @@ interface SpendingEmptyStateProps {
 
 /** Insights → Spending, for a window with no expense in it. */
 export function SpendingEmptyState({ onOpenBudgets }: SpendingEmptyStateProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const startTransaction = useStartManualTransaction();
@@ -25,17 +27,17 @@ export function SpendingEmptyState({ onOpenBudgets }: SpendingEmptyStateProps) {
     <View style={styles.stack} testID="empty-spending">
       <EmptyStateCard
         illustration={<ThemedIllustration name="spending" />}
-        title="Chưa có khoản chi"
-        description="Ghi giao dịch để xem tiền đi đâu theo danh mục."
+        title={t("reports.spending.empty.title")}
+        description={t("reports.spending.empty.body")}
         action={
           needsWallet
             ? {
-                label: "Tạo ví",
+                label: t("common.action.createWallet"),
                 icon: <WalletIcon size={18} color={colors.onGreen} />,
                 onPress: openWalletCreator,
               }
             : {
-                label: "Thêm giao dịch",
+                label: t("common.action.addTransaction"),
                 icon: <PlusIcon size={18} color={colors.onGreen} />,
                 onPress: startTransaction,
                 testID: "btn-empty-spending-add",
@@ -49,8 +51,8 @@ export function SpendingEmptyState({ onOpenBudgets }: SpendingEmptyStateProps) {
             <InsightIcon size={18} color={colors.green} />
           </View>
           <View style={styles.tipText}>
-            <Text style={styles.tipEyebrow}>Mẹo</Text>
-            <Text style={styles.tipBody}>Đặt ngân sách cho từng danh mục để biết mỗi ngày còn được chi bao nhiêu.</Text>
+            <Text style={styles.tipEyebrow}>{t("reports.spending.tip.eyebrow")}</Text>
+            <Text style={styles.tipBody}>{t("reports.spending.tip.body")}</Text>
           </View>
           <ChevronRightIcon size={16} color={colors.textMuted} />
         </Pressable>

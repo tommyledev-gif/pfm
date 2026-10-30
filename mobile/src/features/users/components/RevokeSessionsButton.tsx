@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, Text } from "react-native";
 import { isAxiosError } from "axios";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { getErrorMessage, isNetworkError } from "@/lib/api-envelope";
+import { errorText, isNetworkError } from "@/lib/api-envelope";
+import { copyOf, i18n } from "@/lib/i18n";
 import { useRequireOnline } from "@/lib/connectivity";
 import { HTTP_STATUS } from "@/lib/constants";
 import { createStyles, spacing, typography, useColors } from "@/lib/theme";
@@ -16,19 +18,20 @@ interface RevokeSessionsButtonProps {
 }
 
 // Spec US-09 / S-ASW-69 / S-ASW-71 copy.
-const LABEL = "Đăng xuất mọi thiết bị";
-const CONFIRM_TITLE = "Đăng xuất mọi thiết bị?";
-const CONFIRM_LABEL = "Đăng xuất";
-const NOT_FOUND = "Không tìm thấy người dùng.";
-const OFFLINE = "Cần kết nối mạng để đăng xuất mọi thiết bị.";
-const FALLBACK_ERROR = "Chưa đăng xuất được mọi thiết bị. Thử lại.";
+const COPY = copyOf({
+  LABEL: "users.revokeSessions.button",
+  CONFIRM_TITLE: "users.revokeSessions.title",
+  CONFIRM_LABEL: "common.action.signOut",
+  NOT_FOUND: "users.revokeSessions.notFound",
+  OFFLINE: "users.revokeSessions.offline",
+});
 
-const confirmMessage = (email: string) =>
-  `Đăng xuất ${email} khỏi mọi thiết bị? Người này sẽ phải đăng nhập lại bằng mật khẩu.`;
-const successMessage = (email: string) => `Đã đăng xuất ${email} khỏi mọi thiết bị.`;
+const confirmMessage = (email: string) => i18n.t("users.revokeSessions.body", { email });
+const successMessage = (email: string) => i18n.t("users.revokeSessions.toast", { email });
 
 /** Admin's per-member "sign out everywhere" (spec US-09). */
 export function RevokeSessionsButton({ userId, email }: RevokeSessionsButtonProps) {
+  useTranslation(); // COPY reads the current language: re-render on a switch
   const colors = useColors();
   const styles = useStyles();
   const requireOnline = useRequireOnline();
@@ -43,9 +46,9 @@ export function RevokeSessionsButton({ userId, email }: RevokeSessionsButtonProp
       revoke.mutate(userId, {
         onSuccess: () => showToast(successMessage(email), "info"),
         onError: (error) => {
-          if (isNetworkError(error)) return showToast(OFFLINE, "warning");
+          if (isNetworkError(error)) return showToast(COPY.OFFLINE, "warning");
           const notFound = isAxiosError(error) && error.response?.status === HTTP_STATUS.notFound;
-          showToast(notFound ? NOT_FOUND : getErrorMessage(error, FALLBACK_ERROR), "error");
+          showToast(notFound ? COPY.NOT_FOUND : errorText(error, "users.revokeSessions.failed"), "error");
         },
       }),
     );
@@ -63,13 +66,13 @@ export function RevokeSessionsButton({ userId, email }: RevokeSessionsButtonProp
         testID={`btn-user-revoke-sessions-${userId}`}
       >
         {revoke.isPending ? <ActivityIndicator size="small" color={colors.peach} /> : null}
-        <Text style={styles.label}>{LABEL}</Text>
+        <Text style={styles.label}>{COPY.LABEL}</Text>
       </Pressable>
       <ConfirmDialog
         visible={confirmOpen}
-        title={CONFIRM_TITLE}
+        title={COPY.CONFIRM_TITLE}
         message={confirmMessage(email)}
-        confirmLabel={CONFIRM_LABEL}
+        confirmLabel={COPY.CONFIRM_LABEL}
         onConfirm={confirm}
         onCancel={() => setConfirmOpen(false)}
         testID="dialog-user-revoke-sessions"

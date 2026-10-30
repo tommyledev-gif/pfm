@@ -1,5 +1,7 @@
 import { Pressable, Text, View } from "react-native";
+import { Trans, useTranslation } from "react-i18next";
 
+import { categoryLabel } from "@/features/categories/category-label";
 import { formatCurrency } from "@/lib/currency";
 import { spacing, typography, createStyles } from "@/lib/theme";
 import { ConfidenceBadge, ProposalEntry, confidenceBadge } from "@/features/budget-wizard/types";
@@ -38,7 +40,9 @@ export function ProposalRow({
   onPressConfidence,
 }: ProposalRowProps) {
   const styles = useStyles();
+  const { t } = useTranslation();
   const badge = confidenceBadge(entry.source);
+  const name = categoryLabel({ name: entry.category_name, system_key: entry.system_key ?? null });
 
   return (
     <Pressable testID={`row-wizard-proposal-${entry.category_id}`} onPress={onPress} style={styles.row}>
@@ -46,7 +50,7 @@ export function ProposalRow({
 
       <View style={styles.labels}>
         <Text style={styles.name} numberOfLines={1}>
-          {entry.category_name}
+          {name}
         </Text>
         {/* Words, not dots. The level is real information but "●●○" beside a
             number has no self-evident meaning, so it lives behind this tap
@@ -59,8 +63,15 @@ export function ProposalRow({
           <Text style={styles.badge} numberOfLines={1}>
             {/* Evidence when there is any, the label alone when there is not.
                 Never a substitute sentence. */}
-            {entry.evidence ? entry.evidence : badge.label}
-            <Text style={styles.badgeHint}> · vì sao?</Text>
+            {/* Escaped in, unescaped out: server text never reads as a tag. */}
+            <Trans
+              t={t}
+              i18nKey="budgetWizard.result.row.why"
+              values={{ source: entry.evidence ? entry.evidence : badge.label }}
+              components={[<Text key="why" style={styles.badgeHint} />]}
+              tOptions={{ interpolation: { escapeValue: true } }}
+              shouldUnescape
+            />
           </Text>
         </Pressable>
       </View>
@@ -71,13 +82,20 @@ export function ProposalRow({
             has no band, and rendering "500.000 – 500.000" would imply an
             uncertainty that does not exist. */}
         {entry.amount_min < entry.amount_max ? (
-          <Text style={styles.band}>từ {formatCurrency(entry.amount_min, currency)}</Text>
+          <Text style={styles.band}>
+            {t("budgetWizard.result.row.from", { amount: formatCurrency(entry.amount_min, currency) })}
+          </Text>
         ) : null}
       </View>
 
       {/* Its own touch target, so the common action (tap the row to edit the
           amount) and the rare one (remove it) never share a tap. */}
-      <Pressable onPress={onRemove} hitSlop={10} testID={`btn-wizard-remove-row-${entry.category_id}`}>
+      <Pressable
+        onPress={onRemove}
+        hitSlop={10}
+        accessibilityLabel={t("budgetWizard.result.row.remove.a11y", { category: name })}
+        testID={`btn-wizard-remove-row-${entry.category_id}`}
+      >
         <Text style={styles.remove}>✕</Text>
       </Pressable>
     </Pressable>

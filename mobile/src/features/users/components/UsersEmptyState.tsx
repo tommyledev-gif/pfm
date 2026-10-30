@@ -1,4 +1,5 @@
 import { EmptyIllustration } from "@/components/shared/EmptyIllustration";
+import { useTranslation } from "react-i18next";
 import { EmptyStateCard } from "@/components/shared/EmptyState";
 import { CloseIcon, PlusIcon, UsersIcon } from "@/components/ui/Icon";
 import { useColors } from "@/lib/theme";
@@ -12,6 +13,7 @@ interface UsersEmptyStateProps {
 
 /** The members list with nothing to show — either none yet, or it failed to load. */
 export function UsersEmptyState({ failed, onInvite, onRetry }: UsersEmptyStateProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   if (failed) {
     return (
@@ -25,9 +27,9 @@ export function UsersEmptyState({ failed, onInvite, onRetry }: UsersEmptyStatePr
             <UsersIcon size={30} color={colors.green} />
           </EmptyIllustration>
         }
-        title="Không tải được danh sách thành viên"
-        description="Kiểm tra kết nối mạng rồi thử lại."
-        action={{ label: "Thử lại", onPress: onRetry, testID: "btn-empty-users-retry" }}
+        title={t("users.error.title")}
+        description={t("users.error.body")}
+        action={{ label: t("common.action.retry"), onPress: onRetry, testID: "btn-empty-users-retry" }}
       />
     );
   }
@@ -39,10 +41,10 @@ export function UsersEmptyState({ failed, onInvite, onRetry }: UsersEmptyStatePr
           <UsersIcon size={30} color={colors.green} />
         </EmptyIllustration>
       }
-      title="Chưa có thành viên nào"
-      description="Người được mời nhận email để kích hoạt tài khoản riêng."
+      title={t("users.empty.title")}
+      description={t("users.empty.body")}
       action={{
-        label: "Mời thành viên",
+        label: t("users.invite.cta"),
         icon: <PlusIcon size={18} color={colors.onGreen} />,
         onPress: onInvite,
         testID: "btn-empty-users-invite",

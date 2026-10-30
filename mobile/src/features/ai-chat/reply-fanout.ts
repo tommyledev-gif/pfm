@@ -1,5 +1,6 @@
 import { nextMessageId } from "@/features/ai-chat/message-id";
 import { toReviewLineKeys } from "@/features/ai-chat/line-review";
+import { appReply } from "@/features/ai-chat/message-text";
 import { ChatAction, ChatMessage, ChatResponse, ImageProposalsResponse } from "@/features/ai-chat/types";
 
 interface ReplyFanoutOptions {
@@ -13,8 +14,6 @@ interface ReplyFanoutOptions {
    *  carry the low-confidence label and the line marks. Never a sourceText. */
   imageOrigin?: boolean;
 }
-
-const NO_WALLET_REPLY = "Chưa có ví. Tạo ví để ghi giao dịch.";
 
 /**
  * Turns one assistant reply into thread messages: one card per proposal, in
@@ -38,7 +37,7 @@ export function toReplyMessages(
       {
         id: nextMessageId(),
         role: "assistant",
-        text: NO_WALLET_REPLY,
+        ...appReply("common.empty.noWallet"),
         intent: "ambiguous",
         offerCreateWallet: true,
         edited,

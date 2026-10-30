@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { StyleProp, Text, View, ViewStyle } from "react-native";
+import { useTranslation } from "react-i18next";
 import Animated, {
   Easing,
   FadeIn,
@@ -46,6 +47,7 @@ interface ScreenLoaderProps {
  * Reduce Motion the arc holds still and only the dot breathes, slowly.
  */
 export function ScreenLoader({ label, style }: ScreenLoaderProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const reduceMotion = useReduceMotion();
@@ -80,7 +82,7 @@ export function ScreenLoader({ label, style }: ScreenLoaderProps) {
       entering={FadeIn.duration(220).delay(SHOW_AFTER_MS)}
       style={[styles.root, style]}
       accessibilityRole="progressbar"
-      accessibilityLabel={label ?? "Đang tải"}
+      accessibilityLabel={label ?? t("common.loading")}
       testID="screen-loader"
     >
       <View style={styles.ring}>

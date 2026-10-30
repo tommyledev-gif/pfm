@@ -1,18 +1,17 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { ListToggleRow } from "@/components/ui/grouped-list";
 import { LockGlyph } from "@/components/ui/grouped-list/list-icons";
+import { i18n, TranslationKey } from "@/lib/i18n";
 import { useColors } from "@/lib/theme";
 import { useSecurityPrefsStore } from "@/stores/security-prefs-store";
 import { useToastStore } from "@/stores/toast-store";
 import { CHANGE_SETTING_PROMPT, verifyOwner } from "@/features/security/identity-check";
 import { PIN_COPY } from "@/features/security/pin/pin-copy";
 
-const TITLE = "Khóa ứng dụng";
 /** The group footer under this row on the Security screen. */
-export const APP_LOCK_FOOTER = "Hỏi mã PIN, vân tay, khuôn mặt hoặc mã khóa màn hình khi mở ứng dụng.";
-const NO_LOCK = "Máy chưa cài khóa màn hình nên chưa bật được khóa ứng dụng. Đặt mã PIN để bật.";
-const FAILED = "Không xác minh được.";
+export const APP_LOCK_FOOTER = "security.appLock.footer" satisfies TranslationKey;
 
 /**
  * The device-wide app lock switch (US-12, default off). Both directions ask
@@ -22,6 +21,7 @@ const FAILED = "Không xác minh được.";
  * on (specs/mobile-app-pin BR-05); it can always turn it off.
  */
 export function AppLockToggleRow() {
+  const { t } = useTranslation();
   const colors = useColors();
   const enabled = useSecurityPrefsStore((s) => s.appLockEnabled);
   const setEnabled = useSecurityPrefsStore((s) => s.setAppLockEnabled);
@@ -33,9 +33,9 @@ export function AppLockToggleRow() {
       const result = await verifyOwner(PIN_COPY.enter, CHANGE_SETTING_PROMPT);
       if (result === "passed") setEnabled(next);
       else if (result === "unavailable") {
-        if (next) useToastStore.getState().show(NO_LOCK, "warning");
+        if (next) useToastStore.getState().show(i18n.t("security.appLock.noLock"), "warning");
         else setEnabled(false);
-      } else if (result === "failed") useToastStore.getState().show(FAILED, "warning");
+      } else if (result === "failed") useToastStore.getState().show(i18n.t("security.verifyFailed"), "warning");
     } finally {
       setChecking(false);
     }
@@ -43,7 +43,7 @@ export function AppLockToggleRow() {
 
   return (
     <ListToggleRow
-      title={TITLE}
+      title={t("security.appLock.title")}
       icon={LockGlyph}
       tone={colors.info}
       value={enabled}

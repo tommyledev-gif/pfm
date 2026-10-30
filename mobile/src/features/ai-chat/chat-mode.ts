@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import { create } from "zustand";
 
 import { IconProps, InsightIcon, ReceiptIcon, TargetIcon } from "@/components/ui/Icon";
+import { i18n } from "@/lib/i18n";
 import { colors } from "@/lib/theme";
 
 /**
@@ -46,34 +47,35 @@ interface ChatModeMeta {
 }
 
 // Getters, not values: read at render time so they follow a theme switch
-// (see src/theme/active-palette.ts).
+// (see src/theme/active-palette.ts) and a language switch (lib/i18n.ts) —
+// the component reading them re-renders through its own useTranslation().
 export const CHAT_MODE_META: Record<ChatMode, ChatModeMeta> = {
   transaction: {
-    label: "Ghi giao dịch",
-    shortLabel: "Giao dịch",
+    get label() { return i18n.t("chat.mode.transaction.label"); },
+    get shortLabel() { return i18n.t("chat.mode.transaction.shortLabel"); },
     // No voice input exists, so the copy promises typing only.
-    description: "Ghi khoản thu chi bằng một câu.",
+    get description() { return i18n.t("chat.mode.transaction.description"); },
     // Three full stops, not "…": a phone font with CJK in it draws that one
     // glyph mid-line, so the hint's dots floated level with its letters.
-    placeholder: "Mô tả một giao dịch...",
+    get placeholder() { return i18n.t("chat.mode.transaction.placeholder"); },
     icon: ReceiptIcon,
     get tint() { return colors.green; },
     get accentTo() { return colors.mint; },
   },
   budget: {
-    label: "Lập ngân sách",
-    shortLabel: "Ngân sách",
-    description: "Chia thu nhập thành hạn mức theo danh mục.",
-    placeholder: "Mô tả một giao dịch...",
+    get label() { return i18n.t("chat.mode.budget.label"); },
+    get shortLabel() { return i18n.t("chat.mode.budget.shortLabel"); },
+    get description() { return i18n.t("chat.mode.budget.description"); },
+    get placeholder() { return i18n.t("chat.mode.budget.placeholder"); },
     icon: TargetIcon,
     get tint() { return colors.lavender; },
     get accentTo() { return colors.periwinkle; },
   },
   consult: {
-    label: "Hỏi phân tích",
-    shortLabel: "Phân tích",
-    description: "Hỏi tháng này chi bao nhiêu, mục nào nhiều nhất.",
-    placeholder: "Hỏi về chi tiêu...",
+    get label() { return i18n.t("chat.mode.consult.label"); },
+    get shortLabel() { return i18n.t("chat.mode.consult.shortLabel"); },
+    get description() { return i18n.t("chat.mode.consult.description"); },
+    get placeholder() { return i18n.t("chat.mode.consult.placeholder"); },
     icon: InsightIcon,
     get tint() { return colors.mint; },
     get accentTo() { return colors.info; },

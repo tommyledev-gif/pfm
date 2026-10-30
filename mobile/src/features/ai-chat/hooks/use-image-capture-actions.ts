@@ -2,10 +2,11 @@ import { isAxiosError } from "axios";
 
 import { getErrorCode } from "@/lib/axios";
 import { isNetworkError } from "@/lib/api-envelope";
-import { NETWORK_ERROR_MESSAGE } from "@/lib/constants";
+import { i18n } from "@/lib/i18n";
 import { useImageProposalsMutation } from "@/features/ai-chat/api/use-image-proposals-mutation";
 import { captureExists } from "@/features/ai-chat/image-capture";
 import { nextMessageId } from "@/features/ai-chat/message-id";
+import { appReply } from "@/features/ai-chat/message-text";
 import { toReplyMessages } from "@/features/ai-chat/reply-fanout";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { useNeedsFirstWallet } from "@/features/wallets/use-open-wallet-creator";
@@ -15,15 +16,16 @@ import { useToastStore } from "@/stores/toast-store";
 
 // Reply copy for a failed reading (specs/ai-chat-image-capture BR-18, BR-19,
 // UI states), per pfm-ux-copy: what failed, then the one next step as a button.
+// Stored in the thread as keys (message-text.ts).
 const SECONDS_PER_MINUTE = 60;
 const BUSY_DEFAULT_MINUTES = 1;
-const IMAGE_READING_OFF = "Đọc ảnh đang tạm dừng.";
-const IMAGE_LIMIT_REACHED = "Đã hết lượt đọc ảnh trong giờ này.";
-const IMAGE_UNAVAILABLE = "Chưa đọc được ảnh. Thử lại sau ít phút.";
-const IMAGE_TOO_LARGE = "Ảnh quá lớn. Chọn ảnh khác.";
-const IMAGE_WRONG_TYPE = "Chỉ nhận ảnh PNG, JPEG hoặc WebP.";
+const IMAGE_READING_OFF = "chat.image.reply.readingOff";
+const IMAGE_LIMIT_REACHED = "chat.image.reply.limitReached";
+const IMAGE_UNAVAILABLE = "chat.image.reply.unavailable";
+const IMAGE_TOO_LARGE = "chat.image.reply.tooLarge";
+const IMAGE_WRONG_TYPE = "chat.image.reply.wrongType";
 // A toast: short phrase, no final period.
-const CAPTURE_GONE = "Ảnh không còn trên máy";
+const CAPTURE_GONE = "chat.image.captureGone.toast";
 
 interface UseImageCaptureActionsOptions {
   sending: boolean;
@@ -86,7 +88,7 @@ export function useImageCaptureActions({ sending, setSending, onSent, minTypingM
     if (sending || !failedReply.retryImageMessageId) return;
     const imageMessage = useChatStore.getState().thread.find((m) => m.id === failedReply.retryImageMessageId);
     if (!imageMessage || !captureExists(imageMessage.imageCapture?.localUri)) {
-      useToastStore.getState().show(CAPTURE_GONE, "error");
+      useToastStore.getState().show(i18n.t(CAPTURE_GONE), "error");
       return;
     }
     updateMessage(failedReply.id, { retryImageMessageId: undefined });
@@ -103,17 +105,17 @@ function failedReply(error: unknown, imageMessageId: string): ChatMessage {
   const status = isAxiosError(error) ? error.response?.status : undefined;
   if (code === "AI_IMAGE_DISABLED") {
     useImageReadingSessionStore.getState().markOff();
-    return { ...base, text: IMAGE_READING_OFF, offerManualEntry: true };
+    return { ...base, ...appReply(IMAGE_READING_OFF), offerManualEntry: true };
   }
   if (code === "AI_IMAGE_BUSY") {
     const minutes = Math.max(BUSY_DEFAULT_MINUTES, Math.ceil((retryAfterSeconds(error) ?? 0) / SECONDS_PER_MINUTE));
-    return { ...base, text: `Chưa đọc được ảnh. Thử lại sau ${minutes} phút.`, offerManualEntry: true, retryImageMessageId: imageMessageId };
+    return { ...base, ...appReply("chat.image.reply.busy", { count: minutes }), offerManualEntry: true, retryImageMessageId: imageMessageId };
   }
-  if (code === "RATE_LIMITED") return { ...base, text: IMAGE_LIMIT_REACHED, offerManualEntry: true };
-  if (code === "IMAGE_TOO_LARGE" || status === 413) return { ...base, text: IMAGE_TOO_LARGE };
-  if (code === "UNSUPPORTED_IMAGE_TYPE") return { ...base, text: IMAGE_WRONG_TYPE };
-  if (isNetworkError(error)) return { ...base, text: NETWORK_ERROR_MESSAGE, retryImageMessageId: imageMessageId };
-  return { ...base, text: IMAGE_UNAVAILABLE, offerManualEntry: true, retryImageMessageId: imageMessageId };
+  if (code === "RATE_LIMITED") return { ...base, ...appReply(IMAGE_LIMIT_REACHED), offerManualEntry: true };
+  if (code === "IMAGE_TOO_LARGE" || status === 413) return { ...base, ...appReply(IMAGE_TOO_LARGE) };
+  if (code === "UNSUPPORTED_IMAGE_TYPE") return { ...base, ...appReply(IMAGE_WRONG_TYPE) };
+  if (isNetworkError(error)) return { ...base, ...appReply("errors.network"), retryImageMessageId: imageMessageId };
+  return { ...base, ...appReply(IMAGE_UNAVAILABLE), offerManualEntry: true, retryImageMessageId: imageMessageId };
 }
 
 function retryAfterSeconds(error: unknown): number | null {

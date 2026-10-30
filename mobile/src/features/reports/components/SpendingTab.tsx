@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, Animated as RNAnimated, ScrollView, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 
@@ -38,6 +39,7 @@ interface SpendingTabProps {
 type DateRange = { from?: string; to?: string };
 
 export const SpendingTab = memo(function SpendingTab({ focusCategoryId, focusNonce, onOpenBudgets }: SpendingTabProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const [dateRange, setDateRange] = useState<DateRange>({});
@@ -93,9 +95,9 @@ export const SpendingTab = memo(function SpendingTab({ focusCategoryId, focusNon
     if (!summary.data) {
       return (
         <View style={styles.loadError}>
-          <Text style={styles.empty}>Chưa tải được báo cáo.</Text>
+          <Text style={styles.empty}>{t("reports.spending.loadError")}</Text>
           <Pressable onPress={() => summary.refetch()} hitSlop={8} testID="btn-spending-retry">
-            <Text style={styles.retry}>Thử lại</Text>
+            <Text style={styles.retry}>{t("common.action.retry")}</Text>
           </Pressable>
         </View>
       );
@@ -138,7 +140,7 @@ export const SpendingTab = memo(function SpendingTab({ focusCategoryId, focusNon
             {/* One surface split down the middle, not two boxes side by side. */}
             <View style={styles.statRow}>
               <RevealableAmount
-                label="Thu nhập"
+                label={t("common.txType.income")}
                 amountCents={primaryTotal?.total_income ?? 0}
                 currency={currency}
                 containerStyle={styles.statCard}
@@ -148,7 +150,7 @@ export const SpendingTab = memo(function SpendingTab({ focusCategoryId, focusNon
               />
               <View style={styles.statDivider} />
               <RevealableAmount
-                label="Chi tiêu"
+                label={t("common.txType.expense")}
                 amountCents={primaryTotal?.total_expense ?? 0}
                 currency={currency}
                 containerStyle={styles.statCard}
@@ -174,13 +176,15 @@ export const SpendingTab = memo(function SpendingTab({ focusCategoryId, focusNon
                   />
                   {budgetTotal !== null && prorated ? (
                     <Text style={styles.budgetHint}>
-                      Hạn mức tháng đã chia theo {rangeDayCount === 1 ? "ngày" : `${rangeDayCount} ngày`} bạn chọn.
+                      {rangeDayCount === 1
+                        ? t("reports.spending.proratedHintOneDay")
+                        : t("reports.spending.proratedHint", { count: rangeDayCount })}
                     </Text>
                   ) : null}
                 </View>
 
                 <View>
-                  <Text style={styles.legendTitle}>Theo danh mục</Text>
+                  <Text style={styles.legendTitle}>{t("reports.spending.byCategory")}</Text>
                   {segments.map((seg, index) => (
                     <Animated.View key={seg.key} entering={legendEntrance(index)}>
                       <DonutLegendRow

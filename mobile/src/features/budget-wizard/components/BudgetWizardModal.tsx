@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { BackHandler, StyleSheet, View } from "react-native";
+import Animated, { Easing, FadeIn, FadeInLeft, FadeInRight, FadeInUp, FadeOut, FadeOutDown } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { daysInCycle, perDayXu } from "@/features/budget-wizard/budget-math";
@@ -15,6 +16,21 @@ import { WizardStepIncome } from "@/features/budget-wizard/components/WizardStep
 import { WizardStepProfile } from "@/features/budget-wizard/components/WizardStepProfile";
 import { WizardStepResult } from "@/features/budget-wizard/components/WizardStepResult";
 import { WizardStepSuccess } from "@/features/budget-wizard/components/WizardStepSuccess";
+
+// Opening, the whole flow rises a little into place as it fades in; closing,
+// it sinks and fades the same way. It used to appear and vanish in one frame.
+const OPEN = FadeInUp.duration(300).easing(Easing.out(Easing.cubic)).withInitialValues({ transform: [{ translateY: 36 }] });
+const CLOSE = FadeOutDown.duration(220).easing(Easing.in(Easing.cubic));
+// Between steps the next one slides in from the side being moved to while
+// the one left behind fades where it stands, so Next and Back read as a
+// direction, not a cut. The exit is direction-free on purpose: an exiting
+// view keeps the props of its last render, which still had the old direction.
+const STEP_IN_MS = 280;
+const STEP_OUT_MS = 150;
+const STEP_FORWARD = FadeInRight.duration(STEP_IN_MS).easing(Easing.out(Easing.cubic));
+const STEP_BACK = FadeInLeft.duration(STEP_IN_MS).easing(Easing.out(Easing.cubic));
+const STEP_LEAVE = FadeOut.duration(STEP_OUT_MS);
+const SUCCESS_IN = FadeIn.duration(320);
 
 interface BudgetWizardModalProps {
   visible: boolean;
@@ -38,6 +54,18 @@ interface BudgetWizardModalProps {
 export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizardModalProps) {
   const styles = useStyles();
   const wizard = useBudgetWizardState(visible, onClose, onCompleted);
+  // Which way the last step change went, and whether one has happened yet in
+  // this opening (the first step only rides the overlay's own entrance).
+  const shownStep = useRef(wizard.step);
+  const stepChanged = useRef(false);
+  const forward = wizard.step >= shownStep.current;
+  if (wizard.step !== shownStep.current) stepChanged.current = true;
+  useEffect(() => {
+    shownStep.current = wizard.step;
+  }, [wizard.step]);
+  useEffect(() => {
+    if (!visible) stepChanged.current = false;
+  }, [visible]);
 
   useEffect(() => {
     if (!visible) return;
@@ -65,13 +93,17 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
     : undefined;
 
   return (
-    <View style={styles.overlay}>
+    <Animated.View style={styles.overlay} entering={OPEN} exiting={CLOSE}>
       {/* ⚠️ Behind the WHOLE screen, header and status bar included — not
           inside the profile step. Drawn inside the step it started under the
           progress header, so the screen read as two backgrounds stacked: the
           plain strip behind the pills, and the glow cut off in a hard line
           right beneath it. */}
-      {step === 2 && !isSuccess ? <WizardAmbientGlow /> : null}
+      {step === 2 && !isSuccess ? (
+        <Animated.View style={StyleSheet.absoluteFill} pointerEvents="none" entering={FadeIn} exiting={FadeOut}>
+          <WizardAmbientGlow />
+        </Animated.View>
+      ) : null}
 
       {/* ⚠️ Success replaces the stepper entirely — it is not rendered inside it.
           It is a destination, not another screen in the sequence, and leaving it
@@ -79,7 +111,9 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
           whatever transition the steps use, so the landing reads as one more
           sideways move. */}
       {isSuccess ? (
-        <WizardStepSuccess createdCount={wizard.createdCount} dailyAllowance={dailyAllowance} onDone={onClose} />
+        <Animated.View key="success" style={StyleSheet.absoluteFill} entering={SUCCESS_IN}>
+          <WizardStepSuccess createdCount={wizard.createdCount} dailyAllowance={dailyAllowance} onDone={onClose} />
+        </Animated.View>
       ) : (
       /* ⚠️ No manual keyboard padding here, deliberately.
           Each step owns a ScrollView, and React Native already scrolls a
@@ -96,6 +130,7 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
           overlay inside <Screen>, whose SafeAreaView already pads the status
           bar; adding the top inset here again pushed the progress header a
           whole status bar's height too low. */
+      <Animated.View key="steps" style={StyleSheet.absoluteFill} exiting={STEP_LEAVE}>
       <SafeAreaView edges={["bottom"]} style={styles.safeArea}>
         <WizardProgressHeader
           step={step}
@@ -105,6 +140,14 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
         />
 
         <View style={styles.body}>
+          {/* Keyed by step, laid over each other so the one leaving fades in
+              place while the next slides in. */}
+          <Animated.View
+            key={step}
+            style={StyleSheet.absoluteFill}
+            entering={stepChanged.current ? (forward ? STEP_FORWARD : STEP_BACK) : undefined}
+            exiting={STEP_LEAVE}
+          >
           {step === 1 ? (
             <WizardStepIncome
               currency={wizard.currency}
@@ -138,6 +181,8 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
               submitting={wizard.submitting}
               error={wizard.error}
               onEditAmount={wizard.editAmount}
+              rowNameKind={wizard.rowNameKind}
+              onRenameRow={wizard.renameRow}
               addedIds={wizard.addedIds}
               categories={wizard.availableCategories}
               addRowOpen={wizard.addRowOpen}
@@ -158,9 +203,10 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
               canSubmit={wizard.canSubmit}
             />
           ) : null}
-
+          </Animated.View>
         </View>
       </SafeAreaView>
+      </Animated.View>
       )}
 
       <WizardBackConfirmDialog
@@ -182,7 +228,7 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
         onClose={wizard.closeFixedCosts}
         onConfirm={wizard.applyFixedCosts}
       />
-    </View>
+    </Animated.View>
   );
 }
 

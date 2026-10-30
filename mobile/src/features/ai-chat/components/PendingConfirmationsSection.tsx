@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
+import { useTranslation } from "react-i18next";
 
 import { entrance, exit, layoutSpring } from "@/components/motion/motion-tokens";
 import { ChevronRightIcon } from "@/components/ui/Icon";
 import { FALLBACK_CURRENCY } from "@/lib/constants";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { categoryLabel } from "@/features/categories/category-label";
 import { Category } from "@/features/categories/types";
 import { PendingRow } from "@/features/ai-chat/components/PendingRow";
 import { proposalCategoryName } from "@/features/ai-chat/proposal-kind";
@@ -45,6 +47,7 @@ export function PendingConfirmationsSection({
   onOpenMessage,
   onRequestRemove,
 }: PendingConfirmationsSectionProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   // Bumped whenever the rendered set changes, so a parked row never stays
@@ -75,13 +78,15 @@ export function PendingConfirmationsSection({
     <Animated.View style={styles.section} entering={entrance("fadeDown")} exiting={exit("fade")} layout={layoutSpring()}>
       <View style={styles.headerRow}>
         <View style={styles.titleRow}>
-          <Text style={styles.sectionTitle}>Chờ xác nhận</Text>
+          <Text style={styles.sectionTitle} numberOfLines={1}>
+            {t("common.status.pending")}
+          </Text>
           <View style={styles.countBadge}>
             <Text style={styles.countBadgeLabel}>{messages.length}</Text>
           </View>
         </View>
         <Pressable onPress={onViewAll} hitSlop={8} testID="btn-pending-view-all">
-          <Text style={styles.action}>Xem tất cả</Text>
+          <Text style={styles.action}>{t("common.action.seeAll")}</Text>
         </Pressable>
       </View>
 
@@ -96,7 +101,9 @@ export function PendingConfirmationsSection({
                 peek={peekFirst && index === 0}
                 message={message}
                 label={
-                  payload?.note || (payload && proposalCategoryName(payload, (id) => categoryById.get(id)?.name)) || "Giao dịch"
+                  payload?.note ||
+                  (payload && proposalCategoryName(payload, (id) => categoryLabel(categoryById.get(id)) || undefined)) ||
+                  t("chat.proposal.fallbackName")
                 }
                 currency={walletCurrencyById.get(payload?.wallet_id ?? "") ?? FALLBACK_CURRENCY}
                 closeSignal={closeSignal}
@@ -115,7 +122,9 @@ export function PendingConfirmationsSection({
             onPress={onViewAll}
             style={({ pressed }) => [styles.overflowRow, pressed && styles.overflowPressed]}
           >
-            <Text style={styles.overflowLabel}>+{hiddenCount} giao dịch khác đang chờ xác nhận</Text>
+            <Text style={styles.overflowLabel} numberOfLines={1}>
+              {t("chat.pending.more", { count: hiddenCount })}
+            </Text>
             <ChevronRightIcon size={16} color={colors.textMuted} />
           </Pressable>
         ) : null}
@@ -132,7 +141,7 @@ const useStyles = createStyles((colors) => ({
     justifyContent: "space-between",
     marginBottom: spacing.xs,
   },
-  titleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexShrink: 1 },
   sectionTitle: {
     ...typography.caption,
     color: colors.textSecondary,
@@ -162,5 +171,5 @@ const useStyles = createStyles((colors) => ({
     borderTopColor: colors.surfaceBorder,
   },
   overflowPressed: { opacity: 0.6 },
-  overflowLabel: { ...typography.caption, color: colors.textSecondary },
+  overflowLabel: { ...typography.caption, color: colors.textSecondary, flexShrink: 1 },
 }));

@@ -2,7 +2,8 @@ import { View } from "react-native";
 import { Image } from "expo-image";
 
 import { EmojiGlyph } from "@/components/ui/EmojiGlyph";
-import { UsersIcon, WalletIcon } from "@/components/ui/Icon";
+import { UsersIcon } from "@/components/ui/Icon";
+import { TintedIconTile } from "@/components/ui/TintedIconTile";
 import { readableInk, withAlpha } from "@/lib/color";
 import { createStyles, walletCardInk } from "@/lib/theme";
 import { WalletCardArt } from "@/features/wallets/components/WalletCardArt";
@@ -21,6 +22,8 @@ interface WalletMiniCardProps {
   size?: keyof typeof SIZES;
   /** Adds the small people badge in the corner — a wallet with members. */
   shared?: boolean;
+  /** The wallet's name, read out for the logo a wallet without an icon shows. */
+  name?: string;
 }
 
 /**
@@ -29,8 +32,12 @@ interface WalletMiniCardProps {
  * badge when it is shared. Stands for a wallet wherever the full card would
  * not fit — the shared-wallet list, the members sheet, invitations — so it is
  * recognisably the same object as the card on Home.
+ *
+ * Without a photo or an emoji the face carries the app logo in a tinted tile,
+ * as the full card (WalletStackCard) and the list's avatar do: a plain wallet
+ * glyph here made the same wallet look different on every screen.
  */
-export function WalletMiniCard({ accentColor, icon, iconUrl, size = "sm", shared = false }: WalletMiniCardProps) {
+export function WalletMiniCard({ accentColor, icon, iconUrl, size = "sm", shared = false, name = "" }: WalletMiniCardProps) {
   const styles = useStyles();
   const m = SIZES[size];
   const ink = readableInk(accentColor, walletCardInk.dark, walletCardInk.light);
@@ -60,7 +67,7 @@ export function WalletMiniCard({ accentColor, icon, iconUrl, size = "sm", shared
             ) : icon ? (
               <EmojiGlyph emoji={icon} size={m.glyph} />
             ) : (
-              <WalletIcon size={m.glyph} color={withAlpha(ink, 0.9)} />
+              <TintedIconTile color={ink} size={m.photo} label={name} />
             )}
           </View>
         </View>

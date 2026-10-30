@@ -1,0 +1,330 @@
+{
+  "chat": {
+    "mode": {
+      "transaction": {
+        "label": "Log transactions",
+        "shortLabel": "Transactions",
+        "description": "Log income or spending in one sentence.",
+        "placeholder": "Describe a transaction..."
+      },
+      "budget": {
+        "label": "Plan budgets",
+        "shortLabel": "Budgets",
+        "description": "Split your income into limits by category.",
+        "placeholder": "Describe a transaction..."
+      },
+      "consult": {
+        "label": "Ask for insights",
+        "shortLabel": "Insights",
+        "description": "Ask what you spent this month and where most of it went.",
+        "placeholder": "Ask about your spending..."
+      }
+    },
+    "menu": {
+      "search": "Search messages"
+    },
+    "input": {
+      "clear": {
+        "a11y": "Clear message"
+      },
+      "send": {
+        "a11y": "Send"
+      },
+      "clearConfirm": {
+        "title": "Clear this message?",
+        "body": "This can't be undone.",
+        "confirm": "Clear message"
+      }
+    },
+    "thread": {
+      "scrollToLatest": {
+        "a11y": "Go to latest message"
+      },
+      "loading": {
+        "a11y": "Loading messages"
+      }
+    },
+    "search": {
+      "close": {
+        "a11y": "Close search"
+      },
+      "placeholder_one": "Search {{count}} message",
+      "placeholder_other": "Search {{count}} messages",
+      "placeholderEmpty": "Search messages",
+      "who": {
+        "user": "You",
+        "assistant": "Assistant"
+      },
+      "hitMeta": "{{who}} · {{day}} {{time}}",
+      "empty": {
+        "title": "No messages found"
+      },
+      "resultCount_one": "{{count}} message",
+      "resultCount_other": "{{count}} messages",
+      "older": {
+        "a11y": "Older result"
+      },
+      "position": {
+        "a11y": "Result {{position}} of {{count}}"
+      },
+      "newer": {
+        "a11y": "Newer result"
+      },
+      "closeResults": {
+        "a11y": "Close search results"
+      }
+    },
+    "recording": {
+      "examples": {
+        "coffee": "Coffee 50k cash",
+        "lunch": "Lunch 45k",
+        "salary": "Got paid 15m",
+        "title": "Try typing"
+      },
+      "empty": {
+        "title": "Log a transaction in one sentence",
+        "body": "Type what you just spent or received. Nothing is saved until you tap Save."
+      },
+      "readingPhoto": "Reading photo…",
+      "readingMessage": "Reading message…"
+    },
+    "pinToggle": {
+      "hint": {
+        "turnOff": "Turn off location pin",
+        "turnOn": "Turn on location pin"
+      },
+      "a11y": "Pin location on save"
+    },
+    "offlineEntry": {
+      "title": "No connection",
+      "body": "The assistant needs a connection to read messages. Manual entries stay on this phone and sync once you're online."
+    },
+    "proposal": {
+      "saveEditFailed": "Couldn't save the changes. Your balance hasn't changed.",
+      "editedBadge": "Edited",
+      "createVndWallet": "Create VND wallet",
+      "walletRequired": "Choose a VND wallet to save this transaction.",
+      "noWallet": "No wallet chosen",
+      "noVndWallet": "No VND wallet yet. Create one to save this transaction.",
+      "lowConfidence": "Low confidence",
+      "possibleDuplicate": "Looks like a saved transaction: {{amount}} on {{date}}",
+      "needsReview": "Check this",
+      "items": {
+        "hide_one": "Hide {{count}} item",
+        "hide_other": "Hide {{count}} items",
+        "show_one": "Show {{count}} item",
+        "show_other": "Show {{count}} items",
+        "gap": "Off by {{gap}} from the transaction amount.",
+        "gapWithAmount": "Off by {{gap}} from the transaction amount of {{amount}}."
+      },
+      "fallbackName": "Transaction"
+    },
+    "reply": {
+      "failed": "Couldn't read this message.",
+      "busy": "The assistant is busy. Try again in a few minutes."
+    },
+    "consult": {
+      "empty": {
+        "title": "Ask about your spending",
+        "body": "Figures come from your recorded transactions, budgets and wallets."
+      },
+      "answering": "Checking the numbers…",
+      "limitReached": "Question limit reached for this hour. Meanwhile, try:",
+      "pickCategory": "Which category?",
+      "error": "Couldn't answer that. Try again."
+    },
+    "location": {
+      "current": "Current location",
+      "movedUnsaved": "Moved, not saved",
+      "tile": {
+        "a11y": "Location: {{place}}. Open map"
+      },
+      "unnamedArea": "unnamed area",
+      "add": "Add location"
+    },
+    "budgetCard": {
+      "done_one": "Created {{count}} budget",
+      "done_other": "Created {{count}} budgets",
+      "open": "Plan budgets"
+    },
+    "tombstone": {
+      "deleted": "Transaction deleted",
+      "discarded": "Discarded, never saved",
+      "viewHistory": "View history"
+    },
+    "removal": {
+      "deleteFailed": "Couldn't delete the transaction",
+      "discard": {
+        "title": "Discard this suggestion?",
+        "body": "It was never saved, so nothing is deleted. It stays in the chat."
+      },
+      "delete": {
+        "title": "Delete this transaction?",
+        "summary": "{{name}} · {{amount}} · {{date}}",
+        "body": "It leaves your transaction list but stays in transaction history."
+      }
+    },
+    "messageMenu": {
+      "copy": "Copy"
+    },
+    "phrases": {
+      "unsave": "Unsave phrase",
+      "save": "Save phrase",
+      "noMatch": "No matching phrases",
+      "search": {
+        "placeholder_one": "Search {{count}} saved phrase",
+        "placeholder_other": "Search {{count}} saved phrases"
+      },
+      "delete": "Delete phrase",
+      "saved": {
+        "toast": "Phrase saved"
+      },
+      "unsaved": {
+        "toast": "Phrase unsaved"
+      },
+      "full": {
+        "toast": "{{max}} saved phrases is the limit. Delete one to add another."
+      },
+      "deleted": {
+        "toast": "Phrase deleted"
+      }
+    },
+    "copyText": {
+      "createdAt": "Created at: {{time}}",
+      "date": "Date: {{date}}",
+      "amount": "Amount: {{amount}}",
+      "category": "Category: {{category}}",
+      "wallet": "Wallet: {{wallet}}"
+    },
+    "image": {
+      "placeholder": "Photo",
+      "view": {
+        "a11y": "View photo"
+      },
+      "close": {
+        "a11y": "Close photo"
+      },
+      "readingOff": {
+        "toast": "Photo reading is paused"
+      },
+      "needsConnection": {
+        "toast": "Photo reading needs a connection"
+      },
+      "privacy": {
+        "title": "Photos are sent for reading",
+        "body": "An outside AI service reads the photo, then deletes it. The only copy stays on this phone."
+      },
+      "denied": {
+        "camera": {
+          "title": "Camera access needed",
+          "body": "Allow camera access in Settings to take receipt photos."
+        },
+        "library": {
+          "title": "Photo access needed",
+          "body": "Allow photo access in Settings to pick a receipt."
+        }
+      },
+      "attach": {
+        "a11y": "Read a transaction from a photo"
+      },
+      "source": {
+        "camera": "Take photo",
+        "library": "Choose from photos"
+      },
+      "preview": {
+        "a11y": "Photo to send"
+      },
+      "caption": {
+        "placeholder": "Caption, e.g. MB wallet",
+        "a11y": "Photo caption"
+      },
+      "discard": "Discard photo",
+      "send": "Send photo",
+      "tooLarge": {
+        "toast": "Photo too large, choose another"
+      },
+      "unreadable": {
+        "toast": "Couldn't open this photo"
+      },
+      "reply": {
+        "readingOff": "Photo reading is paused.",
+        "limitReached": "No photo readings left this hour.",
+        "unavailable": "Couldn't read the photo. Try again in a few minutes.",
+        "tooLarge": "Photo too large. Choose another one.",
+        "wrongType": "Use a PNG, JPEG or WebP photo.",
+        "busy_one": "Couldn't read the photo. Try again in {{count}} minute.",
+        "busy_other": "Couldn't read the photo. Try again in {{count}} minutes."
+      },
+      "captureGone": {
+        "toast": "Photo no longer on this phone"
+      }
+    },
+    "editMessage": {
+      "title": "Edit message",
+      "placeholder": "Edit message…"
+    },
+    "editTransaction": {
+      "error": {
+        "chooseDestination": "Choose the receiving wallet.",
+        "chooseCategory": "Choose a category."
+      },
+      "title": "Edit transaction",
+      "typeLocked": "A saved transaction's type can't be changed",
+      "sameCurrencyOnly": "Showing wallets in the same currency only",
+      "needsSecondVndWallet": "Add another VND wallet to make a transfer."
+    },
+    "editHistory": {
+      "created": "Suggestion created",
+      "edit": "Edit {{number}}",
+      "title": "Edit history"
+    },
+    "history": {
+      "action": {
+        "create": "Transaction created",
+        "update": "Edited",
+        "delete": "Transaction deleted"
+      },
+      "title": "Transaction history",
+      "neverSaved": "This suggestion was never saved, so the server has no history for it.",
+      "empty": "No changes recorded.",
+      "loadFailed": "Couldn't load the history."
+    },
+    "pending": {
+      "more_one": "+{{count}} more transaction pending",
+      "more_other": "+{{count}} more transactions pending",
+      "row": {
+        "hint": "Swipe right to edit, left to discard",
+        "reviewTransfer": "Tap to review transfer",
+        "reviewIncome": "Tap to review income",
+        "reviewExpense": "Tap to review spending"
+      }
+    }
+  },
+  "pending": {
+    "footer": {
+      "mixedCurrencies": "Multiple currencies",
+      "balanceChange": "Balance change",
+      "approveAll": "Approve all · {{count}}"
+    },
+    "tabs": {
+      "all": "All ({{count}})",
+      "expense": "Spending ({{count}})",
+      "income": "Income ({{count}})"
+    },
+    "subtitle": "Suggested by the assistant · tap one to edit",
+    "empty": {
+      "title": "All reviewed",
+      "body": "Nothing left to confirm."
+    },
+    "card": {
+      "hint": "Tap to edit before approving",
+      "dismiss": "Discard",
+      "approve": "Approve"
+    },
+    "toast": {
+      "approvedPartial": "{{saved}} approved, {{failed}} not saved",
+      "approved_one": "{{count}} approved",
+      "approved_other": "{{count}} approved"
+    }
+  }
+}

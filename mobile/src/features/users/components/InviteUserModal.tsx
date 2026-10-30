@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Pressable, Text, TextInput, View } from "react-native";
 
 import { Drawer } from "@/components/shared/Drawer";
 import { PillButton } from "@/components/ui/PillButton";
-import { getErrorMessage } from "@/lib/axios";
+import { errorText } from "@/lib/api-envelope";
 import { withAlpha } from "@/lib/color";
 import { useRequireOnline } from "@/lib/connectivity";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
@@ -21,6 +22,7 @@ interface InviteUserModalProps {
 // /admin/users/invite) — activation happens via the emailed link, same as
 // frontend/src/features/users/components/invite-user-dialog.tsx.
 export function InviteUserModal({ visible, onClose }: InviteUserModalProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const requireOnline = useRequireOnline();
@@ -42,8 +44,8 @@ export function InviteUserModal({ visible, onClose }: InviteUserModalProps) {
 
   return (
     <Drawer visible={visible} onClose={onClose}>
-      <Text style={styles.title}>Mời thành viên</Text>
-      <Text style={styles.description}>Người được mời nhận email để kích hoạt tài khoản.</Text>
+      <Text style={styles.title}>{t("users.invite.title")}</Text>
+      <Text style={styles.description}>{t("users.invite.body")}</Text>
 
       <Text style={styles.label}>Email</Text>
       <TextInput
@@ -56,25 +58,25 @@ export function InviteUserModal({ visible, onClose }: InviteUserModalProps) {
         style={styles.input}
       />
 
-      <Text style={styles.label}>Vai trò</Text>
+      <Text style={styles.label}>{t("users.invite.roleLabel")}</Text>
       <View style={styles.chipRow}>
         {USER_ROLES.map((r) => (
           <Pressable key={r} onPress={() => setRole(r)} style={[styles.chip, role === r && styles.chipActive]}>
             <Text style={[styles.chipLabel, role === r && styles.chipLabelActive]}>
-              {r === "admin" ? "Quản trị" : "Thành viên"}
+              {t(r === "admin" ? "common.role.admin" : "common.role.member")}
             </Text>
           </Pressable>
         ))}
       </View>
 
       {inviteUser.isError ? (
-        <Text style={styles.error}>{getErrorMessage(inviteUser.error, "Chưa gửi được lời mời. Thử lại.")}</Text>
+        <Text style={styles.error}>{errorText(inviteUser.error, "users.invite.failed")}</Text>
       ) : null}
 
       <View style={styles.actions}>
-        <PillButton label="Hủy" variant="outline" onPress={onClose} style={styles.flexButton} />
+        <PillButton label={t("common.action.cancel")} variant="outline" onPress={onClose} style={styles.flexButton} />
         <PillButton
-          label="Gửi lời mời"
+          label={t("users.invite.submit")}
           onPress={() => requireOnline(submit)}
           loading={inviteUser.isPending}
           disabled={!email.trim()}

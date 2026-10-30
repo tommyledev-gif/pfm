@@ -1,6 +1,7 @@
 import { ComponentType, memo, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
 import Reanimated from "react-native-reanimated";
+import { useTranslation } from "react-i18next";
 
 import { PressableScale } from "@/components/motion/PressableScale";
 import { IconProps } from "@/components/ui/icons/primitives";
@@ -48,6 +49,7 @@ interface ExpandableFabProps {
  * list padding changing.
  */
 export const ExpandableFab = memo(function ExpandableFab({ actions, accessibilityLabel, testID, style }: ExpandableFabProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const bottom = useFabBottom();
@@ -134,7 +136,7 @@ export const ExpandableFab = memo(function ExpandableFab({ actions, accessibilit
         <PressableScale
           testID={testID}
           accessibilityRole="button"
-          accessibilityLabel={open ? "Đóng" : accessibilityLabel}
+          accessibilityLabel={open ? t("common.action.close") : accessibilityLabel}
           accessibilityState={{ expanded: open }}
           onPress={() => setOpen((prev) => !prev)}
           hitSlop={8}

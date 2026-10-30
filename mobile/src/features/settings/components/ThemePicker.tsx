@@ -1,5 +1,6 @@
 import { Pressable, Text, View } from "react-native";
 import Animated, { ZoomIn } from "react-native-reanimated";
+import { useTranslation } from "react-i18next";
 
 import { ListCell, ListSection } from "@/components/ui/grouped-list";
 import { CheckIcon } from "@/components/ui/Icon";
@@ -18,12 +19,13 @@ const SWATCH_HEIGHT = 64;
 // A group of the screen's grouped list: "Giao diện" is the group's header
 // (the label the old row carried), the tiles fill its one cell.
 export function ThemePicker() {
+  const { t } = useTranslation();
   const styles = useStyles();
   const active = useThemeName();
   const switchTheme = useSwitchTheme();
 
   return (
-    <ListSection header="Giao diện" testID="section-settings-appearance">
+    <ListSection header={t("userSettings.appearance.header")} testID="section-settings-appearance">
       <ListCell style={styles.cell}>
         <View style={styles.options}>
           {THEME_NAMES.map((name) => (
@@ -41,8 +43,11 @@ export function ThemePicker() {
 }
 
 function ThemeOption({ name, selected, onPress }: { name: ThemeName; selected: boolean; onPress: () => void }) {
+  const { t } = useTranslation();
   const styles = useStyles();
-  const { label, palette } = THEMES[name];
+  const { palette } = THEMES[name];
+  // Keyed by the theme's name, in the app language (ui.theme.*).
+  const label = t(`ui.theme.${name}` as const);
 
   return (
     <Pressable
@@ -50,7 +55,7 @@ function ThemeOption({ name, selected, onPress }: { name: ThemeName; selected: b
       onPress={onPress}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
-      accessibilityLabel={`Giao diện ${label}`}
+      accessibilityLabel={t("userSettings.appearance.optionA11y", { theme: label })}
       testID={`btn-theme-${name}`}
     >
       <View style={[styles.swatch, { backgroundColor: palette.bgApp, borderColor: selected ? palette.green : palette.surfaceBorder }, selected && styles.swatchSelected]}>

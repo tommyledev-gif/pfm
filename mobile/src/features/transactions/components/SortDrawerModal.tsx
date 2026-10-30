@@ -1,5 +1,6 @@
 import { memo, useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { Drawer } from "@/components/shared/Drawer";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
@@ -18,6 +19,7 @@ interface SortDrawerModalProps {
 // options in sequence stamps each with a priority number, so amount + date
 // can combine (e.g. highest amount first, most recent as the tiebreaker).
 export const SortDrawerModal = memo(function SortDrawerModal({ visible, onClose, selected, onApply }: SortDrawerModalProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const [order, setOrder] = useState<SortKey[]>([]);
 
@@ -46,10 +48,10 @@ export const SortDrawerModal = memo(function SortDrawerModal({ visible, onClose,
   return (
     <Drawer visible={visible} onClose={onClose}>
       <DrawerHeader
-        title="Sắp xếp"
+        title={t("common.action.sort")}
         actions={[
-          { label: "Đặt lại", onPress: clear, variant: "secondary" },
-          { label: "Áp dụng", onPress: apply },
+          { label: t("transactions.sort.reset"), onPress: clear, variant: "secondary" },
+          { label: t("common.action.apply"), onPress: apply },
         ]}
       />
       <View style={styles.section}>
@@ -68,7 +70,7 @@ export const SortDrawerModal = memo(function SortDrawerModal({ visible, onClose,
               disabled={disabled}
               onPress={() => toggle(opt.key)}
             >
-              <Text style={[styles.rowLabel, disabled && styles.rowLabelDisabled]}>{opt.label}</Text>
+              <Text style={[styles.rowLabel, disabled && styles.rowLabelDisabled]}>{t(opt.labelKey)}</Text>
               <View style={[styles.badge, priority >= 0 && styles.badgeActive]}>
                 {priority >= 0 ? <Text style={styles.badgeText}>{priority + 1}</Text> : null}
               </View>

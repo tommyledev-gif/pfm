@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { Pressable, Text } from "react-native";
+import { useTranslation } from "react-i18next";
 import Animated from "react-native-reanimated";
 
 import { useFreshEntrance } from "@/components/motion/use-fresh-entrance";
@@ -8,6 +9,7 @@ import { UserBubble } from "@/features/ai-chat/components/UserBubble";
 import { messageCreatedAt } from "@/features/ai-chat/components/ChatMessageRow";
 import { useHoldMenu } from "@/features/ai-chat/hooks/use-hold-menu";
 import { useMessageActions } from "@/features/ai-chat/hooks/use-message-actions";
+import { messageText } from "@/features/ai-chat/message-text";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { ConsultHandlers, ConsultReplyCard } from "@/features/analytics/components/ConsultReplyCard";
 import { useAnchoredLongPress } from "@/features/ai-chat/hooks/use-anchored-long-press";
@@ -41,6 +43,8 @@ const IN_TURN_GAP = spacing.sm;
  */
 export const ConsultMessageRow = memo(function ConsultMessageRow({ message, startsTurn, handlers }: ConsultMessageRowProps) {
   const styles = useStyles();
+  // Re-renders the row on a language switch: an app reply follows it (message-text.ts).
+  useTranslation();
   const gap = { marginTop: startsTurn ? TURN_GAP : IN_TURN_GAP };
   const entering = useFreshEntrance(messageCreatedAt(message.id));
   const menu = useHoldMenu();
@@ -80,7 +84,7 @@ export const ConsultMessageRow = memo(function ConsultMessageRow({ message, star
           delayLongPress={MESSAGE_HOLD_MS}
           disabled={!onLongPress}
         >
-          <Text style={styles.assistantText}>{message.text}</Text>
+          <Text style={styles.assistantText}>{messageText(message)}</Text>
         </Pressable>
       ) : null}
       {message.consult ? (

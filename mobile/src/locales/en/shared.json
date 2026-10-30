@@ -1,0 +1,201 @@
+{
+  "ui": {
+    "sheetHandle": {
+      "collapse": "Drag down to collapse",
+      "expand": "Drag up to expand"
+    },
+    "toast": {
+      "dismiss": "Dismiss"
+    },
+    "categoryField": {
+      "placeholder": "No category chosen",
+      "change": "Change category"
+    },
+    "dateRange": {
+      "title": "Date range",
+      "selected": "{{from}} – {{to}}",
+      "pickStart": "Choose a start date",
+      "maxHint_one": "Up to {{count}} day.",
+      "maxHint_other": "Up to {{count}} days."
+    },
+    "datePicker": {
+      "title": "Choose date"
+    },
+    "calendar": {
+      "pickMonthYear": "Choose month and year",
+      "monthYear": "{{month}} {{year}}"
+    },
+    "monthYearSheet": {
+      "title": "Choose month"
+    },
+    "offline": {
+      "strip": "You're offline",
+      "reconnected": "Back online · syncing",
+      "openHint": "Shows when data was last updated and what needs a connection",
+      "stripQueued_one": "You're offline · {{count}} waiting to sync",
+      "stripQueued_other": "You're offline · {{count}} waiting to sync",
+      "sheet": {
+        "stillWorks": {
+          "viewSaved": "View saved data",
+          "addTransaction": "Add transactions, synced when you're back online"
+        },
+        "needsNetwork": {
+          "editDelete": "Edit or delete transactions",
+          "manage": "Add or edit wallets, categories, budgets",
+          "assistant": "Chat with the assistant and review pending items",
+          "importExport": "Import and export data",
+          "inviteMembers": "Invite members"
+        },
+        "title": "You're offline",
+        "lastUpdated": "Last updated {{time}}",
+        "noSavedData": "No data saved on this phone yet",
+        "staleNote": "Balances and figures may be out of date until you're back online.",
+        "queued_one": "{{count}} transaction waiting. It syncs when you're back online.",
+        "queued_other": "{{count}} transactions waiting. They sync when you're back online.",
+        "stillWorksTitle": "Still works",
+        "needsNetworkTitle": "Needs a connection"
+      }
+    },
+    "calculator": {
+      "spoken": {
+        "plus": "plus",
+        "minus": "minus",
+        "times": "times",
+        "divide": "divided by",
+        "decimal": "decimal point",
+        "tripleZero": "triple zero",
+        "decimalSeparator": "point"
+      },
+      "backspace": "Delete",
+      "backspaceHint": "Hold to clear all",
+      "confirm": "Confirm"
+    },
+    "amount": {
+      "error": {
+        "divideByZero": "Can't divide by 0",
+        "outOfRange": "Over the maximum amount"
+      },
+      "notice": {
+        "rounded": "Rounded to {{amount}} because {{currency}} has no decimals.",
+        "cleared": "Amount cleared because {{currency}} has no decimals."
+      },
+      "problem": {
+        "roundedToZero": "This rounds to 0, below the smallest {{currency}} unit.",
+        "notPositive": "Enter an amount above 0."
+      },
+      "spokenEmpty": "No amount entered",
+      "revealHint": "Hold to see the full amount"
+    },
+    "currencySwitch": {
+      "viewIn": "Show in {{currency}}"
+    },
+    "iconPicker": {
+      "upload": "Upload a photo"
+    },
+    "iconField": {
+      "uploaded": "Uploaded photo",
+      "default": "Default icon",
+      "hint": "Emoji or your own photo"
+    },
+    "emojiPicker": {
+      "placeholder": "Choose emoji",
+      "clear": "Remove"
+    },
+    "openMoji": {
+      "searchPlaceholder": "Search, e.g. coffee",
+      "empty": "No icons found.",
+      "credit": "Icons: OpenMoji (CC BY-SA 4.0)",
+      "group": {
+        "foodDrink": "Food & drink",
+        "objects": "Objects",
+        "travelPlaces": "Travel & places",
+        "activities": "Activities",
+        "animalsNature": "Animals & nature",
+        "smileysEmotion": "Smileys",
+        "peopleBody": "People",
+        "symbols": "Symbols",
+        "flags": "Flags"
+      }
+    },
+    "donut": {
+      "seeTransactions": "See transactions"
+    },
+    "upload": {
+      "waiting": "Uploading photo…"
+    },
+    "clipboard": {
+      "copied": "Copied",
+      "copyFailed": "Couldn't copy"
+    },
+    "device": {
+      "fallbackName": "Phone"
+    },
+    "walletColor": {
+      "blue": "Blue",
+      "indigo": "Indigo",
+      "violet": "Purple",
+      "magenta": "Magenta",
+      "rose": "Rose",
+      "orange": "Burnt orange",
+      "green": "Green",
+      "teal": "Teal",
+      "slate": "Slate",
+      "amber": "Yellow",
+      "lime": "Lime",
+      "cyan": "Turquoise"
+    },
+    "theme": {
+      "dark": "Dark",
+      "light": "Light"
+    }
+  },
+  "format": {
+    "calendar": {
+      "monthNames": "January, February, March, April, May, June, July, August, September, October, November, December",
+      "monthNamesShort": "Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec",
+      "dayNames": "Sunday, Monday, Tuesday, Wednesday, Thursday, Friday, Saturday",
+      "dayNamesShort": "Sun, Mon, Tue, Wed, Thu, Fri, Sat"
+    },
+    "previousPeriod": {
+      "day": "yesterday",
+      "year": "last year",
+      "month": "last month"
+    },
+    "amountWords": {
+      "currency": {
+        "VND": "dong",
+        "USD": "US dollars"
+      }
+    }
+  },
+  "appUpdate": {
+    "title": "New Budgest version needed",
+    "message": "This version no longer gets updates. Install the new one on top, and your data and sign-in stay as they are.",
+    "version": "Version {{name}}",
+    "hint": "Once it's downloaded, tap Install when your phone asks.",
+    "readyHint": "If your phone asks to allow app installs, allow it for Budgest.",
+    "browserHint": "Once it's downloaded, open the file and tap Install.",
+    "download": "Download update",
+    "install": "Install update",
+    "retry": "Download again",
+    "browser": "Download in browser",
+    "downloadFailed": "Couldn't download the update. Check your connection and try again.",
+    "installFailed": "Couldn't open the installer.",
+    "progress": "Downloading update"
+  },
+  "debug": {
+    "bubble": {
+      "open": "Open debug console"
+    },
+    "viewer": {
+      "title": "Debug console",
+      "screen": "Screen: {{path}}",
+      "share": "Share",
+      "clear": "Clear log",
+      "testAccounts": "Test accounts",
+      "showNew_one": "Show {{count}} new",
+      "showNew_other": "Show {{count}} new",
+      "empty": "No log entries yet."
+    }
+  }
+}

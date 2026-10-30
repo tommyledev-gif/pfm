@@ -1,4 +1,5 @@
 import { Pressable, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { CloseIcon, SearchIcon } from "@/components/ui/Icon";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
@@ -23,6 +24,7 @@ const FIELD_HEIGHT = 44;
  * something to clear.
  */
 export function SearchField({ value, onChangeText, placeholder, testID, autoCorrect, autoFocus }: SearchFieldProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   return (
@@ -41,7 +43,7 @@ export function SearchField({ value, onChangeText, placeholder, testID, autoCorr
         testID={testID}
       />
       {value ? (
-        <Pressable onPress={() => onChangeText("")} hitSlop={10} accessibilityRole="button" accessibilityLabel="Xóa tìm kiếm">
+        <Pressable onPress={() => onChangeText("")} hitSlop={10} accessibilityRole="button" accessibilityLabel={t("common.action.clearSearch")}>
           <CloseIcon size={16} color={colors.textSecondary} />
         </Pressable>
       ) : null}

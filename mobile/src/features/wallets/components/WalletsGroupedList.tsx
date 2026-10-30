@@ -1,18 +1,20 @@
 import { useEffect, useMemo, useRef } from "react";
 import { Animated, SectionList, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { useListEntrance } from "@/components/motion/MotionView";
 import { GroupedListCell, ListSectionHeader } from "@/components/ui/grouped-list";
 import { WALLET_TYPES, WalletType } from "@/lib/constants";
+import { TranslationKey } from "@/lib/i18n";
 import { spacing, createStyles, useColors } from "@/lib/theme";
 import { Wallet } from "@/features/wallets/types";
 import { WalletListItem } from "@/features/wallets/components/WalletListItem";
 
-const TYPE_LABEL: Record<WalletType, string> = {
-  cash: "Tiền mặt",
-  bank: "Ngân hàng",
-  e_wallet: "Ví điện tử",
-  other: "Khác",
+const TYPE_LABEL_KEY: Record<WalletType, TranslationKey> = {
+  cash: "common.walletType.cash",
+  bank: "common.walletType.bank",
+  e_wallet: "common.walletType.e_wallet",
+  other: "common.walletType.other",
 };
 
 // The list's rows are not measured on the first frame, so scrolling to one
@@ -58,6 +60,7 @@ export function WalletsGroupedList({
 }: WalletsGroupedListProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const enter = useListEntrance("wallets-list");
 
   const sections = useMemo<WalletSection[]>(() => {
@@ -68,9 +71,9 @@ export function WalletsGroupedList({
       group.push(wallet);
       byType.set(wallet.type, group);
     }
-    const groups = WALLET_TYPES.map((type) => ({ key: type, title: TYPE_LABEL[type], data: byType.get(type) ?? [] }));
+    const groups = WALLET_TYPES.map((type) => ({ key: type, title: t(TYPE_LABEL_KEY[type]), data: byType.get(type) ?? [] }));
     return groups.filter((section) => section.data.length > 0);
-  }, [wallets]);
+  }, [wallets, t]);
 
   const listRef = useRef<SectionList<Wallet, WalletSection>>(null);
   const scrollRetries = useRef(0);

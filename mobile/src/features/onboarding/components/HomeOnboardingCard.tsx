@@ -1,6 +1,7 @@
 import { Pressable, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 
 import { MotionStagger } from "@/components/motion/MotionStagger";
 import { EmptyStateCard } from "@/components/shared/EmptyState";
@@ -37,6 +38,7 @@ interface HomeOnboardingCardProps {
  * is next.
  */
 export function HomeOnboardingCard({ hasWallet, hasTransaction, hasBudget, onAddTransaction }: HomeOnboardingCardProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const { isDark } = useThemeDefinition();
@@ -71,12 +73,12 @@ export function HomeOnboardingCard({ hasWallet, hasTransaction, hasBudget, onAdd
             accessible={false}
           />
         }
-        title="Biết tiền đi đâu"
-        description="Ghi thu chi, đặt ngân sách theo danh mục."
+        title={t("onboarding.title")}
+        description={t("onboarding.description")}
       />
 
       <View style={styles.journeyHeader}>
-        <Text style={styles.journeyTitle}>Xong {completed}/3 bước</Text>
+        <Text style={styles.journeyTitle}>{t("onboarding.progress", { done: completed, total: steps.length })}</Text>
       </View>
 
       {/* The steps follow the card in, one after another. */}
@@ -90,7 +92,7 @@ export function HomeOnboardingCard({ hasWallet, hasTransaction, hasBudget, onAdd
 
       {active ? (
         <PillButton
-          label={active.cta}
+          label={t(active.ctaKey)}
           icon={ctaIcon[active.key]}
           onPress={() => onAction(active.key)}
           testID={`btn-onboarding-${active.key}`}
@@ -101,6 +103,7 @@ export function HomeOnboardingCard({ hasWallet, hasTransaction, hasBudget, onAdd
 }
 
 function StepRow({ step, index, onPress }: { step: OnboardingStep; index: number; onPress: () => void }) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const isActive = step.status === "active";
@@ -133,7 +136,7 @@ function StepRow({ step, index, onPress }: { step: OnboardingStep; index: number
       <View style={styles.rowText}>
         <View style={styles.rowTitleLine}>
           <Text style={[styles.rowTitle, isDone && styles.rowTitleDone]} numberOfLines={1}>
-            {step.title}
+            {t(step.titleKey)}
           </Text>
           {/* A View pill around one line of text, never shrunk: the padding,
               tint and radius used to sit on the Text itself, which Android
@@ -144,11 +147,15 @@ function StepRow({ step, index, onPress }: { step: OnboardingStep; index: number
               style={[styles.badgeLabel, isActive || isDone ? styles.badgeLabelGreen : styles.badgeLabelMuted]}
               numberOfLines={1}
             >
-              {isActive ? "Cần làm" : isDone ? "Xong" : `Bước ${index + 1}`}
+              {isActive
+                ? t("onboarding.step.badge.active")
+                : isDone
+                  ? t("onboarding.step.badge.done")
+                  : t("onboarding.step.badge.locked", { number: index + 1 })}
             </Text>
           </View>
         </View>
-        <Text style={styles.rowDescription}>{step.description}</Text>
+        <Text style={styles.rowDescription}>{t(step.descriptionKey)}</Text>
       </View>
     </Pressable>
   );

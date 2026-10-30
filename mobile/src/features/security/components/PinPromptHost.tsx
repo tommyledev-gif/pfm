@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { AppState, Modal, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTranslation } from "react-i18next";
 
 import { CloseIcon } from "@/components/ui/Icon";
+import { PIN_LENGTH } from "@/lib/constants";
 import { createStyles, spacing, typography, useColors } from "@/lib/theme";
 import { confirmOwner, phoneCheckLabel } from "@/features/security/identity-check";
 import { PinAltActions } from "@/features/security/components/PinAltActions";
@@ -29,6 +31,7 @@ export function PinPromptHost() {
 }
 
 function PinPrompt({ request }: { request: PinPromptRequest }) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
@@ -85,7 +88,7 @@ function PinPrompt({ request }: { request: PinPromptRequest }) {
       if (outcome.kind === "wrong") return showProblem(wrongPin(outcome.triesLeft));
       if (outcome.kind === "wiped") return settle("wiped");
       if (outcome.kind === "missing") return settle("no-pin");
-      return showProblem(PIN_COPY.checkFailed);
+      return showProblem(t(PIN_COPY.checkFailed));
     }
     if (stage === "new") {
       setFirstEntry(pin);
@@ -93,7 +96,7 @@ function PinPrompt({ request }: { request: PinPromptRequest }) {
     }
     if (pin !== firstEntry) {
       setStage("new");
-      return showProblem(PIN_COPY.mismatch);
+      return showProblem(t(PIN_COPY.mismatch));
     }
     setBusy(true);
     try {
@@ -103,7 +106,7 @@ function PinPrompt({ request }: { request: PinPromptRequest }) {
     } catch {
       setBusy(false);
       setStage("new");
-      showProblem(PIN_COPY.saveFailed);
+      showProblem(t(PIN_COPY.saveFailed));
     }
   };
 
@@ -115,7 +118,7 @@ function PinPrompt({ request }: { request: PinPromptRequest }) {
     if (result === "passed") {
       await usePinStore.getState().resetWrongCount();
       settle("passed");
-    } else if (result === "failed") setMessage(PIN_COPY.biometricFailed);
+    } else if (result === "failed") setMessage(t(PIN_COPY.biometricFailed));
   };
 
   const forgot = async () => {
@@ -124,7 +127,12 @@ function PinPrompt({ request }: { request: PinPromptRequest }) {
     settle("wiped");
   };
 
-  const title = { verify: request.title ?? PIN_COPY.enter, current: PIN_COPY.current, new: PIN_COPY.create, repeat: PIN_COPY.repeat }[stage];
+  const title = {
+    verify: request.title ?? t(PIN_COPY.enter),
+    current: t(PIN_COPY.current),
+    new: t(PIN_COPY.create, { length: PIN_LENGTH }),
+    repeat: t(PIN_COPY.repeat),
+  }[stage];
 
   return (
     <Modal visible animationType="slide" statusBarTranslucent onRequestClose={() => !busy && settle("cancelled")}>
@@ -139,7 +147,7 @@ function PinPrompt({ request }: { request: PinPromptRequest }) {
             hitSlop={8}
             style={styles.close}
             accessibilityRole="button"
-            accessibilityLabel={PIN_COPY.close}
+            accessibilityLabel={t(PIN_COPY.close)}
             testID="btn-pin-close"
           >
             <CloseIcon size={24} color={colors.textPrimary} />

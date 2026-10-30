@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { BackHandler, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTranslation } from "react-i18next";
 
 import { AmountInput } from "@/components/ui/AmountInput";
 import {
@@ -28,8 +29,10 @@ interface FixedCostsModalProps {
   onConfirm: (result: { items: FixedCostItem[]; text: string; suggested: FixedCostItem[] }) => void;
 }
 
-const PLACEHOLDER =
+// i18n-ignore below: examples of what to type, for a parser that reads Vietnamese (spec edge case 5).
+const PLACEHOLDER = // i18n-ignore
   "thuê nhà 3m / tháng, đổ rác 50k/tháng, gửi xe máy 100k, phí quản lý 200k/tháng, điện 300k, nước 500k, internet 160k, học phí 5m";
+const NOTHING_PARSED_EXAMPLE = "điện 300k"; // i18n-ignore
 
 const PROMPT_KEYS = new Set(FIXED_COST_PROMPTS.map((p) => p.key));
 
@@ -83,6 +86,7 @@ export function FixedCostsModal({
 }: FixedCostsModalProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const [text, setText] = useState(initialText);
   // Prompt rows are keyed by their stable prompt key; custom rows are their own
   // list because their labels are editable.
@@ -122,7 +126,7 @@ export function FixedCostsModal({
   const suggested = useMemo<FixedCostItem[]>(() => {
     const fromPrompts = FIXED_COST_PROMPTS.filter((p) => (promptAmounts[p.key] ?? 0) > 0).map((p) => ({
       key: p.key,
-      label: p.label,
+      label: t(p.labelKey),
       amountXu: promptAmounts[p.key],
       source: "suggested" as const,
     }));
@@ -135,7 +139,7 @@ export function FixedCostsModal({
         source: "suggested" as const,
       }));
     return [...fromPrompts, ...fromCustom];
-  }, [promptAmounts, customRows]);
+  }, [promptAmounts, customRows, t]);
 
   const merged = useMemo(() => mergeFixedCosts(typed, suggested), [typed, suggested]);
   const total = totalFixedCosts(merged);
@@ -155,17 +159,17 @@ export function FixedCostsModal({
       <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
         <View style={styles.headerRow}>
           <Pressable onPress={onClose} hitSlop={8}>
-            <Text style={styles.cancelLabel}>Huỷ</Text>
+            <Text style={styles.cancelLabel}>{t("common.action.cancel")}</Text>
           </Pressable>
           <Text style={styles.headerTitle} numberOfLines={1}>
-            Chi phí cố định
+            {t("budgetWizard.fixedCosts.title")}
           </Text>
           <Pressable
             testID="btn-wizard-fixed-costs-confirm"
             onPress={() => onConfirm({ items: merged, text, suggested })}
             hitSlop={8}
           >
-            <Text style={styles.confirmLabel}>Dùng số này</Text>
+            <Text style={styles.confirmLabel}>{t("budgetWizard.fixedCosts.confirm")}</Text>
           </Pressable>
         </View>
 
@@ -173,13 +177,10 @@ export function FixedCostsModal({
           {/* Numbers that changed themselves, unannounced, read as data loss.
               Said once, on the open that did it, and never again. */}
           {rescaled ? (
-            <Text style={styles.rescaledNote}>
-              Bạn vừa đổi tổng chi phí cố định, nên các khoản dưới đây đã được chia lại theo đúng tỉ lệ cũ. Bạn sửa
-              lại khoản nào cũng được.
-            </Text>
+            <Text style={styles.rescaledNote}>{t("budgetWizard.fixedCosts.rescaled")}</Text>
           ) : null}
 
-          <Text style={styles.label}>Kể ra những khoản cố định của bạn</Text>
+          <Text style={styles.label}>{t("budgetWizard.fixedCosts.inputLabel")}</Text>
           <TextInput
             testID="input-wizard-fixed-costs-text"
             value={text}
@@ -189,13 +190,11 @@ export function FixedCostsModal({
             multiline
             style={styles.textArea}
           />
-          <Text style={styles.hint}>
-            Viết tự nhiên, cách nhau bằng dấu phẩy. &quot;3m&quot; = 3 triệu, &quot;50k&quot; = 50 nghìn.
-          </Text>
+          <Text style={styles.hint}>{t("budgetWizard.fixedCosts.inputHint")}</Text>
 
           <Pressable testID="btn-wizard-fixed-costs-ask" onPress={() => setAskOpen((v) => !v)} style={styles.askToggle}>
             <Text style={styles.askToggleLabel}>
-              {askOpen ? "Ẩn danh sách gợi ý" : "Hoặc để tôi hỏi từng khoản →"}
+              {askOpen ? t("budgetWizard.fixedCosts.hidePrompts") : t("budgetWizard.fixedCosts.showPrompts")}
             </Text>
           </Pressable>
 
@@ -212,14 +211,14 @@ export function FixedCostsModal({
                 return (
                   <View key={prompt.key} style={styles.row}>
                     <Text style={[styles.rowLabel, covered && styles.rowLabelCovered]} numberOfLines={1}>
-                      {prompt.label}
+                      {t(prompt.labelKey)}
                     </Text>
                     {covered ? (
-                      <Text style={styles.coveredNote}>đã có trong mô tả</Text>
+                      <Text style={styles.coveredNote}>{t("budgetWizard.fixedCosts.covered")}</Text>
                     ) : (
                       <AmountInput
                         value={value > 0 ? String(toMajorUnits(value)) : ""}
-                        onChangeText={(t) => setPromptAmount(prompt.key, toCents(Number(t) || 0))}
+                        onChangeText={(v) => setPromptAmount(prompt.key, toCents(Number(v) || 0))}
                         style={styles.rowInput}
                       />
                     )}
@@ -238,18 +237,19 @@ export function FixedCostsModal({
                   <TextInput
                     value={row.label}
                     onChangeText={(label) => updateCustom(row.id, { label })}
-                    placeholder="Khoản khác"
+                    placeholder={t("budgetWizard.fixedCosts.customPlaceholder")}
                     placeholderTextColor={colors.textMuted}
                     style={styles.customLabelInput}
                   />
                   <AmountInput
                     value={row.amountXu > 0 ? String(toMajorUnits(row.amountXu)) : ""}
-                    onChangeText={(t) => updateCustom(row.id, { amountXu: toCents(Number(t) || 0) })}
+                    onChangeText={(v) => updateCustom(row.id, { amountXu: toCents(Number(v) || 0) })}
                     style={styles.rowInput}
                   />
                   <Pressable
                     onPress={() => removeCustom(row.id)}
                     hitSlop={8}
+                    accessibilityLabel={t("budgetWizard.fixedCosts.remove.a11y", { name: row.label.trim() })}
                     testID={`btn-wizard-fixed-costs-remove-${row.id}`}
                   >
                     <Text style={styles.removeLabel}>✕</Text>
@@ -262,7 +262,7 @@ export function FixedCostsModal({
                 onPress={() => setCustomRows((prev) => [...prev, { id: nextCustomRowId(), label: "", amountXu: 0 }])}
                 style={styles.addRow}
               >
-                <Text style={styles.addLabel}>+ Thêm khoản khác</Text>
+                <Text style={styles.addLabel}>{t("budgetWizard.fixedCosts.addCustom")}</Text>
               </Pressable>
             </View>
           ) : null}
@@ -278,14 +278,14 @@ export function FixedCostsModal({
                 </View>
               ))}
               <View style={[styles.summaryRow, styles.totalRow]}>
-                <Text style={styles.totalLabel}>Tổng</Text>
+                <Text style={styles.totalLabel}>{t("common.field.total")}</Text>
                 <Text testID="text-wizard-fixed-costs-total" style={styles.totalValue}>
                   {formatCurrency(total, currency)}
                 </Text>
               </View>
             </View>
           ) : (
-            <Text style={styles.empty}>Chưa đọc được khoản nào. Bạn viết dạng &quot;điện 300k&quot; nhé.</Text>
+            <Text style={styles.empty}>{t("budgetWizard.fixedCosts.nothingParsed", { example: NOTHING_PARSED_EXAMPLE })}</Text>
           )}
         </ScrollView>
       </SafeAreaView>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { PillButton } from "@/components/ui/PillButton";
@@ -19,18 +20,19 @@ interface PendingSyncActionsSheetProps {
 }
 
 const DISCARD_COPY = {
-  title: "Bỏ giao dịch chưa đồng bộ này?",
-  message: "Giao dịch sẽ bị xoá khỏi máy và không được gửi lên tài khoản.",
-  maybeSent: "Giao dịch có thể đã được lưu lên tài khoản. Hãy kiểm tra danh sách sau khi đồng bộ.",
-  confirm: "Bỏ",
+  title: "transactions.sync.discard.title",
+  message: "transactions.sync.discard.body",
+  maybeSent: "transactions.sync.discard.maybeSent",
+  confirm: "common.action.discard",
 } as const;
-const SENDING_HINT = "Đang gửi — chờ một chút để sửa hoặc bỏ.";
+const SENDING_HINT = "transactions.sync.sendingHint";
 const SCRIM_OPACITY = 0.6;
 
 // Retry / Edit / Discard for one queued Transaction (US-06). Edit and Discard
 // are unavailable while it is being sent (S-OFF-50); Discard always confirms
 // and warns when an earlier send may have landed (S-OFF-51).
 export function PendingSyncActionsSheet({ item, onClose }: PendingSyncActionsSheetProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const userId = useCurrentUserId();
@@ -73,13 +75,13 @@ export function PendingSyncActionsSheet({ item, onClose }: PendingSyncActionsShe
                   {pendingItemTitle(item)}
                 </Text>
                 <Text style={[styles.status, item.status === "failed" && { color: colors.danger }]}>
-                  {isSending ? SENDING_HINT : pendingStatusText(item)}
+                  {isSending ? t(SENDING_HINT) : pendingStatusText(item)}
                 </Text>
                 {/* One row, as in ConfirmDialog: the way out on the left, the
                     primary action on the right. */}
                 <View style={styles.actions}>
                   <PillButton
-                    label="Bỏ"
+                    label={t("common.action.discard")}
                     variant="outline"
                     onPress={() => setConfirmOpen(true)}
                     disabled={isSending}
@@ -89,7 +91,7 @@ export function PendingSyncActionsSheet({ item, onClose }: PendingSyncActionsShe
                     testID="btn-pending-sync-discard"
                   />
                   <PillButton
-                    label="Sửa"
+                    label={t("common.action.edit")}
                     variant={canRetry ? "outline" : "solid"}
                     onPress={handleEdit}
                     disabled={isSending}
@@ -99,7 +101,7 @@ export function PendingSyncActionsSheet({ item, onClose }: PendingSyncActionsShe
                   />
                   {canRetry ? (
                     <PillButton
-                      label="Thử lại"
+                      label={t("common.action.retry")}
                       onPress={handleRetry}
                       singleLine
                       style={styles.flexButton}
@@ -115,9 +117,9 @@ export function PendingSyncActionsSheet({ item, onClose }: PendingSyncActionsShe
 
       <ConfirmDialog
         visible={item !== null && confirmOpen}
-        title={DISCARD_COPY.title}
-        message={item?.maybe_sent ? DISCARD_COPY.maybeSent : DISCARD_COPY.message}
-        confirmLabel={DISCARD_COPY.confirm}
+        title={t(DISCARD_COPY.title)}
+        message={t(item?.maybe_sent ? DISCARD_COPY.maybeSent : DISCARD_COPY.message)}
+        confirmLabel={t(DISCARD_COPY.confirm)}
         onCancel={() => setConfirmOpen(false)}
         onConfirm={handleDiscard}
         testID="dialog-confirm-discard-pending-sync"

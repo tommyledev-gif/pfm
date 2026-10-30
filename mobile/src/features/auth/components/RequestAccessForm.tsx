@@ -1,9 +1,10 @@
 import { useRef, useState } from "react";
 import { Keyboard, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { PillButton } from "@/components/ui/PillButton";
-import { getErrorCode, getErrorMessage } from "@/lib/axios";
-import { isNetworkError } from "@/lib/api-envelope";
+import { errorText, getErrorCode } from "@/lib/api-envelope";
+import { i18n, TranslationKey } from "@/lib/i18n";
 import { spacing, createStyles } from "@/lib/theme";
 import { AuthField } from "@/features/auth/components/AuthField";
 import { AuthFormError } from "@/features/auth/components/AuthFormError";
@@ -13,38 +14,36 @@ type Field = "email" | "adminEmail";
 type FieldErrors = Partial<Record<Field, string>>;
 
 const COPY = {
-  emailLabel: "Email của bạn",
-  emailPlaceholder: "ten@email.com",
-  adminLabel: "Email admin",
-  adminPlaceholder: "admin@email.com",
-  submit: "Gửi yêu cầu",
-  emptyEmail: "Nhập email.",
-  badEmail: "Nhập email đúng dạng ten@email.com.",
-  sameEmail: "Email admin phải khác email của bạn.",
-  failed: "Chưa gửi được yêu cầu. Thử lại.",
-} as const;
+  emailLabel: "auth.requestAccess.emailLabel",
+  emailPlaceholder: "auth.emailPlaceholder",
+  adminLabel: "auth.requestAccess.adminLabel",
+  adminPlaceholder: "auth.requestAccess.adminPlaceholder",
+  submit: "auth.requestAccess.submit",
+  emptyEmail: "auth.requestAccess.emptyEmail",
+  badEmail: "auth.requestAccess.badEmail",
+  sameEmail: "auth.requestAccess.sameEmail",
+  failed: "auth.requestAccess.failed",
+} as const satisfies Record<string, TranslationKey>;
 
 // Server failures that belong to one field; the rest show above the button.
-const FIELD_ERROR_BY_CODE: Record<string, { field: Field; message: string }> = {
-  ADMIN_NOT_FOUND: { field: "adminEmail", message: "Không có admin nào dùng email này." },
+const FIELD_ERROR_BY_CODE: Record<string, { field: Field; key: TranslationKey }> = {
+  ADMIN_NOT_FOUND: { field: "adminEmail", key: "auth.requestAccess.ADMIN_NOT_FOUND" },
 };
-const FORM_ERROR_BY_CODE: Record<string, string> = {
-  // AccessRequestRateLimiter: 5 per hour per network.
-  RATE_LIMITED: "Đã gửi quá nhiều yêu cầu. Thử lại sau 1 giờ.",
-};
+// AccessRequestRateLimiter: 5 per hour per network.
+const RATE_LIMIT_HOURS = 1;
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function emailProblem(value: string): string | undefined {
-  if (!value) return COPY.emptyEmail;
-  if (!EMAIL_PATTERN.test(value)) return COPY.badEmail;
+  if (!value) return i18n.t(COPY.emptyEmail);
+  if (!EMAIL_PATTERN.test(value)) return i18n.t(COPY.badEmail);
   return undefined;
 }
 
 function validate(email: string, adminEmail: string): FieldErrors {
   const errors: FieldErrors = { email: emailProblem(email), adminEmail: emailProblem(adminEmail) };
   if (!errors.email && !errors.adminEmail && email.toLowerCase() === adminEmail.toLowerCase()) {
-    errors.adminEmail = COPY.sameEmail;
+    errors.adminEmail = i18n.t(COPY.sameEmail);
   }
   return errors;
 }
@@ -58,6 +57,7 @@ interface RequestAccessFormProps {
 // on every keystroke after that, so the red clears as soon as it is fixed);
 // submitting checks both and focuses the first one to fix.
 export function RequestAccessForm({ onSent }: RequestAccessFormProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const request = useRequestAccessMutation();
   const [email, setEmail] = useState("");
@@ -105,15 +105,18 @@ export function RequestAccessForm({ onSent }: RequestAccessFormProps) {
       {
         onSuccess: () => onSent(trimmedEmail),
         onError: (error) => {
-          if (isNetworkError(error)) return setFormError(getErrorMessage(error, COPY.failed));
           const code = getErrorCode(error) ?? "";
           const fieldError = FIELD_ERROR_BY_CODE[code];
           if (fieldError) {
-            setErrors((current) => ({ ...current, [fieldError.field]: fieldError.message }));
+            setErrors((current) => ({ ...current, [fieldError.field]: t(fieldError.key) }));
             adminRef.current?.focus();
             return;
           }
-          setFormError(FORM_ERROR_BY_CODE[code] ?? COPY.failed);
+          if (code === "RATE_LIMITED") {
+            setFormError(t("auth.requestAccess.RATE_LIMITED", { count: RATE_LIMIT_HOURS }));
+            return;
+          }
+          setFormError(errorText(error, COPY.failed));
         },
       },
     );
@@ -124,12 +127,12 @@ export function RequestAccessForm({ onSent }: RequestAccessFormProps) {
       <View style={styles.fields}>
         <AuthField
           ref={emailRef}
-          label={COPY.emailLabel}
+          label={t(COPY.emailLabel)}
           value={email}
           onChangeText={(v) => onChange("email", v)}
           onBlur={() => onLeave("email")}
           error={errors.email}
-          placeholder={COPY.emailPlaceholder}
+          placeholder={t(COPY.emailPlaceholder)}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="email-address"
@@ -142,12 +145,12 @@ export function RequestAccessForm({ onSent }: RequestAccessFormProps) {
         />
         <AuthField
           ref={adminRef}
-          label={COPY.adminLabel}
+          label={t(COPY.adminLabel)}
           value={adminEmail}
           onChangeText={(v) => onChange("adminEmail", v)}
           onBlur={() => onLeave("adminEmail")}
           error={errors.adminEmail}
-          placeholder={COPY.adminPlaceholder}
+          placeholder={t(COPY.adminPlaceholder)}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="email-address"
@@ -159,7 +162,7 @@ export function RequestAccessForm({ onSent }: RequestAccessFormProps) {
       </View>
       <AuthFormError message={formError} />
       <PillButton
-        label={COPY.submit}
+        label={t(COPY.submit)}
         loading={request.isPending}
         onPress={submit}
         style={styles.button}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Keyboard, Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { DrawerChild } from "@/components/shared/Drawer";
 import { Avatar } from "@/components/ui/Avatar";
@@ -61,10 +62,11 @@ interface WalletPickerListProps {
 }
 
 function WalletPickerList({ wallets, selectedId, onPick }: WalletPickerListProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
 
-  if (wallets.length === 0) return <Text style={styles.empty}>Chưa có ví.</Text>;
+  if (wallets.length === 0) return <Text style={styles.empty}>{t("transactions.walletPicker.empty")}</Text>;
 
   return (
     <View style={styles.group}>

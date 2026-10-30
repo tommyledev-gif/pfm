@@ -1,5 +1,6 @@
 import { memo, useEffect, useMemo, useRef } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import Animated, {
   Easing,
   Extrapolation,
@@ -112,6 +113,7 @@ export const DonutChart = memo(function DonutChart({
   budgetTotal = null,
   onPressDetails,
 }: DonutChartProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const tooltipHeight = onPressDetails ? TOOLTIP_HEIGHT_WITH_LINK : TOOLTIP_HEIGHT;
 
@@ -191,7 +193,7 @@ export const DonutChart = memo(function DonutChart({
           </Text>
           {onPressDetails ? (
             <Pressable onPress={() => onPressDetails(activeSegment.key)} hitSlop={8} testID="btn-donut-tooltip-details">
-              <Text style={styles.tooltipLink}>Xem giao dịch</Text>
+              <Text style={styles.tooltipLink}>{t("ui.donut.seeTransactions")}</Text>
             </Pressable>
           ) : null}
         </Animated.View>

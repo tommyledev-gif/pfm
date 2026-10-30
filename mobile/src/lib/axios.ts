@@ -2,6 +2,7 @@ import axios, { CanceledError } from "axios";
 
 import { Config } from "@/lib/config";
 import { withDeviceHeaders } from "@/lib/device-identity";
+import { currentLanguage } from "@/lib/i18n";
 import { userIdFromAccessToken } from "@/lib/jwt";
 import { redact } from "@/lib/redact";
 import { useDebugLogStore } from "@/stores/debug-log-store";
@@ -43,6 +44,9 @@ apiClient.interceptors.request.use((config) => {
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }
+  // The app's language, for the replies the server writes (specs/mobile-
+  // language-switch §5.8). Ignored by the backend until it reads it.
+  config.headers.set("Accept-Language", currentLanguage());
   return config;
 });
 // Every request says which device it comes from: sign-ins bind their session
@@ -51,7 +55,7 @@ apiClient.interceptors.request.use(withDeviceHeaders);
 
 // responseType "arraybuffer" (GET /transactions/export is the only caller
 // today) applies to every response, not just the 2xx — so a 4xx JSON error
-// envelope also arrives as binary. Left as-is, getErrorMessage finds no
+// envelope also arrives as binary. Left as-is, errorText finds no
 // `message` field, so every failure shows the same generic toast, and the
 // debug console renders the body as a useless "{}" (JSON.stringify of an
 // ArrayBuffer). Decoding it back into the envelope here — before the logger
@@ -167,4 +171,4 @@ apiClient.interceptors.response.use(
 // Re-exported for every existing `import { unwrap } from "@/lib/axios"` call
 // site — the types/helpers themselves now live in lib/api-envelope.ts (no
 // session-store dependency), see that file's doc comment for why.
-export { unwrap, getErrorMessage, getErrorCode, type ApiEnvelope } from "@/lib/api-envelope";
+export { unwrap, getErrorCode, type ApiEnvelope } from "@/lib/api-envelope";

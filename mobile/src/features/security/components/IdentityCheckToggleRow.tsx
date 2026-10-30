@@ -1,16 +1,16 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { ListToggleRow } from "@/components/ui/grouped-list";
 import { IdentityCheckGlyph } from "@/components/ui/grouped-list/list-icons";
+import { TranslationKey } from "@/lib/i18n";
 import { useColors } from "@/lib/theme";
 import { useSecurityPrefsStore } from "@/stores/security-prefs-store";
 import { CHANGE_SETTING_PROMPT, verifyOwner } from "@/features/security/identity-check";
 import { PIN_COPY } from "@/features/security/pin/pin-copy";
 
-const TITLE = "Xác minh khi chuyển tài khoản";
 /** The group footer under this row on the Security screen. */
-export const IDENTITY_CHECK_FOOTER =
-  "Hỏi mã PIN, vân tay, khuôn mặt hoặc mã khóa màn hình trước khi chuyển sang tài khoản đã lưu.";
+export const IDENTITY_CHECK_FOOTER = "security.identityCheck.footer" satisfies TranslationKey;
 
 /**
  * The device-wide identity-check switch (spec US-07). Turning it OFF first
@@ -19,6 +19,7 @@ export const IDENTITY_CHECK_FOOTER =
  * with no lock at all lets it go off. Turning it ON needs nothing.
  */
 export function IdentityCheckToggleRow() {
+  const { t } = useTranslation();
   const colors = useColors();
   const enabled = useSecurityPrefsStore((s) => s.identityCheckEnabled);
   const setEnabled = useSecurityPrefsStore((s) => s.setIdentityCheckEnabled);
@@ -40,7 +41,7 @@ export function IdentityCheckToggleRow() {
 
   return (
     <ListToggleRow
-      title={TITLE}
+      title={t("security.identityCheck.title")}
       icon={IdentityCheckGlyph}
       tone={colors.mint}
       value={enabled}

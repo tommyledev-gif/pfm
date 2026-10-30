@@ -1,6 +1,7 @@
 import { isAxiosError } from "axios";
 
 import { apiClient, unwrap, type ApiEnvelope } from "@/lib/axios";
+import { i18n } from "@/lib/i18n";
 import { userIdFromAccessToken } from "@/lib/jwt";
 import { HTTP_STATUS, SWITCH_CHAT_FLUSH_TIMEOUT_MS } from "@/lib/constants";
 import { useSessionStore } from "@/stores/session-store";
@@ -13,8 +14,6 @@ import { useSwitchProgressStore } from "@/features/accounts/switch-progress-stor
 import { User } from "@/features/users/types";
 
 export type LoginOutcome = "signed-in" | "same-user";
-
-export const ALREADY_ACTIVE_MESSAGE = "Bạn đang dùng tài khoản này.";
 
 // Login and the sync hook can both ask at once — one request serves both.
 let rememberInFlight: Promise<boolean> | null = null;
@@ -62,7 +61,7 @@ export async function completeLogin(pair: LoginResponse, email: string): Promise
   // dropping it would sign the User out.
   if (currentUserId && currentUserId === userIdFromAccessToken(pair.access_token)) {
     await useSessionStore.getState().setTokens(pair.access_token, pair.refresh_token, useSessionStore.getState().email ?? email);
-    useToastStore.getState().show(ALREADY_ACTIVE_MESSAGE, "info");
+    useToastStore.getState().show(i18n.t("accounts.login.alreadyActive"), "info");
     return "same-user";
   }
 

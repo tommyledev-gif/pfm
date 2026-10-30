@@ -1,10 +1,11 @@
 import { useCallback, useMemo, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
+import { useTranslation } from "react-i18next";
 
 import { Screen } from "@/components/shared/Screen";
 import { Fab } from "@/components/ui/Fab";
 import { monthRange } from "@/lib/date-range";
-import { formatDateRange } from "@/lib/format-date";
+import { formatDateRange, formatMonthYear } from "@/lib/format-date";
 import { useLatestCallback } from "@/lib/use-latest-callback";
 import { useRefresh } from "@/lib/use-refresh";
 import { spacing, createStyles } from "@/lib/theme";
@@ -26,6 +27,7 @@ import { DaySectionList } from "@/features/transactions/components/DaySectionLis
 import { TransactionListRow } from "@/features/transactions/components/TransactionListRow";
 import { useCollapsedDays } from "@/features/transactions/hooks/use-collapsed-days";
 import { useFocusTransaction } from "@/features/transactions/hooks/use-focus-transaction";
+import { useWalletFilterParam } from "@/features/transactions/hooks/use-wallet-filter-param";
 import { useTransactionFilters } from "@/features/transactions/hooks/use-transaction-filters";
 import { useWalletCurrencies } from "@/features/transactions/hooks/use-wallet-currencies";
 import { TransactionsHeader, TypeFilterValue } from "@/features/transactions/components/TransactionsHeader";
@@ -43,6 +45,7 @@ const NO_CATEGORIES: Category[] = [];
 const NO_WALLETS: Wallet[] = [];
 
 export default function TransactionsScreen() {
+  const { t } = useTranslation();
   const styles = useStyles();
   const wallets = useWalletsQuery();
   const walletCurrencies = useWalletCurrencies(wallets.data);
@@ -66,6 +69,7 @@ export default function TransactionsScreen() {
     focusedAt?: string;
   }>();
   const categories = useCategoriesQuery();
+  useWalletFilterParam(filters, wallets.data, () => setSortKeys([]));
 
   // A new filter keeps the current rows on screen until its own land, rather
   // than dropping to a skeleton on every search refinement.
@@ -103,7 +107,8 @@ export default function TransactionsScreen() {
 
   const sections = useMemo(
     () => buildDaySections(upToToday, { grouped: !hasAmountSort, walletCurrencyMap, collapsedDays, foldingDays }),
-    [upToToday, hasAmountSort, walletCurrencyMap, collapsedDays, foldingDays],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t: day labels follow a language switch
+    [upToToday, hasAmountSort, walletCurrencyMap, collapsedDays, foldingDays, t],
   );
   // A new result set staggers in once its rows land; a refetch or the next
   // page changes none of it.
@@ -125,12 +130,11 @@ export default function TransactionsScreen() {
     onFoundInFuture: () => setFutureOpen(true),
   });
 
-  const now = new Date();
-  const currentMonthLabel = `Tháng ${now.getMonth() + 1}, ${now.getFullYear()}`;
+  const currentMonthLabel = formatMonthYear(new Date());
   const dateRangeLabel =
     hasDateFilter && dateRange.from ? formatDateRange(dateRange.from, dateRange.to ?? dateRange.from) : null;
   const headerRange = hasDateFilter ? { from: dateRange.from, to: dateRange.to } : monthRange(0);
-  const { total: headerTotal, otherCurrencies, refetch: refetchHeaderTotal } = useFilteredReportTotal(
+  const { total: headerTotal, otherCurrencies, otherTotals, refetch: refetchHeaderTotal } = useFilteredReportTotal(
     headerRange,
     categoryIds,
     walletId,
@@ -140,10 +144,7 @@ export default function TransactionsScreen() {
   // Export and import act on the period on screen: the date filter, else the
   // current month the header summarises. Both bounds are required by the API.
   const currentMonth = monthRange(0);
-  const exportRange = {
-    from: headerRange.from ?? currentMonth.from,
-    to: headerRange.to ?? currentMonth.to,
-  };
+  const exportRange = { from: headerRange.from ?? currentMonth.from, to: headerRange.to ?? currentMonth.to };
   const transactionIO = useTransactionIO({
     range: exportRange,
     walletId,
@@ -215,6 +216,7 @@ export default function TransactionsScreen() {
             periodLabel={dateRangeLabel ?? currentMonthLabel}
             headerTotal={headerTotal}
             otherCurrencies={otherCurrencies}
+            otherTotals={otherTotals}
             typeFilter={filter ?? "all"}
             onChangeTypeFilter={changeTypeFilter}
             searchSeed={filters.searchSeed}
@@ -256,7 +258,7 @@ export default function TransactionsScreen() {
         footer={<TransactionsListFooter query={transactions} />}
       />
 
-      <Fab accessibilityLabel="Thêm giao dịch" testID="btn-add-transaction" onPress={openCreateForm} />
+      <Fab accessibilityLabel={t("common.action.addTransaction")} testID="btn-add-transaction" onPress={openCreateForm} />
 
       <TransactionsFilterSheets
         open={sheets.open}

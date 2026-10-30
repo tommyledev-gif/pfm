@@ -1,4 +1,5 @@
 import { Pressable, ScrollView, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { CheckIcon } from "@/components/ui/Icon";
 import { EmojiGlyph } from "@/components/ui/EmojiGlyph";
@@ -67,12 +68,13 @@ const ROW_MIN_HEIGHT = 72;
 export function WizardStepProfile({ selected, onSelect }: WizardStepProfileProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   return (
     <View style={styles.root}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.head}>
-          <Text style={styles.title}>Bạn đang sống kiểu nào?</Text>
-          <Text style={styles.subtitle}>Ngân sách khởi điểm dựa trên câu trả lời này.</Text>
+          <Text style={styles.title}>{t("budgetWizard.profile.title")}</Text>
+          <Text style={styles.subtitle}>{t("budgetWizard.profile.subtitle")}</Text>
         </View>
 
         {PRESET_OPTIONS.map((opt) => {
@@ -102,10 +104,10 @@ export function WizardStepProfile({ selected, onSelect }: WizardStepProfileProps
 
               <View style={styles.copy}>
                 <Text style={[styles.label, active && { color: tint }]} numberOfLines={1}>
-                  {opt.label}
+                  {t(`budgetWizard.preset.${opt.key}.label`)}
                 </Text>
                 <Text style={styles.description} numberOfLines={2}>
-                  {opt.description}
+                  {t(`budgetWizard.preset.${opt.key}.description`)}
                 </Text>
               </View>
 

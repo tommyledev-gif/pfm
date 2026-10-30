@@ -1,10 +1,11 @@
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { ChevronDownIcon } from "@/components/ui/Icon";
 import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { WalletAccess } from "@/features/wallets/types";
-import { ROLE_LABEL } from "@/features/wallets/components/wallet-member-copy";
+import { ROLE_LABEL_KEY } from "@/features/wallets/components/wallet-member-copy";
 
 interface RolePillProps {
   role: WalletAccess;
@@ -25,6 +26,7 @@ interface RolePillProps {
 export function RolePill({ role, pending = false, onPress, accessibilityLabel, testID }: RolePillProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const tone = pending
     ? colors.mustard
     : role === "owner"
@@ -32,7 +34,7 @@ export function RolePill({ role, pending = false, onPress, accessibilityLabel, t
       : role === "editor"
         ? colors.periwinkle
         : colors.textSecondary;
-  const label = pending ? "Chờ trả lời" : ROLE_LABEL[role];
+  const label = pending ? t("common.status.awaitingReply") : t(ROLE_LABEL_KEY[role]);
   const body = (
     <>
       <Text style={[styles.label, { color: tone }]} numberOfLines={1}>

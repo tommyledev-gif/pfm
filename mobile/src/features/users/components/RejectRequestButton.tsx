@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, Text } from "react-native";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { getErrorMessage, isNetworkError } from "@/lib/api-envelope";
+import { errorText, isNetworkError } from "@/lib/api-envelope";
+import { copyOf, i18n } from "@/lib/i18n";
 import { withAlpha } from "@/lib/color";
 import { useRequireOnline } from "@/lib/connectivity";
 import { createStyles, radii, spacing, typography, useColors } from "@/lib/theme";
@@ -15,21 +17,22 @@ interface RejectRequestButtonProps {
   email: string;
 }
 
-const LABEL = "Từ chối";
-const CONFIRM_TITLE = "Từ chối yêu cầu?";
-const KEEP_LABEL = "Giữ lại";
-const SUCCESS = "Đã từ chối yêu cầu";
-const FALLBACK_ERROR = "Chưa từ chối được. Thử lại.";
+const COPY = copyOf({
+  LABEL: "users.reject.button",
+  CONFIRM_TITLE: "users.reject.title",
+  KEEP_LABEL: "common.action.keep",
+  SUCCESS: "users.reject.toast",
+});
 
 // The server sends the requester nothing, so the admin is told; and the
 // request is removed rather than blocked, so asking again stays open.
-const confirmMessage = (email: string) =>
-  `${email} sẽ không nhận được email báo. Người này có thể gửi lại yêu cầu.`;
+const confirmMessage = (email: string) => i18n.t("users.reject.body", { email });
 
 // Rejects an access request (status "requested"), next to ApproveRequestButton.
 // The request is removed: its row leaves Thành viên and the notification
 // about it loses both buttons.
 export function RejectRequestButton({ userId, email }: RejectRequestButtonProps) {
+  useTranslation(); // COPY reads the current language: re-render on a switch
   const colors = useColors();
   const styles = useStyles();
   const requireOnline = useRequireOnline();
@@ -42,11 +45,11 @@ export function RejectRequestButton({ userId, email }: RejectRequestButtonProps)
     if (reject.isPending) return;
     requireOnline(() =>
       reject.mutate(userId, {
-        onSuccess: () => showToast(SUCCESS, "info"),
+        onSuccess: () => showToast(COPY.SUCCESS, "info"),
         onError: (error) => {
-          if (isRequestNoLongerWaiting(error)) return showToast(REQUEST_NOT_WAITING, "info");
+          if (isRequestNoLongerWaiting(error)) return showToast(i18n.t(REQUEST_NOT_WAITING), "info");
           // The server's own message is shown only for "no connection".
-          showToast(isNetworkError(error) ? getErrorMessage(error, FALLBACK_ERROR) : FALLBACK_ERROR, "error");
+          showToast(isNetworkError(error) ? errorText(error) : i18n.t("users.reject.failed"), "error");
         },
       }),
     );
@@ -60,19 +63,19 @@ export function RejectRequestButton({ userId, email }: RejectRequestButtonProps)
         disabled={reject.isPending}
         hitSlop={6}
         accessibilityRole="button"
-        accessibilityLabel={`Từ chối yêu cầu của ${email}`}
+        accessibilityLabel={i18n.t("users.reject.a11y", { email })}
         accessibilityState={{ disabled: reject.isPending, busy: reject.isPending }}
         testID={`btn-reject-request-${userId}`}
       >
         {reject.isPending ? <ActivityIndicator size="small" color={colors.peach} /> : null}
-        <Text style={styles.label}>{LABEL}</Text>
+        <Text style={styles.label}>{COPY.LABEL}</Text>
       </Pressable>
       <ConfirmDialog
         visible={confirmOpen}
-        title={CONFIRM_TITLE}
+        title={COPY.CONFIRM_TITLE}
         message={confirmMessage(email)}
-        confirmLabel={LABEL}
-        cancelLabel={KEEP_LABEL}
+        confirmLabel={COPY.LABEL}
+        cancelLabel={COPY.KEEP_LABEL}
         onConfirm={confirm}
         onCancel={() => setConfirmOpen(false)}
         testID="dialog-reject-request"

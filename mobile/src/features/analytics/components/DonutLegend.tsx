@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { DonutSegment } from "@/components/shared/DonutChart";
 import { Avatar } from "@/components/ui/Avatar";
@@ -33,12 +34,13 @@ const DIMMED_OPACITY = 0.45;
  * Categories, not a Category.
  */
 export function DonutLegend({ segments, currency, selected, onToggle, defaultOpen }: DonutLegendProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const [open, setOpen] = useState(defaultOpen);
   const total = segments.reduce((sum, s) => sum + s.amount, 0);
   const count = segments.filter((s) => s.key !== ANALYTICS_OTHER_KEY).length;
-  const toggleLabel = open ? "Ẩn danh mục" : `Xem ${count} danh mục`;
+  const toggleLabel = open ? t("analytics.legend.hide") : t("analytics.legend.show", { count });
 
   return (
     <View>

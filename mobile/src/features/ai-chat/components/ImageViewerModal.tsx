@@ -1,4 +1,5 @@
 import { Modal, Pressable, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -18,6 +19,7 @@ interface ImageViewerModalProps {
 export function ImageViewerModal({ uri, onClose }: ImageViewerModalProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={uri !== null} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
@@ -26,7 +28,7 @@ export function ImageViewerModal({ uri, onClose }: ImageViewerModalProps) {
         <Pressable
           testID="btn-close-image-viewer"
           accessibilityRole="button"
-          accessibilityLabel="Đóng ảnh"
+          accessibilityLabel={t("chat.image.close.a11y")}
           hitSlop={CLOSE_HIT_SLOP}
           onPress={onClose}
           style={[styles.close, { top: insets.top + spacing.lg }]}

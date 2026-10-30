@@ -1,49 +1,50 @@
 import { PIN_LENGTH } from "@/lib/constants";
+import { i18n, TranslationKey } from "@/lib/i18n";
 
-// specs/mobile-app-pin §UI copy.
+// specs/mobile-app-pin §UI copy. Keys, passed to t() where shown (create
+// takes {{length}}: PIN_LENGTH); the functions below read theirs when called.
 export const PIN_COPY = {
-  section: "Mã PIN",
-  footer:
-    "Dùng 6 số để mở khóa ứng dụng và xác minh khi chuyển tài khoản. Sai 5 lần liên tiếp thì mọi tài khoản trên máy bị đăng xuất.",
-  setRow: "Đặt mã PIN",
-  changeRow: "Đổi mã PIN",
-  offRow: "Tắt mã PIN",
+  section: "security.pin.section",
+  footer: "security.pin.footer",
+  setRow: "security.pin.setRow",
+  changeRow: "security.pin.changeRow",
+  offRow: "security.pin.offRow",
 
-  enter: "Nhập mã PIN",
-  create: `Nhập mã PIN gồm ${PIN_LENGTH} số`,
-  repeat: "Nhập lại mã PIN",
-  current: "Nhập mã PIN hiện tại",
-  forSwitch: "Nhập mã PIN để chuyển tài khoản",
+  enter: "security.pin.enter",
+  create: "security.pin.create",
+  repeat: "security.pin.repeat",
+  current: "security.pin.current",
+  forSwitch: "security.pin.forSwitch",
 
-  mismatch: "Hai mã PIN chưa khớp. Nhập lại.",
-  checkFailed: "Chưa kiểm tra được mã PIN. Thử lại.",
-  saveFailed: "Chưa lưu được mã PIN. Nhập lại.",
-  biometricFailed: "Xác thực chưa khớp. Thử lại.",
+  mismatch: "security.pin.mismatch",
+  checkFailed: "security.pin.checkFailed",
+  saveFailed: "security.pin.saveFailed",
+  biometricFailed: "security.biometricFailed",
 
-  close: "Đóng",
-  forgot: "Quên mã PIN?",
-  forgotMessage: "Mọi tài khoản trên máy sẽ bị đăng xuất và mã PIN bị xóa. Đăng nhập lại bằng mật khẩu để dùng tiếp.",
-  forgotConfirm: "Đăng xuất mọi tài khoản",
-  forgotKeep: "Giữ lại",
+  close: "common.action.close",
+  forgot: "security.pin.forgot",
+  forgotMessage: "security.pin.forgotMessage",
+  forgotConfirm: "security.pin.forgotConfirm",
+  forgotKeep: "common.action.keep",
 
-  set: "Đã đặt mã PIN",
-  changed: "Đã đổi mã PIN",
-  off: "Đã tắt mã PIN",
-  offWithLock: "Đã tắt mã PIN và khóa ứng dụng.",
-  wipedWrong: "Nhập sai mã PIN 5 lần. Đã đăng xuất mọi tài khoản trên máy.",
-  wipedForgot: "Đã đăng xuất mọi tài khoản trên máy.",
+  set: "security.pin.set",
+  changed: "security.pin.changed",
+  off: "security.pin.off",
+  offWithLock: "security.pin.offWithLock",
+  wipedWrong: "security.pin.wipedWrong",
+  wipedForgot: "security.pin.wipedForgot",
 
-  deleteDigit: "Xóa một số",
-} as const;
+  deleteDigit: "security.pin.deleteDigitA11y",
+} as const satisfies Record<string, TranslationKey>;
 
 export function wrongPin(triesLeft: number): string {
-  return `Sai mã PIN. Còn ${triesLeft} lần thử.`;
+  return i18n.t("security.pin.wrong", { count: triesLeft });
 }
 
 export function digitKey(digit: string): string {
-  return `Phím ${digit}`;
+  return i18n.t("security.pin.digitKeyA11y", { digit });
 }
 
 export function entered(count: number): string {
-  return `Đã nhập ${count} trên ${PIN_LENGTH} số`;
+  return i18n.t("security.pin.enteredA11y", { count, length: PIN_LENGTH });
 }

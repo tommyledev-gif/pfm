@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Pressable } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -8,6 +9,7 @@ import { TrashGlyph } from "@/components/ui/grouped-list/list-icons";
 import { colorForCategory } from "@/lib/category-color";
 import { useRequireOnline } from "@/lib/connectivity";
 import { createStyles, spacing, useColors } from "@/lib/theme";
+import { categoryLabel } from "@/features/categories/category-label";
 import { Category } from "@/features/categories/types";
 import { useDeleteCategoryMutation } from "@/features/categories/api/use-delete-category-mutation";
 
@@ -19,19 +21,21 @@ const AVATAR_SIZE = 36;
 export function CategoryListItem({ category, onPress }: { category: Category; onPress: () => void }) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const requireOnline = useRequireOnline();
   const isSystem = category.user_id === null;
+  const name = categoryLabel(category);
   const deleteCategory = useDeleteCategoryMutation();
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   return (
     <>
       <ListRow
-        title={category.name}
+        title={name}
         titleLines={1}
         leading={
           <Avatar
-            name={category.name}
+            name={name}
             color={colorForCategory(category.id)}
             size={AVATAR_SIZE}
             icon={category.icon}
@@ -49,7 +53,7 @@ export function CategoryListItem({ category, onPress }: { category: Category; on
               onPress={() => requireOnline(() => setConfirmDeleteOpen(true))}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel={`Xóa danh mục ${category.name}`}
+              accessibilityLabel={t("categories.row.deleteA11y", { name })}
               style={({ pressed }) => [styles.deleteButton, pressed && styles.pressed]}
             >
               <TrashGlyph size={20} color={colors.textSecondary} />
@@ -60,10 +64,10 @@ export function CategoryListItem({ category, onPress }: { category: Category; on
 
       <ConfirmDialog
         visible={confirmDeleteOpen}
-        title="Xóa danh mục?"
-        message={`"${category.name}" sẽ bị xóa.`}
-        confirmLabel="Xóa danh mục"
-        cancelLabel="Giữ lại"
+        title={t("categories.delete.title")}
+        message={t("categories.delete.bodyNamed", { name })}
+        confirmLabel={t("categories.delete.confirm")}
+        cancelLabel={t("common.action.keep")}
         onCancel={() => setConfirmDeleteOpen(false)}
         onConfirm={() => {
           setConfirmDeleteOpen(false);

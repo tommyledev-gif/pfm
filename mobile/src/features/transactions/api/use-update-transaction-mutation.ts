@@ -4,6 +4,7 @@ import { checkBudgetLimit } from "@/features/budgets/check-budget-limit";
 import { apiClient, unwrap } from "@/lib/axios";
 import { TRANSACTION_DETAIL_QUERY_ROOT } from "@/lib/query-persistence/persist-policy";
 import { Transaction, UpdateTransactionRequest } from "@/features/transactions/types";
+import { patchWalletBalance } from "@/features/wallets/api/patch-wallet-balance";
 
 interface UpdateTransactionVariables {
   id: string;
@@ -24,6 +25,7 @@ export function useUpdateTransactionMutation() {
       return unwrap(res.data);
     },
     onSuccess: async (transaction) => {
+      patchWalletBalance(queryClient, transaction);
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: [TRANSACTION_DETAIL_QUERY_ROOT] });
       queryClient.invalidateQueries({ queryKey: ["wallets"] });

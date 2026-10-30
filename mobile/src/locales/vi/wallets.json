@@ -1,0 +1,202 @@
+{
+  "wallets": {
+    "view": {
+      "carousel": "Dạng thẻ",
+      "list": "Theo nhóm",
+      "shared": "Ví chung"
+    },
+    "empty": {
+      "title": "Chưa có ví nào",
+      "body": "Tiền mặt, tài khoản ngân hàng hay ví điện tử — mỗi nguồn tiền là một ví, và mọi giao dịch đều được ghi vào một ví.",
+      "cta": "Tạo ví đầu tiên"
+    },
+    "owner": {
+      "sharedBy": "Ví chung của {{owner}}",
+      "unknown": "người khác",
+      "yoursShared": "Ví chung của bạn",
+      "yours": "Ví của bạn",
+      "sharedByWithRole": "Ví chung của {{owner}} · {{role}}",
+      "ownedBy": "Của {{owner}}"
+    },
+    "list": {
+      "pendingSync_other": "{{count}} chưa đồng bộ"
+    },
+    "setDefault": {
+      "confirm": {
+        "title": "Đặt ví mặc định?",
+        "body": "\"{{wallet}}\" sẽ trở thành ví mặc định của bạn."
+      }
+    },
+    "card": {
+      "balance": {
+        "onHand": "Số dư hiện có",
+        "available": "Số dư khả dụng"
+      },
+      "typeShared": "{{type}} · Ví chung",
+      "a11y": "{{wallet}}, {{amount}}",
+      "pendingNotCounted_other": "Chưa tính {{count}} giao dịch chờ đồng bộ"
+    },
+    "carousel": {
+      "a11y": {
+        "next": "Ví sau",
+        "previous": "Ví trước",
+        "hint": "Vuốt lên hoặc xuống để đổi ví, chạm hai lần để mở",
+        "nextButton": "Ví tiếp theo"
+      }
+    },
+    "active": {
+      "sharedBadge": "{{role}} · {{owner}}",
+      "members": "Thành viên",
+      "shareCount": "Chia sẻ · {{count}}",
+      "share": "Chia sẻ",
+      "edit": "Sửa ví"
+    },
+    "recent": {
+      "title": {
+        "shared": "Giao dịch trong ví chung",
+        "own": "Gần đây trong ví này"
+      },
+      "error": "Không tải được giao dịch của ví này.",
+      "empty": "Ví này chưa có giao dịch nào."
+    },
+    "form": {
+      "name": {
+        "required": "Nhập tên ví.",
+        "placeholder": "vd: Tiền mặt"
+      },
+      "title": {
+        "edit": "Sửa ví",
+        "create": "Ví mới"
+      },
+      "colour": {
+        "label": "Màu thẻ",
+        "auto": "Màu tự động"
+      },
+      "currency": {
+        "label": "Loại tiền",
+        "labelLocked": "Loại tiền (không đổi được sau khi tạo)"
+      },
+      "initialBalance": {
+        "label": "Số dư ban đầu ({{currency}})"
+      },
+      "error": {
+        "saveFailed": "Không thể lưu ví"
+      }
+    }
+  },
+  "sharedWallets": {
+    "action": {
+      "share": "Chia sẻ một ví",
+      "shareAnother": "Chia sẻ một ví khác",
+      "toViewer": "Đổi sang Chỉ xem",
+      "toEditor": "Đổi sang Ghi chép",
+      "leave": "Rời ví",
+      "revokeInvitation": "Thu hồi lời mời",
+      "removeMember": "Xóa khỏi ví"
+    },
+    "recordedBy": "{{name}} ghi",
+    "tab": {
+      "invitations": "Lời mời"
+    },
+    "empty": {
+      "title": "Chưa có ví chung",
+      "body": "Mời người thân vào một ví để cùng ghi thu chi, chung một số dư."
+    },
+    "activity": {
+      "title": "Giao dịch ví chung",
+      "hint": "Tìm và lọc giao dịch của mọi người trong ví",
+      "empty": {
+        "body": "Chia sẻ một ví ở tab Ví chung để cùng ghi thu chi.",
+        "cta": "Mở tab Ví chung"
+      }
+    },
+    "group": {
+      "withMe": "Được chia sẻ với bạn",
+      "byMe": "Bạn đang chia sẻ"
+    },
+    "card": {
+      "a11y": "{{wallet}}, {{owner}}, {{role}}, {{amount}}",
+      "a11yWithPeople": "{{wallet}}, {{owner}}, {{role}}, {{amount}}, {{people}}"
+    },
+    "picker": {
+      "title": "Chọn ví để chia sẻ",
+      "sharedWith_other": "Ví chung · {{count}} người"
+    },
+    "filter": {
+      "clearDate": "Bỏ lọc thời gian",
+      "clearCategory": "Bỏ lọc danh mục"
+    },
+    "role": {
+      "owner": "Chủ ví",
+      "editor": "Ghi chép",
+      "viewer": "Chỉ xem",
+      "editorHint": "Thêm được giao dịch. Chỉ sửa được giao dịch mình ghi.",
+      "viewerHint": "Xem số dư và giao dịch, không thêm được."
+    },
+    "member": {
+      "statusPending": "{{role}} · Chờ trả lời",
+      "statusAccountPending": "{{role}} · Chờ tạo tài khoản",
+      "count_other": "{{count}} người",
+      "countWithPending": "{{people}} · {{pending}} chờ trả lời",
+      "nameSelf": "{{name}}<0> (bạn)</0>",
+      "roleA11y": "{{role}}. Tùy chọn cho {{name}}"
+    },
+    "invite": {
+      "error": {
+        "noAccount": "Không có tài khoản nào với email hoặc tên đăng nhập này.",
+        "memberExists": "Người này đã ở trong ví hoặc chưa trả lời lời mời.",
+        "limit": "Ví đã đủ {{max}} người.",
+        "self": "Đây là tài khoản của bạn.",
+        "failed": "Chưa gửi được lời mời. Thử lại."
+      },
+      "title": "Mời thêm người",
+      "full": "Ví đã đủ {{max}} người. Xóa bớt người để mời thêm.",
+      "send": "Gửi lời mời"
+    },
+    "memberDialog": {
+      "toViewer": {
+        "title": "Đổi {{name}} sang Chỉ xem?",
+        "body": "Người này vẫn xem được ví nhưng không thêm được giao dịch."
+      },
+      "toEditor": {
+        "title": "Đổi {{name}} sang Ghi chép?",
+        "body": "Người này thêm được giao dịch vào ví."
+      },
+      "leave": {
+        "title": "Rời ví {{wallet}}?",
+        "body": "Ví sẽ không còn trong danh sách của bạn. Giao dịch bạn đã ghi vẫn ở lại trong ví."
+      },
+      "revoke": {
+        "title": "Thu hồi lời mời?",
+        "body": "{{name}} sẽ không vào được ví này."
+      },
+      "remove": {
+        "title": "Xóa {{name}} khỏi ví?",
+        "body": "Giao dịch {{name}} đã ghi vẫn ở lại trong ví."
+      }
+    },
+    "members": {
+      "title": "Người trong ví",
+      "loadError": "Chưa tải được danh sách.",
+      "allEntries": "Tìm và lọc mọi giao dịch",
+      "noOthers": "Chưa có ai khác trong ví."
+    },
+    "invitee": {
+      "active": "Đã ở trong ví",
+      "self": "Tài khoản của bạn",
+      "newAccount": "Chưa có tài khoản. Lời mời sẽ gửi qua email để tạo tài khoản."
+    },
+    "invitation": {
+      "single": "{{owner}} mời bạn vào ví {{wallet}}",
+      "count_other": "{{count}} lời mời vào ví chung",
+      "respondFailed": "Chưa trả lời được lời mời. Thử lại.",
+      "joined": "Đã vào ví {{wallet}}",
+      "eyebrow": "Lời mời vào ví chung",
+      "decline": "Từ chối",
+      "accept": "Tham gia"
+    },
+    "invitationBanner": {
+      "a11yHint": "Mở tab Ví chung"
+    }
+  }
+}

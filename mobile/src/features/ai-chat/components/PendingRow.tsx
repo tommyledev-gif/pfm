@@ -1,14 +1,25 @@
+import { useRef } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { SwipeableRow } from "@/components/shared/SwipeableRow";
 import { ChevronRightIcon, EditIcon, HistoryIcon, TrashIcon } from "@/components/ui/Icon";
-import { formatCurrency } from "@/lib/currency";
+import { formatCurrencyCompact } from "@/lib/currency";
 import { mixHex, withAlpha } from "@/lib/color";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { proposalAmountSign } from "@/features/ai-chat/proposal-kind";
 import { ChatMessage } from "@/features/ai-chat/types";
+import { useTooltipStore } from "@/stores/tooltip-store";
 
 const ICON_SIZE = 34;
+// Same hold as an icon button's hint: the row's tap opens the proposal.
+const REVEAL_DELAY_MS = 500;
+
+const REVIEW_KEY = {
+  transfer: "chat.pending.row.reviewTransfer",
+  income: "chat.pending.row.reviewIncome",
+  expense: "chat.pending.row.reviewExpense",
+} as const;
 
 interface PendingRowProps {
   message: ChatMessage;
@@ -32,6 +43,12 @@ interface PendingRowProps {
  *
  * ⚠️ Swiping reveals a button; it never acts on release. Discarding goes
  * through the caller's confirmation and never deletes the message itself.
+ *
+ * The amount is compacted past six digits ("~12m500k") and keeps a fixed
+ * share of the row: shown in full it could not shrink (a Text does not by
+ * default), so a large figure squeezed the label away and ran past the
+ * chevron. Holding the row shows the exact figure over it, the same contract
+ * every other compacted amount has (RevealableAmount).
  */
 export function PendingRow({
   message,
@@ -43,11 +60,21 @@ export function PendingRow({
   onOpen,
   onRequestRemove,
 }: PendingRowProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
+  const amountRef = useRef<View>(null);
   const type = message.action?.payload.type ?? "expense";
   const isIncome = type === "income";
   const isTransfer = type === "transfer";
+  const amountCents = message.action?.payload.amount ?? 0;
+
+  const revealAmount = () =>
+    amountRef.current?.measure((_x, _y, width, height, pageX, pageY) =>
+      useTooltipStore
+        .getState()
+        .show({ x: pageX, y: pageY, width, height }, { kind: "amount", amountCents, currency, label }),
+    );
 
   return (
     <SwipeableRow
@@ -58,14 +85,14 @@ export function PendingRow({
       leftAction={{
         Icon: EditIcon,
         color: colors.green,
-        label: "Sửa",
+        label: t("common.action.edit"),
         testID: "btn-pending-edit",
         onPress: () => onOpen(true),
       }}
       rightAction={{
         Icon: TrashIcon,
         color: colors.peach,
-        label: "Bỏ",
+        label: t("common.action.discard"),
         destructive: true,
         testID: "btn-pending-discard",
         onPress: onRequestRemove,
@@ -74,8 +101,10 @@ export function PendingRow({
       <Pressable
         style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
         onPress={() => onOpen()}
+        onLongPress={revealAmount}
+        delayLongPress={REVEAL_DELAY_MS}
         accessibilityRole="button"
-        accessibilityHint="Vuốt sang phải để sửa, sang trái để bỏ"
+        accessibilityHint={t("chat.pending.row.hint")}
       >
         <View style={styles.icon}>
           <HistoryIcon size={17} color={colors.mustard} />
@@ -86,17 +115,19 @@ export function PendingRow({
               {label}
             </Text>
             <Text style={styles.hint} numberOfLines={1}>
-              Chạm để duyệt mục {isTransfer ? "chuyển khoản" : isIncome ? "thu" : "chi"}
+              {t(REVIEW_KEY[type])}
             </Text>
           </View>
-          <Text
-            testID={`text-pending-amount-${message.id}`}
-            style={[styles.amount, { color: isTransfer ? colors.periwinkle : isIncome ? colors.green : colors.textPrimary }]}
-            numberOfLines={1}
-          >
-            {proposalAmountSign(type)}
-            {formatCurrency(message.action?.payload.amount ?? 0, currency)}
-          </Text>
+          <View ref={amountRef} style={styles.amountBox} collapsable={false}>
+            <Text
+              testID={`text-pending-amount-${message.id}`}
+              style={[styles.amount, { color: isTransfer ? colors.periwinkle : isIncome ? colors.green : colors.textPrimary }]}
+              numberOfLines={1}
+            >
+              {proposalAmountSign(type)}
+              {formatCurrencyCompact(amountCents, currency)}
+            </Text>
+          </View>
           <ChevronRightIcon size={15} color={colors.textMuted} />
         </View>
       </Pressable>
@@ -139,5 +170,8 @@ const useStyles = createStyles((colors) => ({
   textCol: { flex: 1, minWidth: 0, gap: 2 },
   label: { ...typography.body, color: colors.textPrimary },
   hint: { ...typography.caption, color: colors.textSecondary },
+  // Never wider than this share of the row, so the label always keeps room;
+  // a compacted figure fits well inside it.
+  amountBox: { flexShrink: 0, maxWidth: "45%" },
   amount: { ...typography.body, fontWeight: "700" },
 }));

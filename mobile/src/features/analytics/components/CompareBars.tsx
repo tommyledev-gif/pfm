@@ -1,4 +1,6 @@
 import { Animated, Text, View } from "react-native";
+import { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 
 import { AmountText } from "@/components/ui/AmountText";
 import { AnalyticsCompare } from "@/features/analytics/types";
@@ -17,9 +19,12 @@ const PREVIOUS_ALPHA = 0.4;
 
 // "Tăng 12% so với T8/26" — the direction in words. A lone "▲ 12%" left the
 // reader to work out what it was compared with.
-function changeText(pct: number, previousLabel: string): string {
-  if (pct === 0) return `Không đổi so với ${previousLabel}`;
-  return `${pct > 0 ? "Tăng" : "Giảm"} ${Math.abs(pct)}% so với ${previousLabel}`;
+function changeText(t: TFunction, pct: number, previousLabel: string): string {
+  if (pct === 0) return t("analytics.compare.same", { previous: previousLabel });
+  return t(pct > 0 ? "analytics.compare.up" : "analytics.compare.down", {
+    percent: `${Math.abs(pct)}%`,
+    previous: previousLabel,
+  });
 }
 
 // Q4: two periods side by side, in the same row grammar as BarList (label and
@@ -27,6 +32,7 @@ function changeText(pct: number, previousLabel: string): string {
 // the previous period was zero — then no percentage is shown at all
 // (spec.md S-AIQ-08).
 export function CompareBars({ compare, currency }: CompareBarsProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const max = Math.max(compare.current, compare.previous, 1);
@@ -63,7 +69,7 @@ export function CompareBars({ compare, currency }: CompareBarsProps) {
       ))}
       {pct !== null ? (
         <Text style={[styles.change, pct > 0 ? styles.up : pct < 0 ? styles.down : null]}>
-          {changeText(pct, compare.previous_label)}
+          {changeText(t, pct, compare.previous_label)}
         </Text>
       ) : null}
     </View>

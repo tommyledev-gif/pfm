@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 
-import { getErrorCode, getErrorMessage } from "@/lib/axios";
+import { errorText, getErrorCode } from "@/lib/api-envelope";
 import { useRequireOnline } from "@/lib/connectivity";
 import { useLatestCallback } from "@/lib/use-latest-callback";
 import { useDeleteTransactionMutation } from "@/features/transactions/api/use-delete-transaction-mutation";
@@ -74,7 +74,7 @@ export function useTransactionRemoval(): TransactionRemoval {
         }
         // ⚠️ No tombstone here: the transaction still exists, so the card has
         // to stay a live card the user can act on again.
-        useToastStore.getState().show(getErrorMessage(error, "Chưa xóa được giao dịch"), "error");
+        useToastStore.getState().show(errorText(error, "chat.removal.deleteFailed"), "error");
         setTarget(null);
       },
     });

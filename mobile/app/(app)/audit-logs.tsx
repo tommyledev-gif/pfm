@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { ActivityIndicator, SectionList, Text, View } from "react-native";
 
 import { useListEntrance } from "@/components/motion/MotionView";
@@ -7,7 +8,8 @@ import { useFabBottom } from "@/components/ui/Fab";
 import { Screen } from "@/components/shared/Screen";
 import { ScreenLoader } from "@/components/shared/ScreenLoader";
 import { ScreenHeader } from "@/components/shared/ScreenHeader";
-import { dayLabelVi, formatDateViShort } from "@/lib/format-date";
+import { dayLabel, formatDateGroupHeader } from "@/lib/format-date";
+import { categoryLabel } from "@/features/categories/category-label";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { AuditLogRow } from "@/features/audit-logs/components/AuditLogRow";
 import { AuditLogsEmptyState } from "@/features/audit-logs/components/AuditLogsEmptyState";
@@ -30,6 +32,7 @@ interface DaySection {
 // the log is history, not a time machine (that spec's Out of Scope).
 // Each day is one rounded group; its entries are hairline-split rows.
 export default function AuditLogsScreen() {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const auditLogs = useAuditLogsQuery();
@@ -40,9 +43,11 @@ export default function AuditLogsScreen() {
   const categories = useCategoriesQuery();
   const wallets = useWalletsQuery();
 
+  // categoryLabel: a built-in category reads in the app language; t: rebuilt on a switch.
   const categoryNameById = useMemo(
-    () => new Map(categories.data?.map((c) => [c.id, c.name])),
-    [categories.data],
+    () => new Map(categories.data?.map((c) => [c.id, categoryLabel(c)])),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [categories.data, t],
   );
   const walletNameById = useMemo(() => new Map(wallets.data?.map((w) => [w.id, w.name])), [wallets.data]);
   // The log renders category and wallet *names*, so a refresh that only
@@ -66,8 +71,8 @@ export default function AuditLogsScreen() {
       if (!group) {
         group = {
           key: dayKey,
-          dayLabel: dayLabelVi(entry.created_at),
-          dateLabel: formatDateViShort(entry.created_at),
+          dayLabel: dayLabel(entry.created_at),
+          dateLabel: formatDateGroupHeader(entry.created_at),
           data: [],
         };
         groups.push(group);
@@ -75,7 +80,9 @@ export default function AuditLogsScreen() {
       group.data.push(entry);
     }
     return groups;
-  }, [entries]);
+    // t: the day labels are text, rebuilt in the new language on a switch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entries, t]);
 
   // Each day's first entry's position in the whole log, for the stagger.
   const sectionStart = useMemo(() => {
@@ -90,7 +97,7 @@ export default function AuditLogsScreen() {
 
   return (
     <Screen style={styles.screen}>
-      <ScreenHeader title="Nhật ký giao dịch" subtitle="Lịch sử tạo, sửa và xóa giao dịch" />
+      <ScreenHeader title={t("nav.title.auditLogs")} subtitle={t("auditLogs.subtitle")} />
 
       {auditLogs.isLoading ? (
         <ScreenLoader />
@@ -124,8 +131,8 @@ export default function AuditLogsScreen() {
               <AuditLogRow
                 entry={item}
                 currency={currency}
-                resolveCategoryName={(id) => categoryNameById.get(id) ?? "Danh mục"}
-                resolveWalletName={(id) => walletNameById.get(id) ?? "Ví"}
+                resolveCategoryName={(id) => categoryNameById.get(id) ?? t("auditLogs.fallback.category")}
+                resolveWalletName={(id) => walletNameById.get(id) ?? t("common.field.wallet")}
               />
             </GroupedListCell>
           )}

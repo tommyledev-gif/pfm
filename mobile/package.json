@@ -29,9 +29,12 @@
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",
     "expo-updates": "~29.0.20",
+    "i18next": "26.4.5",
+    "intl-pluralrules": "2.0.1",
     "phosphor-react-native": "^3.0.6",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "react-i18next": "17.0.16",
     "react-native": "0.81.5",
     "react-native-calendars": "^1.1314.0",
     "react-native-maps": "1.20.1",
@@ -60,7 +63,8 @@
     "apk": "node scripts/ota/build-apk.mjs",
     "ota:check": "node scripts/ota/check-setup.mjs",
     "ota:publish": "node scripts/ota/publish-update.mjs",
-    "ota:rollback": "node scripts/ota/rollback-update.mjs"
+    "ota:rollback": "node scripts/ota/rollback-update.mjs",
+    "check-i18n": "node scripts/check-i18n.mjs"
   },
   "private": true,
   "reanimated": {

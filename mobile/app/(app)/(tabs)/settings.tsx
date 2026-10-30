@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { ScrollView } from "react-native";
 import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 
 import { MotionView } from "@/components/motion/MotionView";
 import { ListGlyph, ListRow, ListSection } from "@/components/ui/grouped-list";
@@ -18,6 +19,7 @@ import {
 import { BusyOverlay } from "@/components/shared/BusyOverlay";
 import { Screen } from "@/components/shared/Screen";
 import { ScreenHeader } from "@/components/shared/ScreenHeader";
+import { TranslationKey } from "@/lib/i18n";
 import { type Palette, spacing, createStyles, useColors } from "@/lib/theme";
 import { useSessionStore } from "@/stores/session-store";
 import { outboxItemsFor } from "@/stores/outbox-store";
@@ -38,7 +40,7 @@ type SettingsHref =
   | "/edit-profile";
 
 interface SettingsRow {
-  label: string;
+  labelKey: TranslationKey;
   icon: ListGlyph;
   /** The tile's palette token; none = a neutral grey tile. */
   tone?: keyof Palette;
@@ -60,35 +62,37 @@ interface SettingsRow {
 //
 // Grouped the way iOS Settings groups: money first, then the account, then
 // the rest; switching and signing out close the list in a group of their own.
-const SETTINGS_GROUPS: { header: string; rows: SettingsRow[] }[] = [
+//
+// Keys are also the React keys: they stay put when the language changes.
+const SETTINGS_GROUPS: { headerKey: TranslationKey; rows: SettingsRow[] }[] = [
   {
-    header: "Tài chính",
+    headerKey: "settings.group.money",
     rows: [
-      { label: "Ví của bạn", icon: WalletGlyph, tone: "info", href: "/wallets" },
-      { label: "Danh mục", icon: TagGlyph, tone: "mustard", href: "/categories" },
-      { label: "Nhật ký giao dịch", icon: HistoryGlyph, tone: "lavender", href: "/audit-logs" },
+      { labelKey: "common.label.yourWallets", icon: WalletGlyph, tone: "info", href: "/wallets" },
+      { labelKey: "nav.title.categories", icon: TagGlyph, tone: "mustard", href: "/categories" },
+      { labelKey: "nav.title.auditLogs", icon: HistoryGlyph, tone: "lavender", href: "/audit-logs" },
     ],
   },
   {
-    header: "Tài khoản",
+    headerKey: "settings.group.account",
     rows: [
-      { label: "Bảo mật", icon: ShieldGlyph, tone: "mint", href: "/security", testID: "row-settings-security" },
+      { labelKey: "nav.title.security", icon: ShieldGlyph, tone: "mint", href: "/security", testID: "row-settings-security" },
       // How the app looks and behaves for this User; its own screen lists them.
       {
-        label: "Cài đặt người dùng",
+        labelKey: "nav.title.userSettings",
         icon: UserSettingsGlyph,
         tone: "periwinkle",
         href: "/user-settings",
         testID: "row-settings-user",
       },
-      { label: "Thành viên gia đình", icon: MembersGlyph, tone: "green", href: "/users", adminOnly: true },
+      { labelKey: "nav.title.members", icon: MembersGlyph, tone: "green", href: "/users", adminOnly: true },
     ],
   },
   {
-    header: "Khác",
+    headerKey: "settings.group.other",
     rows: [
-      { label: "Trợ giúp & hỗ trợ", icon: HelpGlyph, tone: "info", href: null },
-      { label: "Nhà phát triển", icon: DeveloperGlyph, href: "/developer" },
+      { labelKey: "settings.row.helpSupport", icon: HelpGlyph, tone: "info", href: null },
+      { labelKey: "nav.title.developer", icon: DeveloperGlyph, href: "/developer" },
     ],
   },
 ];
@@ -99,6 +103,7 @@ const ROW_TAP_GUARD_MS = 600;
 const BOTTOM_NAV_CLEARANCE = 140;
 
 export default function SettingsScreen() {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
@@ -133,10 +138,10 @@ export default function SettingsScreen() {
     [role],
   );
 
-  const renderRow = ({ label, icon, tone, href, testID }: SettingsRow) => (
+  const renderRow = ({ labelKey, icon, tone, href, testID }: SettingsRow) => (
     <ListRow
-      key={label}
-      title={label}
+      key={labelKey}
+      title={t(labelKey)}
       icon={icon}
       tone={tone ? colors[tone] : undefined}
       onPress={href ? () => openRow(href) : undefined}
@@ -148,7 +153,7 @@ export default function SettingsScreen() {
   return (
     <Screen>
       <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-        <ScreenHeader title="Cài đặt" onBack={false} style={styles.header} />
+        <ScreenHeader title={t("settings.title")} onBack={false} style={styles.header} />
 
         {/* Groups stagger in top to bottom on the first visit; the tab stays
             mounted afterwards, so coming back does not replay it. */}
@@ -157,8 +162,8 @@ export default function SettingsScreen() {
         </MotionView>
 
         {groups.map((group, index) => (
-          <MotionView key={group.header} index={index + 1}>
-            <ListSection header={group.header}>{group.rows.map(renderRow)}</ListSection>
+          <MotionView key={group.headerKey} index={index + 1}>
+            <ListSection header={t(group.headerKey)}>{group.rows.map(renderRow)}</ListSection>
           </MotionView>
         ))}
 
@@ -167,7 +172,7 @@ export default function SettingsScreen() {
             {/* Directly above "Đăng xuất" (specs/mobile-account-switch AC-05). */}
             <AccountSwitchRow />
             <ListRow
-              title={loggingOut ? "Đang đăng xuất…" : "Đăng xuất"}
+              title={t(loggingOut ? "settings.logout.inProgress" : "common.action.signOut")}
               icon={SignOutGlyph}
               tone={colors.peach}
               variant="destructive"

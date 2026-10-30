@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { DrawerChild } from "@/components/shared/Drawer";
 import { OpenMojiGrid } from "@/components/shared/OpenMojiGrid";
@@ -24,6 +25,7 @@ interface UseIconPickerOptions {
  * Picking closes the panel straight away — a single choice needs no confirm.
  */
 export function useIconPicker({ icon, onPickEmoji, onUpload }: UseIconPickerOptions) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const [visible, setVisible] = useState(false);
@@ -33,7 +35,7 @@ export function useIconPicker({ icon, onPickEmoji, onUpload }: UseIconPickerOpti
   const child: DrawerChild = {
     visible,
     onClose: close,
-    title: "Chọn biểu tượng",
+    title: t("common.field.chooseIcon"),
     children: (
       <View style={styles.body}>
         <Pressable
@@ -47,7 +49,7 @@ export function useIconPicker({ icon, onPickEmoji, onUpload }: UseIconPickerOpti
           testID="btn-icon-picker-upload"
         >
           <UploadIcon size={18} color={colors.green} />
-          <Text style={styles.uploadLabel}>Tải ảnh từ thiết bị</Text>
+          <Text style={styles.uploadLabel}>{t("ui.iconPicker.upload")}</Text>
         </Pressable>
         <OpenMojiGrid
           value={icon}

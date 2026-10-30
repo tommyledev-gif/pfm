@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, Text } from "react-native";
+import { useTranslation } from "react-i18next";
 import { Calendar, CalendarProps } from "react-native-calendars";
 
 import { MonthYearWheelSheet } from "@/components/shared/MonthYearWheelSheet";
@@ -38,6 +39,7 @@ type MonthYearCalendarProps = Omit<CalendarProps, "initialDate" | "renderHeader"
  * window (see that file for why it must not live inside the host sheet).
  */
 export function MonthYearCalendar({ initialDate, ...calendarProps }: MonthYearCalendarProps) {
+  const { t } = useTranslation();
   const calendarTheme = useCalendarTheme();
   const styles = useStyles();
   // Calendar re-reads `initialDate` on every change (unlike `current`), which
@@ -51,6 +53,8 @@ export function MonthYearCalendar({ initialDate, ...calendarProps }: MonthYearCa
   useEffect(() => {
     setJumpDate(initialDate ?? todayDateOnly());
   }, [initialDate]);
+
+  const monthNames = useMemo(() => t("format.calendar.monthNames").split(", "), [t]);
 
   const years = useMemo(() => {
     const oldest = new Date().getFullYear() - YEARS_BACK;
@@ -76,10 +80,10 @@ export function MonthYearCalendar({ initialDate, ...calendarProps }: MonthYearCa
               setWheelOpen(true);
             }}
             hitSlop={8}
-            accessibilityLabel="Chọn tháng và năm"
+            accessibilityLabel={t("ui.calendar.pickMonthYear")}
           >
             <Text style={styles.headerLabel}>
-              Tháng {month.getMonth() + 1}, {month.getFullYear()}
+              {t("ui.calendar.monthYear", { month: monthNames[month.getMonth()], year: month.getFullYear() })}
             </Text>
             <Text style={styles.headerCaret}>▾</Text>
           </Pressable>

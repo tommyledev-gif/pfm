@@ -1,4 +1,5 @@
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { CheckIcon, SparkleIcon } from "@/components/ui/Icon";
 import { withAlpha } from "@/lib/color";
@@ -21,11 +22,12 @@ interface BudgetWizardCardProps {
 export function BudgetWizardCard({ submitted, createdCount, onPress }: BudgetWizardCardProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   if (submitted) {
     return (
       <View style={styles.compactRow}>
         <CheckIcon size={16} color={colors.green} />
-        <Text style={styles.compactLabel}>Đã lập {createdCount ?? 0} ngân sách</Text>
+        <Text style={styles.compactLabel}>{t("chat.budgetCard.done", { count: createdCount ?? 0 })}</Text>
       </View>
     );
   }
@@ -33,7 +35,7 @@ export function BudgetWizardCard({ submitted, createdCount, onPress }: BudgetWiz
   return (
     <Pressable style={styles.card} onPress={onPress} testID="card-budget-wizard">
       <SparkleIcon size={20} />
-      <Text style={styles.label}>Lập ngân sách</Text>
+      <Text style={styles.label}>{t("chat.budgetCard.open")}</Text>
     </Pressable>
   );
 }

@@ -1,4 +1,5 @@
 import { StyleProp, Text, ViewStyle, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { OFFLINE_NO_DATA_MESSAGE } from "@/lib/constants";
 import { spacing, typography, createStyles } from "@/lib/theme";
@@ -11,10 +12,11 @@ interface OfflinePlaceholderProps {
 // place of a skeleton or an empty state when a query has no saved data and
 // is waiting for a connection (see lib/query-status.ts).
 export function OfflinePlaceholder({ style }: OfflinePlaceholderProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   return (
     <View style={[styles.container, style]} testID="empty-offline-no-data">
-      <Text style={styles.text}>{OFFLINE_NO_DATA_MESSAGE}</Text>
+      <Text style={styles.text}>{t(OFFLINE_NO_DATA_MESSAGE)}</Text>
     </View>
   );
 }

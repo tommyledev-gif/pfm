@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { AmountText } from "@/components/ui/AmountText";
 import { Collapsible } from "@/components/ui/Collapsible";
@@ -7,6 +8,7 @@ import { ChevronDownIcon } from "@/components/ui/Icon";
 import { TintedIconTile } from "@/components/ui/TintedIconTile";
 import { AnalyticsTxRow } from "@/features/analytics/types";
 import { useCategoryLookup } from "@/features/categories/api/use-category-lookup";
+import { categoryLabel } from "@/features/categories/category-label";
 import { Category } from "@/features/categories/types";
 import { colorForCategory } from "@/lib/category-color";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
@@ -42,6 +44,7 @@ function shortDate(iso: string): string {
 // same Category has the same colour and icon here as in the Transactions list.
 // No rank number: the order is the ranking, and the column only added noise.
 export function RankedList({ rows, moreRows = [], currency, totalMatched, colorFor }: RankedListProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const categories = useCategoryLookup();
@@ -51,24 +54,29 @@ export function RankedList({ rows, moreRows = [], currency, totalMatched, colorF
   const hidden = totalMatched !== undefined ? Math.max(totalMatched - rows.length, 0) : 0;
   const notShown = expanded ? hidden - moreRows.length : moreRows.length > 0 ? 0 : hidden;
 
-  const renderRow = (row: AnalyticsTxRow, divided: boolean) => (
-    <View key={row.id} style={[styles.row, divided && styles.divider]}>
-      <CategoryTile
-        row={row}
-        category={row.category_id ? categories.get(row.category_id) : undefined}
-        color={row.category_id ? colorFor?.(row.category_id) : undefined}
-      />
-      <View style={styles.middle}>
-        <Text style={styles.title} numberOfLines={1}>
-          {row.category_name}
-        </Text>
-        <Text style={styles.meta} numberOfLines={1}>
-          {shortDate(row.occurred_at)} · {row.wallet_name}
-        </Text>
+  const renderRow = (row: AnalyticsTxRow, divided: boolean) => {
+    const category = row.category_id ? categories.get(row.category_id) : undefined;
+    const name = categoryLabel(category, row.category_name);
+    return (
+      <View key={row.id} style={[styles.row, divided && styles.divider]}>
+        <CategoryTile
+          row={row}
+          name={name}
+          category={category}
+          color={row.category_id ? colorFor?.(row.category_id) : undefined}
+        />
+        <View style={styles.middle}>
+          <Text style={styles.title} numberOfLines={1}>
+            {name}
+          </Text>
+          <Text style={styles.meta} numberOfLines={1}>
+            {shortDate(row.occurred_at)} · {row.wallet_name}
+          </Text>
+        </View>
+        <AmountText amountCents={row.amount} currency={currency} style={styles.amount} />
       </View>
-      <AmountText amountCents={row.amount} currency={currency} style={styles.amount} />
-    </View>
-  );
+    );
+  };
 
   return (
     <View>
@@ -88,7 +96,7 @@ export function RankedList({ rows, moreRows = [], currency, totalMatched, colorF
           hitSlop={spacing.sm}
           style={[styles.toggle, styles.divider]}
         >
-          <Text style={styles.toggleLabel}>{expanded ? "Thu gọn" : `Xem thêm ${moreRows.length} khoản`}</Text>
+          <Text style={styles.toggleLabel}>{expanded ? t("analytics.ranked.collapse") : t("analytics.ranked.showMore", { count: moreRows.length })}</Text>
           <View style={expanded ? styles.chevronUp : null}>
             <ChevronDownIcon size={16} color={colors.textSecondary} />
           </View>
@@ -97,7 +105,9 @@ export function RankedList({ rows, moreRows = [], currency, totalMatched, colorF
 
       {notShown > 0 ? (
         <Text style={styles.more}>
-          {expanded ? `Còn ${notShown} khoản nhỏ hơn — xem đủ ở tab Giao dịch.` : `và ${notShown} khoản khác`}
+          {expanded
+            ? t("analytics.ranked.notShownExpanded", { count: notShown })
+            : t("analytics.ranked.notShownCollapsed", { count: notShown })}
         </Text>
       ) : null}
     </View>
@@ -108,7 +118,7 @@ export function RankedList({ rows, moreRows = [], currency, totalMatched, colorF
 // the tile then falls back to a neutral one, never to a guessed colour.
 // ⚠️ The fallback must be a six-digit hex token: TintedIconTile appends an
 // alpha suffix to it, which turns an rgba() token into an invalid colour.
-function CategoryTile({ row, category, color }: { row: AnalyticsTxRow; category?: Category; color?: string }) {
+function CategoryTile({ row, name, category, color }: { row: AnalyticsTxRow; name: string; category?: Category; color?: string }) {
   const colors = useColors();
   return (
     <TintedIconTile
@@ -116,7 +126,7 @@ function CategoryTile({ row, category, color }: { row: AnalyticsTxRow; category?
       size={TILE_SIZE}
       icon={category?.icon}
       iconUrl={category?.icon_url}
-      label={row.category_name}
+      label={name}
     />
   );
 }

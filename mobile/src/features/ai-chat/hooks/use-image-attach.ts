@@ -4,12 +4,13 @@ import { Keyboard } from "react-native";
 import { PopoverAnchor } from "@/components/shared/ActionPopover";
 import { ImageSource, pickImage } from "@/features/ai-chat/image-capture";
 import { hasSeenImagePrivacyNotice, markImagePrivacyNoticeSeen } from "@/features/ai-chat/image-privacy-notice";
+import { i18n } from "@/lib/i18n";
 import { useCurrentUserId } from "@/stores/use-current-user-id";
 import { useToastStore } from "@/stores/toast-store";
 
 // Toasts: short phrases, no final period (pfm-ux-copy patterns §1).
-const IMAGE_TOO_LARGE = "Ảnh quá lớn, chọn ảnh khác";
-const IMAGE_UNREADABLE = "Không mở được ảnh này";
+const IMAGE_TOO_LARGE = "chat.image.tooLarge.toast";
+const IMAGE_UNREADABLE = "chat.image.unreadable.toast";
 
 /**
  * The steps between tapping attach and the preview (specs/ai-chat-image-
@@ -52,10 +53,10 @@ export function useImageAttach() {
         setDeniedSource(result.source);
         return;
       case "too_large":
-        useToastStore.getState().show(IMAGE_TOO_LARGE, "error");
+        useToastStore.getState().show(i18n.t(IMAGE_TOO_LARGE), "error");
         return;
       case "failed":
-        useToastStore.getState().show(IMAGE_UNREADABLE, "error");
+        useToastStore.getState().show(i18n.t(IMAGE_UNREADABLE), "error");
         return;
       case "cancelled":
         return;

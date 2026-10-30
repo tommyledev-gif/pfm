@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 
 import { Screen } from "@/components/shared/Screen";
 import { ChevronLeftIcon } from "@/components/ui/Icon";
@@ -18,6 +19,7 @@ import { useToastStore } from "@/stores/toast-store";
 // password. Back from the second step returns to the first, to fix a typo in
 // the email; from the first it leaves.
 export default function ResetPasswordScreen() {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
@@ -38,7 +40,7 @@ export default function ResetPasswordScreen() {
   };
 
   const onDone = () => {
-    useToastStore.getState().show(RESET_COPY.done, "success");
+    useToastStore.getState().show(t(RESET_COPY.done), "success");
     router.replace("/(app)/(tabs)");
   };
 
@@ -54,15 +56,15 @@ export default function ResetPasswordScreen() {
             onPress={back}
             style={styles.back}
             accessibilityRole="button"
-            accessibilityLabel={RESET_COPY.back}
+            accessibilityLabel={t(RESET_COPY.back)}
             testID="btn-reset-back"
           >
             <ChevronLeftIcon size={24} color={colors.textPrimary} />
           </Pressable>
         </View>
 
-        <Text style={styles.title} accessibilityRole="header">{RESET_COPY.title}</Text>
-        <Text style={styles.sub}>{step === "request" ? RESET_COPY.requestSub : confirmSub(identifier)}</Text>
+        <Text style={styles.title} accessibilityRole="header">{t(RESET_COPY.title)}</Text>
+        <Text style={styles.sub}>{step === "request" ? t(RESET_COPY.requestSub) : confirmSub(identifier)}</Text>
         <View style={styles.form}>
           {step === "request" ? (
             <ResetRequestForm initialIdentifier={identifier} onSent={onSent} />

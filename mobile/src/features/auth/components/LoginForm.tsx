@@ -1,10 +1,12 @@
 import { useRef, useState } from "react";
 import { Keyboard, LayoutAnimation, Pressable, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 
 import { PillButton } from "@/components/ui/PillButton";
 import { ArrowRightIcon, EyeIcon, EyeOffIcon, UserIcon } from "@/components/ui/Icon";
 import { DEV_LOGIN } from "@/lib/dev-login";
+import { TranslationKey } from "@/lib/i18n";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useReduceMotion } from "@/lib/use-reduce-motion";
 import { useLoginMutation } from "@/features/auth/api/use-login-mutation";
@@ -34,26 +36,26 @@ interface LoginFormProps {
 
 // Who first, then the password: one field and one green button at a time.
 type Step = "identifier" | "password";
-type FieldErrors = Partial<Record<"email" | "password", string>>;
+type FieldErrors = Partial<Record<"email" | "password", TranslationKey>>;
 
-const SUBMIT_LABEL: Record<LoginFormMode, string> = {
-  login: "Đăng nhập",
-  "add-account": "Thêm tài khoản",
+const SUBMIT_LABEL: Record<LoginFormMode, TranslationKey> = {
+  login: "common.action.signIn",
+  "add-account": "nav.title.addAccount",
 };
 
 const COPY = {
   // Either one signs in (backend AuthService.Login).
-  emailLabel: "Email hoặc tên đăng nhập",
-  emailPlaceholder: "ten@email.com",
-  passwordLabel: "Mật khẩu",
-  passwordPlaceholder: "Nhập mật khẩu",
-  showPassword: "Hiện mật khẩu",
-  hidePassword: "Ẩn mật khẩu",
-  next: "Tiếp tục",
-  forgotPassword: "Quên mật khẩu?",
-  emailMissing: "Nhập email hoặc tên đăng nhập.",
-  passwordMissing: "Nhập mật khẩu.",
-} as const;
+  emailLabel: "common.field.identifier",
+  emailPlaceholder: "auth.emailPlaceholder",
+  passwordLabel: "auth.loginForm.passwordLabel",
+  passwordPlaceholder: "auth.loginForm.passwordPlaceholder",
+  showPassword: "common.action.showPassword",
+  hidePassword: "common.action.hidePassword",
+  next: "common.action.continue",
+  forgotPassword: "auth.loginForm.forgotPassword",
+  emailMissing: "common.validation.enterIdentifier",
+  passwordMissing: "auth.loginForm.passwordMissing",
+} as const satisfies Record<string, TranslationKey>;
 
 const FIELD_HEIGHT = 56;
 const FIELD_RADIUS = 16;
@@ -84,6 +86,7 @@ export function LoginForm({
   hideEmail = false,
   onDone,
 }: LoginFormProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
@@ -152,11 +155,11 @@ export function LoginForm({
       <View style={styles.fields}>
         {hideEmail ? null : (
           <AuthField
-            label={COPY.emailLabel}
+            label={t(COPY.emailLabel)}
             value={email}
             onChangeText={changeEmail}
-            error={errors.email}
-            placeholder={COPY.emailPlaceholder}
+            error={errors.email && t(errors.email)}
+            placeholder={t(COPY.emailPlaceholder)}
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="email-address"
@@ -177,11 +180,11 @@ export function LoginForm({
         {atIdentifier ? null : (
           <AuthField
             ref={passwordRef}
-            label={COPY.passwordLabel}
+            label={t(COPY.passwordLabel)}
             value={password}
             onChangeText={changePassword}
-            error={errors.password}
-            placeholder={COPY.passwordPlaceholder}
+            error={errors.password && t(errors.password)}
+            placeholder={t(COPY.passwordPlaceholder)}
             secureTextEntry={!showPassword}
             autoComplete="current-password"
             textContentType="password"
@@ -199,7 +202,7 @@ export function LoginForm({
                 hitSlop={4}
                 style={styles.trailing}
                 accessibilityRole="button"
-                accessibilityLabel={showPassword ? COPY.hidePassword : COPY.showPassword}
+                accessibilityLabel={t(showPassword ? COPY.hidePassword : COPY.showPassword)}
               >
                 {showPassword ? (
                   <EyeOffIcon size={22} color={colors.textSecondary} />
@@ -219,13 +222,13 @@ export function LoginForm({
             accessibilityRole="button"
             testID="btn-login-forgot-password"
           >
-            <Text style={styles.forgotLabel}>{COPY.forgotPassword}</Text>
+            <Text style={styles.forgotLabel}>{t(COPY.forgotPassword)}</Text>
           </Pressable>
         ) : null}
       </View>
       <AuthFormError message={login.isError ? loginErrorMessage(login.error) : null} />
       <PillButton
-        label={atIdentifier ? COPY.next : SUBMIT_LABEL[mode]}
+        label={t(atIdentifier ? COPY.next : SUBMIT_LABEL[mode])}
         icon={atIdentifier ? <ArrowRightIcon size={20} color={colors.onGreen} /> : undefined}
         iconPosition="end"
         loading={login.isPending}

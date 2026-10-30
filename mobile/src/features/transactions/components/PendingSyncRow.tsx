@@ -1,10 +1,13 @@
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { formatCurrency } from "@/lib/currency";
-import { formatDateViShort } from "@/lib/format-date";
+import { formatDateGroupHeader } from "@/lib/format-date";
+import { i18n, TranslationKey } from "@/lib/i18n";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
-import { TRANSACTION_KIND_LABELS } from "@/lib/constants";
+import { TransactionKind } from "@/lib/constants";
 import { OutboxItem, OutboxStatus } from "@/features/transactions/outbox/outbox-types";
+import { saveErrorKey } from "@/features/transactions/items/save-error-message";
 
 interface PendingSyncRowProps {
   item: OutboxItem;
@@ -12,31 +15,51 @@ interface PendingSyncRowProps {
   isLast: boolean;
 }
 
-export const PENDING_STATUS_LABELS: Record<Exclude<OutboxStatus, "failed">, string> = {
-  waiting: "Đang chờ",
-  sending: "Đang gửi",
+export const PENDING_STATUS_KEYS: Record<Exclude<OutboxStatus, "failed">, TranslationKey> = {
+  waiting: "transactions.sync.status.waiting",
+  sending: "transactions.sync.status.sending",
 };
 
+const KIND_KEYS: Record<TransactionKind, TranslationKey> = {
+  expense: "common.txType.expenseShort",
+  income: "common.txType.incomeShort",
+  transfer: "common.txType.transfer",
+};
+
+// A failure is put into words from its error_code when shown, so it follows
+// the language (spec BR-10). Items stored without a code (or one with no
+// sentence) keep the text they were stored with.
+function failureText(item: OutboxItem): string {
+  const key = item.error_code ? saveErrorKey(item.error_code) : undefined;
+  return key ? i18n.t(key) : (item.error_message ?? "");
+}
+
+// The helpers below translate when called: a component showing them calls
+// useTranslation() itself, so it re-renders on a switch.
 export function pendingStatusText(item: OutboxItem): string {
-  return item.status === "failed" ? `Lỗi: ${item.error_message ?? ""}` : PENDING_STATUS_LABELS[item.status];
+  return item.status === "failed"
+    ? i18n.t("transactions.sync.status.failed", { message: failureText(item) })
+    : i18n.t(PENDING_STATUS_KEYS[item.status]);
 }
 
 export function pendingItemTitle(item: OutboxItem): string {
   const { payload, display } = item;
   if (payload.note?.trim()) return payload.note.trim();
-  return display.category_name ?? TRANSACTION_KIND_LABELS[payload.type];
+  return display.category_name ?? i18n.t(KIND_KEYS[payload.type]);
 }
 
 // A queued Transaction — shown apart from the server list, with its state in
 // words, so it never reads as money that has already moved (EC-OFF-21).
 export function PendingSyncRow({ item, onPress, isLast }: PendingSyncRowProps) {
+  // Re-renders on a switch: the title and status come from the helpers above.
+  useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const { payload, display } = item;
   const isTransfer = payload.type === "transfer";
   const sign = isTransfer ? "" : payload.type === "income" ? "+" : "-";
   const walletText = isTransfer ? `${display.wallet_name} → ${display.to_wallet_name ?? "?"}` : display.wallet_name;
-  const dateText = payload.occurred_at ? formatDateViShort(payload.occurred_at) : "";
+  const dateText = payload.occurred_at ? formatDateGroupHeader(payload.occurred_at) : "";
 
   return (
     <Pressable

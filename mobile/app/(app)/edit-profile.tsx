@@ -1,5 +1,6 @@
 import { useRouter } from "expo-router";
 import { ScrollView } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { MotionView } from "@/components/motion/MotionView";
 import { Screen } from "@/components/shared/Screen";
@@ -10,6 +11,7 @@ import { spacing, createStyles } from "@/lib/theme";
 
 // Entry points: Settings' profile card and the avatar on it.
 export default function EditProfileScreen() {
+  const { t } = useTranslation();
   const styles = useStyles();
   const router = useRouter();
   // Clear of the floating BottomNav (it hides only while the keyboard is up).
@@ -17,7 +19,7 @@ export default function EditProfileScreen() {
 
   return (
     <Screen style={styles.screen}>
-      <ScreenHeader title="Hồ sơ" backTestID="btn-edit-profile-back" />
+      <ScreenHeader title={t("profile.title")} backTestID="btn-edit-profile-back" />
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: navClearance }]}
         keyboardShouldPersistTaps="handled"

@@ -1,12 +1,14 @@
 import { useState } from "react";
 
 import { getErrorCode } from "@/lib/axios";
+import { i18n } from "@/lib/i18n";
 import { useSendChatMessageMutation } from "@/features/ai-chat/api/use-send-chat-message-mutation";
 import { useUpdateTransactionMutation } from "@/features/transactions/api/use-update-transaction-mutation";
 import { transactionSaveErrorMessage } from "@/features/transactions/items/save-error-message";
 import { ChatMessage, EditHistoryEntry, SavedProposalPatch, TransactionActionPayload } from "@/features/ai-chat/types";
 import { nextMessageId, newIdempotencyKey } from "@/features/ai-chat/message-id";
 import { toReplyMessages } from "@/features/ai-chat/reply-fanout";
+import { appReply } from "@/features/ai-chat/message-text";
 import { proposalLinesChanged } from "@/features/ai-chat/proposal-lines";
 import { useConfirmProposal } from "@/features/ai-chat/hooks/use-confirm-proposal";
 import { useImageCaptureActions } from "@/features/ai-chat/hooks/use-image-capture-actions";
@@ -16,11 +18,11 @@ import { captureChatEpoch, useChatStore } from "@/stores/chat-store";
 import { useToastStore } from "@/stores/toast-store";
 
 // A saved proposal's PATCH failed for a reason without its own copy.
-const SAVE_EDIT_FAILED = "Chưa lưu được thay đổi. Số dư chưa thay đổi.";
+const SAVE_EDIT_FAILED = "chat.proposal.saveEditFailed";
 // A text reply that failed. The bubble carries a Thử lại button (retryText),
-// so the copy names the failure only.
-const REPLY_FAILED = "Chưa xử lý được tin nhắn này.";
-const REPLY_BUSY = "Hệ thống đang bận. Thử lại sau ít phút.";
+// so the copy names the failure only. Stored as keys (message-text.ts).
+const REPLY_FAILED = "chat.reply.failed";
+const REPLY_BUSY = "chat.reply.busy";
 
 // The typing indicator is meant to be felt, not just technically present —
 // even a fast reply holds the dots for a beat before the answer appears.
@@ -74,7 +76,7 @@ export function useChatActions({ onSent }: UseChatActionsOptions) {
         {
           id: nextMessageId(),
           role: "assistant",
-          text: isBusy ? REPLY_BUSY : REPLY_FAILED,
+          ...appReply(isBusy ? REPLY_BUSY : REPLY_FAILED),
           offerManualEntry: isBusy,
           retryText: message,
           edited,
@@ -176,7 +178,7 @@ export function useChatActions({ onSent }: UseChatActionsOptions) {
           // The sheet is already closed, so the refusal (a wallet in another
           // currency, a stale pin…) is said here; the card keeps its old values.
           onError: (error) =>
-            useToastStore.getState().show(transactionSaveErrorMessage(error) ?? SAVE_EDIT_FAILED, "error"),
+            useToastStore.getState().show(transactionSaveErrorMessage(error) ?? i18n.t(SAVE_EDIT_FAILED), "error"),
         },
       );
       return;

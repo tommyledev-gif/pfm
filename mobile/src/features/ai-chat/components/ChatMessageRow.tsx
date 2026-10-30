@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { useTranslation } from "react-i18next";
 import Animated from "react-native-reanimated";
 
 import { useFreshEntrance } from "@/components/motion/use-fresh-entrance";
@@ -13,10 +14,12 @@ import { useHoldMenu } from "@/features/ai-chat/hooks/use-hold-menu";
 import { useMessageActions } from "@/features/ai-chat/hooks/use-message-actions";
 import { isEditLocked } from "@/features/ai-chat/edit-lock";
 import { useAutoPinLabel } from "@/features/ai-chat/proposal-auto-pin";
+import { messageText } from "@/features/ai-chat/message-text";
 import { proposalCategoryName } from "@/features/ai-chat/proposal-kind";
 import { isSavableProposal, proposalLinesGap, proposalWalletName } from "@/features/ai-chat/proposal-wallet";
 import { isRemovable, tombstoneKind } from "@/features/ai-chat/tombstone";
 import { ChatMessage } from "@/features/ai-chat/types";
+import { categoryLabel } from "@/features/categories/category-label";
 import { Category } from "@/features/categories/types";
 import { Wallet } from "@/features/wallets/types";
 import { ManualEntryButton } from "@/features/ai-chat/components/ManualEntryButton";
@@ -87,6 +90,7 @@ function ChatMessageRowView({
   onCreateWallet,
   onOpenWalletCreator,
 }: ChatMessageRowProps) {
+  const { t } = useTranslation();
   const wallet = message.action ? walletById.get(message.action.payload.wallet_id ?? "") : undefined;
   const currency = wallet?.currency ?? FALLBACK_CURRENCY;
   // Only an expense spends a budget.
@@ -99,7 +103,7 @@ function ChatMessageRowView({
   // carried before it became one.
   const category = message.action && !isTransfer ? categoryById.get(message.action.payload.category_id) : undefined;
   const kind = tombstoneKind(message);
-  const walletName = message.action ? proposalWalletName(message.action.payload, walletById) : "Ví";
+  const walletName = message.action ? proposalWalletName(message.action.payload, walletById) : t("common.field.wallet");
   // A proposal without a VND Wallet opens the edit form instead of saving
   // (spec AC-31, AC-32).
   const walletRequired = message.action ? !isSavableProposal(message.action.payload, walletById) : false;
@@ -110,7 +114,8 @@ function ChatMessageRowView({
     Boolean(message.imageOrigin && message.action && !message.edited) &&
     (message.action?.confidence ?? 1) < AI_CONFIDENCE_THRESHOLD;
   const categoryName =
-    (message.action && proposalCategoryName(message.action.payload, (id) => categoryById.get(id)?.name)) || "Danh mục";
+    (message.action && proposalCategoryName(message.action.payload, (id) => categoryLabel(categoryById.get(id)))) ||
+    t("common.field.category");
   const onEdit = isEditLocked(message) ? undefined : () => onTriggerEdit(message);
   const onDelete = isRemovable(message) ? () => onTriggerDelete(message) : undefined;
   const locationLabel = useAutoPinLabel(message);
@@ -141,7 +146,7 @@ function ChatMessageRowView({
           true once it is saved, and the card already names it and its amount. */}
       <ChatBubble
         role={message.role}
-        text={kind || (message.confirmed && message.action) ? "" : message.text}
+        text={kind || (message.confirmed && message.action) ? "" : messageText(message)}
         testID={`msg-chat-${message.id}`}
         onLongPress={menuActions.length > 0 ? menu.open : undefined}
         // Only while a card is actually drawn under the text.

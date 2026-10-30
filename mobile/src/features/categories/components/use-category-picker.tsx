@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { DrawerChild } from "@/components/shared/Drawer";
 import { PillButton } from "@/components/ui/PillButton";
@@ -30,8 +31,9 @@ export function useCategoryPicker({
   selectedIds,
   onApply,
   multiple = false,
-  title = "Chọn danh mục",
+  title,
 }: UseCategoryPickerOptions) {
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
   const [draft, setDraft] = useState<string[]>(selectedIds);
   // Creating a category takes the whole panel: the list, its search and the
@@ -77,7 +79,7 @@ export function useCategoryPicker({
   const child: DrawerChild = {
     visible,
     onClose: creating ? () => setCreating(false) : close,
-    title: creating ? "Danh mục mới" : title,
+    title: creating ? t("categories.form.titleNew") : (title ?? t("common.action.chooseCategory")),
     children: (
       <CategoryPickerList
         categories={categories}
@@ -92,9 +94,18 @@ export function useCategoryPicker({
     // is one the keyboard does not have to take from the form.
     footer: creating ? undefined : (
       <>
-        <PillButton label="Bỏ chọn" variant="outline" onPress={() => setDraft([])} style={{ flex: 1 }} />
         <PillButton
-          label={multiple && draft.length > 0 ? `Chọn (${draft.length})` : "Chọn"}
+          label={t("categories.picker.clearSelection")}
+          variant="outline"
+          onPress={() => setDraft([])}
+          style={{ flex: 1 }}
+        />
+        <PillButton
+          label={
+            multiple && draft.length > 0
+              ? t("categories.picker.confirmCount", { count: draft.length })
+              : t("categories.picker.confirm")
+          }
           onPress={confirm}
           disabled={draft.length === 0}
           style={{ flex: 1 }}

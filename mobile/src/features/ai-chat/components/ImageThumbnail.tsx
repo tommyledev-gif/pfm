@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import { Image } from "expo-image";
 
 import { ImageIcon } from "@/components/ui/Icon";
@@ -24,6 +25,7 @@ interface ImageThumbnailProps {
 export function ImageThumbnail({ capture, messageId }: ImageThumbnailProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const [viewerOpen, setViewerOpen] = useState(false);
   const uri = capture.localUri;
 
@@ -31,14 +33,14 @@ export function ImageThumbnail({ capture, messageId }: ImageThumbnailProps) {
     return (
       <View style={styles.placeholder} testID={`img-chat-thumbnail-placeholder-${messageId}`}>
         <ImageIcon size={PLACEHOLDER_ICON_SIZE} color={colors.onGreen} />
-        <Text style={styles.placeholderLabel}>Ảnh</Text>
+        <Text style={styles.placeholderLabel}>{t("chat.image.placeholder")}</Text>
       </View>
     );
   }
 
   return (
     <>
-      <Pressable accessibilityRole="imagebutton" accessibilityLabel="Xem ảnh" onPress={() => setViewerOpen(true)}>
+      <Pressable accessibilityRole="imagebutton" accessibilityLabel={t("chat.image.view.a11y")} onPress={() => setViewerOpen(true)}>
         <Image testID={`img-chat-thumbnail-${messageId}`} source={{ uri }} style={styles.thumbnail} contentFit="cover" />
       </Pressable>
       <ImageViewerModal uri={viewerOpen ? uri : null} onClose={() => setViewerOpen(false)} />

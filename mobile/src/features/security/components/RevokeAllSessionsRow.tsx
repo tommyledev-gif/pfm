@@ -1,25 +1,22 @@
 import { useState } from "react";
 import { onlineManager } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { ListRow } from "@/components/ui/grouped-list";
 import { SignOutGlyph } from "@/components/ui/grouped-list/list-icons";
+import { i18n, TranslationKey } from "@/lib/i18n";
 import { useColors } from "@/lib/theme";
 import { useSessionStore } from "@/stores/session-store";
 import { useToastStore } from "@/stores/toast-store";
 import { REVOKE_ALL_COPY, useRevokeAllSessionsMutation } from "@/features/security/api/use-revoke-all-sessions-mutation";
 
-const LABEL = "Đăng xuất mọi thiết bị";
 /** The group footer under this row on the Security screen. */
-export const REVOKE_ALL_FOOTER = "Mọi thiết bị khác phải đăng nhập lại bằng mật khẩu. Thiết bị này vẫn giữ đăng nhập.";
-const CONFIRM_TITLE = "Đăng xuất mọi thiết bị?";
-const CONFIRM_LABEL = "Đăng xuất";
-
-const confirmMessage = (email: string) =>
-  `Tài khoản ${email} sẽ bị đăng xuất khỏi mọi thiết bị khác, kể cả các máy đã lưu tài khoản để chuyển nhanh.`;
+export const REVOKE_ALL_FOOTER = "security.revokeAll.footer" satisfies TranslationKey;
 
 /** "Đăng xuất mọi thiết bị" on the Security screen (spec US-08). */
 export function RevokeAllSessionsRow() {
+  const { t } = useTranslation();
   const colors = useColors();
   const email = useSessionStore((s) => s.email);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -30,7 +27,7 @@ export function RevokeAllSessionsRow() {
     if (revokeAll.isPending) return;
     setConfirmOpen(false);
     if (!onlineManager.isOnline()) {
-      useToastStore.getState().show(REVOKE_ALL_COPY.offline, "warning");
+      useToastStore.getState().show(i18n.t(REVOKE_ALL_COPY.offline), "warning");
       return;
     }
     revokeAll.mutate();
@@ -39,7 +36,7 @@ export function RevokeAllSessionsRow() {
   return (
     <>
       <ListRow
-        title={LABEL}
+        title={t("security.revokeAll.label")}
         icon={SignOutGlyph}
         tone={colors.peach}
         variant="destructive"
@@ -49,9 +46,9 @@ export function RevokeAllSessionsRow() {
       />
       <ConfirmDialog
         visible={confirmOpen}
-        title={CONFIRM_TITLE}
-        message={confirmMessage(email ?? "")}
-        confirmLabel={CONFIRM_LABEL}
+        title={t("security.revokeAll.confirmTitle")}
+        message={t("security.revokeAll.confirmMessage", { email: email ?? "" })}
+        confirmLabel={t("common.action.signOut")}
         onConfirm={confirm}
         onCancel={() => setConfirmOpen(false)}
         loading={revokeAll.isPending}

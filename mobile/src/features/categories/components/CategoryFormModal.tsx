@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import { useTranslation } from "react-i18next";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Drawer } from "@/components/shared/Drawer";
@@ -9,7 +10,7 @@ import { useIconPicker } from "@/components/shared/use-icon-picker";
 import { FieldError } from "@/components/ui/FieldError";
 import { PillButton } from "@/components/ui/PillButton";
 import { TrashIcon } from "@/components/ui/Icon";
-import { getErrorMessage } from "@/lib/axios";
+import { errorText } from "@/lib/api-envelope";
 import { colorForCategory } from "@/lib/category-color";
 import { withAlpha } from "@/lib/color";
 import { useRequireOnline } from "@/lib/connectivity";
@@ -35,6 +36,7 @@ interface CategoryFormModalProps {
 export function CategoryFormModal({ visible, onClose, editingCategory }: CategoryFormModalProps) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   const requireOnline = useRequireOnline();
   const isEditing = Boolean(editingCategory);
   const createCategory = useCreateCategoryMutation();
@@ -108,7 +110,7 @@ export function CategoryFormModal({ visible, onClose, editingCategory }: Categor
   const iconUrlBody = iconUrl === null ? "" : iconUrl;
 
   const errors = {
-    name: !name.trim() ? "Vui lòng nhập tên danh mục" : undefined,
+    name: !name.trim() ? t("categories.form.nameRequired") : undefined,
   };
 
   const submit = () => {
@@ -138,9 +140,9 @@ export function CategoryFormModal({ visible, onClose, editingCategory }: Categor
   return (
     <>
       <Drawer visible={visible} onClose={onClose} child={iconPicker.child}>
-        <Text style={styles.title}>{isEditing ? "Sửa danh mục" : "Danh mục mới"}</Text>
+        <Text style={styles.title}>{isEditing ? t("categories.form.titleEdit") : t("categories.form.titleNew")}</Text>
 
-        <Text style={styles.label}>Biểu tượng</Text>
+        <Text style={styles.label}>{t("common.field.icon")}</Text>
         <IconSelectField
           name={name}
           color={editingCategory ? colorForCategory(editingCategory.id) : colors.lavender}
@@ -150,11 +152,11 @@ export function CategoryFormModal({ visible, onClose, editingCategory }: Categor
           onPress={iconPicker.open}
         />
 
-        <Text style={styles.label}>Tên</Text>
+        <Text style={styles.label}>{t("common.field.name")}</Text>
         <TextInput
           value={name}
           onChangeText={setName}
-          placeholder="vd: Đi chợ"
+          placeholder={t("categories.form.namePlaceholder")}
           placeholderTextColor={colors.textMuted}
           style={styles.input}
           maxLength={CATEGORY_NAME_MAX_LENGTH}
@@ -162,29 +164,29 @@ export function CategoryFormModal({ visible, onClose, editingCategory }: Categor
         {submitAttempted ? <FieldError message={errors.name} /> : null}
 
 
-        <Text style={styles.label}>Loại{isEditing ? " (khóa sau khi tạo)" : ""}</Text>
+        <Text style={styles.label}>{isEditing ? t("categories.form.typeLocked") : t("common.field.type")}</Text>
         <View style={styles.chipRow}>
-          {CATEGORY_TYPES.map((t) => (
+          {CATEGORY_TYPES.map((option) => (
             <Pressable
-              key={t}
-              onPress={() => !isEditing && setType(t)}
-              style={[styles.chip, type === t && styles.chipActive, isEditing && styles.chipDisabled]}
+              key={option}
+              onPress={() => !isEditing && setType(option)}
+              style={[styles.chip, type === option && styles.chipActive, isEditing && styles.chipDisabled]}
             >
-              <Text style={[styles.chipLabel, type === t && styles.chipLabelActive]}>
-                {t === "expense" ? "Chi" : "Thu"}
+              <Text style={[styles.chipLabel, type === option && styles.chipLabelActive]}>
+                {option === "expense" ? t("common.txType.expenseShort") : t("common.txType.incomeShort")}
               </Text>
             </Pressable>
           ))}
         </View>
 
         {activeError ? (
-          <Text style={styles.error}>{getErrorMessage(activeError, "Không thể lưu danh mục")}</Text>
+          <Text style={styles.error}>{errorText(activeError, "categories.form.saveFailed")}</Text>
         ) : null}
 
         <View style={styles.actions}>
-          <PillButton label="Hủy" variant="outline" onPress={onClose} style={styles.flexButton} />
+          <PillButton label={t("common.action.cancel")} variant="outline" onPress={onClose} style={styles.flexButton} />
           <PillButton
-            label={isEditing ? "Lưu" : "Tạo"}
+            label={isEditing ? t("common.action.save") : t("common.action.create")}
             onPress={() => requireOnline(submit)}
             loading={mutation.isPending}
             disabled={submitAttempted && Boolean(errors.name)}
@@ -195,15 +197,15 @@ export function CategoryFormModal({ visible, onClose, editingCategory }: Categor
         {isEditing ? (
           <Pressable style={styles.deleteRow} onPress={() => requireOnline(() => setConfirmDeleteOpen(true))} disabled={deleteCategory.isPending}>
             <TrashIcon size={18} />
-            <Text style={styles.deleteLabel}>Xóa danh mục</Text>
+            <Text style={styles.deleteLabel}>{t("categories.form.delete")}</Text>
           </Pressable>
         ) : null}
       </Drawer>
 
       <ConfirmDialog
         visible={confirmDeleteOpen}
-        title="Xóa danh mục?"
-        message="Hành động này không thể hoàn tác."
+        title={t("categories.delete.title")}
+        message={t("common.confirm.cannotUndo")}
         onCancel={() => setConfirmDeleteOpen(false)}
         onConfirm={() => {
           setConfirmDeleteOpen(false);

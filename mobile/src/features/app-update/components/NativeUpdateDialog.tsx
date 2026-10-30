@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Linking, Modal, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { DownloadIcon } from "@/components/ui/Icon";
 import { PillButton } from "@/components/ui/PillButton";
@@ -13,20 +14,20 @@ import { UpdateProgress } from "@/features/app-update/components/UpdateProgress"
 import { ApkUpdateState, useApkUpdate } from "@/features/app-update/hooks/use-apk-update";
 
 const COPY = {
-  title: "Cần cài bản Budgest mới",
-  message: "Bản đang dùng đã cũ nên không nhận thêm cập nhật. Cài bản mới đè lên, dữ liệu và đăng nhập vẫn giữ nguyên.",
-  version: (name: string) => `Bản ${name}`,
-  hint: "Tải xong, chọn Cài đặt khi máy hỏi.",
+  title: "appUpdate.title",
+  message: "appUpdate.message",
+  version: "appUpdate.version",
+  hint: "appUpdate.hint",
   // The installer sheet was closed: most often Android first asking to
   // allow installs from Budgest.
-  readyHint: "Máy hỏi quyền cài ứng dụng thì bật cho Budgest.",
-  browserHint: "Tải xong, mở file vừa tải và chọn Cài đặt.",
-  download: "Tải bản mới",
-  install: "Cài bản mới",
-  retry: "Tải lại",
-  browser: "Tải bằng trình duyệt",
-  downloadFailed: "Chưa tải được bản mới. Kiểm tra mạng rồi thử lại.",
-  installFailed: "Chưa mở được trình cài đặt.",
+  readyHint: "appUpdate.readyHint",
+  browserHint: "appUpdate.browserHint",
+  download: "appUpdate.download",
+  install: "appUpdate.install",
+  retry: "appUpdate.retry",
+  browser: "appUpdate.browser",
+  downloadFailed: "appUpdate.downloadFailed",
+  installFailed: "appUpdate.installFailed",
 } as const;
 
 const ACTION_HEIGHT = 52;
@@ -69,6 +70,7 @@ export function NativeUpdateDialog() {
 }
 
 function NativeUpdateCard({ versionName, browserUrl }: { versionName: string; browserUrl: string }) {
+  const { t } = useTranslation();
   const openInBrowser = () => void Linking.openURL(browserUrl);
   const colors = useColors();
   const styles = useStyles();
@@ -89,30 +91,30 @@ function NativeUpdateCard({ versionName, browserUrl }: { versionName: string; br
         return (
           <>
             <UpdateProgress progress={state.phase === "downloading" ? state.progress : null} />
-            <Text style={styles.hint}>{COPY.hint}</Text>
+            <Text style={styles.hint}>{t(COPY.hint)}</Text>
           </>
         );
       case "install":
         return (
           <>
             <PillButton
-              label={COPY.install}
+              label={t(COPY.install)}
               onPress={() => {
                 if (state.phase === "ready") void install(state.fileUri);
               }}
               style={styles.action}
               testID="btn-native-update-install"
             />
-            <Text style={styles.hint}>{COPY.readyHint}</Text>
+            <Text style={styles.hint}>{t(COPY.readyHint)}</Text>
           </>
         );
       case "failed":
         return (
           <>
-            <ErrorNote message={COPY.downloadFailed} />
-            <PillButton label={COPY.retry} onPress={() => void download()} style={styles.action} testID="btn-native-update-retry" />
+            <ErrorNote message={t(COPY.downloadFailed)} />
+            <PillButton label={t(COPY.retry)} onPress={() => void download()} style={styles.action} testID="btn-native-update-retry" />
             <PillButton
-              label={COPY.browser}
+              label={t(COPY.browser)}
               variant="outline"
               onPress={openInBrowser}
               style={styles.action}
@@ -123,15 +125,15 @@ function NativeUpdateCard({ versionName, browserUrl }: { versionName: string; br
       case "browser":
         return (
           <>
-            {state.phase === "failed" ? <ErrorNote message={COPY.installFailed} /> : null}
+            {state.phase === "failed" ? <ErrorNote message={t(COPY.installFailed)} /> : null}
             <PillButton
-              label={COPY.download}
+              label={t(COPY.download)}
               icon={<DownloadIcon size={18} color={colors.onGreen} />}
               onPress={openInBrowser}
               style={styles.action}
               testID="btn-native-update-download"
             />
-            <Text style={styles.hint}>{COPY.browserHint}</Text>
+            <Text style={styles.hint}>{t(COPY.browserHint)}</Text>
           </>
         );
     }
@@ -148,12 +150,12 @@ function NativeUpdateCard({ versionName, browserUrl }: { versionName: string; br
             </View>
             {versionName ? (
               <View style={styles.version}>
-                <Text style={styles.versionText}>{COPY.version(versionName)}</Text>
+                <Text style={styles.versionText}>{t(COPY.version, { name: versionName })}</Text>
               </View>
             ) : null}
           </View>
-          <Text style={styles.title}>{COPY.title}</Text>
-          <Text style={styles.message}>{COPY.message}</Text>
+          <Text style={styles.title}>{t(COPY.title)}</Text>
+          <Text style={styles.message}>{t(COPY.message)}</Text>
           <SmoothHeight>
             <FadeIn key={stage} style={styles.body}>
               {renderStage()}

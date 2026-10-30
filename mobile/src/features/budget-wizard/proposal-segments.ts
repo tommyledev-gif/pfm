@@ -1,6 +1,8 @@
 import { BarSegment } from "@/components/shared/SegmentedBar";
 import { SegmentLegendEntry } from "@/features/budget-wizard/components/SegmentLegend";
 import { BudgetProposalsResponse, ProposalEntry } from "@/features/budget-wizard/types";
+import { categoryLabel } from "@/features/categories/category-label";
+import { i18n } from "@/lib/i18n";
 import { colors } from "@/lib/theme";
 
 /** The unallocated remainder's segment. Not a category, and never treated as
@@ -37,7 +39,8 @@ export function buildProposalSegments(
   return segments;
 }
 
-/** What the tapped block is, or null when nothing is selected. */
+/** What the tapped block is, or null when nothing is selected. Its name is in
+ *  the app language at call time: call it during render. */
 export function segmentLegendEntry(
   result: BudgetProposalsResponse,
   ordered: ProposalEntry[],
@@ -50,7 +53,7 @@ export function segmentLegendEntry(
   if (activeKey === BUFFER_SEGMENT_KEY) {
     return {
       key: BUFFER_SEGMENT_KEY,
-      name: "Dự phòng (chưa thuộc mục nào)",
+      name: i18n.t("budgetWizard.result.bufferSegment"),
       color: colors.surfaceBorder,
       amount: result.unallocated_amount,
       share: share(result.unallocated_amount),
@@ -61,7 +64,7 @@ export function segmentLegendEntry(
   if (!entry) return null;
   return {
     key: entry.category_id,
-    name: entry.category_name,
+    name: categoryLabel({ name: entry.category_name, system_key: entry.system_key ?? null }),
     color: colorFor(entry.category_id),
     amount: entry.amount_max,
     share: share(entry.amount_max),

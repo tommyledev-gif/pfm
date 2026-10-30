@@ -1,9 +1,6 @@
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { useTranslation } from "react-i18next";
 
-const TITLE = "Không có kết nối mạng";
-const MESSAGE =
-  "Trợ lý cần mạng để đọc tin nhắn. Nhập thủ công thì giao dịch lưu trên máy và tự đồng bộ khi có mạng.";
-const CONFIRM_LABEL = "Nhập thủ công";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 interface OfflineManualEntryDialogProps {
   visible: boolean;
@@ -17,12 +14,13 @@ interface OfflineManualEntryDialogProps {
  * record it (into the offline queue).
  */
 export function OfflineManualEntryDialog({ visible, onConfirm, onCancel }: OfflineManualEntryDialogProps) {
+  const { t } = useTranslation();
   return (
     <ConfirmDialog
       visible={visible}
-      title={TITLE}
-      message={MESSAGE}
-      confirmLabel={CONFIRM_LABEL}
+      title={t("chat.offlineEntry.title")}
+      message={t("chat.offlineEntry.body")}
+      confirmLabel={t("common.action.manualEntry")}
       tone="default"
       onConfirm={onConfirm}
       onCancel={onCancel}

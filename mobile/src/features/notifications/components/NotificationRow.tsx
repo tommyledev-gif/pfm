@@ -1,4 +1,5 @@
 import { ComponentType, ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { BellIcon, TargetIcon, UserIcon, UsersIcon } from "@/components/ui/Icon";
@@ -52,6 +53,7 @@ interface NotificationRowProps {
  * does.
  */
 export function NotificationRow({ notification, onPress, action, separated, unread: unreadOverride }: NotificationRowProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const look = LOOK[notification.type] ?? DEFAULT_LOOK;
   const unread = unreadOverride ?? !notification.is_read;
@@ -61,7 +63,10 @@ export function NotificationRow({ notification, onPress, action, separated, unre
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
       accessibilityRole="button"
-      accessibilityLabel={`${unread ? "Chưa đọc. " : ""}${notification.title}. ${notification.body}`}
+      accessibilityLabel={t(unread ? "notifications.row.a11yUnread" : "notifications.row.a11y", {
+        title: notification.title,
+        body: notification.body,
+      })}
       testID={`row-notification-${notification.id}`}
     >
       <View style={styles.gutter}>{unread ? <View style={styles.dot} /> : null}</View>

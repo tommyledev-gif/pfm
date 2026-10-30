@@ -1,6 +1,7 @@
 import { ReactNode, useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 
 import { EmptyIllustration } from "@/components/shared/EmptyIllustration";
 import { EmptyStateCard } from "@/components/shared/EmptyState";
@@ -28,6 +29,7 @@ const SUGGESTION_SOURCE = { limit: 10 };
 
 /** The account has no transactions at all — nothing is being filtered out. */
 export function NoTransactionsState({ onAdd }: { onAdd: () => void }) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
@@ -40,19 +42,19 @@ export function NoTransactionsState({ onAdd }: { onAdd: () => void }) {
     <View style={styles.stack} testID="empty-transactions-none">
       <EmptyStateCard
         illustration={<ThemedIllustration name="transactions" />}
-        title="Chưa có giao dịch nào"
+        title={t("transactions.empty.none.title")}
         // No wallet is the one thing the title does not already say.
-        description={needsWallet ? "Chưa có ví. Tạo ví để ghi giao dịch." : undefined}
+        description={needsWallet ? t("common.empty.noWallet") : undefined}
         action={
           needsWallet
             ? {
-                label: "Tạo ví",
+                label: t("common.action.createWallet"),
                 icon: <WalletIcon size={18} color={colors.onGreen} />,
                 onPress: openWalletCreator,
                 testID: "btn-empty-create-wallet",
               }
             : {
-                label: "Thêm giao dịch",
+                label: t("common.action.addTransaction"),
                 icon: <PlusIcon size={18} color={colors.onGreen} />,
                 onPress: onAdd,
                 testID: "btn-empty-add-transaction",
@@ -62,14 +64,14 @@ export function NoTransactionsState({ onAdd }: { onAdd: () => void }) {
       <View style={styles.tiles}>
         <ShortcutTile
           icon={<SparkleIcon size={18} />}
-          eyebrow="Ghi bằng AI"
-          label="Nhắn “Cà phê 50k”"
+          eyebrow={t("transactions.empty.shortcut.aiEyebrow")}
+          label={t("transactions.empty.shortcut.aiExample")}
           onPress={() => router.navigate("/ai-chat")}
         />
         <ShortcutTile
           icon={<TagIcon size={18} color={colors.green} />}
-          eyebrow="Danh mục"
-          label="Tuỳ chỉnh danh mục"
+          eyebrow={t("nav.title.categories")}
+          label={t("transactions.empty.shortcut.categories")}
           onPress={() => router.push("/categories")}
         />
       </View>
@@ -85,6 +87,7 @@ interface NoResultsStateProps {
 
 /** The account has transactions, but none match the filters on screen. */
 export function NoResultsState({ onClearFilters, onSearch }: NoResultsStateProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   // Search only matches notes (backend transactions.sql), so a generic
@@ -105,10 +108,10 @@ export function NoResultsState({ onClearFilters, onSearch }: NoResultsStateProps
             <SearchIcon size={30} color={colors.green} />
           </EmptyIllustration>
         }
-        title="Không tìm thấy giao dịch"
-        description="Thử từ khóa khác."
+        title={t("transactions.empty.filtered.title")}
+        description={t("common.empty.tryAnotherKeyword")}
         action={{
-          label: "Xóa bộ lọc",
+          label: t("common.action.clearFilters"),
           icon: <CloseIcon size={16} color={colors.onGreen} strokeWidth={2.4} />,
           onPress: onClearFilters,
           testID: "btn-empty-clear-filters",
@@ -116,7 +119,7 @@ export function NoResultsState({ onClearFilters, onSearch }: NoResultsStateProps
       />
       {suggestions.length > 0 ? (
         <View style={styles.suggestions}>
-          <Text style={styles.suggestionsTitle}>Gợi ý từ ghi chú gần đây</Text>
+          <Text style={styles.suggestionsTitle}>{t("transactions.empty.filtered.suggestions")}</Text>
           <View style={styles.chips}>
             {suggestions.map((note) => (
               <Chip key={note} label={note} onPress={() => onSearch(note)} />

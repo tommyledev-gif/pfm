@@ -1,5 +1,6 @@
 import { RefObject, useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, LayoutChangeEvent, ListRenderItemInfo, StyleSheet, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { closeParkedSwipeRow, closeParkedSwipeRowOnOutsideTouch } from "@/components/shared/use-swipe-actions";
 import { TypingIndicator } from "@/components/shared/TypingIndicator";
@@ -33,8 +34,8 @@ import { useUiPrefsStore } from "@/stores/ui-prefs-store";
 const messageKey = (m: ChatMessage) => m.id;
 
 // What the assistant is reading: the newest user message, sent or re-sent.
-const READING_PHOTO = "Đang đọc ảnh…";
-const READING_MESSAGE = "Đang đọc tin nhắn…";
+const READING_PHOTO = "chat.recording.readingPhoto";
+const READING_MESSAGE = "chat.recording.readingMessage";
 const readingLabel = (messages: ChatMessage[]) =>
   messages.find((m) => m.role === "user")?.imageCapture ? READING_PHOTO : READING_MESSAGE;
 
@@ -87,6 +88,7 @@ export function RecordingPane({
 }: RecordingPaneProps) {
   const chatThreadStyles = useChatThreadStyles();
   const colors = useColors();
+  const { t } = useTranslation();
   const requireOnline = useRequireOnline();
   // A restore reads only the latest page; scrolling back to the top of the
   // thread pages in older messages from the server (chat-store loadOlder).
@@ -230,7 +232,7 @@ export function RecordingPane({
           ListHeaderComponent={
             chat.sending ? (
               <View style={chatThreadStyles.typingRow}>
-                <TypingIndicator label={readingLabel(messages)} testID="typing-recording" />
+                <TypingIndicator label={t(readingLabel(messages))} testID="typing-recording" />
               </View>
             ) : null
           }

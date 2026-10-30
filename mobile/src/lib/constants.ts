@@ -1,3 +1,5 @@
+import { i18n, TranslationKey } from "@/lib/i18n";
+
 // App-wide constants — no magic values inline in components (dev.md rule,
 // same convention as frontend/src/lib/constants.ts). Numbers here mirror
 // backend/internal/common/constants.go so mobile and web never drift apart
@@ -33,9 +35,9 @@ export const REFRESH_RETRY_DELAY_SECONDS = 30;
 // Offline support (specs/mobile-offline-support). Copy lives here, not in
 // each component, because the same sentence is shown from several places
 // (every getErrorMessage caller, every useRequireOnline surface).
-export const NETWORK_ERROR_MESSAGE = "Không thể kết nối máy chủ. Vui lòng kiểm tra mạng và thử lại.";
-export const NEEDS_CONNECTION_MESSAGE = "Cần kết nối mạng để thực hiện thao tác này.";
-export const OFFLINE_REFRESH_MESSAGE = "Đang ngoại tuyến — chưa thể làm mới.";
+// Keys, read with t()/i18n.t() where shown (specs/mobile-language-switch).
+export const NEEDS_CONNECTION_MESSAGE = "errors.needsConnection" satisfies TranslationKey;
+export const OFFLINE_REFRESH_MESSAGE = "errors.offlineRefresh" satisfies TranslationKey;
 // The offline strip (components/shared/OfflineBanner.tsx) moves the screen's
 // content, so a flapping connection must not make it flicker (EC-OFF-04):
 // it appears only once offline has lasted OFFLINE_STRIP_SHOW_DELAY_MS, and
@@ -44,7 +46,7 @@ export const OFFLINE_REFRESH_MESSAGE = "Đang ngoại tuyến — chưa thể l�
 export const OFFLINE_STRIP_SHOW_DELAY_MS = 2000;
 export const ONLINE_STABLE_DELAY_MS = 1000;
 export const RECONNECTED_STRIP_MS = 2000;
-export const OFFLINE_NO_DATA_MESSAGE = "Chưa có dữ liệu đã lưu cho mục này. Kết nối mạng để tải.";
+export const OFFLINE_NO_DATA_MESSAGE = "errors.offlineNoData" satisfies TranslationKey;
 
 // Per-User saved query cache (US-03). Keep age confirmed by the product owner
 // (spec decision #8); also the gcTime of every allow-listed query, so a
@@ -112,10 +114,11 @@ export type TransactionType = (typeof TRANSACTION_TYPES)[number];
 export const TRANSACTION_KINDS = ["expense", "income", "transfer"] as const;
 export type TransactionKind = (typeof TRANSACTION_KINDS)[number];
 
+// Getters: each reads the current language when it is shown.
 export const TRANSACTION_KIND_LABELS: Record<TransactionKind, string> = {
-  expense: "Chi",
-  income: "Thu",
-  transfer: "Chuyển khoản",
+  get expense() { return i18n.t("common.txType.expenseShort"); },
+  get income() { return i18n.t("common.txType.incomeShort"); },
+  get transfer() { return i18n.t("common.txType.transfer"); },
 };
 
 // Same emoji migration 022 seeds on the system transfer category — which is

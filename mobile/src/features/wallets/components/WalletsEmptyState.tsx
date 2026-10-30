@@ -1,4 +1,5 @@
 import { ScrollView } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { EmptyIllustration } from "@/components/shared/EmptyIllustration";
 import { EmptyStateCard } from "@/components/shared/EmptyState";
@@ -15,6 +16,7 @@ const BOTTOM_NAV_CLEARANCE = 140;
 export function WalletsEmptyState({ onCreate }: { onCreate: () => void }) {
   const colors = useColors();
   const styles = useStyles();
+  const { t } = useTranslation();
   return (
     <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
       <EmptyStateCard
@@ -24,10 +26,10 @@ export function WalletsEmptyState({ onCreate }: { onCreate: () => void }) {
             <WalletIcon size={30} color={colors.green} />
           </EmptyIllustration>
         }
-        title="Chưa có ví nào"
-        description="Tiền mặt, tài khoản ngân hàng hay ví điện tử — mỗi nguồn tiền là một ví, và mọi giao dịch đều được ghi vào một ví."
+        title={t("wallets.empty.title")}
+        description={t("wallets.empty.body")}
         action={{
-          label: "Tạo ví đầu tiên",
+          label: t("wallets.empty.cta"),
           icon: <PlusIcon size={18} color={colors.onGreen} />,
           onPress: onCreate,
           testID: "btn-empty-wallets-create",

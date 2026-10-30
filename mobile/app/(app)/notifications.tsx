@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, SectionList, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
@@ -11,7 +12,8 @@ import { Screen } from "@/components/shared/Screen";
 import { ScreenHeader } from "@/components/shared/ScreenHeader";
 import { ScreenLoader } from "@/components/shared/ScreenLoader";
 import { NotificationRow } from "@/features/notifications/components/NotificationRow";
-import { dayLabelVi } from "@/lib/format-date";
+import { dayLabel } from "@/lib/format-date";
+import { TranslationKey } from "@/lib/i18n";
 import { useRequireOnline } from "@/lib/connectivity";
 import { matchesSearch } from "@/lib/search-text";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
@@ -27,9 +29,9 @@ import { useSessionStore } from "@/stores/session-store";
 
 type Filter = "all" | "unread";
 
-const FILTERS: { value: Filter; label: string }[] = [
-  { value: "all", label: "Tất cả" },
-  { value: "unread", label: "Chưa đọc" },
+const FILTERS: { value: Filter; labelKey: TranslationKey }[] = [
+  { value: "all", labelKey: "common.label.all" },
+  { value: "unread", labelKey: "notifications.filter.unread" },
 ];
 
 interface DaySection {
@@ -42,6 +44,8 @@ interface DaySection {
 // inset group (NotificationRow), inset from the screen edges like every other
 // list in the app rather than running edge to edge.
 export default function NotificationsScreen() {
+  const { t } = useTranslation();
+  const filters = useMemo(() => FILTERS.map((f) => ({ value: f.value, label: t(f.labelKey) })), [t]);
   const colors = useColors();
   const styles = useStyles();
   const requireOnline = useRequireOnline();
@@ -127,31 +131,33 @@ export default function NotificationsScreen() {
       // Read since it was fetched, and not on screen this visit: not "unread" any more.
       if (filter === "unread" && n.is_read && !keptUnread.has(n.id)) continue;
       if (search.trim() && !matchesSearch(`${n.title} ${n.body}`, search)) continue;
-      const label = dayLabelVi(n.created_at);
+      const label = dayLabel(n.created_at);
       const section = grouped.find((g) => g.title === label);
       if (section) section.data.push(n);
       else grouped.push({ title: label, data: [n] });
     }
     return grouped;
-  }, [items, search, filter, keptUnread]);
+    // t: the day labels are text, rebuilt in the new language on a switch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, search, filter, keptUnread, t]);
 
   const empty = notifications.isError ? (
     <View style={styles.empty}>
-      <Text style={styles.emptyTitle}>Chưa tải được thông báo.</Text>
+      <Text style={styles.emptyTitle}>{t("notifications.error.loadFailed")}</Text>
       <Pressable onPress={() => void notifications.refetch()} hitSlop={8} accessibilityRole="button">
-        <Text style={styles.retry}>Thử lại</Text>
+        <Text style={styles.retry}>{t("common.action.retry")}</Text>
       </Pressable>
     </View>
   ) : search.trim() ? (
     <View style={styles.empty}>
-      <Text style={styles.emptyTitle}>Không tìm thấy thông báo</Text>
-      <Text style={styles.emptyHint}>Thử từ khóa khác.</Text>
+      <Text style={styles.emptyTitle}>{t("notifications.search.noResults")}</Text>
+      <Text style={styles.emptyHint}>{t("common.empty.tryAnotherKeyword")}</Text>
     </View>
   ) : (
     <View style={styles.empty}>
       <BellIcon size={28} color={colors.textMuted} />
       <Text style={styles.emptyTitle}>
-        {filter === "unread" ? "Không có thông báo chưa đọc." : "Chưa có thông báo."}
+        {t(filter === "unread" ? "notifications.empty.unread" : "notifications.empty.all")}
       </Text>
     </View>
   );
@@ -159,7 +165,7 @@ export default function NotificationsScreen() {
   return (
     <Screen style={styles.screen}>
       <ScreenHeader
-        title="Thông báo"
+        title={t("nav.title.notifications")}
         trailing={
           canMarkAll ? (
             <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(140)}>
@@ -168,10 +174,10 @@ export default function NotificationsScreen() {
                 disabled={markAllRead.isPending}
                 hitSlop={8}
                 accessibilityRole="button"
-                accessibilityLabel="Đánh dấu mọi thông báo đã đọc"
+                accessibilityLabel={t("notifications.markAllRead.a11y")}
                 testID="btn-notifications-read-all"
               >
-                <Text style={styles.readAll}>Đánh dấu đã đọc</Text>
+                <Text style={styles.readAll}>{t("notifications.markAllRead.button")}</Text>
               </Pressable>
             </Animated.View>
           ) : null
@@ -179,8 +185,8 @@ export default function NotificationsScreen() {
       />
 
       <View style={styles.controls}>
-        <SegmentedTabs options={FILTERS} value={filter} onChange={setFilter} testID="tabs-notifications-filter" />
-        <SearchField value={search} onChangeText={setSearch} placeholder="Tìm thông báo" testID="input-notifications-search" />
+        <SegmentedTabs options={filters} value={filter} onChange={setFilter} testID="tabs-notifications-filter" />
+        <SearchField value={search} onChangeText={setSearch} placeholder={t("notifications.search.placeholder")} testID="input-notifications-search" />
       </View>
 
       {notifications.isLoading ? (

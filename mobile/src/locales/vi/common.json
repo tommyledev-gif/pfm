@@ -1,0 +1,163 @@
+{
+  "common": {
+    "action": {
+      "cancel": "Hủy",
+      "close": "Đóng",
+      "retry": "Thử lại",
+      "keep": "Giữ lại",
+      "save": "Lưu",
+      "delete": "Xóa",
+      "back": "Quay lại",
+      "create": "Tạo",
+      "edit": "Sửa",
+      "apply": "Áp dụng",
+      "choose": "Chọn",
+      "discard": "Bỏ",
+      "add": "Thêm",
+      "done": "Xong",
+      "skip": "Bỏ qua",
+      "continue": "Tiếp tục",
+      "later": "Để sau",
+      "gotIt": "Đã hiểu",
+      "seeAll": "Xem tất cả",
+      "openSettings": "Mở Cài đặt",
+      "clearSearch": "Xóa tìm kiếm",
+      "clearFilters": "Xóa bộ lọc",
+      "clearFilter": "Xóa lọc",
+      "signIn": "Đăng nhập",
+      "signOut": "Đăng xuất",
+      "saveAnyway": "Vẫn lưu",
+      "max": "Tối đa",
+      "sort": "Sắp xếp",
+      "createWallet": "Tạo ví",
+      "addTransaction": "Thêm giao dịch",
+      "createBudget": "Tạo ngân sách",
+      "createCategory": "Tạo danh mục",
+      "chooseCategory": "Chọn danh mục",
+      "openInMaps": "Mở trên Google Maps",
+      "setDefault": "Đặt mặc định",
+      "showPassword": "Hiện mật khẩu",
+      "hidePassword": "Ẩn mật khẩu",
+      "manualEntry": "Nhập thủ công",
+      "moreOptions": "Tùy chọn khác"
+    },
+    "field": {
+      "wallet": "Ví",
+      "category": "Danh mục",
+      "amount": "Số tiền",
+      "date": "Ngày",
+      "note": "Ghi chú",
+      "type": "Loại",
+      "location": "Vị trí",
+      "name": "Tên",
+      "icon": "Biểu tượng",
+      "fromWallet": "Từ ví",
+      "toWallet": "Đến ví",
+      "time": "Thời gian",
+      "quantity": "Số lượng",
+      "unitPrice": "Đơn giá",
+      "lineAmount": "Thành tiền",
+      "total": "Tổng",
+      "items": "Các món",
+      "username": "Tên đăng nhập",
+      "identifier": "Email hoặc tên đăng nhập",
+      "newPassword": "Mật khẩu mới",
+      "confirmNewPassword": "Nhập lại mật khẩu mới",
+      "searchCategories": "Tìm danh mục",
+      "chooseIcon": "Chọn biểu tượng"
+    },
+    "txType": {
+      "expense": "Chi tiêu",
+      "income": "Thu nhập",
+      "transfer": "Chuyển khoản",
+      "expenseShort": "Chi",
+      "incomeShort": "Thu"
+    },
+    "walletType": {
+      "cash": "Tiền mặt",
+      "bank": "Ngân hàng",
+      "e_wallet": "Ví điện tử",
+      "other": "Khác"
+    },
+    "adjustment": {
+      "tax": "Thuế",
+      "fee": "Phí",
+      "discount": "Giảm giá",
+      "other": "Khác",
+      "group": "Thuế, phí, giảm giá"
+    },
+    "label": {
+      "all": "Tất cả",
+      "default": "Mặc định",
+      "sharedWallet": "Ví chung",
+      "yourWallets": "Ví của bạn"
+    },
+    "role": {
+      "member": "Thành viên",
+      "admin": "Quản trị"
+    },
+    "status": {
+      "pending": "Chờ xác nhận",
+      "awaitingReply": "Chờ trả lời",
+      "awaitingApproval": "Chờ duyệt",
+      "pendingSync": "Chờ đồng bộ",
+      "notEntered": "Chưa nhập"
+    },
+    "budget": {
+      "spent": "Đã chi",
+      "left": "Còn lại",
+      "over": "Vượt",
+      "nearLimit": "Sắp vượt"
+    },
+    "date": {
+      "today": "Hôm nay",
+      "yesterday": "Hôm qua",
+      "thisMonth": "Tháng này"
+    },
+    "count": {
+      "categories_other": "{{count}} danh mục",
+      "transactions_other": "{{count}} giao dịch",
+      "items_other": "{{count}} món",
+      "wallets_other": "{{count}} ví",
+      "days_other": "{{count}} ngày",
+      "months_other": "{{count}} tháng"
+    },
+    "empty": {
+      "noWallet": "Chưa có ví. Tạo ví để ghi giao dịch.",
+      "tryAnotherKeyword": "Thử từ khóa khác.",
+      "noMatchingCategories": "Không có danh mục nào khớp."
+    },
+    "confirm": {
+      "cannotUndo": "Hành động này không thể hoàn tác."
+    },
+    "validation": {
+      "chooseCategory": "Vui lòng chọn danh mục",
+      "enterAmount": "Nhập số tiền.",
+      "enterIdentifier": "Nhập email hoặc tên đăng nhập."
+    },
+    "loading": "Đang tải",
+    "brand": "Budgest"
+  },
+  "nav": {
+    "tab": {
+      "home": "Trang chủ",
+      "transactions": "Giao dịch",
+      "assistant": "Trợ lý",
+      "insights": "Phân tích",
+      "settings": "Cài đặt"
+    },
+    "title": {
+      "wallets": "Ví",
+      "categories": "Danh mục",
+      "auditLogs": "Nhật ký giao dịch",
+      "security": "Bảo mật",
+      "userSettings": "Cài đặt người dùng",
+      "developer": "Nhà phát triển",
+      "changePassword": "Đổi mật khẩu",
+      "addAccount": "Thêm tài khoản",
+      "notifications": "Thông báo",
+      "members": "Thành viên gia đình",
+      "switchAccount": "Chuyển tài khoản"
+    }
+  }
+}

@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { Trans, useTranslation } from "react-i18next";
 
 import { AmountText } from "@/components/ui/AmountText";
 import { AnalyticsBudgetItem } from "@/features/analytics/types";
@@ -8,6 +9,7 @@ import { BudgetIconTile } from "@/features/budgets/components/BudgetIconTile";
 import { BudgetProgressBar } from "@/features/budgets/components/BudgetProgressBar";
 import { BudgetLimit } from "@/features/budgets/types";
 import { useCategoryLookup } from "@/features/categories/api/use-category-lookup";
+import { categoryLabel } from "@/features/categories/category-label";
 import { Category } from "@/features/categories/types";
 import { formatCurrency } from "@/lib/currency";
 import { WalletCurrency } from "@/lib/constants";
@@ -43,6 +45,7 @@ function asBudgetLimit(b: AnalyticsBudgetItem, currency: string): BudgetLimit {
 // name for an answer stored before category_id was sent (those also carry no
 // icon of their own, which is what left them showing a bare initial).
 export function BudgetStatusList({ budgets, currency, elapsed }: BudgetStatusListProps) {
+  const { t } = useTranslation();
   const styles = useStyles();
   const categories = useCategoryLookup();
   const categoryByName = useMemo(() => {
@@ -61,10 +64,11 @@ export function BudgetStatusList({ budgets, currency, elapsed }: BudgetStatusLis
       {budgets.map((b, i) => {
         const status = budgetRowStatus(asBudgetLimit(b, currency), elapsed);
         const category = (b.category_id ? categories.get(b.category_id) : undefined) ?? categoryByName.get(b.category_name);
+        const name = categoryLabel(category, b.category_name);
         return (
           <View key={b.budget_id} style={[styles.row, i > 0 && styles.divider]}>
             <BudgetIconTile
-              name={b.category_name}
+              name={name}
               // || not ??: an icon saved as "" is no icon, and must not
               // hide the Category's.
               icon={b.icon || category?.icon}
@@ -73,11 +77,15 @@ export function BudgetStatusList({ budgets, currency, elapsed }: BudgetStatusLis
             <View style={styles.body}>
               <View style={styles.head}>
                 <Text style={styles.name} numberOfLines={1}>
-                  {b.category_name}
+                  {name}
                 </Text>
                 {status.over ? (
                   <Text style={styles.over}>
-                    Vượt <AmountText amountCents={b.spent - b.limit} currency={currency} style={styles.over} />
+                    <Trans
+                      t={t}
+                      i18nKey="analytics.budgetStatus.over"
+                      components={[<AmountText key="amount" amountCents={b.spent - b.limit} currency={currency} style={styles.over} />]}
+                    />
                   </Text>
                 ) : (
                   <AmountText amountCents={b.remaining} currency={currency} style={styles.remaining} />
@@ -93,8 +101,11 @@ export function BudgetStatusList({ budgets, currency, elapsed }: BudgetStatusLis
               />
               <Text style={styles.meta} numberOfLines={1}>
                 {status.state === "unused"
-                  ? `Chưa chi · Hạn mức ${formatCurrency(b.limit, currency)}`
-                  : `Đã chi ${formatCurrency(b.spent, currency)} / ${formatCurrency(b.limit, currency)}`}
+                  ? t("analytics.budgetStatus.unused", { limit: formatCurrency(b.limit, currency) })
+                  : t("analytics.budgetStatus.spent", {
+                      spent: formatCurrency(b.spent, currency),
+                      limit: formatCurrency(b.limit, currency),
+                    })}
               </Text>
             </View>
           </View>

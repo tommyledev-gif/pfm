@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
@@ -63,6 +64,7 @@ export const CategoryTransactionsDialog = memo(function CategoryTransactionsDial
   total,
   budget,
 }: CategoryTransactionsDialogProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const wallets = useWalletsQuery();
@@ -117,7 +119,10 @@ export const CategoryTransactionsDialog = memo(function CategoryTransactionsDial
 
   return (
     <Drawer visible={visible} onClose={onClose} onEndReached={loadMore}>
-      <DrawerHeader title="Giao dịch" actions={[{ label: "Đóng", onPress: onClose, variant: "secondary" }]} />
+      <DrawerHeader
+        title={t("reports.categorySheet.title")}
+        actions={[{ label: t("common.action.close"), onPress: onClose, variant: "secondary" }]}
+      />
 
       <View style={styles.summary}>
         <Avatar name={categoryName} color={color} size={36} icon={icon} iconUrl={iconUrl} />
@@ -146,7 +151,7 @@ export const CategoryTransactionsDialog = memo(function CategoryTransactionsDial
           ))}
         </View>
       ) : items.length === 0 ? (
-        <Text style={styles.empty}>Không có giao dịch nào trong khoảng thời gian này.</Text>
+        <Text style={styles.empty}>{t("reports.categorySheet.empty")}</Text>
       ) : (
         <View>
           {items.map((item) => (

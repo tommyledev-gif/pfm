@@ -12,6 +12,7 @@
 // contradicts.
 
 import { floorToPerDayStep, floorToSuggestedStep, formatCurrency } from "@/lib/currency";
+import { i18n } from "@/lib/i18n";
 
 // ---------------------------------------------------------------------------
 // Constants — all xu. Mirrors common/budget_wizard_v2.go.
@@ -122,29 +123,34 @@ export type IncomeValidation =
 /**
  * Screen 1's gate. Mirrors the server's own checks — the client blocks so the
  * user gets an answer while typing, and the server re-checks because it never
- * trusts the client.
+ * trusts the client. `message` is in the app language at call time: call it
+ * during render of a component that uses useTranslation().
  */
 export function validateIncomeStep(incomeXu: number, fixedXu: number, savingsXu: number): IncomeValidation {
   if (incomeXu <= 0) {
-    return { ok: false, field: "income", message: "Nhập thu nhập lớn hơn 0." };
+    return { ok: false, field: "income", message: i18n.t("budgetWizard.validation.incomeRequired") };
   }
   if (incomeXu > INCOME_CAP_XU) {
     // Names the ceiling: "the maximum the app supports" gave no number to act on.
-    return { ok: false, field: "income", message: `Thu nhập tối đa ${formatCurrency(INCOME_CAP_XU)}.` };
+    return {
+      ok: false,
+      field: "income",
+      message: i18n.t("budgetWizard.validation.incomeMax", { amount: formatCurrency(INCOME_CAP_XU) }),
+    };
   }
   const disposable = disposableXu(incomeXu, fixedXu, savingsXu);
   if (disposable <= 0) {
     return {
       ok: false,
       field: "fixed",
-      message: "Chi phí cố định và tiết kiệm vượt thu nhập. Giảm một trong hai khoản.",
+      message: i18n.t("budgetWizard.validation.overIncome"),
     };
   }
   if (disposable < MIN_VIABLE_DISPOSABLE_XU) {
     return {
       ok: false,
       field: "fixed",
-      message: "Phần còn lại quá ít để chia theo danh mục. Giảm tiết kiệm hoặc chi phí cố định.",
+      message: i18n.t("budgetWizard.validation.tooLittleLeft"),
     };
   }
   return { ok: true };

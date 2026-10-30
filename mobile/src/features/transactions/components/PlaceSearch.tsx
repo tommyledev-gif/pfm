@@ -1,5 +1,6 @@
 import { ReactNode, useMemo, useState } from "react";
 import { ActivityIndicator, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { EdgeFade } from "@/components/ui/EdgeFade";
 import { CloseIcon, HistoryIcon, MapPinIcon, SearchIcon } from "@/components/ui/Icon";
@@ -40,6 +41,7 @@ interface PlaceSearchProps {
  * Picking one moves the pin there and recentres the map.
  */
 export function PlaceSearch({ savedPlaces, onPick, onRemoveSaved, children }: PlaceSearchProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const [query, setQuery] = useState("");
@@ -67,13 +69,13 @@ export function PlaceSearch({ savedPlaces, onPick, onRemoveSaved, children }: Pl
           onChangeText={setQuery}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          placeholder="Tìm địa chỉ, tên đường"
+          placeholder={t("transactions.place.searchPlaceholder")}
           placeholderTextColor={colors.textMuted}
           style={styles.input}
           returnKeyType="search"
         />
         {query ? (
-          <Pressable onPress={() => setQuery("")} hitSlop={HIT_SLOP} accessibilityRole="button" accessibilityLabel="Xóa tìm kiếm">
+          <Pressable onPress={() => setQuery("")} hitSlop={HIT_SLOP} accessibilityRole="button" accessibilityLabel={t("common.action.clearSearch")}>
             <CloseIcon size={16} color={colors.textSecondary} />
           </Pressable>
         ) : null}
@@ -92,7 +94,7 @@ export function PlaceSearch({ savedPlaces, onPick, onRemoveSaved, children }: Pl
               >
                 <HistoryIcon size={12} color={colors.textSecondary} />
                 <Text style={styles.chipLabel} numberOfLines={1}>
-                  {savedPlaceLabel(place) ?? "Vị trí chưa có tên"}
+                  {savedPlaceLabel(place) ?? t("transactions.place.unnamed")}
                 </Text>
               </Pressable>
             ))}
@@ -105,7 +107,7 @@ export function PlaceSearch({ savedPlaces, onPick, onRemoveSaved, children }: Pl
         {children}
         {showResults ? (
           <ScrollView style={styles.results} keyboardShouldPersistTaps="handled" testID="list-location-results">
-            {savedMatches.length > 0 ? <Text style={styles.section}>Đã ghim trước đây</Text> : null}
+            {savedMatches.length > 0 ? <Text style={styles.section}>{t("transactions.place.savedHeader")}</Text> : null}
             {savedMatches.map((place) => (
               <Pressable
                 key={`saved-${place.latitude},${place.longitude}`}
@@ -116,7 +118,7 @@ export function PlaceSearch({ savedPlaces, onPick, onRemoveSaved, children }: Pl
                 <HistoryIcon size={16} color={colors.textSecondary} />
                 <View style={styles.rowText}>
                   <Text style={styles.rowTitle} numberOfLines={1}>
-                    {savedPlaceLabel(place) ?? "Vị trí chưa có tên"}
+                    {savedPlaceLabel(place) ?? t("transactions.place.unnamed")}
                   </Text>
                   {place.note && place.place_name ? (
                     <Text style={styles.rowSub} numberOfLines={1}>
@@ -128,25 +130,25 @@ export function PlaceSearch({ savedPlaces, onPick, onRemoveSaved, children }: Pl
                   onPress={() => onRemoveSaved(place)}
                   hitSlop={HIT_SLOP}
                   accessibilityRole="button"
-                  accessibilityLabel="Xóa nơi đã ghim"
+                  accessibilityLabel={t("transactions.place.removeSaved")}
                 >
                   <CloseIcon size={14} color={colors.textMuted} />
                 </Pressable>
               </Pressable>
             ))}
 
-            {searching ? <Text style={styles.section}>Kết quả</Text> : null}
+            {searching ? <Text style={styles.section}>{t("transactions.place.resultsHeader")}</Text> : null}
             {searching && search.status === "searching" ? (
               <View style={styles.status}>
                 <ActivityIndicator size="small" color={colors.green} />
-                <Text style={styles.statusText}>Đang tìm…</Text>
+                <Text style={styles.statusText}>{t("transactions.place.searching")}</Text>
               </View>
             ) : null}
             {searching && search.status === "failed" ? (
-              <Text style={[styles.statusText, styles.status]}>Chưa tìm được địa điểm. Kiểm tra mạng rồi thử lại.</Text>
+              <Text style={[styles.statusText, styles.status]}>{t("transactions.place.searchFailed")}</Text>
             ) : null}
             {searching && search.status === "done" && search.results.length === 0 ? (
-              <Text style={[styles.statusText, styles.status]}>Không tìm thấy địa điểm. Thử thêm tên quận, thành phố.</Text>
+              <Text style={[styles.statusText, styles.status]}>{t("transactions.place.noResults")}</Text>
             ) : null}
             {search.results.map((result) => (
               <Pressable
