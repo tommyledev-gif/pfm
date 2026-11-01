@@ -18,6 +18,8 @@ export const RESET_COPY = {
   sendCode: "auth.resetPassword.sendCode",
   codeLabel: "auth.resetPassword.codeLabel",
   codePlaceholder: "auth.resetPassword.codePlaceholder",
+  checkCode: "common.action.continue",
+  passwordSub: "auth.resetPassword.passwordSub",
   passwordLabel: "common.field.newPassword",
   passwordPlaceholder: "auth.resetPassword.passwordPlaceholder",
   confirmLabel: "common.field.confirmNewPassword",
@@ -29,7 +31,7 @@ export const RESET_COPY = {
   done: "auth.resetPassword.done",
 } as const satisfies Record<string, TranslationKey>;
 
-/** Step 2's line under the title. Never says whether the account exists. */
+/** The code step's line under the title. Never says whether the account exists. */
 export function confirmSub(identifier: string): string {
   return i18n.t("auth.resetPassword.confirmSub", {
     identifier,
@@ -49,6 +51,13 @@ export function identifierProblem(identifier: string): string | undefined {
   return identifier ? undefined : i18n.t("common.validation.enterIdentifier");
 }
 
+/** The code step's errors. */
+export interface CodeErrors {
+  code?: string;
+  form?: string;
+}
+
+/** The password step's errors; `code` means the code no longer works. */
 export interface ConfirmErrors {
   code?: string;
   password?: string;
@@ -67,13 +76,30 @@ function passwordProblem(password: string): string | undefined {
   return undefined;
 }
 
-/** Every field's problem at once, checked before anything is sent. */
-export function validateConfirm(code: string, password: string, confirm: string): ConfirmErrors {
+/** Checked before the code is sent, so a short code never spends a try. */
+export function codeProblem(code: string): string | undefined {
+  return CODE_PATTERN.test(code) ? undefined : i18n.t("auth.resetPassword.codeMissing", { length: PASSWORD_RESET_CODE_LENGTH });
+}
+
+/** Both password fields' problems at once, checked before anything is sent. */
+export function validateNewPassword(password: string, confirm: string): ConfirmErrors {
   return {
-    code: CODE_PATTERN.test(code) ? undefined : i18n.t("auth.resetPassword.codeMissing", { length: PASSWORD_RESET_CODE_LENGTH }),
     password: passwordProblem(password),
     confirm: password === confirm ? undefined : i18n.t("auth.password.mismatch"),
   };
+}
+
+/** Where a failed code check's sentence goes. Never the server's own message. */
+export function verifyErrorsFor(error: unknown): CodeErrors {
+  if (isNetworkError(error)) return { form: errorText(error, "auth.resetPassword.verifyFailed") };
+  switch (getErrorCode(error)) {
+    case "RESET_CODE_INVALID":
+      return { code: i18n.t("auth.resetPassword.codeInvalid") };
+    case "RATE_LIMITED":
+      return { form: i18n.t("errors.tooManyAttempts", { minutes: RESET_WINDOW_MINUTES }) };
+    default:
+      return { form: i18n.t("auth.resetPassword.verifyFailed") };
+  }
 }
 
 /** Where a failed confirm's sentence goes. Never the server's own message. */

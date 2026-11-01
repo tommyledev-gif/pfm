@@ -4,48 +4,49 @@ import { useTranslation } from "react-i18next";
 
 import { PillButton } from "@/components/ui/PillButton";
 import { EyeIcon, EyeOffIcon } from "@/components/ui/Icon";
-import { MIN_PASSWORD_LENGTH, PASSWORD_RESET_CODE_LENGTH } from "@/lib/constants";
+import { MIN_PASSWORD_LENGTH } from "@/lib/constants";
 import { spacing, createStyles, useColors } from "@/lib/theme";
 import { completeLogin } from "@/features/accounts/complete-login";
 import { useConfirmPasswordResetMutation } from "@/features/auth/api/use-confirm-password-reset-mutation";
 import { AuthField } from "@/features/auth/components/AuthField";
 import { AuthFormError } from "@/features/auth/components/AuthFormError";
-import { ResendCodeLink } from "@/features/auth/components/ResendCodeLink";
-import { confirmErrorsFor, ConfirmErrors, RESET_COPY, validateConfirm } from "@/features/auth/password-reset-copy";
+import { confirmErrorsFor, ConfirmErrors, RESET_COPY, validateNewPassword } from "@/features/auth/password-reset-copy";
 
 interface ResetConfirmFormProps {
   identifier: string;
+  /** The code the server accepted on the code step. */
+  code: string;
+  /** The code stopped working since (expired, ended, replaced): back to it. */
+  onCodeRejected: (message: string) => void;
   /** The new password is set and this phone is signed in with it. */
   onDone: () => void;
 }
 
-// Step 2 of forgot password: the emailed code and the new password. Checked
-// here first so a typo never spends one of the code's 5 tries; on success the
-// returned pair signs this phone in exactly like a password login.
-export function ResetConfirmForm({ identifier, onDone }: ResetConfirmFormProps) {
+// Step 3 of forgot password: the new password, set with the code checked on
+// step 2. Checked here first so a typo never spends one of the code's tries;
+// on success the returned pair signs this phone in exactly like a password
+// login.
+export function ResetConfirmForm({ identifier, code, onCodeRejected, onDone }: ResetConfirmFormProps) {
   const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const confirmReset = useConfirmPasswordResetMutation();
-  const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<ConfirmErrors>({});
-  const codeRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
   const confirmRef = useRef<TextInput>(null);
 
   const focusFirst = (found: ConfirmErrors) => {
-    if (found.code) codeRef.current?.focus();
-    else if (found.password) passwordRef.current?.focus();
+    if (found.password) passwordRef.current?.focus();
     else if (found.confirm) confirmRef.current?.focus();
   };
 
   const submit = () => {
-    const found = validateConfirm(code, password, confirm);
+    const found = validateNewPassword(password, confirm);
     setErrors(found);
-    if (found.code || found.password || found.confirm) return focusFirst(found);
+    if (found.password || found.confirm) return focusFirst(found);
     Keyboard.dismiss();
     confirmReset.mutate(
       { identifier, code, new_password: password },
@@ -56,6 +57,7 @@ export function ResetConfirmForm({ identifier, onDone }: ResetConfirmFormProps) 
         },
         onError: (error) => {
           const next = confirmErrorsFor(error, password);
+          if (next.code) return onCodeRejected(next.code);
           setErrors(next);
           focusFirst(next);
         },
@@ -84,23 +86,6 @@ export function ResetConfirmForm({ identifier, onDone }: ResetConfirmFormProps) 
     <View style={styles.form}>
       <View style={styles.fields}>
         <AuthField
-          ref={codeRef}
-          label={t(RESET_COPY.codeLabel)}
-          value={code}
-          onChangeText={edit("code", (v) => setCode(v.replace(/[^0-9]/g, "")))}
-          error={errors.code}
-          placeholder={t(RESET_COPY.codePlaceholder, { length: PASSWORD_RESET_CODE_LENGTH })}
-          keyboardType="number-pad"
-          maxLength={PASSWORD_RESET_CODE_LENGTH}
-          autoComplete="one-time-code"
-          textContentType="oneTimeCode"
-          autoFocus
-          returnKeyType="next"
-          onSubmitEditing={() => passwordRef.current?.focus()}
-          submitBehavior="submit"
-          testID="input-reset-code"
-        />
-        <AuthField
           ref={passwordRef}
           label={t(RESET_COPY.passwordLabel)}
           value={password}
@@ -110,6 +95,7 @@ export function ResetConfirmForm({ identifier, onDone }: ResetConfirmFormProps) 
           secureTextEntry={!showPassword}
           autoComplete="new-password"
           textContentType="newPassword"
+          autoFocus
           returnKeyType="next"
           onSubmitEditing={() => confirmRef.current?.focus()}
           submitBehavior="submit"
@@ -139,7 +125,6 @@ export function ResetConfirmForm({ identifier, onDone }: ResetConfirmFormProps) 
         textStyle={styles.buttonLabel}
         testID="btn-reset-submit"
       />
-      <ResendCodeLink identifier={identifier} onError={(message) => setErrors((e) => ({ ...e, form: message ?? undefined }))} />
     </View>
   );
 }

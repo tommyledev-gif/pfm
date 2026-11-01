@@ -186,7 +186,7 @@ There is no need to judge which case applies: `ota:publish` refuses when native 
 
 ## 10. Forgot password and app PIN (2026-10, `specs/forgot-password/`, `specs/mobile-app-pin/`)
 
-**Forgot password.** `POST /api/v1/auth/password-reset/request` emails a 6-digit code; `POST /api/v1/auth/password-reset/confirm` sets the new password with it and signs the calling phone in (same response as login). Codes live in `password_reset_codes` (migration 036) as an HMAC keyed from `JWT_SECRET`, never in clear.
+**Forgot password.** `POST /api/v1/auth/password-reset/request` emails a 6-digit code; `POST /api/v1/auth/password-reset/verify` checks it (the app's code step; a wrong code spends one of its 5 tries); `POST /api/v1/auth/password-reset/confirm` sets the new password with it and signs the calling phone in (same response as login). Codes live in `password_reset_codes` (migration 036) as an HMAC keyed from `JWT_SECRET`, never in clear.
 
 - **Order:** migration 036 before the backend (`deploy.sh` runs `cmd/migrate` first), then the mobile OTA bundle (§8), which adds "Quên mật khẩu?" to the login screen.
 - **Needs SMTP.** The code only reaches the user by email. With `SMTP_HOST` unset the placeholder sender logs the masked address and drops the code, so a reset cannot finish. Locally, a catcher such as Mailpit (`axllent/mailpit`, `SMTP_PORT=1025`) shows the email.

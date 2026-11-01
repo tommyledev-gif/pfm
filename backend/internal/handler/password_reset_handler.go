@@ -40,6 +40,24 @@ func (h *PasswordResetHandler) Request(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, "password reset requested", nil)
 }
 
+// Verify handles POST /auth/password-reset/verify — public, IP rate-limited
+// together with Confirm. 200 with no data when the code is right; the code
+// stays live for Confirm.
+func (h *PasswordResetHandler) Verify(c *fiber.Ctx) error {
+	var req dto.PasswordResetVerifyRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, h.logger, common.NewInvalidInputError("malformed request body"))
+	}
+	if err := validate.Struct(req); err != nil {
+		return response.Error(c, h.logger, newValidationError(err))
+	}
+
+	if err := h.service.VerifyCode(c.Context(), req.Identifier, req.Code); err != nil {
+		return response.Error(c, h.logger, err)
+	}
+	return response.Success(c, fiber.StatusOK, "password reset code verified", nil)
+}
+
 // Confirm handles POST /auth/password-reset/confirm — public, IP rate-limited.
 // Same response as POST /auth/login: the calling phone is signed in.
 func (h *PasswordResetHandler) Confirm(c *fiber.Ctx) error {

@@ -11,19 +11,23 @@ const TICK_MS = 1000;
 
 interface ResendCodeLinkProps {
   identifier: string;
+  /** When the last code was asked for (Date.now()), kept by the screen. */
+  sentAt: number;
+  /** A new code was asked for at this time. */
+  onSent: (at: number) => void;
   /** A failed resend's sentence, or null to clear it. */
   onError: (message: string | null) => void;
 }
 
-// "Gửi lại mã", held for the server's per-account cooldown after each send
-// (the screen mounts this right after the first one), so it never offers a
-// tap the server would quietly ignore.
-export function ResendCodeLink({ identifier, onError }: ResendCodeLinkProps) {
+// "Gửi lại mã", held for the server's per-account cooldown after each send,
+// so it never offers a tap the server would quietly ignore. The send time
+// lives on the screen: coming back from the password step keeps the
+// countdown where it was.
+export function ResendCodeLink({ identifier, sentAt, onSent, onError }: ResendCodeLinkProps) {
   const { t } = useTranslation();
   const styles = useStyles();
   const request = useRequestPasswordResetMutation();
-  const [sentAt, setSentAt] = useState(() => Date.now());
-  const [now, setNow] = useState(sentAt);
+  const [now, setNow] = useState(() => Date.now());
   const left = Math.max(0, Math.ceil((sentAt + PASSWORD_RESET_RESEND_SECONDS * 1000 - now) / 1000));
   const waiting = left > 0;
 
@@ -41,7 +45,7 @@ export function ResendCodeLink({ identifier, onError }: ResendCodeLinkProps) {
       {
         onSuccess: () => {
           const at = Date.now();
-          setSentAt(at);
+          onSent(at);
           setNow(at);
         },
         onError: (error) => onError(requestErrorMessage(error)),

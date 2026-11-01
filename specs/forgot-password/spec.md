@@ -19,7 +19,7 @@ Actor: **User** — anyone on the login screen. The server only acts for an `act
 | BR-02 | Only an `active`, not deleted account gets a code. `pending`, `requested`, `disabled`, deleted and unknown get none — and the API answers exactly the same (status, body) as when a code was sent. ⚠️ Enumeration. |
 | BR-03 | The code is 6 decimal digits from `crypto/rand`, valid **15 minutes**, usable **once**. Asking again ends every earlier live code of that account. |
 | BR-04 | A code allows **5** wrong tries; the 5th wrong try ends it. A right code after that is refused like a wrong one. |
-| BR-05 | At most one new code per account per **60 s**, and **5** per account per hour. Over either, nothing is sent and the answer is the same success (BR-02). Per client IP: 5 requests / 15 min, 20 confirms / 15 min → `429`. |
+| BR-05 | At most one new code per account per **60 s**, and **5** per account per hour. Over either, nothing is sent and the answer is the same success (BR-02). Per client IP: 5 requests / 15 min, 20 verifies + confirms together / 15 min → `429`. |
 | BR-06 | The code is never stored or logged in clear: the database keeps `HMAC-SHA256(key, code)` with a key derived from `JWT_SECRET`, compared in constant time. Logs carry the user id, never the email, code or password. |
 | BR-07 | The new password follows the activation/change rules: ≥ 8 characters, ≤ 72 bytes (`WEAK_PASSWORD`). A rejected password does **not** spend a try. |
 | BR-08 | ⚠️ A successful reset, atomically: stores the new hash, moves `tokens_valid_after` (every earlier credential stops), marks the code used. Then every session of the account ends (`password_reset`) and the calling phone gets a fresh, device-bound session. |
@@ -62,13 +62,16 @@ Actor: **User** — anyone on the login screen. The server only acts for an `act
 
 **As a** User holding the code, **I want** to set a new password **so that** I can sign in again.
 
-**API:** `POST /api/v1/auth/password-reset/confirm` `{ "identifier", "code", "new_password" }` + device headers → `200 { access_token, refresh_token, email }` (same shape as login), `400 RESET_CODE_INVALID`, `400 WEAK_PASSWORD`, `400 INVALID_INPUT`, `429`.
+**API:**
+- `POST /api/v1/auth/password-reset/verify` `{ "identifier", "code" }` → `200` (no data; the code stays live), `400 RESET_CODE_INVALID`, `400 INVALID_INPUT`, `429`. Same account/code checks as confirm; a wrong code spends a try (BR-04). Added 2026-11-01 for the separate code step.
+- `POST /api/v1/auth/password-reset/confirm` `{ "identifier", "code", "new_password" }` + device headers → `200 { access_token, refresh_token, email }` (same shape as login), `400 RESET_CODE_INVALID`, `400 WEAK_PASSWORD`, `400 INVALID_INPUT`, `429`.
 
 ### Main Flow
-1. Step 2 of the screen: "Mã đặt lại" (6 digits), "Mật khẩu mới", "Nhập lại mật khẩu mới", button [Đặt lại mật khẩu]; link "Gửi lại mã" (after the countdown).
-2. App checks locally: 6 digits, password ≥ 8, both passwords equal.
-3. Server: password rules (BR-07) → account (BR-02, unknown = `RESET_CODE_INVALID`) → live code → compare (BR-06) → wrong: spend a try (BR-04) → `RESET_CODE_INVALID`; right: BR-08.
+1. Step 2 of the screen: "Mã đặt lại" (6 digits), button [Tiếp tục]; link "Gửi lại mã" (after the countdown). App checks 6 digits locally, then calls verify; `RESET_CODE_INVALID` stays on this step.
+2. Step 3: "Mật khẩu mới", "Nhập lại mật khẩu mới", button [Đặt lại mật khẩu]. App checks locally: password ≥ 8, both passwords equal.
+3. Server (confirm): password rules (BR-07) → account (BR-02, unknown = `RESET_CODE_INVALID`) → live code → compare (BR-06) → wrong: spend a try (BR-04) → `RESET_CODE_INVALID`; right: BR-08. A `RESET_CODE_INVALID` here (the code expired or was replaced since step 2) returns the App to step 2 with the error on the code field.
 4. App signs in with the returned pair exactly like a password login (`completeLogin`), shows "Đã đặt lại mật khẩu", opens Home.
+5. Back (on screen or the phone's) goes one step back, keeping the code typed; the resend countdown keeps running from the last send.
 
 ### Scenarios
 | ID | Given | When | Then | Notes |
@@ -101,8 +104,10 @@ Actor: **User** — anyone on the login screen. The server only acts for an `act
 | Step 1 sub | Mã đặt lại gửi tới email của tài khoản. |
 | Step 1 field / button | Email hoặc tên đăng nhập / Gửi mã |
 | Step 2 sub | Nếu {{identifier}} có tài khoản, mã 6 số đã gửi tới email của tài khoản đó. Mã dùng được trong 15 phút. |
-| Step 2 fields | Mã đặt lại / Mật khẩu mới / Nhập lại mật khẩu mới |
-| Step 2 button | Đặt lại mật khẩu |
+| Step 2 field / button | Mã đặt lại / Tiếp tục |
+| Step 3 sub | Thiết bị khác sẽ phải đăng nhập lại. |
+| Step 3 fields / button | Mật khẩu mới / Nhập lại mật khẩu mới / Đặt lại mật khẩu |
+| Code check failed (network, 5xx) | Chưa kiểm tra được mã. Thử lại. |
 | Resend | Gửi lại mã · Gửi lại mã sau {{seconds}} giây |
 | Field errors | Nhập email hoặc tên đăng nhập. · Nhập mã 6 số. · Mật khẩu cần ít nhất 8 ký tự. · Hai mật khẩu chưa khớp. |
 | `RESET_CODE_INVALID` | Mã không đúng hoặc đã hết hạn. |

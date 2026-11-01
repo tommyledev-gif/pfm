@@ -24,6 +24,12 @@ export interface PasswordResetRequestBody {
   identifier: string;
 }
 
+/** POST /auth/password-reset/verify. 200 with no data when the code is right. */
+export interface PasswordResetVerifyBody {
+  identifier: string;
+  code: string;
+}
+
 /** POST /auth/password-reset/confirm. Answers like POST /auth/login. */
 export interface PasswordResetConfirmBody {
   identifier: string;

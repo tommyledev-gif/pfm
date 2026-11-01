@@ -6,6 +6,12 @@ type PasswordResetRequest struct {
 	Identifier string `json:"identifier" validate:"required,max=254"`
 }
 
+// PasswordResetVerifyRequest is the body of POST /auth/password-reset/verify.
+type PasswordResetVerifyRequest struct {
+	Identifier string `json:"identifier" validate:"required,max=254"`
+	Code       string `json:"code" validate:"required,len=6,numeric"`
+}
+
 // PasswordResetConfirmRequest is the body of POST /auth/password-reset/confirm.
 // The password rules (8 characters, 72 bytes) are business rules checked by
 // the service, which answers WEAK_PASSWORD; max=256 only keeps a

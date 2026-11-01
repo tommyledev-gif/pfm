@@ -18,8 +18,8 @@ func PasswordResetRequestRateLimiter(logger *zap.Logger) fiber.Handler {
 	}, logger)
 }
 
-// PasswordResetConfirmRateLimiter caps POST /auth/password-reset/confirm per
-// client IP. Guessing is already bounded per code (5 tries); this bounds one
+// PasswordResetConfirmRateLimiter caps POST /auth/password-reset/verify and
+// /confirm per client IP (one instance mounted on both). Guessing is already bounded per code (5 tries); this bounds one
 // client spreading guesses over many accounts.
 func PasswordResetConfirmRateLimiter(logger *zap.Logger) fiber.Handler {
 	return newLimiter(limit{

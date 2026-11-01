@@ -29,7 +29,8 @@ type PasswordResetRepo interface {
 var _ PasswordResetRepo = (*repository.PasswordResetRepository)(nil)
 
 // PasswordResetService is forgot password by email code
-// (specs/forgot-password): ask for a code, then set a new password with it.
+// (specs/forgot-password): ask for a code, check it, then set a new password
+// with it.
 // Both routes are public; whether an identifier has an account is never
 // revealed (BR-02): asking always "succeeds", and every failure to confirm
 // is the same RESET_CODE_INVALID.
@@ -106,6 +107,23 @@ func (s *PasswordResetService) issueCode(userID uuid.UUID, toEmail string, now t
 	if err := s.email.SendPasswordResetCode(ctx, toEmail, code); err != nil {
 		s.logger.Error("password reset: email not sent", zap.String("user_id", userID.String()), zap.Error(err))
 	}
+}
+
+// VerifyCode checks a code before the new password is asked for (the App's
+// code step). A wrong code spends a try exactly like a wrong confirm (BR-04);
+// a right one is left live, so ConfirmReset checks it again and uses it.
+func (s *PasswordResetService) VerifyCode(ctx context.Context, identifier, code string) error {
+	user, live, err := s.liveCodeFor(ctx, identifier)
+	if err != nil {
+		return err
+	}
+	if s.hasher.matches(user.ID.String(), code, live.CodeHash) {
+		return nil
+	}
+	if err := s.codes.SpendTry(ctx, live.ID, common.ResetCodeMaxTries); err != nil {
+		return fmt.Errorf("service.VerifyCode: %w", err)
+	}
+	return common.ErrResetCodeInvalid
 }
 
 // ConfirmReset sets a new password with a live code (US-02) and signs the
