@@ -67,9 +67,14 @@ function ModeSegment({ mode, active, onPress }: { mode: ChatMode; active: boolea
     lit.value = reduceMotion ? (active ? 1 : 0) : withTiming(active ? 1 : 0, { duration: COLOUR_MS });
   }, [active, reduceMotion, lit]);
 
+  // ⚠️ Worked out here, on the JS thread: withAlpha is not a worklet, and
+  // calling it inside useAnimatedStyle (the UI thread) killed the app as soon
+  // as the preloaded Trợ lý tab mounted. The worklet only reads the strings.
   const tint = meta.tint;
+  const washOff = withAlpha(tint, 0);
+  const washOn = withAlpha(tint, TINT_ALPHA);
   const wash = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(lit.value, [0, 1], [withAlpha(tint, 0), withAlpha(tint, TINT_ALPHA)]),
+    backgroundColor: interpolateColor(lit.value, [0, 1], [washOff, washOn]),
   }));
   const Icon = meta.icon;
   const animate = mounted.current && !reduceMotion;
