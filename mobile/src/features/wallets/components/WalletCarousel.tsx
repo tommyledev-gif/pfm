@@ -14,7 +14,7 @@ import {
   CAROUSEL_SHADOW_BLEED_BOTTOM,
   CAROUSEL_SHADOW_BLEED_TOP,
 } from "@/features/wallets/components/WalletStackCard";
-import { SNAP_INTERVAL, useWalletCarousel } from "@/features/wallets/components/use-wallet-carousel";
+import { useWalletCarousel } from "@/features/wallets/components/use-wallet-carousel";
 import {
   cardAtOffset,
   useCarouselIntro,
@@ -29,12 +29,6 @@ const accentFor = (wallets: Wallet[], index: number) =>
   walletFace(wallets[index]?.color, index, wallets.length);
 
 const CARDS_HEIGHT = CARD_HEIGHT + CAROUSEL_SHADOW_BLEED_TOP + CAROUSEL_SHADOW_BLEED_BOTTOM;
-
-// From this many wallets the deck draws one card per wallet, each at its
-// nearest loop copy (wallet-carousel-motion's slotOf). Below it a wallet can
-// be visible on both sides at once (at ±1.5 places with three wallets), so
-// every loop copy is drawn.
-const MIN_WALLETS_FOR_SINGLE_DECK = 4;
 
 interface WalletCarouselProps {
   wallets: Wallet[];
@@ -77,16 +71,16 @@ interface WalletCarouselProps {
  * where it was pressed says which card (cardAtOffset): the centred one opens,
  * a neighbour slides over.
  *
- * A plain ScrollView rather than a FlatList: looping means silently jumping
- * the scroll offset by a whole copy's width, and wallet counts are small
- * enough that rendering every card outright is cheaper than windowing.
+ * The ScrollView only drags. A let-go swipe is finished by the carousel
+ * itself, in 300–480ms (useCarouselScroll): decelerationRate 0 leaves the
+ * native fling nothing to throw, and there is no native snap.
  *
- * ⚠️ The scroll space holds three copies of the list, the cards do not have
- * to: from four wallets up each wallet is drawn once and placed at its
- * nearest copy (MIN_WALLETS_FOR_SINGLE_DECK). Three copies of every card —
- * each two SVG gradients, an image and auto-fitted text, with three animated
- * styles re-run on every scroll frame — was what a swipe and the first
- * render of the carousel were paying for (2026-10-30).
+ * ⚠️ The deck is one card per wallet, each placed at its nearest position on
+ * an endless line (wallet-carousel-motion's slotOf); three wallets get two of
+ * each (useWalletCarousel). Three copies of every card — each two SVG
+ * gradients, an image and auto-fitted text, with three animated styles re-run
+ * on every scroll frame — was what a swipe and the first render of the
+ * carousel were paying for (2026-10-30).
  */
 function WalletCarouselView({
   wallets,
@@ -101,12 +95,15 @@ function WalletCarouselView({
   const {
     scrollRef,
     scrollX,
+    anchor,
     centre,
     scrollHandler,
     containerWidth,
     centreIndex,
-    rendered,
-    sidePadding,
+    deck,
+    loopCount,
+    contentWidth,
+    walletAt,
     onLayout,
     onContentSizeChange,
     pressCard,
@@ -117,12 +114,9 @@ function WalletCarouselView({
   // is dealt.
   const intro = useCarouselIntro(containerWidth > 0 && wallets.length > 0);
   const press = useCarouselPress();
-  // The card the current touch started on, rendered index; null for empty space.
+  // The card the current touch started on, as a card position; null for empty space.
   const touched = useRef<number | null>(null);
   const dotColors = useMemo(() => wallets.map((_, i) => accentFor(wallets, i)), [wallets]);
-  const contentWidth = sidePadding * 2 + Math.max(0, rendered.length - 1) * SNAP_INTERVAL + CARD_WIDTH;
-  const singleDeck = looping && wallets.length >= MIN_WALLETS_FOR_SINGLE_DECK;
-  const deck = singleDeck ? wallets : rendered;
   const accessibilityActions = useMemo(
     () => [
       { name: "increment" as const, label: t("wallets.carousel.a11y.next") },
@@ -133,13 +127,14 @@ function WalletCarouselView({
   );
 
   const cardAt = (event: GestureResponderEvent): number | null => {
-    // locationX is in the content's own coordinates; minus the scroll offset
-    // it is where on screen the finger is.
-    const dx = event.nativeEvent.locationX - scrollX.value - containerWidth / 2;
+    // locationX is in the content's own coordinates; minus the native scroll
+    // offset (not the cards' position: see useCarouselScroll) it is where on
+    // screen the finger is.
+    const dx = event.nativeEvent.locationX - (scrollX.value - anchor.value) - containerWidth / 2;
     const side = cardAtOffset(dx);
     if (side === null) return null;
-    const index = Math.round(centre.value) + side;
-    return index >= 0 && index < rendered.length ? index : null;
+    const slot = Math.round(centre.value) + side;
+    return walletAt(slot) ? slot : null;
   };
   const handlePressIn = useLatestCallback((event: GestureResponderEvent) => {
     touched.current = cardAt(event);
@@ -149,22 +144,25 @@ function WalletCarouselView({
   // A side card is a shortcut for the swipe that would bring it over; only
   // the card already in the middle is "opened".
   const handlePress = useLatestCallback(() => {
-    const index = touched.current;
-    if (index === null) return;
-    const wallet = rendered[index];
-    pressCard(index, onPressWallet && wallet ? () => onPressWallet(wallet) : undefined);
+    const slot = touched.current;
+    if (slot === null) return;
+    const wallet = walletAt(slot);
+    pressCard(slot, onPressWallet && wallet ? () => onPressWallet(wallet) : undefined);
   });
   const handleAccessibilityAction = useLatestCallback((event: AccessibilityActionEvent) => {
     if (event.nativeEvent.actionName === "increment") step(1);
     else if (event.nativeEvent.actionName === "decrement") step(-1);
-    else if (event.nativeEvent.actionName === "activate") pressCard(centreIndex, () => onPressWallet?.(rendered[centreIndex]));
+    else if (event.nativeEvent.actionName === "activate") {
+      const wallet = walletAt(centreIndex);
+      pressCard(centreIndex, onPressWallet && wallet ? () => onPressWallet(wallet) : undefined);
+    }
   });
 
   if (wallets.length === 0) {
     return <Text style={styles.empty}>{t("common.empty.noWallet")}</Text>;
   }
 
-  const centred = rendered[centreIndex];
+  const centred = walletAt(centreIndex);
   const cardLeft = Math.max(0, (containerWidth - CARD_WIDTH) / 2);
 
   return (
@@ -189,7 +187,7 @@ function WalletCarouselView({
                   // Every loop copy of the wallet gets it — whichever copy is
                   // centred is the one the user sees.
                   highlightOpacity={wallet.id === highlightWalletId ? highlightOpacity : undefined}
-                  loopCount={singleDeck ? wallets.length : 0}
+                  loopCount={loopCount}
                 />
               ))}
         </View>
@@ -199,15 +197,15 @@ function WalletCarouselView({
           horizontal
           style={StyleSheet.absoluteFill}
           showsHorizontalScrollIndicator={false}
-          snapToInterval={SNAP_INTERVAL}
-          disableIntervalMomentum
-          decelerationRate="fast"
+          // No native snap and no fling to speak of: a let-go swipe is
+          // finished on the UI thread (useCarouselScroll's release).
+          decelerationRate={0}
           // Only the horizontal axis is claimed, so the home screen's vertical
           // scroll still works over the cards.
           directionalLockEnabled
           scrollEventThrottle={16}
           onContentSizeChange={onContentSizeChange}
-          // Scroll, drag start and momentum end, all in one UI-thread handler.
+          // Scroll, drag start, release and momentum end, all in one UI-thread handler.
           onScroll={scrollHandler}
         >
           {containerWidth === 0 ? null : (
@@ -235,12 +233,12 @@ function WalletCarouselView({
         dotCount={wallets.length}
         // The active dot wears its wallet's card colour, tying the bar to the card above it.
         dotColors={dotColors}
-        positionCount={rendered.length}
+        positionCount={deck.length}
         looping={looping}
         scrollX={scrollX}
         areaWidth={containerWidth}
         canGoBack={looping || centreIndex > 0}
-        canGoForward={looping || centreIndex < rendered.length - 1}
+        canGoForward={looping || centreIndex < wallets.length - 1}
         onBack={() => step(-1)}
         onForward={() => step(1)}
       />

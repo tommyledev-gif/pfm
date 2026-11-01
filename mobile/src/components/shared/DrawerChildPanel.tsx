@@ -38,13 +38,19 @@ interface DrawerChildPanelProps extends DrawerChild {
   // the backdrop that already pads for the keyboard, so it has to lift itself:
   // its whole point is holding a search field.
   bottomInset: number;
+  // The sheet under it was dragged up to full screen: the panel is full
+  // screen too, its header clear of the status bar (`topInset`).
+  expanded: boolean;
+  topInset: number;
 }
 
-// How far down the overlay the panel starts. Matches Drawer's own 90% sheet
+// How far down the overlay the panel starts. Matches Drawer's own 92% sheet
 // cap, so the panel always fully covers the sheet it slid in over — a shorter
 // panel would leave a strip of the parent form showing above it, which reads
-// as two competing sheets rather than one step of the same flow.
-const TOP_INSET = "10%";
+// as two competing sheets rather than one step of the same flow. ⚠️ It was
+// 10% against that 92%, and a sheet dragged to full screen showed its whole
+// top above the panel.
+const TOP_INSET = "8%";
 
 // The sliding half of Drawer's `child` prop — see the DrawerChild doc comment
 // above for why this lives on Drawer rather than being nested in its children.
@@ -62,6 +68,8 @@ export function DrawerChildPanel({
   hideBack = false,
   width,
   bottomInset,
+  expanded,
+  topInset,
 }: DrawerChildPanelProps) {
   const colors = useColors();
   const styles = useStyles();
@@ -93,13 +101,13 @@ export function DrawerChildPanel({
 
   return (
     <Animated.View
-      style={[styles.panel, { bottom: bottomInset, transform: [{ translateX }] }]}
+      style={[styles.panel, expanded && styles.panelExpanded, { bottom: bottomInset, transform: [{ translateX }] }]}
       // Nothing here should fall through to the backdrop underneath, which
       // would dismiss the parent sheet along with this panel.
       pointerEvents="box-none"
     >
-      <View style={styles.surface}>
-        <View style={styles.header}>
+      <View style={[styles.surface, expanded && styles.surfaceExpanded]}>
+        <View style={[styles.header, expanded && { paddingTop: topInset + spacing.lg }]}>
           {hideBack ? (
             // Keeps the title centred between equal sides.
             <View style={styles.backSpacer} />
@@ -128,6 +136,7 @@ const useStyles = createStyles((colors) => ({
   // elevation alongside zIndex: on Android the sibling backdrop can otherwise
   // paint over a later sibling regardless of document order.
   panel: { position: "absolute", left: 0, right: 0, top: TOP_INSET, zIndex: 1, elevation: 1 },
+  panelExpanded: { top: 0 },
   surface: {
     flex: 1,
     backgroundColor: colors.surface,
@@ -135,6 +144,8 @@ const useStyles = createStyles((colors) => ({
     borderTopRightRadius: radii.hero,
     overflow: "hidden",
   },
+  // Square at the top edge, like the full-screen sheet under it.
+  surfaceExpanded: { borderTopLeftRadius: 0, borderTopRightRadius: 0 },
   header: {
     flexDirection: "row",
     alignItems: "center",

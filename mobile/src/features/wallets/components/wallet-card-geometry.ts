@@ -9,6 +9,9 @@ export const CARD_HEIGHT = 132;
 // them, which read as a filmstrip of unrelated tiles; overlapping them makes
 // the row read as one stack of cards with the active one lifted off the top.
 export const CARD_OVERLAP = 56;
+// Each card steps less than its own width, so every card overlaps its
+// neighbour — the layout itself is a stack, not a row with gaps.
+export const SNAP_INTERVAL = CARD_WIDTH - CARD_OVERLAP;
 // Vertical room the card's drop shadow needs beyond the card (radius 14,
 // pushed 6 down, so more below than above). The carousel's scroll box clips
 // anything outside its bounds, so it reserves this much on each side. The

@@ -14,7 +14,7 @@ import { useTranslation } from "react-i18next";
 import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/Icon";
 import { withAlpha } from "@/lib/color";
 import { radii, spacing, createStyles, useColors } from "@/lib/theme";
-import { SNAP_INTERVAL } from "@/features/wallets/components/use-wallet-carousel";
+import { SNAP_INTERVAL } from "@/features/wallets/components/wallet-card-geometry";
 import { CAROUSEL_SHADOW_BLEED_BOTTOM } from "@/features/wallets/components/WalletStackCard";
 
 const DOT = 6;

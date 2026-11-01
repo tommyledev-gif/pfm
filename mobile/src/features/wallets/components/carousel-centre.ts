@@ -41,3 +41,25 @@ export function nextCentre(position: number, previous: number, centre: number): 
   if (Math.abs(position - centre) < 0.5 + CENTRE_HYSTERESIS) return centre;
   return Math.round(position);
 }
+
+// A release faster than this (dp per ms; the scroll's end-drag velocity) is a
+// flick: on to the next card the way it was going, however little it moved.
+export const FLICK_SPEED = 0.25;
+// Released this close to a card, a flick still counts as on it: not a whole
+// card further.
+const ON_CARD = 0.04;
+
+/**
+ * The card a released swipe lands on, from the `position` it was let go at
+ * (in cards), the way it was last moving (`heading`, ±1, 0 for unknown) and
+ * the release `speed`. Never more than one card on from where it was let go.
+ * Direction comes from the scroll's own movement, not the event's velocity:
+ * Android reports that as the finger's, opposite in sign to iOS.
+ */
+export function releaseTarget(position: number, heading: number, speed: number): number {
+  "worklet";
+  if (speed >= FLICK_SPEED && heading !== 0) {
+    return heading > 0 ? Math.ceil(position - ON_CARD) : Math.floor(position + ON_CARD);
+  }
+  return Math.round(position);
+}

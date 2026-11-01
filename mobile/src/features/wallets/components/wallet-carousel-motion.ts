@@ -10,12 +10,12 @@ import {
   withTiming,
 } from "react-native-reanimated";
 
-import { SNAP_INTERVAL } from "@/features/wallets/components/use-wallet-carousel";
 import {
   CARD_WIDTH,
   SHEEN_ANGLE,
   SHEEN_X_FROM_LEFT,
   SHEEN_X_FROM_RIGHT,
+  SNAP_INTERVAL,
 } from "@/features/wallets/components/wallet-card-geometry";
 
 // ── The resting stack ────────────────────────────────────────────────────
@@ -145,12 +145,12 @@ export function useCarouselPress() {
 }
 
 /**
- * Where card `index` stands in the scroll's own positions (the rendered,
- * looped list). With `loopCount` set, the deck holds one card per wallet and
- * each sits at whichever loop copy of its wallet is nearest the scroll: the
- * copies only ever differ by whole loops, and only cards within two places of
- * the centre are visible, so from four wallets up this draws exactly what
- * three copies of every card did, with a third of the cards.
+ * Where card `index` stands on the carousel's endless line of positions.
+ * With `loopCount` set (looping: the deck's size), each card sits at
+ * whichever of its positions, every `loopCount` places, is nearest the
+ * scroll. Only cards within two places of the centre are visible and the deck
+ * has at least four cards, so every visible place always has its card, and
+ * moving the scroll by whole decks changes nothing on screen.
  */
 function slotOf(index: number, loopCount: number, position: number): number {
   "worklet";

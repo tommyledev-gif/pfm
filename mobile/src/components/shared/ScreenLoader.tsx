@@ -35,6 +35,11 @@ interface ScreenLoaderProps {
   /** One short line under it, when the wait deserves a word. */
   label?: string;
   style?: StyleProp<ViewStyle>;
+  /**
+   * There at once, without the delayed fade-in: for a host that fades it in
+   * itself (the language switch's cover, ThemeTransitionHost).
+   */
+  instant?: boolean;
 }
 
 /**
@@ -46,7 +51,7 @@ interface ScreenLoaderProps {
  * Fades in only after SHOW_AFTER_MS, so a quick load never flashes it. Under
  * Reduce Motion the arc holds still and only the dot breathes, slowly.
  */
-export function ScreenLoader({ label, style }: ScreenLoaderProps) {
+export function ScreenLoader({ label, style, instant = false }: ScreenLoaderProps) {
   const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
@@ -79,7 +84,7 @@ export function ScreenLoader({ label, style }: ScreenLoaderProps) {
 
   return (
     <Animated.View
-      entering={FadeIn.duration(220).delay(SHOW_AFTER_MS)}
+      entering={instant ? undefined : FadeIn.duration(220).delay(SHOW_AFTER_MS)}
       style={[styles.root, style]}
       accessibilityRole="progressbar"
       accessibilityLabel={label ?? t("common.loading")}

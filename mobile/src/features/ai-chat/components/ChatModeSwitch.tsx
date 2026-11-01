@@ -2,7 +2,6 @@ import { useEffect, useRef } from "react";
 import { Pressable, View } from "react-native";
 import Animated, {
   FadeIn,
-  FadeOut,
   LinearTransition,
   interpolateColor,
   useAnimatedStyle,
@@ -23,13 +22,18 @@ const TINT_ALPHA = 0.24;
 const COLOUR_MS = 220;
 // One small overshoot (~5%), then still: the segments trade width, and a
 // longer wobble made the row breathe. ⚠️ The mass is not optional: on
-// Reanimated 4's default (4) this rang for seconds, and each time the opening
-// segment swung back under its label's width, overflow: hidden cut the
-// label's tail off (see motion-tokens' SPRING note).
+// Reanimated 4's default (4) this rang for seconds (see motion-tokens' SPRING
+// note).
 const RESIZE = LinearTransition.springify().damping(22).stiffness(260).mass(1);
 // The label fades in once its segment is nearly open, never while the
 // opening edge is still crossing it.
-const LABEL_IN = { delay: 120, duration: 160 };
+const LABEL_IN = { delay: 160, duration: 160 };
+// ⚠️ The name is one unbreakable run with a no-break space of slack at its
+// end, drawn with clip rather than "…". Some Android fonts draw bold text a
+// few px wider than it measured, and the name ended in "…" at rest
+// ("Giao d…") however wide the bar was; the slack is what gets cut instead.
+const NBSP = " ";
+const unbreakable = (label: string) => `${label.replace(/ /g, NBSP)}${NBSP}`;
 // The bar has room for the longest short name up to this text size; past it
 // the label would push the search and menu buttons off the bar.
 const LABEL_MAX_FONT_SCALE = 1.3;
@@ -105,15 +109,18 @@ function ModeSegment({ mode, active, onPress }: { mode: ChatMode; active: boolea
           color={active ? tint : colors.textSecondary}
           toColor={active ? meta.iconToColor : undefined}
         />
+        {/* Gone at once when the mode changes: the segment no longer clips,
+            so a fading name would spill over the next icon as it closed. */}
         {active ? (
           <Animated.Text
             entering={animate ? FadeIn.duration(LABEL_IN.duration).delay(LABEL_IN.delay) : undefined}
-            exiting={FadeOut.duration(90)}
             style={styles.label}
             numberOfLines={1}
+            ellipsizeMode="clip"
+            textBreakStrategy="simple"
             maxFontSizeMultiplier={LABEL_MAX_FONT_SCALE}
           >
-            {meta.shortLabel}
+            {unbreakable(meta.shortLabel)}
           </Animated.Text>
         ) : null}
       </Pressable>
@@ -135,7 +142,9 @@ const useStyles = createStyles((colors) => ({
     borderRadius: radii.pill,
     backgroundColor: withAlpha(colors.overlayBase, 0.06),
   },
-  segment: { height: SEGMENT_HEIGHT, borderRadius: SEGMENT_HEIGHT / 2, overflow: "hidden" },
+  // ⚠️ No overflow: hidden. The wash is rounded by borderRadius alone, and a
+  // segment springing open or shut must never cut its own name off.
+  segment: { height: SEGMENT_HEIGHT, borderRadius: SEGMENT_HEIGHT / 2 },
   press: {
     flexDirection: "row",
     alignItems: "center",
@@ -144,5 +153,6 @@ const useStyles = createStyles((colors) => ({
     minWidth: SEGMENT_HEIGHT,
     paddingHorizontal: (SEGMENT_HEIGHT - ICON_SIZE) / 2,
   },
-  label: { ...typography.label, fontWeight: "700", color: colors.textPrimary, paddingRight: 4, flexShrink: 0 },
+  // The trailing no-break space stands in for most of the right padding.
+  label: { ...typography.label, fontWeight: "700", color: colors.textPrimary, paddingRight: 1, flexShrink: 0 },
 }));

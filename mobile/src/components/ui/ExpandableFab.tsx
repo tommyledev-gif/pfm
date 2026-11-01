@@ -3,10 +3,10 @@ import { Animated, Easing, Pressable, StyleProp, StyleSheet, Text, View, ViewSty
 import Reanimated from "react-native-reanimated";
 import { useTranslation } from "react-i18next";
 
-import { PressableScale } from "@/components/motion/PressableScale";
 import { IconProps } from "@/components/ui/icons/primitives";
 import { PlusIcon } from "@/components/ui/Icon";
-import { FAB_PRESS_SCALE, FAB_SIZE, fabEntrance, useFabBottom } from "@/components/ui/Fab";
+import { FAB_SIZE, fabEntrance, useFabBottom } from "@/components/ui/Fab";
+import { FabButton } from "@/components/ui/FabButton";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useReduceMotion } from "@/lib/use-reduce-motion";
 
@@ -133,20 +133,16 @@ export const ExpandableFab = memo(function ExpandableFab({ actions, accessibilit
           })}
         </View>
 
-        <PressableScale
+        <FabButton
           testID={testID}
-          accessibilityRole="button"
           accessibilityLabel={open ? t("common.action.close") : accessibilityLabel}
           accessibilityState={{ expanded: open }}
           onPress={() => setOpen((prev) => !prev)}
-          hitSlop={8}
-          scaleTo={FAB_PRESS_SCALE}
-          style={styles.fab}
         >
           <Animated.View style={{ transform: [{ rotate }] }}>
             <PlusIcon size={24} color={colors.onGreen} />
           </Animated.View>
-        </PressableScale>
+        </FabButton>
       </Reanimated.View>
     </>
   );
@@ -177,19 +173,5 @@ const useStyles = createStyles((colors) => ({
     elevation: 4,
   },
   actionLabel: { ...typography.label, color: colors.textPrimary },
-  // Same look as the plain Fab — see Fab.tsx.
-  fab: {
-    width: FAB_SIZE,
-    height: FAB_SIZE,
-    borderRadius: radii.pill,
-    backgroundColor: colors.green,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: colors.green,
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
-  },
   pressed: { opacity: 0.85, transform: [{ scale: 0.95 }] },
 }));

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, LayoutAnimation, LayoutChangeEvent, PanResponder } from "react-native";
+import { Animated, LayoutChangeEvent, PanResponder } from "react-native";
 
 // Dragged down past this share of the sheet's resting height → close.
 const CLOSE_RATIO = 0.5;
@@ -17,14 +17,6 @@ const MOVE_SLOP = 4;
 const RUBBER_MAX = 36;
 const rubber = (distance: number) => RUBBER_MAX * (1 - Math.exp(-distance / (RUBBER_MAX * 3)));
 
-// The height change between resting and full: a soft spring, so the sheet
-// settles into the new height rather than snapping to it.
-const RESIZE_ANIMATION = {
-  duration: 320,
-  create: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
-  update: { type: LayoutAnimation.Types.spring, springDamping: 0.86 },
-};
-
 interface UseSheetDragOptions {
   /** The sheet's own slide transform — dragging writes straight into it. */
   translateY: Animated.Value;
@@ -41,7 +33,7 @@ interface UseSheetDragOptions {
  *
  * The sheet follows the finger down, and gives a little with resistance on
  * the way up, so it feels held throughout; the height change itself happens
- * on release, as a layout spring.
+ * on release, as Drawer's layout spring.
  *
  * ⚠️ Attached to the handle strip only, never the whole sheet: the body is a
  * ScrollView, and a sheet-wide responder would fight it for every vertical
@@ -73,9 +65,11 @@ export function useSheetDrag({ translateY, onClose }: UseSheetDragOptions) {
     const springBack = () =>
       Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 240 }).start();
 
+    // The height change itself glides on Drawer's layout transition
+    // (SHEET_RESIZE). ⚠️ No LayoutAnimation here: it used to animate this
+    // same frame, and two animators on one view fight over it.
     const setExpandedAnimated = (next: boolean) => {
       if (expandedRef.current === next) return;
-      LayoutAnimation.configureNext(RESIZE_ANIMATION);
       setExpanded(next);
     };
 

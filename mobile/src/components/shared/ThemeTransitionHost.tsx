@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Animated, Easing, Image, StyleSheet } from "react-native";
-import { useTranslation } from "react-i18next";
+import { Animated, Easing, Image, StyleSheet } from "react-native";
 
+import { ScreenLoader } from "@/components/shared/ScreenLoader";
 import { withAlpha } from "@/lib/color";
 import { useColors, useThemeName } from "@/lib/theme";
 import { useThemeStore } from "@/stores/theme-store";
@@ -19,7 +19,7 @@ const FADE_MS = 380;
 const SETTLE_MS = 90;
 // A local JPEG decodes in well under this; past it the image is not coming.
 const LOAD_FAILSAFE_MS = 1500;
-// A language switch: how long the dimmed cover and its spinner take to come in
+// A language switch: how long the dimmed cover and its loader take to come in
 // over the snapshot before the switch starts.
 const COVER_MS = 140;
 // Idle turns of the JS thread, in a row, before the language counts as
@@ -81,7 +81,6 @@ function afterAppSettles(done: () => void): () => void {
 }
 
 function SnapshotFade({ uri, change }: { uri: string; change: PendingChange }) {
-  const { t } = useTranslation();
   const colors = useColors();
   // ⚠️ Never reset this value (setValue) while the overlay is mounted. It is
   // driven natively, so setValue reaches the screen on the next frame, while
@@ -89,7 +88,7 @@ function SnapshotFade({ uri, change }: { uri: string; change: PendingChange }) {
   // fade showed the old theme again for a few frames before the overlay went
   // away — the flash at the end of every switch.
   const opacity = useRef(new Animated.Value(1)).current;
-  // The language switch's dimmed cover and spinner, 0 → 1 before it starts.
+  // The language switch's dimmed cover and loader, 0 → 1 before it starts.
   const cover = useRef(new Animated.Value(0)).current;
   const [painted, setPainted] = useState(false);
   const themeName = useThemeName();
@@ -116,8 +115,9 @@ function SnapshotFade({ uri, change }: { uri: string; change: PendingChange }) {
   // ⚠️ A language switch re-renders every mounted screen in one go (all five
   // tabs, the screen it was made from, every row in their lists) and holds
   // the JS thread while it does: anything JS starts then only starts after.
-  // So the cover comes in first and the switch begins once it is up; the
-  // spinner is a native view and keeps turning through the whole re-render.
+  // So the cover comes in first and the switch begins once it is up. Its
+  // loader (ScreenLoader) runs on the UI thread: the ring keeps turning and
+  // the dot breathing through the whole re-render.
   useEffect(() => {
     if (!painted) return;
     if (!isLanguage) {
@@ -163,7 +163,9 @@ function SnapshotFade({ uri, change }: { uri: string; change: PendingChange }) {
       <Image source={source} style={StyleSheet.absoluteFill} resizeMode="stretch" fadeDuration={0} onLoad={onLoad} onError={onLoad} />
       {isLanguage ? (
         <Animated.View style={[styles.cover, { backgroundColor: withAlpha(colors.bgApp, 0.6), opacity: cover }]}>
-          <ActivityIndicator size="large" color={colors.textPrimary} accessibilityLabel={t("common.loading")} />
+          {/* Instant: the cover's own fade brings it in. Its delayed fade-in
+              would start just as the re-render holds every commit. */}
+          <ScreenLoader instant />
         </Animated.View>
       ) : null}
     </Animated.View>

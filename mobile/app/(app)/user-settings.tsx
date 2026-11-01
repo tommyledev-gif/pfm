@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ScrollView } from "react-native";
 import { useTranslation } from "react-i18next";
 
@@ -6,7 +7,7 @@ import { ListSection } from "@/components/ui/grouped-list";
 import { Screen } from "@/components/shared/Screen";
 import { ScreenHeader } from "@/components/shared/ScreenHeader";
 import { useFabBottom } from "@/components/ui/Fab";
-import { LanguagePicker } from "@/features/settings/components/LanguagePicker";
+import { LanguagePicker, LanguageSheet } from "@/features/settings/components/LanguagePicker";
 import { ThemePicker } from "@/features/settings/components/ThemePicker";
 import { PinLocationDefaultRow } from "@/features/settings/components/PinLocationDefaultRow";
 import { spacing, createStyles } from "@/lib/theme";
@@ -21,6 +22,7 @@ export default function UserSettingsScreen() {
   const styles = useStyles();
   // Clear of the floating BottomNav, which covers the screen's foot.
   const navClearance = useFabBottom();
+  const [languageOpen, setLanguageOpen] = useState(false);
 
   return (
     <Screen style={styles.screen}>
@@ -30,7 +32,7 @@ export default function UserSettingsScreen() {
           <ThemePicker />
         </MotionView>
         <MotionView index={1}>
-          <LanguagePicker />
+          <LanguagePicker onOpen={() => setLanguageOpen(true)} />
         </MotionView>
         <MotionView index={2}>
           <ListSection header={t("userSettings.transactions.header")}>
@@ -38,6 +40,8 @@ export default function UserSettingsScreen() {
           </ListSection>
         </MotionView>
       </ScrollView>
+      {/* At the root, not in the list: the sheet covers the whole screen. */}
+      <LanguageSheet visible={languageOpen} onClose={() => setLanguageOpen(false)} />
     </Screen>
   );
 }
