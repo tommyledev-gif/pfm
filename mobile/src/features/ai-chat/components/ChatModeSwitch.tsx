@@ -21,9 +21,18 @@ const SEGMENT_HEIGHT = 36;
 const ICON_SIZE = 18;
 const TINT_ALPHA = 0.24;
 const COLOUR_MS = 220;
-// Critically damped enough not to wobble: the segments trade width, and an
-// overshoot would make the row breathe.
-const RESIZE = LinearTransition.springify().damping(22).stiffness(260);
+// One small overshoot (~5%), then still: the segments trade width, and a
+// longer wobble made the row breathe. ⚠️ The mass is not optional: on
+// Reanimated 4's default (4) this rang for seconds, and each time the opening
+// segment swung back under its label's width, overflow: hidden cut the
+// label's tail off (see motion-tokens' SPRING note).
+const RESIZE = LinearTransition.springify().damping(22).stiffness(260).mass(1);
+// The label fades in once its segment is nearly open, never while the
+// opening edge is still crossing it.
+const LABEL_IN = { delay: 120, duration: 160 };
+// The bar has room for the longest short name up to this text size; past it
+// the label would push the search and menu buttons off the bar.
+const LABEL_MAX_FONT_SCALE = 1.3;
 
 interface ChatModeSwitchProps {
   mode: ChatMode;
@@ -98,10 +107,11 @@ function ModeSegment({ mode, active, onPress }: { mode: ChatMode; active: boolea
         />
         {active ? (
           <Animated.Text
-            entering={animate ? FadeIn.duration(180).delay(80) : undefined}
+            entering={animate ? FadeIn.duration(LABEL_IN.duration).delay(LABEL_IN.delay) : undefined}
             exiting={FadeOut.duration(90)}
             style={styles.label}
             numberOfLines={1}
+            maxFontSizeMultiplier={LABEL_MAX_FONT_SCALE}
           >
             {meta.shortLabel}
           </Animated.Text>
@@ -117,6 +127,9 @@ const useStyles = createStyles((colors) => ({
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",
+    // The mode in use always shows its whole name: the bar's buttons are
+    // fixed-size, so the switch never has to give way to them.
+    flexShrink: 0,
     padding: 3,
     gap: 2,
     borderRadius: radii.pill,
@@ -131,5 +144,5 @@ const useStyles = createStyles((colors) => ({
     minWidth: SEGMENT_HEIGHT,
     paddingHorizontal: (SEGMENT_HEIGHT - ICON_SIZE) / 2,
   },
-  label: { ...typography.label, fontWeight: "700", color: colors.textPrimary, paddingRight: 4 },
+  label: { ...typography.label, fontWeight: "700", color: colors.textPrimary, paddingRight: 4, flexShrink: 0 },
 }));

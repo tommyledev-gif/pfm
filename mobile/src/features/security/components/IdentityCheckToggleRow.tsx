@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { ListToggleRow } from "@/components/ui/grouped-list";
 import { IdentityCheckGlyph } from "@/components/ui/grouped-list/list-icons";
-import { TranslationKey } from "@/lib/i18n";
+import { i18n, TranslationKey } from "@/lib/i18n";
 import { useColors } from "@/lib/theme";
 import { useSecurityPrefsStore } from "@/stores/security-prefs-store";
 import { CHANGE_SETTING_PROMPT, verifyOwner } from "@/features/security/identity-check";
@@ -32,7 +32,7 @@ export function IdentityCheckToggleRow() {
     }
     setChecking(true);
     try {
-      const result = await verifyOwner(PIN_COPY.enter, CHANGE_SETTING_PROMPT);
+      const result = await verifyOwner(i18n.t(PIN_COPY.enter), i18n.t(CHANGE_SETTING_PROMPT));
       if (result === "passed" || result === "unavailable") setEnabled(false);
     } finally {
       setChecking(false);

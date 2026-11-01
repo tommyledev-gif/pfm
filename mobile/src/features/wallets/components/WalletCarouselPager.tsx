@@ -94,6 +94,13 @@ interface ActiveCapsuleProps {
  * the scroll frame by frame (the carousel's own Reanimated value), drawing
  * out a little mid-way and blending from one wallet's colour into the next.
  * Across the loop's seam it fades from one end to the other (capsuleAt).
+ *
+ * ⚠️ Drawn out by scaleX, never by width. Every prop here but width goes
+ * straight to the view (Reanimated's ANDROID_SYNCHRONOUSLY_UPDATE_UI_PROPS,
+ * package.json); a width sent the whole frame through a shadow-tree commit
+ * and a layout pass instead, on every frame of every swipe, and that commit
+ * is dropped whenever React is committing too. The stretch is at most 8px
+ * on a 6px-tall pill, so its rounded ends never visibly flatten.
  */
 function ActiveCapsule({ dotCount, looping, scrollX, colors }: ActiveCapsuleProps) {
   const styles = useStyles();
@@ -103,9 +110,9 @@ function ActiveCapsule({ dotCount, looping, scrollX, colors }: ActiveCapsuleProp
     const frac = position - index;
     const width = PILL + PILL_STRETCH * Math.sin(Math.PI * frac);
     return {
-      width,
       opacity,
-      transform: [{ translateX: EDGE + position * STEP + DOT / 2 - width / 2 }],
+      // Scaled about its own centre, so the centre stays on the dot.
+      transform: [{ translateX: EDGE + position * STEP + DOT / 2 - PILL / 2 }, { scaleX: width / PILL }],
       backgroundColor: interpolateColor(frac, [0, 1], [colors[index] ?? colors[0], colors[(index + 1) % dotCount] ?? colors[0]]),
     };
   });
@@ -285,7 +292,7 @@ const useStyles = createStyles((colors) => ({
   dots: { height: DOT, overflow: "hidden" },
   dotRow: { position: "absolute", top: 0, left: 0, height: DOT },
   dot: { position: "absolute", top: 0, width: DOT, height: DOT, borderRadius: DOT / 2, backgroundColor: colors.trackMuted },
-  capsule: { position: "absolute", top: 0, left: 0, height: DOT, borderRadius: DOT / 2 },
+  capsule: { position: "absolute", top: 0, left: 0, width: PILL, height: DOT, borderRadius: DOT / 2 },
   ellipsis: { flexDirection: "row", alignItems: "center", gap: ELLIPSIS_GAP, width: ELLIPSIS_WIDTH },
   ellipsisDot: { width: ELLIPSIS_DOT, height: ELLIPSIS_DOT, borderRadius: ELLIPSIS_DOT / 2, backgroundColor: colors.trackMuted },
 }));

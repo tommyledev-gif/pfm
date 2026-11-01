@@ -5,7 +5,7 @@ import { withDeviceHeaders } from "@/lib/device-identity";
 import { currentLanguage } from "@/lib/i18n";
 import { userIdFromAccessToken } from "@/lib/jwt";
 import { redact } from "@/lib/redact";
-import { useDebugLogStore } from "@/stores/debug-log-store";
+import { consoleDetail, useDebugLogStore } from "@/stores/debug-log-store";
 import { useSessionStore } from "@/stores/session-store";
 
 // Unlike frontend/'s apiClient (which points at a same-origin BFF proxy so
@@ -103,11 +103,15 @@ apiClient.interceptors.response.use(
   (response) => {
     useDebugLogStore
       .getState()
-      .append("api", `${response.status} ${response.config.method?.toUpperCase()} ${response.config.url}`, {
-        headers: redact(response.config.headers),
-        request: redact(response.config.data),
-        response: redact(response.data),
-      });
+      .append(
+        "api",
+        `${response.status} ${response.config.method?.toUpperCase()} ${response.config.url}`,
+        consoleDetail(() => ({
+          headers: redact(response.config.headers),
+          request: redact(response.config.data),
+          response: redact(response.data),
+        })),
+      );
     return response;
   },
   async (error) => {

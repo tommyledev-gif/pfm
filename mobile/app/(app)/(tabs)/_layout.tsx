@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Animated, Dimensions, Easing } from "react-native";
 import { Href, Tabs, useRouter } from "expo-router";
 
@@ -69,6 +69,9 @@ function usePreloadTabs() {
   }, [router]);
 }
 
+// Module scope, so the navigator is not handed a new bar renderer per render.
+const renderNoTabBar = () => null;
+
 // The five bottom-nav destinations, as a real tab navigator.
 //
 // ⚠️ They used to be plain Stack routes switched with router.replace, which
@@ -92,16 +95,20 @@ function usePreloadTabs() {
 export default function TabsLayout() {
   const colors = useColors();
   usePreloadTabs();
+  // Built once per theme: this layout re-renders on every tab switch (its
+  // route carries the tab state), and fresh options made the navigator
+  // rebuild all five descriptors and re-render every scene's shell for it.
+  const screenOptions = useMemo(
+    () => ({
+      headerShown: false,
+      sceneStyle: { backgroundColor: colors.bgApp },
+      sceneStyleInterpolator: slideInterpolator,
+      transitionSpec: { animation: "timing" as const, config: { duration: SWITCH_MS, easing: Easing.out(Easing.cubic) } },
+    }),
+    [colors],
+  );
   return (
-    <Tabs
-      tabBar={() => null}
-      screenOptions={{
-        headerShown: false,
-        sceneStyle: { backgroundColor: colors.bgApp },
-        sceneStyleInterpolator: slideInterpolator,
-        transitionSpec: { animation: "timing", config: { duration: SWITCH_MS, easing: Easing.out(Easing.cubic) } },
-      }}
-    >
+    <Tabs tabBar={renderNoTabBar} screenOptions={screenOptions}>
       <Tabs.Screen name="index" />
       <Tabs.Screen name="transactions" />
       <Tabs.Screen name="ai-chat" />

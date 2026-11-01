@@ -21,7 +21,7 @@ export const FAB_PRESS_SCALE = 0.92;
 // part of the layout. Built per mount: Reanimated's builders are mutable.
 const FAB_ENTER_DELAY_MS = 150;
 export const fabEntrance = () =>
-  ZoomIn.springify().damping(SPRING.damping).stiffness(SPRING.stiffness).delay(FAB_ENTER_DELAY_MS);
+  ZoomIn.springify().damping(SPRING.damping).stiffness(SPRING.stiffness).mass(SPRING.mass).delay(FAB_ENTER_DELAY_MS);
 
 interface FabProps {
   onPress: () => void;

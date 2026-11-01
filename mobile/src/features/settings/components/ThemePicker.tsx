@@ -2,6 +2,7 @@ import { Pressable, Text, View } from "react-native";
 import Animated, { ZoomIn } from "react-native-reanimated";
 import { useTranslation } from "react-i18next";
 
+import { PRESS_SPRING } from "@/components/motion/motion-tokens";
 import { ListCell, ListSection } from "@/components/ui/grouped-list";
 import { CheckIcon } from "@/components/ui/Icon";
 import { createStyles, radii, spacing, typography, useThemeName } from "@/lib/theme";
@@ -64,9 +65,10 @@ function ThemeOption({ name, selected, onPress }: { name: ThemeName; selected: b
           <View style={[styles.swatchLineShort, { backgroundColor: palette.textMuted }]} />
         </View>
         <View style={[styles.swatchDot, { backgroundColor: palette.green }]}>
-          {/* Springs in on the tile just picked, so the choice visibly lands. */}
+          {/* Springs in on the tile just picked, so the choice visibly lands: one
+              small overshoot (PRESS_SPRING), then still. */}
           {selected ? (
-            <Animated.View entering={ZoomIn.springify().damping(12)}>
+            <Animated.View entering={ZoomIn.springify().damping(PRESS_SPRING.damping).stiffness(PRESS_SPRING.stiffness).mass(PRESS_SPRING.mass)}>
               <CheckIcon size={12} color={palette.onGreen} strokeWidth={3} />
             </Animated.View>
           ) : null}

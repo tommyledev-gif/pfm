@@ -1,5 +1,7 @@
 import { create } from "zustand";
 
+import { useUiPrefsStore } from "@/stores/ui-prefs-store";
+
 // Client-only, non-persisted diagnostic log (specs/mobile-debug-console/spec.md)
 // — deliberately NOT paired with TanStack Query or secure storage; this is
 // ephemeral, in-memory data for the current app session only, same
@@ -25,6 +27,18 @@ interface DebugLogState {
 }
 
 let nextId = 1;
+
+/**
+ * An entry's detail, built only while the debug console is switched on
+ * (Developer screen; off by default). A successful API call's detail is a
+ * redacted deep copy of its whole request and response: built for every call
+ * and kept for the last MAX_ENTRIES of them, it cost a deep copy per response
+ * and megabytes of heap for the whole session, behind a console nobody had
+ * opened. The summary line is logged either way.
+ */
+export function consoleDetail<T>(build: () => T): T | undefined {
+  return useUiPrefsStore.getState().debugBubbleVisible ? build() : undefined;
+}
 
 export const useDebugLogStore = create<DebugLogState>((set) => ({
   entries: [],

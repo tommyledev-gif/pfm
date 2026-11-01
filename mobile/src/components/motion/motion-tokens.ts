@@ -23,6 +23,12 @@ import {
 // (ReduceMotion.System is their default): with it on, the content appears in
 // its final place with no movement.
 
+// ⚠️ Every spring here, and every builder or withSpring built from one,
+// passes its mass. Reanimated 4 changed the default from 1 to 4: these
+// dampings, tuned for 1, then ring at a quarter of their damping ratio.
+// SPRING overshot by ~20% instead of none, a damping(12) tick by ~70%, and
+// every entrance and layout move kept the UI thread busy ~4x longer than
+// designed (2026-11-01).
 /** animate-ui's default spring: quick, no visible wobble. */
 export const SPRING = { stiffness: 220, damping: 26, mass: 1 } as const;
 /** For an indicator that slides between options (tabs, segmented control). */
@@ -47,7 +53,7 @@ export type EntrancePreset = "fadeUp" | "fadeDown" | "fade" | "zoom" | "slideLef
  * would leak one view's delay into the next.
  */
 export function entrance(preset: EntrancePreset = "fadeUp", delay = 0) {
-  const { damping, stiffness } = SPRING;
+  const { damping, stiffness, mass } = SPRING;
   switch (preset) {
     case "fade":
       return FadeIn.duration(220).delay(delay);
@@ -56,24 +62,28 @@ export function entrance(preset: EntrancePreset = "fadeUp", delay = 0) {
         .springify()
         .damping(damping)
         .stiffness(stiffness)
+        .mass(mass)
         .delay(delay);
     case "zoom":
       return ZoomIn.withInitialValues({ transform: [{ scale: 0.95 }] })
         .springify()
         .damping(damping)
         .stiffness(stiffness)
+        .mass(mass)
         .delay(delay);
     case "slideLeft":
       return FadeInRight.withInitialValues({ opacity: 0, transform: [{ translateX: ENTER_OFFSET * 2 }] })
         .springify()
         .damping(damping)
         .stiffness(stiffness)
+        .mass(mass)
         .delay(delay);
     case "slideRight":
       return FadeInLeft.withInitialValues({ opacity: 0, transform: [{ translateX: -ENTER_OFFSET * 2 }] })
         .springify()
         .damping(damping)
         .stiffness(stiffness)
+        .mass(mass)
         .delay(delay);
     case "fadeUp":
     default:
@@ -81,6 +91,7 @@ export function entrance(preset: EntrancePreset = "fadeUp", delay = 0) {
         .springify()
         .damping(damping)
         .stiffness(stiffness)
+        .mass(mass)
         .delay(delay);
   }
 }
@@ -102,7 +113,8 @@ export function exit(preset: ExitPreset = "fade") {
 }
 
 /** Siblings sliding into the space a row left or took (lists, accordions). */
-export const layoutSpring = () => LinearTransition.springify().damping(SPRING.damping).stiffness(SPRING.stiffness);
+export const layoutSpring = () =>
+  LinearTransition.springify().damping(SPRING.damping).stiffness(SPRING.stiffness).mass(SPRING.mass);
 
 /** The stagger delay for row `index`. */
 export const staggerDelay = (index: number, base = 0) => base + Math.min(index, STAGGER_MAX_INDEX) * STAGGER_MS;

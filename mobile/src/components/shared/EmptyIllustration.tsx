@@ -83,7 +83,7 @@ export function EmptyIllustration({
   }, [animate, float, pulse, twinkle]);
 
   useEffect(() => {
-    badgeScale.value = reduceMotion ? 1 : withDelay(BADGE_DELAY_MS, withSpring(1, { damping: 9, stiffness: 180 }));
+    badgeScale.value = reduceMotion ? 1 : withDelay(BADGE_DELAY_MS, withSpring(1, { damping: 9, stiffness: 180, mass: 1 }));
   }, [reduceMotion, badgeScale]);
 
   const floatStyle = useAnimatedStyle(() => ({ transform: [{ translateY: -FLOAT_DISTANCE * float.value }] }));

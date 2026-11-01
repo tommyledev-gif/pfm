@@ -2,6 +2,7 @@ import { View } from "react-native";
 import Animated, { ZoomIn } from "react-native-reanimated";
 import { useTranslation } from "react-i18next";
 
+import { PRESS_SPRING } from "@/components/motion/motion-tokens";
 import { ListRow, ListSection } from "@/components/ui/grouped-list";
 import { CheckIcon } from "@/components/ui/Icon";
 import { createStyles, useColors } from "@/lib/theme";
@@ -14,7 +15,9 @@ const CHECK_SIZE = 18;
 // Cài đặt người dùng → "Ngôn ngữ" (specs/mobile-language-switch US-01, D-05):
 // one radio row per language, each written in its own language, so someone
 // who switched by mistake still finds the way back. Applies on tap — no save
-// step, no restart — through the same cross-fade as the theme tiles above.
+// step, no restart — under a snapshot of the screen, dimmed with a spinner
+// until every mounted screen has re-rendered, then the same cross-fade as the
+// theme tiles above (ThemeTransitionHost).
 export function LanguagePicker() {
   const { t } = useTranslation();
   const colors = useColors();
@@ -41,7 +44,12 @@ export function LanguagePicker() {
               <View style={styles.checkSlot}>
                 {/* Springs in on the row just picked, like the theme tile's tick. */}
                 {selected ? (
-                  <Animated.View entering={ZoomIn.springify().damping(12)}>
+                  <Animated.View
+                    entering={ZoomIn.springify()
+                      .damping(PRESS_SPRING.damping)
+                      .stiffness(PRESS_SPRING.stiffness)
+                      .mass(PRESS_SPRING.mass)}
+                  >
                     <CheckIcon size={CHECK_SIZE} color={colors.green} strokeWidth={3} />
                   </Animated.View>
                 ) : null}

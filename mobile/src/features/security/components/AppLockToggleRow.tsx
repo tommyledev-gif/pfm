@@ -30,7 +30,7 @@ export function AppLockToggleRow() {
   const onChange = async (next: boolean) => {
     setChecking(true);
     try {
-      const result = await verifyOwner(PIN_COPY.enter, CHANGE_SETTING_PROMPT);
+      const result = await verifyOwner(i18n.t(PIN_COPY.enter), i18n.t(CHANGE_SETTING_PROMPT));
       if (result === "passed") setEnabled(next);
       else if (result === "unavailable") {
         if (next) useToastStore.getState().show(i18n.t("security.appLock.noLock"), "warning");

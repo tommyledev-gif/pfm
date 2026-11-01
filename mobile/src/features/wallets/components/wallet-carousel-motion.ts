@@ -139,7 +139,7 @@ export function useCarouselPress() {
       depth.value = withTiming(1, { duration: 110 });
     },
     pressOut: () => {
-      depth.value = withSpring(0, { damping: 12, stiffness: 260 });
+      depth.value = withSpring(0, { damping: 12, stiffness: 260, mass: 1 });
     },
   };
 }

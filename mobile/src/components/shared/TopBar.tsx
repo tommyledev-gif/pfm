@@ -37,7 +37,7 @@ export const TopBar = memo(function TopBar() {
           {/* Pops in when something new arrives, and out once it is read. */}
           {hasUnread ? (
             <Animated.View
-              entering={ZoomIn.springify().damping(SPRING.damping).stiffness(SPRING.stiffness)}
+              entering={ZoomIn.springify().damping(SPRING.damping).stiffness(SPRING.stiffness).mass(SPRING.mass)}
               exiting={ZoomOut.duration(160)}
               style={styles.dot}
             />
