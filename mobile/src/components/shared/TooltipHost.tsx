@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { BackHandler, LayoutChangeEvent, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
+import { useTranslation } from "react-i18next";
 
+import { amountInWords } from "@/lib/amount-in-words";
 import { formatCurrency } from "@/lib/currency";
-import { amountInWordsVi } from "@/lib/number-to-words-vi";
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
 import { TooltipContent, useTooltipStore } from "@/stores/tooltip-store";
 
@@ -115,12 +116,16 @@ export function TooltipHost() {
 
 function TooltipBody({ content }: { content: TooltipContent }) {
   const styles = useStyles();
+  // The words follow the UI language, and re-render with it.
+  const { i18n } = useTranslation();
   if (content.kind === "hint") return <Text style={styles.hint}>{content.text}</Text>;
   return (
     <>
       {content.label ? <Text style={styles.label}>{content.label}</Text> : null}
       <Text style={styles.amount}>{formatCurrency(content.amountCents, content.currency)}</Text>
-      <Text style={styles.words}>{amountInWordsVi(content.amountCents, content.currency)}</Text>
+      <Text style={styles.words}>
+        {amountInWords(content.amountCents, content.currency, i18n.language === "en" ? "en" : "vi")}
+      </Text>
     </>
   );
 }

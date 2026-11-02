@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import {
   FixedCostItem,
@@ -84,6 +84,19 @@ export function useWizardFixedCosts() {
   const closeHelper = useCallback(() => setOpen(false), []);
 
   /**
+   * The itemised costs behind the total, as the result screen lists them.
+   *
+   * Re-spread across the current total the same way openHelper does, so the
+   * items always add up to the figure printed above them, even after the
+   * slider moved it. Empty when the total was only ever set directly, or
+   * dragged to zero.
+   */
+  const items = useMemo(
+    () => (fixed > 0 ? scaleFixedCosts(mergeFixedCosts(parseFixedCosts(text), suggested), fixed) : []),
+    [fixed, text, suggested],
+  );
+
+  /**
    * One action, not three call sites: the breakdown and the total it implies
    * must never be set separately, or the field can show a total that its own
    * itemised list does not add up to.
@@ -109,5 +122,5 @@ export function useWizardFixedCosts() {
     setOpen(false);
   }, []);
 
-  return { fixed, setFixed, text, suggested, open, rescaled, openHelper, closeHelper, apply, reset };
+  return { fixed, setFixed, text, suggested, items, open, rescaled, openHelper, closeHelper, apply, reset };
 }

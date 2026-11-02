@@ -1,6 +1,6 @@
 import { Pressable, Text, View } from "react-native";
 
-import { useHintTooltip } from "@/components/shared/use-hint-tooltip";
+import { useTapTooltip } from "@/components/shared/use-hint-tooltip";
 import { Avatar } from "@/components/ui/Avatar";
 import { colors, spacing, typography, createStyles } from "@/lib/theme";
 import { BudgetProgressBar } from "@/features/budgets/components/BudgetProgressBar";
@@ -25,8 +25,9 @@ interface SnapshotProgressRowProps {
   // Share of the period elapsed, drawn as a tick. Omitted on rows where a
   // pace comparison means nothing (a share-of-spend has no pace).
   pace?: number;
+  /** For a row without a hint; a row with one shows it on a tap instead. */
   onPress?: () => void;
-  // Shown over the row on a hold (TooltipHost): the amounts behind the bar.
+  // Shown over the row on a tap (TooltipHost): the amounts behind the bar.
   hint?: string;
   testID?: string;
 }
@@ -55,8 +56,9 @@ export function SnapshotProgressRow({
 }: SnapshotProgressRowProps) {
   const styles = useStyles();
   // The bar and the percentage are all a row has room for; the amounts they
-  // stand for are one hold away, the way an icon button's words are.
-  const hintTooltip = useHintTooltip(hint ?? "");
+  // stand for are one tap away. A hold used to be the only way to them, and
+  // nothing on the row said a hold would do anything.
+  const hintTooltip = useTapTooltip(hint ?? "");
 
   const content = (
     <>
@@ -75,8 +77,8 @@ export function SnapshotProgressRow({
     </>
   );
 
-  // Pressable only where a tap or a hold does something — a row that
-  // highlights on touch and then does nothing reads as a broken link.
+  // Pressable only where a tap does something — a row that highlights on
+  // touch and then does nothing reads as a broken link.
   if (!onPress && !hint) {
     return (
       <View testID={testID} style={styles.row}>
@@ -87,8 +89,8 @@ export function SnapshotProgressRow({
   return (
     <Pressable
       testID={testID}
-      onPress={onPress}
-      {...(hint ? hintTooltip : null)}
+      {...(hint ? hintTooltip : { onPress })}
+      accessibilityRole="button"
       accessibilityHint={hint}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >

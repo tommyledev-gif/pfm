@@ -166,7 +166,7 @@ export default function SharedWalletsScreen() {
           replayKey={replayKey}
           stickySectionHeadersEnabled={false}
           refreshControl={refreshControl}
-          onEndReachedThreshold={0.4}
+          onEndReachedThreshold={1}
           onEndReached={loadNextPage}
           ListHeaderComponent={
             <SharedActivityHeader

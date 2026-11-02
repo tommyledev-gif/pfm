@@ -13,6 +13,7 @@ import { WizardResultFooter } from "@/features/budget-wizard/components/WizardRe
 import { WizardResultError, WizardResultLoading } from "@/features/budget-wizard/components/WizardResultStates";
 import { Category } from "@/features/categories/types";
 import { daysInCycle, perDayXu } from "@/features/budget-wizard/budget-math";
+import { FixedCostItem } from "@/features/budget-wizard/fixed-costs";
 import { buildProposalSegments, segmentLegendEntry } from "@/features/budget-wizard/proposal-segments";
 import { BudgetProposalsResponse, ConfidenceBadge, ProposalEntry } from "@/features/budget-wizard/types";
 import { RowNameKind } from "@/features/budget-wizard/hooks/use-wizard-renames";
@@ -26,6 +27,8 @@ interface WizardStepResultProps {
   /** xu — shown as already-deducted reference lines, not as budget rows. */
   savings: number;
   fixed: number;
+  /** What `fixed` is made of, as entered on screen 1; listed under it. */
+  fixedItems: FixedCostItem[];
   result: BudgetProposalsResponse | null;
   loading: boolean;
   submitting: boolean;
@@ -74,6 +77,7 @@ export function WizardStepResult({
   cycleStartDay,
   savings,
   fixed,
+  fixedItems,
   result,
   loading,
   submitting,
@@ -198,6 +202,7 @@ export function WizardStepResult({
           buffer={result.unallocated_amount}
           savings={savings}
           fixed={fixed}
+          fixedItems={fixedItems}
           overCommitted={result.over_committed}
           shortfall={result.shortfall}
         />

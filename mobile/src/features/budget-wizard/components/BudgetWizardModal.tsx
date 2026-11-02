@@ -176,6 +176,7 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
               cycleStartDay={wizard.cycleStartDay}
               savings={wizard.savings}
               fixed={wizard.fixed}
+              fixedItems={wizard.fixedCostItems}
               result={wizard.result}
               loading={wizard.loadingProposal}
               submitting={wizard.submitting}

@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, SectionList, Text, View } from "react-nat
 import { useRouter } from "expo-router";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 
+import { useAppendEntrance } from "@/components/motion/MotionView";
 import { BellIcon } from "@/components/ui/Icon";
 import { GroupedListCell, ListSectionHeader } from "@/components/ui/grouped-list";
 import { SearchField } from "@/components/ui/SearchField";
@@ -140,6 +141,13 @@ export default function NotificationsScreen() {
     // t: the day labels are text, rebuilt in the new language on a switch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, search, filter, keptUnread, t]);
+  // Each later page fades in under the last row. Per filter: the other tab is
+  // a different list, not a page of this one.
+  const cellKeys = useMemo(
+    () => sections.flatMap((section) => [`day:${section.title}`, ...section.data.map((n) => n.id)]),
+    [sections],
+  );
+  const appendEnter = useAppendEntrance(cellKeys, filter);
 
   const empty = notifications.isError ? (
     <View style={styles.empty}>
@@ -201,12 +209,12 @@ export default function NotificationsScreen() {
           viewabilityConfig={SEEN_VIEWABILITY}
           onViewableItemsChanged={seen.onViewableItemsChanged}
           renderSectionHeader={({ section }) => (
-            <View style={styles.sectionHeader}>
+            <Animated.View style={styles.sectionHeader} entering={appendEnter(`day:${section.title}`)}>
               <ListSectionHeader title={section.title} />
-            </View>
+            </Animated.View>
           )}
           renderItem={({ item, index, section }) => (
-            <GroupedListCell index={index} count={section.data.length}>
+            <GroupedListCell index={index} count={section.data.length} entering={appendEnter(item.id)}>
               <NotificationRow
                 notification={item}
                 onPress={() => openNotification(item)}
@@ -217,7 +225,8 @@ export default function NotificationsScreen() {
             </GroupedListCell>
           )}
           ListEmptyComponent={empty}
-          onEndReachedThreshold={0.4}
+          // A screen ahead, so the next page is usually in before the end is reached.
+          onEndReachedThreshold={1}
           onEndReached={() => {
             if (notifications.hasNextPage && !notifications.isFetchingNextPage) void notifications.fetchNextPage();
           }}

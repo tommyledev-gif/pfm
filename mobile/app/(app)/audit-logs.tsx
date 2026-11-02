@@ -1,8 +1,9 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, SectionList, Text, View } from "react-native";
+import { ActivityIndicator, SectionList, Text } from "react-native";
+import Animated from "react-native-reanimated";
 
-import { useListEntrance } from "@/components/motion/MotionView";
+import { useAppendEntrance, useListEntrance } from "@/components/motion/MotionView";
 import { GroupedListCell, ListSectionHeader } from "@/components/ui/grouped-list";
 import { useFabBottom } from "@/components/ui/Fab";
 import { Screen } from "@/components/shared/Screen";
@@ -38,8 +39,9 @@ export default function AuditLogsScreen() {
   const auditLogs = useAuditLogsQuery();
   // Clear of the floating BottomNav, so the oldest entry is never under it.
   const navClearance = useFabBottom();
-  // The first page staggers in once; later pages and refetches just appear.
-  const enter = useListEntrance(auditLogs.isLoading ? "loading" : "ready");
+  // The first page staggers in once; each later page fades in under it.
+  const replayKey = auditLogs.isLoading ? "loading" : "ready";
+  const enter = useListEntrance(replayKey);
   const categories = useCategoriesQuery();
   const wallets = useWalletsQuery();
 
@@ -94,6 +96,11 @@ export default function AuditLogsScreen() {
     }
     return starts;
   }, [sections]);
+  const cellKeys = useMemo(
+    () => sections.flatMap((section) => [`day:${section.key}`, ...section.data.map((entry) => entry.id)]),
+    [sections],
+  );
+  const appendEnter = useAppendEntrance(cellKeys, replayKey);
 
   return (
     <Screen style={styles.screen}>
@@ -110,23 +117,27 @@ export default function AuditLogsScreen() {
           stickySectionHeadersEnabled={false}
           showsVerticalScrollIndicator={false}
           refreshControl={refreshControl}
-          onEndReachedThreshold={0.4}
+          // A screen ahead, so the next page is usually in before the end is reached.
+          onEndReachedThreshold={1}
           onEndReached={() => {
             if (auditLogs.hasNextPage && !auditLogs.isFetchingNextPage) auditLogs.fetchNextPage();
           }}
           renderSectionHeader={({ section }) => (
-            <View style={section.key !== sections[0]?.key && styles.laterDay}>
+            <Animated.View
+              style={section.key !== sections[0]?.key && styles.laterDay}
+              entering={appendEnter(`day:${section.key}`)}
+            >
               <ListSectionHeader
                 title={section.dayLabel}
                 trailing={<Text style={styles.dayHeaderDate}>{section.dateLabel}</Text>}
               />
-            </View>
+            </Animated.View>
           )}
           renderItem={({ item, index, section }) => (
             <GroupedListCell
               index={index}
               count={section.data.length}
-              entering={enter(index + (sectionStart.get(section.key) ?? 0))}
+              entering={appendEnter(item.id) ?? enter(index + (sectionStart.get(section.key) ?? 0))}
             >
               <AuditLogRow
                 entry={item}

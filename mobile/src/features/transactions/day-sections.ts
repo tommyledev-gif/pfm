@@ -132,3 +132,38 @@ export function buildDaySections(
   // still cover every row, so a folded day says what it is hiding.
   return groups.map((g) => (g.collapsed && !g.folding ? { ...g, data: [] } : g));
 }
+
+/**
+ * `next`, with every day that did not change swapped back for its object in
+ * `previous`.
+ *
+ * buildDaySections builds every section afresh, so each new page handed every
+ * memoized day header a new `section` and all of them re-rendered, on the same
+ * frames the page's new rows were mounting. A day is unchanged when its rows
+ * are the same objects (TanStack Query keeps a loaded page's rows as they
+ * were) and everything its header shows is equal.
+ */
+export function reuseUnchangedSections(previous: DaySection[], next: DaySection[]): DaySection[] {
+  if (previous.length === 0) return next;
+  const byKey = new Map(previous.map((section) => [section.key, section]));
+  return next.map((section) => {
+    const before = byKey.get(section.key);
+    return before && sameSection(before, section) ? before : section;
+  });
+}
+
+function sameSection(a: DaySection, b: DaySection): boolean {
+  return (
+    a.dayLabel === b.dayLabel &&
+    a.dateLabel === b.dateLabel &&
+    a.count === b.count &&
+    a.income === b.income &&
+    a.expense === b.expense &&
+    a.currency === b.currency &&
+    a.collapsed === b.collapsed &&
+    a.folding === b.folding &&
+    a.otherCurrencies.join() === b.otherCurrencies.join() &&
+    a.data.length === b.data.length &&
+    a.data.every((item, i) => item === b.data[i])
+  );
+}

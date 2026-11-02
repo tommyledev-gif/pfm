@@ -9,14 +9,19 @@ export interface RestoreContext {
   /** In-session carry-over from a step-back. Categories only, never amounts. */
   keptPlan: KeptPlanShape | null;
   chosenPreset: PresetKey;
+  /** Every category the User has now (the prefill's); null while unknown. */
+  categoryIds: ReadonlySet<string> | null;
 }
 
 export interface RestoredProposal {
   response: BudgetProposalsResponse;
   /** Set only on the saved-plan path, which also restores which rows were the
-   *  user's own and which categories still need creating. */
+   *  user's own, which categories still need creating, which were renamed,
+   *  and which of the server's rows the user had removed. */
   addedIds?: string[];
   pendingCategories?: Record<string, string>;
+  renamedCategories?: Record<string, string>;
+  removedIds?: string[];
 }
 
 /**
@@ -32,17 +37,25 @@ export interface RestoredProposal {
  */
 export function restoreProposal(
   data: BudgetProposalsResponse,
-  { pendingSavedRows, restoredFrom, keptPlan, chosenPreset }: RestoreContext,
+  { pendingSavedRows, restoredFrom, keptPlan, chosenPreset, categoryIds }: RestoreContext,
 ): RestoredProposal {
   if (pendingSavedRows && pendingSavedRows.length > 0 && restoredFrom?.preset === chosenPreset) {
+    const renamedCategories = restoredFrom.renamedCategories ?? {};
+    const response = applySavedPlanRows(data, pendingSavedRows, categoryIds, renamedCategories);
+    const kept = new Set(response.proposals.map((p) => p.category_id));
     return {
-      response: applySavedPlanRows(data, pendingSavedRows),
-      addedIds: pendingSavedRows.filter((row) => row.added).map((row) => row.category_id),
+      response,
+      addedIds: pendingSavedRows.filter((row) => row.added && kept.has(row.category_id)).map((row) => row.category_id),
       pendingCategories: Object.fromEntries(
         pendingSavedRows
           .filter((row) => row.pendingName)
           .map((row) => [row.category_id, row.pendingName as string]),
       ),
+      renamedCategories,
+      // The server's rows the plan left out were removed by the user before
+      // saving: recorded as such, so a step-back that keeps the plan does not
+      // bring them back either.
+      removedIds: data.proposals.filter((p) => !kept.has(p.category_id)).map((p) => p.category_id),
     };
   }
 

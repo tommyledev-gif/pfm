@@ -117,7 +117,7 @@ DoD: [ ] S-LNG-10..14 pass.
 | S-LNG-17 | `en`, filter with 1 category, then 3 | Look at the filter chip | "1 category", "3 categories" | VI "1 danh mục", "3 danh mục" (one form) |
 | S-LNG-18 | `en`, a VND wallet | Any amount | "1.250.000 ₫", exactly as in VI | D-07 ⚠️ |
 | S-LNG-19 | `en`, a USD wallet | Any amount | "$1,250" as today | D-07 |
-| S-LNG-20 | `en` | Long-press an amount (reveal popup) | Exact amount shown; the VI "amount in words" line is hidden in EN until an EN converter exists | Open Question 4 |
+| S-LNG-20 | `en` | Long-press an amount (reveal popup) | Exact amount shown, spelled out in English underneath ("one million two hundred fifty thousand dong") | Open Question 4 (resolved 2026-11-02) |
 
 Edge cases
 1. Hermes lacks some `Intl` APIs (`PluralRules`, `RelativeTimeFormat`, `formatRange` on some builds). Plurals use a polyfill if `Intl.PluralRules` is missing; relative labels and ranges are built by the helpers, not `Intl` (§5.10).
@@ -299,7 +299,7 @@ Phase 2:
 | Time | 14:05 | 14:05 | 24-hour in both (Open Question 5) |
 | Plurals | `{{count}} danh mục` (`_other`) | `{{count}} category` / `{{count}} categories` | i18next v4 + `Intl.PluralRules` (polyfill if missing). Zero is an empty state, not a plural |
 | Percent | 80% | 80% | `lib/percent.ts`, unchanged |
-| Amount in words | "một triệu hai trăm nghìn đồng" | Hidden in v1 | `amountInWords` entry point; EN converter is Open Question 4 |
+| Amount in words | "một triệu hai trăm nghìn đồng" | "one million two hundred thousand dong" | `amountInWords` (`lib/amount-in-words.ts`) picks `number-to-words-vi.ts` / `number-to-words-en.ts`; units from `format.amountWords.currency.*` |
 
 VI date output stays hand-built: `Intl` for `vi` gives "tháng 10" and "Th 2", not the app's "Tháng 10" and "T2".
 
@@ -372,7 +372,7 @@ Effort shape: ~1,390 keys, of which ~125 common. The heaviest areas are Transact
 1. **Approve the EN copy and coined terms** (§9). The tables are a proposal; the owner reviews per area before its Phase 1 PR.
 2. **"Follow phone" option?** Proposed: no for v1 (D-03). If yes: a third row "Theo máy / Use phone language", `expo-localization` in the next APK.
 3. ⚠️ **EN money format**: keep "1.250.000 ₫" in EN (proposed, D-07) or move to "1,250,000 ₫" (the skill's EN examples) together with the keypad, as its own change with its own tests.
-4. **Amount in words in EN**: hide the line (proposed for v1) or write an EN converter ("one million two hundred fifty thousand dong").
+4. **Amount in words in EN**: hide the line (proposed for v1) or write an EN converter ("one million two hundred fifty thousand dong"). Resolved 2026-11-02: EN converter (`number-to-words-en.ts`, US short scale, no "and").
 5. **12-hour time in EN**: keep 24-hour (proposed) or follow en-US "2:05 PM".
 6. **English input to the assistant and the fixed-costs box**: today both read Vietnamese only ("50k", "triệu", "ăn trưa"). Keep VI examples in EN mode (proposed) or extend the parser/prompts and examples to English.
 7. **OS permission strings in English** (`app.json` → Expo `locales`, needs an APK): do it with the next APK, or leave VI.

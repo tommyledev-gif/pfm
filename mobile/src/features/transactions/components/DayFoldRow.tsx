@@ -32,7 +32,8 @@ interface DayFoldRowProps {
   /** Position in its day, so an unfolding day's rows grow in one after another. */
   index: number;
   reduceMotion: boolean;
-  /** The list's own entrance (useListEntrance), for a new result set. */
+  /** The list's own entrance: useListEntrance for a new result set,
+   *  useAppendEntrance for a row the next page brought. */
   entering?: Entering;
   children: ReactNode;
 }

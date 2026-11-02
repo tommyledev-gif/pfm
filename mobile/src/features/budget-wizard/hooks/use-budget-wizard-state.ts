@@ -70,7 +70,6 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
   // saved preset comes back (see applySavedRows).
   const [restoredFrom, setRestoredFrom] = useState<SavedBudgetPlan | null>(null);
   const [pendingSavedRows, setPendingSavedRows] = useState<SavedPlanRow[] | null>(null);
-  const [planSaved, setPlanSaved] = useState(false);
   const [overwriteConfirmOpen, setOverwriteConfirmOpen] = useState(false);
   // Suggested rows the user removed. Held apart from addedIds because the two
   // answer different questions: which rows are the user's own, and which of
@@ -130,7 +129,6 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
     setError(null);
     setRestoredFrom(plan ?? null);
     setPendingSavedRows(plan?.rows ?? null);
-    setPlanSaved(false);
     setOverwriteConfirmOpen(false);
     setRemovedIds([]);
     keptCategories.forget();
@@ -161,10 +159,13 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
           restoredFrom,
           keptPlan: keptCategories.keptPlan,
           chosenPreset,
+          categoryIds: prefill.data ? new Set(prefill.data.categories.map((c) => c.id)) : null,
         });
         setResult(restored.response);
         if (restored.addedIds) setAddedIds(restored.addedIds);
         if (restored.pendingCategories) setPendingCategories(restored.pendingCategories);
+        if (restored.renamedCategories) renames.resetRenames(restored.renamedCategories);
+        if (restored.removedIds) setRemovedIds(restored.removedIds);
         // One-shot: from here on the screen is live, and a retry after changing
         // the income must show what the server actually says.
         setPendingSavedRows(null);
@@ -173,7 +174,9 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
         setError(errorText(e, "budgetWizard.error.proposalFailed"));
       }
     },
-    [proposals, income, fixed, savings, currency, cycleStartDay, pendingSavedRows, restoredFrom, keptCategories.keptPlan],
+    // prefill.data, renames: read when a saved plan is restored.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [proposals, income, fixed, savings, currency, cycleStartDay, pendingSavedRows, restoredFrom, keptCategories.keptPlan, prefill.data],
   );
 
   const selectPreset = useCallback(
@@ -256,38 +259,22 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
 
   const hasExistingBudgets = (prefill.data?.existing_budgets?.length ?? 0) > 0;
 
-  const persistence = useWizardPlanPersistence(useCallback(() => setPlanSaved(true), []));
-
-  const savePlan = useCallback(
-    () =>
-      persistence.savePlan({
-        result,
-        currency,
-        income,
-        fixed,
-        fixedCostsText: fixedCosts.text,
-        fixedCostsSuggested: fixedCosts.suggested,
-        savingsChoice,
-        cycleStartDay,
-        preset,
-        addedIds,
-        pendingCategories,
-      }),
-    [
-      persistence,
-      result,
-      currency,
-      income,
-      fixed,
-      fixedCosts.text,
-      fixedCosts.suggested,
-      savingsChoice,
-      cycleStartDay,
-      preset,
-      addedIds,
-      pendingCategories,
-    ],
-  );
+  // Everything the saved plan keeps. It also says whether what is on screen
+  // is what was kept (planSaved), so the save button follows every edit.
+  const persistence = useWizardPlanPersistence({
+    result,
+    currency,
+    income,
+    fixed,
+    fixedCostsText: fixedCosts.text,
+    fixedCostsSuggested: fixedCosts.suggested,
+    savingsChoice,
+    cycleStartDay,
+    preset,
+    addedIds,
+    pendingCategories,
+    renamedCategories: renames.renamedCategories,
+  });
 
   /** Drops the restored figures and starts this run from zero. */
   const discardSavedPlan = useCallback(() => {
@@ -300,7 +287,9 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
     setResult(null);
     setAddedIds([]);
     setPendingCategories({});
-  }, [persistence, fixedCosts]);
+    setRemovedIds([]);
+    renames.resetRenames();
+  }, [persistence, fixedCosts, renames]);
 
   const submit = useCallback(async () => {
     setError(null);
@@ -333,6 +322,7 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
     cycleStartDay,
     fixedCostsText: fixedCosts.text,
     fixedCostsSuggested: fixedCosts.suggested,
+    fixedCostItems: fixedCosts.items,
     fixedCostsOpen: fixedCosts.open,
     fixedCostsRescaled: fixedCosts.rescaled,
     disposable,
@@ -341,7 +331,7 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
     // banner and nothing else reads it.
     restoredFrom,
     savedPlan,
-    planSaved,
+    planSaved: persistence.planSaved,
     overwriteConfirmOpen,
     preset,
     result,
@@ -403,7 +393,7 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
     },
     cancelOverwrite: () => setOverwriteConfirmOpen(false),
     submit,
-    savePlan,
+    savePlan: persistence.savePlan,
     discardSavedPlan,
     close: onClose,
   };

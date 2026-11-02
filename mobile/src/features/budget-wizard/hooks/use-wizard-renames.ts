@@ -54,7 +54,8 @@ export function useWizardRenames({ setResult, pendingCategories, setPendingCateg
     [setResult, setPendingCategories],
   );
 
-  const resetRenames = useCallback(() => setRenamedCategories({}), []);
+  // Back to none, or to a saved plan's renames when it is restored.
+  const resetRenames = useCallback((next?: Record<string, string>) => setRenamedCategories(next ?? {}), []);
 
   return { renamedCategories, nameKind, renameRow, resetRenames };
 }

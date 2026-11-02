@@ -17,6 +17,9 @@ export interface SavedPlanRow {
   added: boolean;
   /** Set only when the row's category did not exist yet at save time. */
   pendingName?: string;
+  /** The user set this figure by hand. Absent in plans kept before it was
+   *  recorded, which restored every row as hand-set — still read that way. */
+  manual?: boolean;
 }
 
 /**
@@ -47,6 +50,9 @@ export interface SavedBudgetPlan {
   cycleStartDay: number;
   preset: PresetKey | null;
   rows: SavedPlanRow[];
+  /** The User's own categories renamed on screen 3 (id → new name), applied
+   *  when the plan is finally confirmed. Absent in plans kept before. */
+  renamedCategories?: Record<string, string>;
 }
 
 interface SavedPlanState {
@@ -181,45 +187,58 @@ export function formatSavedAt(savedAt: string): string {
   return `${day}/${month}/${date.getFullYear()}`;
 }
 
+/** A plan's content, without the moment it was kept — for telling whether two
+ *  plans say the same thing (the save button reads "saved" while they do). */
+export function planSignature(plan: SavedBudgetPlan): string {
+  const { savedAt: _savedAt, ...content } = plan;
+  return JSON.stringify(content);
+}
+
 /**
- * Lays a saved plan's own figures back over a freshly computed proposal.
+ * Lays a saved plan back over a freshly computed proposal: the rows it kept,
+ * in the order it kept them, at the figures it kept.
  *
  * ⚠️ The proposal is still requested from the server rather than read out of the
  * saved plan: the allocator, the presets and the user's categories can all have
- * moved since the plan was kept, and replaying a stale allocation would hand
- * back a plan that no longer matches its own inputs. What the server cannot
- * know is which rows the user overruled by hand last time — that is the part
- * worth restoring, and it is all this does.
+ * moved since the plan was kept. The fresh response supplies what the server
+ * knows about each row (its badge, its evidence, the category's current name);
+ * the saved plan decides which rows there are and what each is set to.
  *
- * Rows the user invented are re-appended (they exist in no preset), and the
- * buffer absorbs the whole difference, exactly as a live hand-edit does.
+ * ⚠️ The plan as kept, not merged into the fresh one. Overlaying the saved
+ * figures on the server's rows brought back every row the user had removed
+ * before saving, and moved their own rows below the server's. So a fresh row
+ * the plan does not have is dropped, a row the user invented is re-added, and
+ * a row whose category no longer exists (deleted since) is left out — writing
+ * a budget for it would fail the whole confirm.
+ *
+ * The buffer absorbs the whole difference, exactly as a live hand-edit does.
  */
 export function applySavedPlanRows(
   response: BudgetProposalsResponse,
   rows: SavedPlanRow[],
+  /** Every category the User has now; null while not known, which keeps all. */
+  categoryIds: ReadonlySet<string> | null,
+  renamedCategories: Record<string, string> = {},
 ): BudgetProposalsResponse {
-  const savedById = new Map(rows.map((row) => [row.category_id, row]));
+  const freshById = new Map(response.proposals.map((p) => [p.category_id, p]));
+  const proposals: ProposalEntry[] = [];
 
-  const merged: ProposalEntry[] = response.proposals.map((p) => {
-    const saved = savedById.get(p.category_id);
-    if (!saved) return p;
-    return { ...p, amount_min: saved.amountXu, amount_max: saved.amountXu, source: "manual", locked: true };
-  });
-
-  const present = new Set(merged.map((p) => p.category_id));
   for (const row of rows) {
-    if (present.has(row.category_id)) continue;
-    merged.push({
-      category_id: row.category_id,
-      category_name: row.category_name,
-      amount_min: row.amountXu,
-      amount_max: row.amountXu,
-      source: "manual",
-      locked: true,
-      confidence: 1,
-    });
+    const fresh = freshById.get(row.category_id);
+    if (!fresh && !row.pendingName && categoryIds && !categoryIds.has(row.category_id)) continue;
+    // A name the user gave it wins; otherwise the server's, current and in
+    // the current language.
+    const name = row.pendingName ?? renamedCategories[row.category_id] ?? fresh?.category_name ?? row.category_name;
+    const amounts = { amount_min: row.amountXu, amount_max: row.amountXu };
+    if (fresh && row.manual === false) {
+      proposals.push({ ...fresh, ...amounts, category_name: name });
+    } else if (fresh) {
+      proposals.push({ ...fresh, ...amounts, category_name: name, source: "manual", locked: true });
+    } else {
+      proposals.push({ category_id: row.category_id, category_name: name, ...amounts, source: "manual", locked: true, confidence: 1 });
+    }
   }
 
-  const allocated = merged.reduce((sum, p) => sum + p.amount_max, 0);
-  return { ...response, proposals: merged, unallocated_amount: response.disposable - allocated };
+  const allocated = proposals.reduce((sum, p) => sum + p.amount_max, 0);
+  return { ...response, proposals, unallocated_amount: response.disposable - allocated };
 }

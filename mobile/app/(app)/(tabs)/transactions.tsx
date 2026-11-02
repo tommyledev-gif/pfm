@@ -208,7 +208,7 @@ export default function TransactionsScreen() {
         replayKey={listReplayKey}
         stickySectionHeadersEnabled={false}
         refreshControl={refreshControl}
-        onEndReachedThreshold={0.4}
+        onEndReachedThreshold={1}
         onEndReached={loadNextPage}
         ListHeaderComponent={
           <TransactionsHeader

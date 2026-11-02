@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, SectionList, View } from "react-native";
 
-import { useListEntrance } from "@/components/motion/MotionView";
+import { useAppendEntrance, useListEntrance } from "@/components/motion/MotionView";
 import { GroupedListCell, ListSection, ListSectionHeader } from "@/components/ui/grouped-list";
 import { Fab, useFabClearance } from "@/components/ui/Fab";
 import { SearchField } from "@/components/ui/SearchField";
@@ -52,8 +52,12 @@ export default function UsersScreen() {
   // Clear of the floating BottomNav and the Fab, so the last member is never under them.
   const clearance = useFabClearance();
   // Rows stagger in once, when the list first has data; refetches keep the key.
-  const enter = useListEntrance(users.isLoading ? "loading" : "ready");
+  const replayKey = users.isLoading ? "loading" : "ready";
+  const enter = useListEntrance(replayKey);
   const list = useMemo(() => users.data?.pages.flatMap((page) => page.data) ?? [], [users.data]);
+  // Each later page fades in under the last row instead of popping in.
+  const userIds = useMemo(() => list.map((u) => u.id), [list]);
+  const appendEnter = useAppendEntrance(userIds, replayKey);
   // Everyone, not only the pages loaded so far (the server's count, first page).
   const total = users.data?.pages[0]?.pagination.total ?? list.length;
   const loadMore = () => {
@@ -116,11 +120,12 @@ export default function UsersScreen() {
           renderSectionHeader={({ section }) => <ListSectionHeader title={`${section.title} · ${section.data.length}`} />}
           SectionSeparatorComponent={() => <View style={styles.sectionGap} />}
           renderItem={({ item, index, section }) => (
-            <GroupedListCell index={index} count={section.data.length} entering={enter(index)}>
+            <GroupedListCell index={index} count={section.data.length} entering={appendEnter(item.id) ?? enter(index)}>
               <UserListItem user={item} />
             </GroupedListCell>
           )}
-          onEndReachedThreshold={0.4}
+          // A screen ahead, so the next page is usually in before the end is reached.
+          onEndReachedThreshold={1}
           onEndReached={loadMore}
           ListFooterComponent={
             users.isFetchingNextPage ? <ActivityIndicator color={colors.textMuted} style={styles.more} /> : null

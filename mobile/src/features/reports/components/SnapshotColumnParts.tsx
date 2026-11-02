@@ -66,8 +66,8 @@ interface SnapshotRightColumnProps {
 
 /**
  * The snapshot's right-hand column: budgets close to their limit on the Day
- * tab, otherwise the period's top spending categories. A hold on a row says
- * the amounts its bar stands for.
+ * tab, otherwise the period's top spending categories. A tap on a row says
+ * the amounts its bar stands for; "Xem tất cả" is the way to the full list.
  */
 export function SnapshotRightColumn({
   isDay,
@@ -92,7 +92,6 @@ export function SnapshotRightColumn({
             <SnapshotProgressRow
               key={`${budget.id}-${limit.currency}`}
               testID={`row-home-at-risk-${budget.category_id}`}
-              onPress={onOpenBudgets}
               hint={t("home.snapshot.hint.budget", {
                 category: name,
                 spent: formatCurrency(limit.spent, limit.currency),

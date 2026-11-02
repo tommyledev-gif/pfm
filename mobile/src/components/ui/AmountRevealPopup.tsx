@@ -1,8 +1,9 @@
 import { useMemo } from "react";
 import { Modal, Pressable, Text } from "react-native";
+import { useTranslation } from "react-i18next";
 
+import { amountInWords } from "@/lib/amount-in-words";
 import { formatCurrency } from "@/lib/currency";
-import { amountInWordsVi } from "@/lib/number-to-words-vi";
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
 
 interface AmountRevealPopupProps {
@@ -21,7 +22,9 @@ interface AmountRevealPopupProps {
 // bubble wouldn't.
 export function AmountRevealPopup({ visible, onClose, amountCents, currency }: AmountRevealPopupProps) {
   const styles = useStyles();
-  const words = useMemo(() => amountInWordsVi(amountCents, currency), [amountCents, currency]);
+  const { i18n } = useTranslation();
+  const language = i18n.language === "en" ? "en" : "vi";
+  const words = useMemo(() => amountInWords(amountCents, currency, language), [amountCents, currency, language]);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
