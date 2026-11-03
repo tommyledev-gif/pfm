@@ -131,14 +131,14 @@ func resolveReportWindow(fromStr, toStr string, defaultFrom time.Time) (time.Tim
 	to := time.Now().UTC()
 
 	if fromStr != "" {
-		parsed, err := parseFlexibleTimestamp(fromStr)
+		parsed, err := parseRangeStart(fromStr)
 		if err != nil {
 			return time.Time{}, time.Time{}, common.NewInvalidInputError("from must be a valid date or timestamp")
 		}
 		from = parsed
 	}
 	if toStr != "" {
-		parsed, err := parseFlexibleTimestamp(toStr)
+		parsed, err := parseRangeEnd(toStr)
 		if err != nil {
 			return time.Time{}, time.Time{}, common.NewInvalidInputError("to must be a valid date or timestamp")
 		}

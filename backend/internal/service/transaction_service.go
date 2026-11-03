@@ -120,7 +120,9 @@ func (s *TransactionService) checkVisibleCategories(ctx context.Context, userID 
 // date ("2006-01-02", interpreted as UTC midnight) — SRS's own example
 // scenarios pass bare dates (e.g. "2025-12-23") for occurred_at, which
 // encoding/json cannot unmarshal directly into a time.Time. Used for
-// occurred_at (Create/Update) and the from/to list filters alike.
+// occurred_at (Create/Update); the from/to range filters use
+// parseRangeStart/parseRangeEnd (date_window.go), which read a plain date as
+// an AppLocation day instead.
 func parseFlexibleTimestamp(value string) (time.Time, error) {
 	if t, err := time.Parse(time.RFC3339, value); err == nil {
 		return t.UTC(), nil

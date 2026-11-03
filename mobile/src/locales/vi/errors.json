@@ -1,9 +1,9 @@
 {
   "errors": {
     "unknown": "Có lỗi xảy ra. Thử lại.",
-    "network": "Không thể kết nối máy chủ. Vui lòng kiểm tra mạng và thử lại.",
+    "network": "Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.",
     "needsConnection": "Cần kết nối mạng để thực hiện thao tác này.",
-    "offlineRefresh": "Đang ngoại tuyến — chưa thể làm mới.",
+    "offlineRefresh": "Đang ngoại tuyến. Chưa làm mới được.",
     "offlineNoData": "Chưa có dữ liệu đã lưu cho mục này. Kết nối mạng để tải.",
     "sessionExpired": "Phiên đăng nhập đã hết hạn.",
     "tooManyAttempts": "Thử quá nhiều lần. Thử lại sau {{minutes}} phút.",

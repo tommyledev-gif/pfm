@@ -27,6 +27,7 @@ import { DaySectionList } from "@/features/transactions/components/DaySectionLis
 import { TransactionListRow } from "@/features/transactions/components/TransactionListRow";
 import { useCollapsedDays } from "@/features/transactions/hooks/use-collapsed-days";
 import { useFocusTransaction } from "@/features/transactions/hooks/use-focus-transaction";
+import { useTrimListOnBlur } from "@/features/transactions/hooks/use-trim-list-on-blur";
 import { useWalletFilterParam } from "@/features/transactions/hooks/use-wallet-filter-param";
 import { useTransactionFilters } from "@/features/transactions/hooks/use-transaction-filters";
 import { useWalletCurrencies } from "@/features/transactions/hooks/use-wallet-currencies";
@@ -57,8 +58,7 @@ export default function TransactionsScreen() {
   const [formOpen, setFormOpen] = useState(false);
   const [futureOpen, setFutureOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-  // Day keys (YYYY-MM-DD) folded away. Session-local on purpose: collapsing
-  // is "out of my way for now", not a setting.
+  // Day keys (YYYY-MM-DD) folded away. Session-local on purpose: "out of my way for now", not a setting.
   const days = useCollapsedDays();
   const { collapsedDays, foldingDays } = days;
   // Set by "Xem trong Giao dịch": scroll to that row and flash a border on
@@ -85,9 +85,8 @@ export default function TransactionsScreen() {
     return sortTransactions(items, sortKeys);
   }, [transactions.data, sortKeys]);
 
-  // How many transactions the filters match in total (first page only — see
-  // ListTransactionsResult), not how many rows are loaded. Unknown while the
-  // answer for these filters is still on its way.
+  // How many transactions the filters match in total (first page only — see ListTransactionsResult), not how
+  // many rows are loaded. Unknown while the answer for these filters is still on its way.
   const firstPageTotal = transactions.data?.pages[0]?.total;
   const matchedCount = switchingFilters || firstPageTotal === undefined ? null : firstPageTotal;
 
@@ -129,6 +128,7 @@ export default function TransactionsScreen() {
     toggleDay: days.toggleDay,
     onFoundInFuture: () => setFutureOpen(true),
   });
+  useTrimListOnBlur({ ...sharedFilters, type: filter }, focus.listRef);
 
   const currentMonthLabel = formatMonthYear(new Date());
   const dateRangeLabel =

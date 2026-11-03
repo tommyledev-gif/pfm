@@ -16,7 +16,7 @@
       "confirm": "Xóa danh mục"
     },
     "form": {
-      "nameRequired": "Vui lòng nhập tên danh mục",
+      "nameRequired": "Nhập tên danh mục",
       "titleEdit": "Sửa danh mục",
       "titleNew": "Danh mục mới",
       "namePlaceholder": "vd: Đi chợ",

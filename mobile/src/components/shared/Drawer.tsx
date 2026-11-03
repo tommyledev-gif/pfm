@@ -232,6 +232,7 @@ function DrawerSheet({ visible, onClose, children, footer, child, onEndReached, 
               {...child}
               width={windowSize.width}
               bottomInset={keyboardHeight}
+              navInset={navPad}
               expanded={drag.expanded}
               topInset={topInset}
             />

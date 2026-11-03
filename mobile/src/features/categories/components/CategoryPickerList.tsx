@@ -53,6 +53,7 @@ export function CategoryPickerList({
   // Searched by the name on screen: a default category reads in the app language.
   const visible = useMemo(
     () => categories.filter((c) => matchesSearch(categoryLabel(c), search)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t: the names searched follow a language switch
     [categories, search, t],
   );
   const selected = useMemo(() => new Set(selectedIds), [selectedIds]);

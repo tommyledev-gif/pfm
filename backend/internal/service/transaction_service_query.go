@@ -86,14 +86,14 @@ func (s *TransactionService) ListTransactions(ctx context.Context, userID uuid.U
 		filter.Type = &q.Type
 	}
 	if q.From != "" {
-		from, err := parseFlexibleTimestamp(q.From)
+		from, err := parseRangeStart(q.From)
 		if err != nil {
 			return ListTransactionsResult{}, common.NewInvalidInputError("from must be a valid date or timestamp")
 		}
 		filter.From = &from
 	}
 	if q.To != "" {
-		to, err := parseFlexibleTimestamp(q.To)
+		to, err := parseRangeEnd(q.To)
 		if err != nil {
 			return ListTransactionsResult{}, common.NewInvalidInputError("to must be a valid date or timestamp")
 		}

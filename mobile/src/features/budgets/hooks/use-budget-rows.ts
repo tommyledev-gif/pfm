@@ -132,7 +132,6 @@ export function useBudgetRows({
     // reads: budgetPeriodElapsed below calls new Date() itself, so without
     // something that changes at midnight every row's tick would freeze at
     // whatever it was when the screen mounted.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     // themeName is read only through budgetRowStatus's colors.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [budgets, currency, paceElapsed, rangeActive, rangeDayCount, rangeElapsed, spentByCategory, themeName]);

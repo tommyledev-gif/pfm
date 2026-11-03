@@ -38,6 +38,9 @@ interface DrawerChildPanelProps extends DrawerChild {
   // the backdrop that already pads for the keyboard, so it has to lift itself:
   // its whole point is holding a search field.
   bottomInset: number;
+  // The gesture bar / nav buttons strip under the footer while the keyboard is
+  // down (Drawer's navPad): the footer pads by it, as the sheet's own does.
+  navInset: number;
   // The sheet under it was dragged up to full screen: the panel is full
   // screen too, its header clear of the status bar (`topInset`).
   expanded: boolean;
@@ -68,6 +71,7 @@ export function DrawerChildPanel({
   hideBack = false,
   width,
   bottomInset,
+  navInset,
   expanded,
   topInset,
 }: DrawerChildPanelProps) {
@@ -126,7 +130,7 @@ export function DrawerChildPanel({
 
         <View style={styles.body}>{children}</View>
 
-        {footer ? <View style={styles.footer}>{footer}</View> : null}
+        {footer ? <View style={[styles.footer, { paddingBottom: spacing.xl + navInset }]}>{footer}</View> : null}
       </View>
     </Animated.View>
   );

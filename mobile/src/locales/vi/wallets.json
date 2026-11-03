@@ -7,7 +7,7 @@
     },
     "empty": {
       "title": "Chưa có ví nào",
-      "body": "Tiền mặt, tài khoản ngân hàng hay ví điện tử — mỗi nguồn tiền là một ví, và mọi giao dịch đều được ghi vào một ví.",
+      "body": "Mỗi nơi giữ tiền là một ví: tiền mặt, ngân hàng hay ví điện tử.",
       "cta": "Tạo ví đầu tiên"
     },
     "owner": {

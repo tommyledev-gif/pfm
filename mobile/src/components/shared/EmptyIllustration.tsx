@@ -22,6 +22,13 @@ const FLOAT_MS = 2400;
 const PULSE_MS = 2800;
 const TWINKLE_MS = 1700;
 const BADGE_DELAY_MS = 250;
+// Runs per focus, then still: a loop that never ends kept the app drawing a
+// frame every vsync for as long as the empty state was open (perf audit
+// 2026-11-03). The float and the twinkle go there and back, so an even count
+// ends where they started; the pulse ends faded out.
+const FLOAT_REPS = 6;
+const PULSE_REPS = 3;
+const TWINKLE_REPS = 8;
 
 interface EmptyIllustrationProps {
   /** The art at the centre — usually one icon, drawn inside a tinted tile. */
@@ -43,7 +50,8 @@ interface EmptyIllustrationProps {
  * Motion instead of a Lottie file — there is no Lottie dependency or asset in
  * this app, and an icon from the app's own set keeps every empty state in the
  * same visual language as the screen around it. Everything runs on the UI
- * thread (reanimated), and the loops stop while the screen is not focused —
+ * thread (reanimated), each loop runs a few times per focus and then rests,
+ * and the loops stop while the screen is not focused —
  * tabs stay mounted behind each other here, and an animation nobody can see
  * is battery spent on nothing — and entirely for reduced-motion users.
  */
@@ -75,11 +83,11 @@ export function EmptyIllustration({
       return;
     }
     const ease = Easing.inOut(Easing.sin);
-    float.value = withRepeat(withTiming(1, { duration: FLOAT_MS, easing: ease }), -1, true);
+    float.value = withRepeat(withTiming(1, { duration: FLOAT_MS, easing: ease }), FLOAT_REPS, true);
     // Restarted from 0 so a resumed loop does not begin mid-ring.
     pulse.value = 0;
-    pulse.value = withRepeat(withTiming(1, { duration: PULSE_MS, easing: Easing.out(Easing.quad) }), -1, false);
-    twinkle.value = withRepeat(withTiming(1, { duration: TWINKLE_MS, easing: ease }), -1, true);
+    pulse.value = withRepeat(withTiming(1, { duration: PULSE_MS, easing: Easing.out(Easing.quad) }), PULSE_REPS, false);
+    twinkle.value = withRepeat(withTiming(1, { duration: TWINKLE_MS, easing: ease }), TWINKLE_REPS, true);
   }, [animate, float, pulse, twinkle]);
 
   useEffect(() => {

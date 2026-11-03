@@ -49,7 +49,8 @@ export function ImageAttachButton({ disabled, onSend }: ImageAttachButtonProps) 
       useToastStore.getState().show(t(readingOff ? READING_OFF : NEEDS_CONNECTION), "info");
       return;
     }
-    buttonRef.current?.measureInWindow((x, y, width, height) => void attach.open({ x, y, width, height }));
+    // Page coordinates: see PopoverAnchor.
+    buttonRef.current?.measure((_x, _y, width, height, pageX, pageY) => void attach.open({ x: pageX, y: pageY, width, height }));
   };
 
   const handleSend = (caption: string) => {

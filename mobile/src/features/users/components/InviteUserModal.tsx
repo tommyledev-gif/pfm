@@ -29,13 +29,16 @@ export function InviteUserModal({ visible, onClose }: InviteUserModalProps) {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<UserRole>(DEFAULT_ROLE);
   const inviteUser = useInviteUserMutation();
+  // Stable across renders (TanStack's observer binds it once): only an open
+  // resets the form, never a change of the mutation's own state.
+  const resetInvite = inviteUser.reset;
 
   useEffect(() => {
     if (!visible) return;
     setEmail("");
     setRole(DEFAULT_ROLE);
-    inviteUser.reset();
-  }, [visible]);
+    resetInvite();
+  }, [visible, resetInvite]);
 
   const submit = () => {
     if (!email.trim()) return;

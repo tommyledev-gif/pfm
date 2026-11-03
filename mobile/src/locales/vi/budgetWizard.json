@@ -40,7 +40,7 @@
       "covered": "đã có trong mô tả",
       "customPlaceholder": "Khoản khác",
       "addCustom": "+ Thêm khoản khác",
-      "nothingParsed": "Chưa đọc được khoản nào. Bạn viết dạng \"{{example}}\" nhé.",
+      "nothingParsed": "Chưa đọc được khoản nào. Viết theo dạng \"{{example}}\".",
       "remove": {
         "a11y": "Xóa {{name}}"
       }
@@ -176,7 +176,7 @@
       "saveFailed": "Chưa lưu được ngân sách. Thử lại."
     },
     "problem": {
-      "serverOutdated": "Máy chủ chưa hỗ trợ phiên bản thiết lập ngân sách này. Bạn cập nhật lại máy chủ rồi thử lại nhé.",
+      "serverOutdated": "Máy chủ chưa hỗ trợ phiên bản thiết lập ngân sách này. Cập nhật máy chủ rồi thử lại.",
       "categoriesUnmigrated": "Danh mục hệ thống trên máy chủ chưa được cập nhật nên chưa khớp được với các gói gợi ý."
     },
     "editRow": {

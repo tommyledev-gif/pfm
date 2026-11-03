@@ -42,8 +42,9 @@ export function TransactionsFilterBar({ filters, wallets, categoryById, dateLabe
   const [currencyMenu, setCurrencyMenu] = useState<PopoverAnchor | null>(null);
 
   const openCurrencyMenu = (event: GestureResponderEvent) => {
-    const target = event.currentTarget as unknown as Pick<View, "measureInWindow">;
-    target.measureInWindow((x, y, width, height) => setCurrencyMenu({ x, y, width, height }));
+    // Page coordinates: see PopoverAnchor.
+    const target = event.currentTarget as unknown as Pick<View, "measure">;
+    target.measure((_x, _y, width, height, pageX, pageY) => setCurrencyMenu({ x: pageX, y: pageY, width, height }));
   };
   // A wallet in another currency would leave the list empty: it goes.
   const pickCurrency = (next: string) => {

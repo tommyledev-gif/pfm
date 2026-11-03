@@ -20,9 +20,15 @@ export function useOverlayOrigin(visible: boolean) {
   const anchorRef = useRef<View>(null);
   const [origin, setOrigin] = useState({ x: 0, y: 0 });
 
+  // ⚠️ measure()'s page coordinates, not measureInWindow (same trap as
+  // RevealableAmount): on Android edge-to-edge, measureInWindow reports y
+  // below the status bar, so the overlay sat a status bar's height too low —
+  // a sheet's last row and a sub-panel's footer buttons were pushed off the
+  // bottom of the screen (perf audit 2026-11-03, 142 px on a Pixel 10a).
   const measureAnchor = () => {
-    anchorRef.current?.measureInWindow((x, y) => {
-      setOrigin((prev) => (prev.x === x && prev.y === y ? prev : { x, y }));
+    anchorRef.current?.measure((_x, _y, _width, _height, pageX, pageY) => {
+      if (!Number.isFinite(pageX) || !Number.isFinite(pageY)) return;
+      setOrigin((prev) => (prev.x === pageX && prev.y === pageY ? prev : { x: pageX, y: pageY }));
     });
   };
 

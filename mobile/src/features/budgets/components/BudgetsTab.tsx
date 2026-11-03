@@ -107,7 +107,7 @@ export const BudgetsTab = memo(function BudgetsTab({ initialRange, rangeNonce, o
   const { rangeLoading } = live;
   const held = useLastSettled(live, rangeLoading);
   const rangeDim = useDimWhile(rangeLoading);
-  const { rangeActive, resolvedRange, rangeDayCount, rangeElapsed, rows, counts, totals, visibleRows } = held ?? live;
+  const { rangeActive, resolvedRange, rangeElapsed, rows, counts, totals, visibleRows } = held ?? live;
   const pickerCategories = useMemo(
     () =>
       Array.from(new Map(rows.map(({ budget }) => [budget.category_id, budget])).values()).map((budget) => ({
@@ -117,6 +117,7 @@ export const BudgetsTab = memo(function BudgetsTab({ initialRange, rangeNonce, o
         iconUrl: budget.icon_url ?? categoryById.get(budget.category_id)?.icon_url,
         color: colorForCategory(budget.category_id),
       })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t: category names follow a language switch
     [rows, categoryById, t],
   );
   const scrollContentStyle = useMemo(() => ({ paddingBottom: fabClearance }), [fabClearance]);

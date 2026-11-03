@@ -73,9 +73,9 @@
       "availableBalanceAfter": "Số dư khả dụng: {{balance}} → {{after}} sau giao dịch này",
       "noTransferTarget": "Cần thêm một ví khác cùng đơn vị tiền tệ để chuyển khoản.",
       "error": {
-        "wallet": "Vui lòng chọn ví",
-        "toWallet": "Vui lòng chọn ví nhận",
-        "amount": "Vui lòng nhập số tiền"
+        "wallet": "Chọn ví",
+        "toWallet": "Chọn ví nhận",
+        "amount": "Nhập số tiền"
       }
     },
     "dropItems": {
@@ -162,13 +162,13 @@
       "viewTitle": "Vị trí giao dịch",
       "pickTitle": "Ghim vị trí",
       "error": {
-        "denied": "Budgest chưa được cấp quyền vị trí. Hãy cho phép trong Cài đặt rồi thử lại.",
+        "denied": "Budgest chưa có quyền vị trí. Cho phép trong Cài đặt rồi thử lại.",
         "servicesOff": "Định vị (GPS) đang tắt. Bật định vị để ghim vị trí giao dịch.",
         "unavailable": "Chưa lấy được vị trí hiện tại. Thử lại ở nơi thoáng hơn."
       },
       "locating": "Đang xác định vị trí…",
       "naming": "Đang tìm khu vực…",
-      "noAreaName": "Chưa có tên khu vực (cần mạng) — vẫn lưu toạ độ",
+      "noAreaName": "Chưa có tên khu vực (cần mạng). Toạ độ vẫn được lưu.",
       "noteLabel": "Ghi chú địa điểm",
       "noteEmpty": "Chưa có ghi chú cho địa điểm này.",
       "adjustHint": "{{coords}} · Chạm hoặc kéo ghim để chỉnh lại",
@@ -186,7 +186,7 @@
     },
     "sync": {
       "queued": "Đã lưu trên máy, sẽ đồng bộ khi có mạng.",
-      "queueFull": "Có quá nhiều giao dịch chờ đồng bộ. Hãy kết nối mạng để đồng bộ trước.",
+      "queueFull": "Có quá nhiều giao dịch chờ đồng bộ. Kết nối mạng để đồng bộ trước.",
       "status": {
         "waiting": "Đang chờ",
         "sending": "Đang gửi",
@@ -195,12 +195,12 @@
       "discard": {
         "title": "Bỏ giao dịch chưa đồng bộ này?",
         "body": "Giao dịch sẽ bị xoá khỏi máy và không được gửi lên tài khoản.",
-        "maybeSent": "Giao dịch có thể đã được lưu lên tài khoản. Hãy kiểm tra danh sách sau khi đồng bộ."
+        "maybeSent": "Giao dịch có thể đã được lưu lên tài khoản. Kiểm tra danh sách sau khi đồng bộ."
       },
-      "sendingHint": "Đang gửi — chờ một chút để sửa hoặc bỏ.",
+      "sendingHint": "Đang gửi. Chờ một chút để sửa hoặc bỏ.",
       "synced_other": "Đã đồng bộ {{count}} giao dịch",
-      "failed_other": "{{count}} giao dịch không thể đồng bộ — vui lòng kiểm tra.",
-      "replayDiffers": "Giao dịch này đã được lưu trước đó; thay đổi sau không được áp dụng. Hãy sửa trong danh sách.",
+      "failed_other": "{{count}} giao dịch chưa đồng bộ được. Kiểm tra danh sách.",
+      "replayDiffers": "Giao dịch này đã được lưu trước đó; thay đổi sau không được áp dụng. Sửa trong danh sách.",
       "serverError": "Lỗi máy chủ"
     },
     "export": {
@@ -221,8 +221,8 @@
         "toImport": "Sẽ nhập",
         "errors": "Lỗi",
         "total": "Tổng: {{amount}}",
-        "errorRows": "Dòng bị lỗi — sửa trong file rồi tải lại",
-        "duplicates": "Đã nhập trước đó — sẽ bỏ qua"
+        "errorRows": "Dòng bị lỗi: sửa trong file rồi tải lại",
+        "duplicates": "Đã nhập trước đó: sẽ bỏ qua"
       },
       "summary": {
         "skipped": "Bỏ qua",

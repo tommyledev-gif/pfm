@@ -65,7 +65,7 @@
       "a11y": "Thêm ngân sách"
     },
     "form": {
-      "amountInvalid": "Vui lòng nhập hạn mức hợp lệ",
+      "amountInvalid": "Nhập hạn mức lớn hơn 0",
       "titleEdit": "Sửa ngân sách",
       "titleNew": "Ngân sách mới",
       "categoryLocked": "Danh mục + \" (khóa sau khi tạo)\"",
@@ -126,7 +126,7 @@
     "ranked": {
       "collapse": "Thu gọn",
       "showMore": "Xem thêm {{count}} khoản",
-      "notShownExpanded_other": "Còn {{count}} khoản nhỏ hơn — xem đủ ở tab Giao dịch.",
+      "notShownExpanded_other": "Còn {{count}} khoản nhỏ hơn. Xem đủ ở tab Giao dịch.",
       "notShownCollapsed": "và {{count}} khoản khác"
     },
     "budgetStatus": {

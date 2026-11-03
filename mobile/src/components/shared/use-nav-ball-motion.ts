@@ -22,6 +22,13 @@ const ICON_IN_LEAD = POP_DELAY_MS / ICON_IN_MS;
 // native timing can loop it.
 const BOB_INPUT = Array.from({ length: 13 }, (_, k) => k / 12);
 const BOB_OUTPUT = BOB_INPUT.map((t) => (1 - Math.cos(2 * Math.PI * t)) / 2);
+// Breaths after the nav appears and after each switch, then still. A float
+// that never ended kept the app drawing a frame every vsync on every tab
+// (~60 fps, ~30% of a core on the render thread with nothing else moving —
+// perf audit 2026-11-03), and an app that never goes idle also stalls UI
+// automation waiting for it. A breath ends where it starts, at rest, so
+// stopping after whole ones shows no jump.
+const BOB_BREATHS = 3;
 
 // The squash and the icon pop are curves over ONE native 0 → 1 timing per
 // switch, sampled from the springs they used to be. A sequence or a `delay`
@@ -81,6 +88,19 @@ function createBallMotion(tabCount: number, startIndex: number) {
 
   const bob = bobPhase.interpolate({ inputRange: BOB_INPUT, outputRange: BOB_OUTPUT });
 
+  // A float already running carries on rather than restarting: a native loop
+  // started part-way would jump back to that point on every breath.
+  let floating: Animated.CompositeAnimation | null = null;
+  const float = () => {
+    if (floating) return;
+    bobPhase.setValue(0);
+    const run = Animated.loop(timing(bobPhase, 1, BOB_DURATION * 2, Easing.linear), { iterations: BOB_BREATHS });
+    floating = run;
+    run.start(() => {
+      if (floating === run) floating = null;
+    });
+  };
+
   return {
     ballOpacity,
     ballX,
@@ -113,6 +133,13 @@ function createBallMotion(tabCount: number, startIndex: number) {
       timing(ballOpacity, 1, 120).start();
     },
 
+    float,
+
+    stopFloat() {
+      floating?.stop();
+      floating = null;
+    },
+
     /**
      * Ball to `x`, icons to tab `index`. Every piece is one native animation,
      * started here and never stepped from JS again.
@@ -129,6 +156,7 @@ function createBallMotion(tabCount: number, startIndex: number) {
         (i === index ? timing(opacity, 1, ICON_IN_MS, iconInEasing) : timing(opacity, 0, 120)).start(),
       );
       rowOpacities.forEach((opacity, i) => timing(opacity, i === index ? 0 : 1, i === index ? 160 : 220).start());
+      float();
     },
   };
 }
@@ -154,15 +182,14 @@ function createBallMotion(tabCount: number, startIndex: number) {
  */
 export function useNavBallMotion(tabCount: number, startIndex: number) {
   const [motion] = useState(() => createBallMotion(tabCount, startIndex));
-  const { bobPhase } = motion;
 
-  // Idle float, forever: it drives translateY only, while ballX and the
-  // switch own translateX and scale, so a switch mid-float leaves it alone.
+  // Idle float, BOB_BREATHS at a time (switchTo starts the next): it drives
+  // translateY only, while ballX and the switch own translateX and scale, so
+  // a switch mid-float leaves it alone.
   useEffect(() => {
-    const loop = Animated.loop(timing(bobPhase, 1, BOB_DURATION * 2, Easing.linear));
-    loop.start();
-    return () => loop.stop();
-  }, [bobPhase]);
+    motion.float();
+    return motion.stopFloat;
+  }, [motion]);
 
   return motion;
 }

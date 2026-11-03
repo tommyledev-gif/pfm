@@ -13,8 +13,9 @@ import { colors, typography, createStyles } from "@/lib/theme";
 // Neither motion ever rebuilds the path. The surface is drawn once, at the
 // top of a body twice the circle's height, and both movements are native
 // transforms on the view that holds it:
-//  - translateX: shifted left by exactly one wavelength, forever
-//    (Animated.loop), so it reads as an endlessly scrolling surface.
+//  - translateX: shifted left by exactly one wavelength, WAVE_CYCLES times
+//    each time the ring comes into view (Animated.loop), so it reads as a
+//    scrolling surface that then settles.
 //  - translateY: the level. A progress change springs the whole body up or
 //    down (LEVEL_SPRING — one overshoot, then settle); the extra height below
 //    the surface is what stays behind to fill the circle as it moves.
@@ -24,6 +25,11 @@ const WAVE_AMPLITUDE = 6;
 // invisible.
 const WAVE_WIDTH_MULTIPLIER = 2;
 const WAVE_LOOP_MS = 3200;
+// Then still until the next focus. A wave that never ended kept Home drawing
+// a frame every vsync for as long as it was open (perf audit 2026-11-03).
+// Every cycle ends on a frame identical to its first, so stopping after whole
+// ones shows no seam.
+const WAVE_CYCLES = 3;
 // Keeps the wave visibly present (not a sliver) and never fully covers the
 // label at the very top of the circle, at 0%/100% progress respectively.
 const MIN_FILL = 0.08;
@@ -133,8 +139,11 @@ export function LiquidCircle({
       run = current;
       const loopFromZero = () => {
         shift.setValue(0);
-        current.current = Animated.loop(cycle(-hump, WAVE_LOOP_MS));
-        current.current.start();
+        current.current = Animated.loop(cycle(-hump, WAVE_LOOP_MS), { iterations: WAVE_CYCLES });
+        current.current.start(({ finished }) => {
+          // Settled: the next focus starts another few cycles.
+          if (finished && run === current) run = null;
+        });
       };
 
       // ⚠️ Resumed from where it paused, by finishing that cycle first. A

@@ -139,22 +139,23 @@ func (s *TransactionExportService) walletCurrencies(ctx context.Context, userID 
 }
 
 // parseExportRange validates the required from/to pair (S-TXI-05, S-TXI-06).
-// `to` is widened to the end of its day so a single-day export
-// (from == to) actually contains that day's transactions — occurred_at is a
-// timestamptz and the column is a plain date.
+// Both are AppLocation calendar days (date_window.go), `to` widened to the
+// end of its day so a single-day export (from == to) actually contains that
+// day's transactions — occurred_at is a timestamptz and the column is a plain
+// date.
 func parseExportRange(q dto.ExportTransactionsQuery) (time.Time, time.Time, error) {
-	from, err := time.Parse(common.DateOnlyLayout, q.From)
+	from, err := time.ParseInLocation(common.DateOnlyLayout, q.From, common.AppLocation)
 	if err != nil {
 		return time.Time{}, time.Time{}, common.NewInvalidInputError("from must be a valid date (YYYY-MM-DD)")
 	}
-	to, err := time.Parse(common.DateOnlyLayout, q.To)
+	to, err := time.ParseInLocation(common.DateOnlyLayout, q.To, common.AppLocation)
 	if err != nil {
 		return time.Time{}, time.Time{}, common.NewInvalidInputError("to must be a valid date (YYYY-MM-DD)")
 	}
 	if to.Before(from) {
 		return time.Time{}, time.Time{}, common.NewInvalidInputError("from must not be after to")
 	}
-	return from.UTC(), to.UTC().Add(24*time.Hour - time.Nanosecond), nil
+	return from.UTC(), endOfDay(to), nil
 }
 
 // writeWorkbook renders the rows into the Transactions sheet, columns exactly

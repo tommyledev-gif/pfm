@@ -35,7 +35,7 @@
       "sheet": {
         "stillWorks": {
           "viewSaved": "Xem dữ liệu đã lưu",
-          "addTransaction": "Thêm giao dịch mới — tự đồng bộ khi có mạng"
+          "addTransaction": "Thêm giao dịch mới, tự đồng bộ khi có mạng"
         },
         "needsNetwork": {
           "editDelete": "xóa",
@@ -48,7 +48,7 @@
         "lastUpdated": "Dữ liệu cập nhật lúc {{time}}",
         "noSavedData": "Chưa có dữ liệu nào được lưu trên máy",
         "staleNote": "Số dư và số liệu có thể đã cũ cho tới khi có mạng lại.",
-        "queued_other": "{{count}} giao dịch đang chờ — sẽ tự đồng bộ khi có mạng.",
+        "queued_other": "{{count}} giao dịch đang chờ. Tự đồng bộ khi có mạng.",
         "stillWorksTitle": "Vẫn làm được",
         "needsNetworkTitle": "Cần kết nối mạng"
       }
@@ -77,7 +77,7 @@
         "cleared": "Đã xóa số tiền vì {{currency}} không có phần lẻ."
       },
       "problem": {
-        "roundedToZero": "Số tiền làm tròn về 0 — nhỏ hơn đơn vị nhỏ nhất của {{currency}}.",
+        "roundedToZero": "Số tiền làm tròn về 0, nhỏ hơn đơn vị nhỏ nhất của {{currency}}.",
         "notPositive": "Số tiền phải lớn hơn 0."
       },
       "spokenEmpty": "Chưa nhập số tiền",
@@ -191,7 +191,7 @@
       "clear": "Clear log",
       "testAccounts": "Test accounts",
       "showNew_other": "Show {{count}} new",
-      "empty": "No log entries yet."
+      "empty": "Chưa có log nào."
     }
   }
 }

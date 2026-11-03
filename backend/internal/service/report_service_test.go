@@ -98,7 +98,8 @@ func TestReportService_GetSummary_PartialWindowDefaultsIndependently(t *testing.
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	wantFrom := time.Date(2025, time.January, 1, 0, 0, 0, 0, time.UTC)
+	// A plain date is the AppLocation day (date_window.go), not UTC midnight.
+	wantFrom := time.Date(2025, time.January, 1, 0, 0, 0, 0, common.AppLocation)
 	if !reportRepo.lastFilter.From.Equal(wantFrom) {
 		t.Fatalf("expected explicit from %v, got %v", wantFrom, reportRepo.lastFilter.From)
 	}

@@ -50,6 +50,7 @@ export const FutureTransactionsDialog = memo(function FutureTransactionsDialog({
     }
     return groups;
     // `t` changes with the language: the day labels are rebuilt in it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t, see above
   }, [transactions, t]);
 
   return (

@@ -41,6 +41,23 @@ const markUnsynced = (unsynced: Unsynced, id: string): Unsynced => ({ ...unsynce
 const withoutSent = (unsynced: Unsynced, sent: Unsynced): Unsynced =>
   Object.fromEntries(Object.entries(unsynced).filter(([id, stamp]) => sent[id] !== stamp));
 
+// The newest messages kept on the device. The whole thread used to be
+// written back on every change — older pages included once loadOlder had
+// paged them in — so each new message cost a bigger write, toward Android's
+// ~2 MB AsyncStorage read limit. Older messages stay on the server, and
+// scrolling back to the top pages them in again (loadOlder).
+const PERSISTED_MESSAGES = 200;
+
+// The saved part of the thread: its last PERSISTED_MESSAGES, extended back to
+// the oldest unsynced message, so nothing that has not reached the server yet
+// is ever dropped. Always one contiguous tail: loadOlder pages back from its
+// oldest synced message.
+function persistedTail(thread: ChatMessage[], unsynced: Unsynced): ChatMessage[] {
+  const firstUnsynced = thread.findIndex((m) => m.id in unsynced);
+  const start = Math.max(0, thread.length - PERSISTED_MESSAGES);
+  return thread.slice(firstUnsynced === -1 ? start : Math.min(start, firstUnsynced));
+}
+
 // Set once the saved thread has been read back, or the read failed: until
 // then an empty thread means "not loaded yet", not "no messages".
 let threadRestored = false;
@@ -232,7 +249,11 @@ export const useChatStore = create<ChatState>()(
       name: "pfm_chat_thread",
       storage: createJSONStorage(() => AsyncStorage),
       // restoredFor, epoch and olderStatus describe this app run only.
-      partialize: (state) => ({ thread: state.thread, ownerId: state.ownerId, unsynced: state.unsynced }),
+      partialize: (state) => ({
+        thread: persistedTail(state.thread, state.unsynced),
+        ownerId: state.ownerId,
+        unsynced: state.unsynced,
+      }),
       // v1 added `unsynced`. A thread saved before it has no record of what
       // reached the server, so every message counts as unsynced once — the
       // same full upload every sync used to be, one last time.

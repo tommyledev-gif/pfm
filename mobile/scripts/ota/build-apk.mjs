@@ -72,6 +72,13 @@ run(
     // arm64 only: every phone that can run passkeys (Android 9+) is arm64,
     // and the template's four ABIs (x86 ones are for emulators) made it 124 MB.
     "-PreactNativeArchitectures=arm64-v8a",
+    // R8 and resource shrinking (perf audit 2026-11-03, x86_64 emulator): dex
+    // 47.8 → 12.2 MB, APK 54.7 → 41.8 MB, cold start 1.81 → 1.10 s. Flags
+    // here rather than a config plugin so the update fingerprint does not
+    // move: installed APKs keep receiving updates. androidx.credentials 1.6.0
+    // ships the keep rule passkeys need.
+    "-Pandroid.enableMinifyInReleaseBuilds=true",
+    "-Pandroid.enableShrinkResourcesInReleaseBuilds=true",
   ],
   { cwd: ANDROID_DIR },
 );

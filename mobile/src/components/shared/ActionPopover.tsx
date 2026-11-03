@@ -14,7 +14,12 @@ export interface PopoverAction {
   testID?: string;
 }
 
-/** The held element's frame, in window coordinates (from measureInWindow). */
+/**
+ * The held element's frame in page coordinates — measure()'s pageX/pageY,
+ * never measureInWindow: edge to edge, window coordinates start under the
+ * status bar while this Modal draws from the top of the screen, so the menu
+ * opened a status bar too high, over the element it belongs to.
+ */
 export interface PopoverAnchor {
   x: number;
   y: number;
