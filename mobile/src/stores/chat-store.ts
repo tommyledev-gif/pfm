@@ -8,6 +8,7 @@ import {
   fetchChatThreadPage,
   syncChatThreadRequest,
 } from "@/features/ai-chat/api/use-chat-thread-sync";
+import { inWrittenOrder } from "@/features/ai-chat/message-id";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { userIdFromAccessToken } from "@/lib/jwt";
 import { queryClient } from "@/lib/query-client";
@@ -154,7 +155,7 @@ interface ChatState {
   // device that has nothing, never a merge: the local copy is always the newer
   // one (every local edit syncs UP to the server, seconds after the fact).
   // Also ignored unless `userId` owns the thread, and it marks the restore as
-  // done for that User either way.
+  // done for that User either way. Put back in written order (inWrittenOrder).
   hydrateThread: (messages: ChatMessage[], userId: string) => void;
   /** Empties the thread and hands it to `ownerId` (null = nobody signed in). */
   clear: (ownerId?: string | null) => void;
@@ -202,7 +203,7 @@ export const useChatStore = create<ChatState>()(
       hydrateThread: (messages, userId) =>
         set((state) => {
           if (state.ownerId !== userId) return state;
-          return { restoredFor: userId, thread: state.thread.length === 0 ? messages : state.thread };
+          return { restoredFor: userId, thread: state.thread.length === 0 ? inWrittenOrder(messages) : state.thread };
         }),
       clear: (ownerId = null) => {
         if (syncTimer) {
@@ -237,7 +238,12 @@ export const useChatStore = create<ChatState>()(
           set((state) => {
             const known = new Set(state.thread.map((m) => m.id));
             const older = page.messages.filter((m) => !known.has(m.id));
-            return { thread: [...older, ...state.thread], olderStatus: page.hasMore && older.length > 0 ? "idle" : "done" };
+            // Sorted as a whole: a batch the server stamped with one time can
+            // straddle the page boundary.
+            return {
+              thread: inWrittenOrder([...older, ...state.thread]),
+              olderStatus: page.hasMore && older.length > 0 ? "idle" : "done",
+            };
           });
         } catch {
           // Offline or a failed request: the next scroll to the top tries again.
@@ -257,10 +263,13 @@ export const useChatStore = create<ChatState>()(
       // v1 added `unsynced`. A thread saved before it has no record of what
       // reached the server, so every message counts as unsynced once — the
       // same full upload every sync used to be, one last time.
-      version: 1,
+      // v2: a thread restored from the server before it was put back in
+      // written order is sorted once (inWrittenOrder).
+      version: 2,
       migrate: (persisted, version) => {
         const state = persisted as { thread?: ChatMessage[]; ownerId?: string | null; unsynced?: Unsynced };
         if (version < 1) state.unsynced = Object.fromEntries((state.thread ?? []).map((m) => [m.id, 0]));
+        if (version < 2 && state.thread) state.thread = inWrittenOrder(state.thread);
         return state as ChatState;
       },
       // Called after a successful read and after a failed one alike.

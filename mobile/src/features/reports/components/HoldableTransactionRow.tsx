@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Animated, Easing, Pressable, Text, Vibration, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
-import { TransactionRow } from "@/components/shared/TransactionRow";
+import { TransactionRow, TransactionRowCategory } from "@/components/shared/TransactionRow";
 import { ChevronRightIcon, ListIcon } from "@/components/ui/Icon";
 import { withAlpha } from "@/lib/color";
 import { HOLD_VIBRATION_MS } from "@/lib/gestures";
@@ -19,7 +19,7 @@ const ARROW_SIZE = 10;
 interface HoldableTransactionRowProps {
   transaction: Transaction;
   currency?: string;
-  category?: { icon: string | null; icon_url: string | null };
+  category?: TransactionRowCategory;
   /** Its tooltip is showing. */
   open: boolean;
   onOpen: (transactionId: string) => void;

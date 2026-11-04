@@ -266,7 +266,8 @@
     "editTransaction": {
       "error": {
         "chooseDestination": "Choose the receiving wallet.",
-        "chooseCategory": "Choose a category."
+        "chooseCategory": "Choose a category.",
+        "writeRevoked": "Can't record in this wallet anymore. The transaction is unchanged."
       },
       "title": "Edit transaction",
       "typeLocked": "A saved transaction's type can't be changed",

@@ -259,7 +259,8 @@
     "editTransaction": {
       "error": {
         "chooseDestination": "Chọn ví nhận.",
-        "chooseCategory": "Chọn danh mục."
+        "chooseCategory": "Chọn danh mục.",
+        "writeRevoked": "Không còn quyền ghi vào ví này. Giao dịch giữ nguyên."
       },
       "title": "Sửa giao dịch",
       "typeLocked": "Không đổi được loại của giao dịch đã lưu",

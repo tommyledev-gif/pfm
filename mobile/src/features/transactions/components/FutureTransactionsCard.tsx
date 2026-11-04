@@ -3,11 +3,15 @@ import { useTranslation } from "react-i18next";
 
 import { formatDateGroupHeader } from "@/lib/format-date";
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
+import { transactionCategoryLabel } from "@/features/categories/category-label";
+import { Category } from "@/features/categories/types";
 import { Transaction } from "@/features/transactions/types";
 
 interface FutureTransactionsCardProps {
   /** Already sorted soonest-first — see splitFutureTransactions. */
   transactions: Transaction[];
+  /** So the next one's category reads in the app language. */
+  categoryById: Map<string, Category>;
   onPress: () => void;
 }
 
@@ -20,7 +24,7 @@ interface FutureTransactionsCardProps {
  * user needs from the top of the screen — the rows themselves are one tap away
  * and cost nothing until asked for.
  */
-export function FutureTransactionsCard({ transactions, onPress }: FutureTransactionsCardProps) {
+export function FutureTransactionsCard({ transactions, categoryById, onPress }: FutureTransactionsCardProps) {
   const { t } = useTranslation();
   const styles = useStyles();
   if (transactions.length === 0) return null;
@@ -31,7 +35,10 @@ export function FutureTransactionsCard({ transactions, onPress }: FutureTransact
       <View style={styles.textBlock}>
         <Text style={styles.title}>{t("transactions.future.count", { count: transactions.length })}</Text>
         <Text style={styles.subtitle} numberOfLines={1}>
-          {t("transactions.future.next", { date: formatDateGroupHeader(next.occurred_at), category: next.category_name })}
+          {t("transactions.future.next", {
+            date: formatDateGroupHeader(next.occurred_at),
+            category: transactionCategoryLabel(next, categoryById.get(next.category_id)),
+          })}
         </Text>
       </View>
       <Text style={styles.chevron}>›</Text>

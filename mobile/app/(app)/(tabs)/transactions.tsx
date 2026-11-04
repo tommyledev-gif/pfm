@@ -240,7 +240,7 @@ export default function TransactionsScreen() {
             importing={transactionIO.importing}
           >
             <PendingSyncSection />
-            <FutureTransactionsCard transactions={future} onPress={openFuture} />
+            <FutureTransactionsCard transactions={future} categoryById={categoryById} onPress={openFuture} />
           </TransactionsHeader>
         }
         renderRow={renderRow}

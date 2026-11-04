@@ -21,6 +21,7 @@ import { useOpenWalletCreator } from "@/features/wallets/use-open-wallet-creator
 import { EditTransactionChoices } from "@/features/ai-chat/components/EditTransactionChoices";
 import { useProposalLocation } from "@/features/ai-chat/hooks/use-proposal-location";
 import { useProposalWallets } from "@/features/ai-chat/hooks/use-proposal-wallets";
+import { lostWriteAccess } from "@/features/ai-chat/proposal-wallet";
 import { SavedProposalPatch, TransactionActionPayload } from "@/features/ai-chat/types";
 
 const FALLBACK_CURRENCY = "VND";
@@ -77,6 +78,8 @@ export function EditTransactionModal({
   const wallets = useWalletsQuery("writable");
   const openWalletCreator = useOpenWalletCreator();
   const savedId = confirmed ? transactionId : null;
+  // The row offers no edit then (isWriteRevoked); this covers a deep link or access lost mid-edit.
+  const writeRevoked = savedId !== null && payload !== null && lostWriteAccess(payload, wallets.data);
   // The keypad's decimals follow the chosen wallet's currency: always VND for
   // an unsaved proposal (only VND wallets are offered), otherwise the
   // selected wallet's, which a saved one shares with its original wallet.
@@ -176,16 +179,19 @@ export function EditTransactionModal({
   const destinationChosen = Boolean(destination) || savedId !== null;
   const amountValid = amount.cents !== null && amount.cents > 0;
   const kindChosen = isTransfer ? destinationChosen : Boolean(categoryId);
-  const canSave = amountValid && kindChosen && Boolean(wallet) && Boolean(occurredAt);
+  const canSave = amountValid && kindChosen && Boolean(wallet) && Boolean(occurredAt) && !writeRevoked;
   const kindError = isTransfer
     ? destinationChosen ? undefined : t("chat.editTransaction.error.chooseDestination")
     : categoryId ? undefined : t("chat.editTransaction.error.chooseCategory");
-  const errors = submitAttempted
-    ? [kindError, amount.problem ?? (amountValid ? undefined : t("common.validation.enterAmount"))]
-    : [];
+  const errors = writeRevoked
+    ? [t("chat.editTransaction.error.writeRevoked")]
+    : submitAttempted
+      ? [kindError, amount.problem ?? (amountValid ? undefined : t("common.validation.enterAmount"))]
+      : [];
 
   const submit = () => {
     Keyboard.dismiss();
+    if (writeRevoked) return;
     setSubmitAttempted(true);
     // Trims/evaluates an expression still being typed ("120+"), so what is
     // saved is exactly what the amount display then shows.
@@ -253,7 +259,7 @@ export function EditTransactionModal({
           onClearItems={lines.clear}
           wallet={wallet}
           onOpenWallets={proposalWallets.sourcePicker.open}
-          walletLocked={confirmed && (savedId === null || isTransfer)}
+          walletLocked={confirmed && (savedId === null || isTransfer || writeRevoked)}
           destination={destination}
           destinationCount={proposalWallets.destinations.length}
           onOpenDestinations={proposalWallets.destinationPicker.open}

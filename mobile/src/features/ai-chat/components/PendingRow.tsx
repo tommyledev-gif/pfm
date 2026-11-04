@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { SwipeableRow } from "@/components/shared/SwipeableRow";
@@ -12,6 +12,11 @@ import { ChatMessage } from "@/features/ai-chat/types";
 import { useTooltipStore } from "@/stores/tooltip-store";
 
 const ICON_SIZE = 34;
+// The amount column, the same on every row: the widest compact figure
+// ("-~999m999k ₫") fits at the default font size. It grows with the system
+// font size, up to MAX_FONT_SCALE, so a large one still leaves the label room.
+const AMOUNT_WIDTH = 104;
+const MAX_FONT_SCALE = 1.3;
 // Same hold as an icon button's hint: the row's tap opens the proposal.
 const REVEAL_DELAY_MS = 500;
 
@@ -44,11 +49,12 @@ interface PendingRowProps {
  * ⚠️ Swiping reveals a button; it never acts on release. Discarding goes
  * through the caller's confirmation and never deletes the message itself.
  *
- * The amount is compacted past six digits ("~12m500k") and keeps a fixed
- * share of the row: shown in full it could not shrink (a Text does not by
- * default), so a large figure squeezed the label away and ran past the
- * chevron. Holding the row shows the exact figure over it, the same contract
- * every other compacted amount has (RevealableAmount).
+ * The amount is compacted past six digits ("~12m500k") and sits in a column
+ * of fixed width, right-aligned. Sized by its content it moved with every
+ * figure, and a long note left it nowhere to go: the label is what gives way
+ * (one line, cut with "…"), never the amount. Holding the row shows the
+ * exact figure over it, the same contract every other compacted amount has
+ * (RevealableAmount).
  */
 export function PendingRow({
   message,
@@ -63,6 +69,7 @@ export function PendingRow({
   const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
+  const { fontScale } = useWindowDimensions();
   const amountRef = useRef<View>(null);
   const type = message.action?.payload.type ?? "expense";
   const isIncome = type === "income";
@@ -118,7 +125,11 @@ export function PendingRow({
               {t(REVIEW_KEY[type])}
             </Text>
           </View>
-          <View ref={amountRef} style={styles.amountBox} collapsable={false}>
+          <View
+            ref={amountRef}
+            style={[styles.amountBox, { width: AMOUNT_WIDTH * Math.min(fontScale, MAX_FONT_SCALE) }]}
+            collapsable={false}
+          >
             <Text
               testID={`text-pending-amount-${message.id}`}
               style={[styles.amount, { color: isTransfer ? colors.periwinkle : isIncome ? colors.green : colors.textPrimary }]}
@@ -170,8 +181,7 @@ const useStyles = createStyles((colors) => ({
   textCol: { flex: 1, minWidth: 0, gap: 2 },
   label: { ...typography.body, color: colors.textPrimary },
   hint: { ...typography.caption, color: colors.textSecondary },
-  // Never wider than this share of the row, so the label always keeps room;
-  // a compacted figure fits well inside it.
-  amountBox: { flexShrink: 0, maxWidth: "45%" },
-  amount: { ...typography.body, fontWeight: "700" },
+  // Its width is set per render (AMOUNT_WIDTH); never shrunk by the label.
+  amountBox: { flexShrink: 0 },
+  amount: { ...typography.body, fontWeight: "700", textAlign: "right" },
 }));

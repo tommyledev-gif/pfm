@@ -16,6 +16,7 @@ import { useChatThreadStyles } from "@/features/ai-chat/components/chat-thread-s
 import { ChatDraftStore } from "@/features/ai-chat/chat-draft";
 import { CHAT_MODE_META, ChatMode } from "@/features/ai-chat/chat-mode";
 import { pinFreshProposals, withAutoPin } from "@/features/ai-chat/proposal-auto-pin";
+import { isWriteRevoked } from "@/features/ai-chat/proposal-wallet";
 import { useChatActions } from "@/features/ai-chat/hooks/use-chat-actions";
 import { MessageJump, useMessageJump } from "@/features/ai-chat/hooks/use-message-jump";
 import { ChatMessage } from "@/features/ai-chat/types";
@@ -154,6 +155,7 @@ export function RecordingPane({
           categoryById={categoryById}
           budgetByCategoryCurrency={budgetByCategoryCurrency}
           confirming={confirmingId === item.id}
+          writeRevoked={isWriteRevoked(item, wallets.data)}
           onConfirm={handleConfirm}
           onTriggerEdit={handleTriggerEdit}
           onTriggerDelete={handleTriggerDelete}
@@ -186,6 +188,7 @@ export function RecordingPane({
       categoryById,
       budgetByCategoryCurrency,
       confirmingId,
+      wallets.data,
       handleConfirm,
       handleTriggerEdit,
       handleTriggerDelete,

@@ -30,6 +30,32 @@ export function isSavableProposal(payload: TransactionActionPayload, walletById:
   return !wallet || wallet.currency === PROPOSAL_CURRENCY;
 }
 
+/**
+ * Whether the User may no longer write to a Wallet this proposal touches
+ * (specs/shared-wallets BR-05, BR-07): a shared one they were made a viewer
+ * of, or left. `writable` is the "writable" Wallet list, undefined while it
+ * loads, which locks nothing.
+ */
+export function lostWriteAccess(
+  payload: Pick<TransactionActionPayload, "wallet_id" | "to_wallet_id">,
+  writable: Wallet[] | undefined,
+): boolean {
+  if (!writable) return false;
+  return [payload.wallet_id, payload.to_wallet_id].some((id) => Boolean(id) && !writable.some((w) => w.id === id));
+}
+
+/**
+ * A saved proposal whose Transaction the User can no longer edit or delete:
+ * only its recorder may, and only while they can still write to every Wallet
+ * it touches (BR-07), so the server refuses both with 403. An unsaved one is
+ * never locked: its Wallet is picked again from the writable ones.
+ */
+export function isWriteRevoked(message: ChatMessage, writable: Wallet[] | undefined): boolean {
+  const payload = message.action?.payload;
+  if (!message.confirmed || !message.transactionId || !payload) return false;
+  return lostWriteAccess(payload, writable);
+}
+
 /** The Wallet a proposal names: "Chưa chọn ví" without one, "A → B" for a transfer. In the current language. */
 export function proposalWalletName(payload: TransactionActionPayload, walletById: Map<string, Wallet>): string {
   const nameOf = (id: string) => walletById.get(id)?.name ?? i18n.t("common.field.wallet");

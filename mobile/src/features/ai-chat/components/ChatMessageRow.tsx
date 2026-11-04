@@ -44,6 +44,8 @@ interface ChatMessageRowProps {
    *  measured against a budget limit in another. */
   budgetByCategoryCurrency: Map<string, { amount_limit: number; spent: number }>;
   confirming: boolean;
+  /** Saved, and on a Wallet the User can no longer write to (isWriteRevoked): no edit, no delete. */
+  writeRevoked: boolean;
   onConfirm: (message: ChatMessage) => void;
   onTriggerEdit: (message: ChatMessage) => void;
   onTriggerDelete: (message: ChatMessage) => void;
@@ -79,6 +81,7 @@ function ChatMessageRowView({
   categoryById,
   budgetByCategoryCurrency,
   confirming,
+  writeRevoked,
   onConfirm,
   onTriggerEdit,
   onTriggerDelete,
@@ -116,8 +119,11 @@ function ChatMessageRowView({
   const categoryName =
     (message.action && proposalCategoryName(message.action.payload, (id) => categoryLabel(categoryById.get(id)))) ||
     t("common.field.category");
-  const onEdit = isEditLocked(message) ? undefined : () => onTriggerEdit(message);
-  const onDelete = isRemovable(message) ? () => onTriggerDelete(message) : undefined;
+  // A saved one on a Wallet the User can no longer write to: the server would
+  // refuse both (isWriteRevoked).
+  const editLocked = isEditLocked(message) || writeRevoked;
+  const onEdit = editLocked ? undefined : () => onTriggerEdit(message);
+  const onDelete = isRemovable(message) && !writeRevoked ? () => onTriggerDelete(message) : undefined;
   const locationLabel = useAutoPinLabel(message);
 
   const entering = useFreshEntrance(messageCreatedAt(message.id));
@@ -136,7 +142,7 @@ function ChatMessageRowView({
       // User bubbles are right-aligned, assistant bubbles left-aligned, so
       // each is dragged away from the edge it already sits on.
       direction={message.role === "user" ? "left" : "right"}
-      disabled={isEditLocked(message)}
+      disabled={editLocked}
       onTriggerEdit={() => onTriggerEdit(message)}
       onTriggerDelete={onDelete}
       locked={menu.visible}

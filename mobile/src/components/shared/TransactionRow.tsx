@@ -9,15 +9,20 @@ import { colorForCategory } from "@/lib/category-color";
 import { TRANSFER_CATEGORY_ICON } from "@/lib/constants";
 import { formatCurrencyTruncated } from "@/lib/currency";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
+import { transactionCategoryLabel } from "@/features/categories/category-label";
+import { Category } from "@/features/categories/types";
 import { Transaction } from "@/features/transactions/types";
 import { SharedWalletTag } from "@/features/wallets/components/SharedWalletTag";
 
 const ICON_SIZE = 42;
 
+/** What a row reads from the caller's category lookup. */
+export type TransactionRowCategory = Pick<Category, "icon" | "icon_url" | "name" | "system_key">;
+
 interface TransactionRowProps {
   transaction: Transaction;
   currency?: string;
-  category?: { icon: string | null; icon_url: string | null };
+  category?: TransactionRowCategory;
   /** Tapping anywhere on the row, the amount included. */
   onPress?: () => void;
   /**
@@ -44,9 +49,12 @@ interface TransactionRowProps {
 // `currency` comes from the caller's wallet lookup — Transaction itself
 // carries no currency field (only a denormalized wallet_name), the backend
 // resolves currency via the wallet relation, so mobile must too.
-// `category` is an optional lookup result (icon/icon_url) from the caller's
-// own categories fetch — Transaction itself only carries a denormalized
-// category_name, same reasoning as the `currency` prop above.
+// `category` is an optional lookup result from the caller's own categories
+// fetch — Transaction itself only carries a denormalized category_name, same
+// reasoning as the `currency` prop above. That name is the server's, always
+// Vietnamese for a system category, so the label goes through
+// transactionCategoryLabel to follow the app language; category_name is only
+// the fallback for one missing from the lookup (a shared wallet owner's own).
 export const TransactionRow = memo(function TransactionRow({
   transaction,
   currency,
@@ -61,7 +69,8 @@ export const TransactionRow = memo(function TransactionRow({
   const styles = useStyles();
   const isIncome = transaction.type === "income";
   const isTransfer = transaction.type === "transfer";
-  const label = transaction.note?.trim() || transaction.category_name;
+  const categoryName = transactionCategoryLabel(transaction, category);
+  const label = transaction.note?.trim() || categoryName;
   // A transfer only moves money between the user's own wallets — neither a
   // gain nor a loss — so it gets a neutral colour and no +/- sign.
   const amountColor = isTransfer ? colors.periwinkle : isIncome ? colors.green : colors.peach;
@@ -81,7 +90,7 @@ export const TransactionRow = memo(function TransactionRow({
   const leftMeta = isTransfer
     ? `${transaction.wallet_name} → ${transaction.to_wallet_name ?? "?"}`
     : hasNote
-      ? transaction.category_name
+      ? categoryName
       : null;
 
   const amount = (
