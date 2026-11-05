@@ -31,6 +31,7 @@ import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useChatThreadQuery } from "@/features/ai-chat/api/use-chat-thread-sync";
 import { ChatMessage, SavedProposalPatch, TransactionActionPayload } from "@/features/ai-chat/types";
 import { isWaitingForNetwork } from "@/lib/query-status";
+import { useAfterTabSwitch } from "@/lib/use-after-tab-switch";
 import { useLatestCallback } from "@/lib/use-latest-callback";
 import { useChatStore, useChatThreadRestored } from "@/stores/chat-store";
 import { useCurrentUserId } from "@/stores/use-current-user-id";
@@ -60,6 +61,7 @@ export default function AiChatScreen() {
   const [focusRecordingInput, setFocusRecordingInput] = useState(false);
 
   const overlays = useChatOverlays();
+  const afterTabSwitch = useAfterTabSwitch();
 
   const { focusMessageId, focusedAt, openEdit } = useLocalSearchParams<{
     focusMessageId?: string;
@@ -132,7 +134,8 @@ export default function AiChatScreen() {
     setJump({ id: focusMessageId, nonce: Date.now() });
     if (openEdit === "1") {
       const message = thread.find((m) => m.id === focusMessageId);
-      if (message?.action && !isTombstone(message)) overlays.setEditingActionMessage(message);
+      // Once this tab has slid in: opened during the slide, the sheet shook.
+      if (message?.action && !isTombstone(message)) afterTabSwitch(() => overlays.setEditingActionMessage(message));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusMessageId, focusedAt]);

@@ -14,7 +14,7 @@ import { useTransactionsQuery } from "@/features/transactions/api/use-transactio
 import { useTransactionIO } from "@/features/transactions/use-transaction-io";
 import { useFilteredReportTotal } from "@/features/transactions/api/use-filtered-report-total";
 import { Transaction } from "@/features/transactions/types";
-import { buildDaySections } from "@/features/transactions/day-sections";
+import { buildDaySections, DaySection } from "@/features/transactions/day-sections";
 import { rangeTargetsFuture, splitFutureTransactions } from "@/features/transactions/future";
 import { FutureTransactionsCard } from "@/features/transactions/components/FutureTransactionsCard";
 import { FutureTransactionsDialog } from "@/features/transactions/components/FutureTransactionsDialog";
@@ -44,6 +44,7 @@ import { useWalletLookups } from "@/features/wallets/use-wallet-lookups";
 
 const NO_CATEGORIES: Category[] = [];
 const NO_WALLETS: Wallet[] = [];
+const NO_SECTIONS: DaySection[] = [];
 
 export default function TransactionsScreen() {
   const { t } = useTranslation();
@@ -71,8 +72,7 @@ export default function TransactionsScreen() {
   const categories = useCategoriesQuery();
   useWalletFilterParam(filters, wallets.data, () => setSortKeys([]));
 
-  // A new filter keeps the current rows on screen until its own land, rather
-  // than dropping to a skeleton on every search refinement.
+  // keepPrevious holds the header still; the list shows its skeleton meanwhile (TransactionsListEmpty).
   const transactions = useTransactionsQuery({ ...sharedFilters, type: filter }, { keepPrevious: true });
   const switchingFilters = transactions.isPlaceholderData;
 
@@ -203,7 +203,7 @@ export default function TransactionsScreen() {
         onScrollToIndexFailed={focus.onScrollToIndexFailed}
         style={styles.screen}
         contentContainerStyle={styles.content}
-        sections={sections}
+        sections={switchingFilters ? NO_SECTIONS : sections}
         days={days}
         replayKey={listReplayKey}
         stickySectionHeadersEnabled={false}

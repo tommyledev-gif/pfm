@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useTranslation } from "react-i18next";
 
@@ -15,6 +15,8 @@ import { Budget, BudgetLimit } from "@/features/budgets/types";
 import { categoryLabel } from "@/features/categories/category-label";
 import { Category } from "@/features/categories/types";
 
+const BAR_HEIGHT = 6;
+
 interface BudgetListRowProps {
   budget: Budget;
   limit: BudgetLimit;
@@ -29,23 +31,24 @@ interface BudgetListRowProps {
    *  separate target from the row's own tap, which edits the limit. */
   onPressBar: (budget: Budget, limit: BudgetLimit) => void;
   highlighted?: boolean;
+  /** Draws the hairline above this row (every row of the group but the first). */
+  separated?: boolean;
 }
 
-// One budget in the Insights → Budgets list.
+// One budget in the Insights → Budgets list: a row of the tab's rounded group.
 //
-// Replaces the old two-bar card ("Budget" muted over "Actual" colored, both
-// scaled against the largest limit in the list). That card answered "how big
-// is this budget relative to the others", which is not a question anyone opens
-// this screen with; it took a full Card of vertical space per budget, and it
-// never showed whether spending was ahead of the month. This row answers
-// "am I fine" in one glance instead: a single bar scaled to *its own* limit,
-// colored by pace state, with its own period tick drawn on it, the money left (or
-// overspent) called out on the right, and the raw spent/limit pair underneath.
+// Two lines beside the icon, nothing more: the name with what was spent of the
+// limit ("1,2tr / 2tr"), then the bar with what is left (or over) and the
+// share used. It used to stack five things per budget — name and spend, the
+// bar, "37% · Còn 1,2tr" with "Hạn mức: 2tr" under it, and a "Xem giao dịch →"
+// link — and a handful of budgets filled the screen.
 //
-// Tap-to-edit and the 2s hold that opens the category picker are carried over
-// from the card unchanged. Amounts are short (k / m / b, formatCurrencyCompact)
-// as on the Spending tab next door; the exact limit is in the edit form, the
-// exact spend in the bar's transactions sheet.
+// The bar (with its line) still opens the transactions behind it; screen
+// readers hear it as "Xem giao dịch". A single bar scaled to *its own* limit,
+// coloured by pace state, with its own period tick. Tap-to-edit and the 2s
+// hold that opens the category picker are unchanged. Amounts are short
+// (k / m / b, formatCurrencyCompact); the exact limit is in the edit form,
+// the exact spend in the bar's transactions sheet.
 export const BudgetListRow = memo(function BudgetListRow({
   budget,
   limit,
@@ -55,6 +58,7 @@ export const BudgetListRow = memo(function BudgetListRow({
   onHold,
   onPressBar,
   highlighted,
+  separated,
 }: BudgetListRowProps) {
   const { t } = useTranslation();
   const colors = useColors();
@@ -80,74 +84,73 @@ export const BudgetListRow = memo(function BudgetListRow({
       delayLongPress={2000}
       style={[styles.row, highlighted && styles.rowHighlighted]}
     >
-      <View style={styles.headRow}>
-        <BudgetIconTile name={name} icon={icon} iconUrl={iconUrl} />
-        <Animated.Text style={[styles.name, tintStyle]} numberOfLines={1}>
-          {name}
-        </Animated.Text>
-        {/* What was spent, in the header's corner. Over-budget turns it red;
-            otherwise it stays plain — the bar and caption below carry pace. */}
-        <Text style={[styles.headline, status.over && styles.headlineOver]} numberOfLines={1}>
-          {formatCurrencyCompact(limit.spent, limit.currency)}
-        </Text>
-      </View>
-
-      {/* The bar is its own target: the row answers "change this limit", the
-          bar answers "what is this number made of". Nested inside the row's
-          Pressable rather than beside it so the layout is unchanged — RN gives
-          the innermost responder the tap, so the two never both fire. */}
-      <Pressable onPress={() => onPressBar(budget, limit)} hitSlop={6} testID="btn-budget-transactions">
-        <BudgetProgressBar
-          ratio={status.ratio}
-          // A budget with nothing spent yet has no pace to be behind, and the
-          // tick on an empty track just reads as noise.
-          pace={status.state === "unused" ? undefined : periodElapsed}
-          color={status.color}
-        />
-
-        {/* Two figures, not four: the old footer said "over budget" three
-            times (385% — đã vượt, vượt 5.280.000 đ, 7.130.000 / 1.850.000). */}
-        <View style={styles.footRow}>
-          <Text style={[styles.caption, { color: status.over ? colors.danger : status.color }]} numberOfLines={1}>
-            {t(status.over ? "budgets.row.over" : "budgets.row.left", {
-              percent: formatPercent(status.ratio * 100),
-              amount: formatCurrencyCompact(Math.abs(status.remaining), limit.currency),
+      <BudgetIconTile name={name} icon={icon} iconUrl={iconUrl} />
+      <View style={[styles.body, separated && styles.separated]}>
+        <View style={styles.line}>
+          <Animated.Text style={[styles.name, tintStyle]} numberOfLines={1}>
+            {name}
+          </Animated.Text>
+          <Text style={[styles.amounts, status.over && styles.amountsOver]} numberOfLines={1}>
+            {t("budgets.row.spentOfLimit", {
+              spent: formatCurrencyCompact(limit.spent, limit.currency),
+              limit: formatCurrencyCompact(limit.amount_limit, limit.currency),
             })}
-          </Text>
-          <Text style={styles.amounts} numberOfLines={1}>
-            {t("budgets.row.limit", { amount: formatCurrencyCompact(limit.amount_limit, limit.currency) })}
           </Text>
         </View>
 
-        {/* Said out loud, because a bar that happens to be tappable is a
-            secret. Only on rows that have something to show — an untouched
-            budget would open an empty sheet. */}
-        {status.state !== "unused" ? <Text style={styles.drillLink}>{t("budgets.row.seeTransactions")}</Text> : null}
-      </Pressable>
+        {/* Its own target, nested so RN gives it the tap over the row's. */}
+        <Pressable
+          onPress={() => onPressBar(budget, limit)}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel={t("budgets.row.seeTransactions")}
+          testID="btn-budget-transactions"
+          style={styles.barBlock}
+        >
+          <BudgetProgressBar
+            ratio={status.ratio}
+            // A budget with nothing spent yet has no pace to be behind, and the
+            // tick on an empty track just reads as noise.
+            pace={status.state === "unused" ? undefined : periodElapsed}
+            color={status.color}
+            height={BAR_HEIGHT}
+          />
+          <View style={styles.line}>
+            <Text style={[styles.caption, { color: status.over ? colors.danger : status.color }]} numberOfLines={1}>
+              {t(status.over ? "budgets.row.over" : "budgets.row.left", {
+                amount: formatCurrencyCompact(Math.abs(status.remaining), limit.currency),
+              })}
+            </Text>
+            <Text style={styles.percent} numberOfLines={1}>
+              {formatPercent(status.ratio * 100)}
+            </Text>
+          </View>
+        </Pressable>
+      </View>
     </Pressable>
   );
 });
 
 const useStyles = createStyles((colors) => ({
-  row: {
-    gap: spacing.sm,
-    paddingVertical: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.surfaceBorder,
-  },
+  row: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingLeft: spacing.lg },
   rowHighlighted: { backgroundColor: withAlpha(colors.green, 0.06) },
-  headRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
-  name: { flex: 1, ...typography.cardTitle },
-  headline: { ...typography.body, fontWeight: "700", color: colors.textPrimary, flexShrink: 0 },
-  headlineOver: { color: colors.danger },
-  footRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  // The hairline starts after the icon, as in every other inset group.
+  body: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
+    minWidth: 0,
     gap: spacing.sm,
-    paddingTop: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingRight: spacing.lg,
   },
-  drillLink: { ...typography.tiny, color: colors.green, paddingTop: spacing.xs },
+  separated: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.surfaceBorder },
+  // Name and figures share a line; the name gives way (see yoga note in PendingRow).
+  line: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
+  name: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, ...typography.body },
+  amounts: { ...typography.caption, color: colors.textSecondary, flexShrink: 0 },
+  amountsOver: { color: colors.danger },
+  barBlock: { gap: 6 },
   caption: { ...typography.caption, flexShrink: 1 },
-  amounts: { ...typography.caption, color: colors.textMuted, flexShrink: 1 },
+  percent: { ...typography.caption, color: colors.textMuted, flexShrink: 0 },
 }));

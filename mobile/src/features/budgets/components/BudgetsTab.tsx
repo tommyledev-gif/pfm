@@ -13,7 +13,7 @@ import { BudgetFormModal } from "@/features/budgets/components/BudgetFormModal";
 import { colorForCategory } from "@/lib/category-color";
 import { monthRange } from "@/lib/date-range";
 import { formatDateRange } from "@/lib/format-date";
-import { spacing, typography, createStyles } from "@/lib/theme";
+import { radii, spacing, typography, createStyles } from "@/lib/theme";
 import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
 import { isAwaitingFirstData, isWaitingForNetwork } from "@/lib/query-status";
 import { useRefresh } from "@/lib/use-refresh";
@@ -23,13 +23,12 @@ import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { Budget } from "@/features/budgets/types";
 import { currentMonthPace } from "@/features/budgets/budget-pace";
 import { useBudgetRows } from "@/features/budgets/hooks/use-budget-rows";
-import { BUDGET_FILTERS, BudgetFilterChips, BudgetFilterKey } from "@/features/budgets/components/BudgetFilterChips";
+import { BUDGET_FILTERS, BudgetFilterKey, BudgetFilterTabs } from "@/features/budgets/components/BudgetFilterTabs";
 import { BudgetDetailDialog } from "@/features/budgets/components/BudgetDetailDialog";
 import { BudgetsFab } from "@/features/budgets/components/BudgetsFab";
-import { BudgetListSkeleton } from "@/features/budgets/components/BudgetCardSkeleton";
+import { BudgetListSkeleton, BudgetTabSkeleton } from "@/features/budgets/components/BudgetCardSkeleton";
 import { BudgetListRow } from "@/features/budgets/components/BudgetListRow";
-import { BudgetMonthSummary } from "@/features/budgets/components/BudgetMonthSummary";
-import { BudgetRangeRow } from "@/features/budgets/components/BudgetRangeRow";
+import { BudgetSummaryCard } from "@/features/budgets/components/BudgetSummaryCard";
 import { BudgetPreset, BudgetsEmptyState } from "@/features/budgets/components/BudgetsEmptyState";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { categoryLabel } from "@/features/categories/category-label";
@@ -38,7 +37,7 @@ import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { primaryCurrency } from "@/features/wallets/wallet-totals";
 
 // Insights → Budgets tab: a month-level summary on top, then one row per
-// budget ordered worst-first, with chips to jump straight to the budgets that
+// budget ordered worst-first, with tabs to jump straight to the budgets that
 // need attention (see BudgetListRow for the row itself).
 interface BudgetsTabProps {
   /** Opens straight into a date filter — used by Home's "sắp vượt" list, which
@@ -163,7 +162,7 @@ export const BudgetsTab = memo(function BudgetsTab({ initialRange, rangeNonce, o
   return (
     <View style={styles.container}>
       {/* Only the list waits on the skeleton: the Fab and the sheets work at once. */}
-      <SkeletonSwap fill loading={isAwaitingFirstData(budgets)} skeleton={<BudgetListSkeleton />}>
+      <SkeletonSwap fill loading={isAwaitingFirstData(budgets)} skeleton={<BudgetTabSkeleton />}>
         {() => (
           <ScrollView
             ref={scrollRef}
@@ -179,8 +178,8 @@ export const BudgetsTab = memo(function BudgetsTab({ initialRange, rangeNonce, o
               />
             ) : (
               <>
-                <BudgetRangeRow
-                  label={
+                <BudgetSummaryCard
+                  rangeLabel={
                     rangeLoading && dateRange.from
                       ? formatDateRange(dateRange.from, dateRange.to ?? dateRange.from)
                       : resolvedRange
@@ -188,8 +187,17 @@ export const BudgetsTab = memo(function BudgetsTab({ initialRange, rangeNonce, o
                         : t("common.date.thisMonth")
                   }
                   filtered={live.rangeActive}
+                  daysLeft={rangeActive ? null : pace.daysLeft}
                   onOpenPicker={() => setRangePickerOpen(true)}
                   onClear={() => setDateRange({})}
+                  figures={rangeLoading && !held ? null : {
+                    elapsed: rangeActive && resolvedRange ? rangeElapsed : pace.elapsed,
+                    totalLimit: totals.limit,
+                    totalSpent: totals.spent,
+                    currency,
+                    overCount: counts.over,
+                  }}
+                  dimStyle={rangeDim}
                 />
 
                 {/* A picked range not answered yet, with no rows to hold: every
@@ -200,19 +208,7 @@ export const BudgetsTab = memo(function BudgetsTab({ initialRange, rangeNonce, o
                   </LateSkeleton>
                 ) : (
                   <Animated.View style={rangeDim} onLayout={(e) => (dimTop.current = e.nativeEvent.layout.y)}>
-                    <BudgetMonthSummary
-                      // Under a filter the card describes the selected window, not the
-                      // month — its own totals already come from the filtered rows, so the
-                      // pace and the wording have to follow or the card contradicts itself.
-                      pace={rangeActive && resolvedRange ? { elapsed: rangeElapsed, daysLeft: 0 } : pace}
-                      showDaysLeft={!rangeActive}
-                      totalLimit={totals.limit}
-                      totalSpent={totals.spent}
-                      currency={currency}
-                      overCount={counts.over}
-                    />
-
-                    <BudgetFilterChips value={filter} onChange={setFilter} counts={counts} />
+                    <BudgetFilterTabs value={filter} onChange={setFilter} counts={counts} style={styles.tabs} />
 
                     <Animated.View style={filterSlide} onLayout={(e) => (rowsTop.current = e.nativeEvent.layout.y)}>
                       {visibleRows.length === 0 ? (
@@ -220,26 +216,29 @@ export const BudgetsTab = memo(function BudgetsTab({ initialRange, rangeNonce, o
                           {rows.length === 0 ? t("budgets.list.emptyCurrency", { currency }) : t("budgets.list.emptyFilter")}
                         </Text>
                       ) : (
-                        visibleRows.map(({ budget, limit, periodElapsed }, index) => (
-                          <Reanimated.View
-                            key={`${budget.id}-${limit.currency}`}
-                            entering={rowEntrance(index)}
-                            onLayout={(e) => {
-                              rowOffsets.current[budget.id] = e.nativeEvent.layout.y;
-                            }}
-                          >
-                            <BudgetListRow
-                              budget={budget}
-                              limit={limit}
-                              periodElapsed={periodElapsed}
-                              category={categoryById.get(budget.category_id)}
-                              highlighted={highlightedBudgetId === budget.id}
-                              onPress={openEditBudget}
-                              onHold={openCategoryPicker}
-                              onPressBar={openDetail}
-                            />
-                          </Reanimated.View>
-                        ))
+                        <View style={styles.group}>
+                          {visibleRows.map(({ budget, limit, periodElapsed }, index) => (
+                            <Reanimated.View
+                              key={`${budget.id}-${limit.currency}`}
+                              entering={rowEntrance(index)}
+                              onLayout={(e) => {
+                                rowOffsets.current[budget.id] = e.nativeEvent.layout.y;
+                              }}
+                            >
+                              <BudgetListRow
+                                budget={budget}
+                                limit={limit}
+                                periodElapsed={periodElapsed}
+                                category={categoryById.get(budget.category_id)}
+                                highlighted={highlightedBudgetId === budget.id}
+                                separated={index > 0}
+                                onPress={openEditBudget}
+                                onHold={openCategoryPicker}
+                                onPressBar={openDetail}
+                              />
+                            </Reanimated.View>
+                          ))}
+                        </View>
                       )}
                     </Animated.View>
                   </Animated.View>
@@ -293,6 +292,9 @@ export const BudgetsTab = memo(function BudgetsTab({ initialRange, rangeNonce, o
 
 const useStyles = createStyles((colors) => ({
   container: { flex: 1 },
+  tabs: { marginVertical: spacing.lg },
+  // One rounded group, rows split by hairlines (BudgetListRow), as every other list.
+  group: { borderRadius: radii.card, overflow: "hidden", backgroundColor: colors.surface },
   empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", marginTop: spacing.xl },
   fab: { right: 0 },
 }));

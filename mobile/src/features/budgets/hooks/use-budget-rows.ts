@@ -12,7 +12,7 @@ import {
   daysInRange,
   proratedLimit,
 } from "@/features/budgets/budget-pace";
-import { BUDGET_FILTERS, BudgetFilterKey } from "@/features/budgets/components/BudgetFilterChips";
+import { BUDGET_FILTERS, BudgetFilterKey } from "@/features/budgets/components/BudgetFilterTabs";
 
 export interface BudgetRow {
   budget: Budget;

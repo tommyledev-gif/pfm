@@ -55,20 +55,31 @@ export function SkeletonSwap({ loading, skeleton, children, fill = false, style 
  * SKELETON_DELAY_MS, so a fast load never flashes it, and fades out as it
  * unmounts, over whatever took its place. The two fades multiply: one never
  * seen leaves nothing to fade out.
+ *
+ * `delayMs` 0 is for a list whose rows were just taken away (a new filter):
+ * the User is watching that spot, so the skeleton comes up at once.
  */
-export function LateSkeleton({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+export function LateSkeleton({
+  children,
+  style,
+  delayMs = SKELETON_DELAY_MS,
+}: {
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+  delayMs?: number;
+}) {
   const opacity = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const fadeIn = Animated.timing(opacity, {
       toValue: 1,
       duration: 160,
-      delay: SKELETON_DELAY_MS,
+      delay: delayMs,
       easing: Easing.out(Easing.quad),
       useNativeDriver: true,
     });
     fadeIn.start();
     return () => fadeIn.stop();
-  }, [opacity]);
+  }, [opacity, delayMs]);
   return (
     <Reanimated.View exiting={FadeOut.duration(180)} style={style} importantForAccessibility="no-hide-descendants">
       <Animated.View style={{ opacity }}>{children}</Animated.View>

@@ -11,7 +11,9 @@ import { SearchField } from "@/components/ui/SearchField";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { Screen } from "@/components/shared/Screen";
 import { ScreenHeader } from "@/components/shared/ScreenHeader";
-import { ScreenLoader } from "@/components/shared/ScreenLoader";
+import { GroupedListSkeleton } from "@/components/shared/GroupedListSkeleton";
+import { LateSkeleton } from "@/components/motion/SkeletonSwap";
+import { isAwaitingFirstData } from "@/lib/query-status";
 import { NotificationRow } from "@/features/notifications/components/NotificationRow";
 import { dayLabel } from "@/lib/format-date";
 import { TranslationKey } from "@/lib/i18n";
@@ -57,6 +59,11 @@ export default function NotificationsScreen() {
   // only the first page left anything older out of reach.
   const notifications = useNotificationsInfiniteQuery(filter === "unread");
   const items = useMemo(() => notifications.data?.pages.flatMap((page) => page.data) ?? [], [notifications.data]);
+  // Nothing of this filter's to show yet: the first load (late, so the saved
+  // list read back at launch never blinks one), or the other tab's rows still
+  // standing in (at once: the User just switched).
+  const awaiting = isAwaitingFirstData(notifications);
+  const switching = notifications.isPlaceholderData;
   const markRead = useMarkNotificationReadMutation();
   const markAllRead = useMarkAllNotificationsReadMutation();
   // Seen on screen = read on the server; the dot stays until the User leaves.
@@ -128,6 +135,7 @@ export default function NotificationsScreen() {
   // fetched, title or body, ignoring case and accents.
   const sections = useMemo<DaySection[]>(() => {
     const grouped: DaySection[] = [];
+    if (switching) return grouped;
     for (const n of items) {
       // Read since it was fetched, and not on screen this visit: not "unread" any more.
       if (filter === "unread" && n.is_read && !keptUnread.has(n.id)) continue;
@@ -140,7 +148,7 @@ export default function NotificationsScreen() {
     return grouped;
     // t: the day labels are text, rebuilt in the new language on a switch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, search, filter, keptUnread, t]);
+  }, [items, search, filter, keptUnread, switching, t]);
   // Each later page fades in under the last row. Per filter: the other tab is
   // a different list, not a page of this one.
   const cellKeys = useMemo(
@@ -149,7 +157,11 @@ export default function NotificationsScreen() {
   );
   const appendEnter = useAppendEntrance(cellKeys, filter);
 
-  const empty = notifications.isError ? (
+  const empty = awaiting || switching ? (
+    <LateSkeleton delayMs={switching ? 0 : undefined}>
+      <GroupedListSkeleton />
+    </LateSkeleton>
+  ) : notifications.isError ? (
     <View style={styles.empty}>
       <Text style={styles.emptyTitle}>{t("notifications.error.loadFailed")}</Text>
       <Pressable onPress={() => void notifications.refetch()} hitSlop={8} accessibilityRole="button">
@@ -197,44 +209,44 @@ export default function NotificationsScreen() {
         <SearchField value={search} onChangeText={setSearch} placeholder={t("notifications.search.placeholder")} testID="input-notifications-search" />
       </View>
 
-      {notifications.isLoading ? (
-        <ScreenLoader />
-      ) : (
-        <SectionList
-          sections={sections}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
-          stickySectionHeadersEnabled={false}
-          keyboardShouldPersistTaps="handled"
-          viewabilityConfig={SEEN_VIEWABILITY}
-          onViewableItemsChanged={seen.onViewableItemsChanged}
-          renderSectionHeader={({ section }) => (
-            <Animated.View style={styles.sectionHeader} entering={appendEnter(`day:${section.title}`)}>
-              <ListSectionHeader title={section.title} />
-            </Animated.View>
-          )}
-          renderItem={({ item, index, section }) => (
-            <GroupedListCell index={index} count={section.data.length} entering={appendEnter(item.id)}>
-              <NotificationRow
-                notification={item}
-                onPress={() => openNotification(item)}
-                action={approveActionFor(item)}
-                separated={index > 0}
-                unread={showsUnread(item)}
-              />
-            </GroupedListCell>
-          )}
-          ListEmptyComponent={empty}
-          // A screen ahead, so the next page is usually in before the end is reached.
-          onEndReachedThreshold={1}
-          onEndReached={() => {
-            if (notifications.hasNextPage && !notifications.isFetchingNextPage) void notifications.fetchNextPage();
-          }}
-          ListFooterComponent={
-            notifications.isFetchingNextPage ? <ActivityIndicator color={colors.textMuted} style={styles.more} /> : null
-          }
-        />
-      )}
+      {/* The list from the first frame: while loading, its empty slot holds
+          the skeleton (above), which fades out under the rows that replace it. */}
+      <SectionList
+        sections={sections}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.list}
+        stickySectionHeadersEnabled={false}
+        keyboardShouldPersistTaps="handled"
+        viewabilityConfig={SEEN_VIEWABILITY}
+        onViewableItemsChanged={seen.onViewableItemsChanged}
+        renderSectionHeader={({ section }) => (
+          <Animated.View style={styles.sectionHeader} entering={appendEnter(`day:${section.title}`)}>
+            <ListSectionHeader title={section.title} />
+          </Animated.View>
+        )}
+        renderItem={({ item, index, section }) => (
+          <GroupedListCell index={index} count={section.data.length} entering={appendEnter(item.id)}>
+            <NotificationRow
+              notification={item}
+              onPress={() => openNotification(item)}
+              action={approveActionFor(item)}
+              separated={index > 0}
+              unread={showsUnread(item)}
+            />
+          </GroupedListCell>
+        )}
+        ListEmptyComponent={empty}
+        // A screen ahead, so the next page is usually in before the end is reached.
+        onEndReachedThreshold={1}
+        onEndReached={() => {
+          // Not while the other tab's rows stand in: their next page is not this tab's.
+          if (switching) return;
+          if (notifications.hasNextPage && !notifications.isFetchingNextPage) void notifications.fetchNextPage();
+        }}
+        ListFooterComponent={
+          notifications.isFetchingNextPage ? <ActivityIndicator color={colors.textMuted} style={styles.more} /> : null
+        }
+      />
     </Screen>
   );
 }

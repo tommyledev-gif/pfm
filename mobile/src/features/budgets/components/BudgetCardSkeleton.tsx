@@ -1,52 +1,63 @@
-import { View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
 import { SkeletonBlock } from "@/components/ui/SkeletonBlock";
-import { spacing, createStyles } from "@/lib/theme";
+import { radii, spacing, createStyles } from "@/lib/theme";
 
-const LIST_SKELETON_COUNT = 3;
+const LIST_SKELETON_COUNT = 4;
 
-/** The Budgets list while loading: a few rows shaped like BudgetListRow. */
+/** The whole Budgets tab while loading: the summary card, then the list. */
+export function BudgetTabSkeleton() {
+  const styles = useStyles();
+  return (
+    <View>
+      <View style={styles.card}>
+        <View style={styles.spread}>
+          <SkeletonBlock width={110} height={12} />
+          <SkeletonBlock width={70} height={11} />
+        </View>
+        <SkeletonBlock width={180} height={26} />
+        <SkeletonBlock width="100%" height={8} borderRadius={4} />
+      </View>
+      <BudgetListSkeleton />
+    </View>
+  );
+}
+
+/** The tabs and the rounded group of rows, shaped like BudgetFilterTabs and BudgetListRow. */
 export function BudgetListSkeleton() {
   const styles = useStyles();
   return (
-    <View style={styles.list}>
-      {Array.from({ length: LIST_SKELETON_COUNT }).map((_, i) => (
-        <BudgetCardSkeleton key={i} />
-      ))}
-    </View>
-  );
-}
-
-// Mirrors BudgetListRow's own StyleSheet (36px icon tile, name + headline
-// figure, one full-width bar, then the caption/amounts pair).
-export function BudgetCardSkeleton() {
-  const styles = useStyles();
-  return (
-    <View style={styles.row}>
-      <View style={styles.headRow}>
-        <SkeletonBlock width={36} height={36} borderRadius={18} />
-        <SkeletonBlock width={110} height={17} />
-        <View style={styles.spacer} />
-        <SkeletonBlock width={90} height={17} />
-      </View>
-      <SkeletonBlock width="100%" height={8} borderRadius={4} />
-      <View style={styles.footRow}>
-        <SkeletonBlock width={120} height={12} />
-        <SkeletonBlock width={140} height={12} />
+    <View>
+      <SkeletonBlock width="100%" height={40} borderRadius={radii.pill} style={styles.tabs} />
+      <View style={styles.group}>
+        {Array.from({ length: LIST_SKELETON_COUNT }).map((_, i) => (
+          <View key={i} style={styles.row}>
+            <SkeletonBlock width={36} height={36} borderRadius={18} />
+            <View style={[styles.body, i > 0 && styles.separated]}>
+              <View style={styles.spread}>
+                <SkeletonBlock width="45%" height={14} />
+                <SkeletonBlock width={70} height={11} />
+              </View>
+              <SkeletonBlock width="100%" height={6} borderRadius={3} />
+              <View style={styles.spread}>
+                <SkeletonBlock width={80} height={11} />
+                <SkeletonBlock width={30} height={11} />
+              </View>
+            </View>
+          </View>
+        ))}
       </View>
     </View>
   );
 }
 
+// Mirrors BudgetsTab's summary card and BudgetListRow's own styles.
 const useStyles = createStyles((colors) => ({
-  list: { gap: spacing.md },
-  row: {
-    gap: spacing.sm,
-    paddingVertical: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.surfaceBorder,
-  },
-  headRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
-  spacer: { flex: 1 },
-  footRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  card: { gap: spacing.sm, padding: spacing.lg, borderRadius: radii.card, backgroundColor: colors.surface, marginTop: spacing.sm },
+  spread: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
+  tabs: { marginVertical: spacing.lg },
+  group: { borderRadius: radii.card, overflow: "hidden", backgroundColor: colors.surface },
+  row: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingLeft: spacing.lg },
+  body: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, gap: spacing.sm, paddingVertical: spacing.md, paddingRight: spacing.lg },
+  separated: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.surfaceBorder },
 }));

@@ -35,17 +35,19 @@
     "summary": {
       "daysLeft_other": "còn {{count}} ngày",
       "overLimit": "vượt hạn mức <0>{{limit}}</0>",
-      "leftOfLimit": "còn lại trong hạn mức <0>{{limit}}</0>",
-      "someOver_other": "{{count}} danh mục đã vượt hạn mức. Tổng vẫn còn nhờ các mục khác."
+      "leftOfLimit": "còn lại của <0>{{limit}}</0>",
+      "someOver_other": "{{count}} danh mục đã vượt hạn mức."
     },
-    "filter": {
-      "over": "Đã vượt"
+    "tab": {
+      "all_other": "Tất cả · {{count}}",
+      "atRisk_other": "Sắp vượt · {{count}}",
+      "over_other": "Đã vượt · {{count}}"
     },
     "row": {
-      "over": "{{percent}} · Vượt {{amount}}",
-      "left": "{{percent}} · Còn {{amount}}",
-      "limit": "Hạn mức: {{amount}}",
-      "seeTransactions": "Xem giao dịch →"
+      "over": "Vượt {{amount}}",
+      "left": "Còn {{amount}}",
+      "spentOfLimit": "{{spent}} / {{limit}}",
+      "seeTransactions": "Xem giao dịch"
     },
     "figures": {
       "usedShare": "Đã dùng {{percent}} hạn mức",

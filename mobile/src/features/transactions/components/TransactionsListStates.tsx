@@ -53,11 +53,13 @@ export function TransactionsListEmpty({
   const { t } = useTranslation();
   const styles = useStyles();
   if (isWaitingForNetwork(query)) return <OfflinePlaceholder />;
-  // Still loading a new filter: "nothing matches" would be a guess. Late, so
-  // the saved first page read back at launch never blinks a skeleton.
+  // Still loading: "nothing matches" would be a guess. A new filter's rows
+  // (the screen empties the list meanwhile) get theirs at once, the User just
+  // asked for them; the first load waits SKELETON_DELAY_MS, so the saved
+  // first page read back at launch never blinks one.
   if (isAwaitingFirstData(query) || query.isPlaceholderData) {
     return (
-      <LateSkeleton>
+      <LateSkeleton delayMs={query.isPlaceholderData ? 0 : undefined}>
         {Array.from({ length: LIST_SKELETON_COUNT }).map((_, i) => (
           <TransactionRowSkeleton key={i} />
         ))}

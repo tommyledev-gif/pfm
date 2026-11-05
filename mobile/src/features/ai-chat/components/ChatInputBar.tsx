@@ -7,6 +7,7 @@ import { CloseIcon, SendIcon } from "@/components/ui/Icon";
 import { CHAT_MODE_META, ChatMode } from "@/features/ai-chat/chat-mode";
 import { COMPOSER_NAV_CLEARANCE } from "@/features/ai-chat/components/chat-composer-metrics";
 import { useReportComposerFocus } from "@/features/ai-chat/components/KeyboardLiftView";
+import { LOCATION_TOGGLE_SIZE } from "@/features/ai-chat/components/LocationPinToggle";
 import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
@@ -37,6 +38,12 @@ interface ChatInputBarProps {
   focusNonce?: number;
   /** Inside the field, before the text — the recording pane's attach-image button. */
   leading?: ReactNode;
+  /**
+   * Floats at the right of the row above the field, level with aboveInput's
+   * last row (the phrase search) — the recording pane's location switch. The
+   * row is there even while aboveInput is not, so it can always be tapped.
+   */
+  floating?: ReactNode;
 }
 
 const CLEAR_HIT_SLOP = 8;
@@ -55,6 +62,7 @@ export function ChatInputBar({
   onFocusChange,
   focusNonce,
   leading,
+  floating,
 }: ChatInputBarProps) {
   const colors = useColors();
   const styles = useStyles();
@@ -98,7 +106,19 @@ export function ChatInputBar({
       ) : null}
 
 
-      {aboveInput}
+      {floating ? (
+        // ⚠️ The floating button is inside this row's bounds, never hung below
+        // an empty one: Android delivers no touches outside a parent's box.
+        // The rest of the row lets touches through to the thread.
+        <View style={styles.aboveRow} pointerEvents="box-none">
+          {aboveInput}
+          <View style={styles.floating} pointerEvents="box-none">
+            {floating}
+          </View>
+        </View>
+      ) : (
+        aboveInput
+      )}
 
       <View
         style={[
@@ -185,6 +205,11 @@ const useStyles = createStyles((colors) => ({
     marginBottom: spacing.sm,
   },
   quickActionLabel: { ...typography.caption, color: colors.textPrimary },
+  // At least the floating button's own row; the phrase panel, when it shows,
+  // makes it taller and keeps its search on the bottom line beside it.
+  aboveRow: { minHeight: LOCATION_TOGGLE_SIZE + spacing.sm, justifyContent: "flex-end" },
+  // The phrase panel's bottom margin, so it sits level with the search pill.
+  floating: { position: "absolute", right: spacing.xl, bottom: spacing.sm },
   inputBar: {
     marginHorizontal: spacing.xl,
     flexDirection: "row",

@@ -6,7 +6,7 @@ import { onlineManager } from "@tanstack/react-query";
 import { ChatComposer } from "@/features/ai-chat/components/ChatComposer";
 import { ChatInputBar } from "@/features/ai-chat/components/ChatInputBar";
 import { ImageAttachButton } from "@/features/ai-chat/components/ImageAttachButton";
-import { LocationPinToggle } from "@/features/ai-chat/components/LocationPinToggle";
+import { LOCATION_TOGGLE_SIZE, LocationPinToggle } from "@/features/ai-chat/components/LocationPinToggle";
 import { OfflineManualEntryDialog } from "@/features/ai-chat/components/OfflineManualEntryDialog";
 import { PhraseSuggestions } from "@/features/ai-chat/components/PhraseSuggestions";
 import { ChatDraftStore, useChatDraftText } from "@/features/ai-chat/chat-draft";
@@ -16,6 +16,7 @@ import { draftFromText } from "@/features/transactions/draft-from-text";
 import { useManualDraftStore } from "@/features/transactions/manual-draft-store";
 import { useKeyboardHeight } from "@/lib/use-keyboard-height";
 import { useLinger } from "@/lib/use-linger";
+import { spacing } from "@/lib/theme";
 import { useCurrentUserId } from "@/stores/use-current-user-id";
 
 // The suggestion area may take at most this share of the pane's height.
@@ -36,7 +37,8 @@ interface RecordingComposerProps {
 }
 
 /**
- * The recording pane's floating input, phrase suggestions and attach button.
+ * The recording pane's floating input, phrase suggestions, attach button and
+ * location switch.
  * Owns everything that changes per keystroke, so typing never re-renders the
  * thread above it.
  */
@@ -105,12 +107,8 @@ export function RecordingComposer({
           autoFocus={autoFocusInput}
           onFocusChange={handleFocusChange}
           focusNonce={inputFocusNonce}
-          leading={
-            <>
-              <ImageAttachButton disabled={chat.sending} onSend={(uri, caption) => void chat.sendImage(uri, caption)} />
-              <LocationPinToggle />
-            </>
-          }
+          leading={<ImageAttachButton disabled={chat.sending} onSend={(uri, caption) => void chat.sendImage(uri, caption)} />}
+          floating={<LocationPinToggle />}
           aboveInput={
             <PhrasePanel
               open={phrasePanelOpen}
@@ -156,6 +154,8 @@ function PhrasePanel({ open, input, userId, paneHeight, onSelect, onSearchFocusC
       userId={userId}
       // Of the part of the pane the keyboard does not cover.
       maxHeight={Math.max(0, paneHeight - keyboardHeight) * SUGGESTION_MAX_HEIGHT_RATIO}
+      // The location switch floats at the right of the search's line.
+      searchInsetRight={LOCATION_TOGGLE_SIZE + spacing.sm}
       onSelect={onSelect}
       onSearchFocusChange={onSearchFocusChange}
     />

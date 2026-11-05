@@ -28,6 +28,8 @@ interface PhraseSuggestionsProps {
   onSelect: (text: string, fromSearch: boolean) => void;
   /** The search field's own focus, so the panel stays open while it has it. */
   onSearchFocusChange: (focused: boolean) => void;
+  /** Room kept at the right of the search's line (the location switch floats there). */
+  searchInsetRight?: number;
 }
 
 /**
@@ -40,7 +42,14 @@ interface PhraseSuggestionsProps {
  * `keyboardShouldPersistTaps="always"`: a tap on a row must fill the input,
  * not blur it — blurring would hide this panel before the tap landed.
  */
-export function PhraseSuggestions({ input, userId, maxHeight, onSelect, onSearchFocusChange }: PhraseSuggestionsProps) {
+export function PhraseSuggestions({
+  input,
+  userId,
+  maxHeight,
+  onSelect,
+  onSearchFocusChange,
+  searchInsetRight = 0,
+}: PhraseSuggestionsProps) {
   const colors = useColors();
   const styles = useStyles();
   const { t } = useTranslation();
@@ -112,24 +121,26 @@ export function PhraseSuggestions({ input, userId, maxHeight, onSelect, onSearch
         <Text style={styles.noMatch}>{t("chat.phrases.noMatch")}</Text>
       ) : null}
 
-      <View style={styles.searchField}>
-        <SearchIcon size={14} color={colors.textMuted} />
-        <TextInput
-          testID="input-phrase-search"
-          value={search}
-          onChangeText={setSearch}
-          onFocus={() => handleSearchFocus(true)}
-          onBlur={() => handleSearchFocus(false)}
-          placeholder={t("chat.phrases.search.placeholder", { count: total })}
-          placeholderTextColor={colors.textMuted}
-          style={styles.searchInput}
-          returnKeyType="search"
-        />
-        {search ? (
-          <Pressable onPress={() => setSearch("")} hitSlop={ICON_HIT_SLOP} accessibilityRole="button" accessibilityLabel={t("common.action.clearSearch")}>
-            <CloseIcon size={14} color={colors.textSecondary} />
-          </Pressable>
-        ) : null}
+      <View style={{ paddingRight: searchInsetRight }}>
+        <View style={styles.searchField}>
+          <SearchIcon size={14} color={colors.textMuted} />
+          <TextInput
+            testID="input-phrase-search"
+            value={search}
+            onChangeText={setSearch}
+            onFocus={() => handleSearchFocus(true)}
+            onBlur={() => handleSearchFocus(false)}
+            placeholder={t("chat.phrases.search.placeholder", { count: total })}
+            placeholderTextColor={colors.textMuted}
+            style={styles.searchInput}
+            returnKeyType="search"
+          />
+          {search ? (
+            <Pressable onPress={() => setSearch("")} hitSlop={ICON_HIT_SLOP} accessibilityRole="button" accessibilityLabel={t("common.action.clearSearch")}>
+              <CloseIcon size={14} color={colors.textSecondary} />
+            </Pressable>
+          ) : null}
+        </View>
       </View>
     </View>
   );

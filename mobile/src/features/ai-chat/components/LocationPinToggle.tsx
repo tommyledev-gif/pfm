@@ -9,12 +9,18 @@ import { useUiPrefsStore } from "@/stores/ui-prefs-store";
 
 const ICON_SIZE = 18;
 const SLASH_LENGTH = 20;
+/** The button's size: the phrase search pill's height, so the two sit level. */
+export const LOCATION_TOGGLE_SIZE = 34;
 
 /**
  * "Ghim vị trí khi tạo giao dịch" (Cài đặt người dùng) from the recording
- * input itself: lit while what is recorded here gets the device's position
+ * pane: lit while what is recorded here gets the device's position
  * (proposal-auto-pin.ts), struck through while it does not. One tap flips the
  * same setting; a hold says what the tap does.
+ *
+ * A round button of its own, floating at the right of the row above the
+ * input, level with the phrase search (ChatInputBar's `floating`). Inside the
+ * field it took room from the text being typed.
  */
 export function LocationPinToggle() {
   const colors = useColors();
@@ -49,9 +55,19 @@ export function LocationPinToggle() {
   );
 }
 
-const useStyles = createStyles(() => ({
-  // Same height as the attach, clear and send buttons, so the field never shifts.
-  button: { width: 32, height: 40, alignItems: "center", justifyContent: "center" },
+const useStyles = createStyles((colors) => ({
+  // Surface and hairline like the phrase search pill beside it: it floats
+  // over the thread, so it needs its own ground.
+  button: {
+    width: LOCATION_TOGGLE_SIZE,
+    height: LOCATION_TOGGLE_SIZE,
+    borderRadius: radii.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+  },
   well: { width: 28, height: 28, borderRadius: radii.pill, alignItems: "center", justifyContent: "center" },
   slash: { position: "absolute", width: SLASH_LENGTH, height: 1.5, borderRadius: 1, transform: [{ rotate: "-45deg" }] },
 }));

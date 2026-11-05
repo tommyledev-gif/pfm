@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
 import { apiClient, unwrap } from "@/lib/axios";
 import { ListNotificationsResult } from "@/features/notifications/types";
@@ -33,12 +33,17 @@ export function useNotificationsQuery(unreadOnly: boolean) {
  * reached. Under the same "notifications" key prefix, so marking one read
  * (use-mark-notification-read-mutation) refreshes this too.
  */
+//
+// Switching Tất cả / Chưa đọc keeps the other list as placeholder data, so the
+// header's "mark all read" holds still; the screen shows a skeleton in the
+// list meanwhile (isPlaceholderData), not the other filter's rows.
 export function useNotificationsInfiniteQuery(unreadOnly: boolean) {
   return useInfiniteQuery({
     queryKey: ["notifications", "pages", { unreadOnly }],
     initialPageParam: undefined as string | undefined,
     queryFn: ({ pageParam }) => fetchNotificationsPage({ unreadOnly, cursor: pageParam }),
     getNextPageParam: (lastPage) => lastPage.pagination.next_cursor ?? undefined,
+    placeholderData: keepPreviousData,
   });
 }
 

@@ -36,19 +36,24 @@
     "summary": {
       "daysLeft_one": "{{count}} day left",
       "daysLeft_other": "{{count}} days left",
-      "overLimit": "over the <0>{{limit}}</0> limit",
-      "leftOfLimit": "left of the <0>{{limit}}</0> limit",
-      "someOver_one": "{{count}} category is over its limit. The total still has room from the others.",
-      "someOver_other": "{{count}} categories are over their limits. The total still has room from the others."
+      "overLimit": "over <0>{{limit}}</0>",
+      "leftOfLimit": "left of <0>{{limit}}</0>",
+      "someOver_one": "{{count}} category is over its limit.",
+      "someOver_other": "{{count}} categories are over their limits."
     },
-    "filter": {
-      "over": "Over limit"
+    "tab": {
+      "all_one": "All · {{count}}",
+      "all_other": "All · {{count}}",
+      "atRisk_one": "Near limit · {{count}}",
+      "atRisk_other": "Near limit · {{count}}",
+      "over_one": "Over · {{count}}",
+      "over_other": "Over · {{count}}"
     },
     "row": {
-      "over": "{{percent}} · {{amount}} over",
-      "left": "{{percent}} · {{amount}} left",
-      "limit": "Limit: {{amount}}",
-      "seeTransactions": "See transactions →"
+      "over": "{{amount}} over",
+      "left": "{{amount}} left",
+      "spentOfLimit": "{{spent}} / {{limit}}",
+      "seeTransactions": "See transactions"
     },
     "figures": {
       "usedShare": "{{percent}} of limit used",

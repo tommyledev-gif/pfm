@@ -7,7 +7,9 @@ import { useAppendEntrance, useListEntrance } from "@/components/motion/MotionVi
 import { GroupedListCell, ListSectionHeader } from "@/components/ui/grouped-list";
 import { useFabBottom } from "@/components/ui/Fab";
 import { Screen } from "@/components/shared/Screen";
-import { ScreenLoader } from "@/components/shared/ScreenLoader";
+import { LateSkeleton } from "@/components/motion/SkeletonSwap";
+import { GroupedListSkeleton } from "@/components/shared/GroupedListSkeleton";
+import { isAwaitingFirstData } from "@/lib/query-status";
 import { ScreenHeader } from "@/components/shared/ScreenHeader";
 import { dayLabel, formatDateGroupHeader } from "@/lib/format-date";
 import { categoryLabel } from "@/features/categories/category-label";
@@ -39,8 +41,10 @@ export default function AuditLogsScreen() {
   const auditLogs = useAuditLogsQuery();
   // Clear of the floating BottomNav, so the oldest entry is never under it.
   const navClearance = useFabBottom();
+  // Not isLoading: pending while the saved log is read back too.
+  const awaiting = isAwaitingFirstData(auditLogs);
   // The first page staggers in once; each later page fades in under it.
-  const replayKey = auditLogs.isLoading ? "loading" : "ready";
+  const replayKey = awaiting ? "loading" : "ready";
   const enter = useListEntrance(replayKey);
   const categories = useCategoriesQuery();
   const wallets = useWalletsQuery();
@@ -106,53 +110,59 @@ export default function AuditLogsScreen() {
     <Screen style={styles.screen}>
       <ScreenHeader title={t("nav.title.auditLogs")} subtitle={t("auditLogs.subtitle")} />
 
-      {auditLogs.isLoading ? (
-        <ScreenLoader />
-      ) : (
-        <SectionList
-          testID="list-audit-logs"
-          sections={sections}
-          keyExtractor={(entry) => entry.id}
-          contentContainerStyle={[styles.list, { paddingBottom: navClearance }]}
-          stickySectionHeadersEnabled={false}
-          showsVerticalScrollIndicator={false}
-          refreshControl={refreshControl}
-          // A screen ahead, so the next page is usually in before the end is reached.
-          onEndReachedThreshold={1}
-          onEndReached={() => {
-            if (auditLogs.hasNextPage && !auditLogs.isFetchingNextPage) auditLogs.fetchNextPage();
-          }}
-          renderSectionHeader={({ section }) => (
-            <Animated.View
-              style={section.key !== sections[0]?.key && styles.laterDay}
-              entering={appendEnter(`day:${section.key}`)}
-            >
-              <ListSectionHeader
-                title={section.dayLabel}
-                trailing={<Text style={styles.dayHeaderDate}>{section.dateLabel}</Text>}
-              />
-            </Animated.View>
-          )}
-          renderItem={({ item, index, section }) => (
-            <GroupedListCell
-              index={index}
-              count={section.data.length}
-              entering={appendEnter(item.id) ?? enter(index + (sectionStart.get(section.key) ?? 0))}
-            >
-              <AuditLogRow
-                entry={item}
-                currency={currency}
-                resolveCategoryName={(id) => categoryNameById.get(id) ?? t("auditLogs.fallback.category")}
-                resolveWalletName={(id) => walletNameById.get(id) ?? t("common.field.wallet")}
-              />
-            </GroupedListCell>
-          )}
-          ListEmptyComponent={<AuditLogsEmptyState />}
-          ListFooterComponent={
-            auditLogs.isFetchingNextPage ? <ActivityIndicator color={colors.green} style={styles.loader} /> : null
-          }
-        />
-      )}
+      {/* The list from the first frame: while loading, its empty slot holds a
+          skeleton that fades out under the rows that replace it. */}
+      <SectionList
+        testID="list-audit-logs"
+        sections={sections}
+        keyExtractor={(entry) => entry.id}
+        contentContainerStyle={[styles.list, { paddingBottom: navClearance }]}
+        stickySectionHeadersEnabled={false}
+        showsVerticalScrollIndicator={false}
+        refreshControl={refreshControl}
+        // A screen ahead, so the next page is usually in before the end is reached.
+        onEndReachedThreshold={1}
+        onEndReached={() => {
+          if (auditLogs.hasNextPage && !auditLogs.isFetchingNextPage) auditLogs.fetchNextPage();
+        }}
+        renderSectionHeader={({ section }) => (
+          <Animated.View
+            style={section.key !== sections[0]?.key && styles.laterDay}
+            entering={appendEnter(`day:${section.key}`)}
+          >
+            <ListSectionHeader
+              title={section.dayLabel}
+              trailing={<Text style={styles.dayHeaderDate}>{section.dateLabel}</Text>}
+            />
+          </Animated.View>
+        )}
+        renderItem={({ item, index, section }) => (
+          <GroupedListCell
+            index={index}
+            count={section.data.length}
+            entering={appendEnter(item.id) ?? enter(index + (sectionStart.get(section.key) ?? 0))}
+          >
+            <AuditLogRow
+              entry={item}
+              currency={currency}
+              resolveCategoryName={(id) => categoryNameById.get(id) ?? t("auditLogs.fallback.category")}
+              resolveWalletName={(id) => walletNameById.get(id) ?? t("common.field.wallet")}
+            />
+          </GroupedListCell>
+        )}
+        ListEmptyComponent={
+          awaiting ? (
+            <LateSkeleton>
+              <GroupedListSkeleton leading={false} />
+            </LateSkeleton>
+          ) : (
+            <AuditLogsEmptyState />
+          )
+        }
+        ListFooterComponent={
+          auditLogs.isFetchingNextPage ? <ActivityIndicator color={colors.green} style={styles.loader} /> : null
+        }
+      />
     </Screen>
   );
 }
