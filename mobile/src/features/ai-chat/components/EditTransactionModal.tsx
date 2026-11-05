@@ -21,7 +21,7 @@ import { useOpenWalletCreator } from "@/features/wallets/use-open-wallet-creator
 import { EditTransactionChoices } from "@/features/ai-chat/components/EditTransactionChoices";
 import { useProposalLocation } from "@/features/ai-chat/hooks/use-proposal-location";
 import { useProposalWallets } from "@/features/ai-chat/hooks/use-proposal-wallets";
-import { lostWriteAccess } from "@/features/ai-chat/proposal-wallet";
+import { lostWriteAccess, savedMovePatch } from "@/features/ai-chat/proposal-wallet";
 import { SavedProposalPatch, TransactionActionPayload } from "@/features/ai-chat/types";
 
 const FALLBACK_CURRENCY = "VND";
@@ -34,13 +34,12 @@ interface EditTransactionModalProps {
   // what the PATCH needs besides the payload: a changed wallet, a moved pin.
   onSave: (payload: TransactionActionPayload, savedPatch: SavedProposalPatch) => void;
   // True when target is already confirmed (a real Transaction exists) —
-  // ai-chat.tsx's editAction then PATCHes that Transaction in place. PATCH
-  // has no `type`, so the type stays locked; the wallet of an income/expense
-  // can change (after a dialog saying which balances move), within the same
-  // currency, while a transfer's wallets stay locked.
+  // ai-chat.tsx's editAction then PATCHes that Transaction in place: its type
+  // can change (the server moves every balance), and an income/expense's
+  // wallet within its currency (after a dialog). A transfer's wallets stay.
   confirmed?: boolean;
   // The Transaction behind a confirmed proposal. Without one (a message from
-  // before ids were kept) nothing is PATCHed, so the wallet stays locked too.
+  // before ids were kept) nothing is PATCHed: type and wallet stay locked.
   transactionId?: string | null;
   // An unconfirmed AI proposal: its amount was read as VND, so only VND
   // Wallets are offered and Save stays disabled until one is chosen (spec
@@ -175,8 +174,10 @@ export function EditTransactionModal({
     proposalWallets.destinationPicker.child,
   ]);
 
-  // A saved transfer keeps the destination it has; only a new one needs one picked.
-  const destinationChosen = Boolean(destination) || savedId !== null;
+  // A saved transfer keeps the destination it has; a new one (or a saved
+  // entry turned into a transfer) needs one picked.
+  const savedTransfer = savedId !== null && payload?.type === "transfer";
+  const destinationChosen = Boolean(destination) || savedTransfer;
   const amountValid = amount.cents !== null && amount.cents > 0;
   const kindChosen = isTransfer ? destinationChosen : Boolean(categoryId);
   const canSave = amountValid && kindChosen && Boolean(wallet) && Boolean(occurredAt) && !writeRevoked;
@@ -201,7 +202,6 @@ export function EditTransactionModal({
     // block the save; the "Các món" tile says which. A transfer has none.
     if (!isTransfer && lines.problem) return;
     const lineInputs = !isTransfer && lines.items.length > 0 ? lines.toInputs() : null;
-    const walletMoved = savedId !== null && wallet.id !== payload.wallet_id;
     onSave(
       {
         wallet_id: wallet.id,
@@ -216,7 +216,7 @@ export function EditTransactionModal({
         ...(lineInputs && lineInputs.adjustments.length > 0 ? { adjustments: lineInputs.adjustments } : {}),
         ...(location.pin ? { location: location.pin } : {}),
       },
-      savedId !== null ? { ...(walletMoved ? { wallet_id: wallet.id } : {}), ...location.savedPatch() } : {},
+      savedId !== null ? { ...savedMovePatch(payload, wallet, type, destination), ...location.savedPatch() } : {},
     );
   };
 
@@ -254,7 +254,7 @@ export function EditTransactionModal({
         <EditTransactionChoices
           type={type}
           onChangeType={setType}
-          typeLocked={confirmed}
+          typeLocked={confirmed && (savedId === null || writeRevoked)}
           itemCount={lines.items.length}
           onClearItems={lines.clear}
           wallet={wallet}
@@ -263,7 +263,7 @@ export function EditTransactionModal({
           destination={destination}
           destinationCount={proposalWallets.destinations.length}
           onOpenDestinations={proposalWallets.destinationPicker.open}
-          destinationLocked={confirmed}
+          destinationLocked={confirmed && (savedTransfer || savedId === null || writeRevoked)}
           noVndWallet={Boolean(vndOnly && wallets.data && proposalWallets.selectable.length === 0)}
           // Closed first: the sheet would otherwise sit over the Wallets
           // screen it just opened.

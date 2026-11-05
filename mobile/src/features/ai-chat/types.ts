@@ -50,8 +50,12 @@ export interface TransactionActionPayload {
 
 // What editing an already-saved proposal adds to its PATCH besides the
 // payload's own fields — each part only when it changed: the wallet it moves
-// to, the moved pin, the pin's note.
-export type SavedProposalPatch = Pick<UpdateTransactionRequest, "wallet_id" | "location" | "location_note">;
+// to, the type it changes to (with a new transfer's destination), the moved
+// pin, the pin's note.
+export type SavedProposalPatch = Pick<
+  UpdateTransactionRequest,
+  "wallet_id" | "type" | "to_wallet_id" | "location" | "location_note"
+>;
 
 export interface ChatAction {
   type: "create_transaction";

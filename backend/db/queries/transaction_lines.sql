@@ -49,8 +49,10 @@ GROUP BY transaction_id;
 -- stale-edit check run (plan F1, F17), so two concurrent edits can never both
 -- pass a check against a state the other is about to overwrite. wallet_id is
 -- read under the lock too: a wallet move reverses the effect on the Wallet
--- the row is on NOW, not the one a pre-tx read saw.
-SELECT amount, updated_at, wallet_id
+-- the row is on NOW, not the one a pre-tx read saw. type and to_wallet_id
+-- are read too: since a PATCH can change them, an edit planned against an
+-- older type is refused rather than applied with the wrong signs.
+SELECT amount, updated_at, wallet_id, type, to_wallet_id
 FROM transactions
 WHERE id = $1
   AND user_id = $2

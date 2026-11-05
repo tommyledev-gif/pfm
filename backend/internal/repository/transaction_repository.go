@@ -232,6 +232,12 @@ type UpdateTransactionParams struct {
 	// WalletID moves the Transaction to another Wallet; nil leaves it. The
 	// service moves both balances in the same tx before this write.
 	WalletID *uuid.UUID
+	// Type changes the Transaction's type; nil leaves it. Whenever it is set,
+	// to_wallet_id is rewritten with it: ToWalletID for "transfer", NULL for
+	// anything else (transactions_transfer_wallets_check). The service has
+	// already moved every balance and set CategoryID to match.
+	Type       *string
+	ToWalletID *uuid.UUID
 }
 
 // UpdateTransaction is scoped by id + user_id, same visibility guarantee as
@@ -250,6 +256,8 @@ func (r *TransactionRepository) UpdateTransaction(ctx context.Context, tx pgx.Tx
 		LocationLng:  arg.LocationLng,
 		LocationName: arg.LocationName,
 		WalletID:     arg.WalletID,
+		Type:         arg.Type,
+		ToWalletID:   arg.ToWalletID,
 	})
 	if err != nil {
 		return nil, err

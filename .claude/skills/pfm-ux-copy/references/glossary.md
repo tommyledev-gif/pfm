@@ -48,6 +48,7 @@ Một khái niệm = một từ, ở cả VI và EN. Cột "Nguồn": `app` = đ
 | Needs-review mark (một món/dòng AI đọc từ ảnh chưa chắc) | cần kiểm tra | check this | đề xuất | Nhãn cạnh từng món trong "Chi tiết món" của thẻ đọc từ ảnh. Khác "Độ tin cậy thấp" (nhãn cho cả thẻ). Không chặn lưu |
 | Possible duplicate (thẻ đọc từ ảnh trùng giao dịch đã lưu) | giống giao dịch | looks like a saved transaction | đề xuất | Dòng trên thẻ: "Giống giao dịch {{amount}} ngày {{date}}"; nút lưu đổi thành "Vẫn lưu". Không chặn lưu |
 | Shared wallet | ví chung | shared wallet | app | Ví chủ ví mời người khác vào để cùng ghi thu chi (specs/shared-wallets). Không gọi "sổ", "sổ chung", "ví nhóm". Trên thẻ: "Ví chung của {{owner}}" hoặc "{{type}} · Ví chung" |
+| Personal wallets (tab) | ví cá nhân | personal | app | Tab màn Ví đối lập "Ví chung": ví của chính user. Không gọi "ví riêng", "ví của tôi" |
 | Wallet owner | chủ ví | owner | app | Người tạo ví. Một ví một chủ ví |
 | Recorder role (ví chung) | ghi chép | can record | app | Vai trò thêm được giao dịch vào ví chung. Khác "người ghi" (ai đã ghi một giao dịch: "{{name}} ghi") |
 | Viewer role (ví chung) | chỉ xem | view only | app | Vai trò chỉ xem số dư và giao dịch |

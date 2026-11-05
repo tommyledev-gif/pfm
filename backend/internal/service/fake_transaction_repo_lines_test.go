@@ -77,7 +77,13 @@ func (f *fakeTransactionRepo) LockTransactionForUpdate(_ context.Context, _ pgx.
 	if !ok || t.DeletedAt != nil || t.UserID != userID {
 		return repository.LockedTransaction{}, pgx.ErrNoRows
 	}
-	return repository.LockedTransaction{Amount: t.Amount, UpdatedAt: t.UpdatedAt, WalletID: t.WalletID}, nil
+	return repository.LockedTransaction{
+		Amount:     t.Amount,
+		UpdatedAt:  t.UpdatedAt,
+		WalletID:   t.WalletID,
+		Type:       t.Type,
+		ToWalletID: t.ToWalletID,
+	}, nil
 }
 
 // setUpdatedAt simulates an edit saved elsewhere (stale-edit tests).

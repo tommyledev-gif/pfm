@@ -13,7 +13,8 @@ import { Wallet } from "@/features/wallets/types";
 interface EditTransactionChoicesProps {
   type: TransactionKind;
   onChangeType: (type: TransactionKind) => void;
-  // A saved transaction keeps its type: PATCH has no such field.
+  // Only a saved proposal with no Transaction id behind it (or one the User
+  // can no longer write to) keeps its type; any other can change it.
   typeLocked: boolean;
   // Items on the proposal: switching to transfer asks before dropping them.
   itemCount: number;
@@ -40,9 +41,9 @@ interface EditTransactionChoicesProps {
  * The type and wallet pickers of EditTransactionModal, split out for its
  * 300-line limit: the type as the manual form's segmented control, the wallet
  * as a row of an inset group opening the wallet list, "Từ ví" over "Đến ví"
- * for a transfer (the same as the manual form). A saved income/expense's wallet can
- * change (the caller asks first, see useWalletChangeGuard); its type cannot,
- * and a saved transfer's wallets cannot either.
+ * for a transfer (the same as the manual form). A saved entry's type can
+ * change, and an income/expense's wallet (the caller asks first, see
+ * useWalletChangeGuard); a saved transfer's wallets cannot.
  */
 export function EditTransactionChoices({
   type,

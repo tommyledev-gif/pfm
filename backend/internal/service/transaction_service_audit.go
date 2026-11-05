@@ -158,6 +158,29 @@ func auditUpdateDiff(existing *model.Transaction, req dto.UpdateTransactionReque
 	return before, after
 }
 
+// auditTypeChange adds a type change to an update entry: the type, the
+// destination that comes or goes with a transfer, and the Category when the
+// change picked it rather than the PATCH (becoming a transfer). Keys are the
+// snapshot's, so a reader shows them the same way.
+func auditTypeChange(before, after map[string]any, existing *model.Transaction, change *typeChange) {
+	before["type"] = string(existing.Type)
+	after["type"] = string(change.to)
+	if existing.ToWalletID != nil || change.destination != nil {
+		before["to_wallet_id"] = nil
+		if existing.ToWalletID != nil {
+			before["to_wallet_id"] = *existing.ToWalletID
+		}
+		after["to_wallet_id"] = nil
+		if change.destination != nil {
+			after["to_wallet_id"] = change.destination.ID
+		}
+	}
+	if change.category != nil {
+		before["category_id"] = existing.CategoryID
+		after["category_id"] = change.category.ID
+	}
+}
+
 // auditPin renders a pin's position the way the API's `location` object
 // does; a nil place name marshals as null.
 func auditPin(latitude, longitude float64, placeName *string) map[string]any {

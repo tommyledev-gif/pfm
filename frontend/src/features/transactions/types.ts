@@ -53,11 +53,15 @@ export interface CreateTransactionRequest {
   idempotency_key?: string;
 }
 
-// type is never accepted by PATCH (spec.md Context #5) — deliberately absent
-// from this type, mirroring the backend DTO's structural exclusion.
 export interface UpdateTransactionRequest {
   amount?: number;
   category_id?: string;
+  // Changes what the Transaction is (2026-11-05): becoming income/expense
+  // needs a category_id of that type, becoming a transfer needs to_wallet_id
+  // (and drops any items). Backend: dto.UpdateTransactionRequest.Type.
+  type?: TransactionType;
+  // A new transfer's destination; a transfer's own never moves.
+  to_wallet_id?: string;
   // Moves an income/expense to another wallet in the same currency; the old
   // wallet gets its effect back and the new one takes it. 422
   // WALLET_CURRENCY_MISMATCH / TRANSFER_WALLET_IMMUTABLE otherwise. Backend:

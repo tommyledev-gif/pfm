@@ -25,6 +25,7 @@ interface UseWalletCarouselOptions {
   /** Wallet to land on when the carousel first lays out; the first one otherwise. */
   initialWalletId?: string | null;
   onActiveWalletChange?: (walletId: string) => void;
+  onHeadingTo?: (walletId: string) => void;
 }
 
 /**
@@ -35,7 +36,7 @@ interface UseWalletCarouselOptions {
  * Card positions run on without end when looping (card n at n·SNAP_INTERVAL,
  * wallet n mod count); `walletAt` reads the wallet at one.
  */
-export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChange }: UseWalletCarouselOptions) {
+export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChange, onHeadingTo }: UseWalletCarouselOptions) {
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const [containerWidth, setContainerWidth] = useState(0);
   const { centreIndex, settledCentre, settle: onSettle, settleNow, cancel: cancelSettle } = useCarouselSettle();
@@ -65,9 +66,19 @@ export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChan
   const walletAt = (slot: number): Wallet | undefined =>
     wallets[looping ? ((slot % count) + count) % count : slot];
 
+  // Where a slide is going, straight away (onActiveWalletChange waits for the
+  // cards to settle): the landing is reported too, so a slide re-aimed back
+  // to where it started says so.
+  const headTo = (slot: number) => {
+    const walletId = walletAt(slot)?.id;
+    if (walletId) onHeadingTo?.(walletId);
+  };
+  const onDriveStart = useLatestCallback(headTo);
   const onDriveEnd = useLatestCallback((landed?: number) => {
     isDriving.current = false;
-    if (landed !== undefined) onSettle(landed);
+    if (landed === undefined) return;
+    onSettle(landed);
+    headTo(landed);
   });
   const onBeginDrag = useLatestCallback(() => {
     isDriving.current = false;
@@ -84,6 +95,7 @@ export function useWalletCarousel({ wallets, initialWalletId, onActiveWalletChan
     maxSlot,
     driveReach: Math.max(1, count - 1) * SNAP_INTERVAL,
     onDriveEnd,
+    onDriveStart,
     onBeginDrag,
     onRelease,
   });

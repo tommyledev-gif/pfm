@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BackHandler, StyleSheet, View } from "react-native";
 import Animated, { Easing, FadeIn, FadeInLeft, FadeInRight, FadeInUp, FadeOut, FadeOutDown } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -9,6 +9,7 @@ import { spacing, createStyles } from "@/lib/theme";
 import { useSheetStore } from "@/stores/sheet-store";
 import { BUDGET_WIZARD_TOTAL_STEPS, useBudgetWizardState } from "@/features/budget-wizard/hooks/use-budget-wizard-state";
 import { FixedCostsModal } from "@/features/budget-wizard/components/FixedCostsModal";
+import { SavedPlansDrawer } from "@/features/budget-wizard/components/SavedPlansDrawer";
 import { WizardAmbientGlow } from "@/features/budget-wizard/components/WizardAmbientGlow";
 import { WizardBackConfirmDialog } from "@/features/budget-wizard/components/WizardBackConfirmDialog";
 import { WizardProgressHeader } from "@/features/budget-wizard/components/WizardProgressHeader";
@@ -54,6 +55,7 @@ interface BudgetWizardModalProps {
 export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizardModalProps) {
   const styles = useStyles();
   const wizard = useBudgetWizardState(visible, onClose, onCompleted);
+  const [savedPlansOpen, setSavedPlansOpen] = useState(false);
   // Which way the last step change went, and whether one has happened yet in
   // this opening (the first step only rides the overlay's own entrance).
   const shownStep = useRef(wizard.step);
@@ -64,7 +66,10 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
     shownStep.current = wizard.step;
   }, [wizard.step]);
   useEffect(() => {
-    if (!visible) stepChanged.current = false;
+    if (!visible) {
+      stepChanged.current = false;
+      setSavedPlansOpen(false);
+    }
   }, [visible]);
 
   useEffect(() => {
@@ -165,6 +170,7 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
               onNext={wizard.goToProfile}
               restoredFromSavedAt={wizard.restoredFrom?.savedAt}
               onDiscardSavedPlan={wizard.discardSavedPlan}
+              onOpenSavedPlans={() => setSavedPlansOpen(true)}
             />
           ) : null}
 
@@ -228,6 +234,17 @@ export function BudgetWizardModal({ visible, onClose, onCompleted }: BudgetWizar
         rescaled={wizard.fixedCostsRescaled}
         onClose={wizard.closeFixedCosts}
         onConfirm={wizard.applyFixedCosts}
+      />
+
+      {/* A sibling for the same reason: it covers the whole wizard. */}
+      <SavedPlansDrawer
+        visible={savedPlansOpen}
+        currentPlanId={wizard.restoredFrom?.id ?? null}
+        onClose={() => setSavedPlansOpen(false)}
+        onPick={(plan) => {
+          setSavedPlansOpen(false);
+          wizard.applySavedPlan(plan);
+        }}
       />
     </Animated.View>
   );

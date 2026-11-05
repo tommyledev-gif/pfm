@@ -1,8 +1,9 @@
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 
 import { SavingsChoice } from "@/features/budget-wizard/budget-math";
 import { FixedCostItem } from "@/features/budget-wizard/fixed-costs";
-import { SavedBudgetPlan, planSignature, useSavedBudgetPlanStore } from "@/features/budget-wizard/saved-plan";
+import { SavedBudgetPlan, planSignature } from "@/features/budget-wizard/saved-plan";
+import { newPlanId, useSavedBudgetPlanStore } from "@/features/budget-wizard/saved-plan-store";
 import { BudgetProposalsResponse, PresetKey } from "@/features/budget-wizard/types";
 import { useLatestCallback } from "@/lib/use-latest-callback";
 
@@ -29,10 +30,11 @@ interface PlanSnapshotInputs {
  * a half-written copy updated on every keystroke is a second source of truth
  * for the same answers, and it would be the stale one exactly when it mattered.
  */
-function buildSavedPlan(inputs: PlanSnapshotInputs, savedAt: string): SavedBudgetPlan | null {
+function buildSavedPlan(inputs: PlanSnapshotInputs, id: string, savedAt: string): SavedBudgetPlan | null {
   if (!inputs.result) return null;
   const onPlan = new Set(inputs.result.proposals.map((p) => p.category_id));
   return {
+    id,
     savedAt,
     currency: inputs.currency,
     income: inputs.income,
@@ -66,26 +68,27 @@ function buildSavedPlan(inputs: PlanSnapshotInputs, savedAt: string): SavedBudge
  * use-wizard-kept-categories, which deliberately keeps none. The two never
  * read each other.
  *
- * ⚠️ `planSaved` is whether the screen and the kept plan say the same thing,
- * not whether the button was pressed this run. As a flag set on save, it left
- * the button reading "saved" (and disabled) through every edit made after it,
- * so those edits could never be kept; and a plan reopened unchanged offered to
- * save itself again.
+ * ⚠️ `planSaved` is whether the screen says the same thing as one of the kept
+ * plans, not whether the button was pressed this run. As a flag set on save,
+ * it left the button reading "saved" (and disabled) through every edit made
+ * after it, so those edits could never be kept; and a plan reopened unchanged
+ * offered to save itself again.
+ *
+ * Saving adds a plan to the list: the one this run started from stays as it
+ * was (saved-plan-store).
  */
 export function useWizardPlanPersistence(inputs: PlanSnapshotInputs) {
-  const storedPlan = useSavedBudgetPlanStore((s) => s.plan);
-  const storedSignature = useMemo(() => (storedPlan ? planSignature(storedPlan) : null), [storedPlan]);
+  const storedPlans = useSavedBudgetPlanStore((s) => s.plans);
+  const storedSignatures = useMemo(() => new Set(storedPlans.map(planSignature)), [storedPlans]);
   // Rebuilt per render rather than memoized on a dozen inputs: a handful of
   // rows, serialised, costs less than keeping that dependency list right.
-  const current = buildSavedPlan(inputs, "");
-  const planSaved = current !== null && storedSignature === planSignature(current);
+  const current = buildSavedPlan(inputs, "", "");
+  const planSaved = current !== null && storedSignatures.has(planSignature(current));
 
   const savePlan = useLatestCallback(() => {
-    const plan = buildSavedPlan(inputs, new Date().toISOString());
+    const plan = buildSavedPlan(inputs, newPlanId(), new Date().toISOString());
     if (plan) useSavedBudgetPlanStore.getState().savePlan(plan);
   });
 
-  const clearStoredPlan = useCallback(() => useSavedBudgetPlanStore.getState().clearPlan(), []);
-
-  return { savePlan, planSaved, clearStoredPlan };
+  return { savePlan, planSaved };
 }

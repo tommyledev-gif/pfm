@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useBudgetProposalsMutation } from "@/features/budget-wizard/api/use-budget-proposals-mutation";
 import { useBudgetWizardPrefillQuery } from "@/features/budget-wizard/api/use-budget-wizard-prefill-query";
 import { useWizardRenames } from "@/features/budget-wizard/hooks/use-wizard-renames";
-import { AddBudgetRowResult } from "@/features/budget-wizard/components/AddBudgetRowModal";
 import {
   DEFAULT_SAVINGS_CHOICE,
   SavingsChoice,
@@ -12,10 +11,11 @@ import {
   validateIncomeStep,
 } from "@/features/budget-wizard/budget-math";
 import { useWizardFixedCosts } from "@/features/budget-wizard/hooks/use-wizard-fixed-costs";
-import { SavedBudgetPlan, SavedPlanRow, useSavedBudgetPlanStore } from "@/features/budget-wizard/saved-plan";
+import { SavedBudgetPlan, SavedPlanRow } from "@/features/budget-wizard/saved-plan";
+import { useSavedBudgetPlanStore } from "@/features/budget-wizard/saved-plan-store";
 import { useWizardPlanPersistence } from "@/features/budget-wizard/hooks/use-wizard-plan-persistence";
 import { useWizardSubmit } from "@/features/budget-wizard/hooks/use-wizard-submit";
-import { withAddedRow, withEditedAmount, withRemovedRow } from "@/features/budget-wizard/proposal-edits";
+import { useWizardRowEdits } from "@/features/budget-wizard/hooks/use-wizard-row-edits";
 import { PROBLEM_MESSAGES, resolvePresetIntents } from "@/features/budget-wizard/preset-intents";
 import { useWizardKeptCategories } from "@/features/budget-wizard/hooks/use-wizard-kept-categories";
 import { useWizardStepBack } from "@/features/budget-wizard/hooks/use-wizard-step-back";
@@ -23,6 +23,7 @@ import { restoreProposal } from "@/features/budget-wizard/proposal-restore";
 import { BudgetProposalsResponse, CategoryIntentRequest, PresetKey } from "@/features/budget-wizard/types";
 import { errorText } from "@/lib/api-envelope";
 import { i18n } from "@/lib/i18n";
+import { useLatestCallback } from "@/lib/use-latest-callback";
 
 export const BUDGET_WIZARD_TOTAL_STEPS = 3;
 
@@ -104,9 +105,11 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
   // has not resolved yet" as "nothing saved" would blank a plan on a cold
   // launch, which is the one launch where the user is most likely to be
   // reaching for it.
-  useEffect(() => {
-    if (!visible || !savedPlanHydrated) return;
-    const plan = useSavedBudgetPlanStore.getState().plan;
+  //
+  // startFrom is also how a run switches to another kept plan (the saved-plans
+  // list) and how "Bắt đầu lại" empties it (null). It only reads the plan:
+  // nothing here changes or removes a kept one.
+  const startFrom = useLatestCallback((plan: SavedBudgetPlan | null) => {
     setStep(1);
     setIncome(plan?.income ?? 0);
     setSavingsChoice(
@@ -132,8 +135,10 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
     setOverwriteConfirmOpen(false);
     setRemovedIds([]);
     keptCategories.forget();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, savedPlanHydrated]);
+  });
+  useEffect(() => {
+    if (visible && savedPlanHydrated) startFrom(useSavedBudgetPlanStore.getState().plan);
+  }, [visible, savedPlanHydrated, startFrom]);
 
   const intentsForPreset = useCallback(
     (key: PresetKey) => resolvePresetIntents(prefill.data, key),
@@ -205,38 +210,7 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
     void requestProposal(intents, preset);
   }, [preset, intentsForPreset, requestProposal]);
 
-  /**
-   * A hand-edited row.
-   *
-   * ⚠️ Applied locally and ONLY to the row that was edited — the buffer absorbs
-   * the difference and every other row is left untouched. Re-asking the server
-   * would re-run the allocator, which would rebalance rows the user did not
-   * touch: exactly the silent rewrite the edit modal's ceiling exists to
-   * prevent. The transform itself lives in proposal-edits.ts.
-   */
-  const editAmount = useCallback((categoryId: string, amountXu: number) => {
-    setResult((prev) => (prev ? withEditedAmount(prev, categoryId, amountXu) : prev));
-  }, []);
-
-  const addProposalRow = useCallback((entry: AddBudgetRowResult) => {
-    const tempId = entry.categoryId ?? `new:${Date.now()}`;
-    if (!entry.categoryId) setPendingCategories((prev) => ({ ...prev, [tempId]: entry.name }));
-    setResult((prev) => (prev ? withAddedRow(prev, tempId, entry.name, entry.amountXu) : prev));
-    setAddedIds((prev) => (prev.includes(tempId) ? prev : [...prev, tempId]));
-    setAddRowOpen(false);
-  }, []);
-
-  const removeProposalRow = useCallback((categoryId: string) => {
-    setResult((prev) => (prev ? withRemovedRow(prev, categoryId) : prev));
-    setAddedIds((prev) => prev.filter((id) => id !== categoryId));
-    // Recorded so a step-back that keeps the plan does not resurrect it.
-    setRemovedIds((prev) => (prev.includes(categoryId) ? prev : [...prev, categoryId]));
-    setPendingCategories((prev) => {
-      const next = { ...prev };
-      delete next[categoryId];
-      return next;
-    });
-  }, []);
+  const rowEdits = useWizardRowEdits({ setResult, setAddedIds, setRemovedIds, setPendingCategories, setAddRowOpen });
 
   /**
    * Whether this account already has budgets that a run would replace.
@@ -276,20 +250,8 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
     renamedCategories: renames.renamedCategories,
   });
 
-  /** Drops the restored figures and starts this run from zero. */
-  const discardSavedPlan = useCallback(() => {
-    persistence.clearStoredPlan();
-    setRestoredFrom(null);
-    setPendingSavedRows(null);
-    setIncome(0);
-    fixedCosts.reset();
-    setPreset(null);
-    setResult(null);
-    setAddedIds([]);
-    setPendingCategories({});
-    setRemovedIds([]);
-    renames.resetRenames();
-  }, [persistence, fixedCosts, renames]);
+  /** Drops the restored figures and starts this run from zero. The plan stays kept. */
+  const discardSavedPlan = useCallback(() => startFrom(null), [startFrom]);
 
   const submit = useCallback(async () => {
     setError(null);
@@ -366,11 +328,11 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
     canSubmit: (result?.proposals.length ?? 0) >= MIN_PLAN_ROWS,
     selectPreset,
     retryProposal,
-    editAmount,
+    editAmount: rowEdits.editAmount,
     openAddRow: () => setAddRowOpen(true),
     closeAddRow: () => setAddRowOpen(false),
-    addProposalRow,
-    removeProposalRow,
+    addProposalRow: rowEdits.addProposalRow,
+    removeProposalRow: rowEdits.removeProposalRow,
     // ⚠️ The submit button calls THIS, not submit(): POST /budgets/bulk replaces
     // the caller's entire active budget set (see useBulkCreateBudgetsMutation),
     // so running the wizard on an account that already has budgets silently
@@ -395,6 +357,8 @@ export function useBudgetWizardState(visible: boolean, onClose: () => void, onCo
     submit,
     savePlan: persistence.savePlan,
     discardSavedPlan,
+    /** Starts this run over from another kept plan (the saved-plans list). */
+    applySavedPlan: startFrom,
     close: onClose,
   };
 }

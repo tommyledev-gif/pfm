@@ -6,6 +6,7 @@ import { formatCurrency } from "@/lib/currency";
 import { withAlpha } from "@/lib/color";
 import { formatDateShort, formatTime } from "@/lib/format-date";
 import { TranslationKey } from "@/lib/i18n";
+import { TransactionKind } from "@/lib/constants";
 import { colors, radii, spacing, typography, createStyles } from "@/lib/theme";
 import { AuditAction, AuditLogEntry, AuditSnapshot } from "@/features/audit-logs/types";
 import { formatCoordinates } from "@/features/transactions/location/map-support";
@@ -31,9 +32,16 @@ const FIELD_LABEL: Record<string, TranslationKey> = {
   occurred_at: "common.field.date",
   note: "common.field.note",
   wallet_id: "common.field.wallet",
+  to_wallet_id: "common.field.toWallet",
   type: "common.field.type",
   location: "common.field.location",
   location_note: "auditLogs.field.locationNote",
+};
+
+const TYPE_LABEL: Record<TransactionKind, TranslationKey> = {
+  expense: "common.txType.expense",
+  income: "common.txType.income",
+  transfer: "common.txType.transfer",
 };
 
 // A moved pin is logged as {latitude, longitude, place_name}: read as its
@@ -73,11 +81,13 @@ export function AuditLogRow({ entry, resolveCategoryName, resolveWalletName, cur
       case "category_id":
         return resolveCategoryName(String(value));
       case "wallet_id":
+      case "to_wallet_id":
         return resolveWalletName(String(value));
       case "occurred_at":
         return formatDateShort(String(value));
+      // A type change (PATCH type): which kind it was and became.
       case "type":
-        return value === "income" ? "Thu" : "Chi";
+        return value === "income" || value === "expense" || value === "transfer" ? t(TYPE_LABEL[value]) : String(value);
       case "location":
         return typeof value === "object" ? formatPin(value) : String(value);
       default:

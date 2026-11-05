@@ -17,6 +17,22 @@
       "perDay": "{{amount}}\nper day",
       "next": "Next →"
     },
+    "savedPlans": {
+      "link_one": "{{count}} saved plan",
+      "link_other": "{{count}} saved plans",
+      "title": "Saved plans",
+      "search_one": "Search {{count}} plan",
+      "search_other": "Search {{count}} plans",
+      "noMatch": "No plans found",
+      "untitled": "Budget plan",
+      "detail_one": "Income {{income}} · {{count}} category",
+      "detail_other": "Income {{income}} · {{count}} categories",
+      "delete": "Delete plan",
+      "deleteConfirm": {
+        "title": "Delete this plan?",
+        "message": "Deletes the plan saved on {{date}}. This can't be undone. Your current budgets stay as they are."
+      }
+    },
     "savings": {
       "label": "Set aside",
       "none": "None",

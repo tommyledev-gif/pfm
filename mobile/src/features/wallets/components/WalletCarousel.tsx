@@ -38,6 +38,8 @@ interface WalletCarouselProps {
   initialWalletId?: string | null;
   /** Fires with the centred wallet's id whenever a different card settles in the middle. */
   onActiveWalletChange?: (walletId: string) => void;
+  /** Fires as a slide sets off toward a card, and again as it lands, before the cards settle. */
+  onHeadingTo?: (walletId: string) => void;
   /** Draws a fading "you picked this one" border on this wallet's card. */
   highlightWalletId?: string | null;
   /** The 1 → 0 opacity for that border — from useHighlightFade. */
@@ -87,6 +89,7 @@ function WalletCarouselView({
   onPressWallet,
   initialWalletId,
   onActiveWalletChange,
+  onHeadingTo,
   highlightWalletId,
   highlightOpacity,
 }: WalletCarouselProps) {
@@ -109,7 +112,7 @@ function WalletCarouselView({
     pressCard,
     step,
     looping,
-  } = useWalletCarousel({ wallets, initialWalletId, onActiveWalletChange });
+  } = useWalletCarousel({ wallets, initialWalletId, onActiveWalletChange, onHeadingTo });
   // Cards are only rendered once the width is known, so that is when the deck
   // is dealt.
   const intro = useCarouselIntro(containerWidth > 0 && wallets.length > 0);

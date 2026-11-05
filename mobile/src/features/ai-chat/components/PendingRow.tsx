@@ -169,8 +169,16 @@ const useStyles = createStyles((colors) => ({
     backgroundColor: withAlpha(colors.mustard, 0.14),
   },
   // The hairline starts after the icon, as an iOS list's does.
+  // ⚠️ Grow, shrink and a zero basis spelled out, here and on textCol. With
+  // `flex: 1` (shrink 0) both were sized by the note inside this swipe row's
+  // horizontal ScrollView: a long note made the body 335 wide in 301 of room
+  // (measured on the emulator) and pushed the amount and chevron off the
+  // edge instead of cutting the note with "…".
   body: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
+    minWidth: 0,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
@@ -178,7 +186,7 @@ const useStyles = createStyles((colors) => ({
     paddingRight: spacing.md,
   },
   separated: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.surfaceBorder },
-  textCol: { flex: 1, minWidth: 0, gap: 2 },
+  textCol: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, gap: 2 },
   label: { ...typography.body, color: colors.textPrimary },
   hint: { ...typography.caption, color: colors.textSecondary },
   // Its width is set per render (AMOUNT_WIDTH); never shrunk by the label.

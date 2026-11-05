@@ -18,7 +18,7 @@ import { isAwaitingFirstData, isWaitingForNetwork } from "@/lib/query-status";
 import { useHighlightFade } from "@/lib/use-highlight-fade";
 import { TranslationKey } from "@/lib/i18n";
 import { useLatestCallback } from "@/lib/use-latest-callback";
-import { useUiPrefsStore, WalletsViewMode } from "@/stores/ui-prefs-store";
+import { useUiPrefsStore, WalletsTab } from "@/stores/ui-prefs-store";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useWalletInvitationsQuery } from "@/features/wallets/api/use-wallet-members-query";
 import { Wallet } from "@/features/wallets/types";
@@ -31,17 +31,18 @@ import { WalletCarousel } from "@/features/wallets/components/WalletCarousel";
 import { WalletFormModal } from "@/features/wallets/components/WalletFormModal";
 import { WalletInvitationBanner } from "@/features/wallets/components/WalletInvitationBanner";
 import { WalletMembersSheet } from "@/features/wallets/components/WalletMembersSheet";
-import { WalletRecentPanel } from "@/features/wallets/components/WalletRecentPanel";
+import { WalletRecentPanel, WalletRecentPanelHandle } from "@/features/wallets/components/WalletRecentPanel";
 import { WalletsEmptyState } from "@/features/wallets/components/WalletsEmptyState";
 import { WalletsGroupedList } from "@/features/wallets/components/WalletsGroupedList";
+import { WalletsViewModeButton } from "@/features/wallets/components/WalletsViewModeButton";
 import { WalletsListSkeleton } from "@/features/wallets/components/WalletsListSkeleton";
 import { TransactionFormModal } from "@/features/transactions/components/TransactionFormModal";
 import { Transaction } from "@/features/transactions/types";
 
-const VIEW_MODES: { labelKey: TranslationKey; value: WalletsViewMode }[] = [
-  { labelKey: "wallets.view.carousel", value: "carousel" },
-  { labelKey: "wallets.view.list", value: "list" },
-  { labelKey: "wallets.view.shared", value: "shared" },
+// How the own tab draws its wallets is the header button's (WalletsViewModeButton).
+const TABS: { labelKey: TranslationKey; value: WalletsTab }[] = [
+  { labelKey: "wallets.tab.own", value: "own" },
+  { labelKey: "wallets.tab.shared", value: "shared" },
 ];
 const NO_WALLETS: Wallet[] = [];
 
@@ -64,6 +65,8 @@ export default function WalletsScreen() {
   }>();
   const wallets = useWalletsQuery();
   const invitations = useWalletInvitationsQuery();
+  const tab = useUiPrefsStore((s) => s.walletsTab);
+  const setTab = useUiPrefsStore((s) => s.setWalletsTab);
   const viewMode = useUiPrefsStore((s) => s.walletsViewMode);
   const setViewMode = useUiPrefsStore((s) => s.setWalletsViewMode);
   const [modalOpen, setModalOpen] = useState(false);
@@ -86,15 +89,14 @@ export default function WalletsScreen() {
     setOpenedTransaction(transaction);
     setTransactionOpen(true);
   });
-  const viewModes = useMemo(() => VIEW_MODES.map((m) => ({ label: t(m.labelKey), value: m.value })), [t]);
+  const tabs = useMemo(() => TABS.map((m) => ({ label: t(m.labelKey), value: m.value })), [t]);
   // The wallet the card view is centred on — kept here rather than in the
   // carousel so switching to the list and back lands on the same one.
   const [activeWalletId, setActiveWalletId] = useState<string | null>(focusWalletId ?? null);
-  // Which way the carousel last moved: the recent list under it follows —
-  // the next wallet's list rises from below, the previous one's drops in.
-  const [listDirection, setListDirection] = useState<1 | -1>(1);
-  const activeWalletIdRef = useRef(activeWalletId);
-  activeWalletIdRef.current = activeWalletId;
+  // Told where a slide is heading the moment it sets off, so the list under
+  // the cards turns to its skeleton without waiting for them to settle.
+  const recentPanel = useRef<WalletRecentPanelHandle>(null);
+  const headTo = useLatestCallback((walletId: string) => recentPanel.current?.headTo(walletId));
 
   // Only once the wallet is actually on screen to be highlighted — fading a
   // border over a loading skeleton would spend the whole fade on nothing.
@@ -114,27 +116,12 @@ export default function WalletsScreen() {
   const ownWallets = useMemo(() => wallets.data?.filter(isOwnWallet) ?? NO_WALLETS, [wallets.data]);
 
   const activeWallet = ownWallets.find((w) => w.id === activeWalletId) ?? ownWallets[0] ?? null;
-  // Stable for the memoized carousel. The shorter way round the loop is the
-  // direction the cards moved.
-  const changeActiveWallet = useLatestCallback((walletId: string) => {
-    const count = ownWallets.length;
-    const from = ownWallets.findIndex((w) => w.id === activeWalletIdRef.current);
-    const to = ownWallets.findIndex((w) => w.id === walletId);
-    const direction = (to - from + count) % count <= count / 2 ? 1 : -1;
-    if (from < 0 || to < 0 || from === to || direction === listDirection) {
-      setActiveWalletId(walletId);
-      return;
-    }
-    // A turn of direction lands a frame before the switch: the outgoing list
-    // leaves with the props of its last render, so it must have rendered
-    // with the new direction first or it would exit the old way.
-    setListDirection(direction);
-    requestAnimationFrame(() => setActiveWalletId(walletId));
-  });
+  // Stable for the memoized carousel.
+  const changeActiveWallet = useLatestCallback((walletId: string) => setActiveWalletId(walletId));
   // Only once loaded — never while loading or waiting offline, which keep
-  // their own skeleton / placeholder. No wallet of the User's own: the card
-  // and list tabs show the create prompt, while the Ví chung tab may still
-  // hold someone else's wallet or an invitation to one.
+  // their own skeleton / placeholder. No wallet of the User's own: the own
+  // tab shows the create prompt, while the Ví chung tab may still hold
+  // someone else's wallet or an invitation to one.
   const isEmpty = wallets.isSuccess && ownWallets.length === 0;
   // Not isLoading: pending while the saved cache is read back, when the card
   // view used to draw an empty carousel ("Chưa có ví") before the cards.
@@ -158,25 +145,28 @@ export default function WalletsScreen() {
   const focusTarget = wallets.data?.find((w) => w.id === focusWalletId);
   useEffect(() => {
     if (!focusTarget) return;
-    if (!isOwnWallet(focusTarget)) setViewMode("shared");
-    else if (viewMode === "shared" && !isSharedWallet(focusTarget)) setViewMode("carousel");
+    if (!isOwnWallet(focusTarget)) setTab("shared");
+    else if (tab === "shared" && !isSharedWallet(focusTarget)) setTab("own");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusTarget?.id, focusedAt]);
 
   return (
     <Screen>
-      <ScreenHeader title={t("nav.title.wallets")} />
+      <ScreenHeader
+        title={t("nav.title.wallets")}
+        trailing={tab === "own" && !isEmpty ? <WalletsViewModeButton mode={viewMode} onChange={setViewMode} /> : null}
+      />
 
-      {/* Three ways of looking at nothing is not a choice worth offering. */}
+      {/* Two ways of looking at nothing is not a choice worth offering. */}
       {hasAnything ? (
         <MotionView preset="fade" style={styles.modeTabs}>
-          <SegmentedTabs options={viewModes} value={viewMode} onChange={setViewMode} />
+          <SegmentedTabs options={tabs} value={tab} onChange={setTab} />
         </MotionView>
       ) : null}
 
-      {viewMode !== "shared" ? <WalletInvitationBanner onPress={() => setViewMode("shared")} /> : null}
+      {tab !== "shared" ? <WalletInvitationBanner onPress={() => setTab("shared")} /> : null}
 
-      {viewMode === "shared" && wallets.isSuccess ? (
+      {tab === "shared" && wallets.isSuccess ? (
         <SharedWalletsView
           wallets={wallets.data}
           faceById={faceById}
@@ -187,7 +177,7 @@ export default function WalletsScreen() {
         />
       ) : isEmpty ? (
         <WalletsEmptyState onCreate={openCreator} />
-      ) : viewMode === "carousel" ? (
+      ) : tab === "own" && viewMode === "carousel" ? (
         <View style={styles.cardsView}>
           {/* Pinned under the tabs, outside any scroll: in a centred
               ScrollView every height change of the recent list dragged the
@@ -204,6 +194,7 @@ export default function WalletsScreen() {
                 wallets={ownWallets}
                 initialWalletId={activeWalletId}
                 onActiveWalletChange={changeActiveWallet}
+                onHeadingTo={headTo}
                 onPressWallet={openEditor}
                 highlightWalletId={highlightWalletId}
                 highlightOpacity={highlightOpacity}
@@ -221,15 +212,15 @@ export default function WalletsScreen() {
           </View>
           {activeWallet ? (
             <WalletRecentPanel
+              ref={recentPanel}
               wallet={activeWallet}
-              direction={listDirection}
               bottomClearance={BOTTOM_NAV_CLEARANCE}
               onSelectTransaction={openTransaction}
             />
           ) : null}
         </View>
       ) : awaiting ? (
-        // The list views, and the Ví chung tab until its wallets land.
+        // The by-type list, and the Ví chung tab until its wallets land.
         <LateSkeleton>
           <WalletsListSkeleton />
         </LateSkeleton>
@@ -251,7 +242,7 @@ export default function WalletsScreen() {
 
       {/* The screen's one primary action, at the thumb: create a wallet, or
           on the Ví chung tab share one. Before the sheets, so they cover it. */}
-      {viewMode === "shared" ? (
+      {tab === "shared" ? (
         <Fab
           key="share"
           Icon={UsersIcon}

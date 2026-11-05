@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { MoneyField } from "@/features/budget-wizard/components/MoneyField";
+import { WizardSavedPlansBar } from "@/features/budget-wizard/components/WizardSavedPlansBar";
 import { WizardSavingsField } from "@/features/budget-wizard/components/WizardSavingsField";
 import {
   SavingsChoice,
@@ -19,7 +20,6 @@ import {
   summarizeFixedCosts,
 } from "@/features/budget-wizard/fixed-costs";
 import { formatCurrency } from "@/lib/currency";
-import { formatDateDMY } from "@/lib/format-date";
 import { WIZARD_MONEY_MAX_XU, WIZARD_MONEY_SCALE } from "@/features/budget-wizard/wizard-money-scale";
 import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
@@ -42,6 +42,8 @@ interface WizardStepIncomeProps {
   /** ISO timestamp of the kept plan these figures came from, when they did. */
   restoredFromSavedAt?: string;
   onDiscardSavedPlan?: () => void;
+  /** Opens the list of kept plans. */
+  onOpenSavedPlans: () => void;
   onNext: () => void;
 }
 
@@ -80,6 +82,7 @@ export function WizardStepIncome({
   onNext,
   restoredFromSavedAt,
   onDiscardSavedPlan,
+  onOpenSavedPlans,
 }: WizardStepIncomeProps) {
   const styles = useStyles();
   const { t } = useTranslation();
@@ -117,21 +120,11 @@ export function WizardStepIncome({
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>{t("budgetWizard.income.title")}</Text>
 
-        {/* Says where these numbers came from. A form that opens pre-filled with
-            no explanation reads as the app having remembered something it was
-            never asked to, and leaves no way back to a blank one. */}
-        {restoredFromSavedAt ? (
-          <View style={styles.restoredBanner}>
-            <Text style={styles.restoredText}>
-              {t("budgetWizard.income.restored", { date: formatDateDMY(restoredFromSavedAt) })}
-            </Text>
-            {onDiscardSavedPlan ? (
-              <Pressable onPress={onDiscardSavedPlan} hitSlop={8} testID="btn-wizard-discard-plan">
-                <Text style={styles.restoredAction}>{t("budgetWizard.income.startOver")}</Text>
-              </Pressable>
-            ) : null}
-          </View>
-        ) : null}
+        <WizardSavedPlansBar
+          restoredFromSavedAt={restoredFromSavedAt}
+          onDiscardSavedPlan={onDiscardSavedPlan}
+          onOpenSavedPlans={onOpenSavedPlans}
+        />
 
         <MoneyField
           testID="input-wizard-income"
@@ -267,22 +260,6 @@ const useStyles = createStyles((colors) => ({
   resultBig: { ...typography.hero, fontSize: 26, color: colors.textPrimary },
   resultPerDay: { ...typography.label, color: colors.green, textAlign: "right" },
   error: { ...typography.caption, color: colors.mustard },
-  restoredBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.listCard,
-    // Same plain hairline box as step 3's estimate notice, not a coloured
-    // stripe down the left edge.
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    backgroundColor: colors.surface,
-  },
-  restoredText: { flex: 1, ...typography.tiny, color: colors.textSecondary },
-  restoredAction: { ...typography.tiny, color: colors.green },
   primaryBtn: {
     marginHorizontal: spacing.xl,
     marginBottom: spacing.md,

@@ -28,14 +28,15 @@ import (
 
 // resolveWalletMove validates the PATCH's wallet_id before the tx opens. It
 // returns nil when there is nothing to move: no wallet_id, or the Wallet the
-// Transaction is already on.
-func (s *TransactionService) resolveWalletMove(ctx context.Context, userID uuid.UUID, existing *model.Transaction, req dto.UpdateTransactionRequest) (*model.Wallet, error) {
+// Transaction is already on. finalType is its type after this PATCH.
+func (s *TransactionService) resolveWalletMove(ctx context.Context, userID uuid.UUID, existing *model.Transaction, req dto.UpdateTransactionRequest, finalType model.TransactionType) (*model.Wallet, error) {
 	if req.WalletID == nil || *req.WalletID == existing.WalletID {
 		return nil, nil
 	}
 	// A transfer names two Wallets and moves money between them; re-pointing
-	// one side is a different transfer, not an edit of this one.
-	if existing.Type == model.TransactionTypeTransfer {
+	// one side is a different transfer, not an edit of this one. One that
+	// stops or starts being a transfer in the same PATCH may move.
+	if existing.Type == model.TransactionTypeTransfer && finalType == model.TransactionTypeTransfer {
 		return nil, common.ErrTransferWalletImmutable
 	}
 	// 404 for a missing or soft-deleted Wallet, 403 for one the caller may

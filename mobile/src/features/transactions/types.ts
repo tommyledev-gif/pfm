@@ -134,12 +134,18 @@ export interface CreateTransactionRequest {
   adjustments?: TransactionAdjustmentInput[];
 }
 
-// type is never accepted by PATCH (backend dto.UpdateTransactionRequest
-// excludes it structurally) — mirrors frontend/src/features/transactions/
-// types.ts's UpdateTransactionRequest.
+// Mirrors frontend/src/features/transactions/types.ts's UpdateTransactionRequest.
 export interface UpdateTransactionRequest {
   amount?: number;
   category_id?: string;
+  // Changes what the Transaction is (2026-11-05): becoming income/expense
+  // needs a category_id of that type, becoming a transfer needs to_wallet_id
+  // and drops any items. The old effect on every wallet is taken back and the
+  // new one applied, atomically. Send it only when the type changed.
+  type?: TransactionKind;
+  // A new transfer's destination. A transfer's own never moves (422
+  // TRANSFER_WALLET_IMMUTABLE).
+  to_wallet_id?: string;
   // Moves an income/expense to another wallet: the old one gets its effect
   // back, the new one takes it (at the new amount when amount is sent too).
   // Same currency only (422 WALLET_CURRENCY_MISMATCH), never a transfer (422

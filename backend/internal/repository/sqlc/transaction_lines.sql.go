@@ -126,7 +126,7 @@ func (q *Queries) CountActiveItemsByTransactionIDs(ctx context.Context, userID u
 }
 
 const lockTransactionForUpdate = `-- name: LockTransactionForUpdate :one
-SELECT amount, updated_at, wallet_id
+SELECT amount, updated_at, wallet_id, type, to_wallet_id
 FROM transactions
 WHERE id = $1
   AND user_id = $2
@@ -135,15 +135,17 @@ FOR UPDATE
 `
 
 type LockTransactionForUpdateRow struct {
-	Amount    int64
-	UpdatedAt time.Time
-	WalletID  uuid.UUID
+	Amount     int64
+	UpdatedAt  time.Time
+	WalletID   uuid.UUID
+	Type       string
+	ToWalletID *uuid.UUID
 }
 
 func (q *Queries) LockTransactionForUpdate(ctx context.Context, id, userID uuid.UUID) (LockTransactionForUpdateRow, error) {
 	row := q.db.QueryRow(ctx, lockTransactionForUpdate, id, userID)
 	var i LockTransactionForUpdateRow
-	err := row.Scan(&i.Amount, &i.UpdatedAt, &i.WalletID)
+	err := row.Scan(&i.Amount, &i.UpdatedAt, &i.WalletID, &i.Type, &i.ToWalletID)
 	return i, err
 }
 

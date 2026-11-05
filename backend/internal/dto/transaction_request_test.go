@@ -45,7 +45,7 @@ func TestUpdateTransactionRequest_AmountCeiling(t *testing.T) {
 }
 
 // PATCH accepts wallet_id since 2026-10-13 (moving a Transaction to another
-// Wallet); type is still rejected by DecodeStrict.
+// Wallet). Unknown fields are still rejected by DecodeStrict.
 func TestUpdateTransactionRequest_WalletID(t *testing.T) {
 	walletID := uuid.New()
 	var req UpdateTransactionRequest
@@ -59,8 +59,34 @@ func TestUpdateTransactionRequest_WalletID(t *testing.T) {
 		t.Fatal("a wallet_id-only PATCH must count as an update")
 	}
 
-	var withType UpdateTransactionRequest
-	if err := DecodeStrict([]byte(`{"type":"income"}`), &withType); err == nil {
-		t.Fatal("type must still be rejected by DecodeStrict")
+	var unknown UpdateTransactionRequest
+	if err := DecodeStrict([]byte(`{"user_id":"`+walletID.String()+`"}`), &unknown); err == nil {
+		t.Fatal("an unknown field must still be rejected by DecodeStrict")
+	}
+}
+
+// PATCH accepts type and to_wallet_id since 2026-11-05 (changing what a
+// Transaction is); the service checks how they combine.
+func TestUpdateTransactionRequest_Type(t *testing.T) {
+	v := validator.New()
+	toWalletID := uuid.New()
+	var req UpdateTransactionRequest
+	body := `{"type":"transfer","to_wallet_id":"` + toWalletID.String() + `"}`
+	if err := DecodeStrict([]byte(body), &req); err != nil {
+		t.Fatalf("type and to_wallet_id must be accepted by DecodeStrict, got %v", err)
+	}
+	if req.Type == nil || *req.Type != "transfer" || req.ToWalletID == nil || *req.ToWalletID != toWalletID {
+		t.Fatalf("expected type transfer to %s, got %v → %v", toWalletID, req.Type, req.ToWalletID)
+	}
+	if !req.HasUpdates() {
+		t.Fatal("a type-only PATCH must count as an update")
+	}
+	if err := v.Struct(req); err != nil {
+		t.Fatalf("a valid type must pass, got %v", err)
+	}
+
+	bad := "refund"
+	if err := v.Struct(UpdateTransactionRequest{Type: &bad}); err == nil || !strings.Contains(err.Error(), "Type") {
+		t.Fatalf("an unknown type must fail on Type, got %v", err)
 	}
 }

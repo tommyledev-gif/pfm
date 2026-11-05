@@ -236,6 +236,15 @@ func (f *fakeTransactionRepo) UpdateTransaction(_ context.Context, _ pgx.Tx, arg
 	if arg.WalletID != nil {
 		t.WalletID = *arg.WalletID
 	}
+	// Mirrors the real CASE: a type rewrites the destination with it.
+	if arg.Type != nil {
+		t.Type = model.TransactionType(*arg.Type)
+		t.ToWalletID = nil
+		if t.Type == model.TransactionTypeTransfer && arg.ToWalletID != nil {
+			to := *arg.ToWalletID
+			t.ToWalletID = &to
+		}
+	}
 	if arg.OccurredAt != nil {
 		t.OccurredAt = *arg.OccurredAt
 	}

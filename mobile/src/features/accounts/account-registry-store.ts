@@ -7,7 +7,7 @@ import { tokenExpiresAt } from "@/lib/jwt";
 import { removeUserQueryCache } from "@/lib/query-persistence/user-cache-persister";
 import { secureStorage } from "@/lib/secure-storage";
 import { onSessionRefused, onSessionRenewed } from "@/lib/session-events";
-import { useSavedBudgetPlanStore } from "@/features/budget-wizard/saved-plan";
+import { useSavedBudgetPlanStore } from "@/features/budget-wizard/saved-plan-store";
 import { useRecentPhrasesStore } from "@/stores/recent-phrases-store";
 import { useSavedPhrasesStore } from "@/stores/saved-phrases-store";
 import { useSavedPlacesStore } from "@/stores/saved-places-store";

@@ -80,15 +80,27 @@ type TransactionLocationMoveRequest struct {
 	PlaceName *string  `json:"place_name" validate:"omitempty,max=200"`
 }
 
-// UpdateTransactionRequest is the body of PATCH /transactions/{id}.
-// Deliberately has no type field at the type level (spec.md: "never accepted
-// by this endpoint" — Context #5) — decoded via dto.DecodeStrict so an
-// unrecognized field is rejected with 400, not silently ignored, mirroring
-// UpdateWalletRequest/UpdateBudgetRequest's precedent. OccurredAt is a string
-// for the same reason as CreateTransactionRequest's.
+// UpdateTransactionRequest is the body of PATCH /transactions/{id}. Decoded
+// via dto.DecodeStrict so an unrecognized field is rejected with 400, not
+// silently ignored, mirroring UpdateWalletRequest/UpdateBudgetRequest's
+// precedent. OccurredAt is a string for the same reason as
+// CreateTransactionRequest's.
 type UpdateTransactionRequest struct {
 	Amount     *int64     `json:"amount" validate:"omitempty,gt=0,lte=99999999999999"`
 	CategoryID *uuid.UUID `json:"category_id"`
+	// Type changes what the Transaction is (2026-11-05; spec.md Context #5
+	// used to rule it out): income and expense either way, or to and from a
+	// transfer. The old balance effect is taken back and the new one applied
+	// in the same DB transaction as the row update. Becoming income/expense
+	// needs a CategoryID of that type; becoming a transfer needs ToWalletID,
+	// is filed under the system transfer Category (a CategoryID is refused)
+	// and drops any Items. Naming the current type is not a change.
+	Type *string `json:"type" validate:"omitempty,oneof=income expense transfer"`
+	// ToWalletID is the destination of a Transaction becoming a transfer —
+	// only with Type "transfer" on one that is not a transfer yet. A
+	// transfer's own destination never moves (TRANSFER_WALLET_IMMUTABLE);
+	// naming the one it has is not a change.
+	ToWalletID *uuid.UUID `json:"to_wallet_id"`
 	// WalletID moves an income/expense Transaction to another of the caller's
 	// Wallets (2026-10-13; it used to be rejected like type). The old Wallet
 	// gets the Transaction's effect back and the new one takes it — at the
@@ -127,7 +139,7 @@ type UpdateTransactionRequest struct {
 // location_note of "" counts: clearing the note is an update.
 func (r UpdateTransactionRequest) HasUpdates() bool {
 	return r.Amount != nil || r.CategoryID != nil || r.WalletID != nil || r.OccurredAt != nil || r.Note != nil ||
-		r.Location != nil || r.LocationNote != nil || r.Items != nil
+		r.Location != nil || r.LocationNote != nil || r.Items != nil || r.Type != nil || r.ToWalletID != nil
 }
 
 // ListTransactionsQuery is the query-string binding for GET /transactions.

@@ -1,4 +1,4 @@
-import { useSavedBudgetPlanStore } from "@/features/budget-wizard/saved-plan";
+import { useSavedBudgetPlanStore } from "@/features/budget-wizard/saved-plan-store";
 import { deleteAllCaptures } from "@/features/ai-chat/image-capture";
 import { userIdFromAccessToken } from "@/lib/jwt";
 import { flushOutbox } from "@/features/transactions/outbox/flush-outbox";

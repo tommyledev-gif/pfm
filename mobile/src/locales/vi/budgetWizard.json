@@ -15,6 +15,19 @@
       "perDay": "{{amount}}\nmỗi ngày",
       "next": "Tiếp →"
     },
+    "savedPlans": {
+      "link_other": "{{count}} kế hoạch đã lưu",
+      "title": "Kế hoạch đã lưu",
+      "search_other": "Tìm trong {{count}} kế hoạch",
+      "noMatch": "Không tìm thấy kế hoạch",
+      "untitled": "Kế hoạch ngân sách",
+      "detail_other": "Thu nhập {{income}} · {{count}} danh mục",
+      "delete": "Xóa kế hoạch",
+      "deleteConfirm": {
+        "title": "Xóa kế hoạch này?",
+        "message": "Xóa kế hoạch lưu ngày {{date}}. Không thể hoàn tác. Ngân sách đang dùng không đổi."
+      }
+    },
     "savings": {
       "label": "Muốn để dành",
       "none": "Chưa",

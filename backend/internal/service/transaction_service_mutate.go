@@ -15,12 +15,12 @@ import (
 	"github.com/example/pfm/backend/internal/repository"
 )
 
-// UpdateTransaction implements US-04. type is structurally excluded from
-// dto.UpdateTransactionRequest (Context #5) — only amount, category_id,
-// wallet_id (moving an income/expense to another same-currency Wallet, see
-// transaction_service_wallet_move.go), occurred_at, note, location (moving the
+// UpdateTransaction implements US-04: amount, category_id, wallet_id (moving
+// an income/expense to another same-currency Wallet, see
+// transaction_service_wallet_move.go), type with to_wallet_id (see
+// transaction_service_retype.go), occurred_at, note, location (moving the
 // pin, or adding one to a Transaction without: new coordinates + place name)
-// and location_note can ever change; a pin is never removed. Always opens one DB
+// and location_note can change; a pin is never removed. Always opens one DB
 // transaction (plan.md Finding #13), even when amount is unchanged, so the
 // balance adjustments (when present) and the row update never observably
 // split. The insufficient-balance floor does NOT apply here (spec.md
@@ -31,7 +31,7 @@ import (
 // Wallet's new balance").
 func (s *TransactionService) UpdateTransaction(ctx context.Context, userID, transactionID uuid.UUID, req dto.UpdateTransactionRequest) (*model.Transaction, *int64, error) {
 	if !req.HasUpdates() {
-		return nil, nil, common.NewInvalidInputError("at least one of amount, category_id, wallet_id, occurred_at, note, location, or location_note must be provided")
+		return nil, nil, common.NewInvalidInputError("at least one of amount, category_id, wallet_id, type, to_wallet_id, occurred_at, note, location, or location_note must be provided")
 	}
 
 	existing, err := s.getOwnedTransaction(ctx, userID, transactionID)
@@ -42,9 +42,12 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, userID, tran
 		return nil, nil, err
 	}
 
+	// The type the Transaction has after this PATCH: what its Category,
+	// Wallets and Items are checked against.
+	finalType := resultType(existing, req)
 	var categoryName string
 	// A transfer is always filed under the system transfer Category.
-	if req.CategoryID != nil && existing.Type == model.TransactionTypeTransfer {
+	if req.CategoryID != nil && finalType == model.TransactionTypeTransfer {
 		return nil, nil, common.ErrTransferCategoryImmutable
 	}
 	if req.CategoryID != nil {
@@ -52,13 +55,18 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, userID, tran
 		if err != nil {
 			return nil, nil, err
 		}
-		if string(category.Type) != string(existing.Type) {
+		if string(category.Type) != string(finalType) {
 			return nil, nil, common.ErrCategoryTypeMismatch
 		}
 		categoryName = category.Name
 	}
 
-	move, err := s.resolveWalletMove(ctx, userID, existing, req)
+	move, err := s.resolveWalletMove(ctx, userID, existing, req, finalType)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	change, err := s.resolveTypeChange(ctx, userID, existing, req, move)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -77,12 +85,12 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, userID, tran
 		occurredAt = &parsed
 	}
 
-	update, err := resolveLineUpdate(existing, req)
+	update, err := resolveLineUpdate(existing, req, finalType)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	transaction, walletBalance, err := s.updateTransactionTx(ctx, userID, transactionID, existing, req, occurredAt, location, update, move)
+	transaction, walletBalance, err := s.updateTransactionTx(ctx, userID, transactionID, existing, req, occurredAt, location, update, move, change)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -91,6 +99,16 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, userID, tran
 		transaction.WalletName = move.Name
 	}
 	transaction.ToWalletName = existing.ToWalletName
+	if change != nil {
+		transaction.ToWalletName = nil
+		if change.destination != nil {
+			name := change.destination.Name
+			transaction.ToWalletName = &name
+		}
+		if change.category != nil {
+			categoryName = change.category.Name
+		}
+	}
 	if categoryName != "" {
 		transaction.CategoryName = categoryName
 	} else {
@@ -100,8 +118,9 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, userID, tran
 }
 
 // location is resolveLocationUpdate's result (nil parts = unchanged); move is
-// resolveWalletMove's (nil = the Wallet stays).
-func (s *TransactionService) updateTransactionTx(ctx context.Context, userID, transactionID uuid.UUID, existing *model.Transaction, req dto.UpdateTransactionRequest, occurredAt *time.Time, location locationUpdate, update lineUpdate, move *model.Wallet) (*model.Transaction, *int64, error) {
+// resolveWalletMove's (nil = the Wallet stays); change is resolveTypeChange's
+// (nil = the type stays).
+func (s *TransactionService) updateTransactionTx(ctx context.Context, userID, transactionID uuid.UUID, existing *model.Transaction, req dto.UpdateTransactionRequest, occurredAt *time.Time, location locationUpdate, update lineUpdate, move *model.Wallet, change *typeChange) (*model.Transaction, *int64, error) {
 	tx, err := s.repo.BeginTx(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("service.UpdateTransaction: %w", err)
@@ -116,6 +135,12 @@ func (s *TransactionService) updateTransactionTx(ctx context.Context, userID, tr
 		return nil, nil, err
 	}
 	locked := update.needsLock(req)
+	// Everything above was checked against the type read before the tx, and
+	// the balance moves below take their signs from it: a type changed since
+	// (another PATCH) refuses this edit rather than applying it wrongly.
+	if lockedRow.Type != existing.Type || !sameWalletID(lockedRow.ToWalletID, existing.ToWalletID) {
+		return nil, nil, common.ErrTransactionChanged
+	}
 	if lockedRow.Amount != existing.Amount || lockedRow.WalletID != existing.WalletID {
 		fresh := *existing
 		fresh.Amount = lockedRow.Amount
@@ -125,7 +150,12 @@ func (s *TransactionService) updateTransactionTx(ctx context.Context, userID, tr
 
 	// Unconditional — no floor check (spec.md Context #3); the resulting
 	// balances may land at zero or below.
-	walletBalance, err := s.applyBalanceInTx(ctx, tx, existing, req, move)
+	var walletBalance *int64
+	if change != nil {
+		walletBalance, err = s.retypeBalanceInTx(ctx, tx, existing, change.after(existing, req, move))
+	} else {
+		walletBalance, err = s.applyBalanceInTx(ctx, tx, existing, req, move)
+	}
 	if err != nil {
 		return nil, nil, err
 	}
@@ -141,6 +171,16 @@ func (s *TransactionService) updateTransactionTx(ctx context.Context, userID, tr
 	}
 	if move != nil {
 		params.WalletID = &move.ID
+	}
+	if change != nil {
+		to := string(change.to)
+		params.Type = &to
+		if change.destination != nil {
+			params.ToWalletID = &change.destination.ID
+		}
+		if change.category != nil {
+			params.CategoryID = &change.category.ID
+		}
 	}
 	if move := location.Move; move != nil {
 		params.LocationLat = &move.Latitude
@@ -166,6 +206,9 @@ func (s *TransactionService) updateTransactionTx(ctx context.Context, userID, tr
 	// transaction as the row update above (specs/transaction-audit-log/
 	// spec.md US-01, Context #1/#4).
 	auditBefore, auditAfter := auditUpdateDiff(existing, req, occurredAt, location)
+	if change != nil {
+		auditTypeChange(auditBefore, auditAfter, existing, change)
+	}
 	if update.replace {
 		auditBefore["items"] = auditLinesSummary(lineResult.before)
 		auditAfter["items"] = auditLinesSummary(lineResult.final)

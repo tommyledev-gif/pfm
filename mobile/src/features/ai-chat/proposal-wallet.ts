@@ -1,6 +1,6 @@
-import { PROPOSAL_CURRENCY } from "@/lib/constants";
+import { PROPOSAL_CURRENCY, TransactionKind } from "@/lib/constants";
 import { i18n } from "@/lib/i18n";
-import { ChatMessage, TransactionActionPayload } from "@/features/ai-chat/types";
+import { ChatMessage, SavedProposalPatch, TransactionActionPayload } from "@/features/ai-chat/types";
 import { Wallet } from "@/features/wallets/types";
 
 // Locale keys; the components pass them to t().
@@ -78,6 +78,25 @@ export function proposalLinesGap(payload: TransactionActionPayload): number {
     total += direction === "subtract" ? -adjustment.amount : adjustment.amount;
   }
   return total - payload.amount;
+}
+
+/**
+ * The wallet and type part of a saved proposal's PATCH: the wallet it moved
+ * to, and the type it changed to, with a new transfer's destination. Each
+ * only when it changed, since the server moves balances for each.
+ */
+export function savedMovePatch(
+  original: TransactionActionPayload,
+  wallet: Wallet,
+  type: TransactionKind,
+  destination: Wallet | null,
+): SavedProposalPatch {
+  const retyped = type !== original.type;
+  return {
+    ...(wallet.id !== original.wallet_id ? { wallet_id: wallet.id } : {}),
+    ...(retyped ? { type } : {}),
+    ...(retyped && type === "transfer" && destination ? { to_wallet_id: destination.id } : {}),
+  };
 }
 
 /**

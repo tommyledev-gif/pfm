@@ -146,8 +146,10 @@ WHERE (t.user_id = $1 OR (sqlc.arg('wallet_scoped')::bool AND sqlc.narg('wallet_
 
 -- name: UpdateTransaction :one
 -- Partial update via COALESCE, same convention as UpdateWallet/UpdateCategory.
--- type is never a column this query can touch — it isn't a request field at
--- all (spec.md Context #5). wallet_id moves an income/expense Transaction to
+-- type changes the Transaction's type (2026-11-05): NULL leaves type and
+-- to_wallet_id alone; set, it rewrites both, to_wallet_id becoming the given
+-- destination for 'transfer' and NULL otherwise (the service has moved every
+-- balance and picked the matching category_id). wallet_id moves an income/expense Transaction to
 -- another Wallet (2026-10-13): the service has already checked ownership,
 -- the same currency and "not a transfer", and moves both balances in the
 -- same DB transaction. NULL leaves it unchanged.
@@ -179,6 +181,12 @@ SET
     location_name = CASE
         WHEN sqlc.narg('location_lat')::float8 IS NULL THEN location_name
         ELSE NULLIF(sqlc.narg('location_name')::text, '')
+    END,
+    type          = COALESCE(sqlc.narg('type')::text, type),
+    to_wallet_id  = CASE
+        WHEN sqlc.narg('type')::text IS NULL THEN to_wallet_id
+        WHEN sqlc.narg('type')::text = 'transfer' THEN sqlc.narg('to_wallet_id')::uuid
+        ELSE NULL
     END,
     updated_at    = NOW()
 WHERE id = $1

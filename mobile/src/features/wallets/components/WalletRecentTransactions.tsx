@@ -2,6 +2,8 @@ import { useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { SkeletonCrossfade } from "@/components/motion/SkeletonCrossfade";
+import { SKELETON_DELAY_MS } from "@/components/motion/use-content-reveal";
 import { TransactionRow } from "@/components/shared/TransactionRow";
 import { useCategoryLookup } from "@/features/categories/api/use-category-lookup";
 import { Transaction } from "@/features/transactions/types";
@@ -11,7 +13,7 @@ import { Wallet } from "@/features/wallets/types";
 import { isSharedWallet } from "@/features/wallets/wallet-access";
 import { spacing, typography, createStyles } from "@/lib/theme";
 import { OfflinePlaceholder } from "@/components/shared/OfflinePlaceholder";
-import { isWaitingForNetwork } from "@/lib/query-status";
+import { isAwaitingFirstData, isWaitingForNetwork } from "@/lib/query-status";
 import { useLatestCallback } from "@/lib/use-latest-callback";
 
 interface WalletRecentTransactionsProps {
@@ -25,6 +27,12 @@ interface WalletRecentTransactionsProps {
   onSelect?: (transaction: Transaction) => void;
   /** "Xem tất cả" beside the title: the wallet's full list elsewhere. */
   onSeeAll?: () => void;
+  /**
+   * The cards are sliding to another wallet (WalletRecentPanel): the rows
+   * give way to their skeleton at once, and the next wallet's rows replace it
+   * once the cards settle and they have loaded.
+   */
+  switching?: boolean;
 }
 
 // Enough to answer "what moved in this wallet lately" at a glance; the full
@@ -43,7 +51,13 @@ const SHARED_PAGE = 10;
  * when that was someone else, and older ones load as the list nears its end
  * (loadMoreSignal), no "Xem thêm" to tap.
  */
-export function WalletRecentTransactions({ wallet, loadMoreSignal = 0, onSelect, onSeeAll }: WalletRecentTransactionsProps) {
+export function WalletRecentTransactions({
+  wallet,
+  loadMoreSignal = 0,
+  onSelect,
+  onSeeAll,
+  switching = false,
+}: WalletRecentTransactionsProps) {
   const { t } = useTranslation();
   const styles = useStyles();
   const shared = isSharedWallet(wallet);
@@ -59,6 +73,9 @@ export function WalletRecentTransactions({ wallet, loadMoreSignal = 0, onSelect,
   const items = shared
     ? (transactions.data?.pages.flatMap((page) => page.data) ?? [])
     : (transactions.data?.pages[0]?.data ?? []).slice(0, RECENT_LIMIT);
+  // Not isLoading: pending while the saved cache is read back, when the
+  // list used to say "no transactions" before its rows.
+  const loading = isAwaitingFirstData(transactions);
 
   return (
     <View style={styles.section} testID="section-wallet-recent">
@@ -72,31 +89,39 @@ export function WalletRecentTransactions({ wallet, loadMoreSignal = 0, onSelect,
           </Pressable>
         ) : null}
       </View>
-      {transactions.isLoading ? (
-        Array.from({ length: RECENT_LIMIT }).map((_, i) => <TransactionRowSkeleton key={i} />)
-      ) : isWaitingForNetwork(transactions) ? (
-        <OfflinePlaceholder />
-      ) : transactions.isError ? (
-        <Text style={styles.empty}>{t("wallets.recent.error")}</Text>
-      ) : items.length === 0 ? (
-        <Text style={styles.empty}>{t("wallets.recent.empty")}</Text>
-      ) : (
-        items.map((item) => (
-          <View key={item.id}>
-            <TransactionRow
-              transaction={item}
-              currency={wallet.currency}
-              category={categories.get(item.category_id)}
-              onPress={onSelect ? () => onSelect(item) : undefined}
-            />
-            {item.recorded_by ? (
-              <Text style={styles.recorder} numberOfLines={1}>
-                {t("sharedWallets.recordedBy", { name: item.recorded_by.name })}
-              </Text>
-            ) : null}
-          </View>
-        ))
-      )}
+      {/* Straight away while switching (the User just swiped and is
+          watching); after SKELETON_DELAY_MS on a first load, so a fast one
+          never blinks it. */}
+      <SkeletonCrossfade
+        showSkeleton={switching || loading}
+        delayMs={switching ? 0 : SKELETON_DELAY_MS}
+        style={styles.rows}
+        skeleton={Array.from({ length: RECENT_LIMIT }).map((_, i) => <TransactionRowSkeleton key={i} />)}
+      >
+        {loading ? null : isWaitingForNetwork(transactions) ? (
+          <OfflinePlaceholder />
+        ) : transactions.isError ? (
+          <Text style={styles.empty}>{t("wallets.recent.error")}</Text>
+        ) : items.length === 0 ? (
+          <Text style={styles.empty}>{t("wallets.recent.empty")}</Text>
+        ) : (
+          items.map((item) => (
+            <View key={item.id}>
+              <TransactionRow
+                transaction={item}
+                currency={wallet.currency}
+                category={categories.get(item.category_id)}
+                onPress={onSelect ? () => onSelect(item) : undefined}
+              />
+              {item.recorded_by ? (
+                <Text style={styles.recorder} numberOfLines={1}>
+                  {t("sharedWallets.recordedBy", { name: item.recorded_by.name })}
+                </Text>
+              ) : null}
+            </View>
+          ))
+        )}
+      </SkeletonCrossfade>
       {/* The next page arriving, in the shape of what it will be. */}
       {transactions.isFetchingNextPage
         ? Array.from({ length: 2 }).map((_, i) => <TransactionRowSkeleton key={`more-${i}`} />)
@@ -107,6 +132,7 @@ export function WalletRecentTransactions({ wallet, loadMoreSignal = 0, onSelect,
 
 const useStyles = createStyles((colors) => ({
   section: { gap: spacing.xs },
+  rows: { gap: spacing.xs },
   // The link sits on the title's line, as every section header's does (Home).
   titleRow: {
     flexDirection: "row",

@@ -26,6 +26,7 @@ const BOB_DISTANCE = 3;
 const BOB_MS = 520;
 const SETTLE_MS = 150;
 const BAR_HEIGHT = 4;
+const DONE_CHECK_DELAY_MS = 120;
 
 // Lands with the press spring's slight overshoot: a pop, not a fade. Built
 // fresh per call, like motion-tokens' presets (the builders are mutable).
@@ -38,9 +39,8 @@ export const popIn = () =>
 
 /**
  * The upload card's tinted circle: a cloud with an arrow, lifting gently while
- * the upload runs, and a solid green disc with a check popping over it once
- * the server has the file. Reduce motion: the cloud stays still, and the disc
- * appears without the pop (Reanimated's layout animations follow the setting).
+ * the upload runs. Reduce motion: the cloud stays still. The check that ends a
+ * run is UploadDoneCheck, in the middle of the card, not in here.
  */
 export function UploadWell({ phase }: { phase: UploadPhase }) {
   const colors = useColors();
@@ -65,12 +65,33 @@ export function UploadWell({ phase }: { phase: UploadPhase }) {
       <Animated.View style={bobStyle}>
         <CloudArrowUpIcon size={GLYPH_SIZE} color={colors.green} weight="bold" />
       </Animated.View>
-      {phase === "done" ? (
-        <Animated.View entering={popIn()} exiting={exit("fade")} style={styles.doneDisc}>
-          <CheckIcon size={GLYPH_SIZE} color={colors.onGreen} weight="bold" />
-        </Animated.View>
-      ) : null}
     </View>
+  );
+}
+
+/**
+ * The end of a run: a solid green disc with a check, alone in the middle of
+ * the card. No "Đã đổi ảnh" beside it: in a card sized for "Đổi ảnh" that
+ * label was cut off, and the check already says it. Laid over the card, so the
+ * card keeps its size. Reduce motion: it appears without the pop.
+ */
+export function UploadDoneCheck() {
+  const colors = useColors();
+  const styles = useStyles();
+  return (
+    <Animated.View
+      // After the card's contents have mostly faded, not over the "100%".
+      entering={popIn().delay(DONE_CHECK_DELAY_MS)}
+      exiting={exit("fade")}
+      style={styles.doneCenter}
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <View style={styles.doneDisc}>
+        <CheckIcon size={GLYPH_SIZE} color={colors.onGreen} weight="bold" />
+      </View>
+    </Animated.View>
   );
 }
 
@@ -94,10 +115,16 @@ const useStyles = createStyles((colors) => ({
     justifyContent: "center",
     backgroundColor: withAlpha(colors.green, 0.14),
   },
-  doneDisc: {
+  doneCenter: {
     position: "absolute",
-    left: 0,
     top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  doneDisc: {
     width: WELL_SIZE,
     height: WELL_SIZE,
     borderRadius: radii.pill,

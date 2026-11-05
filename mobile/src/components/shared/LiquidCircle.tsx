@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, AppState, AppStateStatus, Easing, Text, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import Svg, { Path } from "react-native-svg";
@@ -12,7 +12,7 @@ import { colors, typography, createStyles } from "@/lib/theme";
 //
 // Neither motion ever rebuilds the path. The surface is drawn once, at the
 // top of a body twice the circle's height, and both movements are native
-// transforms on the view that holds it:
+// transforms, each on its own view (see the ⚠️ at the render):
 //  - translateX: shifted left by exactly one wavelength, WAVE_CYCLES times
 //    each time the ring comes into view (Animated.loop), so it reads as a
 //    scrolling surface that then settles.
@@ -82,7 +82,10 @@ interface LiquidCircleProps {
   topValue: string;
 }
 
-export function LiquidCircle({
+// Memoized: Home's snapshot card re-renders several times in its first second
+// (queries landing, the loading cross-fade, its own measurements), and every
+// render of this one recommitted the animated views underneath it.
+export const LiquidCircle = memo(function LiquidCircle({
   size: outerSize = 180,
   progress,
   color = colors.green,
@@ -191,15 +194,21 @@ export function LiquidCircle({
       ]}
     >
       <View style={[styles.wrapper, { width: size, height: size, borderRadius: size / 2 }]}>
-        <Animated.View
-          style={[
-            styles.wave,
-            { width: waveWidth, height: bodyHeight, transform: [{ translateY }, { translateX: shift }] },
-          ]}
-        >
-          <Svg width={waveWidth} height={bodyHeight}>
-            <Path d={wavePath} fill={color} />
-          </Svg>
+        {/* ⚠️ Level and wave on two views, never one transform. When a native
+            animation ends, RN Animated re-renders its view to hand the final
+            value to React (Fabric), and that commit carries every animated
+            prop of the view at its JS value — which, for one still running,
+            is where it STARTED. With both in one transform, the level settling
+            snapped the wave back to its first position for a frame, and the
+            wave ending mid-spring dropped the liquid to its old level: the
+            ring flickered right after Home appeared, and again on every
+            refetch that moved the level. */}
+        <Animated.View style={[styles.wave, { width: waveWidth, height: bodyHeight, transform: [{ translateY }] }]}>
+          <Animated.View style={{ width: waveWidth, height: bodyHeight, transform: [{ translateX: shift }] }}>
+            <Svg width={waveWidth} height={bodyHeight}>
+              <Path d={wavePath} fill={color} />
+            </Svg>
+          </Animated.View>
         </Animated.View>
         <View style={[styles.label, { width: size * 0.86 }]} pointerEvents="none">
           <View style={styles.scrim}>
@@ -214,7 +223,7 @@ export function LiquidCircle({
       </View>
     </View>
   );
-}
+});
 
 const useStyles = createStyles((colors) => ({
   outline: { alignItems: "center", justifyContent: "center", borderWidth: OUTLINE_WIDTH },

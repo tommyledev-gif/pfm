@@ -1,9 +1,13 @@
 {
   "wallets": {
+    "tab": {
+      "own": "Ví cá nhân",
+      "shared": "Ví chung"
+    },
     "view": {
       "carousel": "Dạng thẻ",
       "list": "Theo nhóm",
-      "shared": "Ví chung"
+      "change": "Đổi cách hiển thị"
     },
     "empty": {
       "title": "Chưa có ví nào",

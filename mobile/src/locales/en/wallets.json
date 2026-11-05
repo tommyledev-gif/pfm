@@ -1,9 +1,13 @@
 {
   "wallets": {
+    "tab": {
+      "own": "Personal",
+      "shared": "Shared"
+    },
     "view": {
       "carousel": "Cards",
       "list": "By type",
-      "shared": "Shared"
+      "change": "Change view"
     },
     "empty": {
       "title": "No wallets yet",

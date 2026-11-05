@@ -1,7 +1,3 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
-
 import { SavingsChoice } from "@/features/budget-wizard/budget-math";
 import { FixedCostItem } from "@/features/budget-wizard/fixed-costs";
 import { BudgetProposalsResponse, PresetKey, ProposalEntry } from "@/features/budget-wizard/types";
@@ -38,6 +34,8 @@ export interface SavedPlanRow {
  * they overruled by hand.
  */
 export interface SavedBudgetPlan {
+  /** Local key (newPlanId). Plans kept before there was a list got one when the store moved to v3. */
+  id: string;
   /** ISO timestamp. Shown to the user, so they can tell a stale plan from a fresh one. */
   savedAt: string;
   currency: string;
@@ -55,129 +53,6 @@ export interface SavedBudgetPlan {
   renamedCategories?: Record<string, string>;
 }
 
-interface SavedPlanState {
-  /** The active User's plan — derived from byUser, kept for the wizard's selectors. */
-  plan: SavedBudgetPlan | null;
-  // False until AsyncStorage has been read back. The wizard checks it before
-  // deciding a user has no saved plan — treating "not loaded yet" as "nothing
-  // saved" would silently start them from zero on a cold launch.
-  hydrated: boolean;
-  /**
-   * One plan per User. AsyncStorage is per device, not per account, and
-   * several accounts can now take turns on one phone
-   * (specs/mobile-account-switch AC-09, S-ASW-14): switching A → B → A must
-   * give A back their plan and never show it to B.
-   */
-  byUser: Record<string, SavedBudgetPlan>;
-  /** A plan saved before plans had an owner (v0/v1 with ownerId null). */
-  unowned: SavedBudgetPlan | null;
-  /** Whose plan `plan` currently is; null while nobody is signed in. */
-  activeUserId: string | null;
-  savePlan: (plan: SavedBudgetPlan) => void;
-  clearPlan: () => void;
-  /**
-   * Hands the store to `userId` (stores/session-scoped-reset.ts, at every
-   * session start or user change). An unowned plan is adopted only when
-   * `adoptUnowned` — a session restored on launch is the same person who
-   * saved it, a fresh login could be anyone.
-   */
-  claimFor: (userId: string, adoptUnowned: boolean) => void;
-  /** Drops a User's plan from this device (saved account removed). */
-  removeUser: (userId: string) => void;
-}
-
-interface PersistedPlanV1 {
-  plan?: SavedBudgetPlan | null;
-  ownerId?: string | null;
-}
-
-interface PersistedPlanV2 {
-  byUser: Record<string, SavedBudgetPlan>;
-  unowned: SavedBudgetPlan | null;
-  activeUserId: string | null;
-}
-
-const PLAN_STORE_VERSION = 2;
-
-// v1 held one slot + its owner; v2 keys plans by User.
-function migratePlan(persisted: unknown, version: number): PersistedPlanV2 {
-  if (version >= PLAN_STORE_VERSION) return persisted as PersistedPlanV2;
-  const v1 = (persisted ?? {}) as PersistedPlanV1;
-  const plan = v1.plan ?? null;
-  const ownerId = v1.ownerId ?? null;
-  return {
-    byUser: plan && ownerId ? { [ownerId]: plan } : {},
-    unowned: plan && !ownerId ? plan : null,
-    activeUserId: ownerId,
-  };
-}
-
-export const useSavedBudgetPlanStore = create<SavedPlanState>()(
-  persist(
-    (set) => ({
-      plan: null,
-      hydrated: false,
-      byUser: {},
-      unowned: null,
-      activeUserId: null,
-      savePlan: (plan) =>
-        set((state) =>
-          state.activeUserId
-            ? { plan, byUser: { ...state.byUser, [state.activeUserId]: plan } }
-            : { plan, unowned: plan },
-        ),
-      clearPlan: () =>
-        set((state) => {
-          if (!state.activeUserId) return { plan: null, unowned: null };
-          const { [state.activeUserId]: _dropped, ...rest } = state.byUser;
-          return { plan: null, byUser: rest };
-        }),
-      claimFor: (userId, adoptUnowned) =>
-        set((state) => {
-          const adopt = adoptUnowned && state.unowned !== null && !state.byUser[userId];
-          const byUser = adopt && state.unowned ? { ...state.byUser, [userId]: state.unowned } : state.byUser;
-          return {
-            activeUserId: userId,
-            byUser,
-            unowned: adopt ? null : state.unowned,
-            plan: byUser[userId] ?? null,
-          };
-        }),
-      removeUser: (userId) =>
-        set((state) => {
-          const { [userId]: _dropped, ...rest } = state.byUser;
-          const isActive = state.activeUserId === userId;
-          return { byUser: rest, plan: isActive ? null : state.plan };
-        }),
-    }),
-    {
-      name: "pfm_budget_plan",
-      storage: createJSONStorage(() => AsyncStorage),
-      version: PLAN_STORE_VERSION,
-      migrate: migratePlan,
-      partialize: (state): PersistedPlanV2 => ({
-        byUser: state.byUser,
-        unowned: state.unowned,
-        activeUserId: state.activeUserId,
-      }),
-      onRehydrateStorage: () => (state) => {
-        // `state` is the store after rehydration — undefined only if reading
-        // storage threw, in which case there is nothing to restore and the
-        // wizard should stop waiting for one.
-        const byUser = state?.byUser ?? {};
-        const activeUserId = state?.activeUserId ?? null;
-        useSavedBudgetPlanStore.setState({
-          hydrated: true,
-          byUser,
-          unowned: state?.unowned ?? null,
-          activeUserId,
-          plan: activeUserId ? (byUser[activeUserId] ?? null) : null,
-        });
-      },
-    },
-  ),
-);
-
 /** "14/09/2026" — what the restored-plan banner and the save button show. */
 export function formatSavedAt(savedAt: string): string {
   const date = new Date(savedAt);
@@ -190,7 +65,7 @@ export function formatSavedAt(savedAt: string): string {
 /** A plan's content, without the moment it was kept — for telling whether two
  *  plans say the same thing (the save button reads "saved" while they do). */
 export function planSignature(plan: SavedBudgetPlan): string {
-  const { savedAt: _savedAt, ...content } = plan;
+  const { savedAt: _savedAt, id: _id, ...content } = plan;
   return JSON.stringify(content);
 }
 

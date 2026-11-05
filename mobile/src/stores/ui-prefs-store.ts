@@ -6,11 +6,14 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import { DEFAULT_LANGUAGE, Language, isLanguage } from "@/locales/languages";
 
 export type HomePeriod = "day" | "month" | "year";
-// The Wallets screen's tabs: the card carousel Home also shows (the
-// default), the vertical list grouped by wallet type, or "shared" — the Ví
-// chung tab, invitations and every shared wallet, kept out of the card stack
-// of the User's own wallets.
-export type WalletsViewMode = "carousel" | "list" | "shared";
+// The Wallets screen's two tabs: the User's own wallets, or "shared" — the
+// Ví chung tab, invitations and every shared wallet, kept out of the card
+// stack of the User's own wallets.
+export type WalletsTab = "own" | "shared";
+// How the own tab draws them, picked from the header's popover: the card
+// carousel Home also shows (the default), or the vertical list grouped by
+// wallet type.
+export type WalletsViewMode = "carousel" | "list";
 
 // Small persisted UI-preferences store — currently just the Home screen's
 // selected Day/Month/Year snapshot period, so it survives navigation and
@@ -26,6 +29,8 @@ interface UiPrefsState {
   // independently of this flag and is never affected by it.
   debugBubbleVisible: boolean;
   setDebugBubbleVisible: (visible: boolean) => void;
+  walletsTab: WalletsTab;
+  setWalletsTab: (tab: WalletsTab) => void;
   walletsViewMode: WalletsViewMode;
   setWalletsViewMode: (mode: WalletsViewMode) => void;
   // Settings' "Ghim vị trí khi tạo giao dịch": where each new Transaction
@@ -47,6 +52,8 @@ export const useUiPrefsStore = create<UiPrefsState>()(
       setHomePeriod: (period) => set({ homePeriod: period }),
       debugBubbleVisible: false, // 1. Sửa mặc định thành false ở đây
       setDebugBubbleVisible: (visible) => set({ debugBubbleVisible: visible }),
+      walletsTab: "own",
+      setWalletsTab: (tab) => set({ walletsTab: tab }),
       walletsViewMode: "carousel",
       setWalletsViewMode: (mode) => set({ walletsViewMode: mode }),
       pinLocationByDefault: true,
@@ -85,8 +92,14 @@ export const useUiPrefsStore = create<UiPrefsState>()(
       // migrate only runs across versions: a v4 store holding a language this
       // build does not have (a newer build's, a hand-edited value) is caught
       // here and read as the default (BR-01).
+      // Also every load: "shared" was a third view mode before the Wallets
+      // screen had two tabs, and reads as that tab with the cards.
       merge: (persisted, current) => {
         const state = { ...current, ...(persisted as Partial<UiPrefsState> | undefined) };
+        if ((state.walletsViewMode as string) === "shared") {
+          state.walletsViewMode = "carousel";
+          state.walletsTab = "shared";
+        }
         return isLanguage(state.language) ? state : { ...state, language: DEFAULT_LANGUAGE };
       },
     },

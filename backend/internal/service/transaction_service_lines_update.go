@@ -33,8 +33,8 @@ type lineEditResult struct {
 
 // resolveLineUpdate runs the shape checks that do not need the DB: PATCH
 // semantics (plan F5), Kind-dependent line rules, the transfer rule and the
-// expected_updated_at format.
-func resolveLineUpdate(existing *model.Transaction, req dto.UpdateTransactionRequest) (lineUpdate, error) {
+// expected_updated_at format. finalType is the type after this PATCH.
+func resolveLineUpdate(existing *model.Transaction, req dto.UpdateTransactionRequest, finalType model.TransactionType) (lineUpdate, error) {
 	update := lineUpdate{}
 	if req.ExpectedUpdatedAt != nil {
 		parsed, err := time.Parse(time.RFC3339Nano, *req.ExpectedUpdatedAt)
@@ -47,6 +47,10 @@ func resolveLineUpdate(existing *model.Transaction, req dto.UpdateTransactionReq
 		if req.Adjustments != nil {
 			return lineUpdate{}, common.NewInvalidInputError("adjustments must be sent together with items")
 		}
+		// A transfer has no lines: becoming one drops any it had.
+		if finalType == model.TransactionTypeTransfer && existing.Type != model.TransactionTypeTransfer {
+			update.replace = true
+		}
 		return update, nil
 	}
 
@@ -58,7 +62,7 @@ func resolveLineUpdate(existing *model.Transaction, req dto.UpdateTransactionReq
 	if err != nil {
 		return lineUpdate{}, err
 	}
-	if existing.Type == model.TransactionTypeTransfer && hasLines(lines) {
+	if finalType == model.TransactionTypeTransfer && hasLines(lines) {
 		return lineUpdate{}, common.ErrItemsNotAllowed
 	}
 	update.replace = true
@@ -70,7 +74,7 @@ func resolveLineUpdate(existing *model.Transaction, req dto.UpdateTransactionReq
 // balance or must detect a stale copy — the cases that take the row lock
 // (plan F1, F17).
 func (u lineUpdate) needsLock(req dto.UpdateTransactionRequest) bool {
-	return req.Amount != nil || req.WalletID != nil || u.replace || u.expectedUpdatedAt != nil
+	return req.Amount != nil || req.WalletID != nil || req.Type != nil || u.replace || u.expectedUpdatedAt != nil
 }
 
 // checkLinesInTx locks the row, refuses a stale edit, and enforces the balance
@@ -81,7 +85,13 @@ func (u lineUpdate) needsLock(req dto.UpdateTransactionRequest) bool {
 func (s *TransactionService) checkLinesInTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, existing *model.Transaction, req dto.UpdateTransactionRequest, update lineUpdate) (repository.TransactionLines, repository.LockedTransaction, error) {
 	transactionID := existing.ID
 	if !update.needsLock(req) {
-		return repository.TransactionLines{}, repository.LockedTransaction{Amount: existing.Amount, UpdatedAt: existing.UpdatedAt, WalletID: existing.WalletID}, nil
+		return repository.TransactionLines{}, repository.LockedTransaction{
+			Amount:     existing.Amount,
+			UpdatedAt:  existing.UpdatedAt,
+			WalletID:   existing.WalletID,
+			Type:       existing.Type,
+			ToWalletID: existing.ToWalletID,
+		}, nil
 	}
 	locked, err := s.repo.LockTransactionForUpdate(ctx, tx, transactionID, userID)
 	if err != nil {

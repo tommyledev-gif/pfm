@@ -1,3 +1,5 @@
+import { TransactionKind } from "@/lib/constants";
+
 // Mirrors backend/internal/dto/audit_log_response.go —
 // GET /transactions/audit-logs (specs/transaction-audit-log/).
 export type AuditAction = "create" | "update" | "delete";
@@ -8,9 +10,12 @@ export type AuditAction = "create" | "update" | "delete";
 // the keys that were in that PATCH body.
 export interface AuditSnapshot {
   wallet_id?: string;
+  // A transfer's destination; on an update, present (null on the side that
+  // was not a transfer) when the type changed to or from one.
+  to_wallet_id?: string | null;
   category_id?: string;
   amount?: number; // integer cents, same unit the API uses everywhere
-  type?: "income" | "expense";
+  type?: TransactionKind;
   note?: string | null;
   occurred_at?: string;
 }

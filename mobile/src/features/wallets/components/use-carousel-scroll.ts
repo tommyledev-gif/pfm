@@ -49,6 +49,8 @@ interface UseCarouselScrollOptions {
   driveReach: number;
   /** A slide (release, arrow, tap) landed on card position `landed`; none if it never started. */
   onDriveEnd: (landed?: number) => void;
+  /** A slide set off (or was re-aimed) toward card position `goal`. */
+  onDriveStart: (goal: number) => void;
   onBeginDrag: () => void;
   /** A let-go swipe is sliding on by itself. */
   onRelease: () => void;
@@ -78,6 +80,7 @@ export function useCarouselScroll({
   maxSlot,
   driveReach,
   onDriveEnd,
+  onDriveStart,
   onBeginDrag,
   onRelease,
 }: UseCarouselScrollOptions) {
@@ -161,6 +164,7 @@ export function useCarouselScroll({
   const startDrive = (goal: number) => {
     "worklet";
     beginDrive(goal);
+    scheduleOnRN(onDriveStart, goal / SNAP_INTERVAL);
     // A re-aim or a drag cut it short: whoever did that owns the scroll now.
     driveX.value = withSpring(goal, DRIVE_SPRING, (finished) => {
       if (finished) land();
@@ -182,6 +186,7 @@ export function useCarouselScroll({
       if (finished) land();
     });
     scheduleOnRN(onRelease);
+    scheduleOnRN(onDriveStart, goal / SNAP_INTERVAL);
   };
 
   /** One card along (the arrows). Pressed again mid-slide, it extends the running slide's goal. */
