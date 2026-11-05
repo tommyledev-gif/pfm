@@ -53,22 +53,30 @@ export function useHomeSnapshot(homePeriod: HomePeriod) {
   // in a single frame and the ring sprang up under them.
   const periodRange = useMemo(() => currentPeriodRange(homePeriod), [homePeriod]);
   const periodSummary = useReportSummaryQuery(periodRange, { keepPrevious: true });
-  // Top categories always reflect the calendar month, independent of the
-  // selector above — a "top categories today" list usually holds one row or
-  // none, which is noise rather than insight.
+  // The day tab ranks the month's categories: a "top categories today" list
+  // usually holds one row or none, which is noise rather than insight.
   const thisMonthRange = useMemo(() => monthRange(0), []);
   const thisMonthSummary = useReportSummaryQuery(thisMonthRange);
   // The trend badge, by contrast, does track the selected period — comparing
   // against yesterday only means anything while the day is selected.
   const previousRange = useMemo(() => previousPeriodRange(homePeriod), [homePeriod]);
   const previousPeriodSummary = useReportSummaryQuery(previousRange, { keepPrevious: true });
+  const switching = [periodSummary, previousPeriodSummary].some((q) => q.isPlaceholderData && !q.isPaused);
+  // ⚠️ A period's figures change together, once BOTH of its requests are in.
+  // They land at different times, and each used to reach the card as it came:
+  // the new period's spending appeared under the old period's name (the ring
+  // springing up, "Vượt ngân sách" showing, in place), then the card slid
+  // over when the second one landed. A flash, then a shake, on every period's
+  // first visit (reproduced on the emulator, 2026-11-05).
   // Offline, the new period's request waits for the network: its stand-in
   // figures are dropped (zeros, as before) rather than shown under its name.
-  const periodData = settledData(periodSummary);
-  const previousPeriodData = settledData(previousPeriodSummary);
-  const switching = [periodSummary, previousPeriodSummary].some((q) => q.isPlaceholderData && !q.isPaused);
-  const shownPeriod = useRef(homePeriod);
-  if (!switching) shownPeriod.current = homePeriod;
+  const latest = { period: homePeriod, data: settledData(periodSummary), previous: settledData(previousPeriodSummary) };
+  const shownRef = useRef(latest);
+  if (!switching) shownRef.current = latest;
+  const shown = shownRef.current;
+  const periodData = shown.data;
+  const previousPeriodData = shown.previous;
+  const shownRange = useMemo(() => currentPeriodRange(shown.period), [shown.period]);
 
   // One currency at a time, switchable on the card (useCurrencyChoice, VND
   // first). It used to be the report's first total — sorted by code, so a
@@ -128,27 +136,34 @@ export function useHomeSnapshot(homePeriod: HomePeriod) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [budgets.data, currency, themeName]);
 
+  // What the right column ranks: the period on the card, so the year tab
+  // lists the year. It always read this month, and with nothing spent yet
+  // this month the year tab said "no spending in this period" beside a ring
+  // over its budget. The day tab keeps the month (see thisMonthSummary).
+  const categorySource = shown.period === "day" ? thisMonthSummary.data : periodData;
   const topCategories = useMemo(() => {
     // Same currency as the rest of the card: a USD row ranked against VND ones
     // compared numbers that mean different things.
     const expenses =
-      thisMonthSummary.data?.by_category.filter((c) => c.type === "expense" && c.currency === currency) ?? [];
+      categorySource?.by_category.filter((c) => c.type === "expense" && c.currency === currency) ?? [];
     return [...expenses].sort((a, b) => b.amount - a.amount).slice(0, TOP_CATEGORIES_COUNT);
-  }, [thisMonthSummary.data, currency]);
+  }, [categorySource, currency]);
 
   // The same currency-matched total the Insights donut divides by, reused so
-  // the compact rows can show a share of the month rather than a currency
+  // the compact rows can show a share of the period rather than a currency
   // string, which is what actually fits that column.
-  const topCategoriesExpenseTotal =
-    thisMonthSummary.data?.totals.find((t) => t.currency === currency)?.total_expense ?? 0;
+  const topCategoriesExpenseTotal = categorySource?.totals.find((t) => t.currency === currency)?.total_expense ?? 0;
 
   return {
     /** The period the figures are for: lags the tapped one until its data lands. */
-    period: shownPeriod.current,
+    period: shown.period,
+    /** The tapped period's figures are still on their way (the card keeps the last ones). */
+    switching,
     currency,
     currencies,
     setCurrency,
-    periodRange,
+    /** The window of the period on the card, for "see all" links. */
+    periodRange: shownRange,
     periodSpent,
     spentDelta: periodSpent - previousPeriodSpent,
     budgetSnapshot,

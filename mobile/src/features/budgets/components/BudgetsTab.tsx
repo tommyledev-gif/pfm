@@ -4,6 +4,7 @@ import Reanimated from "react-native-reanimated";
 import { useTranslation } from "react-i18next";
 
 import { useListEntrance } from "@/components/motion/MotionView";
+import { PeriodSlide } from "@/components/motion/PeriodSlide";
 import { LateSkeleton, SkeletonSwap } from "@/components/motion/SkeletonSwap";
 import { useDimWhile } from "@/components/motion/use-dim-while";
 import { useFabClearance } from "@/components/ui/Fab";
@@ -32,7 +33,6 @@ import { BudgetSummaryCard } from "@/features/budgets/components/BudgetSummaryCa
 import { BudgetPreset, BudgetsEmptyState } from "@/features/budgets/components/BudgetsEmptyState";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { categoryLabel } from "@/features/categories/category-label";
-import { usePeriodSlide } from "@/features/reports/hooks/use-period-slide";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { primaryCurrency } from "@/features/wallets/wallet-totals";
 
@@ -70,9 +70,9 @@ export const BudgetsTab = memo(function BudgetsTab({ initialRange, rangeNonce, o
   // figure the bar showed, rather than re-deriving it and risking disagreement.
   const [detailRow, setDetailRow] = useState<{ budget: Budget; limit: Budget["limits"][number] } | null>(null);
   const [filter, setFilter] = useState<BudgetFilterKey>("all");
-  // The rows slide in from the side of the chip the User moved to — the same
+  // The rows slide in from the side of the tab the User moved to — the same
   // motion Home's Ngày / Tháng / Năm tabs use.
-  const filterSlide = usePeriodSlide(BUDGET_FILTERS.findIndex((f) => f.key === filter));
+  const filterIndex = BUDGET_FILTERS.findIndex((f) => f.key === filter);
 
   // Wallets and categories are refreshed alongside the budgets themselves:
   // the primary currency the whole tab is scaled to comes from wallets, and
@@ -210,7 +210,7 @@ export const BudgetsTab = memo(function BudgetsTab({ initialRange, rangeNonce, o
                   <Animated.View style={rangeDim} onLayout={(e) => (dimTop.current = e.nativeEvent.layout.y)}>
                     <BudgetFilterTabs value={filter} onChange={setFilter} counts={counts} style={styles.tabs} />
 
-                    <Animated.View style={filterSlide} onLayout={(e) => (rowsTop.current = e.nativeEvent.layout.y)}>
+                    <PeriodSlide index={filterIndex} onLayout={(e) => (rowsTop.current = e.nativeEvent.layout.y)}>
                       {visibleRows.length === 0 ? (
                         <Text style={styles.empty}>
                           {rows.length === 0 ? t("budgets.list.emptyCurrency", { currency }) : t("budgets.list.emptyFilter")}
@@ -240,7 +240,7 @@ export const BudgetsTab = memo(function BudgetsTab({ initialRange, rangeNonce, o
                           ))}
                         </View>
                       )}
-                    </Animated.View>
+                    </PeriodSlide>
                   </Animated.View>
                 )}
               </>

@@ -75,6 +75,8 @@ interface LiquidCircleProps {
   size?: number;
   // 0..1 fraction of the circle's height the liquid fills, from the bottom.
   progress: number;
+  /** Where the liquid starts on mount (0..1). Omitted, it fills up from near empty. */
+  startProgress?: number;
   color?: string;
   /** Ring drawn around the circle. Defaults to the liquid color, softened. */
   outlineColor?: string;
@@ -88,6 +90,7 @@ interface LiquidCircleProps {
 export const LiquidCircle = memo(function LiquidCircle({
   size: outerSize = 180,
   progress,
+  startProgress,
   color = colors.green,
   outlineColor,
   topLabel,
@@ -101,9 +104,9 @@ export const LiquidCircle = memo(function LiquidCircle({
   const hump = waveWidth / 2;
   const wavePath = useMemo(() => buildWavePath(waveWidth, bodyHeight), [waveWidth, bodyHeight]);
 
-  // Mounts at MIN_FILL and rises to the real level: the intro fill-up.
+  // Mounts at MIN_FILL (or startProgress) and moves to the real level: the intro.
   const level = useLevelAnimation(clamped, {
-    initial: MIN_FILL,
+    initial: startProgress === undefined ? MIN_FILL : clampLevel(startProgress, MIN_FILL, MAX_FILL),
     floor: MIN_FILL - LEVEL_HEADROOM,
     ceiling: MAX_FILL + LEVEL_HEADROOM,
   });

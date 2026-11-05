@@ -176,7 +176,7 @@ export default function HomeScreen() {
               <HomeSnapshotCard
                 loading={snapshot.loading || deciding}
                 periodIndex={PERIODS.findIndex((p) => p.value === snapshot.period)}
-                isDay={snapshot.period === "day"}
+                switching={snapshot.switching}
                 currency={snapshot.currency}
                 currencies={snapshot.currencies}
                 onChangeCurrency={snapshot.setCurrency}

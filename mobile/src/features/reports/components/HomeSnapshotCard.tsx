@@ -1,8 +1,10 @@
-import { memo, useState } from "react";
+import { memo, useRef, useState } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { PeriodSlide } from "@/components/motion/PeriodSlide";
 import { SKELETON_DELAY_MS, useContentReveal } from "@/components/motion/use-content-reveal";
+import { useDimWhile } from "@/components/motion/use-dim-while";
 import { Card } from "@/components/ui/Card";
 import { LiquidCircle } from "@/components/shared/LiquidCircle";
 import { SnapshotCardSkeleton } from "@/components/shared/SnapshotCardSkeleton";
@@ -14,7 +16,6 @@ import { Category } from "@/features/categories/types";
 import { ReportCategoryEntry } from "@/features/reports/types";
 import { AtRiskBudgetRow } from "@/features/reports/hooks/use-home-snapshot";
 import { HomePeriod } from "@/stores/ui-prefs-store";
-import { usePeriodSlide } from "@/features/reports/hooks/use-period-slide";
 
 // The left column is half the card, so the ring cannot be a fixed size — on
 // a narrow phone that column is narrower than the ring and a hardcoded circle
@@ -34,7 +35,8 @@ const RING_MAX_SIZE = 132;
 interface HomeSnapshotCardProps {
   loading: boolean;
   periodIndex: number; // the active Ngày / Tháng / Năm tab's position — sets the slide's direction
-  isDay: boolean;
+  /** The tapped period's figures are on their way: the card keeps the last ones, dimmed after a moment. */
+  switching: boolean;
   currency: string;
   /** Every currency the card can switch to (SnapshotTopRow). */
   currencies: string[];
@@ -66,7 +68,7 @@ interface HomeSnapshotCardProps {
 export const HomeSnapshotCard = memo(function HomeSnapshotCard({
   loading,
   periodIndex,
-  isDay,
+  switching,
   currency,
   currencies,
   onChangeCurrency,
@@ -98,11 +100,12 @@ export const HomeSnapshotCard = memo(function HomeSnapshotCard({
   // Belt-and-braces for the reserved slots above: the tallest the content has
   // been is kept as its minimum, so no tab can ever make the card shrink.
   const [contentMinHeight, setContentMinHeight] = useState(0);
-  const slideStyle = usePeriodSlide(periodIndex);
+  const dimStyle = useDimWhile(switching);
   // Delayed skeleton: at launch the figures come back from the saved cache
   // within a few hundred ms, and a skeleton shown for that long blinked
   // before the cross-fade. A fast load now fades the figures in once.
   const reveal = useContentReveal(loading, { placeholderDelayMs: SKELETON_DELAY_MS });
+  const isDay = period === "day";
   const isOverBudget = Boolean(budgetSnapshot && periodSpent > budgetSnapshot.limit);
 
   // The figure under the ring is the one the user acts on, and it was rendered
@@ -125,6 +128,13 @@ export const HomeSnapshotCard = memo(function HomeSnapshotCard({
     : budgetSnapshot && budgetSnapshot.limit > 0
       ? periodSpent / budgetSnapshot.limit
       : 0;
+  // Where the ring starts when PeriodSlide remounts it for another period: the
+  // level the last period left, so it rises or falls from there instead of
+  // refilling from empty on every switch. Unset at mount (the intro fill).
+  const lastRing = useRef({ index: periodIndex, progress: ringProgress });
+  const ringFrom = useRef<number | undefined>(undefined);
+  if (lastRing.current.index !== periodIndex) ringFrom.current = lastRing.current.progress;
+  lastRing.current = { index: periodIndex, progress: ringProgress };
 
   return (
     <Card style={styles.card} radius={radii.hero}>
@@ -135,100 +145,103 @@ export const HomeSnapshotCard = memo(function HomeSnapshotCard({
           arrived. Rendering the real thing underneath makes the loading and
           loaded card exactly the same height by construction, and the two
           cross-fade when the data lands (useContentReveal). */}
-      <Animated.View style={slideStyle}>
-        <Animated.View
-          style={[styles.body, reveal.contentStyle]}
-          pointerEvents={loading ? "none" : "auto"}
-          importantForAccessibility={loading ? "no-hide-descendants" : "auto"}
-        >
-          <SnapshotTopRow
-            currency={currency}
-            currencies={currencies}
-            onChangeCurrency={onChangeCurrency}
-            spentDelta={spentDelta}
-            period={period}
-          />
-
-          <View
-            style={[styles.row, { minHeight: contentMinHeight }]}
-            onLayout={(e) => {
-              const height = e.nativeEvent.layout.height;
-              setContentMinHeight((prev) => (height > prev ? height : prev));
-            }}
+      <Animated.View style={dimStyle}>
+        <PeriodSlide index={periodIndex}>
+          <Animated.View
+            style={[styles.body, reveal.contentStyle]}
+            pointerEvents={loading ? "none" : "auto"}
+            importantForAccessibility={loading ? "no-hide-descendants" : "auto"}
           >
+            <SnapshotTopRow
+              currency={currency}
+              currencies={currencies}
+              onChangeCurrency={onChangeCurrency}
+              spentDelta={spentDelta}
+              period={period}
+            />
+
             <View
-              style={styles.left}
+              style={[styles.row, { minHeight: contentMinHeight }]}
               onLayout={(e) => {
-                // A screen out of view can lay out at 0 wide: keep the last real size.
-                const width = Math.round(e.nativeEvent.layout.width);
-                if (width > 0) setRingSize(Math.min(RING_MAX_SIZE, Math.max(RING_MIN_SIZE, width)));
+                const height = e.nativeEvent.layout.height;
+                setContentMinHeight((prev) => (height > prev ? height : prev));
               }}
             >
-              <LiquidCircle
-                size={ringSize}
-                progress={ringProgress}
-                topLabel={t("common.budget.spent")}
-                topValue={formatCurrency(periodSpent, currency)}
-              />
-              {/* Label above value, not on one line — a single inline run
-                  wraps into a ragged three-line block in a column this narrow. */}
-              <Text style={styles.remainingLabel} numberOfLines={1}>
-                {t(isDay ? "home.snapshot.leftToday" : "common.budget.left")}
-              </Text>
-              <Text
-                style={[styles.remainingValue, { color: remainingColor }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.7}
-                testID="text-home-remaining-today"
+              <View
+                style={styles.left}
+                onLayout={(e) => {
+                  // A screen out of view can lay out at 0 wide: keep the last real size.
+                  const width = Math.round(e.nativeEvent.layout.width);
+                  if (width > 0) setRingSize(Math.min(RING_MAX_SIZE, Math.max(RING_MIN_SIZE, width)));
+                }}
               >
-                {isDay
-                  ? remainingToday !== null
-                    ? formatCurrency(remainingToday, currency)
-                    : "—"
-                  : budgetSnapshot
-                    ? formatCurrency(budgetSnapshot.remaining, currency)
-                    : "—"}
-              </Text>
-              {isDay ? (
-                // Said plainly so the figure is not mistaken for a hard cap
-                // — it is the month's remainder spread over the days left.
-                // Rendered empty rather than omitted — see RIGHT_COLUMN_ROWS.
-                <Text style={styles.status} numberOfLines={2}>
-                  {budgetSnapshot ? t("home.snapshot.daysLeft", { count: daysLeft }) : " "}
+                <LiquidCircle
+                  size={ringSize}
+                  progress={ringProgress}
+                  startProgress={ringFrom.current}
+                  topLabel={t("common.budget.spent")}
+                  topValue={formatCurrency(periodSpent, currency)}
+                />
+                {/* Label above value, not on one line — a single inline run
+                    wraps into a ragged three-line block in a column this narrow. */}
+                <Text style={styles.remainingLabel} numberOfLines={1}>
+                  {t(isDay ? "home.snapshot.leftToday" : "common.budget.left")}
                 </Text>
-              ) : budgetSnapshot ? (
-                // In-budget stays muted: the figure above it is already green,
-                // and repeating the colour on the line below it made the two
-                // read as one run of text. Over budget keeps the alarm — that
-                // is the one state worth spending a second colour on.
                 <Text
-                  style={[styles.status, isOverBudget ? { color: colors.peach } : null]}
-                  numberOfLines={2}
+                  style={[styles.remainingValue, { color: remainingColor }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}
+                  testID="text-home-remaining-today"
                 >
-                  {t(isOverBudget ? "home.snapshot.overBudget" : "home.snapshot.withinBudget")}
+                  {isDay
+                    ? remainingToday !== null
+                      ? formatCurrency(remainingToday, currency)
+                      : "—"
+                    : budgetSnapshot
+                      ? formatCurrency(budgetSnapshot.remaining, currency)
+                      : "—"}
                 </Text>
-              ) : (
-                <Text style={styles.status}> </Text>
-              )}
-            </View>
+                {isDay ? (
+                  // Said plainly so the figure is not mistaken for a hard cap
+                  // — it is the month's remainder spread over the days left.
+                  // Rendered empty rather than omitted — see RIGHT_COLUMN_ROWS.
+                  <Text style={styles.status} numberOfLines={2}>
+                    {budgetSnapshot ? t("home.snapshot.daysLeft", { count: daysLeft }) : " "}
+                  </Text>
+                ) : budgetSnapshot ? (
+                  // In-budget stays muted: the figure above it is already green,
+                  // and repeating the colour on the line below it made the two
+                  // read as one run of text. Over budget keeps the alarm — that
+                  // is the one state worth spending a second colour on.
+                  <Text
+                    style={[styles.status, isOverBudget ? { color: colors.peach } : null]}
+                    numberOfLines={2}
+                  >
+                    {t(isOverBudget ? "home.snapshot.overBudget" : "home.snapshot.withinBudget")}
+                  </Text>
+                ) : (
+                  <Text style={styles.status}> </Text>
+                )}
+              </View>
 
-            <SnapshotRightColumn
-              isDay={isDay}
-              atRiskBudgets={atRiskBudgets}
-              topCategories={topCategories}
-              topCategoriesExpenseTotal={topCategoriesExpenseTotal}
-              categoryById={categoryById}
-              onOpenBudgets={onOpenBudgets}
-              onOpenInsights={onOpenInsights}
-            />
-          </View>
-        </Animated.View>
-        {reveal.placeholderMounted ? (
-          <Animated.View style={[StyleSheet.absoluteFill, reveal.placeholderStyle]} pointerEvents="none">
-            <SnapshotCardSkeleton />
+              <SnapshotRightColumn
+                isDay={isDay}
+                atRiskBudgets={atRiskBudgets}
+                topCategories={topCategories}
+                topCategoriesExpenseTotal={topCategoriesExpenseTotal}
+                categoryById={categoryById}
+                onOpenBudgets={onOpenBudgets}
+                onOpenInsights={onOpenInsights}
+              />
+            </View>
           </Animated.View>
-        ) : null}
+          {reveal.placeholderMounted ? (
+            <Animated.View style={[StyleSheet.absoluteFill, reveal.placeholderStyle]} pointerEvents="none">
+              <SnapshotCardSkeleton />
+            </Animated.View>
+          ) : null}
+        </PeriodSlide>
       </Animated.View>
     </Card>
   );
