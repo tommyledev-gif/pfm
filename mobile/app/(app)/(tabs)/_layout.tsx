@@ -3,6 +3,7 @@ import { Animated, Dimensions, Easing } from "react-native";
 import { Href, Tabs, useRouter } from "expo-router";
 
 import { useColors } from "@/lib/theme";
+import { useTabsWarmupStore } from "@/stores/tabs-warmup-store";
 
 // A tab switch slides the screens along the bar's own order — the tab to the
 // right comes in from the right, the one to the left from the left — with a
@@ -13,11 +14,12 @@ import { useColors } from "@/lib/theme";
 const SWITCH_MS = 220;
 const SLIDE = Math.round(Dimensions.get("window").width * 0.2);
 // The tabs other than the one the app opens on, mounted ahead of their first
-// visit once the app has settled, a little apart, in the order they tend to
-// be opened.
+// visit, in the order they tend to be opened.
 const PRELOAD_TABS: Href[] = ["/transactions", "/ai-chat", "/insights", "/settings"];
-const PRELOAD_FIRST_MS = 1500;
-const PRELOAD_GAP_MS = 700;
+// Idle turns of the JS thread in a row, then a beat for native to draw what
+// they left, before the tabs count as warm and the launch splash may go.
+const IDLE_ROUNDS = 2;
+const SETTLE_MS = 120;
 
 type SceneStyle = ReturnType<typeof buildSceneStyle>;
 const sceneStyles = new WeakMap<Animated.Value, SceneStyle>();
@@ -59,13 +61,31 @@ function slideInterpolator({ current }: { current: { progress: Animated.Value } 
 // Mounts each other tab ahead of its first visit (React Navigation's preload,
 // through expo-router's prefetch), so a first tap only switches, instead of
 // building a whole screen while the slide and the nav ball are running.
-function usePreloadTabs() {
+//
+// ⚠️ All at once, at mount, behind the launch splash, which holds until the
+// JS thread has gone quiet after them (useTabsWarmupStore → BrandSplash).
+// They used to mount one by one from 1.5s on, 700ms apart, in front of the
+// user: a tap in the first few seconds landed on a whole screen mounting,
+// and the switch froze, then the new tab flashed through empty, skeleton and
+// data on separate frames.
+function useWarmUpTabs() {
   const router = useRouter();
   useEffect(() => {
-    const timers = PRELOAD_TABS.map((href, index) =>
-      setTimeout(() => router.prefetch(href), PRELOAD_FIRST_MS + index * PRELOAD_GAP_MS),
-    );
-    return () => timers.forEach(clearTimeout);
+    PRELOAD_TABS.forEach((href) => router.prefetch(href));
+    let idle: number | null = null;
+    let settle: ReturnType<typeof setTimeout> | null = null;
+    const waitIdle = (roundsLeft: number) => {
+      idle = requestIdleCallback(() => {
+        idle = null;
+        if (roundsLeft > 1) waitIdle(roundsLeft - 1);
+        else settle = setTimeout(() => useTabsWarmupStore.getState().markWarm(), SETTLE_MS);
+      });
+    };
+    waitIdle(IDLE_ROUNDS);
+    return () => {
+      if (idle !== null) cancelIdleCallback(idle);
+      if (settle) clearTimeout(settle);
+    };
   }, [router]);
 }
 
@@ -94,7 +114,7 @@ const renderNoTabBar = () => null;
 // snapshot card sprang in from its corner each time.
 export default function TabsLayout() {
   const colors = useColors();
-  usePreloadTabs();
+  useWarmUpTabs();
   // Built once per theme: this layout re-renders on every tab switch (its
   // route carries the tab state), and fresh options made the navigator
   // rebuild all five descriptors and re-render every scene's shell for it.

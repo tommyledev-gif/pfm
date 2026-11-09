@@ -170,7 +170,11 @@ function WaveLetter({ char, index, stagger, clock, style, baseColor, highlightCo
   return <Animated.Text style={[style, wave]}>{char}</Animated.Text>;
 }
 
+// ⚠️ The line is bounded by its parent and may shrink; a word never shrinks
+// (it wraps whole to the next line instead). Without these, Yoga measured the
+// wrapping row at its unwrapped width inside the content-sized bubble, and the
+// letters ran out past the bubble's edge (yoga flex shrink trap).
 const styles = StyleSheet.create({
-  line: { flexDirection: "row", flexWrap: "wrap", alignItems: "flex-end" },
-  word: { flexDirection: "row", alignItems: "flex-end" },
+  line: { flexDirection: "row", flexWrap: "wrap", flexShrink: 1, minWidth: 0, maxWidth: "100%", alignItems: "flex-end" },
+  word: { flexDirection: "row", flexShrink: 0, alignItems: "flex-end" },
 });

@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { View } from "react-native";
 import Animated, { ZoomIn } from "react-native-reanimated";
 import { useTranslation } from "react-i18next";
@@ -42,23 +43,37 @@ interface LanguageSheetProps {
 
 // One radio row per language, each written in its own language, so someone
 // who switched by mistake still finds the way back. Applies on tap — no save
-// step, no restart: the sheet slides away under a snapshot of the screen,
-// which dims under a loader until every mounted screen has re-rendered, then
+// step, no restart: the sheet slides away, then the screen is snapshotted and
+// dims under a loader until every mounted screen has re-rendered, then
 // cross-fades like the theme tiles (ThemeTransitionHost).
+//
+// ⚠️ The switch waits for the sheet to be gone (Drawer's onExited). Started
+// on the tap, it snapshotted the sheet halfway down with the dim still up,
+// re-rendered the sheet in the new language beneath that picture, and the
+// dissolve then swapped a half-closed sheet for an empty screen: the sheet
+// shook, then flashed away.
 export function LanguageSheet({ visible, onClose }: LanguageSheetProps) {
   const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
   const language = useUiPrefsStore((s) => s.language);
   const switchLanguage = useSwitchLanguage();
+  // The language tapped, switched to once the sheet has slid away.
+  const picked = useRef<Language | null>(null);
 
   const pick = (code: Language) => {
+    picked.current = code;
     onClose();
-    switchLanguage(code);
+  };
+
+  const onExited = () => {
+    const code = picked.current;
+    picked.current = null;
+    if (code) switchLanguage(code);
   };
 
   return (
-    <Drawer visible={visible} onClose={onClose}>
+    <Drawer visible={visible} onClose={onClose} onExited={onExited}>
       <DrawerHeader
         title={t("userSettings.language.header")}
         actions={[{ label: t("common.action.close"), variant: "secondary", onPress: onClose }]}

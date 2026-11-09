@@ -48,6 +48,10 @@ export const TypingIndicator = memo(function TypingIndicator({ label, testID }: 
 // lifted letters and Vietnamese marks have room inside it.
 const useStyles = createStyles((colors) => ({
   bubble: {
+    // Content-sized but bounded: it hugs a short line and wraps a long one
+    // inside its own edge instead of letting the letters run past it.
+    alignSelf: "flex-start",
+    flexShrink: 1,
     maxWidth: "82%",
     borderRadius: radii.listCard,
     borderBottomLeftRadius: 4,

@@ -22,6 +22,14 @@ import { useTransactionUpdate } from "@/features/transactions/components/use-tra
 import { useFormDrawerChild } from "@/features/transactions/components/use-form-drawer-child";
 import { buildItemsPanelChild } from "@/features/transactions/components/ItemsEditorPanel";
 import { useItemsEditor } from "@/features/transactions/items/use-items-editor";
+import {
+  FormSeed,
+  defaultWalletId,
+  formSeed,
+  seedFromTransactionValues,
+  seedKeyOf,
+  useSeedOnOpen,
+} from "@/features/transactions/components/form-open-seed";
 
 // Until a wallet is picked there is no currency of its own; VND is the app's
 // home currency and the strictest one (no decimals), so nothing typed before
@@ -64,8 +72,6 @@ export function useTransactionForm({ visible, onClose, editingTransaction, editi
   const lines = useItemsEditor(amount);
   const { reset: resetLines, seedLines } = lines;
   const [itemsOpen, setItemsOpen] = useState(false);
-  // Bumped by every reset, so the saved lines are re-applied after it (below).
-  const [seedVersion, setSeedVersion] = useState(0);
   const [note, setNote] = useState("");
   const [occurredAt, setOccurredAt] = useState(todayDateOnly());
   const [datePickerOpen, setDatePickerOpen] = useState(false);
@@ -79,16 +85,17 @@ export function useTransactionForm({ visible, onClose, editingTransaction, editi
   // there (GetTransactionByIdempotencyKey) instead of booking it twice.
   const [idempotencyKey, setIdempotencyKey] = useState(newIdempotencyKey);
 
-  const seedFromTransaction = useCallback((t: Transaction) => {
-    setWalletId(t.wallet_id);
-    setType(t.type);
-    setCategoryId(t.category_id);
-    setToWalletId(t.to_wallet_id);
-    resetAmount(t.amount);
-    resetLines(t.amount, t.items, t.adjustments);
-    setNote(t.note ?? "");
-    setOccurredAt(t.occurred_at.slice(0, 10));
+  const applySeed = useCallback((seed: FormSeed) => {
+    setWalletId(seed.walletId);
+    setType(seed.type);
+    setCategoryId(seed.categoryId);
+    setToWalletId(seed.toWalletId);
+    resetAmount(seed.amountCents);
+    resetLines(seed.amountCents, seed.items, seed.adjustments);
+    setNote(seed.note);
+    setOccurredAt(seed.occurredAt);
   }, [resetAmount, resetLines]);
+  const seedFromTransaction = useCallback((t: Transaction) => applySeed(seedFromTransactionValues(t)), [applySeed]);
 
   const { createTransaction, save, saveQueued, queueing } = useSaveOrQueue();
   const isOnline = useIsOnline();
@@ -101,50 +108,31 @@ export function useTransactionForm({ visible, onClose, editingTransaction, editi
   // Offline before any Wallet was ever loaded: nothing to pick (S-OFF-27).
   const noSavedWallets = !isOnline && !wallets.data?.length;
 
-  useEffect(() => {
-    if (!visible) return;
-    if (editingTransaction) {
-      seedFromTransaction(editingTransaction);
-    } else if (editingQueued) {
-      const queued = editingQueued.payload;
-      setWalletId(queued.wallet_id);
-      setType(queued.type);
-      setCategoryId(queued.category_id ?? null);
-      setToWalletId(queued.to_wallet_id ?? null);
-      resetAmount(queued.amount);
-      resetLines(queued.amount, queued.items, queued.adjustments);
-      setNote(queued.note ?? "");
-      setOccurredAt(queued.occurred_at ?? todayDateOnly());
-    } else {
-      const defaultWallet = wallets.data?.find((w) => w.is_default) ?? wallets.data?.[0];
-      setWalletId(defaultWallet?.id ?? null);
-      setType("expense");
-      setCategoryId(null);
-      setToWalletId(null);
-      resetAmount(draft?.amountCents ?? null);
-      resetLines(draft?.amountCents ?? null);
-      setNote(draft?.note ?? "");
-      setOccurredAt(todayDateOnly());
-    }
+  // Seeded during render, before the first frame is drawn (useSeedOnOpen).
+  useSeedOnOpen(seedKeyOf(visible, { editingTransaction, editingQueued, draft }), (freshOpen) => {
+    applySeed(formSeed({ editingTransaction, editingQueued, draft, wallets: wallets.data, detail }));
     setSubmitAttempted(false);
     setItemsOpen(false);
-    setSeedVersion((v) => v + 1);
-  }, [visible, editingTransaction, editingQueued, draft, wallets.data, resetAmount, resetLines, seedFromTransaction]);
+    // Only on a true open: a fresh note input and a fresh create key.
+    if (freshOpen) {
+      setFormKey((k) => k + 1);
+      setIdempotencyKey(newIdempotencyKey());
+    }
+  });
 
-  // ⚠️ A list row carries no lines; the detail brings them (plan F4). Re-applied
-  // after every reset too, or a background wallets refetch would blank them.
+  // A new one opened before the wallet list had loaded: its default wallet
+  // once the list is in, without touching anything else already typed.
+  useEffect(() => {
+    if (!visible || editingTransaction || editingQueued || walletId) return;
+    const id = defaultWalletId(wallets.data);
+    if (id) setWalletId(id);
+  }, [visible, editingTransaction, editingQueued, walletId, wallets.data]);
+
+  // ⚠️ Lines that arrive after open: a list row carries none; the detail
+  // brings them (plan F4). Ignored once the User edited lines (seedLines).
   useEffect(() => {
     if (visible && detail && detail.id === editingTransaction?.id) seedLines(detail.items, detail.adjustments);
-  }, [visible, detail, editingTransaction?.id, seedLines, seedVersion]);
-
-  // Separate from the reset above on purpose: that effect also re-runs whenever `wallets.data`
-  // refetches in the background — bumping the remount key there too would yank focus out from
-  // under anyone still typing the note. This one only fires on the true open transition.
-  useEffect(() => {
-    if (!visible) return;
-    setFormKey((k) => k + 1);
-    setIdempotencyKey(newIdempotencyKey());
-  }, [visible]);
+  }, [visible, detail, editingTransaction?.id, seedLines]);
 
   const amountCents = amount.cents;
   const amountInvalid = (cents: number | null) => cents === null || cents <= 0;

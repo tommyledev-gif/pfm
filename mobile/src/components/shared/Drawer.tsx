@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
-import { Animated, BackHandler, Dimensions, Easing, Keyboard, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Animated, BackHandler, Dimensions, Keyboard, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import Reanimated, { LinearTransition } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
@@ -9,6 +9,7 @@ import { SheetHandle } from "@/components/shared/SheetHandle";
 import { useScrollEnd } from "@/components/shared/use-scroll-end";
 import { useOverlayOrigin } from "@/components/shared/use-overlay-origin";
 import { useSheetDrag } from "@/components/shared/use-sheet-drag";
+import { OFFSCREEN_Y, useDrawerMotion } from "@/components/shared/use-drawer-motion";
 import { radii, spacing, createStyles } from "@/lib/theme";
 import { useKeyboardHeight } from "@/lib/use-keyboard-height";
 import { useSheetStore } from "@/stores/sheet-store";
@@ -25,6 +26,8 @@ interface DrawerProps {
   child?: DrawerChild;
   /** The body's bottom comes within reach (useScrollEnd): load the next page. */
   onEndReached?: () => void;
+  /** The close slide has finished and the sheet is gone from the screen. */
+  onExited?: () => void;
 }
 
 // Bottom-sheet chrome for every form and picker: dimmed backdrop that closes
@@ -37,25 +40,13 @@ interface DrawerProps {
 // Losing <Modal> also loses the back button and painting above BottomNav;
 // BackHandler and useSheetStore (which hides the nav) cover both.
 //
-// Slide distance only has to clear the screen, so it is the window height.
-const OFFSCREEN_Y = Dimensions.get("window").height;
-// ⚠️ Closing slides the sheet down by its own height (plus a margin), on an
-// even curve, while the dim fades with it. It used to travel the whole
-// window height on an ease-out in 280ms: a short sheet left the screen in
-// its first few dozen ms, so a tap outside read as the sheet being cut off.
-const CLOSE_MS = 320;
-const CLOSE_EASING = Easing.bezier(0.25, 0.1, 0.25, 1);
-const CLOSE_MARGIN = 48;
-// ⚠️ Opening mirrors that: up from just below the screen's edge, critically
-// damped and clamped, so it lands without passing its height. It used to come
-// the whole window height on a bouncy spring: a short sheet crossed most of
-// that unseen, arrived at speed and rose ~24px past its height before
-// settling back — "too high, then snaps down".
-const OPEN_SPRING = { stiffness: 260, damping: 32, mass: 1, overshootClamping: true, useNativeDriver: true };
-// Every change of the sheet's height while open (rows landing in place of a
-// skeleton, the handle's full-screen toggle, the keyboard) glides instead of
-// jumping. Reanimated's, not LayoutAnimation: it takes the new frame on the
-// UI thread before it is drawn, so the old height never flashes first.
+// The slide and the dim live in useDrawerMotion.
+//
+// Every change of the sheet's height once it is open (rows landing in place
+// of a skeleton, the handle's full-screen toggle, the keyboard) glides instead
+// of jumping. Reanimated's, not LayoutAnimation: it takes the new frame on the
+// UI thread before it is drawn, so the old height never flashes first. Not
+// during the open or close slide (useDrawerMotion's `settled`).
 const SHEET_RESIZE = LinearTransition.springify().damping(30).stiffness(260).mass(1);
 
 const claimTouch = () => true;
@@ -77,6 +68,7 @@ export function Drawer(props: DrawerProps) {
       startOpen={startOpen.current}
       onExited={() => {
         startOpen.current = false;
+        props.onExited?.();
         setRendered(false);
       }}
     />
@@ -96,51 +88,15 @@ function DrawerSheet({ visible, onClose, children, footer, child, onEndReached, 
   // the keyboard, when up, covers that strip and lifts the sheet anyway.
   const { bottom: bottomInset, top: topInset } = useSafeAreaInsets();
   const navPad = keyboardHeight > 0 ? 0 : bottomInset;
-  const translateY = useRef(new Animated.Value(startOpen ? 0 : OFFSCREEN_Y)).current;
-  const backdropOpacity = useRef(new Animated.Value(startOpen ? 1 : 0)).current;
+  // Unmounting on exit resets the drag too: every open starts at resting height.
+  const { translateY, dimOpacity, settled, onSheetHeight } = useDrawerMotion({ visible, startOpen, onExited });
   // Grab-handle drag: down past half the height closes, up expands to max.
   const drag = useSheetDrag({ translateY, onClose });
-  // The sheet's last measured height: how far closing has to slide it.
-  const sheetHeight = useRef(0);
-  // An open waiting for the sheet's first layout: only that says how far
-  // below the edge the slide starts. `slidIn`: it has started once already,
-  // so a reopen mid-close goes on from where the sheet is.
-  const pendingOpen = useRef(false);
-  const slidIn = useRef(startOpen);
   const scrollEnd = useScrollEnd(onEndReached);
 
   // The overlay's offset to the real window edges (useOverlayOrigin).
   const { anchorRef, origin, measureAnchor } = useOverlayOrigin(visible);
   const windowSize = Dimensions.get("window");
-
-  const slideIn = () => {
-    pendingOpen.current = false;
-    if (!slidIn.current) translateY.setValue(sheetHeight.current + CLOSE_MARGIN);
-    slidIn.current = true;
-    Animated.spring(translateY, { toValue: 0, ...OPEN_SPRING }).start();
-  };
-
-  useEffect(() => {
-    if (visible) {
-      Animated.timing(backdropOpacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
-      if (sheetHeight.current > 0) slideIn();
-      else pendingOpen.current = true;
-    } else {
-      Animated.parallel([
-        Animated.timing(backdropOpacity, { toValue: 0, duration: CLOSE_MS, useNativeDriver: true }),
-        Animated.timing(translateY, {
-          toValue: sheetHeight.current > 0 ? sheetHeight.current + CLOSE_MARGIN : OFFSCREEN_Y,
-          duration: CLOSE_MS,
-          easing: CLOSE_EASING,
-          useNativeDriver: true,
-        }),
-      ]).start(({ finished }) => {
-        // Unmounting resets the drag too: every open starts at resting height.
-        if (finished) onExited();
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
 
   // Read through a ref, so the back handler is not rebuilt per child toggle.
   const childRef = useRef(child);
@@ -176,11 +132,11 @@ function DrawerSheet({ visible, onClose, children, footer, child, onEndReached, 
             overlay, sheet included, so closing faded the sheet out in 180ms
             while it was meant to be sliding down: a tap outside read as the
             sheet vanishing on the spot. */}
-        <Animated.View pointerEvents="none" style={[styles.dim, { opacity: backdropOpacity }]} />
+        <Animated.View pointerEvents="none" style={[styles.dim, { opacity: dimOpacity }]} />
         <Pressable style={[styles.backdrop, { paddingBottom: keyboardHeight }]} onPress={onClose} accessibilityLabel={t("common.action.close")}>
           {/* The frame (height, top) glides on this one (SHEET_RESIZE); the
               slide and the drag move the one inside it. */}
-          <Reanimated.View layout={SHEET_RESIZE} style={[styles.sheetTouchArea, drag.expanded && styles.sheetTouchAreaExpanded]}>
+          <Reanimated.View layout={settled ? SHEET_RESIZE : undefined} style={[styles.sheetTouchArea, drag.expanded && styles.sheetTouchAreaExpanded]}>
             <Animated.View style={[styles.sheetSlide, drag.expanded && styles.sheetSlideExpanded, { transform: [{ translateY }] }]}>
               {/* Under the sheet, in its colour: pulling the sheet up lifts it
                   off the bottom edge for a moment (use-sheet-drag's rubber
@@ -190,8 +146,7 @@ function DrawerSheet({ visible, onClose, children, footer, child, onEndReached, 
               <Pressable
                 onPress={() => {}}
                 onLayout={(event) => {
-                  sheetHeight.current = event.nativeEvent.layout.height;
-                  if (pendingOpen.current) slideIn();
+                  onSheetHeight(event.nativeEvent.layout.height);
                   drag.onSheetLayout(event);
                 }}
                 // Full screen reaches the very top edge, under the status bar,
@@ -227,7 +182,7 @@ function DrawerSheet({ visible, onClose, children, footer, child, onEndReached, 
           </Reanimated.View>
         </Pressable>
         {child ? (
-          <Animated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { opacity: backdropOpacity }]}>
+          <Animated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { opacity: dimOpacity }]}>
             <DrawerChildPanel
               {...child}
               width={windowSize.width}
@@ -246,7 +201,8 @@ function DrawerSheet({ visible, onClose, children, footer, child, onEndReached, 
 const useStyles = createStyles((colors) => ({
   anchor: { position: "absolute", left: 0, top: 0, width: 0, height: 0 },
   overlay: { position: "absolute", zIndex: 1000, elevation: 1000 },
-  dim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.6)" },
+  // Softer than it was (0.6): it now comes in with the sheet, not ahead of it.
+  dim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.5)" },
   backdrop: { flex: 1, justifyContent: "flex-end" },
   // Resting: never past 92%, which always clears the status bar.
   sheetTouchArea: { maxHeight: "92%" },

@@ -26,6 +26,7 @@ import { installSessionScopedReset } from "@/stores/session-scoped-reset";
 import { useSessionStore } from "@/stores/session-store";
 import { useThemeStore } from "@/stores/theme-store";
 import { useUiPrefsHydrated } from "@/stores/ui-prefs-store";
+import { useTabsWarmupStore } from "@/stores/tabs-warmup-store";
 import { installOutboxSync } from "@/features/transactions/outbox/install-outbox-sync";
 import { useAccountRegistryStore } from "@/features/accounts/account-registry-store";
 import { useSwitchProgressStore } from "@/features/accounts/switch-progress-store";
@@ -61,6 +62,8 @@ const SPLASH_FAILSAFE_MS = 5000;
 setTimeout(() => {
   SplashScreen.hideAsync().catch(() => {});
 }, SPLASH_FAILSAFE_MS);
+// Longest the JS splash waits for the tabs to warm up once signed in.
+const TABS_WARMUP_FAILSAFE_MS = 3000;
 
 // Root layout — providers + the top-level authenticated/unauthenticated
 // split, mirrors frontend/'s middleware.ts route-protection role and
@@ -111,6 +114,18 @@ export default function RootLayout() {
   const hasSession = useSessionStore((s) => s.accessToken !== null);
   const hydrate = useSessionStore((s) => s.hydrate);
   const hydrateAccounts = useAccountRegistryStore((s) => s.hydrate);
+  // Signed in: the splash also waits for the five tabs to mount beneath it
+  // ((tabs)/_layout.tsx), so none mounts while the user is tapping the nav.
+  const tabsWarm = useTabsWarmupStore((s) => s.warm);
+  const splashReady = isHydrated && (!hasSession || tabsWarm);
+
+  // A slow device, or a launch that opens somewhere the tabs never mount,
+  // must not be held on the splash: it goes after this either way.
+  useEffect(() => {
+    if (!isHydrated || !hasSession || tabsWarm) return;
+    const failsafe = setTimeout(() => useTabsWarmupStore.getState().markWarm(), TABS_WARMUP_FAILSAFE_MS);
+    return () => clearTimeout(failsafe);
+  }, [isHydrated, hasSession, tabsWarm]);
 
   // Session tokens live in secure storage, read asynchronously — isHydrated
   // distinguishes "still checking" from "checked, no session" so the guard
@@ -159,7 +174,7 @@ export default function RootLayout() {
           {/* An APK too old for the published updates blocks every screen,
               login included, until the newest one is installed. */}
           {isHydrated ? <NativeUpdateDialog /> : null}
-          <BrandSplash ready={isHydrated} />
+          <BrandSplash ready={splashReady} />
           <ThemeTransitionHost />
         </QueryClientProvider>
       </ThemeProvider>
