@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useLocalSearchParams } from "expo-router";
+import { useTabParams } from "@/lib/tab-route-params";
 
 import { Wallet } from "@/features/wallets/types";
 
@@ -16,7 +16,7 @@ interface WalletFilterTarget {
  * wallet's own currency with it (a USD wallet under the VND default is empty).
  */
 export function useWalletFilterParam(filters: WalletFilterTarget, wallets: Wallet[] | undefined, resetSort: () => void) {
-  const { walletId, walletFilterAt } = useLocalSearchParams<{ walletId?: string; walletFilterAt?: string }>();
+  const { walletId, walletFilterAt } = useTabParams<{ walletId?: string; walletFilterAt?: string }>();
   const applied = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!walletId || !walletFilterAt || applied.current === walletFilterAt || !wallets) return;

@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
-import { useLocalSearchParams } from "expo-router";
 import { useTranslation } from "react-i18next";
 
+import { useTabParams, withTabParams } from "@/lib/tab-route-params";
 import { Screen } from "@/components/shared/Screen";
 import { Fab } from "@/components/ui/Fab";
 import { monthRange } from "@/lib/date-range";
@@ -46,7 +46,7 @@ const NO_CATEGORIES: Category[] = [];
 const NO_WALLETS: Wallet[] = [];
 const NO_SECTIONS: DaySection[] = [];
 
-export default function TransactionsScreen() {
+function TransactionsScreen() {
   const { t } = useTranslation();
   const styles = useStyles();
   const wallets = useWalletsQuery();
@@ -64,7 +64,7 @@ export default function TransactionsScreen() {
   const { collapsedDays, foldingDays } = days;
   // Set by "Xem trong Giao dịch": scroll to that row and flash a border on
   // it. `focusedAt` is a nonce, so the same row can be jumped to twice.
-  const { focusTransactionId, focusDay, focusedAt } = useLocalSearchParams<{
+  const { focusTransactionId, focusDay, focusedAt } = useTabParams<{
     focusTransactionId?: string;
     focusDay?: string;
     focusedAt?: string;
@@ -298,3 +298,6 @@ const useStyles = createStyles((colors) => ({
   // No gap: each cell spaces itself — see DaySectionList.
   content: { paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: 140 },
 }));
+
+// Through withTabParams, not memo alone: see src/lib/tab-route-params.tsx.
+export default withTabParams(TransactionsScreen);

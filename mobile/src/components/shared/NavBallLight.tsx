@@ -43,8 +43,6 @@ interface NavBallLightProps {
   ballX: Animated.Value;
   /** The ball's idle float, 0 seated → 1 raised. */
   bob: Animated.AnimatedInterpolation<number>;
-  /** Hides the light with the ball until the tab row is measured. */
-  opacity: Animated.Value;
 }
 
 /**
@@ -58,52 +56,56 @@ interface NavBallLightProps {
  * itself. The light theme keeps the plain ball: on white this reads as a
  * smudge.
  */
-export const NavBallLight = memo(function NavBallLight({ ballX, bob, opacity }: NavBallLightProps) {
+export const NavBallLight = memo(function NavBallLight({ ballX, bob }: NavBallLightProps) {
   const colors = useColors();
   const { isDark } = useThemeDefinition();
   // Built once: a new node on a native-driven view resets it for a frame.
-  const lit = useMemo(
-    () => ({
-      opacity: Animated.multiply(opacity, bob.interpolate({ inputRange: [0, 1], outputRange: [1, RAISED_INTENSITY] })),
-      transform: [{ translateX: ballX }],
-    }),
-    [opacity, bob, ballX],
+  // One animated value per view (see useNavBallMotion): the box slides with
+  // ballX, the light inside it breathes with the bob. Hidden until the ball
+  // is placed by BottomNav's reveal layer, which this sits in.
+  const slide = useMemo(() => ({ transform: [{ translateX: ballX }] }), [ballX]);
+  const breathe = useMemo(
+    () => ({ opacity: bob.interpolate({ inputRange: [0, 1], outputRange: [1, RAISED_INTENSITY] }) }),
+    [bob],
   );
   if (!isDark) return null;
 
   const glow = colors.navGlow;
 
   return (
-    <Animated.View pointerEvents="none" style={[styles.box, lit]}>
-      <Svg width={WIDTH} height={PILL_HEIGHT}>
-        <Defs>
-          <RadialGradient id="glow" gradientUnits="userSpaceOnUse" cx={CX} cy={GLOW_CY} rx={GLOW_RX} ry={GLOW_RY}>
-            <Stop offset="0" stopColor={glow} stopOpacity={0.22} />
-            <Stop offset="0.5" stopColor={glow} stopOpacity={0.08} />
-            <Stop offset="1" stopColor={glow} stopOpacity={0} />
-          </RadialGradient>
-          <RadialGradient id="beam" gradientUnits="userSpaceOnUse" cx={CX} cy={SOURCE_Y} rx={BEAM_RX} ry={BEAM_RY}>
-            <Stop offset="0" stopColor={glow} stopOpacity={0.5} />
-            <Stop offset="0.6" stopColor={glow} stopOpacity={0.18} />
-            <Stop offset="1" stopColor={glow} stopOpacity={0.02} />
-          </RadialGradient>
-          <RadialGradient id="rim" gradientUnits="userSpaceOnUse" cx={CX} cy={HOLLOW_DEPTH} r={RIM_GLOW_R}>
-            <Stop offset="0" stopColor={glow} stopOpacity={0.95} />
-            <Stop offset="0.45" stopColor={glow} stopOpacity={0.45} />
-            <Stop offset="1" stopColor={glow} stopOpacity={0} />
-          </RadialGradient>
-        </Defs>
-        <Ellipse cx={CX} cy={GLOW_CY} rx={GLOW_RX} ry={GLOW_RY} fill="url(#glow)" />
-        <Path d={HOLLOW} fill="url(#beam)" />
-        {/* A faint wide pass under a thin bright one: the rim reads as a
-            reflective edge, not a painted line. */}
-        <Path d={RIM} stroke="url(#rim)" strokeWidth={3} strokeOpacity={0.3} fill="none" />
-        <Path d={RIM} stroke="url(#rim)" strokeWidth={1.2} fill="none" />
-      </Svg>
+    <Animated.View pointerEvents="none" style={[styles.box, slide]}>
+      <Animated.View style={[styles.fill, breathe]}>
+        <Svg width={WIDTH} height={PILL_HEIGHT}>
+          <Defs>
+            <RadialGradient id="glow" gradientUnits="userSpaceOnUse" cx={CX} cy={GLOW_CY} rx={GLOW_RX} ry={GLOW_RY}>
+              <Stop offset="0" stopColor={glow} stopOpacity={0.22} />
+              <Stop offset="0.5" stopColor={glow} stopOpacity={0.08} />
+              <Stop offset="1" stopColor={glow} stopOpacity={0} />
+            </RadialGradient>
+            <RadialGradient id="beam" gradientUnits="userSpaceOnUse" cx={CX} cy={SOURCE_Y} rx={BEAM_RX} ry={BEAM_RY}>
+              <Stop offset="0" stopColor={glow} stopOpacity={0.5} />
+              <Stop offset="0.6" stopColor={glow} stopOpacity={0.18} />
+              <Stop offset="1" stopColor={glow} stopOpacity={0.02} />
+            </RadialGradient>
+            <RadialGradient id="rim" gradientUnits="userSpaceOnUse" cx={CX} cy={HOLLOW_DEPTH} r={RIM_GLOW_R}>
+              <Stop offset="0" stopColor={glow} stopOpacity={0.95} />
+              <Stop offset="0.45" stopColor={glow} stopOpacity={0.45} />
+              <Stop offset="1" stopColor={glow} stopOpacity={0} />
+            </RadialGradient>
+          </Defs>
+          <Ellipse cx={CX} cy={GLOW_CY} rx={GLOW_RX} ry={GLOW_RY} fill="url(#glow)" />
+          <Path d={HOLLOW} fill="url(#beam)" />
+          {/* A faint wide pass under a thin bright one: the rim reads as a
+              reflective edge, not a painted line. */}
+          <Path d={RIM} stroke="url(#rim)" strokeWidth={3} strokeOpacity={0.3} fill="none" />
+          <Path d={RIM} stroke="url(#rim)" strokeWidth={1.2} fill="none" />
+        </Svg>
+      </Animated.View>
     </Animated.View>
   );
 });
 
 const styles = StyleSheet.create({
   box: { position: "absolute", top: 0, left: BALL_SIZE / 2 - HALF_WIDTH, width: WIDTH, height: PILL_HEIGHT },
+  fill: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
 });

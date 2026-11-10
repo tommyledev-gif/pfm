@@ -153,12 +153,18 @@ export const useStyles = createStyles((colors) => ({
   // opaque. They pop together, in one box the size of the ball.
   ballIcons: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" },
   ballIcon: { position: "absolute" },
+  // The ball's layers, one animated value each (see useNavBallMotion): the
+  // reveal fade over everything that rides the ball, the slot sliding along
+  // the bar, the bob inside it, the squashing body inside that.
+  revealLayer: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
+  ballSlot: { position: "absolute", left: 0, top: BALL_TOP, width: BALL_SIZE, height: BALL_SIZE },
+  ballFill: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
   ball: {
     position: "absolute",
+    top: 0,
     left: 0,
-    top: BALL_TOP,
-    width: BALL_SIZE,
-    height: BALL_SIZE,
+    right: 0,
+    bottom: 0,
     borderRadius: BALL_SIZE / 2,
     backgroundColor: colors.green,
     alignItems: "center",

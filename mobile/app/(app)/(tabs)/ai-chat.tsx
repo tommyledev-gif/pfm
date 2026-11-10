@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Keyboard, StyleSheet, View } from "react-native";
 import Animated from "react-native-reanimated";
-import { useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useTabParams, withTabParams } from "@/lib/tab-route-params";
 import { entrance } from "@/components/motion/motion-tokens";
 import { Screen } from "@/components/shared/Screen";
 import { closeParkedSwipeRow } from "@/components/shared/use-swipe-actions";
@@ -36,7 +36,7 @@ import { useLatestCallback } from "@/lib/use-latest-callback";
 import { useChatStore, useChatThreadRestored } from "@/stores/chat-store";
 import { useCurrentUserId } from "@/stores/use-current-user-id";
 
-export default function AiChatScreen() {
+function AiChatScreen() {
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
@@ -63,7 +63,7 @@ export default function AiChatScreen() {
   const overlays = useChatOverlays();
   const afterTabSwitch = useAfterTabSwitch();
 
-  const { focusMessageId, focusedAt, openEdit } = useLocalSearchParams<{
+  const { focusMessageId, focusedAt, openEdit } = useTabParams<{
     focusMessageId?: string;
     focusedAt?: string;
     openEdit?: string;
@@ -291,3 +291,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   pane: { flex: 1 },
 });
+
+// Through withTabParams, not memo alone: see src/lib/tab-route-params.tsx.
+export default withTabParams(AiChatScreen);

@@ -7,9 +7,9 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
-import { useLocalSearchParams } from "expo-router";
 import { useTranslation } from "react-i18next";
 
+import { useTabParams, withTabParams } from "@/lib/tab-route-params";
 import { MotionHighlight, useOptionRects } from "@/components/motion/MotionHighlight";
 import { ENTER_OFFSET, SPRING } from "@/components/motion/motion-tokens";
 import { Screen } from "@/components/shared/Screen";
@@ -29,14 +29,14 @@ type SubTab = (typeof SUB_TABS)[number]["key"];
 const UNDERLINE_HEIGHT = 2;
 const LABEL_FADE_MS = 180;
 
-export default function InsightsScreen() {
+function InsightsScreen() {
   const { t } = useTranslation();
   const styles = useStyles();
   const reduceMotion = useReduceMotion();
   // From a budget notification (categoryId) or Home's "sắp vượt" list (tab +
   // from/to). Read on the first render too, so a deep link never mounts the
   // other tab first.
-  const { categoryId, focusedAt, tab: tabParam, from, to } = useLocalSearchParams<{
+  const { categoryId, focusedAt, tab: tabParam, from, to } = useTabParams<{
     categoryId?: string;
     focusedAt?: string;
     tab?: string;
@@ -169,3 +169,6 @@ const useStyles = createStyles((colors) => ({
   body: { flex: 1 },
   hidden: { display: "none" },
 }));
+
+// Through withTabParams, not memo alone: see src/lib/tab-route-params.tsx.
+export default withTabParams(InsightsScreen);

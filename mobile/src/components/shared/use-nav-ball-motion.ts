@@ -73,6 +73,39 @@ const iconInEasing = (t: number) => (t <= ICON_IN_LEAD ? 0 : easeInOut((t - ICON
 const timing = (value: Animated.Value, toValue: number, duration: number, easing = easeInOut) =>
   Animated.timing(value, { toValue, duration, easing, useNativeDriver: true });
 
+// Which run of each value is the latest, so a late "finished" from an older
+// one never resets a value a newer run is animating.
+const runIds = new WeakMap<Animated.Value, number>();
+
+/**
+ * Starts a native animation of `value` towards `to` without RN's end sync,
+ * then syncs it once itself, only when the run comes to rest.
+ *
+ * ⚠️ RN's end sync is what made the ball jump back on a quick second tap
+ * (2026-11-10). Starting a run stops the one in flight, and RN then writes the
+ * value it stopped at into the JS side and re-renders every view using it
+ * (Animation.js). With JS busy with the first tap's navigation, that
+ * re-render only commits hundreds of ms later, when the new run has long
+ * moved on: the ball, an icon or a squash showed the stopped run's value for
+ * a frame. `isLooping`, start()'s second argument (internal, not in the
+ * types; Animated.loop passes it), skips that re-render; the JS value is
+ * still synced. The setValue below then commits the resting value once, so
+ * Fabric's shadow tree never keeps a stale one. If a future RN drops the
+ * argument it is ignored and only the quick-tap case regresses.
+ */
+function run(value: Animated.Value, to: number, animation: Animated.CompositeAnimation) {
+  const id = (runIds.get(value) ?? 0) + 1;
+  runIds.set(value, id);
+  const start = animation.start as (callback?: Animated.EndCallback, isLooping?: boolean) => void;
+  start.call(
+    animation,
+    ({ finished }) => {
+      if (finished && runIds.get(value) === id) value.setValue(to);
+    },
+    true,
+  );
+}
+
 function createBallMotion(tabCount: number, startIndex: number) {
   // ⚠️ Hidden until placed: at x 0 the ball would sit under the first tab
   // for a frame before the row is measured.
@@ -107,14 +140,13 @@ function createBallMotion(tabCount: number, startIndex: number) {
     bobPhase,
     bob,
     followBall: { transform: [{ translateX: ballX }] },
-    // The hairline and the hollow's rim: with the ball, and hidden until it is placed.
-    revealFollow: { opacity: ballOpacity, transform: [{ translateX: ballX }] },
+    // Everything that rides the ball (hairline, rim, light, ball): hidden
+    // until it is placed. One layer over all of them, not an opacity on each.
+    revealed: { opacity: ballOpacity },
     bandCover: { opacity: ballOpacity.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) },
-    ballStyle: {
-      opacity: ballOpacity,
+    ballBob: { transform: [{ translateY: bob.interpolate({ inputRange: [0, 1], outputRange: [0, -BOB_DISTANCE] }) }] },
+    ballSquash: {
       transform: [
-        { translateX: ballX },
-        { translateY: bob.interpolate({ inputRange: [0, 1], outputRange: [0, -BOB_DISTANCE] }) },
         { scaleX: switchProgress.interpolate(SCALE_X_KEYS) },
         { scaleY: switchProgress.interpolate(SCALE_Y_KEYS) },
       ],
@@ -149,13 +181,17 @@ function createBallMotion(tabCount: number, startIndex: number) {
      * landing mid-way through the last leaves none half faded.
      */
     switchTo(index: number, x: number) {
-      Animated.spring(ballX, { toValue: x, ...SLIDE_SPRING, useNativeDriver: true }).start();
+      run(ballX, x, Animated.spring(ballX, { toValue: x, ...SLIDE_SPRING, useNativeDriver: true }));
       switchProgress.setValue(0);
-      timing(switchProgress, 1, SWITCH_MS, Easing.linear).start();
+      run(switchProgress, 1, timing(switchProgress, 1, SWITCH_MS, Easing.linear));
       ballIconOpacities.forEach((opacity, i) =>
-        (i === index ? timing(opacity, 1, ICON_IN_MS, iconInEasing) : timing(opacity, 0, 120)).start(),
+        i === index
+          ? run(opacity, 1, timing(opacity, 1, ICON_IN_MS, iconInEasing))
+          : run(opacity, 0, timing(opacity, 0, 120)),
       );
-      rowOpacities.forEach((opacity, i) => timing(opacity, i === index ? 0 : 1, i === index ? 160 : 220).start());
+      rowOpacities.forEach((opacity, i) =>
+        run(opacity, i === index ? 0 : 1, timing(opacity, i === index ? 0 : 1, i === index ? 160 : 220)),
+      );
       float();
     },
   };
@@ -175,6 +211,17 @@ function createBallMotion(tabCount: number, startIndex: number) {
  * The native driver writes straight to the views. Its own trap, a render of
  * the nav sending the JS side's stale values back to them, is closed in
  * BottomNav: the views it animates are never re-rendered by a switch.
+ *
+ * ⚠️ ONE animated value per view (2026-11-10). RN re-renders an animated view
+ * itself when one of its native animations ends (Animation.js: the value is
+ * synced to JS, then every view using it gets `scheduleUpdate`), and that
+ * render commits the JS side of EVERY value on the view. The ball used to
+ * carry ballX, the bob and the squash in one transform: the squash's 560ms
+ * timing ended before the slide's spring had reported rest, so the ball was
+ * re-rendered with ballX still where it was before the tap. On the emulator
+ * the ball jumped back to the old tab for 1-10 frames on most switches while
+ * the hollow (ballX only) stayed put. Hence the nested layers in BottomNav:
+ * slot (ballX) → bob → squash, under one reveal layer (ballOpacity).
  *
  * Everything is created once, so the styles keep their identity for the
  * component's life: a new interpolation node on a native-driven view drops

@@ -112,8 +112,8 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
   const positioned = useRef(false);
   const lastAnimatedIndex = useRef(routeIndex);
   const ball = useNavBallMotion(TABS.length, Math.max(routeIndex, 0));
-  const { ballOpacity, ballX, bob, ballIconStyles, rowIconStyles } = ball;
-  const { followBall, revealFollow, bandCover, ballStyle, iconPop } = ball;
+  const { ballX, bob, ballIconStyles, rowIconStyles } = ball;
+  const { followBall, revealed, bandCover, ballBob, ballSquash, iconPop } = ball;
   const ballTarget = (index: number) => {
     const rect = tabRects.current[index];
     return rect ? rect.x + rect.width / 2 - BALL_SIZE / 2 : null;
@@ -213,30 +213,35 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
   // corners begin, joined by the hollow's own outline — see RIM_PATH. All
   // three are translated by the same ballX as the ball, so the hollow tracks
   // it on the native driver. Then the light (over the hollow and its rim,
-  // under the ball that casts it) and the ball.
+  // under the ball that casts it) and the ball. One animated value per view
+  // (see useNavBallMotion): the ball is slot (slide) → bob → body (squash).
   const ballLayer = useMemo(
     () => (
-      <>
-        <Animated.View pointerEvents="none" style={[styles.topLine, { left: LINE_LEFT_END }, revealFollow]} />
-        <Animated.View pointerEvents="none" style={[styles.topLine, { left: LINE_RIGHT_START }, revealFollow]} />
-        <Animated.View pointerEvents="none" style={[styles.rim, revealFollow]}>
+      <Animated.View pointerEvents="none" style={[styles.revealLayer, revealed]}>
+        <Animated.View style={[styles.topLine, { left: LINE_LEFT_END }, followBall]} />
+        <Animated.View style={[styles.topLine, { left: LINE_RIGHT_START }, followBall]} />
+        <Animated.View style={[styles.rim, followBall]}>
           <Svg width="100%" height="100%">
             <Path d={RIM_PATH} stroke={colors.navBorder} strokeWidth={HAIRLINE} fill="none" />
           </Svg>
         </Animated.View>
-        <NavBallLight ballX={ballX} bob={bob} opacity={ballOpacity} />
-        <Animated.View pointerEvents="none" style={[styles.ball, ballStyle]}>
-          <Animated.View style={[styles.ballIcons, iconPop]}>
-            {TABS.map(({ href, Icon }, index) => (
-              <Animated.View key={href} style={[styles.ballIcon, ballIconStyles[index]]}>
-                <Icon size={22} color={colors.onGreen} weight="fill" />
+        <NavBallLight ballX={ballX} bob={bob} />
+        <Animated.View style={[styles.ballSlot, followBall]}>
+          <Animated.View style={[styles.ballFill, ballBob]}>
+            <Animated.View style={[styles.ball, ballSquash]}>
+              <Animated.View style={[styles.ballIcons, iconPop]}>
+                {TABS.map(({ href, Icon }, index) => (
+                  <Animated.View key={href} style={[styles.ballIcon, ballIconStyles[index]]}>
+                    <Icon size={22} color={colors.onGreen} weight="fill" />
+                  </Animated.View>
+                ))}
               </Animated.View>
-            ))}
+            </Animated.View>
           </Animated.View>
         </Animated.View>
-      </>
+      </Animated.View>
     ),
-    [styles, colors, revealFollow, ballX, bob, ballOpacity, ballStyle, iconPop, ballIconStyles],
+    [styles, colors, revealed, followBall, ballX, bob, ballBob, ballSquash, iconPop, ballIconStyles],
   );
 
   return (

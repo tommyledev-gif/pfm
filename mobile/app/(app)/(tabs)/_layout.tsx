@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { Animated, Dimensions, Easing } from "react-native";
-import { Href, Tabs, useRouter } from "expo-router";
+import { Tabs } from "expo-router";
 
 import { useColors } from "@/lib/theme";
 import { useTabsWarmupStore } from "@/stores/tabs-warmup-store";
@@ -13,9 +13,6 @@ import { useTabsWarmupStore } from "@/stores/tabs-warmup-store";
 // the whole screen lurching.)
 const SWITCH_MS = 220;
 const SLIDE = Math.round(Dimensions.get("window").width * 0.2);
-// The tabs other than the one the app opens on, mounted ahead of their first
-// visit, in the order they tend to be opened.
-const PRELOAD_TABS: Href[] = ["/transactions", "/ai-chat", "/insights", "/settings"];
 // Idle turns of the JS thread in a row, then a beat for native to draw what
 // they left, before the tabs count as warm and the launch splash may go.
 const IDLE_ROUNDS = 2;
@@ -58,20 +55,24 @@ function slideInterpolator({ current }: { current: { progress: Animated.Value } 
   return { sceneStyle };
 }
 
-// Mounts each other tab ahead of its first visit (React Navigation's preload,
-// through expo-router's prefetch), so a first tap only switches, instead of
-// building a whole screen while the slide and the nav ball are running.
+// Every tab is mounted with the navigator (`lazy: false` below), so a first
+// tap only switches, instead of building a whole screen while the slide and
+// the nav ball are running. This holds the launch splash until the JS thread
+// has gone quiet after those mounts (useTabsWarmupStore → BrandSplash).
 //
-// ⚠️ All at once, at mount, behind the launch splash, which holds until the
-// JS thread has gone quiet after them (useTabsWarmupStore → BrandSplash).
-// They used to mount one by one from 1.5s on, 700ms apart, in front of the
+// ⚠️ They used to mount one by one from 1.5s on, 700ms apart, in front of the
 // user: a tap in the first few seconds landed on a whole screen mounting,
 // and the switch froze, then the new tab flashed through empty, skeleton and
 // data on separate frames.
+//
+// ⚠️ Not router.prefetch (2026-11-10). It finds the navigator to preload in
+// from the current navigation state, and from this effect the tab
+// navigator's own state is not in it yet: the PRELOAD went nowhere, and every
+// tab still mounted on its first tap, and the slide waited for it (emulator,
+// production bundle: ~820ms from tap to slide on a first visit to
+// Transactions or AI Chat, ~250-310ms with lazy: false).
 function useWarmUpTabs() {
-  const router = useRouter();
   useEffect(() => {
-    PRELOAD_TABS.forEach((href) => router.prefetch(href));
     let idle: number | null = null;
     let settle: ReturnType<typeof setTimeout> | null = null;
     const waitIdle = (roundsLeft: number) => {
@@ -86,7 +87,7 @@ function useWarmUpTabs() {
       if (idle !== null) cancelIdleCallback(idle);
       if (settle) clearTimeout(settle);
     };
-  }, [router]);
+  }, []);
 }
 
 // Module scope, so the navigator is not handed a new bar renderer per render.
@@ -121,6 +122,8 @@ export default function TabsLayout() {
   const screenOptions = useMemo(
     () => ({
       headerShown: false,
+      // All five mounted at once, behind the splash: see useWarmUpTabs.
+      lazy: false,
       sceneStyle: { backgroundColor: colors.bgApp },
       sceneStyleInterpolator: slideInterpolator,
       transitionSpec: { animation: "timing" as const, config: { duration: SWITCH_MS, easing: Easing.out(Easing.cubic) } },
