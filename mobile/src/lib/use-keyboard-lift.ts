@@ -7,11 +7,13 @@ import {
   useAnimatedKeyboard,
   useAnimatedReaction,
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
   withDelay,
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { scheduleOnRN } from "react-native-worklets";
 
 // ⚠️ Both "translucent" flags must stay on. The app is edge-to-edge (RN 0.81)
 // and paints its own safe areas; left at Reanimated's defaults, Android adds
@@ -35,7 +37,7 @@ const SETTLE_MS = 250;
 const SETTLE_EASING = Easing.inOut(Easing.quad);
 
 /**
- * Animated style that lifts a container so whatever rests `restingOffset` px
+ * Animated style that lifts (translates) a container so whatever rests `restingOffset` px
  * above the screen's bottom edge ends up `gap` px above the keyboard. Driven
  * frame by frame on the UI thread, in step with the keyboard's own open and
  * close animation — unlike useKeyboardHeight, whose Android events only fire
@@ -65,7 +67,12 @@ const SETTLE_EASING = Easing.inOut(Easing.quad);
  * live evidence while the input is focused: the keyboard's height rising (an
  * opening, followed from its first frames) or React Native's show event.
  */
-export function useKeyboardLiftStyle(restingOffset: number, gap: number, inputFocused: SharedValue<boolean>) {
+export function useKeyboardLiftStyle(
+  restingOffset: number,
+  gap: number,
+  inputFocused: SharedValue<boolean>,
+  onSettled: (lift: number) => void,
+) {
   const keyboard = useAnimatedKeyboard(KEYBOARD_OPTIONS);
   const { bottom } = useSafeAreaInsets();
   // With the nav bar treated as translucent, Android measures the keyboard
@@ -155,7 +162,22 @@ export function useKeyboardLiftStyle(restingOffset: number, gap: number, inputFo
     };
   }, [engaged, showCount]);
 
-  return useAnimatedStyle(() => ({
-    marginBottom: Math.min(liftFor(keyboard.height.value), ceiling.value),
-  }));
+  const lift = useDerivedValue(() => Math.min(liftFor(keyboard.height.value), ceiling.value));
+
+  // The lift of a keyboard that has finished opening (0 once let go), for
+  // what has to make room in layout once rather than on every frame.
+  useAnimatedReaction(
+    () => (engaged.value && keyboard.state.value === KeyboardState.OPEN ? Math.round(lift.value) : 0),
+    (settled, before) => {
+      if (settled !== before) scheduleOnRN(onSettled, settled);
+    },
+  );
+
+  // ⚠️ A transform, not marginBottom (2026-11-10). A margin is layout: every
+  // frame of the keyboard's animation laid the whole chat thread out again,
+  // as a shadow-tree commit that Reanimated drops while React is committing,
+  // and React commits most exactly then (the nav hiding, the suggestions'
+  // height). The composer and the thread rose in uneven steps. A transform is
+  // drawn straight onto the view (ANDROID_SYNCHRONOUSLY_UPDATE_UI_PROPS).
+  return useAnimatedStyle(() => ({ transform: [{ translateY: -lift.value }] }));
 }

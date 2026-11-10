@@ -1,8 +1,8 @@
-import { memo, useEffect, useId, useRef, useState } from "react";
-import { Animated, StyleSheet } from "react-native";
-import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { Animated, StyleSheet, View } from "react-native";
 
 import { CHAT_MODE_META, CHAT_MODE_ORDER, ChatMode } from "@/features/ai-chat/chat-mode";
+import { withAlpha } from "@/lib/color";
 
 // How strongly the mode's colours wash the ground: a glow under the header
 // and another rising from behind the input, with the thread's middle left
@@ -27,8 +27,7 @@ export const ChatModeBackdrop = memo(function ChatModeBackdrop({ mode }: { mode:
   ).current;
 
   // Only the washes actually visible are mounted: the current one, plus the
-  // outgoing one while it fades. Three full-screen SVG gradients drawn at once
-  // were a large part of what made the tab slow to show.
+  // outgoing one while it fades.
   const [mounted, setMounted] = useState<ChatMode[]>([mode]);
 
   useEffect(() => {
@@ -55,20 +54,20 @@ export const ChatModeBackdrop = memo(function ChatModeBackdrop({ mode }: { mode:
   );
 });
 
+// ⚠️ RN's own gradient, not react-native-svg (2026-11-10): on Android an SVG
+// is a bitmap the size of the view, here the whole screen (~10MB, two while
+// modes cross-fade), drawn and uploaded to the GPU again each time the tab
+// was shown. A shader has no bitmap. See GradientFill.
 function ModeWash({ mode }: { mode: ChatMode }) {
   const { tint, accentTo } = CHAT_MODE_META[mode];
-  const id = `chat-wash-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
-  return (
-    <Svg width="100%" height="100%">
-      <Defs>
-        <LinearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor={tint} stopOpacity={TOP_ALPHA} />
-          <Stop offset="0.38" stopColor={tint} stopOpacity={0} />
-          <Stop offset="0.7" stopColor={accentTo} stopOpacity={0} />
-          <Stop offset="1" stopColor={accentTo} stopOpacity={BOTTOM_ALPHA} />
-        </LinearGradient>
-      </Defs>
-      <Rect width="100%" height="100%" fill={`url(#${id})`} />
-    </Svg>
-  );
+  const style = useMemo(() => {
+    const stops = [
+      `${withAlpha(tint, TOP_ALPHA)} 0%`,
+      `${withAlpha(tint, 0)} 38%`,
+      `${withAlpha(accentTo, 0)} 70%`,
+      `${withAlpha(accentTo, BOTTOM_ALPHA)} 100%`,
+    ];
+    return [StyleSheet.absoluteFill, { experimental_backgroundImage: `linear-gradient(to bottom, ${stops.join(", ")})` }];
+  }, [tint, accentTo]);
+  return <View style={style} />;
 }

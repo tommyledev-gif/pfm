@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { ChevronDownIcon } from "@/components/ui/Icon";
 import { useChatThreadStyles } from "@/features/ai-chat/components/chat-thread-styles";
+import { useKeyboardReserve } from "@/features/ai-chat/components/KeyboardLiftView";
 import { ChatMessage } from "@/features/ai-chat/types";
 import { radii, spacing, createStyles, useColors } from "@/lib/theme";
 
@@ -41,6 +42,7 @@ export function ChatThreadList({ listRef, style, reservedBottom = 0, contentCont
   const styles = useStyles();
   const { t } = useTranslation();
   const chatThreadStyles = useChatThreadStyles();
+  const keyboardReserve = useKeyboardReserve();
   const [awayFromLatest, setAwayFromLatest] = useState(false);
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -74,8 +76,12 @@ export function ChatThreadList({ listRef, style, reservedBottom = 0, contentCont
         onScroll={handleScroll}
         scrollEventThrottle={SCROLL_THROTTLE_MS}
         windowSize={THREAD_WINDOW_SIZE}
-        // Inverted: paddingTop renders at the visual bottom.
-        contentContainerStyle={[contentContainerStyle, { paddingTop: reservedBottom + spacing.md }]}
+        // Inverted: paddingTop renders at the visual bottom, paddingBottom at
+        // the top, where the open keyboard's lift hides the oldest rows.
+        contentContainerStyle={[
+          contentContainerStyle,
+          { paddingTop: reservedBottom + spacing.md, paddingBottom: spacing.md + keyboardReserve },
+        ]}
         {...listProps}
       />
       <Animated.View

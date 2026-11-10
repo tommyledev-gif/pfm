@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Animated, Easing } from "react-native";
 
 import { BOB_DISTANCE, BOB_DURATION, ICON_BOUNCE_SCALE } from "@/components/shared/bottom-nav-styles";
+import { runNativeAnimation as run } from "@/lib/run-native-animation";
 
 // Origami tension/friction 210/14, 180/10 and 220/7, as stiffness/damping.
 const SLIDE_SPRING = { stiffness: 846, damping: 43, mass: 1 };
@@ -73,40 +74,7 @@ const iconInEasing = (t: number) => (t <= ICON_IN_LEAD ? 0 : easeInOut((t - ICON
 const timing = (value: Animated.Value, toValue: number, duration: number, easing = easeInOut) =>
   Animated.timing(value, { toValue, duration, easing, useNativeDriver: true });
 
-// Which run of each value is the latest, so a late "finished" from an older
-// one never resets a value a newer run is animating.
-const runIds = new WeakMap<Animated.Value, number>();
-
-/**
- * Starts a native animation of `value` towards `to` without RN's end sync,
- * then syncs it once itself, only when the run comes to rest.
- *
- * ⚠️ RN's end sync is what made the ball jump back on a quick second tap
- * (2026-11-10). Starting a run stops the one in flight, and RN then writes the
- * value it stopped at into the JS side and re-renders every view using it
- * (Animation.js). With JS busy with the first tap's navigation, that
- * re-render only commits hundreds of ms later, when the new run has long
- * moved on: the ball, an icon or a squash showed the stopped run's value for
- * a frame. `isLooping`, start()'s second argument (internal, not in the
- * types; Animated.loop passes it), skips that re-render; the JS value is
- * still synced. The setValue below then commits the resting value once, so
- * Fabric's shadow tree never keeps a stale one. If a future RN drops the
- * argument it is ignored and only the quick-tap case regresses.
- */
-function run(value: Animated.Value, to: number, animation: Animated.CompositeAnimation) {
-  const id = (runIds.get(value) ?? 0) + 1;
-  runIds.set(value, id);
-  const start = animation.start as (callback?: Animated.EndCallback, isLooping?: boolean) => void;
-  start.call(
-    animation,
-    ({ finished }) => {
-      if (finished && runIds.get(value) === id) value.setValue(to);
-    },
-    true,
-  );
-}
-
-function createBallMotion(tabCount: number, startIndex: number) {
+function createBallMotion(tabCount: number, startIndex: number, onSettled: () => void) {
   // ⚠️ Hidden until placed: at x 0 the ball would sit under the first tab
   // for a frame before the row is measured.
   const ballOpacity = new Animated.Value(0);
@@ -124,13 +92,15 @@ function createBallMotion(tabCount: number, startIndex: number) {
   // A float already running carries on rather than restarting: a native loop
   // started part-way would jump back to that point on every breath.
   let floating: Animated.CompositeAnimation | null = null;
+  // The latest switch; an older one coming to rest is not "settled".
+  let switchId = 0;
   const float = () => {
     if (floating) return;
     bobPhase.setValue(0);
-    const run = Animated.loop(timing(bobPhase, 1, BOB_DURATION * 2, Easing.linear), { iterations: BOB_BREATHS });
-    floating = run;
-    run.start(() => {
-      if (floating === run) floating = null;
+    const loop = Animated.loop(timing(bobPhase, 1, BOB_DURATION * 2, Easing.linear), { iterations: BOB_BREATHS });
+    floating = loop;
+    loop.start(() => {
+      if (floating === loop) floating = null;
     });
   };
 
@@ -181,9 +151,16 @@ function createBallMotion(tabCount: number, startIndex: number) {
      * landing mid-way through the last leaves none half faded.
      */
     switchTo(index: number, x: number) {
-      run(ballX, x, Animated.spring(ballX, { toValue: x, ...SLIDE_SPRING, useNativeDriver: true }));
+      const id = ++switchId;
+      // The slide and the squash end last (the icon fades are shorter).
+      let running = 2;
+      const restOne = () => {
+        running -= 1;
+        if (running === 0 && id === switchId) onSettled();
+      };
+      run(ballX, x, Animated.spring(ballX, { toValue: x, ...SLIDE_SPRING, useNativeDriver: true }), restOne);
       switchProgress.setValue(0);
-      run(switchProgress, 1, timing(switchProgress, 1, SWITCH_MS, Easing.linear));
+      run(switchProgress, 1, timing(switchProgress, 1, SWITCH_MS, Easing.linear), restOne);
       ballIconOpacities.forEach((opacity, i) =>
         i === index
           ? run(opacity, 1, timing(opacity, 1, ICON_IN_MS, iconInEasing))
@@ -228,7 +205,9 @@ function createBallMotion(tabCount: number, startIndex: number) {
  * the view back to its defaults for a frame.
  */
 export function useNavBallMotion(tabCount: number, startIndex: number) {
-  const [motion] = useState(() => createBallMotion(tabCount, startIndex));
+  // Bumped once each switch has come to rest: see `settled` below.
+  const [settled, setSettled] = useState(0);
+  const [motion] = useState(() => createBallMotion(tabCount, startIndex, () => setSettled((n) => n + 1)));
 
   // Idle float, BOB_BREATHS at a time (switchTo starts the next): it drives
   // translateY only, while ballX and the switch own translateX and scale, so
@@ -238,5 +217,12 @@ export function useNavBallMotion(tabCount: number, startIndex: number) {
     return motion.stopFloat;
   }, [motion]);
 
-  return motion;
+  // ⚠️ `settled` (2026-11-10): BottomNav re-renders the views the ball
+  // animates once a switch is at rest, so the props React holds for them are
+  // what the native driver drew. Fabric's LayoutAnimation (configured on every
+  // keyboard show/hide, use-keyboard-height.ts) re-sends a view's opacity from
+  // those props: never re-rendered, the icons went back to how they were at
+  // launch when the keyboard closed (Home lit on the ball wherever it was,
+  // Home missing from the row; Settings after a theme change made there).
+  return { ...motion, settled };
 }

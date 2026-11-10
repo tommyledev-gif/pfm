@@ -1,6 +1,5 @@
-import { useId } from "react";
+import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
-import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 
 interface GradientFillProps {
   from: string;
@@ -12,22 +11,19 @@ interface GradientFillProps {
  * other children — render it first. The parent supplies the shape: give it
  * a borderRadius and `overflow: "hidden"` and the gradient takes that shape.
  * Never catches touches.
+ *
+ * ⚠️ RN's own gradient, not react-native-svg (2026-11-10). On Android an SVG
+ * is rendered into a bitmap the size of the view and uploaded to the GPU as
+ * a texture: every user bubble in the chat was its own ~800×240px texture,
+ * more than the GPU's texture cache holds for a thread, so they were drawn
+ * and uploaded again on every switch to the tab and on scroll (emulator
+ * trace: hundreds of uploads per switch, 150-270ms frames). This is drawn
+ * with a shader, no bitmap.
  */
 export function GradientFill({ from, to }: GradientFillProps) {
-  // Gradient ids must be unique on screen — a thread shows many of these at
-  // once — and useId's colons are not valid inside url(#…).
-  const id = `gradient-fill-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
-  return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <Svg width="100%" height="100%">
-        <Defs>
-          <LinearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0" stopColor={from} />
-            <Stop offset="1" stopColor={to} />
-          </LinearGradient>
-        </Defs>
-        <Rect width="100%" height="100%" fill={`url(#${id})`} />
-      </Svg>
-    </View>
+  const style = useMemo(
+    () => [StyleSheet.absoluteFill, { experimental_backgroundImage: `linear-gradient(to bottom right, ${from}, ${to})` }],
+    [from, to],
   );
+  return <View pointerEvents="none" style={style} />;
 }

@@ -87,7 +87,8 @@ interface BottomNavProps {
 // native driver (see useNavBallMotion), and a render of a view it animates
 // sends the JS side's values (where the ball was before the tap) back to the
 // view: the renders a switch used to cost landed mid-slide, and the ball and
-// its icon shook and flashed.
+// its icon shook and flashed. They are re-rendered once, after the switch has
+// come to rest (`settled`, see useNavBallMotion), when JS holds the end values.
 export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavProps) {
   const { t } = useTranslation();
   const colors = useColors();
@@ -112,7 +113,7 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
   const positioned = useRef(false);
   const lastAnimatedIndex = useRef(routeIndex);
   const ball = useNavBallMotion(TABS.length, Math.max(routeIndex, 0));
-  const { ballX, bob, ballIconStyles, rowIconStyles } = ball;
+  const { ballX, bob, ballIconStyles, rowIconStyles, settled } = ball;
   const { followBall, revealed, bandCover, ballBob, ballSquash, iconPop } = ball;
   const ballTarget = (index: number) => {
     const rect = tabRects.current[index];
@@ -142,8 +143,8 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
   useEffect(() => releasePending, []);
 
   const handleTabLayout = (index: number) => (e: LayoutChangeEvent) => {
-    // While hidden (display: none) the row lays out at 0 wide: a switch then
-    // would send the ball to the left edge. Keep the last real rects.
+    // A row laid out 0 wide (a 0×0 parent) would send the ball to the left
+    // edge on the next switch. Keep the last real rects.
     if (e.nativeEvent.layout.width === 0) return;
     tabRects.current[index] = { x: e.nativeEvent.layout.x, width: e.nativeEvent.layout.width };
     if (positioned.current || tabRects.current.filter(Boolean).length < TABS.length) return;
@@ -187,7 +188,8 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
           <Icon size={22} color={colors.textSecondary} weight="regular" />
         </Animated.View>
       )),
-    [colors, rowIconStyles],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- settled: see useNavBallMotion
+    [colors, rowIconStyles, settled],
   );
 
   // The bar's surface, with the hollow cut out of its top band so the screen
@@ -206,7 +208,8 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
         <Animated.View pointerEvents="none" style={[styles.bandCover, bandCover]} />
       </>
     ),
-    [styles, colors, followBall, bandCover],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- settled: see useNavBallMotion
+    [styles, colors, followBall, bandCover, settled],
   );
 
   // Top hairline: two straight halves that stop where the hollow's rounded
@@ -241,13 +244,16 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
         </Animated.View>
       </Animated.View>
     ),
-    [styles, colors, revealed, followBall, ballX, bob, ballBob, ballSquash, iconPop, ballIconStyles],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- settled: see useNavBallMotion
+    [styles, colors, revealed, followBall, ballX, bob, ballBob, ballSquash, iconPop, ballIconStyles, settled],
   );
 
   return (
     <View
       style={[styles.wrapper, { height: PILL_HEIGHT + insets.bottom }, hidden && styles.hidden]}
-      pointerEvents="box-none"
+      pointerEvents={hidden ? "none" : "box-none"}
+      accessibilityElementsHidden={hidden}
+      importantForAccessibility={hidden ? "no-hide-descendants" : "auto"}
     >
       {surface}
       <View style={[styles.pill, { paddingBottom: insets.bottom }]}>
