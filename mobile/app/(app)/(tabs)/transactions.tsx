@@ -214,6 +214,7 @@ function TransactionsScreen() {
           <TransactionsHeader
             matchedCount={matchedCount}
             periodLabel={dateRangeLabel ?? currentMonthLabel}
+            onPressPeriod={sheets.openers.date}
             headerTotal={headerTotal}
             otherCurrencies={otherCurrencies}
             otherTotals={otherTotals}
@@ -226,7 +227,6 @@ function TransactionsScreen() {
                 filters={filters}
                 wallets={wallets.data}
                 categoryById={categoryById}
-                dateLabel={dateRangeLabel}
                 currencies={walletCurrencies.currencies}
                 openers={sheets.openers}
               />

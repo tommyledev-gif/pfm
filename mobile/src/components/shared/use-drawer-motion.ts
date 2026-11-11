@@ -23,6 +23,8 @@ interface UseDrawerMotionOptions {
   startOpen: boolean;
   /** The close slide has finished. */
   onExited: () => void;
+  /** The overlay sits where it will stay (useOverlayOrigin's `measured`): the open slide waits for it. */
+  ready: boolean;
 }
 
 /**
@@ -40,7 +42,9 @@ interface UseDrawerMotionOptions {
  * height change during the slide used to run a second spring on the same
  * sheet, and the two read as shaking.
  */
-export function useDrawerMotion({ visible, startOpen, onExited }: UseDrawerMotionOptions) {
+export function useDrawerMotion({ visible, startOpen, onExited, ready }: UseDrawerMotionOptions) {
+  const readyRef = useRef(ready);
+  readyRef.current = ready;
   const translateY = useRef(new Animated.Value(startOpen ? 0 : OFFSCREEN_Y)).current;
   // Resting → hidden distance: the sheet's height plus the margin, once known.
   const travel = useRef(new Animated.Value(OFFSCREEN_Y)).current;
@@ -71,7 +75,7 @@ export function useDrawerMotion({ visible, startOpen, onExited }: UseDrawerMotio
 
   useEffect(() => {
     if (visible) {
-      if (sheetHeight.current > 0) slideIn();
+      if (sheetHeight.current > 0 && readyRef.current) slideIn();
       else pendingOpen.current = true;
       return;
     }
@@ -91,8 +95,15 @@ export function useDrawerMotion({ visible, startOpen, onExited }: UseDrawerMotio
   const onSheetHeight = (height: number) => {
     sheetHeight.current = height;
     travel.setValue(height + CLOSE_MARGIN);
-    if (pendingOpen.current) slideIn();
+    if (pendingOpen.current && readyRef.current) slideIn();
   };
+
+  // The other half of the wait: the sheet was laid out before the overlay's
+  // position came back.
+  useEffect(() => {
+    if (ready && pendingOpen.current && sheetHeight.current > 0) slideIn();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
 
   return { translateY, dimOpacity, settled, onSheetHeight };
 }

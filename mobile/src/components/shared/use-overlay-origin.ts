@@ -4,6 +4,8 @@ import { View } from "react-native";
 // How long after opening the overlay keeps re-checking where its host sits —
 // past a screen push (native-stack fade) and the safe-area padding landing.
 const ANCHOR_SETTLE_MS = 800;
+// The longest the open slide waits for the first measurement.
+const MEASURE_FALLBACK_MS = 150;
 
 /**
  * Where Drawer's overlay has to sit to cover the real window (split out of
@@ -19,6 +21,12 @@ const ANCHOR_SETTLE_MS = 800;
 export function useOverlayOrigin(visible: boolean) {
   const anchorRef = useRef<View>(null);
   const [origin, setOrigin] = useState({ x: 0, y: 0 });
+  // ⚠️ The first measurement has come back. The sheet holds its slide until
+  // then (useDrawerMotion's `ready`): the sheet remounts on every open with
+  // origin {0,0}, and measure() answers a frame or two after the sheet's own
+  // layout, so on a padded host (Transactions: status bar + offline strip)
+  // the whole sheet jumped a status bar's height mid-slide.
+  const [measured, setMeasured] = useState(false);
 
   // ⚠️ measure()'s page coordinates, not measureInWindow (same trap as
   // RevealableAmount): on Android edge-to-edge, measureInWindow reports y
@@ -29,8 +37,16 @@ export function useOverlayOrigin(visible: boolean) {
     anchorRef.current?.measure((_x, _y, _width, _height, pageX, pageY) => {
       if (!Number.isFinite(pageX) || !Number.isFinite(pageY)) return;
       setOrigin((prev) => (prev.x === pageX && prev.y === pageY ? prev : { x: pageX, y: pageY }));
+      setMeasured(true);
     });
   };
+
+  // Never hold the sheet for good on a measurement that does not come back.
+  useEffect(() => {
+    if (!visible || measured) return;
+    const timer = setTimeout(() => setMeasured(true), MEASURE_FALLBACK_MS);
+    return () => clearTimeout(timer);
+  }, [visible, measured]);
 
   // ⚠️ Re-measured every frame for a moment after opening, not once: a sheet
   // opened as its screen mounts (Wallets' `create` param) measured mid-push,
@@ -47,5 +63,5 @@ export function useOverlayOrigin(visible: boolean) {
     return () => cancelAnimationFrame(frame);
   }, [visible]);
 
-  return { anchorRef, origin, measureAnchor };
+  return { anchorRef, origin, measured, measureAnchor };
 }

@@ -57,7 +57,7 @@ function NavHost() {
   const keyboardVisible = useKeyboardVisible();
   const sheetOpen = useSheetStore((s) => s.openCount > 0);
   const hidden = ROUTES_WITHOUT_NAV.includes(pathname) || keyboardVisible || sheetOpen;
-  return <BottomNav hidden={hidden} />;
+  return <BottomNav hidden={hidden} instant={keyboardVisible} />;
 }
 
 const useStyles = createStyles((colors) => ({

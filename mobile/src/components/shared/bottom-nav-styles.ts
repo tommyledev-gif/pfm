@@ -93,10 +93,9 @@ export const useStyles = createStyles((colors) => ({
     right: 0,
     bottom: 0,
   },
-  // Not display: none: Fabric does not mount a display: none subtree, so
-  // every keyboard or sheet closing re-created the bar's native views, SVGs
-  // and all. Hidden by opacity, they stay as they are.
-  hidden: { opacity: 0 },
+  // Hidden by opacity (BottomNav's `shown` fade), never display: none:
+  // Fabric does not mount a display: none subtree, so every keyboard or sheet
+  // closing re-created the bar's native views, SVGs and all.
   // Flush against the screen's bottom/left/right edges now, not a floating
   // margined pill — only the top corners stay rounded. paddingBottom (set
   // inline to insets.bottom) extends the bar's own background into the

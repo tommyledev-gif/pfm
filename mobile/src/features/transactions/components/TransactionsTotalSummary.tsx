@@ -54,6 +54,17 @@ interface TransactionsTotalSummaryProps {
   typeFilter: TypeFilterValue;
   /** Rows matching every active filter; null while that answer is loading. */
   matchedCount: number | null;
+  /** The period line is the date filter: a tap opens the range picker. */
+  onPressPeriod: () => void;
+}
+
+// Splits "Tổng chi {{period}}" around the period, so the period alone can be
+// drawn as the link. One translated string, cut where the period went in:
+// word order stays the locale's own.
+const PERIOD_MARK = "⁣";
+function splitAroundPeriod(sentence: string): [string, string] {
+  const at = sentence.indexOf(PERIOD_MARK);
+  return at === -1 ? [sentence, ""] : [sentence.slice(0, at), sentence.slice(at + PERIOD_MARK.length)];
 }
 
 /**
@@ -69,6 +80,7 @@ export function TransactionsTotalSummary({
   otherTotals,
   typeFilter,
   matchedCount,
+  onPressPeriod,
 }: TransactionsTotalSummaryProps) {
   const { t } = useTranslation();
   const colors = useColors();
@@ -99,18 +111,35 @@ export function TransactionsTotalSummary({
   // Lower-cased mid-sentence in Vietnamese ("Tổng chi tháng 10, 2026"); an
   // English month keeps its capital ("Spending in October 2026").
   const period = currentLanguage() === "vi" ? periodLabel.toLowerCase() : periodLabel;
+  const [before, after] = figure
+    ? splitAroundPeriod(
+        t(typeFilter === "income" ? "transactions.header.incomeInPeriod" : "transactions.header.spendingInPeriod", {
+          period: PERIOD_MARK,
+        }),
+      )
+    : ["", ""];
 
   return (
     <View style={styles.block}>
       <View style={styles.summary}>
         <View style={styles.summaryText}>
-          <Text style={styles.period} numberOfLines={1}>
-            {figure
-              ? t(typeFilter === "income" ? "transactions.header.incomeInPeriod" : "transactions.header.spendingInPeriod", {
-                  period,
-                })
-              : periodLabel}
-          </Text>
+          {/* The whole line is the target (easier to hit than the dates
+              alone); the dates are what is drawn as the link. */}
+          <Pressable
+            onPress={onPressPeriod}
+            style={({ pressed }) => [styles.periodTarget, pressed && styles.periodPressed]}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={figure ? `${before}${period}${after}` : periodLabel}
+            accessibilityHint={t("transactions.header.changePeriod")}
+            testID="btn-transactions-period"
+          >
+            <Text style={styles.period} numberOfLines={1}>
+              {before}
+              <Text style={styles.periodLink}>{figure ? period : periodLabel}</Text>
+              {after}
+            </Text>
+          </Pressable>
           {figure ? (
             // Fixed height, the figures laid over each other: the old one
             // fades out where it stands while the new one fades in.
@@ -183,6 +212,10 @@ const useStyles = createStyles((colors) => ({
   summary: { flexDirection: "row", alignItems: "flex-end", gap: spacing.md },
   summaryText: { flex: 1, minWidth: 0, gap: 2 },
   period: { ...typography.caption, fontWeight: "500", color: colors.textSecondary },
+  periodTarget: { alignSelf: "flex-start", maxWidth: "100%" },
+  periodPressed: { opacity: 0.6 },
+  // Green and underlined: reads as tappable without a chip around it.
+  periodLink: { color: colors.green, fontWeight: "600", textDecorationLine: "underline" },
   figureBox: { height: FIGURE_BOX_HEIGHT },
   figureLayer: { ...StyleSheet.absoluteFillObject, justifyContent: "flex-end" },
   total: { ...typography.hero },

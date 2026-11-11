@@ -6,6 +6,7 @@
     "header": {
       "incomeInPeriod": "Income in {{period}}",
       "spendingInPeriod": "Spending in {{period}}",
+      "changePeriod": "Change dates",
       "sortHint": "Sorts the transactions",
       "export": "Export to Excel",
       "exportHint": "Saves the list as an Excel file",
@@ -16,8 +17,6 @@
     },
     "filter": {
       "clearWallet": "Clear wallet filter",
-      "datePill": "Dates",
-      "clearDate": "Clear date filter",
       "clearCategory": "Clear category filter"
     },
     "walletFilter": {

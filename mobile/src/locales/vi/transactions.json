@@ -6,6 +6,7 @@
     "header": {
       "incomeInPeriod": "Tổng thu {{period}}",
       "spendingInPeriod": "Tổng chi {{period}}",
+      "changePeriod": "Đổi khoảng thời gian",
       "sortHint": "Sắp xếp giao dịch",
       "export": "Xuất Excel",
       "exportHint": "Xuất ra Excel",
@@ -16,8 +17,6 @@
     },
     "filter": {
       "clearWallet": "Bỏ lọc ví",
-      "datePill": "Thời gian",
-      "clearDate": "Bỏ lọc thời gian",
       "clearCategory": "Bỏ lọc danh mục"
     },
     "walletFilter": {

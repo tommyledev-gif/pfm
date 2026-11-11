@@ -34,6 +34,8 @@ interface TransactionsHeaderProps {
   /** Rows matching every active filter; null while that answer is loading. */
   matchedCount: number | null;
   periodLabel: string;
+  /** Tapping the period opens the date range picker (the date filter). */
+  onPressPeriod: () => void;
   // Already narrowed to the selected categories by the screen — null until
   // the report summary lands.
   headerTotal: ReportTotal | null;
@@ -72,6 +74,7 @@ interface TransactionsHeaderProps {
 export function TransactionsHeader({
   matchedCount,
   periodLabel,
+  onPressPeriod,
   headerTotal,
   otherCurrencies = NO_CURRENCIES,
   otherTotals = NO_TOTALS,
@@ -137,6 +140,7 @@ export function TransactionsHeader({
         otherTotals={otherTotals}
         typeFilter={typeFilter}
         matchedCount={matchedCount}
+        onPressPeriod={onPressPeriod}
       />
 
       <TransactionsSearchField key={searchSeed.key} initialText={searchSeed.text} onSearch={onSearch} />

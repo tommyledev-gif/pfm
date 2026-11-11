@@ -93,14 +93,20 @@ function DrawerSheet({ visible, onClose, children, footer, child, onEndReached, 
   // the keyboard, when up, covers that strip and lifts the sheet anyway.
   const { bottom: bottomInset, top: topInset } = useSafeAreaInsets();
   const navPad = keyboardHeight > 0 ? 0 : bottomInset;
+  // The overlay's offset to the real window edges (useOverlayOrigin); the
+  // open slide waits for its first measurement.
+  const { anchorRef, origin, measured, measureAnchor } = useOverlayOrigin(visible);
   // Unmounting on exit resets the drag too: every open starts at resting height.
-  const { translateY, dimOpacity, settled, onSheetHeight } = useDrawerMotion({ visible, startOpen, onExited });
+  const { translateY, dimOpacity, settled, onSheetHeight } = useDrawerMotion({
+    visible,
+    startOpen,
+    onExited,
+    ready: measured,
+  });
   // Grab-handle drag: down past half the height closes, up expands to max.
   const drag = useSheetDrag({ translateY, onClose });
   const scrollEnd = useScrollEnd(onEndReached);
 
-  // The overlay's offset to the real window edges (useOverlayOrigin).
-  const { anchorRef, origin, measureAnchor } = useOverlayOrigin(visible);
   const windowSize = Dimensions.get("window");
   // Full screen glides (height, top padding, corners) on its own UI-thread
   // value; `fill` is the full-screen layout, held until a collapse has landed.

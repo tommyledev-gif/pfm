@@ -3,7 +3,7 @@ import { GestureResponderEvent, ScrollView, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { ActionPopover, PopoverAnchor } from "@/components/shared/ActionPopover";
-import { CalendarIcon, CheckIcon } from "@/components/ui/Icon";
+import { CheckIcon } from "@/components/ui/Icon";
 import { spacing, createStyles, useColors } from "@/lib/theme";
 import { Category } from "@/features/categories/types";
 import { categoryLabel } from "@/features/categories/category-label";
@@ -16,11 +16,9 @@ interface TransactionsFilterBarProps {
   filters: ReturnType<typeof useTransactionFilters>;
   wallets: Wallet[] | undefined;
   categoryById: Map<string, Category>;
-  /** The applied range, formatted; null while no date filter is set. */
-  dateLabel: string | null;
   /** The currencies the User's wallets are in, the list's own first. */
   currencies: string[];
-  openers: Record<Exclude<TransactionsSheet, "sort">, () => void>;
+  openers: Record<Exclude<TransactionsSheet, "sort" | "date">, () => void>;
 }
 
 // The row under the type tabs: the three things that narrow the list, as
@@ -34,11 +32,14 @@ interface TransactionsFilterBarProps {
 //
 // The currency pill sits beside the wallet one: the list is always in one
 // currency (useTransactionFilters), and this says which, with a small menu to
-// change it. An unset date range is a calendar glyph, not the word "Thời gian".
-export function TransactionsFilterBar({ filters, wallets, categoryById, dateLabel, currencies, openers }: TransactionsFilterBarProps) {
+// change it.
+//
+// No date chip: the period line above the total (TransactionsTotalSummary)
+// is the date filter, and the picker's own "Bỏ lọc" clears it.
+export function TransactionsFilterBar({ filters, wallets, categoryById, currencies, openers }: TransactionsFilterBarProps) {
   const { t } = useTranslation();
   const styles = useStyles();
-  const { walletId, setWalletId, setDateRange, categoryIds, setCategoryIds, currency, setCurrency } = filters;
+  const { walletId, setWalletId, categoryIds, setCategoryIds, currency, setCurrency } = filters;
   const [currencyMenu, setCurrencyMenu] = useState<PopoverAnchor | null>(null);
 
   const openCurrencyMenu = (event: GestureResponderEvent) => {
@@ -83,15 +84,6 @@ export function TransactionsFilterBar({ filters, wallets, categoryById, dateLabe
         label={currency ?? currencies[0]}
         onPress={openCurrencyMenu}
         testID="pill-filter-currency"
-      />
-      <FilterPill
-        active={dateLabel !== null}
-        label={dateLabel ?? t("transactions.filter.datePill")}
-        icon={CalendarIcon}
-        onPress={openers.date}
-        onClear={() => setDateRange({})}
-        clearLabel={t("transactions.filter.clearDate")}
-        testID="pill-filter-date"
       />
       <FilterPill
         active={categoryPill !== null}

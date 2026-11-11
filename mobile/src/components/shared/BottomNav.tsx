@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, LayoutChangeEvent, Pressable, View } from "react-native";
 import { useRouter, usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -15,6 +15,7 @@ import {
 import { NavBallLight } from "@/components/shared/NavBallLight";
 import { useNavBallMotion } from "@/components/shared/use-nav-ball-motion";
 import { useColors } from "@/lib/theme";
+import { runNativeAnimation } from "@/lib/run-native-animation";
 import { useLatestCallback } from "@/lib/use-latest-callback";
 import {
   BALL_SIZE,
@@ -65,8 +66,11 @@ const PENDING_TAB_MS = 4000;
 interface BottomNavProps {
   /** Hidden but kept mounted: a sheet or the keyboard is up, or the route has no nav. */
   hidden?: boolean;
+  /** No fade (the keyboard would carry a fading bar up with it). */
+  instant?: boolean;
 }
 
+const HIDE_MS = 140; // ⚠️ A fade, not a cut: a cut blinked on every FAB tap.
 // Bottom nav — mobile/design_handoff_pfm_app/README.md "Design tokens" (nav)
 // + "Interactions summary". The bar itself sits flush against the screen's
 // bottom/left/right edges; only the active tab's green ball (plus its dark
@@ -89,7 +93,7 @@ interface BottomNavProps {
 // view: the renders a switch used to cost landed mid-slide, and the ball and
 // its icon shook and flashed. They are re-rendered once, after the switch has
 // come to rest (`settled`, see useNavBallMotion), when JS holds the end values.
-export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavProps) {
+export const BottomNav = memo(function BottomNav({ hidden = false, instant = false }: BottomNavProps) {
   const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
@@ -141,6 +145,19 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeIndex]);
   useEffect(() => releasePending, []);
+
+  // One value on its own view (see useNavBallMotion), style built once.
+  const [shown] = useState(() => new Animated.Value(hidden ? 0 : 1));
+  const [shownStyle] = useState(() => ({ opacity: shown }));
+  useEffect(() => {
+    const to = hidden ? 0 : 1;
+    if (instant) {
+      shown.stopAnimation();
+      shown.setValue(to);
+      return;
+    }
+    runNativeAnimation(shown, to, Animated.timing(shown, { toValue: to, duration: HIDE_MS, useNativeDriver: true }));
+  }, [hidden, instant, shown]);
 
   const handleTabLayout = (index: number) => (e: LayoutChangeEvent) => {
     // A row laid out 0 wide (a 0×0 parent) would send the ball to the left
@@ -251,8 +268,8 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
   );
 
   return (
-    <View
-      style={[styles.wrapper, { height: PILL_HEIGHT + insets.bottom }, hidden && styles.hidden]}
+    <Animated.View
+      style={[styles.wrapper, { height: PILL_HEIGHT + insets.bottom }, shownStyle]}
       pointerEvents={hidden ? "none" : "box-none"}
       accessibilityElementsHidden={hidden}
       importantForAccessibility={hidden ? "no-hide-descendants" : "auto"}
@@ -277,6 +294,6 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
         </View>
       </View>
       {ballLayer}
-    </View>
+    </Animated.View>
   );
 });
