@@ -33,6 +33,8 @@ interface TransactionFormModalProps {
   editingTransaction?: Transaction | null;
   editingQueued?: OutboxItem | null;
   draft?: TransactionDraft | null;
+  /** Drawer's keepMounted: built with the screen, so the FAB's open is only a slide. */
+  keepMounted?: boolean;
 }
 
 // Manual "Add/Edit Transaction" form — the AI Chat screen was previously the
@@ -46,7 +48,7 @@ interface TransactionFormModalProps {
 // wallets) scroll in the body, while the amount — typed on a calculator
 // keypad instead of the OS keyboard — sits in the pinned footer with the
 // category chip, the note, the date key and the ✓ key that saves.
-export const TransactionFormModal = memo(function TransactionFormModal({ visible, onClose, editingTransaction, editingQueued, draft }: TransactionFormModalProps) {
+export const TransactionFormModal = memo(function TransactionFormModal({ visible, onClose, editingTransaction, editingQueued, draft, keepMounted }: TransactionFormModalProps) {
   const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
@@ -135,6 +137,7 @@ export const TransactionFormModal = memo(function TransactionFormModal({ visible
       <Drawer
         visible={visible}
         onClose={onClose}
+        keepMounted={keepMounted}
         child={child}
         footer={
           <TransactionKeypadFooter

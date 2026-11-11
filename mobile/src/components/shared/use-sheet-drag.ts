@@ -33,7 +33,7 @@ interface UseSheetDragOptions {
  *
  * The sheet follows the finger down, and gives a little with resistance on
  * the way up, so it feels held throughout; the height change itself happens
- * on release, as Drawer's layout spring.
+ * on release, as useSheetExpand's move, which carries on from the finger.
  *
  * ⚠️ Attached to the handle strip only, never the whole sheet: the body is a
  * ScrollView, and a sheet-wide responder would fight it for every vertical
@@ -65,9 +65,9 @@ export function useSheetDrag({ translateY, onClose }: UseSheetDragOptions) {
     const springBack = () =>
       Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 240 }).start();
 
-    // The height change itself glides on Drawer's layout transition
-    // (SHEET_RESIZE). ⚠️ No LayoutAnimation here: it used to animate this
-    // same frame, and two animators on one view fight over it.
+    // The height change itself is useSheetExpand's (transforms only). ⚠️ No
+    // LayoutAnimation here: it used to animate this same frame, and two
+    // animators on one view fight over it.
     const setExpandedAnimated = (next: boolean) => {
       if (expandedRef.current === next) return;
       setExpanded(next);
@@ -82,10 +82,13 @@ export function useSheetDrag({ translateY, onClose }: UseSheetDragOptions) {
         // skirt under the sheet (Drawer) covers the gap it opens at the foot.
         translateY.setValue(g.dy >= 0 ? g.dy : -rubber(-g.dy));
       },
+      // ⚠️ A release that toggles the height leaves the sheet where the finger
+      // left it: the toggle's own move (useSheetExpand) brings it home on the
+      // same curve. Sprung back on its own first, the sheet dropped back to
+      // rest for ~200ms before the expand took it up (emulator, 2026-11-11).
       onPanResponderRelease: (_, g) => {
         // A tap on the handle toggles the height.
         if (Math.abs(g.dy) < MOVE_SLOP && Math.abs(g.dx) < MOVE_SLOP) {
-          springBack();
           setExpandedAnimated(!expandedRef.current);
           return;
         }
@@ -94,8 +97,8 @@ export function useSheetDrag({ translateY, onClose }: UseSheetDragOptions) {
 
         if (expandedRef.current) {
           // From full screen, down only ever steps back to resting.
-          springBack();
           if (goingDown) setExpandedAnimated(false);
+          else springBack();
           return;
         }
 
@@ -108,8 +111,8 @@ export function useSheetDrag({ translateY, onClose }: UseSheetDragOptions) {
           onCloseRef.current();
           return;
         }
-        springBack();
         if (goingUp) setExpandedAnimated(true);
+        else springBack();
       },
       onPanResponderTerminate: springBack,
     }).panHandlers;

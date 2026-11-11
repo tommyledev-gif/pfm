@@ -25,6 +25,8 @@ interface UseDrawerMotionOptions {
   onExited: () => void;
   /** The overlay sits where it will stay (useOverlayOrigin's `measured`): the open slide waits for it. */
   ready: boolean;
+  /** The open slide is starting: the moment the sheet is on its way up. */
+  onSlideStart: () => void;
 }
 
 /**
@@ -42,9 +44,11 @@ interface UseDrawerMotionOptions {
  * height change during the slide used to run a second spring on the same
  * sheet, and the two read as shaking.
  */
-export function useDrawerMotion({ visible, startOpen, onExited, ready }: UseDrawerMotionOptions) {
+export function useDrawerMotion({ visible, startOpen, onExited, ready, onSlideStart }: UseDrawerMotionOptions) {
   const readyRef = useRef(ready);
   readyRef.current = ready;
+  const onSlideStartRef = useRef(onSlideStart);
+  onSlideStartRef.current = onSlideStart;
   const translateY = useRef(new Animated.Value(startOpen ? 0 : OFFSCREEN_Y)).current;
   // Resting → hidden distance: the sheet's height plus the margin, once known.
   const travel = useRef(new Animated.Value(OFFSCREEN_Y)).current;
@@ -68,6 +72,7 @@ export function useDrawerMotion({ visible, startOpen, onExited, ready }: UseDraw
     pendingOpen.current = false;
     if (!slidIn.current) translateY.setValue(sheetHeight.current + CLOSE_MARGIN);
     slidIn.current = true;
+    onSlideStartRef.current();
     Animated.spring(translateY, { toValue: 0, ...OPEN_SPRING }).start(({ finished }) => {
       if (finished) setSettled(true);
     });
@@ -79,6 +84,8 @@ export function useDrawerMotion({ visible, startOpen, onExited, ready }: UseDraw
       else pendingOpen.current = true;
       return;
     }
+    // Mounted closed (Drawer's keepMounted): nothing to close.
+    if (!slidIn.current && !pendingOpen.current) return;
     pendingOpen.current = false;
     setSettled(false);
     Animated.timing(translateY, {
@@ -87,7 +94,14 @@ export function useDrawerMotion({ visible, startOpen, onExited, ready }: UseDraw
       easing: CLOSE_EASING,
       useNativeDriver: true,
     }).start(({ finished }) => {
-      if (finished) onExitedRef.current();
+      if (!finished) return;
+      // A sheet kept mounted waits a whole window below the edge, not just
+      // under it: the keyboard (the backdrop's padding) lifts the closed
+      // sheet too, and from just under the edge that brought it into view.
+      // The next open starts from just under the edge again.
+      slidIn.current = false;
+      translateY.setValue(OFFSCREEN_Y);
+      onExitedRef.current();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);

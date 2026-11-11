@@ -275,7 +275,7 @@ function TransactionsScreen() {
         onApplySort={setSortKeys}
       />
 
-      <TransactionFormModal visible={formOpen} onClose={closeForm} editingTransaction={editingTransaction} />
+      <TransactionFormModal visible={formOpen} onClose={closeForm} editingTransaction={editingTransaction} keepMounted />
 
       <FutureTransactionsDialog
         visible={futureOpen}

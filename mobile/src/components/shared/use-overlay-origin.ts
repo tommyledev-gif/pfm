@@ -37,8 +37,7 @@ export function useOverlayOrigin(visible: boolean) {
     anchorRef.current?.measure((_x, _y, _width, _height, pageX, pageY) => {
       if (!Number.isFinite(pageX) || !Number.isFinite(pageY)) return;
       setOrigin((prev) => (prev.x === pageX && prev.y === pageY ? prev : { x: pageX, y: pageY }));
-      setMeasured(true);
-    });
+      setMeasured(true);    });
   };
 
   // Never hold the sheet for good on a measurement that does not come back.
