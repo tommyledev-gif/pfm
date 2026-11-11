@@ -151,7 +151,9 @@ export const BottomNav = memo(function BottomNav({ hidden = false }: BottomNavPr
     positioned.current = true;
     const startIndex = Math.max(pending.current?.index ?? routeIndex, 0);
     lastAnimatedIndex.current = startIndex;
-    ball.place(startIndex, ballTarget(startIndex) ?? 0);
+    const startX = ballTarget(startIndex) ?? 0;
+    ball.place(startIndex, startX);
+    ball.warmUp(startIndex, startX);
     ball.reveal();
   };
 

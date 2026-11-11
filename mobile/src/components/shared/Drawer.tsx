@@ -9,6 +9,7 @@ import { SheetHandle } from "@/components/shared/SheetHandle";
 import { useScrollEnd } from "@/components/shared/use-scroll-end";
 import { useOverlayOrigin } from "@/components/shared/use-overlay-origin";
 import { useSheetDrag } from "@/components/shared/use-sheet-drag";
+import { useSheetExpand } from "@/components/shared/use-sheet-expand";
 import { OFFSCREEN_Y, useDrawerMotion } from "@/components/shared/use-drawer-motion";
 import { radii, spacing, createStyles } from "@/lib/theme";
 import { useKeyboardHeight } from "@/lib/use-keyboard-height";
@@ -50,6 +51,10 @@ interface DrawerProps {
 const SHEET_RESIZE = LinearTransition.springify().damping(30).stiffness(260).mass(1);
 
 const claimTouch = () => true;
+
+// The sheet surface: a Pressable (it swallows taps meant for the backdrop)
+// whose padding and corners glide with the full-screen toggle.
+const AnimatedPressable = Reanimated.createAnimatedComponent(Pressable);
 
 /**
  * Renders nothing while closed: the sheet and everything it subscribes to
@@ -97,6 +102,15 @@ function DrawerSheet({ visible, onClose, children, footer, child, onEndReached, 
   // The overlay's offset to the real window edges (useOverlayOrigin).
   const { anchorRef, origin, measureAnchor } = useOverlayOrigin(visible);
   const windowSize = Dimensions.get("window");
+  // Full screen glides (height, top padding, corners) on its own UI-thread
+  // value; `fill` is the full-screen layout, held until a collapse has landed.
+  const expand = useSheetExpand({
+    expanded: drag.expanded,
+    available: windowSize.height - keyboardHeight,
+    topInset,
+    cornerRadius: radii.hero,
+  });
+  const fill = expand.fill;
 
   // Read through a ref, so the back handler is not rebuilt per child toggle.
   const childRef = useRef(child);
@@ -134,31 +148,37 @@ function DrawerSheet({ visible, onClose, children, footer, child, onEndReached, 
             sheet vanishing on the spot. */}
         <Animated.View pointerEvents="none" style={[styles.dim, { opacity: dimOpacity }]} />
         <Pressable style={[styles.backdrop, { paddingBottom: keyboardHeight }]} onPress={onClose} accessibilityLabel={t("common.action.close")}>
-          {/* The frame (height, top) glides on this one (SHEET_RESIZE); the
-              slide and the drag move the one inside it. */}
-          <Reanimated.View layout={settled ? SHEET_RESIZE : undefined} style={[styles.sheetTouchArea, drag.expanded && styles.sheetTouchAreaExpanded]}>
-            <Animated.View style={[styles.sheetSlide, drag.expanded && styles.sheetSlideExpanded, { transform: [{ translateY }] }]}>
+          {/* The frame (height, top) glides on this one: content changes on
+              SHEET_RESIZE, the full-screen toggle on useSheetExpand (never
+              both at once). The slide and the drag move the one inside it. */}
+          <Reanimated.View
+            layout={settled && !fill ? SHEET_RESIZE : undefined}
+            style={[styles.sheetTouchArea, fill && styles.sheetTouchAreaExpanded, expand.frameStyle]}
+          >
+            <Animated.View style={[styles.sheetSlide, fill && styles.sheetSlideExpanded, { transform: [{ translateY }] }]}>
               {/* Under the sheet, in its colour: pulling the sheet up lifts it
                   off the bottom edge for a moment (use-sheet-drag's rubber
                   band), and a sheet gliding shorter leaves its old foot
                   uncovered for a moment (SHEET_RESIZE); this fills both. */}
               <View pointerEvents="none" style={styles.skirt} />
-              <Pressable
+              <AnimatedPressable
                 onPress={() => {}}
                 onLayout={(event) => {
                   onSheetHeight(event.nativeEvent.layout.height);
                   drag.onSheetLayout(event);
+                  expand.onSurfaceLayout(event);
                 }}
                 // Full screen reaches the very top edge, under the status bar,
-                // so its own padding carries the handle clear of the bar.
-                style={[styles.sheetSurface, drag.expanded && [styles.sheetSurfaceExpanded, { paddingTop: topInset }]]}
+                // so its own padding (surfaceStyle) carries the handle clear of
+                // the bar, growing in with the height.
+                style={[styles.sheetSurface, fill && styles.sheetSurfaceExpanded, expand.surfaceStyle]}
               >
                 <SheetHandle panHandlers={drag.panHandlers} progress={drag.progress} expanded={drag.expanded} />
                 <ScrollView
                   // flexShrink so a pinned footer can claim its space out of the
                   // scroll area once the sheet hits its 90% cap, rather than
                   // being pushed off the bottom of the screen by it.
-                  style={[styles.sheetScroll, drag.expanded && styles.sheetScrollExpanded]}
+                  style={[styles.sheetScroll, fill && styles.sheetScrollExpanded]}
                   keyboardShouldPersistTaps="handled"
                   showsVerticalScrollIndicator={false}
                   {...scrollEnd}
@@ -177,7 +197,7 @@ function DrawerSheet({ visible, onClose, children, footer, child, onEndReached, 
                   </View>
                 </ScrollView>
                 {footer ? <View style={[styles.footer, { paddingBottom: spacing.xl + navPad }]}>{footer}</View> : null}
-              </Pressable>
+              </AnimatedPressable>
             </Animated.View>
           </Reanimated.View>
         </Pressable>
@@ -212,15 +232,16 @@ const useStyles = createStyles((colors) => ({
   // strip of dimmed screen showing — about a tenth of a phone with a tall
   // status bar or a cutout. The content keeps clear of the bar through the
   // surface's own top padding instead. The scroll area takes the extra
-  // room, so a pinned footer stays at the bottom.
-  sheetTouchAreaExpanded: { height: "100%", maxHeight: "100%" },
+  // room, so a pinned footer stays at the bottom. The height itself glides
+  // in through minHeight (useSheetExpand); this only lifts the 92% cap.
+  sheetTouchAreaExpanded: { maxHeight: "100%" },
   sheetSlide: { flexShrink: 1 },
   sheetSlideExpanded: { flex: 1 },
   // A whole window tall: a full-screen sheet gliding back to a short one
   // leaves nearly that much under it on the way down.
   skirt: { position: "absolute", left: 0, right: 0, top: "50%", height: OFFSCREEN_Y, backgroundColor: colors.surface },
-  // Square at the top edge: nothing shows above a sheet that fills the screen.
-  sheetSurfaceExpanded: { flex: 1, borderTopLeftRadius: 0, borderTopRightRadius: 0 },
+  // Its corners square off as it reaches the top edge (useSheetExpand).
+  sheetSurfaceExpanded: { flex: 1 },
   sheetScrollExpanded: { flex: 1 },
   // The surface (background + rounded top) is on this wrapper, not the
   // ScrollView's content, so a pinned footer outside the scroll shares it.

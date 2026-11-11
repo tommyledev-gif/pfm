@@ -131,6 +131,21 @@ function createBallMotion(tabCount: number, startIndex: number, onSettled: () =>
       rowOpacities.forEach((opacity, i) => opacity.setValue(i === index ? 0 : 1));
     },
 
+    /**
+     * Runs every animation a switch uses once, towards the values the nav is
+     * already at, so the first real tap finds its native node graph built and
+     * attached (the interpolations, the spring, five icon pairs): that setup
+     * used to land inside the first switch, while JS was busy with the screen,
+     * and was the only one slow. Nothing visibly moves. Call after place(),
+     * before reveal().
+     */
+    warmUp(index: number, x: number) {
+      run(ballX, x, Animated.spring(ballX, { toValue: x, ...SLIDE_SPRING, useNativeDriver: true }));
+      run(switchProgress, 1, timing(switchProgress, 1, 1));
+      ballIconOpacities.forEach((opacity, i) => run(opacity, i === index ? 1 : 0, timing(opacity, i === index ? 1 : 0, 1)));
+      rowOpacities.forEach((opacity, i) => run(opacity, i === index ? 0 : 1, timing(opacity, i === index ? 0 : 1, 1)));
+    },
+
     reveal() {
       timing(ballOpacity, 1, 120).start();
     },
