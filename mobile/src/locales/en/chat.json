@@ -168,22 +168,22 @@
       "copy": "Copy"
     },
     "phrases": {
-      "unsave": "Unsave phrase",
-      "save": "Save phrase",
+      "unprioritize": "Deprioritize phrase",
+      "prioritize": "Prioritize phrase",
       "noMatch": "No matching phrases",
       "search": {
-        "placeholder_one": "Search {{count}} saved phrase",
-        "placeholder_other": "Search {{count}} saved phrases"
+        "placeholder_one": "Search {{count}} phrase",
+        "placeholder_other": "Search {{count}} phrases"
       },
       "delete": "Delete phrase",
-      "saved": {
-        "toast": "Phrase saved"
+      "prioritized": {
+        "toast": "Phrase prioritized"
       },
-      "unsaved": {
-        "toast": "Phrase unsaved"
+      "unprioritized": {
+        "toast": "Phrase deprioritized"
       },
       "full": {
-        "toast": "{{max}} saved phrases is the limit. Delete one to add another."
+        "toast": "Prioritized phrases are full at {{max}}, deprioritize one to add another"
       },
       "deleted": {
         "toast": "Phrase deleted"

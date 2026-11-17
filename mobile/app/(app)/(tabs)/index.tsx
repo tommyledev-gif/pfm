@@ -41,6 +41,7 @@ import { useOpenWalletCreator } from "@/features/wallets/use-open-wallet-creator
 import { useWalletLookups } from "@/features/wallets/use-wallet-lookups";
 import { touchesSharedWallet } from "@/features/wallets/wallet-access";
 import { useUiPrefsStore, HomePeriod } from "@/stores/ui-prefs-store";
+import { withThemeScope } from "@/theme/theme-scope";
 
 const RECENT_TRANSACTION_COUNT = 4;
 // Over-fetched on purpose: rows dated ahead of today are dropped below, and
@@ -82,7 +83,7 @@ const RecentRow = memo(function RecentRow({ transaction, onPress, ...row }: Rece
  * proposals after the wallets), and each carries a layout spring, so a late
  * one fades in while everything under it slides down instead of jumping.
  */
-export default function HomeScreen() {
+function HomeScreen() {
   const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
@@ -298,3 +299,7 @@ const useStyles = createStyles((colors) => ({
   sectionAction: { ...typography.caption, color: colors.green },
   addWalletAction: { flexDirection: "row", alignItems: "center", gap: 4 },
 }));
+
+// A theme scope: a theme switch made from a screen pushed over the tabs
+// reaches Home a moment later (src/theme/theme-scope.tsx).
+export default withThemeScope(HomeScreen, 0);

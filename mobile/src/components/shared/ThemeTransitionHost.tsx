@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, Image, StyleSheet } from "react-native";
+import Reanimated, { cancelAnimation, useAnimatedStyle, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
 
 import { ScreenLoader } from "@/components/shared/ScreenLoader";
 import { withAlpha } from "@/lib/color";
@@ -28,6 +29,10 @@ const COVER_MS = 140;
 const IDLE_ROUNDS = 2;
 // The cover comes off by then even if the JS thread never goes idle.
 const LANGUAGE_SETTLE_FAILSAFE_MS = 5000;
+// A theme switch that is still not on screen this long after its snapshot went
+// up shows the loader. A normal one is done well inside it and never does.
+const THEME_LOADER_AFTER_MS = 450;
+const THEME_LOADER_FADE_MS = 200;
 
 // Second half of useSwitchTheme() and useSwitchLanguage(): shows the
 // snapshot of the screen as it was over the whole app, applies the change
@@ -91,6 +96,12 @@ function SnapshotFade({ uri, change }: { uri: string; change: PendingChange }) {
   // The language switch's dimmed cover and loader, 0 → 1 before it starts.
   const cover = useRef(new Animated.Value(0)).current;
   const [painted, setPainted] = useState(false);
+  // A theme switch's loader, for a switch that takes too long. Its delay runs
+  // on the UI thread (Reanimated), started before the switch is: a timer on
+  // the JS thread would not fire until the re-render it is meant to cover was
+  // over. Until then it is fully transparent, so a normal switch shows nothing.
+  const loaderOpacity = useSharedValue(0);
+  const loaderStyle = useAnimatedStyle(() => ({ opacity: loaderOpacity.value }));
   const themeName = useThemeName();
   // The language lands in the same commit as every useTranslation() re-render:
   // lib/i18n.ts switches i18next inside the store update that this reads.
@@ -121,13 +132,16 @@ function SnapshotFade({ uri, change }: { uri: string; change: PendingChange }) {
   useEffect(() => {
     if (!painted) return;
     if (!isLanguage) {
+      loaderOpacity.value = withDelay(THEME_LOADER_AFTER_MS, withTiming(1, { duration: THEME_LOADER_FADE_MS }));
       applyChange(change);
       return;
     }
     Animated.timing(cover, { toValue: 1, duration: COVER_MS, easing: Easing.out(Easing.quad), useNativeDriver: true })
       // Interrupted or not: the switch must happen.
       .start(() => applyChange(change));
-  }, [painted, change, isLanguage, cover]);
+  }, [painted, change, isLanguage, cover, loaderOpacity]);
+
+  useEffect(() => () => cancelAnimation(loaderOpacity), [loaderOpacity]);
 
   // The commit carrying the change has landed (this component re-rendered
   // with it): give native time to show it, then fade the snapshot out. A
@@ -167,6 +181,10 @@ function SnapshotFade({ uri, change }: { uri: string; change: PendingChange }) {
               would start just as the re-render holds every commit. */}
           <ScreenLoader instant />
         </Animated.View>
+      ) : painted ? (
+        <Reanimated.View pointerEvents="none" style={[styles.cover, loaderStyle]}>
+          <ScreenLoader instant />
+        </Reanimated.View>
       ) : null}
     </Animated.View>
   );

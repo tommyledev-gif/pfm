@@ -4,13 +4,12 @@ import { useTranslation } from "react-i18next";
 import { useHintTooltip } from "@/components/shared/use-hint-tooltip";
 import { MapPinIcon } from "@/components/ui/Icon";
 import { withAlpha } from "@/lib/color";
+import { LOCATION_TAB_BUTTON } from "@/features/ai-chat/components/chat-composer-metrics";
 import { radii, createStyles, useColors } from "@/lib/theme";
 import { useUiPrefsStore } from "@/stores/ui-prefs-store";
 
 const ICON_SIZE = 18;
 const SLASH_LENGTH = 20;
-/** The button's size: the phrase search pill's height, so the two sit level. */
-export const LOCATION_TOGGLE_SIZE = 34;
 
 /**
  * "Ghim vị trí khi tạo giao dịch" (Cài đặt người dùng) from the recording
@@ -18,9 +17,10 @@ export const LOCATION_TOGGLE_SIZE = 34;
  * (proposal-auto-pin.ts), struck through while it does not. One tap flips the
  * same setting; a hold says what the tap does.
  *
- * A round button of its own, floating at the right of the row above the
- * input, level with the phrase search (ChatInputBar's `floating`). Inside the
- * field it took room from the text being typed.
+ * A round button with no ground of its own: ChatInputBar seats it in a tab on
+ * the input bar's top edge (its `floating` slot), which carries the surface
+ * and the ring, so it reads as part of the bar. Inside the field it took room
+ * from the text being typed.
  */
 export function LocationPinToggle() {
   const colors = useColors();
@@ -55,18 +55,13 @@ export function LocationPinToggle() {
   );
 }
 
-const useStyles = createStyles((colors) => ({
-  // Surface and hairline like the phrase search pill beside it: it floats
-  // over the thread, so it needs its own ground.
+const useStyles = createStyles(() => ({
   button: {
-    width: LOCATION_TOGGLE_SIZE,
-    height: LOCATION_TOGGLE_SIZE,
+    width: LOCATION_TAB_BUTTON,
+    height: LOCATION_TAB_BUTTON,
     borderRadius: radii.pill,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
   },
   well: { width: 28, height: 28, borderRadius: radii.pill, alignItems: "center", justifyContent: "center" },
   slash: { position: "absolute", width: SLASH_LENGTH, height: 1.5, borderRadius: 1, transform: [{ rotate: "-45deg" }] },

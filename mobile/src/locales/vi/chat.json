@@ -163,21 +163,21 @@
       "copy": "Sao chép"
     },
     "phrases": {
-      "unsave": "Bỏ lưu câu mẫu",
-      "save": "Lưu câu mẫu",
+      "unprioritize": "Bỏ ưu tiên câu mẫu",
+      "prioritize": "Ưu tiên câu mẫu",
       "noMatch": "Không tìm thấy câu mẫu",
       "search": {
         "placeholder_other": "Tìm trong {{count}} câu mẫu"
       },
       "delete": "Xóa câu mẫu",
-      "saved": {
-        "toast": "Đã lưu câu mẫu"
+      "prioritized": {
+        "toast": "Đã ưu tiên câu mẫu"
       },
-      "unsaved": {
-        "toast": "Đã bỏ lưu câu mẫu"
+      "unprioritized": {
+        "toast": "Đã bỏ ưu tiên câu mẫu"
       },
       "full": {
-        "toast": "Đã đủ {{max}} câu mẫu. …"
+        "toast": "Đã đủ {{max}} câu ưu tiên, bỏ ưu tiên một câu để thêm câu khác"
       },
       "deleted": {
         "toast": "Đã xóa câu mẫu"

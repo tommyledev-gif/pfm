@@ -39,6 +39,8 @@ export function BudgetDetailDialog({ row, onClose, category, range, currency }: 
       currency={currency}
       total={row?.limit.spent ?? 0}
       budget={row ? { spent: row.limit.spent, limit: row.limit.amount_limit } : undefined}
+      // What the bar counted: expenses, in the limit's currency.
+      only={{ type: "expense", currency }}
     />
   );
 }

@@ -11,7 +11,6 @@ import { useFabClearance } from "@/components/ui/Fab";
 import { CategoryPickerDrawer } from "@/components/shared/CategoryPickerDrawer";
 import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
 import { BudgetFormModal } from "@/features/budgets/components/BudgetFormModal";
-import { colorForCategory } from "@/lib/category-color";
 import { monthRange } from "@/lib/date-range";
 import { formatDateRange } from "@/lib/format-date";
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
@@ -23,8 +22,10 @@ import { WalletCurrency } from "@/lib/constants";
 import { useBudgetsQuery } from "@/features/budgets/api/use-budgets-query";
 import { Budget } from "@/features/budgets/types";
 import { currentMonthPace } from "@/features/budgets/budget-pace";
+import { useBudgetPickerCategories } from "@/features/budgets/hooks/use-budget-picker-categories";
 import { useBudgetRows } from "@/features/budgets/hooks/use-budget-rows";
 import { BUDGET_FILTERS, BudgetFilterKey, BudgetFilterTabs } from "@/features/budgets/components/BudgetFilterTabs";
+import { BudgetPaceLegend } from "@/features/budgets/components/BudgetPaceLegend";
 import { BudgetDetailDialog } from "@/features/budgets/components/BudgetDetailDialog";
 import { BudgetsFab } from "@/features/budgets/components/BudgetsFab";
 import { BudgetListSkeleton, BudgetTabSkeleton } from "@/features/budgets/components/BudgetCardSkeleton";
@@ -32,7 +33,6 @@ import { BudgetListRow } from "@/features/budgets/components/BudgetListRow";
 import { BudgetSummaryCard } from "@/features/budgets/components/BudgetSummaryCard";
 import { BudgetPreset, BudgetsEmptyState } from "@/features/budgets/components/BudgetsEmptyState";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
-import { categoryLabel } from "@/features/categories/category-label";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { primaryCurrency } from "@/features/wallets/wallet-totals";
 
@@ -107,18 +107,7 @@ export const BudgetsTab = memo(function BudgetsTab({ initialRange, rangeNonce, o
   const held = useLastSettled(live, rangeLoading);
   const rangeDim = useDimWhile(rangeLoading);
   const { rangeActive, resolvedRange, rangeElapsed, rows, counts, totals, visibleRows } = held ?? live;
-  const pickerCategories = useMemo(
-    () =>
-      Array.from(new Map(rows.map(({ budget }) => [budget.category_id, budget])).values()).map((budget) => ({
-        id: budget.category_id,
-        name: categoryLabel(categoryById.get(budget.category_id), budget.category_name),
-        icon: budget.icon ?? categoryById.get(budget.category_id)?.icon,
-        iconUrl: budget.icon_url ?? categoryById.get(budget.category_id)?.icon_url,
-        color: colorForCategory(budget.category_id),
-      })),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- t: category names follow a language switch
-    [rows, categoryById, t],
-  );
+  const pickerCategories = useBudgetPickerCategories(rows, categoryById);
   const scrollContentStyle = useMemo(() => ({ paddingBottom: fabClearance }), [fabClearance]);
 
   // Stable, so the memoized rows re-render only when their own budget does.
@@ -209,6 +198,7 @@ export const BudgetsTab = memo(function BudgetsTab({ initialRange, rangeNonce, o
                 ) : (
                   <Animated.View style={rangeDim} onLayout={(e) => (dimTop.current = e.nativeEvent.layout.y)}>
                     <BudgetFilterTabs value={filter} onChange={setFilter} counts={counts} style={styles.tabs} />
+                    {rows.length > 0 ? <BudgetPaceLegend /> : null}
 
                     <PeriodSlide index={filterIndex} onLayout={(e) => (rowsTop.current = e.nativeEvent.layout.y)}>
                       {visibleRows.length === 0 ? (

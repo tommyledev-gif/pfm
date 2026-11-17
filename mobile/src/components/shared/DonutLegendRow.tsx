@@ -9,6 +9,7 @@ import { formatPercent } from "@/lib/percent";
 import { useHoldProgress } from "@/lib/use-hold-progress";
 import { typography, createStyles, useColors } from "@/lib/theme";
 import { DonutSegment } from "@/components/shared/DonutChart";
+import { markDonutTouch } from "@/components/shared/donut-selection";
 
 const HOLD_MS = 2000;
 
@@ -36,6 +37,9 @@ export const DonutLegendRow = memo(function DonutLegendRow({
 
   return (
     <Pressable
+      // A tap here selects (or deselects) a slice: not "elsewhere" for the
+      // screen's outside-touch clear (donut-selection.ts).
+      onTouchStart={markDonutTouch}
       onPress={() => onPress(segment.key)}
       onPressIn={start}
       onPressOut={cancel}

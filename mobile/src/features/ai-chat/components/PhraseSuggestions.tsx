@@ -12,8 +12,15 @@ import { usePhraseSuggestions } from "@/features/ai-chat/hooks/use-phrase-sugges
 
 // The pin and remove buttons are small; their touch targets should not be.
 const ICON_HIT_SLOP = 12;
+// The list shows at least 2 phrases and at most 5 at a time, however much room
+// the pane has: a one-row list read as broken, a taller one covered the thread.
+// Past 5, it scrolls.
+const MIN_VISIBLE_ROWS = 2;
+const MAX_VISIBLE_ROWS = 5;
 // While a message is being typed, only its closest matches — a hint, not a list.
-const AUTOCOMPLETE_LIMIT = 3;
+const AUTOCOMPLETE_LIMIT = MAX_VISIBLE_ROWS;
+// A row's height until the first one has been laid out and reports its own.
+const ROW_HEIGHT_ESTIMATE = 46;
 const FADE_HEIGHT = 28;
 // Below this much hidden content the list counts as fully shown.
 const SCROLL_EPSILON = 2;
@@ -22,13 +29,16 @@ interface PhraseSuggestionsProps {
   /** The message being typed: its closest matches show while the search is empty. */
   input: string;
   userId: string | null;
-  /** The list is never taller than this — a fifth of the conversation area (spec BR-05). */
+  /**
+   * How tall the list may be: a fifth of the conversation area (spec BR-05).
+   * Counted in rows, kept between MIN_VISIBLE_ROWS and MAX_VISIBLE_ROWS.
+   */
   maxHeight: number;
   /** Replaces the whole input with the phrase. Never sends. */
   onSelect: (text: string, fromSearch: boolean) => void;
   /** The search field's own focus, so the panel stays open while it has it. */
   onSearchFocusChange: (focused: boolean) => void;
-  /** Room kept at the right of the search's line (the location switch floats there). */
+  /** Room kept at the right of the search's line (the location tab sits there). */
   searchInsetRight?: number;
 }
 
@@ -37,7 +47,7 @@ interface PhraseSuggestionsProps {
  * Not the whole list any more: a small search field ("Tìm trong 12 câu mẫu"),
  * which lists every phrase once it is tapped and narrows them as it is typed
  * into. While only the message is being typed, its few closest matches show.
- * Each row pins (saves) or removes its phrase.
+ * Each row prioritizes (lists it first, keeps it) or removes its phrase.
  *
  * `keyboardShouldPersistTaps="always"`: a tap on a row must fill the input,
  * not blur it — blurring would hide this panel before the tap landed.
@@ -63,6 +73,12 @@ export function PhraseSuggestions({
     const metrics = Object.assign(scrollMetrics.current, patch);
     setMoreBelow(metrics.content - metrics.box - metrics.y > SCROLL_EPSILON);
   };
+  // One row's real height, from the first row: the list is sized in rows.
+  const [rowHeight, setRowHeight] = useState(ROW_HEIGHT_ESTIMATE);
+  const measureRow = useLatestCallback((height: number) =>
+    setRowHeight((prev) => (Math.abs(prev - height) < 0.5 ? prev : height)),
+  );
+  const visibleRows = Math.min(MAX_VISIBLE_ROWS, Math.max(MIN_VISIBLE_ROWS, Math.floor(maxHeight / rowHeight)));
 
   // A focused field that unmounts sends no blur: let go of the lift ourselves.
   const searchFocusedRef = useRef(false);
@@ -98,7 +114,7 @@ export function PhraseSuggestions({
   return (
     <View style={styles.panel}>
       {suggestions.length > 0 ? (
-        <View style={[styles.listBox, { maxHeight }]}>
+        <View style={[styles.listBox, { maxHeight: visibleRows * rowHeight }]}>
           <ScrollView
             testID="list-phrase-suggestions"
             keyboardShouldPersistTaps="always"
@@ -112,7 +128,13 @@ export function PhraseSuggestions({
             scrollEventThrottle={32}
           >
             {suggestions.map((suggestion, index) => (
-              <SuggestionRow key={suggestion.text} text={suggestion.text} index={index} onSelect={select} />
+              <SuggestionRow
+                key={suggestion.text}
+                text={suggestion.text}
+                index={index}
+                onSelect={select}
+                onMeasure={index === 0 ? measureRow : undefined}
+              />
             ))}
           </ScrollView>
           {moreBelow ? <EdgeFade edge="bottom" width={FADE_HEIGHT} color={colors.surface} /> : null}
@@ -150,15 +172,17 @@ interface SuggestionRowProps {
   text: string;
   index: number;
   onSelect: (text: string) => void;
+  /** Only the first row reports its height: they are all the same. */
+  onMeasure?: (height: number) => void;
 }
 
 // Memoised: the list re-renders as the input changes, but a row only changes
-// when its own phrase or saved state does.
+// when its own phrase or priority state does.
 //
-// Pin and remove are trailing buttons, not a hold menu: a menu is a Modal,
-// opening it blurs the input, and a blurred input hides this whole panel —
-// the menu would vanish with it. A tap inside this list keeps focus.
-const SuggestionRow = memo(function SuggestionRow({ text, index, onSelect }: SuggestionRowProps) {
+// Prioritize and remove are trailing buttons, not a hold menu: a menu is a
+// Modal, opening it blurs the input, and a blurred input hides this whole
+// panel — the menu would vanish with it. A tap inside this list keeps focus.
+const SuggestionRow = memo(function SuggestionRow({ text, index, onSelect, onMeasure }: SuggestionRowProps) {
   const colors = useColors();
   const styles = useStyles();
   const { t } = useTranslation();
@@ -169,6 +193,7 @@ const SuggestionRow = memo(function SuggestionRow({ text, index, onSelect }: Sug
       testID={`row-phrase-suggestion-${index}`}
       accessibilityRole="button"
       onPress={() => onSelect(text)}
+      onLayout={onMeasure ? (e) => onMeasure(e.nativeEvent.layout.height) : undefined}
       style={({ pressed }) => [styles.row, index > 0 && styles.divider, pressed && styles.pressed]}
     >
       <Text style={styles.label} numberOfLines={1}>
@@ -179,7 +204,7 @@ const SuggestionRow = memo(function SuggestionRow({ text, index, onSelect }: Sug
           <Pressable
             testID={`btn-phrase-pin-${index}`}
             accessibilityRole="button"
-            accessibilityLabel={phrase.saved ? t("chat.phrases.unsave") : t("chat.phrases.save")}
+            accessibilityLabel={phrase.saved ? t("chat.phrases.unprioritize") : t("chat.phrases.prioritize")}
             accessibilityState={{ selected: phrase.saved }}
             onPress={phrase.toggle}
             hitSlop={ICON_HIT_SLOP}

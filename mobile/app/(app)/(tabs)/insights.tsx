@@ -15,6 +15,7 @@ import { ENTER_OFFSET, SPRING } from "@/components/motion/motion-tokens";
 import { Screen } from "@/components/shared/Screen";
 import { spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useReduceMotion } from "@/lib/use-reduce-motion";
+import { withThemeScope } from "@/theme/theme-scope";
 import { SpendingTab } from "@/features/reports/components/SpendingTab";
 import { BudgetsTab } from "@/features/budgets/components/BudgetsTab";
 import { BudgetWizardModal } from "@/features/budget-wizard/components/BudgetWizardModal";
@@ -171,4 +172,4 @@ const useStyles = createStyles((colors) => ({
 }));
 
 // Through withTabParams, not memo alone: see src/lib/tab-route-params.tsx.
-export default withTabParams(InsightsScreen);
+export default withThemeScope(withTabParams(InsightsScreen), 3);

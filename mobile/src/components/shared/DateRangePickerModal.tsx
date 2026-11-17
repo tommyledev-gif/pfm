@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { DateData } from "react-native-calendars";
@@ -7,6 +7,7 @@ import { MarkingProps } from "react-native-calendars/src/calendar/day/marking";
 import { Drawer } from "@/components/shared/Drawer";
 import { MonthYearCalendar } from "@/components/shared/MonthYearCalendar";
 import { formatDateShort } from "@/lib/format-date";
+import { useLatestCallback } from "@/lib/use-latest-callback";
 import { PillButton } from "@/components/ui/PillButton";
 import { colors, radii, spacing, typography, createStyles } from "@/lib/theme";
 
@@ -68,11 +69,23 @@ function addDaysIso(iso: string, days: number): string {
 // The month/year title above the grid jumps to any month and year inline
 // (MonthYearCalendar) — react-native-calendars' own header only has
 // prev/next arrows.
+//
+// ⚠️ The range is handed to the caller once the sheet has slid away (Drawer's
+// onExited), never on the tap. A new range re-renders the whole screen behind
+// the sheet (Transactions: new queries, the list swapped for its skeleton,
+// totals, every row), and on the tap that commit landed while the sheet was
+// still sliding down: its frames were dropped, and a re-render of the sheet
+// itself mid-slide sent it back to where it started for a frame (a shake and a
+// flash). Same order as LanguageSheet. The frame after the exit, so the
+// sheet's own unmount is not part of that commit.
 export const DateRangePickerModal = memo(function DateRangePickerModal({ visible, onClose, from, to, onApply }: DateRangePickerModalProps) {
   const { t } = useTranslation();
   const styles = useStyles();
   const [start, setStart] = useState<string | null>(from ?? null);
   const [end, setEnd] = useState<string | null>(to ?? null);
+  // The range tapped, applied once the sheet is gone. Null: closed without one.
+  const pending = useRef<{ from?: string; to?: string } | null>(null);
+  const applyRange = useLatestCallback(onApply);
 
   // Re-seeds from the caller's own applied range every time the sheet opens —
   // without this, clearing the filter and dismissing without pressing Áp
@@ -80,9 +93,15 @@ export const DateRangePickerModal = memo(function DateRangePickerModal({ visible
   // that no longer matched what was actually applied.
   useEffect(() => {
     if (!visible) return;
-    setStart(from ?? null);
-    setEnd(to ?? null);
-  }, [visible, from, to]);
+    // Reopened before the last close had finished: that range was tapped, so it
+    // is applied now rather than waiting for an exit this open may never reach
+    // by the same route (and then landing on some later dismissal).
+    const unapplied = pending.current;
+    pending.current = null;
+    if (unapplied) applyRange(unapplied);
+    setStart(unapplied ? unapplied.from ?? null : from ?? null);
+    setEnd(unapplied ? unapplied.to ?? null : to ?? null);
+  }, [visible, from, to, applyRange]);
 
   const markedDates = useMemo(() => buildMarkedDates(start, end), [start, end]);
 
@@ -105,24 +124,30 @@ export const DateRangePickerModal = memo(function DateRangePickerModal({ visible
   };
 
   const clear = () => {
-    setStart(null);
-    setEnd(null);
-    // Applies immediately instead of only resetting the calendar's own local
-    // selection — previously "Xóa lọc" left the Áp dụng button disabled (no
-    // start day left to apply) with no way to actually clear the filter
-    // short of picking a whole new range, so the old one silently stayed
-    // active even after backing out of the sheet.
-    onApply({ from: undefined, to: undefined });
+    // Applies, instead of only resetting the calendar's own local selection —
+    // previously "Xóa lọc" left the Áp dụng button disabled (no start day left
+    // to apply) with no way to actually clear the filter short of picking a
+    // whole new range, so the old one silently stayed active even after
+    // backing out of the sheet. The calendar's own selection is left alone:
+    // re-seeding it here would redraw the sheet while it slides away, and the
+    // next open re-seeds it from the applied range anyway.
+    pending.current = { from: undefined, to: undefined };
     onClose();
   };
 
   const apply = () => {
-    onApply({ from: start ?? undefined, to: end ?? start ?? undefined });
+    pending.current = { from: start ?? undefined, to: end ?? start ?? undefined };
     onClose();
   };
 
+  const handleExited = () => {
+    const range = pending.current;
+    pending.current = null;
+    if (range) requestAnimationFrame(() => applyRange(range));
+  };
+
   return (
-    <Drawer visible={visible} onClose={onClose}>
+    <Drawer visible={visible} onClose={onClose} onExited={handleExited}>
       <Text style={styles.title}>{t("ui.dateRange.title")}</Text>
       <Text style={styles.subtitle}>
         {start

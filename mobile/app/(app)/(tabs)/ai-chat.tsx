@@ -8,11 +8,10 @@ import { entrance } from "@/components/motion/motion-tokens";
 import { Screen } from "@/components/shared/Screen";
 import { closeParkedSwipeRow } from "@/components/shared/use-swipe-actions";
 import { ChatModeBackdrop } from "@/features/ai-chat/components/ChatModeBackdrop";
-import { ChatModeHeader } from "@/features/ai-chat/components/ChatModeHeader";
 import { ChatOverlays } from "@/features/ai-chat/components/ChatOverlays";
-import { ChatSearchBar } from "@/features/ai-chat/components/ChatSearchBar";
 import { ChatSearchResults } from "@/features/ai-chat/components/ChatSearchResults";
 import { ChatSearchStepper } from "@/features/ai-chat/components/ChatSearchStepper";
+import { ChatTopBar } from "@/features/ai-chat/components/ChatTopBar";
 import { ConsultPane } from "@/features/ai-chat/components/ConsultPane";
 import { RecordingPane } from "@/features/ai-chat/components/RecordingPane";
 import { useTransactionRemoval } from "@/features/ai-chat/components/use-transaction-removal";
@@ -35,6 +34,7 @@ import { useAfterTabSwitch } from "@/lib/use-after-tab-switch";
 import { useLatestCallback } from "@/lib/use-latest-callback";
 import { useChatStore, useChatThreadRestored } from "@/stores/chat-store";
 import { useCurrentUserId } from "@/stores/use-current-user-id";
+import { withThemeScope } from "@/theme/theme-scope";
 
 function AiChatScreen() {
   const insets = useSafeAreaInsets();
@@ -193,21 +193,17 @@ function AiChatScreen() {
       {/* Outside the content View so its wash runs up under the status bar too. */}
       <ChatModeBackdrop mode={mode} />
       <View style={styles.screen}>
-        {search.open ? (
-          <ChatSearchBar
-            query={search.query}
-            onChangeQuery={search.setQuery}
-            searchableCount={search.searchableCount}
-            onClose={search.closeSearch}
-          />
-        ) : (
-          <ChatModeHeader
-            mode={mode}
-            onSelectMode={handleSelectMode}
-            onPressSearch={search.openSearch}
-            onOpenManualEntry={openManualEntry}
-          />
-        )}
+        <ChatTopBar
+          searching={search.open}
+          mode={mode}
+          onSelectMode={handleSelectMode}
+          onPressSearch={search.openSearch}
+          onOpenManualEntry={openManualEntry}
+          query={search.query}
+          onChangeQuery={search.setQuery}
+          searchableCount={search.searchableCount}
+          onCloseSearch={search.closeSearch}
+        />
 
         {/* Keyed by pane, not mode: recording and the budget wizard share one. */}
         <Animated.View
@@ -293,4 +289,4 @@ const styles = StyleSheet.create({
 });
 
 // Through withTabParams, not memo alone: see src/lib/tab-route-params.tsx.
-export default withTabParams(AiChatScreen);
+export default withThemeScope(withTabParams(AiChatScreen), 2);

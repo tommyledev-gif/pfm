@@ -55,6 +55,9 @@
       "spentOfLimit": "{{spent}} / {{limit}}",
       "seeTransactions": "See transactions"
     },
+    "legend": {
+      "pace": "Vertical mark: spending if spread evenly by day"
+    },
     "figures": {
       "usedShare": "{{percent}} of limit used",
       "limit": "Limit"

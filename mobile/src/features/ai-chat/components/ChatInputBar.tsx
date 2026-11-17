@@ -5,9 +5,13 @@ import { useTranslation } from "react-i18next";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { CloseIcon, SendIcon } from "@/components/ui/Icon";
 import { CHAT_MODE_META, ChatMode } from "@/features/ai-chat/chat-mode";
-import { COMPOSER_NAV_CLEARANCE } from "@/features/ai-chat/components/chat-composer-metrics";
+import {
+  COMPOSER_NAV_CLEARANCE,
+  LOCATION_TAB_HEIGHT,
+  LOCATION_TAB_INSET_RIGHT,
+  LOCATION_TAB_PADDING_X,
+} from "@/features/ai-chat/components/chat-composer-metrics";
 import { useReportComposerFocus } from "@/features/ai-chat/components/KeyboardLiftView";
-import { LOCATION_TOGGLE_SIZE } from "@/features/ai-chat/components/LocationPinToggle";
 import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 
@@ -39,9 +43,10 @@ interface ChatInputBarProps {
   /** Inside the field, before the text — the recording pane's attach-image button. */
   leading?: ReactNode;
   /**
-   * Floats at the right of the row above the field, level with aboveInput's
-   * last row (the phrase search) — the recording pane's location switch. The
-   * row is there even while aboveInput is not, so it can always be tapped.
+   * A tab on the bar's top edge, at the right — the recording pane's location
+   * switch. It shares the bar's surface and ring, so it reads as part of the
+   * bar's container instead of a button hung over the thread. The row holding
+   * it is there even while aboveInput is not, so it can always be tapped.
    */
   floating?: ReactNode;
 }
@@ -90,6 +95,8 @@ export function ChatInputBar({
   const reportComposerFocus = useReportComposerFocus();
   const canSend = value.trim().length > 0 && !sending;
   const tint = CHAT_MODE_META[mode].tint;
+  // The bar's ring, shared with the tab on its top edge so the two match.
+  const ringColor = withAlpha(tint, focused ? FOCUS_RING_ALPHA : IDLE_RING_ALPHA);
 
   const handleFocusChange = (next: boolean) => {
     setFocused(next);
@@ -107,12 +114,14 @@ export function ChatInputBar({
 
 
       {floating ? (
-        // ⚠️ The floating button is inside this row's bounds, never hung below
-        // an empty one: Android delivers no touches outside a parent's box.
-        // The rest of the row lets touches through to the thread.
+        // ⚠️ The tab is inside this row's bounds, never hung below an empty
+        // one: Android delivers no touches outside a parent's box. The row is
+        // drawn above the bar (zIndex) so the tab's own surface can cover the
+        // bar's hairline where the two meet. The rest of the row lets touches
+        // through to the thread.
         <View style={styles.aboveRow} pointerEvents="box-none">
           {aboveInput}
-          <View style={styles.floating} pointerEvents="box-none">
+          <View style={[styles.tab, { borderColor: ringColor }]} pointerEvents="box-none">
             {floating}
           </View>
         </View>
@@ -128,7 +137,7 @@ export function ChatInputBar({
           // this margin on keyboard events made the bar jump after the
           // keyboard instead of moving with it.
           { marginBottom: bottomInset + COMPOSER_NAV_CLEARANCE },
-          { borderColor: withAlpha(tint, focused ? FOCUS_RING_ALPHA : IDLE_RING_ALPHA) },
+          { borderColor: ringColor },
         ]}
       >
         {leading}
@@ -205,11 +214,26 @@ const useStyles = createStyles((colors) => ({
     marginBottom: spacing.sm,
   },
   quickActionLabel: { ...typography.caption, color: colors.textPrimary },
-  // At least the floating button's own row; the phrase panel, when it shows,
-  // makes it taller and keeps its search on the bottom line beside it.
-  aboveRow: { minHeight: LOCATION_TOGGLE_SIZE + spacing.sm, justifyContent: "flex-end" },
-  // The phrase panel's bottom margin, so it sits level with the search pill.
-  floating: { position: "absolute", right: spacing.xl, bottom: spacing.sm },
+  // At least the tab's own height; the phrase panel, when it shows, makes it
+  // taller and keeps its search on the bottom line beside the tab.
+  aboveRow: { minHeight: LOCATION_TAB_HEIGHT + 2, justifyContent: "flex-end", zIndex: 1 },
+  // Shares the bar's fill and ring. No bottom edge, and it drops 1px over the
+  // bar's top hairline (the row is drawn above the bar), so tab and bar are
+  // one shape. Square at the foot, rounded at the top like the bar.
+  tab: {
+    position: "absolute",
+    right: LOCATION_TAB_INSET_RIGHT,
+    bottom: -1,
+    height: LOCATION_TAB_HEIGHT + 1,
+    paddingHorizontal: LOCATION_TAB_PADDING_X,
+    paddingTop: spacing.xs,
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderTopLeftRadius: radii.listCard,
+    borderTopRightRadius: radii.listCard,
+  },
   inputBar: {
     marginHorizontal: spacing.xl,
     flexDirection: "row",

@@ -24,6 +24,7 @@ import { type Palette, spacing, createStyles, useColors } from "@/lib/theme";
 import { useSessionStore } from "@/stores/session-store";
 import { outboxItemsFor } from "@/stores/outbox-store";
 import { useCurrentUserId } from "@/stores/use-current-user-id";
+import { withThemeScope } from "@/theme/theme-scope";
 import { LogoutGuardDialog } from "@/features/settings/components/LogoutGuardDialog";
 import { ProfileSummaryCard } from "@/features/settings/components/ProfileSummaryCard";
 import { AccountSwitchRow } from "@/features/accounts/components/AccountSwitchRow";
@@ -102,7 +103,7 @@ const ROW_TAP_GUARD_MS = 600;
 // Clears the floating bottom nav, so the last group is never hidden under it.
 const BOTTOM_NAV_CLEARANCE = 140;
 
-export default function SettingsScreen() {
+function SettingsScreen() {
   const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
@@ -206,3 +207,7 @@ const useStyles = createStyles((colors) => ({
   // The content already pads the sides; the title lines up with the cards.
   header: { paddingHorizontal: 0, paddingBottom: 0 },
 }));
+
+// A theme scope: a theme switch made from a screen pushed over the tabs
+// reaches this tab a moment later (src/theme/theme-scope.tsx).
+export default withThemeScope(SettingsScreen, 4);

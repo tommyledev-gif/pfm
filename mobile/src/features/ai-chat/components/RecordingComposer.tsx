@@ -6,7 +6,8 @@ import { onlineManager } from "@tanstack/react-query";
 import { ChatComposer } from "@/features/ai-chat/components/ChatComposer";
 import { ChatInputBar } from "@/features/ai-chat/components/ChatInputBar";
 import { ImageAttachButton } from "@/features/ai-chat/components/ImageAttachButton";
-import { LOCATION_TOGGLE_SIZE, LocationPinToggle } from "@/features/ai-chat/components/LocationPinToggle";
+import { LOCATION_TAB_INSET_RIGHT, LOCATION_TAB_WIDTH } from "@/features/ai-chat/components/chat-composer-metrics";
+import { LocationPinToggle } from "@/features/ai-chat/components/LocationPinToggle";
 import { OfflineManualEntryDialog } from "@/features/ai-chat/components/OfflineManualEntryDialog";
 import { PhraseSuggestions } from "@/features/ai-chat/components/PhraseSuggestions";
 import { ChatDraftStore, useChatDraftText } from "@/features/ai-chat/chat-draft";
@@ -38,7 +39,7 @@ interface RecordingComposerProps {
 
 /**
  * The recording pane's floating input, phrase suggestions, attach button and
- * location switch.
+ * location switch (a tab on the input bar's top edge).
  * Owns everything that changes per keystroke, so typing never re-renders the
  * thread above it.
  */
@@ -154,8 +155,9 @@ function PhrasePanel({ open, input, userId, paneHeight, onSelect, onSearchFocusC
       userId={userId}
       // Of the part of the pane the keyboard does not cover.
       maxHeight={Math.max(0, paneHeight - keyboardHeight) * SUGGESTION_MAX_HEIGHT_RATIO}
-      // The location switch floats at the right of the search's line.
-      searchInsetRight={LOCATION_TOGGLE_SIZE + spacing.sm}
+      // The location tab sits on the bar's edge at the right of the search's
+      // line: clear of it, measured from this panel's own right margin.
+      searchInsetRight={LOCATION_TAB_INSET_RIGHT + LOCATION_TAB_WIDTH + spacing.sm - spacing.xl}
       onSelect={onSelect}
       onSearchFocusChange={onSearchFocusChange}
     />

@@ -3,6 +3,7 @@ import { FlatList, ListRenderItemInfo, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { TypingIndicator } from "@/components/shared/TypingIndicator";
+import { clearDonutSelectionOnOutsideTouch } from "@/components/shared/donut-selection";
 import { ChatComposer } from "@/features/ai-chat/components/ChatComposer";
 import { dayStartAt } from "@/features/ai-chat/components/ChatDayLabel";
 import { ChatRowFrame } from "@/features/ai-chat/components/ChatRowFrame";
@@ -84,7 +85,8 @@ export function ConsultPane({ loading, bottomInset, onSwitchToRecording, jump }:
   );
 
   return (
-    <View style={consultStyles.pane}>
+    // A tap anywhere but an answer's donut closes its slice's tooltip.
+    <View style={consultStyles.pane} onTouchStart={clearDonutSelectionOnOutsideTouch}>
       <KeyboardLiftView>
         <ChatThreadList
           listRef={listRef}

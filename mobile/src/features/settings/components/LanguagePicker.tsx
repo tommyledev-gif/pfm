@@ -1,9 +1,7 @@
 import { useRef } from "react";
 import { View } from "react-native";
-import Animated, { ZoomIn } from "react-native-reanimated";
 import { useTranslation } from "react-i18next";
 
-import { PRESS_SPRING } from "@/components/motion/motion-tokens";
 import { Drawer } from "@/components/shared/Drawer";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
 import { ListRow, ListSection } from "@/components/ui/grouped-list";
@@ -52,6 +50,12 @@ interface LanguageSheetProps {
 // re-rendered the sheet in the new language beneath that picture, and the
 // dissolve then swapped a half-closed sheet for an empty screen: the sheet
 // shook, then flashed away.
+//
+// ⚠️ Nothing in the sheet animates by itself. The tick on the row in use used
+// to spring in (a Reanimated entering animation) as the sheet mounted, so a
+// layout animation ran on a row inside a sheet that was itself being slid up
+// by the native driver, the dim fading with it. The tick is just there; the
+// choice is made on the tap and the sheet leaves at once.
 export function LanguageSheet({ visible, onClose }: LanguageSheetProps) {
   const { t } = useTranslation();
   const colors = useColors();
@@ -90,17 +94,7 @@ export function LanguageSheet({ visible, onClose }: LanguageSheetProps) {
               // A fixed-size slot, so the title never shifts as the check moves.
               trailing={
                 <View style={styles.checkSlot}>
-                  {/* Springs in on the row in use, like the theme tile's tick. */}
-                  {selected ? (
-                    <Animated.View
-                      entering={ZoomIn.springify()
-                        .damping(PRESS_SPRING.damping)
-                        .stiffness(PRESS_SPRING.stiffness)
-                        .mass(PRESS_SPRING.mass)}
-                    >
-                      <CheckIcon size={CHECK_SIZE} color={colors.green} strokeWidth={3} />
-                    </Animated.View>
-                  ) : null}
+                  {selected ? <CheckIcon size={CHECK_SIZE} color={colors.green} strokeWidth={3} /> : null}
                 </View>
               }
               accessibilityRole="radio"

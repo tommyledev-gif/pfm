@@ -41,6 +41,7 @@ import { Category } from "@/features/categories/types";
 import { Wallet } from "@/features/wallets/types";
 import { touchesSharedWallet } from "@/features/wallets/wallet-access";
 import { useWalletLookups } from "@/features/wallets/use-wallet-lookups";
+import { withThemeScope } from "@/theme/theme-scope";
 
 const NO_CATEGORIES: Category[] = [];
 const NO_WALLETS: Wallet[] = [];
@@ -300,4 +301,6 @@ const useStyles = createStyles((colors) => ({
 }));
 
 // Through withTabParams, not memo alone: see src/lib/tab-route-params.tsx.
-export default withTabParams(TransactionsScreen);
+// And a theme scope: a theme switch made from a screen pushed over the tabs
+// reaches this tab a moment later (src/theme/theme-scope.tsx).
+export default withThemeScope(withTabParams(TransactionsScreen), 1);

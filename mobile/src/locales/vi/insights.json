@@ -49,6 +49,9 @@
       "spentOfLimit": "{{spent}} / {{limit}}",
       "seeTransactions": "Xem giao dịch"
     },
+    "legend": {
+      "pace": "Vạch đứng: mức chi nếu chi đều mỗi ngày"
+    },
     "figures": {
       "usedShare": "Đã dùng {{percent}} hạn mức",
       "limit": "Hạn mức"

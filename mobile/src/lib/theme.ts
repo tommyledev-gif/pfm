@@ -1,7 +1,9 @@
+import { useContext } from "react";
 import { StyleSheet } from "react-native";
 
 import { colors } from "@/theme/active-palette";
-import { Palette, THEMES, ThemeDefinition, ThemeName } from "@/theme/palettes";
+import { DEFAULT_THEME, Palette, THEMES, ThemeDefinition, ThemeName } from "@/theme/palettes";
+import { ThemeScopeContext } from "@/theme/theme-scope";
 import { useThemeStore } from "@/stores/theme-store";
 
 // Design tokens. Colors live per theme in src/theme/palettes.ts; radii,
@@ -19,8 +21,14 @@ import { useThemeStore } from "@/stores/theme-store";
 export { colors };
 export type { Palette, ThemeName };
 
+// Inside a ThemeScope (a tab screen) the scope hands the name down, and the
+// store selector holds still on null, so a switch re-renders nothing here
+// until the scope itself takes the new theme (theme-scope.tsx). Outside one,
+// it is the live theme.
 export function useThemeName(): ThemeName {
-  return useThemeStore((s) => s.themeName);
+  const scoped = useContext(ThemeScopeContext);
+  const live = useThemeStore((s) => (scoped === null ? s.themeName : null));
+  return scoped ?? live ?? DEFAULT_THEME;
 }
 
 export function useThemeDefinition(): ThemeDefinition {

@@ -3,6 +3,7 @@ import { Pressable, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { DonutSegment } from "@/components/shared/DonutChart";
+import { markDonutTouch } from "@/components/shared/donut-selection";
 import { Avatar } from "@/components/ui/Avatar";
 import { Collapsible } from "@/components/ui/Collapsible";
 import { ChevronDownIcon } from "@/components/ui/Icon";
@@ -71,6 +72,7 @@ export function DonutLegend({ segments, currency, selected, onToggle, defaultOpe
               accessibilityRole="button"
               accessibilityLabel={`${segment.label}: ${amount}, ${share}`}
               accessibilityState={{ selected: active }}
+              onTouchStart={markDonutTouch}
               onPress={() => onToggle(segment.key)}
               style={[styles.row, active && styles.rowActive, selected !== null && !active && styles.rowDimmed]}
             >

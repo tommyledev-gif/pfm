@@ -5,14 +5,17 @@ import { useCurrentUserId } from "@/stores/use-current-user-id";
 import { useToastStore } from "@/stores/toast-store";
 import { i18n } from "@/lib/i18n";
 
-const SAVED_MESSAGE = "chat.phrases.saved.toast";
-const REMOVED_MESSAGE = "chat.phrases.unsaved.toast";
+const PRIORITIZED_MESSAGE = "chat.phrases.prioritized.toast";
+const DEPRIORITIZED_MESSAGE = "chat.phrases.unprioritized.toast";
 const FULL_MESSAGE = "chat.phrases.full.toast";
 const DELETED_MESSAGE = "chat.phrases.deleted.toast";
 
 /**
- * Save / Remove-saved toggle for one phrase. Unavailable (and so never
- * offered) without a phrase or a known User — saved phrases are per User.
+ * Prioritize / deprioritize toggle for one phrase. The store calls it "saved"
+ * (a kept phrase is listed first and is never pushed out by newer ones), but
+ * the User is never told "saved": nothing is added anywhere, the phrase just
+ * moves up the suggestions. Unavailable (and so never offered) without a
+ * phrase or a known User — priority phrases are per User.
  */
 export function usePhraseActions(text: string | null) {
   const userId = useCurrentUserId();
@@ -27,11 +30,11 @@ export function usePhraseActions(text: string | null) {
     const toast = useToastStore.getState();
     if (isSaved) {
       store.remove(userId, trimmed);
-      toast.show(i18n.t(REMOVED_MESSAGE), "info");
+      toast.show(i18n.t(DEPRIORITIZED_MESSAGE), "info");
       return;
     }
     const result = store.save(userId, trimmed);
-    if (result === "saved") toast.show(i18n.t(SAVED_MESSAGE), "info");
+    if (result === "saved") toast.show(i18n.t(PRIORITIZED_MESSAGE), "info");
     else if (result === "full") toast.show(i18n.t(FULL_MESSAGE, { max: MAX_SAVED_PHRASES }), "warning");
   };
 

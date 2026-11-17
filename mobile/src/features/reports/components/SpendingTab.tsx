@@ -12,6 +12,7 @@ import { CategoryPickerDrawer } from "@/components/shared/CategoryPickerDrawer";
 import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
 import { DonutChart } from "@/components/shared/DonutChart";
 import { DonutLegendRow } from "@/components/shared/DonutLegendRow";
+import { clearDonutSelectionOnOutsideTouch } from "@/components/shared/donut-selection";
 import { RevealableAmount } from "@/components/shared/RevealableAmount";
 import { CategoryTransactionsDialog } from "@/features/reports/components/CategoryTransactionsDialog";
 import { formatDateRange } from "@/lib/format-date";
@@ -117,7 +118,15 @@ export const SpendingTab = memo(function SpendingTab({ focusCategoryId, focusNon
     // legend gets the whole screen once scrolled to.
     return (
       <View style={styles.container}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={scrollStyle}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={scrollStyle}
+          // A tap anywhere but the donut or its legend closes the tooltip. On
+          // the scroll, not the tab's root: the sheets below are in this tree,
+          // and a tap inside the transactions sheet must not clear the slice
+          // it was opened from.
+          onTouchStart={clearDonutSelectionOnOutsideTouch}
+        >
           <View style={styles.filterRow}>
             <Pressable style={styles.rangeButton} onPress={openRangePicker}>
               {switchingRange ? (

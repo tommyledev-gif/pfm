@@ -1,23 +1,20 @@
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import { Text, View } from "react-native";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { Drawer } from "@/components/shared/Drawer";
 import { DrawerHeader } from "@/components/shared/DrawerHeader";
 import { BudgetFigures } from "@/features/budgets/components/BudgetFigures";
-import { HoldableTransactionRow } from "@/features/reports/components/HoldableTransactionRow";
-import { Transaction } from "@/features/transactions/types";
-import { TransactionRowSkeleton } from "@/features/transactions/components/TransactionRowSkeleton";
+import {
+  CategoryTransactionRows,
+  useCategoryTransactions,
+  useShowInTransactions,
+} from "@/features/reports/components/CategoryTransactionRows";
+import { TransactionKind } from "@/lib/constants";
 import { formatCurrency } from "@/lib/currency";
 import { formatDateRange } from "@/lib/format-date";
-import { spacing, typography, createStyles, useColors } from "@/lib/theme";
-import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
-import { useTransactionsQuery } from "@/features/transactions/api/use-transactions-query";
-import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
-
-const SKELETON_COUNT = 4;
+import { spacing, typography, createStyles } from "@/lib/theme";
 
 interface CategoryTransactionsDialogProps {
   visible: boolean;
@@ -37,14 +34,17 @@ interface CategoryTransactionsDialogProps {
   total: number;
   /** Opened from a budget's bar: its spend and limit, spelled out over the rows. */
   budget?: { spent: number; limit: number };
+  /**
+   * Only what the figure above counted: a budget's spend is expenses in its own
+   * currency, so its rows are too. Left out, every transaction of the category
+   * in the window shows (the donut's own drill-down).
+   */
+  only?: { type: TransactionKind; currency: string };
 }
 
 // Drill-down behind the donut tooltip's "Xem giao dịch" link (DonutChart) —
 // the individual transactions making up one segment, for the same period the
-// chart covers. Read-only: tapping a row does nothing, because editing from
-// here would have to reconcile with the report summary the chart is still
-// holding. Holding a row for a second opens a tooltip under it whose one
-// action jumps to that row in the Transactions tab (HoldableTransactionRow).
+// chart covers. Read-only (CategoryTransactionRows).
 //
 // Paged as the sheet scrolls: no inner list (it would fight the Drawer's own
 // ScrollView for the gesture) — the Drawer reports when its end comes within
@@ -63,62 +63,23 @@ export const CategoryTransactionsDialog = memo(function CategoryTransactionsDial
   currency,
   total,
   budget,
+  only,
 }: CategoryTransactionsDialogProps) {
   const { t } = useTranslation();
-  const colors = useColors();
   const styles = useStyles();
-  const wallets = useWalletsQuery();
-  const categories = useCategoriesQuery();
 
-  // Gated rather than always-on: this dialog is mounted by SpendingTab for
-  // the whole life of the Insights screen, so an ungated hook would fire an
-  // unfiltered "give me everything" request before the user ever opens it.
-  const shouldFetch = Boolean(categoryId && visible);
-  const transactions = useTransactionsQuery(
-    { category_ids: categoryId ?? undefined, from, to },
-    { enabled: shouldFetch },
-  );
-
-  const walletCurrencyMap = useMemo(() => {
-    const map = new Map<string, string>();
-    wallets.data?.forEach((w) => map.set(w.id, w.currency));
-    return map;
-  }, [wallets.data]);
-
-  const categoryById = useMemo(() => new Map(categories.data?.map((c) => [c.id, c])), [categories.data]);
-
-  const items = useMemo(
-    () => transactions.data?.pages.flatMap((page) => page.data) ?? [],
-    [transactions.data],
-  );
-
-  const loadMore = () => {
-    if (transactions.hasNextPage && !transactions.isFetchingNextPage) void transactions.fetchNextPage();
-  };
-
-  const router = useRouter();
-  // The row whose tooltip is open — one at a time; a new hold moves it.
-  const [heldId, setHeldId] = useState<string | null>(null);
-  useEffect(() => {
-    if (!visible) setHeldId(null);
-  }, [visible]);
-  // Over to the Transactions tab, scrolled to this row with its border
-  // flashing (useFocusTransaction). `focusedAt` makes the same row jumpable
-  // twice; `focusDay` lets that screen unfold the row's day if it is folded.
-  const showInTransactions = (transaction: Transaction) => {
-    onClose();
-    router.navigate({
-      pathname: "/transactions",
-      params: {
-        focusTransactionId: transaction.id,
-        focusDay: transaction.occurred_at.slice(0, 10),
-        focusedAt: String(Date.now()),
-      },
-    });
-  };
+  const list = useCategoryTransactions({
+    categoryId,
+    from,
+    to,
+    enabled: visible,
+    type: only?.type,
+    currency: only?.currency,
+  });
+  const showInTransactions = useShowInTransactions(onClose);
 
   return (
-    <Drawer visible={visible} onClose={onClose} onEndReached={loadMore}>
+    <Drawer visible={visible} onClose={onClose} onEndReached={list.loadMore}>
       <DrawerHeader
         title={t("reports.categorySheet.title")}
         actions={[{ label: t("common.action.close"), onPress: onClose, variant: "secondary" }]}
@@ -144,32 +105,7 @@ export const CategoryTransactionsDialog = memo(function CategoryTransactionsDial
 
       {budget ? <BudgetFigures spent={budget.spent} limit={budget.limit} currency={currency} /> : null}
 
-      {transactions.isLoading ? (
-        <View>
-          {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
-            <TransactionRowSkeleton key={i} />
-          ))}
-        </View>
-      ) : items.length === 0 ? (
-        <Text style={styles.empty}>{t("reports.categorySheet.empty")}</Text>
-      ) : (
-        <View>
-          {items.map((item) => (
-            <HoldableTransactionRow
-              key={item.id}
-              transaction={item}
-              currency={walletCurrencyMap.get(item.wallet_id)}
-              category={categoryById.get(item.category_id)}
-              open={heldId === item.id}
-              onOpen={setHeldId}
-              onClose={() => setHeldId(null)}
-              onShowInTransactions={showInTransactions}
-            />
-          ))}
-        </View>
-      )}
-
-      {transactions.isFetchingNextPage ? <ActivityIndicator color={colors.green} style={styles.more} /> : null}
+      <CategoryTransactionRows list={list} active={visible} onShowInTransactions={showInTransactions} />
     </Drawer>
   );
 });
@@ -180,6 +116,4 @@ const useStyles = createStyles((colors) => ({
   summaryName: { ...typography.body, color: colors.textPrimary },
   summaryRange: { ...typography.tiny, color: colors.textSecondary },
   summaryAmount: { ...typography.cardTitle, color: colors.peach },
-  empty: { ...typography.label, color: colors.textSecondary, textAlign: "center", paddingVertical: spacing.xl },
-  more: { paddingVertical: spacing.md },
 }));

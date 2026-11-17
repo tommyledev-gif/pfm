@@ -18,6 +18,7 @@ import { formatPercent } from "@/lib/percent";
 import { ENTRY_DURATION_MS } from "@/lib/use-entry-animation";
 import { typography, createStyles } from "@/lib/theme";
 import { RingArc, layoutRing, polarToPoint } from "@/components/shared/donut-geometry";
+import { markDonutTouch, registerDonutSelection } from "@/components/shared/donut-selection";
 
 export interface DonutSegment {
   key: string;
@@ -103,6 +104,10 @@ function useSweep(ready: boolean) {
  * One arc per segment; tapping an arc (or its legend row) selects it and dims
  * the rest, tapping anywhere else in the chart clears it. Controlled through
  * `selected`/`onToggle` so the legend shares the same selection.
+ *
+ * A tap elsewhere on the screen clears it too (donut-selection.ts): the screen
+ * owning the chart passes clearDonutSelectionOnOutsideTouch as its
+ * onTouchStart, and the legend rows mark their own touches with markDonutTouch.
  */
 export const DonutChart = memo(function DonutChart({
   segments,
@@ -123,6 +128,12 @@ export const DonutChart = memo(function DonutChart({
 
   const activeArc = arcs.find((a) => a.segment.key === selected);
 
+  // While a slice is selected, a tap outside the chart and its legend clears it.
+  useEffect(() => {
+    if (selected === null) return;
+    return registerDonutSelection(() => onToggle(selected));
+  }, [selected, onToggle]);
+
   // The tooltip points at the middle of the tapped slice and sits on the side
   // of the ring that leaves that slice visible, inside the hollow centre.
   let tooltipPos: { left: number; top: number } | null = null;
@@ -142,7 +153,7 @@ export const DonutChart = memo(function DonutChart({
   const activeSegment = activeArc?.segment;
 
   return (
-    <View style={styles.wrapper}>
+    <View style={styles.wrapper} onTouchStart={markDonutTouch}>
       {/* Under the Svg: a tap the arcs do not take clears the selection. */}
       <Pressable
         style={StyleSheet.absoluteFill}

@@ -15,10 +15,6 @@ interface BudgetProgressBarProps {
   height?: number;
 }
 
-// Width of the dark seam drawn where two coloured sections of the bar meet.
-// Without it the two sections bleed into one ramp and the boundary — the one
-// thing this bar exists to show — has to be inferred from a colour change.
-const SEAM_WIDTH = 2;
 // The over-budget colouring cross-fades in rather than snapping: it is a
 // change of state, and a fade reads as one without adding any bounce.
 const OVER_FADE_MS = 200;
@@ -33,9 +29,15 @@ const OVER_FADE_MS = 200;
 // tail, so at 385% three-quarters of the bar was a pale diagonal pattern and
 // the solid part looked like "a quarter used" — the eye read the opposite of
 // the number printed under it. Now the track is entirely filled: the first
-// 1/ratio of it is the limit itself (soft coral), everything after the seam
-// is the overspend (solid red). Scale is relative to what was spent, so the
-// red share IS the overspent share. No pattern — solid colour carries it.
+// 1/ratio of it is the limit itself (soft coral), everything after is the
+// overspend (solid red). Scale is relative to what was spent, so the red share
+// IS the overspent share. No pattern — solid colour carries it.
+//
+// ⚠️ NO SEAMS. A thin dark cut used to be drawn where the fill ends and where
+// the limit meets the overspend. Nothing labelled it, so users read it as a
+// second, unexplained marker next to the pace tick. The colours already say
+// where each part ends; the pace tick is the only line on the bar, and the
+// list explains it (BudgetPaceLegend).
 //
 // MOTION: the fill follows the ratio with LEVEL_SPRING (one overshoot, then
 // settle), grown in from the left on mount only. ⚠️ It is a full-width layer
@@ -47,7 +49,8 @@ const OVER_FADE_MS = 200;
 // the fill goes to exactly full with no bounce (levelSpringFor's ceiling is
 // the bar's end), and the limit/overspend colouring fades in over it.
 // The pace tick is a fact about the calendar, not data that changed — it
-// never animates.
+// never animates. It marks where an even daily spend would have the bar by
+// now: a bar past it is spending faster than the calendar.
 export function BudgetProgressBar({ ratio, pace, color, height = 8 }: BudgetProgressBarProps) {
   const styles = useStyles();
   // NaN / undefined / negative → empty. +Infinity (spend against a 0 limit)
@@ -103,11 +106,6 @@ export function BudgetProgressBar({ ratio, pace, color, height = 8 }: BudgetProg
                 { opacity: fillOpacity },
               ]}
             />
-            {/* The spent | remaining seam, riding the fill's right edge. Only
-                while the bar is partly full — at 0% or 100% a floating dark
-                tick reads as a defect. */}
-            {!over && fill > 0 && fill < 1 ? <View style={[styles.seam, { right: 0 }]} /> : null}
-
             {/* The budget's own share drawn soft, the overspend after it
                 solid — so the loud part is the part that's wrong. */}
             <Animated.View style={[StyleSheet.absoluteFill, { opacity: overOpacity }]}>
@@ -123,7 +121,6 @@ export function BudgetProgressBar({ ratio, pace, color, height = 8 }: BudgetProg
                   { left: `${shownLimitMark.current * 100}%`, right: 0, backgroundColor: colors.danger },
                 ]}
               />
-              <View style={[styles.seam, { left: `${shownLimitMark.current * 100}%`, marginLeft: -SEAM_WIDTH / 2 }]} />
             </Animated.View>
           </Animated.View>
         ) : null}
@@ -142,10 +139,6 @@ const useStyles = createStyles((colors) => ({
   // outside it so it can sit proud of the bar.
   clip: { ...StyleSheet.absoluteFillObject, overflow: "hidden" },
   segment: { position: "absolute", top: 0, bottom: 0 },
-  // Painted in the app background rather than left transparent: the track
-  // underneath is a translucent white, so a hole would show the track, not a
-  // gap. This has to be an opaque cut.
-  seam: { position: "absolute", top: 0, bottom: 0, width: SEAM_WIDTH, backgroundColor: colors.bgApp },
   // Sits proud of the bar on both edges so it stays legible over a filled
   // section as well as over the empty track.
   pace: { position: "absolute", width: 2, backgroundColor: colors.textSecondary, borderRadius: 1 },

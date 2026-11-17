@@ -16,6 +16,7 @@ import { colorForCategory } from "@/lib/category-color";
 import { toCents, toMajorUnits } from "@/lib/currency";
 import { withAlpha } from "@/lib/color";
 import { useRequireOnline } from "@/lib/connectivity";
+import { monthRange } from "@/lib/date-range";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { categoryLabel } from "@/features/categories/category-label";
@@ -25,6 +26,11 @@ import { useUpdateBudgetMutation } from "@/features/budgets/api/use-update-budge
 import { useDeleteBudgetMutation } from "@/features/budgets/api/use-delete-budget-mutation";
 import { Budget } from "@/features/budgets/types";
 import { BudgetFigures } from "@/features/budgets/components/BudgetFigures";
+import {
+  CategoryTransactionRows,
+  useCategoryTransactions,
+  useShowInTransactions,
+} from "@/features/reports/components/CategoryTransactionRows";
 import { WalletCurrency } from "@/lib/constants";
 
 interface BudgetFormModalProps {
@@ -89,6 +95,24 @@ export function BudgetFormModal({ visible, onClose, currency, editingBudget, pre
 
   const mutation = isEditing ? updateBudget : createBudget;
 
+  // The transactions behind the figures above, for the same window: the
+  // budget's own period is the current calendar month (the `spent` the backend
+  // returns), whatever range the tab is filtered to. Expenses in the limit's
+  // currency, as `spent` counts them. Fetched only while an existing budget's
+  // sheet is open, a page at a time as it scrolls (Drawer's onEndReached).
+  // Read per render (two strings, so nothing downstream sees a change): a month
+  // that rolls over while the app is open counts from the next open.
+  const period = monthRange(0);
+  const periodTransactions = useCategoryTransactions({
+    categoryId: editingBudget?.category_id ?? null,
+    from: period.from,
+    to: period.to,
+    enabled: visible && isEditing,
+    type: "expense",
+    currency,
+  });
+  const showInTransactions = useShowInTransactions(onClose);
+
   const selectedCategory = categories.data?.find((c) => c.id === categoryId);
   // What the budget is saved with: whatever picture the category already
   // carries. Never edited here — see the note above the component.
@@ -134,6 +158,7 @@ export function BudgetFormModal({ visible, onClose, currency, editingBudget, pre
       <Drawer
         visible={visible}
         onClose={onClose}
+        onEndReached={isEditing ? periodTransactions.loadMore : undefined}
         // Editing never re-opens the picker, so the panel is only wired up in
         // create mode — a Drawer child that can never become visible is just a
         // subscription the sheet does not need.
@@ -199,6 +224,18 @@ export function BudgetFormModal({ visible, onClose, currency, editingBudget, pre
             <Text style={styles.deleteLabel}>{t("budgets.form.delete")}</Text>
           </Pressable>
         ) : null}
+
+        {/* After the form and its delete row, so the list never pushes either
+            out of reach: this month's rows for the budget just opened. */}
+        {isEditing ? (
+          <View style={styles.transactions} testID="list-budget-transactions">
+            <View style={styles.transactionsHead}>
+              <Text style={styles.transactionsTitle}>{t("reports.categorySheet.title")}</Text>
+              <Text style={styles.transactionsPeriod}>{t("common.date.thisMonth")}</Text>
+            </View>
+            <CategoryTransactionRows list={periodTransactions} active={visible} onShowInTransactions={showInTransactions} />
+          </View>
+        ) : null}
       </Drawer>
 
       <ConfirmDialog
@@ -236,4 +273,8 @@ const useStyles = createStyles((colors) => ({
   flexButton: { flex: 1 },
   deleteRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, paddingVertical: spacing.sm },
   deleteLabel: { ...typography.body, color: colors.peach },
+  transactions: { gap: spacing.sm },
+  transactionsHead: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: spacing.sm },
+  transactionsTitle: { ...typography.label, color: colors.textSecondary },
+  transactionsPeriod: { ...typography.tiny, color: colors.textMuted },
 }));

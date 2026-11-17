@@ -27,17 +27,28 @@ export function useOverlayOrigin(visible: boolean) {
   // layout, so on a padded host (Transactions: status bar + offline strip)
   // the whole sheet jumped a status bar's height mid-slide.
   const [measured, setMeasured] = useState(false);
+  const measuredRef = useRef(false);
 
   // ⚠️ measure()'s page coordinates, not measureInWindow (same trap as
   // RevealableAmount): on Android edge-to-edge, measureInWindow reports y
   // below the status bar, so the overlay sat a status bar's height too low —
   // a sheet's last row and a sub-panel's footer buttons were pushed off the
   // bottom of the screen (perf audit 2026-11-03, 142 px on a Pixel 10a).
+  //
+  // ⚠️ A state update only for a real move (over half a pixel), and `measured`
+  // only once. This runs every frame while the sheet slides up, and each
+  // update re-renders the sheet: a view driven by the native driver is sent the
+  // JS side's value on a re-render, so a sheet re-rendered mid-slide flickers
+  // between where it is and where JS last saw it.
   const measureAnchor = () => {
     anchorRef.current?.measure((_x, _y, _width, _height, pageX, pageY) => {
       if (!Number.isFinite(pageX) || !Number.isFinite(pageY)) return;
-      setOrigin((prev) => (prev.x === pageX && prev.y === pageY ? prev : { x: pageX, y: pageY }));
-      setMeasured(true);    });
+      setOrigin((prev) => (Math.abs(prev.x - pageX) < 0.5 && Math.abs(prev.y - pageY) < 0.5 ? prev : { x: pageX, y: pageY }));
+      if (!measuredRef.current) {
+        measuredRef.current = true;
+        setMeasured(true);
+      }
+    });
   };
 
   // Never hold the sheet for good on a measurement that does not come back.

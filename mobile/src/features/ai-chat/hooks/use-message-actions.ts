@@ -73,7 +73,7 @@ export function useMessageActions({
   if (phrase.available) {
     actions.push({
       Icon: PinIcon,
-      label: phrase.saved ? t("chat.phrases.unsave") : t("chat.phrases.save"),
+      label: phrase.saved ? t("chat.phrases.unprioritize") : t("chat.phrases.prioritize"),
       testID: phrase.saved ? "btn-msg-menu-unsave-phrase" : "btn-msg-menu-save-phrase",
       onPress: phrase.toggle,
     });
