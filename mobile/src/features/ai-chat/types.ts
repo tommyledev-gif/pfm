@@ -1,4 +1,5 @@
 import { ConsultMessageData } from "@/features/analytics/types";
+import type { IntentionItemState } from "@/features/spending-intentions/types";
 import type { TranslationKey } from "@/lib/i18n";
 import { TransactionKind } from "@/lib/constants";
 import {
@@ -217,4 +218,11 @@ export interface ChatMessage {
   // On a failed text reply: the message to send again on retry, so a dropped
   // request never has to be retyped. Cleared once the retry starts.
   retryText?: string;
+  // On an analysis reply of kind "intention" (specs/ai-chat-spending-intentions):
+  // what became of each proposal, by position (IntentionItemState).
+  intentionStates?: IntentionItemState[];
+  // The User deleted this failure reply (failure-reply.ts isFailureReply). It
+  // stays in the store, so the deletion syncs with the thread instead of the
+  // server copy bringing the bubble back on another device, but is never drawn.
+  dismissed?: boolean;
 }

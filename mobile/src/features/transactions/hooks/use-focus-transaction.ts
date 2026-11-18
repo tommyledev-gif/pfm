@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { SectionList } from "react-native";
 
+import { useAfterTabSwitch } from "@/lib/use-after-tab-switch";
 import { useHighlightFade } from "@/lib/use-highlight-fade";
 import { DaySection } from "@/features/transactions/day-sections";
 import { Transaction } from "@/features/transactions/types";
@@ -72,13 +73,19 @@ export function useFocusTransaction({
   // the filters changed nothing (they were already clear).
   const [seekToken, setSeekToken] = useState(0);
   const highlightOpacity = useHighlightFade(highlightKey);
+  const afterTabSwitch = useAfterTabSwitch();
 
   useEffect(() => {
     if (!focusId) return;
-    seeking.current = { id: focusId, pages: 0 };
-    setHighlightKey(null);
-    setSeekToken((n) => n + 1);
-    resetView();
+    // Once the tab has slid in (not on arrival): clearing the filters
+    // re-renders the list and refetches it, and that ran in the middle of the
+    // slide on the JS thread.
+    afterTabSwitch(() => {
+      seeking.current = { id: focusId, pages: 0 };
+      setHighlightKey(null);
+      setSeekToken((n) => n + 1);
+      resetView();
+    });
     // Only a new navigation starts a jump; the callbacks change every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusId, nonce]);

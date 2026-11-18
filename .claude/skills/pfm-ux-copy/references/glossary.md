@@ -60,6 +60,9 @@ Một khái niệm = một từ, ở cả VI và EN. Cột "Nguồn": `app` = đ
 | System category | mặc định | default | app | Nhóm danh mục có sẵn trong Danh mục ("Mặc định"), đối lập "Của bạn" |
 | Unusual (phân tích) | bất thường | unusual | app | Câu hỏi/trả lời phân tích chi tiêu khác hẳn mức thường ("Hôm nay có gì bất thường?") |
 | Usual level (phân tích) | mức thường | usual | app | Trung vị của các kỳ trước có chi tiêu: "gấp 3 lần mức thường ngày (100.000 ₫)" |
+| Spending intention | dự định chi | planned spending | đề xuất | Việc user định mua hoặc trả góp, giữ trong chế độ Hỏi phân tích (specs/ai-chat-spending-intentions). Tiêu đề sheet và chip: "Dự định chi"; nút thêm: "Thêm dự định chi"; xóa: "Xóa dự định chi" / "Giữ lại". Thẻ chưa lưu mang nhãn "Chờ xác nhận" với [Lưu]/[Sửa]/[Bỏ]. Không gọi "kế hoạch", "khoản định chi", "wishlist" |
+| Instalment plan | trả góp | instalments | đề xuất | Một dự định chi trả đều theo tháng: "Trả góp {{count}} tháng", "{{amount}} mỗi tháng", "Tổng {{amount}}". Khác "một lần" |
+| Usual surplus | số dư mỗi tháng | monthly surplus | đề xuất | Thu trung bình trừ chi trung bình các tháng đã qua, làm tròn xuống ("Thường dư mỗi tháng"). Chỉ là số liệu, không khuyên mua hay không. Khác "số dư" của ví |
 
 ## Từ tránh dùng trong UI
 

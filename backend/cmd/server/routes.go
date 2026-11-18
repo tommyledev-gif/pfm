@@ -289,6 +289,15 @@ func registerRoutes(app *fiber.App, h routeHandlers) {
 	analytics.Post("/query", h.analytics.Query)
 	analytics.Post("/consult", middleware.AIConsultRateLimiter(h.logger), h.analytics.Consult)
 
+	// Feature-12 US-06 spending intentions (specs/ai-chat-spending-intentions):
+	// no RequireRole gate (every active user keeps only their own) and no model
+	// call, so no AI limiter. Outside /ai for the same reason /analytics is.
+	intentions := v1.Group("/spending-intentions", jwtAuth)
+	intentions.Get("/", h.spendingIntention.List)
+	intentions.Post("/", h.spendingIntention.Create)
+	intentions.Put("/:id", h.spendingIntention.Update)
+	intentions.Delete("/:id", h.spendingIntention.Delete)
+
 	// OTA updates and password reset, each in its own file (300-line cap).
 	registerAppUpdateRoutes(app, h.appUpdate, h.appUpdatesDir)
 	registerPasswordResetRoutes(app, h.passwordReset, h.logger)

@@ -59,6 +59,8 @@ type routeHandlers struct {
 	chatImage    *handler.ChatImageHandler
 	budgetWizard *handler.BudgetWizardHandler
 	analytics    *handler.AnalyticsHandler
+	// What the User plans to spend (specs/ai-chat-spending-intentions).
+	spendingIntention *handler.SpendingIntentionHandler
 
 	// Served outside the JSON API: Android's passkey file and mobile updates.
 	assetLinks    fiber.Handler
@@ -92,6 +94,7 @@ func wire(cfg *config.Config, pool *pgxpool.Pool, logger *zap.Logger) (routeHand
 	chatThreadRepo := repository.NewChatThreadRepository(queries, pool)
 	analyticsRepo := repository.NewAnalyticsRepository(queries)
 	intentLogRepo := repository.NewIntentParseLogRepository(queries)
+	spendingIntentionRepo := repository.NewSpendingIntentionRepository(queries)
 
 	// ---- Outside services, each optional: unset config degrades one feature
 	// instead of stopping startup (see newEmailSender, newIconUploader).
@@ -143,7 +146,11 @@ func wire(cfg *config.Config, pool *pgxpool.Pool, logger *zap.Logger) (routeHand
 	// (specs/ai-chat-query-spending/).
 	analyticsService := service.NewAnalyticsService(reportRepo, analyticsRepo, walletRepo, categoryRepo, budgetService, cycleResolver, logger)
 	consultTokens := service.NewConsultTokenBudget(common.ConsultTokenBudgetPerMinute, common.ConsultTokenBudgetWindow)
-	consultService := service.NewConsultService(analyticsService, analyticsRepo, walletRepo, categoryRepo, service.NewHTTPAIConsultClient(aiEndpoint), consultTokens, intentLogRepo, cycleResolver, logger)
+	// Spending intentions: kept by the User, weighed against the same Budgets
+	// and report queries; the free-text reading hands them to ConsultService.
+	spendingIntentionService := service.NewSpendingIntentionService(spendingIntentionRepo, walletRepo, categoryRepo, reportRepo, budgetService, cycleResolver, logger)
+	consultService := service.NewConsultService(analyticsService, analyticsRepo, walletRepo, categoryRepo, service.NewHTTPAIConsultClient(aiEndpoint), consultTokens, intentLogRepo, cycleResolver, logger).
+		WithIntentions(spendingIntentionService)
 
 	// ---- Handlers: HTTP only, one per feature.
 	routes := routeHandlers{
@@ -179,6 +186,8 @@ func wire(cfg *config.Config, pool *pgxpool.Pool, logger *zap.Logger) (routeHand
 		chatImage:    handler.NewChatImageHandler(chatImageService, cfg.AIImageEnabled, logger),
 		budgetWizard: handler.NewBudgetWizardHandler(budgetWizardService, logger),
 		analytics:    handler.NewAnalyticsHandler(analyticsService, consultService, logger),
+
+		spendingIntention: handler.NewSpendingIntentionHandler(spendingIntentionService, logger),
 
 		assetLinks:    handler.NewAssetLinksHandler(cfg.Passkey.AndroidPackage, cfg.Passkey.AndroidCertSHA256),
 		appUpdate:     handler.NewAppUpdateHandler(service.NewAppUpdateService(cfg.AppUpdatesDir), logger).WithPublicAPKURL(cfg.APKPublicURL),

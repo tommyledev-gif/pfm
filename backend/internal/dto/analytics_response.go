@@ -134,6 +134,9 @@ type ConsultResponse struct {
 	Chips             []AnalyticsFollowUp      `json:"chips"`
 	SwitchToRecording bool                     `json:"switch_to_recording,omitempty"`
 	Scenario          *ConsultScenario         `json:"scenario,omitempty"`
+	// Intentions is set only for kind "intention": proposals to keep
+	// (specs/ai-chat-spending-intentions US-01).
+	Intentions *ConsultIntentions `json:"intentions,omitempty"`
 }
 
 // ConsultScenario is a savings-goal plan, all amounts int64 xu. The

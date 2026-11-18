@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
@@ -17,6 +17,7 @@ import { toCents, toMajorUnits } from "@/lib/currency";
 import { withAlpha } from "@/lib/color";
 import { useRequireOnline } from "@/lib/connectivity";
 import { monthRange } from "@/lib/date-range";
+import { useSeedOnOpen } from "@/lib/use-seed-on-open";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { categoryLabel } from "@/features/categories/category-label";
@@ -44,6 +45,8 @@ interface BudgetFormModalProps {
    *  filled in — the Budgets empty state's suggestions. Still just a form:
    *  nothing is saved until the User taps Tạo. */
   preset?: { categoryId: string; amountCents: number | null } | null;
+  /** Drawer's keepMounted: built with the tab, so a tap on a row is only a slide. */
+  keepMounted?: boolean;
 }
 
 // Insights → Budgets tab "+ New budget" action (README), extended to also
@@ -65,7 +68,7 @@ interface BudgetFormModalProps {
 // (CategorySelectField + useCategoryPicker), not the horizontal chip row it had
 // before — that row rendered every expense category at once with no way to find
 // one, which is unusable past a dozen.
-export function BudgetFormModal({ visible, onClose, currency, editingBudget, preset }: BudgetFormModalProps) {
+export function BudgetFormModal({ visible, onClose, currency, editingBudget, preset, keepMounted }: BudgetFormModalProps) {
   const { t } = useTranslation();
   const colors = useColors();
   const styles = useStyles();
@@ -80,8 +83,13 @@ export function BudgetFormModal({ visible, onClose, currency, editingBudget, pre
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
-  useEffect(() => {
-    if (!visible) return;
+  // ⚠️ Seeded during render (useSeedOnOpen), not in an effect: the effect ran
+  // after the sheet's first frame, so it opened showing the last budget's
+  // fields (or none) and filled in a commit later, a flash on every row tap.
+  // Keyed by what is edited, not by the budget's object: a refetch of the
+  // budgets list no longer wipes what was being typed.
+  const seedKey = visible ? `${editingBudget?.id ?? ""}|${preset?.categoryId ?? ""}|${preset?.amountCents ?? ""}|${currency}` : null;
+  useSeedOnOpen(seedKey, () => {
     if (editingBudget) {
       setCategoryId(editingBudget.category_id);
       const existingLimit = editingBudget.limits.find((l) => l.currency === currency);
@@ -91,7 +99,7 @@ export function BudgetFormModal({ visible, onClose, currency, editingBudget, pre
       setAmount(preset?.amountCents ? String(toMajorUnits(preset.amountCents)) : "");
     }
     setSubmitAttempted(false);
-  }, [visible, editingBudget, currency, preset]);
+  });
 
   const mutation = isEditing ? updateBudget : createBudget;
 
@@ -158,6 +166,7 @@ export function BudgetFormModal({ visible, onClose, currency, editingBudget, pre
       <Drawer
         visible={visible}
         onClose={onClose}
+        keepMounted={keepMounted}
         onEndReached={isEditing ? periodTransactions.loadMore : undefined}
         // Editing never re-opens the picker, so the panel is only wired up in
         // create mode — a Drawer child that can never become visible is just a

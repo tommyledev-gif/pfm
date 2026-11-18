@@ -183,6 +183,27 @@ type ChatThreadMessage struct {
 	UpdatedAt       time.Time
 }
 
+// SpendingIntention mirrors the spending_intentions table exactly
+// (038_spending_intentions.sql, specs/ai-chat-spending-intentions). Amounts are
+// BIGINT xu; TargetMonth is the first day of a local month.
+type SpendingIntention struct {
+	ID                uuid.UUID
+	UserID            uuid.UUID
+	Title             string
+	Kind              string
+	CategoryID        *uuid.UUID
+	Currency          string
+	TotalAmount       *int64
+	MonthlyAmount     *int64
+	InstallmentMonths *int32
+	TargetMonth       time.Time
+	Note              *string
+	IdempotencyKey    *string
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	DeletedAt         *time.Time
+}
+
 // TransactionAuditLog mirrors the transaction_audit_logs table exactly
 // (018_transaction_audit_logs.sql, specs/transaction-audit-log). Before/After
 // are raw JSONB bytes — nil for the SQL NULL that a create (no before) or a

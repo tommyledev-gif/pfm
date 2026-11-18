@@ -1,3 +1,4 @@
+import { IntentionsChip } from "@/features/spending-intentions/components/IntentionsChip";
 import { SuggestionChips } from "@/features/analytics/components/SuggestionChips";
 import { STARTER_CHIPS, anomalyTodayChip } from "@/features/analytics/starter-chips";
 import { todayDateOnly } from "@/lib/date-range";
@@ -18,6 +19,8 @@ export function StarterChipsRow({ onAsk, disabled }: StarterChipsRowProps) {
       // breakdown it often leads to.
       chips={[STARTER_CHIPS[0], anomalyTodayChip(todayDateOnly()), ...STARTER_CHIPS.slice(1)]}
       disabled={disabled}
+      // The list of planned spending leads the row: it is a place to go, not a question.
+      leading={<IntentionsChip disabled={disabled} />}
       testIDPrefix="chip-starter"
       bleed={spacing.xl}
       onPress={(chip) => onAsk(chip.query, chip.label)}

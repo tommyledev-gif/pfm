@@ -19,6 +19,7 @@ import { createChatDraftStore } from "@/features/ai-chat/chat-draft";
 import { dismissKeyboardThen } from "@/features/ai-chat/dismiss-keyboard-then";
 import { CHAT_MODE_META, ChatMode, useChatModeStore } from "@/features/ai-chat/chat-mode";
 import { isConsultMessage } from "@/features/ai-chat/consult-message";
+import { isShown } from "@/features/ai-chat/failure-reply";
 import { useChatActions } from "@/features/ai-chat/hooks/use-chat-actions";
 import { useChatOverlays } from "@/features/ai-chat/hooks/use-chat-overlays";
 import { useChatSearch } from "@/features/ai-chat/hooks/use-chat-search";
@@ -99,14 +100,14 @@ function AiChatScreen() {
 
   // Recording messages only, newest first for the inverted list. The store
   // keeps natural order for every other reader.
-  const invertedThread = useMemo(() => thread.filter((m) => !isConsultMessage(m)).reverse(), [thread]);
+  const invertedThread = useMemo(() => thread.filter((m) => isShown(m) && !isConsultMessage(m)).reverse(), [thread]);
   const walletById = useMemo(() => new Map(wallets.data?.map((w) => [w.id, w])), [wallets.data]);
   const categoryById = useMemo(() => new Map(categories.data?.map((c) => [c.id, c])), [categories.data]);
 
   // The header's search covers the pane on screen; a picked result (or a deep
   // link) is a jump the pane carries out (useMessageJump).
   const paneMessages = useMemo(
-    () => (mode === "consult" ? thread.filter(isConsultMessage).reverse() : invertedThread),
+    () => (mode === "consult" ? thread.filter((m) => isShown(m) && isConsultMessage(m)).reverse() : invertedThread),
     [mode, thread, invertedThread],
   );
   const search = useChatSearch(paneMessages);

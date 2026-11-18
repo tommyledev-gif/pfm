@@ -1,3 +1,4 @@
+import { ReactNode } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 
 import { EdgeFade } from "@/components/ui/EdgeFade";
@@ -18,6 +19,8 @@ interface SuggestionChipsProps {
    * gutter; on the right they always run on to the edge.
    */
   bleed?: number;
+  /** A chip of another kind in front of the questions (the analysis input's list of planned spending). */
+  leading?: ReactNode;
 }
 
 const FADE_WIDTH = 32;
@@ -33,10 +36,10 @@ const DISABLED_OPACITY = 0.5;
 //
 // Tonal fill, no border, no icon: these sit in a thread that is already all
 // text, and a ring around every chip was most of what made it look busy.
-export function SuggestionChips({ chips, onPress, disabled, testIDPrefix, bleed }: SuggestionChipsProps) {
+export function SuggestionChips({ chips, onPress, disabled, testIDPrefix, bleed, leading }: SuggestionChipsProps) {
   const colors = useColors();
   const styles = useStyles();
-  if (chips.length === 0) return null;
+  if (chips.length === 0 && !leading) return null;
   const bleeds = bleed !== undefined;
   return (
     <View style={[styles.wrap, bleeds && { marginHorizontal: -bleed }]}>
@@ -47,6 +50,7 @@ export function SuggestionChips({ chips, onPress, disabled, testIDPrefix, bleed 
         // paddingRight would otherwise win over it.
         contentContainerStyle={[styles.row, bleeds && { paddingLeft: bleed, paddingRight: bleed }]}
       >
+        {leading}
         {chips.map((chip, i) => (
           <Pressable
             key={`${chip.label}-${i}`}

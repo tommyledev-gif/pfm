@@ -10,7 +10,6 @@ import (
 	"github.com/example/pfm/backend/internal/common"
 	"github.com/example/pfm/backend/internal/dto"
 	"github.com/example/pfm/backend/internal/model"
-	"github.com/example/pfm/backend/internal/repository"
 )
 
 // Savings-goal scenario: "cần 30tr vào tháng 12 thì mỗi tháng chi thế nào".
@@ -29,13 +28,9 @@ const (
 )
 
 // scenarioBaseline is the average monthly income/expense over the last
-// completed cycles that had any activity in the answer currency.
-type scenarioBaseline struct {
-	cycles  int
-	income  int64
-	expense int64
-	monthly bool
-}
+// completed cycles that had any activity in the answer currency
+// (cycle_baseline.go, shared with the spending-intention figures).
+type scenarioBaseline = cycleBaseline
 
 func (s *ConsultService) routeScenario(ctx context.Context, userID uuid.UUID, p *AIConsultParse, currency string, out consultOutcome) (consultOutcome, error) {
 	base, err := s.scenarioBaseline(ctx, userID, currency)
@@ -59,42 +54,7 @@ func (s *ConsultService) routeScenario(ctx context.Context, userID uuid.UUID, p 
 }
 
 func (s *ConsultService) scenarioBaseline(ctx context.Context, userID uuid.UUID, currency string) (scenarioBaseline, error) {
-	day, err := s.cycles.plans.ActiveCycleStartDay(ctx, userID)
-	if err != nil {
-		return scenarioBaseline{}, err
-	}
-	now, loc := s.cycles.Now(), s.cycles.Location()
-	base := scenarioBaseline{monthly: ResolveCycleWindow(now, day, 0, loc).Start.In(loc).Day() == budgetCycleMinDay}
-	for offset := -1; offset >= -scenarioBaselineCycles; offset-- {
-		w := ResolveCycleWindow(now, day, offset, loc)
-		rows, err := s.analytics.reports.SumTotals(ctx, userID, repository.ReportFilter{From: w.Start, To: w.End.Add(-reportBoundResolution)})
-		if err != nil {
-			return scenarioBaseline{}, err
-		}
-		var income, expense int64
-		for _, row := range rows {
-			if row.Currency != currency {
-				continue
-			}
-			switch row.Type {
-			case string(model.TransactionTypeIncome):
-				income += row.Amount
-			case string(model.TransactionTypeExpense):
-				expense += row.Amount
-			}
-		}
-		if income == 0 && expense == 0 {
-			continue
-		}
-		base.cycles++
-		base.income += income
-		base.expense += expense
-	}
-	if base.cycles > 0 {
-		base.income /= int64(base.cycles)
-		base.expense /= int64(base.cycles)
-	}
-	return base, nil
+	return loadCycleBaseline(ctx, s.cycles, s.analytics.reports, userID, currency, scenarioBaselineCycles, false)
 }
 
 // planScenario returns the plan, or nil and the reason it cannot be made.

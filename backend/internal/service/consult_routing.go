@@ -45,6 +45,8 @@ func (s *ConsultService) route(ctx context.Context, userID uuid.UUID, p *AIConsu
 		}
 		out.reply = &dto.ConsultResponse{Kind: string(model.ConsultKindComingLater), Message: msgComingLater, Chips: comingLaterChips(p.Kind, currency)}
 		return out, nil
+	case model.ParseKindIntention:
+		return s.routeIntention(ctx, userID, p, currency, out)
 	case model.ParseKindEvaluate:
 		out.reply = &dto.ConsultResponse{Kind: string(model.ConsultKindComingLater), Message: msgComingLater, Chips: comingLaterChips(p.Kind, currency)}
 		return out, nil

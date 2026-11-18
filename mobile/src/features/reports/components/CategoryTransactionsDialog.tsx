@@ -40,6 +40,8 @@ interface CategoryTransactionsDialogProps {
    * in the window shows (the donut's own drill-down).
    */
   only?: { type: TransactionKind; currency: string };
+  /** Drawer's keepMounted: built with its screen, so opening it is only a slide. */
+  keepMounted?: boolean;
 }
 
 // Drill-down behind the donut tooltip's "Xem giao dịch" link (DonutChart) —
@@ -64,6 +66,7 @@ export const CategoryTransactionsDialog = memo(function CategoryTransactionsDial
   total,
   budget,
   only,
+  keepMounted,
 }: CategoryTransactionsDialogProps) {
   const { t } = useTranslation();
   const styles = useStyles();
@@ -79,7 +82,7 @@ export const CategoryTransactionsDialog = memo(function CategoryTransactionsDial
   const showInTransactions = useShowInTransactions(onClose);
 
   return (
-    <Drawer visible={visible} onClose={onClose} onEndReached={list.loadMore}>
+    <Drawer visible={visible} onClose={onClose} onEndReached={list.loadMore} keepMounted={keepMounted}>
       <DrawerHeader
         title={t("reports.categorySheet.title")}
         actions={[{ label: t("common.action.close"), onPress: onClose, variant: "secondary" }]}

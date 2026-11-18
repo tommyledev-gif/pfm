@@ -318,5 +318,84 @@
       "approvedPartial": "Đã duyệt {{saved}} mục, {{failed}} mục chưa lưu được",
       "approved_other": "Đã duyệt {{count}} mục"
     }
+  },
+  "intentions": {
+    "title": "Dự định chi",
+    "add": "Thêm dự định chi",
+    "chip": "Dự định chi",
+    "chipCount_other": "Dự định chi · {{count}}",
+    "loadError": "Chưa tải được dự định chi.",
+    "empty": {
+      "title": "Chưa có dự định chi",
+      "body": "Nhắn món định mua vào ô hỏi để lưu lại."
+    },
+    "card": {
+      "state": {
+        "draft": "Chờ xác nhận",
+        "saved": "Đã lưu",
+        "removed": "Đã xóa",
+        "discarded": "Đã bỏ"
+      },
+      "noPrice": "Chưa có giá",
+      "noPriceHint": "Thêm giá để so với ngân sách và số dư.",
+      "oneTime": "Một lần",
+      "installment_other": "Trả góp {{count}} tháng",
+      "perMonth": "{{amount}} mỗi tháng",
+      "total": "Tổng {{amount}}",
+      "incomplete": "Chưa đủ thông tin để lưu. Bấm Sửa để thêm.",
+      "monthMoved": "Tháng đã qua, tính vào tháng này.",
+      "truncated_other": "Chỉ đọc {{count}} món đầu. Nhắn phần còn lại riêng.",
+      "skipped_other": "Có {{count}} món chưa đọc được."
+    },
+    "lines": {
+      "noHistory": "Chưa đủ thu chi các tháng trước để tính số dư.",
+      "surplus": "Thường dư mỗi tháng",
+      "otherPlanned": "Dự định khác cùng tháng",
+      "headroom": "Còn lại sau dự định khác",
+      "budgetLeft": "Ngân sách {{category}} còn",
+      "fitsSurplus": "Nằm trong số dư mỗi tháng",
+      "shortSurplus": "Vượt số dư {{amount}}",
+      "fitsBudget": "Nằm trong ngân sách",
+      "shortBudget": "Vượt ngân sách {{amount}}",
+      "budgetRoom": "Ngân sách {{category}} trừ mức thường chi",
+      "budgetLimit": "Ngân sách {{category}}",
+      "budgetAfterOthers": "Còn sau dự định khác của {{category}}"
+    },
+    "delete": {
+      "title": "Xóa dự định chi này?",
+      "body": "{{title}}. Không thể hoàn tác.",
+      "confirm": "Xóa dự định chi",
+      "a11y": "Xóa {{title}}"
+    },
+    "error": {
+      "save": "Chưa lưu được dự định chi.",
+      "delete": "Chưa xóa được dự định chi."
+    },
+    "form": {
+      "titleNew": "Dự định chi mới",
+      "titleEdit": "Sửa dự định chi",
+      "name": "Tên",
+      "namePlaceholder": "Mua nước hoa",
+      "installment": "Trả góp",
+      "total": "Tổng",
+      "amount": "Số tiền dự kiến",
+      "monthly": "Mỗi tháng",
+      "months": "Số tháng",
+      "month": "Tháng chi",
+      "error": {
+        "title": "Nhập tên",
+        "months": "Nhập số tháng từ {{min}} đến {{max}}",
+        "installmentAmount": "Nhập tổng hoặc số tiền mỗi tháng"
+      }
+    },
+    "portfolio": {
+      "title_other": "Tất cả dự định · {{count}} món",
+      "avgIncome": "Thu trung bình mỗi tháng",
+      "avgExpense": "Chi thực tế trung bình",
+      "planned": "Dự định {{amount}}",
+      "budgetPlanned": "Dự định {{category}}",
+      "moreMonths_other": "và {{count}} tháng nữa"
+    },
+    "saveAll": "Lưu tất cả"
   }
 }

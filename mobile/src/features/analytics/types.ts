@@ -3,6 +3,8 @@
 // codegen. Every amount is integer xu; the client only formats it, never
 // derives a new amount from it.
 
+import type { ConsultIntentions } from "@/features/spending-intentions/types";
+
 export type AnalyticsMetric =
   | "sum"
   | "breakdown"
@@ -172,7 +174,8 @@ export type ConsultKind =
   | "coming_later"
   | "switch_mode"
   | "degraded"
-  | "scenario";
+  | "scenario"
+  | "intention";
 
 export interface ConsultCategoryRef {
   id: string;
@@ -189,6 +192,8 @@ export interface ConsultResponse {
   chips: AnalyticsFollowUp[];
   switch_to_recording?: boolean;
   scenario?: ConsultScenario;
+  /** Kind "intention": proposals to keep (specs/ai-chat-spending-intentions). */
+  intentions?: ConsultIntentions;
 }
 
 /** A savings-goal plan (kind "scenario"); amounts are integer cents. The

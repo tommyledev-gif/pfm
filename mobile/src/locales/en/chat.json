@@ -327,5 +327,90 @@
       "approved_one": "{{count}} approved",
       "approved_other": "{{count}} approved"
     }
+  },
+  "intentions": {
+    "title": "Planned spending",
+    "add": "Add planned spending",
+    "chip": "Planned spending",
+    "chipCount_one": "Planned spending · {{count}}",
+    "chipCount_other": "Planned spending · {{count}}",
+    "loadError": "Could not load planned spending.",
+    "empty": {
+      "title": "No planned spending yet",
+      "body": "Send what you plan to buy in the question box to keep it."
+    },
+    "card": {
+      "state": {
+        "draft": "Pending",
+        "saved": "Saved",
+        "removed": "Deleted",
+        "discarded": "Discarded"
+      },
+      "noPrice": "No price yet",
+      "noPriceHint": "Add a price to compare it with your budget and surplus.",
+      "oneTime": "One time",
+      "installment_one": "{{count}} monthly payment",
+      "installment_other": "{{count}} monthly payments",
+      "perMonth": "{{amount}} a month",
+      "total": "Total {{amount}}",
+      "incomplete": "Not enough to save yet. Tap Edit to add it.",
+      "monthMoved": "That month has passed. Counted in this month.",
+      "truncated_one": "Only the first item was read. Send the rest separately.",
+      "truncated_other": "Only the first {{count}} items were read. Send the rest separately.",
+      "skipped_one": "{{count}} item could not be read.",
+      "skipped_other": "{{count}} items could not be read."
+    },
+    "lines": {
+      "noHistory": "Not enough past income and spending to work out a surplus.",
+      "surplus": "Usually left each month",
+      "otherPlanned": "Other plans that month",
+      "headroom": "Left after other plans",
+      "budgetLeft": "{{category}} budget left",
+      "fitsSurplus": "Within the monthly surplus",
+      "shortSurplus": "{{amount}} over the surplus",
+      "fitsBudget": "Within the budget",
+      "shortBudget": "{{amount}} over the budget",
+      "budgetRoom": "{{category}} budget after usual spending",
+      "budgetLimit": "{{category}} budget",
+      "budgetAfterOthers": "Left after other {{category}} plans"
+    },
+    "delete": {
+      "title": "Delete this planned item?",
+      "body": "{{title}}. This cannot be undone.",
+      "confirm": "Delete planned item",
+      "a11y": "Delete {{title}}"
+    },
+    "error": {
+      "save": "Could not save the planned spending.",
+      "delete": "Could not delete the planned spending."
+    },
+    "form": {
+      "titleNew": "New planned spending",
+      "titleEdit": "Edit planned spending",
+      "name": "Name",
+      "namePlaceholder": "Buy perfume",
+      "installment": "Instalments",
+      "total": "Total",
+      "amount": "Expected amount",
+      "monthly": "Per month",
+      "months": "Months",
+      "month": "Month",
+      "error": {
+        "title": "Enter a name",
+        "months": "Enter a number of months from {{min}} to {{max}}",
+        "installmentAmount": "Enter the total or the monthly amount"
+      }
+    },
+    "portfolio": {
+      "title_one": "All planned spending · {{count}} item",
+      "title_other": "All planned spending · {{count}} items",
+      "avgIncome": "Average income a month",
+      "avgExpense": "Average actual spending",
+      "planned": "Planned {{amount}}",
+      "budgetPlanned": "Planned in {{category}}",
+      "moreMonths_one": "and {{count}} more month",
+      "moreMonths_other": "and {{count}} more months"
+    },
+    "saveAll": "Save all"
   }
 }

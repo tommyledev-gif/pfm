@@ -1,8 +1,11 @@
-import { memo } from "react";
+import { memo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import Animated from "react-native-reanimated";
 
 import { useFreshEntrance } from "@/components/motion/use-fresh-entrance";
+import { isFailureReply } from "@/features/ai-chat/failure-reply";
+import { useDismissCollapse } from "@/features/ai-chat/hooks/use-dismiss-collapse";
+import { useChatStore } from "@/stores/chat-store";
 import { ActionPopover } from "@/components/shared/ActionPopover";
 import { AI_CONFIDENCE_THRESHOLD, FALLBACK_CURRENCY, TRANSFER_CATEGORY_ICON } from "@/lib/constants";
 import { BudgetWizardCard } from "@/features/ai-chat/components/BudgetWizardCard";
@@ -62,6 +65,11 @@ interface ChatMessageRowProps {
   onOpenWalletCreator: () => void;
 }
 
+// What the row below the failure frame is handed: delete the failure reply.
+interface ChatMessageRowViewProps extends ChatMessageRowProps {
+  onDismiss?: () => void;
+}
+
 /**
  * One row of the chat thread.
  *
@@ -92,7 +100,8 @@ function ChatMessageRowView({
   onRetryText,
   onCreateWallet,
   onOpenWalletCreator,
-}: ChatMessageRowProps) {
+  onDismiss,
+}: ChatMessageRowViewProps) {
   const { t } = useTranslation();
   const wallet = message.action ? walletById.get(message.action.payload.wallet_id ?? "") : undefined;
   const currency = wallet?.currency ?? FALLBACK_CURRENCY;
@@ -123,7 +132,9 @@ function ChatMessageRowView({
   // refuse both (isWriteRevoked).
   const editLocked = isEditLocked(message) || writeRevoked;
   const onEdit = editLocked ? undefined : () => onTriggerEdit(message);
-  const onDelete = isRemovable(message) && !writeRevoked ? () => onTriggerDelete(message) : undefined;
+  // A failure reply is deleted on the spot (the swipe's button or the hold
+  // menu is the confirmation); a proposal goes through its own dialog.
+  const onDelete = onDismiss ?? (isRemovable(message) && !writeRevoked ? () => onTriggerDelete(message) : undefined);
   const locationLabel = useAutoPinLabel(message);
 
   const entering = useFreshEntrance(messageCreatedAt(message.id));
@@ -222,4 +233,24 @@ function ChatMessageRowView({
   return entering ? <Animated.View entering={entering}>{row}</Animated.View> : row;
 }
 
-export const ChatMessageRow = memo(ChatMessageRowView);
+/**
+ * A failure reply ("Chưa xử lý được tin nhắn này.") can be deleted: it folds
+ * away, then leaves the thread (failure-reply.ts). Only those rows carry the
+ * fold's animated style, so the rest of the thread pays nothing for it.
+ */
+function FailureRow(props: ChatMessageRowProps) {
+  const { id } = props.message;
+  const remove = useCallback(() => useChatStore.getState().updateMessage(id, { dismissed: true }), [id]);
+  const collapse = useDismissCollapse(remove);
+  return (
+    <Animated.View onLayout={collapse.onLayout} style={collapse.style}>
+      <ChatMessageRowView {...props} onDismiss={collapse.dismiss} />
+    </Animated.View>
+  );
+}
+
+function ChatMessageRowSwitch(props: ChatMessageRowProps) {
+  return isFailureReply(props.message) ? <FailureRow {...props} /> : <ChatMessageRowView {...props} />;
+}
+
+export const ChatMessageRow = memo(ChatMessageRowSwitch);

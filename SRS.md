@@ -281,6 +281,8 @@ The AI shall resolve messages against the User's own Wallets and Categories, and
 
 The same interface shall accept **a photo** (receipt, handwritten note, or spreadsheet screenshot) in place of a typed message and propose the Transactions it contains under the same confirmation rule. The photo shall be used only for that reading and never stored.
 
+The interface shall also let a User keep **spending intentions** (something they plan to buy or pay in instalments), weigh each against their own Budgets and recorded spending with figures computed by the System, and edit or delete them. An intention is kept only after the User confirms it; the System shall not advise whether to buy. Replies that only say a request failed shall be deletable by the User.
+
 ## FR-10: AI-Assisted Budget Setup {#fr-10-ai-assisted-budget-setup}
 
 The System shall let Users set up or replace their Budgets (FR-04) for a period through a guided, AI-assisted flow — entering income and selecting Categories and desired spending levels — instead of creating each Budget one at a time.
@@ -1172,6 +1174,69 @@ This release reads VND amounts only and records them into VND Wallets, without c
     **Given** the device is offline  
     **When** the User opens the AI Chat  
     **Then** the attach-image action is unavailable, with a short explanation
+
+### US-06: Plan an Intended Purchase via Chat [Release 1] {#us-06-plan-an-intended-purchase-via-chat-release-1}
+
+*As a User*  
+*I want to tell the AI Chat about something I intend to buy or pay in instalments, and to keep, edit and delete those intentions*  
+*so that I can see how each one fits my Budgets and my actual spending before I commit to it.*
+
+This story lives in the analysis conversation. The System only reads what the User wrote (what it is, how much, how many months, when); every figure it then shows is computed from the User's own Transactions and Budgets, and nothing is saved until the User confirms.
+
+  **Background**:  
+    **Given** the User is logged in and the device is online  
+     And the User has a default Wallet in VND  
+     And the User has a Category "Shopping" (type Expense) with a monthly Budget of 2,000,000
+
+  **Scenario: Understand an intended purchase and weigh it against Budget and spending**  
+    **Given** the User is in the analysis conversation  
+    **When** the User sends the message "tháng sau mình định mua nước hoa khoảng 2tr"  
+    **Then** the System shows an intention card: what it is, the amount, the month, and the Category it matched  
+     And the card states, from recorded data, how much is left in the Category's Budget and how much the User usually has left each month after spending  
+     And the amounts the System worked out are rounded on the same steps used elsewhere in the app  
+     And nothing is saved until the User taps Save
+
+  **Scenario: Weigh several intentions together**
+    **When** the User sends the message "niềng răng trả góp 12 tháng mỗi tháng 1tr5, mua nước hoa 1tr, mua sữa tắm"
+    **Then** the System shows one proposal for each of the three, in the order said
+     And each proposal is weighed against the other two and against the intentions already kept
+     And the System shows everything planned together month by month against the User's usual income and spending and against each Budget it touches
+     And plans in the same Category are weighed against one Budget
+
+  **Scenario: Keep an instalment plan**  
+    **When** the User sends the message "niềng răng trả góp 12 tháng, mỗi tháng 1tr5"  
+    **Then** the intention card shows 12 monthly payments of 1,500,000  
+     And the card states how those payments fit the usual monthly surplus together with the intentions already kept
+
+  **Scenario: An intention without a price is still kept**  
+    **When** the User sends the message "mua sữa tắm"  
+    **Then** the System shows the intention card without an amount  
+     And the card says the price is missing and offers to add it  
+     And the card still shows what the Budget and the usual surplus leave each month
+
+  **Scenario: Edit and delete a kept intention**  
+    **Given** the User has kept the intention "Nước hoa"  
+    **When** the User edits its amount or month, or deletes it, from its card or from the list of intentions  
+    **Then** every card and the list show the new figures or no longer show it  
+     And a deleted intention no longer counts in any other intention's figures
+
+  **Scenario: The System never invents figures or advice**  
+    **When** the User asks about an intention  
+    **Then** every number shown comes from the User's own records or from the User's own words  
+     And the System does not tell the User whether to buy
+
+### US-07: Delete a Failed Reply in the Chat [Release 1] {#us-07-delete-a-failed-reply-in-the-chat-release-1}
+
+*As a User*  
+*I want to delete the assistant's "could not process" replies from the conversation*  
+*so that failed attempts do not clutter the history.*
+
+  **Scenario: Delete a failure reply**  
+    **Given** the assistant answered a message with a failure notice  
+    **When** the User deletes that reply  
+    **Then** the reply disappears from the conversation  
+     And it stays gone after restarting the app or restoring the conversation on another device  
+     And the User's own message and every Transaction proposal are unchanged
 
 ## Feature-13: AI Budget Setup Wizard {#feature-13-ai-budget-setup-wizard}
 

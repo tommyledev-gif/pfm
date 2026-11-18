@@ -10,7 +10,7 @@ import { useDimWhile } from "@/components/motion/use-dim-while";
 import { useFabClearance } from "@/components/ui/Fab";
 import { CategoryPickerDrawer } from "@/components/shared/CategoryPickerDrawer";
 import { DateRangePickerModal } from "@/components/shared/DateRangePickerModal";
-import { BudgetFormModal } from "@/features/budgets/components/BudgetFormModal";
+import { BudgetSheetsHandle, BudgetSheetsHost } from "@/features/budgets/components/BudgetSheetsHost";
 import { monthRange } from "@/lib/date-range";
 import { formatDateRange } from "@/lib/format-date";
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
@@ -26,7 +26,6 @@ import { useBudgetPickerCategories } from "@/features/budgets/hooks/use-budget-p
 import { useBudgetRows } from "@/features/budgets/hooks/use-budget-rows";
 import { BUDGET_FILTERS, BudgetFilterKey, BudgetFilterTabs } from "@/features/budgets/components/BudgetFilterTabs";
 import { BudgetPaceLegend } from "@/features/budgets/components/BudgetPaceLegend";
-import { BudgetDetailDialog } from "@/features/budgets/components/BudgetDetailDialog";
 import { BudgetsFab } from "@/features/budgets/components/BudgetsFab";
 import { BudgetListSkeleton, BudgetTabSkeleton } from "@/features/budgets/components/BudgetCardSkeleton";
 import { BudgetListRow } from "@/features/budgets/components/BudgetListRow";
@@ -58,17 +57,11 @@ export const BudgetsTab = memo(function BudgetsTab({ initialRange, rangeNonce, o
   const budgets = useBudgetsQuery();
   const wallets = useWalletsQuery();
   const categories = useCategoriesQuery();
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
-  // Held in state, not rebuilt per render: the form resets its fields
-  // whenever this changes identity.
-  const [preset, setPreset] = useState<BudgetPreset | null>(null);
+  // The form and the transactions sheet, and the state that opens them, live in
+  // BudgetSheetsHost: a tap on a row must not re-render this whole tab.
+  const sheets = useRef<BudgetSheetsHandle>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [highlightedBudgetId, setHighlightedBudgetId] = useState<string | null>(null);
-  // Which budget's transactions are being read. Held as the whole row (budget
-  // + the limit it was drawn from) so the sheet's header can quote the exact
-  // figure the bar showed, rather than re-deriving it and risking disagreement.
-  const [detailRow, setDetailRow] = useState<{ budget: Budget; limit: Budget["limits"][number] } | null>(null);
   const [filter, setFilter] = useState<BudgetFilterKey>("all");
   // The rows slide in from the side of the tab the User moved to — the same
   // motion Home's Ngày / Tháng / Năm tabs use.
@@ -113,12 +106,13 @@ export const BudgetsTab = memo(function BudgetsTab({ initialRange, rangeNonce, o
   // Stable, so the memoized rows re-render only when their own budget does.
   const openEditBudget = useCallback((budget: Budget) => {
     setHighlightedBudgetId(null);
-    setEditingBudget(budget);
-    setModalOpen(true);
+    sheets.current?.edit(budget);
   }, []);
   const openCategoryPicker = useCallback(() => setPickerOpen(true), []);
+  // The whole row (budget + the limit it was drawn from), so the sheet's header
+  // quotes the exact figure the bar showed rather than re-deriving it.
   const openDetail = useCallback(
-    (budget: Budget, limit: Budget["limits"][number]) => setDetailRow({ budget, limit }),
+    (budget: Budget, limit: Budget["limits"][number]) => sheets.current?.detail({ budget, limit }),
     [],
   );
 
@@ -136,13 +130,12 @@ export const BudgetsTab = memo(function BudgetsTab({ initialRange, rangeNonce, o
   // Budgets are monthly, so an unfiltered view drills into the current
   // calendar month — the same window the backend's own `spent` is computed
   // over (BudgetRepo.SpentByUserCurrentPeriod).
-  const detailRange = resolvedRange ?? monthRange(0);
+  // By value: the host is memoized on it.
+  const rangeFrom = resolvedRange?.from ?? monthRange(0).from;
+  const rangeTo = resolvedRange?.to ?? monthRange(0).to;
+  const detailRange = useMemo(() => ({ from: rangeFrom, to: rangeTo }), [rangeFrom, rangeTo]);
 
-  const openNew = useCallback((withPreset: BudgetPreset | null = null) => {
-    setEditingBudget(null);
-    setPreset(withPreset);
-    setModalOpen(true);
-  }, []);
+  const openNew = useCallback((withPreset: BudgetPreset | null = null) => sheets.current?.create(withPreset), []);
   const openNewManual = useCallback(() => openNew(), [openNew]);
   const hasNoBudgets = budgets.data?.length === 0;
 
@@ -243,13 +236,7 @@ export const BudgetsTab = memo(function BudgetsTab({ initialRange, rangeNonce, o
           from the edge as Transactions' Fab. */}
       <BudgetsFab onOpenWizard={onOpenBudgetWizard} onCreate={openNewManual} style={styles.fab} />
 
-      <BudgetFormModal
-        visible={modalOpen}
-        onClose={() => setModalOpen(false)}
-        currency={currency}
-        editingBudget={editingBudget}
-        preset={preset}
-      />
+      <BudgetSheetsHost handleRef={sheets} currency={currency} categoryById={categoryById} detailRange={detailRange} />
 
       <DateRangePickerModal
         visible={rangePickerOpen}
@@ -260,14 +247,6 @@ export const BudgetsTab = memo(function BudgetsTab({ initialRange, rangeNonce, o
           setDateRange(range);
           setRangePickerOpen(false);
         }}
-      />
-
-      <BudgetDetailDialog
-        row={detailRow}
-        onClose={() => setDetailRow(null)}
-        category={detailRow ? categoryById.get(detailRow.budget.category_id) : undefined}
-        range={detailRange}
-        currency={currency}
       />
 
       <CategoryPickerDrawer

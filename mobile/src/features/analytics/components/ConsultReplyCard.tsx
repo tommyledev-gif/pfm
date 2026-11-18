@@ -9,6 +9,8 @@ import { SuggestionChips } from "@/features/analytics/components/SuggestionChips
 import { SuggestionRows } from "@/features/analytics/components/SuggestionRows";
 import { ScenarioPlan } from "@/features/analytics/components/ScenarioPlan";
 import { periodElapsed } from "@/features/analytics/period-elapsed";
+import { ChatMessage } from "@/features/ai-chat/types";
+import { IntentionCard } from "@/features/spending-intentions/components/IntentionCard";
 import { AnalyticsPeriodInfo, AnalyticsQuery, ConsultCategoryRef, ConsultMessageData } from "@/features/analytics/types";
 import { radii, spacing, typography, createStyles } from "@/lib/theme";
 
@@ -27,6 +29,8 @@ interface ConsultReplyCardProps {
   handlers: ConsultHandlers;
   /** The User message this reply answered. */
   sourceText?: string;
+  /** The message this card belongs to: an intention card keeps its state on it. */
+  message?: Pick<ChatMessage, "id" | "intentionStates">;
 }
 
 // A single day that is today is still in progress — "up to now", since
@@ -49,7 +53,7 @@ function periodText(t: TFunction, period: AnalyticsPeriodInfo): string {
 // Category picker, the switch-mode button or the questions to try instead.
 // The reply text itself (the summary or the explanation) sits above this,
 // as the message's own first line — answer first, metadata under it.
-export function ConsultReplyCard({ data, handlers, sourceText }: ConsultReplyCardProps) {
+export function ConsultReplyCard({ data, handlers, sourceText, message }: ConsultReplyCardProps) {
   const { t } = useTranslation();
   const styles = useStyles();
   const answer = data.answer;
@@ -76,6 +80,10 @@ export function ConsultReplyCard({ data, handlers, sourceText }: ConsultReplyCar
 
       {data.scenario ? <ScenarioPlan scenario={data.scenario} /> : null}
 
+      {data.intentions && message ? (
+        <IntentionCard messageId={message.id} data={data.intentions} states={message.intentionStates} />
+      ) : null}
+
       {data.kind === "clarify_category" && data.category_choices && data.pending_query ? (
         <CategoryChoiceList
           choices={data.category_choices}
@@ -95,7 +103,7 @@ export function ConsultReplyCard({ data, handlers, sourceText }: ConsultReplyCar
       {/* An answer's follow-ups are optional next questions — a light row of
           chips. A reply that could not answer has nothing else to offer, so
           its questions are the reply: whole tappable rows. */}
-      {answer || data.scenario ? (
+      {data.intentions ? null : answer || data.scenario ? (
         <View style={styles.chips}>
           <SuggestionChips
             chips={chips}

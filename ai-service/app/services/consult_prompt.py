@@ -27,6 +27,17 @@ def _day_anchors(today: str) -> str:
     return f" Hôm qua là {yesterday.isoformat()}. Hôm kia là {day_before.isoformat()}."
 
 
+def _month_anchors(today: str) -> str:
+    """The month after today, printed for the model to copy: month arithmetic
+    across a year edge is the same trap as day arithmetic (see _day_anchors)."""
+    try:
+        day = date.fromisoformat(today)
+    except ValueError:
+        return ""
+    year, month = (day.year + 1, 1) if day.month == 12 else (day.year, day.month + 1)
+    return f" Tháng này là {day.strftime('%Y-%m')}. Tháng sau là {year:04d}-{month:02d}."
+
+
 def build_consult_prompt(categories: list[ConsultCategory], wallets: list[ConsultWallet], today: str, timezone: str) -> str:
     expense = "\n".join(f'- id={c.id} name="{c.name}"' for c in categories if c.type == "expense") or "(không có)"
     income = "\n".join(f'- id={c.id} name="{c.name}"' for c in categories if c.type == "income") or "(không có)"
@@ -36,7 +47,7 @@ def build_consult_prompt(categories: list[ConsultCategory], wallets: list[Consul
 
     return f"""Bạn phân loại câu hỏi về chi tiêu cho ứng dụng tài chính cá nhân PFM.
 Bạn CHỈ phân loại và ánh xạ câu hỏi thành cấu trúc. Bạn KHÔNG tính toán, KHÔNG trả lời, KHÔNG nêu bất kỳ con số nào.
-Hôm nay là {today} (múi giờ {timezone}).{_day_anchors(today)}
+Hôm nay là {today} (múi giờ {timezone}).{_day_anchors(today)}{_month_anchors(today)}
 
 Danh mục CHI TIÊU của người dùng:
 {expense}
@@ -53,6 +64,7 @@ Bạn nhận câu gốc và một dạng đã chuẩn hoá (bỏ dấu, số ti�
 - "query": hỏi con số cụ thể — "bao nhiêu", "tổng", "liệt kê", "top", "lớn nhất", "so sánh", "còn bao nhiêu ngân sách".
 - "evaluate": xin nhận xét/đánh giá — "đánh giá", "nhận xét", "thế nào", "ổn không", "nhiều không", "có tăng nhiều không".
 - "scenario": giả định / mục tiêu tiết kiệm — "nếu", "giả sử", "muốn tiết kiệm", "cắt ... thì", "bao giờ đủ", "muốn mua", "cần X vào tháng Y thì mỗi tháng chi/để dành thế nào".
+- "intention": người dùng NÊU một kế hoạch sắp mua hoặc sắp trả góp, KHÔNG hỏi gì — "mình định mua nước hoa 2tr", "tháng sau mua máy giặt", "sắp niềng răng trả góp 12 tháng mỗi tháng 1tr5", "dự định mua sữa tắm". Dấu hiệu: "định", "dự định", "tính mua", "sắp", "chuẩn bị", "sẽ mua", "trả góp", hoặc "mua ..." gắn với mốc tương lai ("tháng sau", "tuần sau"). Câu HỎI (có từ hỏi, hoặc "thì bao lâu", "mỗi tháng chi thế nào", "bao giờ đủ") KHÔNG phải intention: đó là scenario. Việc đã chi ("hôm qua mua giày 500k", "cafe 50k") là transaction_like, không phải intention.
 - "needs_context": câu thiếu chủ thể, phụ thuộc câu trước — "còn tháng trước?", "thế còn ăn uống?".
 - "transaction_like": đang mô tả một khoản chi/thu để ghi lại, không phải câu hỏi — "cafe 50k", "ăn trưa 35k". \
 Câu có từ hỏi (đâu, gì, nào, bao nhiêu, mấy) KHÔNG BAO GIỜ là transaction_like, kể cả khi không dấu: \
@@ -109,4 +121,16 @@ Không bao giờ bỏ qua một phần câu hỏi để trả lời phần còn 
 - monthly_save_vnd: chỉ khi câu nói rõ mỗi tháng để dành bao nhiêu ("để dành 3tr/tháng bao giờ đủ 50tr").
 Ví dụ: "tháng 12 năm này thi bằng lái 30m thì mỗi tháng chi như nào" → scenario, goal_amount_vnd=30000000, goal_deadline = ngày 01/12 năm nay. "muốn mua laptop 25tr" → scenario, goal_amount_vnd=25000000.
 Giả định cắt giảm một hạng mục ("cắt cà phê 50% thì dư bao nhiêu") → scenario, để trống ba trường trên.
-Mọi kind khác "query": để trống các trường metric/period/category/wallet, coverage = "full"."""
+8. Khi kind = "intention", điền intentions: MỘT phần tử cho MỖI món/việc người dùng nêu, theo đúng thứ tự trong câu \
+("niềng răng trả góp, mua nước hoa, mua sữa tắm" → 3 phần tử). Tối đa 5; nêu hơn 5 thì chỉ điền 5 món đầu và đặt \
+intentions_truncated = true. Mỗi phần tử chỉ chứa những gì người dùng NÓI, không tự tính, không đoán số:
+- title: tên ngắn của món/việc, tối đa 80 ký tự, giữ ngôn ngữ người dùng, bỏ phần "mình định/sắp" ("mình định mua nước hoa" → "Mua nước hoa").
+- kind: "installment" khi trả theo từng tháng ("trả góp", "mỗi tháng ...", có số tháng); còn lại "one_time".
+- amount_vnd: giá, hoặc tổng của kế hoạch trả góp, bằng đồng ("khoảng 2tr" = 2000000). Không nêu → để trống.
+- monthly_vnd: số tiền trả mỗi tháng, chỉ khi người dùng nói rõ. Không tự chia tổng cho số tháng.
+- months: số tháng trả góp, chỉ khi người dùng nói rõ.
+- month: tháng bắt đầu dạng YYYY-MM, chép từ dòng "Tháng này/Tháng sau" ở trên ("tháng sau" → tháng sau). \
+"Tháng này" hoặc không nói → để trống. Một mốc thời gian đứng chung cho cả câu ("tháng sau mua nước hoa và sữa tắm") áp cho từng món.
+- category_id: id danh mục CHI TIÊU hợp nhất của TỪNG món, copy nguyên văn từ danh sách; category_confidence theo quy tắc mục 4. Không rõ → để trống.
+coverage = "full".
+Mọi kind khác "query" và "intention": để trống các trường metric/period/category/wallet, coverage = "full"."""

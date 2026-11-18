@@ -14,7 +14,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.limits import CATEGORIES_MAX, ID_MAX_CHARS, NAME_MAX_CHARS, SHORT_FIELD_MAX_CHARS, WALLETS_MAX
 
-ParseKind = Literal["query", "evaluate", "scenario", "unsupported", "needs_context", "transaction_like"]
+# "intention": the User states something they plan to buy or pay in instalments
+# (specs/ai-chat-spending-intentions). The backend computes every figure.
+ParseKind = Literal["query", "evaluate", "scenario", "intention", "unsupported", "needs_context", "transaction_like"]
 Coverage = Literal["full", "partial"]
 # "anomaly": "anything unusual today/this week/this month?" — the backend
 # compares the period with the User's own history (no model numbers).
@@ -25,6 +27,9 @@ Period = Literal["this_cycle", "last_cycle", "last_3_cycles", "last_6_cycles", "
 
 MESSAGE_MAX_LENGTH = 300
 LIST_MAX_ROWS = 10
+INTENTION_TITLE_MAX_CHARS = 80
+INTENTIONS_MAX = 5
+IntentionKind = Literal["one_time", "installment"]
 
 
 class ConsultCategory(BaseModel):
@@ -54,6 +59,21 @@ class ConsultRequest(BaseModel):
     timezone: str = Field(max_length=SHORT_FIELD_MAX_CHARS)
 
 
+class ConsultIntentionItem(BaseModel):
+    """One planned purchase as the model read it: only what the User said."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(max_length=INTENTION_TITLE_MAX_CHARS, description="short name of what the User plans to buy")
+    kind: IntentionKind = Field(description="installment when paid over months, else one_time")
+    amount_vnd: int | None = Field(default=None, ge=1, description="the price, or an instalment plan's total, in dong; only when the User said it")
+    monthly_vnd: int | None = Field(default=None, ge=1, description="what the User pays each month, in dong; only when the User said it")
+    months: int | None = Field(default=None, ge=1, description="number of monthly payments")
+    month: str | None = Field(default=None, description="YYYY-MM the plan starts in; empty for this month")
+    category_id: str | None = Field(default=None, description="id copied exactly from the expense Category list")
+    category_confidence: float | None = Field(default=None, ge=0, le=1)
+
+
 class ConsultToolOutput(BaseModel):
     """What the model must return. Every field it may leave out is nullable."""
 
@@ -75,6 +95,12 @@ class ConsultToolOutput(BaseModel):
     goal_amount_vnd: int | None = Field(default=None, ge=1, description="scenario only: target amount in dong, e.g. 30000000 for 30tr")
     goal_deadline: str | None = Field(default=None, description="scenario only: YYYY-MM-DD the money is needed by")
     monthly_save_vnd: int | None = Field(default=None, ge=1, description="scenario only: amount the User says they save per month, in dong")
+    intentions: list["ConsultIntentionItem"] = Field(
+        default_factory=list,
+        max_length=INTENTIONS_MAX,
+        description="intention only: one entry per thing the User plans to buy, in the order said",
+    )
+    intentions_truncated: bool = Field(default=False, description="intention only: true when more than the allowed number of things were named")
 
 
 class ConsultQuery(BaseModel):
@@ -103,6 +129,22 @@ class ConsultScenario(BaseModel):
     monthly_save_vnd: int | None = None
 
 
+class ConsultIntention(BaseModel):
+    """What the User said about one planned purchase. Never a figure the model
+    worked out: the backend computes how it sits against Budgets and spending."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str
+    kind: IntentionKind
+    amount_vnd: int | None = None
+    monthly_vnd: int | None = None
+    months: int | None = None
+    month: str | None = None
+    category_id: str | None = None
+    category_confidence: float | None = None
+
+
 class ConsultUsage(BaseModel):
     prompt_tokens: int = 0
     completion_tokens: int = 0
@@ -116,6 +158,9 @@ class ConsultResponse(BaseModel):
     # Set only for kind="scenario" when the question is a savings goal;
     # other what-ifs (cutting a Category) still have no scenario.
     scenario: ConsultScenario | None = None
+    # Set only for kind="intention": one entry per planned purchase named.
+    intentions: list[ConsultIntention] = Field(default_factory=list)
+    intentions_truncated: bool = False
     category_confidence: float | None = None
     normalized_text: str
     usage: ConsultUsage

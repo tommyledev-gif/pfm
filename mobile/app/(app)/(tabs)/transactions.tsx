@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useTabParams, withTabParams } from "@/lib/tab-route-params";
@@ -18,7 +18,7 @@ import { buildDaySections, DaySection } from "@/features/transactions/day-sectio
 import { rangeTargetsFuture, splitFutureTransactions } from "@/features/transactions/future";
 import { FutureTransactionsCard } from "@/features/transactions/components/FutureTransactionsCard";
 import { FutureTransactionsDialog } from "@/features/transactions/components/FutureTransactionsDialog";
-import { TransactionFormModal } from "@/features/transactions/components/TransactionFormModal";
+import { TransactionFormHandle, TransactionFormHost } from "@/features/transactions/components/TransactionFormHost";
 import { ManualDraftEditor } from "@/features/transactions/components/ManualDraftEditor";
 import { TransactionsListEmpty, TransactionsListFooter } from "@/features/transactions/components/TransactionsListStates";
 import { PendingSyncSection } from "@/features/transactions/components/PendingSyncSection";
@@ -57,9 +57,10 @@ function TransactionsScreen() {
     filters;
   const sheets = useTransactionsSheets();
   const [sortKeys, setSortKeys] = useState<SortKey[]>([]);
-  const [formOpen, setFormOpen] = useState(false);
   const [futureOpen, setFutureOpen] = useState(false);
-  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  // The form's open state lives in TransactionFormHost: a tap that opens it
+  // must not re-render this screen.
+  const formHost = useRef<TransactionFormHandle>(null);
   // Day keys (YYYY-MM-DD) folded away. Session-local on purpose: "out of my way for now", not a setting.
   const days = useCollapsedDays();
   const { collapsedDays, foldingDays } = days;
@@ -152,21 +153,13 @@ function TransactionsScreen() {
     currency: headerTotal?.currency ?? "VND",
   });
 
-  const openCreateForm = useCallback(() => {
-    setEditingTransaction(null);
-    setFormOpen(true);
-  }, []);
-  const openEdit = useCallback((transaction: Transaction) => {
-    setEditingTransaction(transaction);
-    setFormOpen(true);
-  }, []);
-  const closeForm = useCallback(() => setFormOpen(false), []);
+  const openCreateForm = useCallback(() => formHost.current?.open(null), []);
+  const openEdit = useCallback((transaction: Transaction) => formHost.current?.open(transaction), []);
   const openFuture = useCallback(() => setFutureOpen(true), []);
   const closeFuture = useCallback(() => setFutureOpen(false), []);
   const selectFuture = useCallback((transaction: Transaction) => {
     setFutureOpen(false);
-    setEditingTransaction(transaction);
-    setFormOpen(true);
+    formHost.current?.open(transaction);
   }, []);
   const changeTypeFilter = useCallback(
     (value: TypeFilterValue) => setFilter(value === "all" ? undefined : value),
@@ -276,7 +269,7 @@ function TransactionsScreen() {
         onApplySort={setSortKeys}
       />
 
-      <TransactionFormModal visible={formOpen} onClose={closeForm} editingTransaction={editingTransaction} keepMounted />
+      <TransactionFormHost handleRef={formHost} />
 
       <FutureTransactionsDialog
         visible={futureOpen}

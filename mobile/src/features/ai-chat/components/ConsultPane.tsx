@@ -13,9 +13,11 @@ import { ChatInputBar } from "@/features/ai-chat/components/ChatInputBar";
 import { ChatThreadList } from "@/features/ai-chat/components/ChatThreadList";
 import { KeyboardLiftView } from "@/features/ai-chat/components/KeyboardLiftView";
 import { ConsultMessageRow } from "@/features/ai-chat/components/ConsultMessageRow";
+import { IntentionSheetsHost } from "@/features/spending-intentions/components/IntentionSheetsHost";
 import { useChatThreadStyles } from "@/features/ai-chat/components/chat-thread-styles";
 import { CHAT_MODE_META } from "@/features/ai-chat/chat-mode";
 import { isConsultMessage } from "@/features/ai-chat/consult-message";
+import { isShown } from "@/features/ai-chat/failure-reply";
 import { useConsultActions } from "@/features/ai-chat/hooks/use-consult-actions";
 import { MessageJump, useMessageJump } from "@/features/ai-chat/hooks/use-message-jump";
 import { ChatMessage } from "@/features/ai-chat/types";
@@ -61,7 +63,7 @@ export function ConsultPane({ loading, bottomInset, onSwitchToRecording, jump }:
   });
 
   // Inverted list, same as the recording pane: offset 0 is "newest".
-  const messages = useMemo(() => thread.filter(isConsultMessage).reverse(), [thread]);
+  const messages = useMemo(() => thread.filter((m) => isShown(m) && isConsultMessage(m)).reverse(), [thread]);
   const { highlightId, highlightOpacity, onScrollToIndexFailed } = useMessageJump(listRef, messages, jump);
 
   const renderItem = useCallback(
@@ -116,6 +118,8 @@ export function ConsultPane({ loading, bottomInset, onSwitchToRecording, jump }:
           onHeightChange={setComposerHeight}
         />
       </KeyboardLiftView>
+      {/* Built with the pane, after the composer, so the sheets paint over it. */}
+      <IntentionSheetsHost />
     </View>
   );
 }

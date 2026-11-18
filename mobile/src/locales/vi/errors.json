@@ -80,7 +80,10 @@
       "DISPOSABLE_TOO_SMALL": "Số tiền còn lại quá nhỏ so với số danh mục đã chọn. Bỏ bớt vài danh mục.",
       "PLAN_VERSION_CONFLICT": "Ngân sách vừa được cập nhật ở thiết bị khác. Thử lại.",
       "IMAGE_MISSING": "Chưa chọn ảnh.",
-      "IMAGE_UNREADABLE": "Không đọc được ảnh này. Chọn ảnh khác."
+      "IMAGE_UNREADABLE": "Không đọc được ảnh này. Chọn ảnh khác.",
+      "SPENDING_INTENTION_NOT_FOUND": "Dự định chi này không còn.",
+      "SPENDING_INTENTION_LIMIT_REACHED": "Đã đạt số dự định chi tối đa. Xóa bớt trước khi thêm.",
+      "SPENDING_INTENTION_DELETED": "Dự định chi này đã bị xóa."
     },
     "reason": {
       "INVALID_USERNAME": {

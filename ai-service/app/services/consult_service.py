@@ -31,6 +31,7 @@ from app.core.llm_errors import provider_error_code
 from app.nlu.intent_rules import read_simple_question
 from app.nlu.normalize import normalize
 from app.schemas.consult_schema import (
+    ConsultIntention,
     ConsultQuery,
     ConsultRequest,
     ConsultResponse,
@@ -39,6 +40,7 @@ from app.schemas.consult_schema import (
     ConsultUsage,
 )
 from app.services.consult_prompt import build_consult_prompt
+from app.services.llm_tools import dereference_schema
 
 logger = logging.getLogger(__name__)
 
@@ -132,15 +134,48 @@ def to_response(output: ConsultToolOutput, req: ConsultRequest, normalized: str,
             goal_deadline=output.goal_deadline,
             monthly_save_vnd=output.monthly_save_vnd,
         )
+    intentions = _to_intentions(output, req) if output.kind == "intention" else []
+    kind = output.kind
+    if output.kind == "intention" and not intentions:
+        # Nothing usable named: not a plan, and never guessed into one.
+        kind, coverage = "unsupported", "partial"
     return ConsultResponse(
-        kind=output.kind,
+        kind=kind,
         coverage=coverage,
         query=query,
         scenario=scenario,
+        intentions=intentions,
+        intentions_truncated=output.intentions_truncated,
         category_confidence=output.category_confidence if output.category_ids else None,
         normalized_text=normalized,
         usage=usage,
     )
+
+
+def _to_intentions(output: ConsultToolOutput, req: ConsultRequest) -> list[ConsultIntention]:
+    """The planned purchases as the User said them. A Category id the model was
+    never shown, or an income Category, is dropped rather than trusted; an item
+    with no title is not a plan and is left out."""
+    expense_ids = {c.id for c in req.categories if c.type == "expense"}
+    plans: list[ConsultIntention] = []
+    for item in output.intentions:
+        title = item.title.strip()
+        if not title:
+            continue
+        shown = item.category_id if item.category_id in expense_ids else None
+        plans.append(
+            ConsultIntention(
+                title=title,
+                kind=item.kind or ("installment" if item.months else "one_time"),
+                amount_vnd=item.amount_vnd,
+                monthly_vnd=item.monthly_vnd,
+                months=item.months,
+                month=(item.month or "").strip() or None,
+                category_id=shown,
+                category_confidence=item.category_confidence if shown else None,
+            )
+        )
+    return plans
 
 
 def _call_groq(system_prompt: str, user_message: str) -> tuple[ConsultToolOutput, ConsultUsage]:
@@ -150,7 +185,9 @@ def _call_groq(system_prompt: str, user_message: str) -> tuple[ConsultToolOutput
         "function": {
             "name": _TOOL_NAME,
             "description": _TOOL_DESCRIPTION,
-            "parameters": ConsultToolOutput.model_json_schema(),
+            # Inlined: the intention list nests an item model, which the forced
+            # tool call mishandles as a $ref (llm_tools.dereference_schema).
+            "parameters": dereference_schema(ConsultToolOutput.model_json_schema()),
         },
     }
     completion = client.chat.completions.create(

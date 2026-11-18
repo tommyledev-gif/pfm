@@ -80,7 +80,10 @@
       "DISPOSABLE_TOO_SMALL": "What's left is too little for this many categories. Remove a few.",
       "PLAN_VERSION_CONFLICT": "Your budgets were just updated on another device. Try again.",
       "IMAGE_MISSING": "No photo selected.",
-      "IMAGE_UNREADABLE": "Couldn't open this photo. Choose another."
+      "IMAGE_UNREADABLE": "Couldn't open this photo. Choose another.",
+      "SPENDING_INTENTION_NOT_FOUND": "This planned item no longer exists.",
+      "SPENDING_INTENTION_LIMIT_REACHED": "Maximum planned items reached. Delete one before adding another.",
+      "SPENDING_INTENTION_DELETED": "This planned item was deleted."
     },
     "reason": {
       "INVALID_USERNAME": {

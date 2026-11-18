@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, Animated as RNAnimated, ScrollView, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
@@ -14,7 +14,7 @@ import { DonutChart } from "@/components/shared/DonutChart";
 import { DonutLegendRow } from "@/components/shared/DonutLegendRow";
 import { clearDonutSelectionOnOutsideTouch } from "@/components/shared/donut-selection";
 import { RevealableAmount } from "@/components/shared/RevealableAmount";
-import { CategoryTransactionsDialog } from "@/features/reports/components/CategoryTransactionsDialog";
+import { SpendingDetailHandle, SpendingDetailHost } from "@/features/reports/components/SpendingDetailHost";
 import { formatDateRange } from "@/lib/format-date";
 import { CurrencySwitch } from "@/components/shared/CurrencySwitch";
 import { useReportCurrency } from "@/features/reports/hooks/use-report-currency";
@@ -51,8 +51,10 @@ export const SpendingTab = memo(function SpendingTab({ focusCategoryId, focusNon
   const budgets = useBudgetsQuery();
   const [selected, setSelected] = useState<string | null>(null);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
-  // Separate from `selected`, so closing the drill-down keeps the highlight.
-  const [detailCategoryId, setDetailCategoryId] = useState<string | null>(null);
+  // The drill-down sheet and its open state live in SpendingDetailHost (apart
+  // from `selected`, so closing it keeps the highlight): opening it must not
+  // re-render this whole tab.
+  const detailHost = useRef<SpendingDetailHandle>(null);
   const { currency, currencies, setCurrency } = useReportCurrency(summary.data);
   const navClearance = useFabBottom();
   const legendEntrance = useListEntrance();
@@ -90,7 +92,7 @@ export const SpendingTab = memo(function SpendingTab({ focusCategoryId, focusNon
   const closeRangePicker = useCallback(() => setPickerOpen(false), []);
   const openCategoryPicker = useCallback(() => setCategoryPickerOpen(true), []);
   const closeCategoryPicker = useCallback(() => setCategoryPickerOpen(false), []);
-  const closeDetail = useCallback(() => setDetailCategoryId(null), []);
+  const openDetail = useCallback((categoryId: string) => detailHost.current?.open(categoryId), []);
 
   const renderLoaded = () => {
     if (!summary.data) {
@@ -110,7 +112,6 @@ export const SpendingTab = memo(function SpendingTab({ focusCategoryId, focusNon
       switchingRange && dateRange.from
         ? formatDateRange(dateRange.from, dateRange.to ?? dateRange.from)
         : formatDateRange(range.from, range.to);
-    const detailSegment = detailCategoryId ? segments.find((s) => s.key === detailCategoryId) : undefined;
 
     // ⚠️ One scroll for the whole tab. Only the legend used to scroll, in what
     // was left under the range row, two stat cards and the boxed donut — on a
@@ -181,7 +182,7 @@ export const SpendingTab = memo(function SpendingTab({ focusCategoryId, focusNon
                     selected={selected}
                     onToggle={toggleSegment}
                     budgetTotal={budgetTotal}
-                    onPressDetails={setDetailCategoryId}
+                    onPressDetails={openDetail}
                   />
                   {budgetTotal !== null && prorated ? (
                     <Text style={styles.budgetHint}>
@@ -220,20 +221,13 @@ export const SpendingTab = memo(function SpendingTab({ focusCategoryId, focusNon
           onApply={setDateRange}
         />
 
-        <CategoryTransactionsDialog
-          visible={detailCategoryId !== null}
-          onClose={closeDetail}
-          categoryId={detailCategoryId}
-          categoryName={detailSegment?.label ?? ""}
-          color={detailSegment?.color ?? colors.lavender}
-          icon={detailSegment?.icon}
-          iconUrl={detailSegment?.iconUrl}
-          // The backend's resolved window, so the rows match the donut even
-          // when no filter is applied.
+        <SpendingDetailHost
+          handleRef={detailHost}
+          segments={segments}
           from={range.from}
           to={range.to}
           currency={currency}
-          total={detailSegment?.amount ?? 0}
+          fallbackColor={colors.lavender}
         />
 
         <CategoryPickerDrawer

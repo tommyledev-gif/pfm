@@ -220,12 +220,12 @@ const useStyles = createStyles((colors) => ({
   // Shares the bar's fill and ring. No bottom edge, and it drops 1px over the
   // bar's top hairline (the row is drawn above the bar), so tab and bar are
   // one shape. Square at the foot, rounded at the top like the bar.
-  tab: {
+   tab: {
     position: "absolute",
     right: LOCATION_TAB_INSET_RIGHT,
     bottom: -1,
     height: LOCATION_TAB_HEIGHT + 1,
-    paddingHorizontal: LOCATION_TAB_PADDING_X,
+    paddingHorizontal: 0,
     paddingTop: spacing.xs,
     alignItems: "center",
     backgroundColor: colors.surface,

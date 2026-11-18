@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useCallback } from "react";
 import { Pressable, Text } from "react-native";
 import { useTranslation } from "react-i18next";
 import Animated from "react-native-reanimated";
@@ -7,7 +7,10 @@ import { useFreshEntrance } from "@/components/motion/use-fresh-entrance";
 import { ActionPopover } from "@/components/shared/ActionPopover";
 import { UserBubble } from "@/features/ai-chat/components/UserBubble";
 import { messageCreatedAt } from "@/features/ai-chat/components/ChatMessageRow";
+import { isFailureReply } from "@/features/ai-chat/failure-reply";
+import { useDismissCollapse } from "@/features/ai-chat/hooks/use-dismiss-collapse";
 import { useHoldMenu } from "@/features/ai-chat/hooks/use-hold-menu";
+import { useChatStore } from "@/stores/chat-store";
 import { useMessageActions } from "@/features/ai-chat/hooks/use-message-actions";
 import { messageText } from "@/features/ai-chat/message-text";
 import { ChatMessage } from "@/features/ai-chat/types";
@@ -22,6 +25,11 @@ interface ConsultMessageRowProps {
    *  reply is from its own question, so turns read as groups. */
   startsTurn: boolean;
   handlers: ConsultHandlers;
+}
+
+interface ConsultMessageRowViewProps extends ConsultMessageRowProps {
+  /** Deletes the message: given only to a failure reply (failure-reply.ts). */
+  onDismiss?: () => void;
 }
 
 // Between turns vs. within one: the gap has to differ enough to be seen.
@@ -41,15 +49,16 @@ const IN_TURN_GAP = spacing.sm;
  *
  * Like ChatMessageRow, only a message that has just arrived rises in.
  */
-export const ConsultMessageRow = memo(function ConsultMessageRow({ message, startsTurn, handlers }: ConsultMessageRowProps) {
+function ConsultMessageRowView({ message, startsTurn, handlers, onDismiss }: ConsultMessageRowViewProps) {
   const styles = useStyles();
   // Re-renders the row on a language switch: an app reply follows it (message-text.ts).
   useTranslation();
   const gap = { marginTop: startsTurn ? TURN_GAP : IN_TURN_GAP };
   const entering = useFreshEntrance(messageCreatedAt(message.id));
   const menu = useHoldMenu();
-  // Analysis messages are never swiped, so Copy is all a hold offers.
-  const menuActions = useMessageActions({ message });
+  // Analysis messages are never swiped: a hold offers Copy, and Delete on a
+  // failure reply ("Chưa trả lời được câu này.").
+  const menuActions = useMessageActions({ message, onDelete: onDismiss });
   const onLongPress = menuActions.length > 0 ? menu.open : undefined;
   // The assistant's text has no bubble of its own, so it measures itself here.
   const assistantText = useAnchoredLongPress(onLongPress);
@@ -88,11 +97,28 @@ export const ConsultMessageRow = memo(function ConsultMessageRow({ message, star
         </Pressable>
       ) : null}
       {message.consult ? (
-        <ConsultReplyCard data={message.consult} handlers={handlers} sourceText={message.sourceText} />
+        <ConsultReplyCard data={message.consult} handlers={handlers} sourceText={message.sourceText} message={message} />
       ) : null}
       {popup}
     </Animated.View>
   );
+}
+
+// A failure reply folds away, then leaves the thread; only those rows carry
+// the fold's animated style.
+function ConsultFailureRow(props: ConsultMessageRowProps) {
+  const { id } = props.message;
+  const remove = useCallback(() => useChatStore.getState().updateMessage(id, { dismissed: true }), [id]);
+  const collapse = useDismissCollapse(remove);
+  return (
+    <Animated.View onLayout={collapse.onLayout} style={collapse.style}>
+      <ConsultMessageRowView {...props} onDismiss={collapse.dismiss} />
+    </Animated.View>
+  );
+}
+
+export const ConsultMessageRow = memo(function ConsultMessageRow(props: ConsultMessageRowProps) {
+  return isFailureReply(props.message) ? <ConsultFailureRow {...props} /> : <ConsultMessageRowView {...props} />;
 });
 
 const useStyles = createStyles((colors) => ({

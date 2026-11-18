@@ -35,6 +35,8 @@ type ConsultService struct {
 	logs          IntentParseLogRepo
 	cycles        *CycleResolver
 	logger        *zap.Logger
+	// intentions is optional: see WithIntentions.
+	intentions *SpendingIntentionService
 }
 
 func NewConsultService(analytics *AnalyticsService, analyticsRepo AnalyticsRepo, wallets WalletRepo, categories CategoryRepo, client AIConsultClient, tokens *ConsultTokenBudget, logs IntentParseLogRepo, cycles *CycleResolver, logger *zap.Logger) *ConsultService {
