@@ -138,6 +138,10 @@ export const TransactionFormModal = memo(function TransactionFormModal({ visible
         visible={visible}
         onClose={onClose}
         keepMounted={keepMounted}
+        // A saved transaction's lines arrive after it is opened; the sheet
+        // waits for them (a beat at most) rather than rising on the list row's
+        // item count and changing under its own slide. Offline they never come.
+        holdOpen={itemsLoading && isOnline}
         child={child}
         footer={
           <TransactionKeypadFooter

@@ -82,7 +82,16 @@ export const CategoryTransactionsDialog = memo(function CategoryTransactionsDial
   const showInTransactions = useShowInTransactions(onClose);
 
   return (
-    <Drawer visible={visible} onClose={onClose} onEndReached={list.loadMore} keepMounted={keepMounted}>
+    // holdOpen: a category not fetched yet opens once its rows are in (at most
+    // a beat). It used to rise on four skeleton rows and grow when the real
+    // ones landed mid-slide, jerking the sheet's top edge and the dim with it.
+    <Drawer
+      visible={visible}
+      onClose={onClose}
+      onEndReached={list.loadMore}
+      keepMounted={keepMounted}
+      holdOpen={list.isLoading}
+    >
       <DrawerHeader
         title={t("reports.categorySheet.title")}
         actions={[{ label: t("common.action.close"), onPress: onClose, variant: "secondary" }]}

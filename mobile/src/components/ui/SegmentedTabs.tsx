@@ -28,6 +28,13 @@ interface SegmentedTabsProps<T extends string> {
   style?: StyleProp<ViewStyle>;
   /** Shown but not changeable (a saved transaction's type). */
   disabled?: boolean;
+  /**
+   * Called on a tap, before anything moves: return true when the caller takes
+   * the tap over (a confirmation opens first) — the fill and the selection then
+   * stay on the tab they are on, and `onChange` is not called. If the user
+   * confirms, the caller changes `value` itself and the fill follows it.
+   */
+  interceptSelect?: (value: T) => boolean;
   testID?: string;
 }
 
@@ -41,7 +48,15 @@ interface SegmentedTabsProps<T extends string> {
 // The green fill is one view that slides to the tab picked (MotionHighlight)
 // rather than each tab filling itself. Until the tabs are measured (the first
 // frame) the active tab fills itself as before, so it is never unmarked.
-function SegmentedTabsView<T extends string>({ options, value, onChange, style, disabled, testID }: SegmentedTabsProps<T>) {
+function SegmentedTabsView<T extends string>({
+  options,
+  value,
+  onChange,
+  style,
+  disabled,
+  interceptSelect,
+  testID,
+}: SegmentedTabsProps<T>) {
   const styles = useStyles();
   const reduceMotion = useReduceMotion();
   const { rects, onOptionLayout } = useOptionRects();
@@ -50,8 +65,15 @@ function SegmentedTabsView<T extends string>({ options, value, onChange, style, 
   // ⚠️ The fill moves first, the selection a frame later (as BottomNav's
   // ball does): the screen's render for the new selection (Home's whole
   // snapshot card) would otherwise run before the slide had even started.
+  //
+  // ⚠️ Never for a tap the caller answers with a confirmation instead of a new
+  // value (`interceptSelect`): the fill had already slid under the new tab, and
+  // when the dialog was dismissed the selection stayed on the old one — the old
+  // tab's label (light, for green) on the bare track and the new tab's label
+  // (muted) on the green: both vanished into their backgrounds.
   const select = (next: T) => {
     if (next === value) return;
+    if (interceptSelect?.(next)) return;
     const rect = rects[next];
     if (rect) highlight.current?.moveTo(rect);
     requestAnimationFrame(() => onChange(next));

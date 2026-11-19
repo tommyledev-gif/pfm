@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
@@ -13,12 +13,12 @@ import { useRequireOnline } from "@/lib/connectivity";
 import { formatCurrency } from "@/lib/currency";
 import { withAlpha } from "@/lib/color";
 import { radii, spacing, typography, createStyles, useColors } from "@/lib/theme";
-import { EditTransactionModal } from "@/features/ai-chat/components/EditTransactionModal";
+import { PendingEditHandle, PendingEditHost } from "@/features/ai-chat/components/PendingEditHost";
 import { PendingReviewCard } from "@/features/ai-chat/components/PendingReviewCard";
 import { useTransactionRemoval } from "@/features/ai-chat/components/use-transaction-removal";
-import { useChatActions } from "@/features/ai-chat/hooks/use-chat-actions";
 import { useConfirmProposal } from "@/features/ai-chat/hooks/use-confirm-proposal";
 import { isPendingProposal } from "@/features/ai-chat/pending";
+import { sortProposalsNewestFirst } from "@/features/ai-chat/proposal-time";
 import { isSavableProposal, proposalWalletName } from "@/features/ai-chat/proposal-wallet";
 import { removalDialogCopy } from "@/features/ai-chat/removal-copy";
 import { ChatMessage } from "@/features/ai-chat/types";
@@ -35,10 +35,10 @@ type TypeFilter = "all" | "expense" | "income";
  * Every AI transaction proposal still awaiting a decision, reviewable in one
  * place — opened from Home's "Chờ xác nhận" section via "Xem tất cả".
  *
- * Each card approves or discards on its own; "Duyệt tất cả" saves every
- * proposal in the current tab. Tapping a card edits it in place without
- * leaving this screen. Nothing here ever deletes a message from the chat
- * thread — see use-transaction-removal.
+ * Newest first, as on Home. Each card approves or discards on its own;
+ * "Duyệt tất cả" saves every proposal in the current tab. Tapping a card
+ * edits it in place without leaving this screen (PendingEditHost). Nothing
+ * here ever deletes a message from the chat thread — see use-transaction-removal.
  */
 export default function PendingReviewScreen() {
   const colors = useColors();
@@ -52,17 +52,20 @@ export default function PendingReviewScreen() {
   const categories = useCategoriesQuery();
   const removal = useTransactionRemoval();
   const proposals = useConfirmProposal();
-  const { editAction } = useChatActions({ onSent: () => {} });
+  // The edit sheet and the message it edits live in PendingEditHost: opening
+  // it must not re-render this list.
+  const editHost = useRef<PendingEditHandle>(null);
 
   const [filter, setFilter] = useState<TypeFilter>("all");
-  const [editing, setEditing] = useState<ChatMessage | null>(null);
 
   const walletById = useMemo(() => new Map(wallets.data?.map((w) => [w.id, w])), [wallets.data]);
   const categoryById = useMemo(() => new Map(categories.data?.map((c) => [c.id, c])), [categories.data]);
   const currencyOf = (m: ChatMessage) =>
     walletById.get(m.action?.payload.wallet_id ?? "")?.currency ?? FALLBACK_CURRENCY;
 
-  const pending = useMemo(() => thread.filter(isPendingProposal), [thread]);
+  // Newest first: the thread is oldest first, and what was just proposed is
+  // what the User came to review.
+  const pending = useMemo(() => sortProposalsNewestFirst(thread.filter(isPendingProposal)), [thread]);
   const expenses = pending.filter((m) => m.action?.payload.type === "expense");
   const incomes = pending.filter((m) => m.action?.payload.type === "income");
   const visible = filter === "expense" ? expenses : filter === "income" ? incomes : pending;
@@ -126,10 +129,10 @@ export default function PendingReviewScreen() {
             // No VND Wallet yet: Confirm opens the edit form instead (spec AC-31).
             onConfirm={() =>
               item.action && !isSavableProposal(item.action.payload, walletById)
-                ? setEditing(item)
+                ? editHost.current?.open(item)
                 : requireOnline(() => proposals.confirm(item))
             }
-            onEdit={() => setEditing(item)}
+            onEdit={() => editHost.current?.open(item)}
             onRemove={() => removal.request(item)}
           />
         )}
@@ -154,23 +157,16 @@ export default function PendingReviewScreen() {
           </View>
           <PillButton
             label={t("pending.footer.approveAll", { count: visible.length })}
-            onPress={() => requireOnline(() => proposals.confirmAll(visible))}
+            // Saved oldest first although listed newest first: each save moves
+            // a balance and is judged against what the earlier ones left.
+            onPress={() => requireOnline(() => proposals.confirmAll([...visible].reverse()))}
             loading={proposals.confirmingAll}
             testID="btn-pending-review-confirm-all"
           />
         </View>
       ) : null}
 
-      <EditTransactionModal
-        visible={Boolean(editing)}
-        payload={editing?.action?.payload ?? null}
-        vndOnly
-        onClose={() => setEditing(null)}
-        onSave={(payload) => {
-          if (editing) editAction(editing, payload);
-          setEditing(null);
-        }}
-      />
+      <PendingEditHost handleRef={editHost} />
 
       <ConfirmDialog
         visible={removal.target !== null}

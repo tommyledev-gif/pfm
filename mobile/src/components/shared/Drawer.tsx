@@ -11,7 +11,7 @@ import { useScrollEnd } from "@/components/shared/use-scroll-end";
 import { useOverlayOrigin } from "@/components/shared/use-overlay-origin";
 import { useSheetDrag } from "@/components/shared/use-sheet-drag";
 import { useSheetExpand } from "@/components/shared/use-sheet-expand";
-import { useDrawerMotion } from "@/components/shared/use-drawer-motion";
+import { useDrawerMotion, useOpenHold } from "@/components/shared/use-drawer-motion";
 import { radii, spacing } from "@/lib/theme";
 import { useKeyboardHeight } from "@/lib/use-keyboard-height";
 import { useSheetStore } from "@/stores/sheet-store";
@@ -36,6 +36,12 @@ interface DrawerProps {
    * Transactions FAB's form), whose build cost the open used to wait for.
    */
   keepMounted?: boolean;
+  /**
+   * The content is still loading (a list's first page): the open slide waits
+   * for it, at most useOpenHold's cap, so the sheet rises once with its rows in
+   * place rather than on a skeleton that changes height under the slide.
+   */
+  holdOpen?: boolean;
 }
 
 // Bottom-sheet chrome for every form and picker: dimmed backdrop that closes
@@ -90,7 +96,17 @@ interface DrawerSheetProps extends DrawerProps {
   onExited: () => void;
 }
 
-function DrawerSheet({ visible, onClose, children, footer, child, onEndReached, startOpen, onExited }: DrawerSheetProps) {
+function DrawerSheet({
+  visible,
+  onClose,
+  children,
+  footer,
+  child,
+  onEndReached,
+  holdOpen = false,
+  startOpen,
+  onExited,
+}: DrawerSheetProps) {
   const { t } = useTranslation();
   const styles = useDrawerStyles();
   const keyboardHeight = useKeyboardHeight();
@@ -101,6 +117,7 @@ function DrawerSheet({ visible, onClose, children, footer, child, onEndReached, 
   // The overlay's offset to the real window edges (useOverlayOrigin); the
   // open slide waits for its first measurement.
   const { anchorRef, origin, measured, measureAnchor } = useOverlayOrigin(visible);
+  const contentReady = useOpenHold(visible, holdOpen);
   // ⚠️ The nav hides as the sheet starts up, not when `visible` flips: the
   // sheet still waited for its layout, so the bar went first and the screen
   // sat a beat with neither (emulator, 2026-11-11).
@@ -120,6 +137,7 @@ function DrawerSheet({ visible, onClose, children, footer, child, onEndReached, 
       onExited();
     },
     ready: measured,
+    contentReady,
     onSlideStart: () => {
       if (navHidden.current) return;
       navHidden.current = true;

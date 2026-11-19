@@ -30,18 +30,30 @@ export function TransactionTypeChips({ type, locked, itemCount, onSelect, onClea
   const [confirmTransfer, setConfirmTransfer] = useState(false);
   const typeOptions = useMemo(() => TRANSACTION_KINDS.map((value) => ({ value, label: t(TYPE_KEYS[value]) })), [t]);
 
+  // Switching to transfer with items asks first: the tap is answered by the
+  // dialog, so SegmentedTabs must neither slide its fill nor select. Cancelling
+  // leaves it exactly as it was; confirming selects through onConfirm below.
+  const askBeforeTransfer = (next: TransactionKind) => {
+    if (next !== "transfer" || itemCount === 0) return false;
+    setConfirmTransfer(true);
+    return true;
+  };
+
   const pick = (next: TransactionKind) => {
     if (locked || next === type) return;
-    if (next === "transfer" && itemCount > 0) {
-      setConfirmTransfer(true);
-      return;
-    }
     onSelect(next);
   };
 
   return (
     <>
-      <SegmentedTabs options={typeOptions} value={type} onChange={pick} disabled={locked} testID="tabs-transaction-type" />
+      <SegmentedTabs
+        options={typeOptions}
+        value={type}
+        onChange={pick}
+        interceptSelect={askBeforeTransfer}
+        disabled={locked}
+        testID="tabs-transaction-type"
+      />
       <ConfirmDialog
         visible={confirmTransfer}
         title={t("transactions.dropItems.title", { count: itemCount })}

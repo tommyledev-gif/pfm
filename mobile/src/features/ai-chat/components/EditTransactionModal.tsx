@@ -8,6 +8,7 @@ import { DrawerHeader } from "@/components/shared/DrawerHeader";
 import { SingleDatePickerModal } from "@/components/shared/SingleDatePickerModal";
 import { PROPOSAL_CURRENCY, TransactionKind } from "@/lib/constants";
 import { useAmountExpression } from "@/lib/use-amount-expression";
+import { useSeedOnOpen } from "@/lib/use-seed-on-open";
 import { useWalletsQuery } from "@/features/wallets/api/use-wallets-query";
 import { useCategoriesQuery } from "@/features/categories/api/use-categories-query";
 import { useCategoryPicker } from "@/features/categories/components/use-category-picker";
@@ -45,20 +46,21 @@ interface EditTransactionModalProps {
   // Wallets are offered and Save stays disabled until one is chosen (spec
   // AC-33). Off for confirmed proposals, which keep their wallet's currency.
   vndOnly?: boolean;
+  /** Drawer's keepMounted: built with its screen, so opening it is only a slide. */
+  keepMounted?: boolean;
 }
 
-// Lets the user correct a proposal the AI got wrong (wrong category, wrong
-// date, wrong amount, …) — opened by swiping an assistant chat bubble that
-// carries a transaction action (see ai-chat.tsx). Editing an unconfirmed
-// proposal mutates it in place before it's ever saved; editing an
-// already-confirmed one PATCHes the real Transaction record in place. An
-// unconfirmed one can also become a transfer between two VND Wallets, which
-// has no category and no items.
+// Lets the user correct a proposal the AI got wrong — opened by swiping an
+// assistant chat bubble that carries a transaction action (ai-chat.tsx), or
+// from the pending-review screen. An unconfirmed proposal is mutated in place
+// before it is saved; a confirmed one PATCHes the real Transaction. An
+// unconfirmed one can also become a transfer between two VND Wallets (no
+// category, no items).
 //
-// Same keypad layout as TransactionFormModal (reference-ui/): type, wallet and
-// the "Vị trí" | "Các món" tiles scroll in the body; the amount keypad,
-// category chip, note and the date key are pinned in the Drawer footer. Items
-// and the location are edited in the same slide-in panels as the manual form.
+// Keypad layout as TransactionFormModal (reference-ui/): type, wallet and the
+// "Vị trí" | "Các món" tiles scroll in the body; the amount keypad, category
+// chip, note and date key are pinned in the footer; items and location use the
+// same slide-in panels as the manual form.
 export function EditTransactionModal({
   visible,
   payload,
@@ -67,6 +69,7 @@ export function EditTransactionModal({
   confirmed = false,
   transactionId = null,
   vndOnly,
+  keepMounted,
 }: EditTransactionModalProps) {
   const { t } = useTranslation();
   const [type, setType] = useState<TransactionKind>("expense");
@@ -112,8 +115,12 @@ export function EditTransactionModal({
   // A transfer has no category to pick; the expense list stays loaded for it.
   const categories = useCategoriesQuery(isTransfer ? "expense" : type);
 
-  useEffect(() => {
-    if (!visible || !payload) return;
+  // ⚠️ Seeded during render (useSeedOnOpen), not in an effect: the effect ran
+  // after the first frame, so the sheet opened on defaults and filled in over
+  // later commits, each changing its height mid-slide. Keyed by content, so an
+  // equal new object does not wipe what is being typed.
+  useSeedOnOpen(visible && payload ? JSON.stringify(payload) : null, () => {
+    if (!payload) return;
     setType(payload.type);
     resetAmount(payload.amount);
     resetLines(payload.amount, payload.items, payload.adjustments);
@@ -121,13 +128,11 @@ export function EditTransactionModal({
     setCategoryId(payload.category_id);
     setWalletId(payload.wallet_id);
     setToWalletId(payload.to_wallet_id ?? null);
-    // react-native-calendars requires a strict "YYYY-MM-DD" key, but
-    // payload.occurred_at may be a full timestamp (see format-date.ts) —
-    // the first 10 characters are "YYYY-MM-DD" either way.
+    // react-native-calendars needs a strict "YYYY-MM-DD"; occurred_at may be a full timestamp.
     setOccurredAt(payload.occurred_at.slice(0, 10));
     setNote(payload.note ?? "");
     setSubmitAttempted(false);
-  }, [visible, payload, resetAmount, resetLines]);
+  });
 
   // Switching type can leave a category selected that belongs to the other
   // type's list (expense categories aren't valid once type flips to income).
@@ -156,18 +161,13 @@ export function EditTransactionModal({
     { category: categoryPicker.child, location: location.stepChild, items: itemsChild },
     "category",
   );
-  const openCategoryPicker = () => {
-    panels.claim("category");
-    categoryPicker.open();
+  const openPanel = (panel: Parameters<typeof panels.claim>[0], open: () => void) => {
+    panels.claim(panel);
+    open();
   };
-  const openItemsEditor = () => {
-    panels.claim("items");
-    setItemsOpen(true);
-  };
-  const openLocation = () => {
-    panels.claim("location");
-    location.open();
-  };
+  const openCategoryPicker = () => openPanel("category", categoryPicker.open);
+  const openItemsEditor = () => openPanel("items", () => setItemsOpen(true));
+  const openLocation = () => openPanel("location", location.open);
   const drawerChild = useVisibleDrawerChild([
     panels.drawerChild,
     proposalWallets.sourcePicker.child,
@@ -225,6 +225,7 @@ export function EditTransactionModal({
       <Drawer
         visible={visible}
         onClose={onClose}
+        keepMounted={keepMounted}
         child={drawerChild}
         footer={
           <TransactionKeypadFooter
